@@ -16,7 +16,6 @@ This project uses meson and ninja to build the C application. On the top level d
 
     meson build
     ninja -C build
-    make
 
 Run the application as root or use sudo:
 
