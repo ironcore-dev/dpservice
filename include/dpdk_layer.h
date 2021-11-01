@@ -12,9 +12,13 @@
 #include <rte_ether.h>
 #include <rte_ethdev.h>
 #include <rte_net.h>
+#include <rte_graph.h>
+#include <rte_node_eth_api.h>
+#include <rte_graph_worker.h>
+
+#include <signal.h>
 
 #include "dp_port.h"
-#include "handler.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,15 +26,26 @@ extern "C" {
 #define DP_MAX_PF_PORT		2
 #define DP_MAX_VF_PRO_PORT	4
 #define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
-#define DP_NR_RX_QUEUES		16
-#define DP_NR_TX_QUEUES		5
+#define DP_NR_RX_QUEUES		1
+#define DP_NR_TX_QUEUES		2
+#define MEMPOOL_CACHE_SIZE	256
+
+#define NB_MBUF(nports)                  \
+	RTE_MAX((2 * 1 * 1024 +              \
+		 2 * 1 * RTE_GRAPH_BURST_SIZE +  \
+		 2 * 1 * 1024 +                  \
+		 1 * MEMPOOL_CACHE_SIZE), 29184u)
 
 struct dp_dpdk_layer {
-	struct rte_mempool	*rte_mempool;
-	struct dp_port		*ports[DP_MAX_PORTS];
-	int					dp_port_cnt;
-	uint16_t			nr_rx_queues;
-	uint16_t			nr_tx_queues;
+	struct rte_mempool				*rte_mempool;
+	struct dp_port					*ports[DP_MAX_PORTS];
+	struct rte_node_ethdev_config 	ethdev_conf[DP_MAX_PORTS];
+	int								dp_port_cnt;
+	uint16_t						nr_rx_queues;
+	uint16_t						nr_tx_queues;
+	char							graph_name[RTE_GRAPH_NAMESIZE];
+	struct							rte_graph *graph;
+	rte_graph_t 					graph_id;
 };
 
 struct dp_port_ext;

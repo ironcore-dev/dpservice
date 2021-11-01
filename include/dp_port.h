@@ -8,7 +8,6 @@
 #include <rte_ethdev.h>
 
 #include "dpdk_layer.h"
-#include "handler.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,14 +33,11 @@ struct dp_port {
 	int						dp_allocated;
 	uint8_t 				vf_name[IFNAMSIZ];
 	struct dp_port_ext		dp_port_ext;
-	struct port_handler 	*handlers[DP_MAX_HANDLER];
-	int						dp_handler_cnt;
+	char					node_name[RTE_NODE_NAMESIZE];
 };
 
 struct dp_port* get_dp_vf_port_with_id(int port_id,
 									   struct dp_dpdk_layer *dp_layer);
-void dp_port_add_handler(struct port_handler* h, int port_id,
-						 struct dp_dpdk_layer *dp_layer);
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer,
 							   dp_port_type type);
 int dp_port_init(struct dp_port* port, int p_port_id, int port_id, 

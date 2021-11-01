@@ -2,6 +2,11 @@ Dataplane Service
 =================
 This is an early protoype version without proper error 
 and memory handling.
+- Uses [DPDK Graph Framework](https://doc.dpdk.org/guides/prog_guide/graph_lib.html) for the data plane.
+- Uses a private pointer in [mbuf](https://doc.dpdk.org/guides/prog_guide/mbuf_lib.html#dynamic-fields-and-flags) structure to carry offloading rte_flow
+data around.
+- Basic hardcoded [rte_flow](https://doc.dpdk.org/guides/prog_guide/rte_flow.html). 
+- Settings are still hard-coded.
 
 Prerequisites
 -------------

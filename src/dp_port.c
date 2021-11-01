@@ -1,6 +1,4 @@
 #include "dp_port.h"
-#include "handlers/arp_handler.h"
-
 
 /* Ethernet port configured with default settings. 8< */
 struct rte_eth_conf port_conf = {
@@ -86,6 +84,9 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 					":: Rx queue setup failed: err=%d, port=%u\n",
 					ret, port_id);
 		}
+		/* Add this rx node to its graph */
+		snprintf(port->node_name,
+				 RTE_NODE_NAMESIZE, "ethdev_rx-%u-%u", port_id, i);
 	}
 
 	txq_conf = dev_info.default_txconf;
@@ -144,35 +145,6 @@ void dp_port_allocate(struct dp_port* port)
 {
 	port->dp_allocated = 1;
 }
-
-static struct dp_port* get_dp_port_with_id(int port_id, struct dp_dpdk_layer *dp_layer)
-{
-	int i;
-
-	for (i = 0; i < dp_layer->dp_port_cnt; i++) 
-		if (dp_layer->ports[i]->dp_port_id == port_id)
-			return dp_layer->ports[i];
-
-	return NULL;
-} 
-
-void dp_port_add_handler(struct port_handler* h, int port_id, struct dp_dpdk_layer *dp_layer)
-{
-	struct hdlr_config config;
-	struct handler_ctx* ctx;
-	struct dp_port* port; 
-	int hdlr_cnt;
-
-	port = get_dp_port_with_id(port_id, dp_layer);
-	if (port) { 
-		config.port_id = port_id;
-		config.rte_mempool = dp_layer->rte_mempool;
-		hdlr_cnt = port->dp_handler_cnt++;
-		port->handlers[hdlr_cnt] = h;
-		ctx = port->handlers[hdlr_cnt]->ctx;
-		port->handlers[hdlr_cnt]->ops->set_config(ctx, &config);
-	}
-}  
 
 void dp_port_exit()
 {

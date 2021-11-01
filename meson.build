@@ -1,4 +1,5 @@
 project('dp_service', 'c',
+  default_options : ['c_args=-Wno-deprecated-declarations'],
   version : '0.0.1',
   license : 'MIT')
 add_global_arguments('-DDEBUG=true', language : 'c')
