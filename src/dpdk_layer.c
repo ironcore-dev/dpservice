@@ -1,17 +1,23 @@
 #include "dpdk_layer.h"
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
+#include "dp_lpm.h"
 #include "nodes/tx_node_priv.h"
+#include "nodes/rx_node_priv.h"
 #include "nodes/arp_node_priv.h"
+#include "nodes/dhcp_node.h"
 #include "nodes/ipv4_lookup_priv.h"
+#include "nodes/l2_decap_node.h"
 
 static volatile bool force_quit;
 
 static const char * const default_patterns[] = {
-	"rx",
+	"rx-*",
 	"cls",
 	"arp",
 	"ipv4_lookup",
+	"dhcp",
+	"l2_decap",
 	"tx-*",
 	"drop",
 };
@@ -50,18 +56,12 @@ int dp_dpdk_init(int argc, char **argv)
 	if (rte_mbuf_dyn_flow_register() < 0)
 		printf("Error registering private mbuf field\n");
 
+	setup_lpm(rte_socket_id());
 	force_quit = false;
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
 	return ret;
-}
-
-static inline void print_ether_addr(const char *what, struct rte_ether_addr *eth_addr)
-{
-	char buf[RTE_ETHER_ADDR_FMT_SIZE];
-	rte_ether_format_addr(buf, RTE_ETHER_ADDR_FMT_SIZE, eth_addr);
-	printf("%s%s", what, buf);
 }
 
 static int graph_main_loop()
@@ -120,7 +120,11 @@ int dp_dpdk_main_loop()
 
 void dp_dpdk_exit()
 {
-	/* TODO Free dynamically allocated ports !*/
+	uint32_t i;
+
+	for (i = 0; i < dp_layer.dp_port_cnt; i++)
+		free(dp_layer.ports[i]); 
+
 	rte_eal_cleanup();
 }
 
@@ -186,9 +190,9 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 			}
 
 			snprintf(ifname_v, sizeof(ifname_v), "%s_", dp_port_ext.port_name);
-			if ((strstr(ifname, ifname_v) != NULL) && !done) { 
+			if ((strstr(ifname, ifname_v) != NULL) && (done < 2)) { 
 				dp_port_prepare(DP_PORT_VF, pf_port_id, port_id, &dp_port_ext);
-				done = 1;
+				done++;
 			}	
 		}
 	}
@@ -197,11 +201,12 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 
 static int dp_init_graph()
 {
-	struct rte_node_register *tx_node, *arp_node, *ipv4_lookup_node;
+	struct rte_node_register *rx_node, *tx_node, *arp_node;
+	struct rte_node_register *dhcp_node, *l2_decap_node;
 	struct ethdev_tx_node_main *tx_node_data;
-	struct rx_node_config rx_cfg;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
+	struct rx_node_config rx_cfg;
 	int ret, i, id;
 	struct rte_graph_param graph_conf;
 	const char **node_patterns;
@@ -220,17 +225,24 @@ static int dp_init_graph()
 	graph_conf.node_patterns = node_patterns;
 
 	/* Graph Configuration */
-	rx_cfg.port_id = 1;
-	rx_cfg.queue_id = 0;
-	ret = config_rx_node(&rx_cfg);
-	if (ret != 0)
-		return -1;
 
-	ipv4_lookup_node = ipv4_lookup_node_get();
 	tx_node_data = tx_node_data_get();
 	tx_node = tx_node_get();
+	rx_node = rx_node_get();
 	arp_node = arp_node_get();
+	l2_decap_node = l2_decap_node_get();
+	dhcp_node = dhcp_node_get();
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
+		snprintf(name, sizeof(name), "%u-%u", i, 0);
+		/* Clone a new rx node with same edges as parent */
+		id = rte_node_clone(rx_node->id, name);
+		if (id == RTE_NODE_ID_INVALID)
+			return -EIO;
+		rx_cfg.port_id = i;
+		rx_cfg.queue_id = 0;
+		rx_cfg.node_id = id;
+		ret = config_rx_node(&rx_cfg);
+
 		snprintf(name, sizeof(name), "%u", i);
 		id = rte_node_clone(tx_node->id, name);
 		tx_node_data->nodes[i] = id;
@@ -243,15 +255,19 @@ static int dp_init_graph()
 				i, rte_node_edge_count(arp_node->id) - 1);
 			if (ret < 0)
 				return ret;
-		}
-		if (dp_layer.ports[i]->dp_p_type == DP_PORT_PF) {
-			rte_node_edge_update(ipv4_lookup_node->id, RTE_EDGE_ID_INVALID,
-						&next_nodes, 1);
-			ret = ipv4_lookup_set_next(
-				i, rte_node_edge_count(ipv4_lookup_node->id) - 1);
+			rte_node_edge_update(dhcp_node->id, RTE_EDGE_ID_INVALID,
+			&next_nodes, 1);
+			ret = dhcp_set_next(
+				i, rte_node_edge_count(dhcp_node->id) - 1);
 			if (ret < 0)
 				return ret;
 		}
+		rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,
+		&next_nodes, 1);
+		ret = l2_decap_set_next(
+			i, rte_node_edge_count(l2_decap_node->id) - 1);
+		if (ret < 0)
+			return ret;
 	}	
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {
 		FILE *f;

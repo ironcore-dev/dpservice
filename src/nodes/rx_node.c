@@ -3,28 +3,20 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "nodes/rx_node_priv.h"
 #include "node_api.h"
 
-enum
-{
-	RX_NEXT_CLS,
-	RX_NEXT_DROP,
-	RX_NEXT_MAX
-};
-
-struct rx_node_ctx
-{
-	uint16_t port_id;
-	uint16_t queue_id;
-	uint16_t next;
-};
-
-static struct rx_node_ctx g_rx_node_ctx;
+static struct ethdev_rx_node_main ethdev_rx_main;
 
 int config_rx_node(struct rx_node_config *cfg)
 {
-	g_rx_node_ctx.port_id = cfg->port_id;
-	g_rx_node_ctx.queue_id = cfg->queue_id;
+	int idx = cfg->port_id;
+
+	RTE_VERIFY(idx < DP_MAX_PORTS);
+
+	ethdev_rx_main.node_ctx[idx].port_id  = cfg->port_id;
+	ethdev_rx_main.node_ctx[idx].queue_id  = cfg->queue_id;
+	ethdev_rx_main.node_ctx[idx].node_id  = cfg->node_id;
 
 	return 0;
 }
@@ -33,9 +25,16 @@ int config_rx_node(struct rx_node_config *cfg)
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
+	int i, port_id;
 
-	ctx->port_id = g_rx_node_ctx.port_id;
-	ctx->queue_id = g_rx_node_ctx.queue_id;
+	for (i = 0; i < DP_MAX_PORTS; i++) {
+		if (ethdev_rx_main.node_ctx[i].node_id == node->id) {
+			port_id = i;
+			break;
+		}
+	}
+	ctx->port_id = ethdev_rx_main.node_ctx[port_id].port_id;
+	ctx->queue_id = ethdev_rx_main.node_ctx[port_id].queue_id;
 	ctx->next = RX_NEXT_CLS;
 
 	printf("rx_node: init, port_id: %u, queue_id: %u\n", ctx->port_id,

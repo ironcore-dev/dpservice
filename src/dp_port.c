@@ -1,4 +1,5 @@
 #include "dp_port.h"
+#include "dp_lpm.h"
 
 /* Ethernet port configured with default settings. 8< */
 struct rte_eth_conf port_conf = {
@@ -23,6 +24,13 @@ struct rte_eth_conf port_conf = {
 					},
 };
 
+#define DP_IP_MASK 24
+static uint32_t port_ip4s[DP_MAX_PORTS] = {
+	RTE_IPV4(192, 168, 120, 1), /* Port 0 */
+	RTE_IPV4(192, 168, 123, 1), /* Port 1 */
+	RTE_IPV4(192, 168, 124, 1), /* Port 2 */
+};
+
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
 	struct dp_port* port;
@@ -33,8 +41,8 @@ struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type
 	
 	memset(port, 0, sizeof(struct dp_port));
 	port->dp_layer = dp_layer;
-	port->dp_p_type = type;
 	port->dp_allocated = 0;
+	port->dp_p_type = type;
 
 	return port;
 }
@@ -112,6 +120,9 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 				rte_strerror(-ret), port_id);
 	/* >8 End of setting the RX port to promiscuous mode. */
 
+	dp_set_mac(port_id);
+	dp_set_ip4(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
+	dp_add_route(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
 	/* Starting the port. 8< */
 	ret = rte_eth_dev_start(port_id);
 	if (ret < 0) {

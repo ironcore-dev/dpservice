@@ -6,6 +6,7 @@
 #include "node_api.h"
 #include "nodes/arp_node_priv.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_lpm.h"
 
 struct arp_node_main arp_node;
 
@@ -29,17 +30,16 @@ static __rte_always_inline int handle_arp(struct rte_mbuf *m)
 	struct rte_ether_addr  tmp_addr; 
 	uint32_t temp_ip;
 
-	if (requested_ip == 0xc0a87b01) {
+	if (requested_ip == dp_get_ip4(m->port)) {
 		rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->d_addr);
 
-		uint8_t my_mac[] = {0x90, 0x3c, 0xb3, 0x33, 0x83, 0xfd };
-		rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, my_mac, 6);
+		rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
 
 
 		incoming_arp_hdr->arp_opcode = htons(2);
 		rte_memcpy(tmp_addr.addr_bytes, incoming_arp_hdr->arp_data.arp_sha.addr_bytes, 
 				   RTE_ETHER_ADDR_LEN);
-		rte_memcpy(incoming_arp_hdr->arp_data.arp_sha.addr_bytes, my_mac, RTE_ETHER_ADDR_LEN);
+		rte_memcpy(incoming_arp_hdr->arp_data.arp_sha.addr_bytes, dp_get_mac(m->port), RTE_ETHER_ADDR_LEN);
 		temp_ip = incoming_arp_hdr->arp_data.arp_sip;
 		incoming_arp_hdr->arp_data.arp_sip = incoming_arp_hdr->arp_data.arp_tip;
 		incoming_arp_hdr->arp_data.arp_tip = temp_ip;

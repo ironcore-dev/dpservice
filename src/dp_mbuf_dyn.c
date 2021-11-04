@@ -9,7 +9,7 @@ static const struct rte_mbuf_dynfield dp_mbuf_dynfield_desc = {
 
 static int priv1_offset = -1;
 
-struct dp_mbuf_priv1* get_dp_mbuf_priv1(struct rte_mbuf *m)
+__rte_always_inline struct dp_mbuf_priv1* get_dp_mbuf_priv1(struct rte_mbuf *m)
 {
 	if (priv1_offset >= 0) 
 		return RTE_MBUF_DYNFIELD(m, priv1_offset, struct dp_mbuf_priv1 *);
@@ -17,7 +17,7 @@ struct dp_mbuf_priv1* get_dp_mbuf_priv1(struct rte_mbuf *m)
 		return NULL;
 }
 
-void init_dp_mbuf_priv1(struct rte_mbuf *m)
+__rte_always_inline void init_dp_mbuf_priv1(struct rte_mbuf *m)
 {
 	if (priv1_offset >= 0) {
 		struct dp_mbuf_priv1 *temp;
