@@ -96,7 +96,6 @@ static struct rte_node_register rx_node_base = {
 	.next_nodes =
 		{
 			[RX_NEXT_CLS] = "cls",
-			[RX_NEXT_DROP] = "drop",
 		},
 };
 

@@ -49,6 +49,22 @@ struct dp_dpdk_layer {
 	rte_graph_t 					graph_id;
 };
 
+struct underlay_conf {
+	uint16_t dst_port;
+	uint16_t src_port;
+	uint8_t vni[3];
+	uint8_t rsvd1;
+	/* Virtual IP */
+	union {
+		uint32_t	src_ip4;
+		uint8_t		src_ip6[16];
+	};
+	union {
+		uint32_t	trgt_ip4;
+		uint8_t		trgt_ip6[16];
+	};
+};
+
 struct dp_port_ext;
 
 /* Functions for internal processing */
@@ -60,6 +76,8 @@ void dp_dpdk_exit();
 int dp_prepare(struct dp_port_ext *ports, int port_count);
 int dp_allocate_vf(int port_id);
 int dp_configure_vf(int port_id);
+
+struct underlay_conf *get_underlay_conf();
 
 #ifdef __cplusplus
 }

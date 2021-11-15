@@ -25,11 +25,29 @@ static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 static uint32_t add_dhcp_option(uint8_t *pos, void *value, uint8_t opt, uint8_t size)
 {
+	uint32_t temp = 0;
+
 	*pos = opt;
 	pos++;
 	*pos = size;
 	pos++;
-	rte_memcpy(pos, value, size);
+
+	if (opt == DP_DHCP_STATIC_ROUT) {
+		*pos = 16;
+		pos++;
+		*pos = 169;
+		pos++;
+		*pos = 254;
+		pos++;
+		rte_memcpy(pos, &temp, sizeof(temp));
+		pos = pos + sizeof(temp);
+		*pos = 0;
+		pos++;
+		temp = htonl(RTE_IPV4(169, 254, 0, 1));
+		rte_memcpy(pos, &temp, sizeof(temp));
+	} else {
+		rte_memcpy(pos, value, size);
+	}
 
 	return size + 2;
 }
@@ -42,8 +60,9 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	struct rte_udp_hdr *incoming_udp_hdr;
 	uint8_t dhcp_type = DP_DHCP_OFFER;
 	uint32_t dhcp_lease = DP_DHCP_INFINITE;
-	uint32_t dhcp_srv_ident;
+	uint32_t dhcp_srv_ident, net_mask;
 	uint8_t vend_pos = 0;
+	uint16_t mtu;
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	incoming_ipv4_hdr = (struct rte_ipv4_hdr*) (incoming_eth_hdr + 1);
@@ -82,6 +101,8 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	dhcp_hdr->magic = htonl(DHCP_MAGIC_COOKIE);
 
 	dhcp_srv_ident = htonl(dp_get_ip4(m->port));
+	net_mask = htonl(DP_DHCP_MASK);
+	mtu = htons(DP_DHCP_MTU_VALUE);
 	if (dhcp_packet_count[m->port] != 0) {
 		dp_set_neigh_mac(m->port, &incoming_eth_hdr->s_addr);
 		dhcp_type = DP_DHCP_ACK;
@@ -89,7 +110,11 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_type, DP_DHCP_MSG_TYPE, 1);
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
+	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
+	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &net_mask, DP_DHCP_SUBNET_MASK, 4);
+	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &mtu, DP_DHCP_MTU, 2);
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
+
 	dhcp_hdr->vend[vend_pos] = DP_DHCP_END;
 
 	dhcp_packet_count[m->port]++; 
@@ -109,7 +134,6 @@ static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		init_dp_mbuf_priv1(mbuf0);
 		if (handle_dhcp(mbuf0))
 			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port] , *objs);
 		else

@@ -14,12 +14,18 @@ extern "C" {
 
 #define DP_DHCP_MSG_TYPE	0x35
 #define DP_DHCP_SRV_IDENT	0x36
+#define DP_DHCP_STATIC_ROUT	0x79
+#define DP_DHCP_SUBNET_MASK	0x01
+#define DP_DHCP_MTU			0x1A
+
 #define DP_DHCP_LEASE_MSG	0x33
-#define DP_DHCP_ROUTER		0x3
+#define DP_DHCP_ROUTER		0x03
 #define DP_DHCP_END			0xFF
 #define DP_DHCP_OFFER		0x02
 #define DP_DHCP_ACK			0x05
 #define DP_DHCP_INFINITE	0xffffffff
+#define DP_DHCP_MASK		0xffffffff
+#define DP_DHCP_MTU_VALUE	0x005DC
 
 #define DHCP_MAGIC_COOKIE 0x63825363
 

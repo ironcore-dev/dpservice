@@ -9,12 +9,15 @@ extern "C" {
 #endif
 
 #define DP_PF_PORT			 0
+#define DP_PF_PORT2			 5
 #define DP_ROUTE_DHCP		-2
 #define DP_ROUTE_DROP		-3
 
 #define DP_IP_PROTO_UDP		0x11
 #define DP_IP_PROTO_TCP		0x06
 #define DP_IP_PROTO_ICMP	0x01
+#define DP_IP6_HOP_LIMIT	0x40
+#define DP_IP6_VTC_FLOW		0x60000000
 
 #define IPV4_L3FWD_LPM_MAX_RULES	1024
 #define IPV4_L3FWD_LPM_NUMBER_TBL8S	(1 << 8)

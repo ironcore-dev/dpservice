@@ -10,6 +10,7 @@ extern "C" {
 enum
 {
 	L2_DECAP_NEXT_DROP,
+	L2_DECAP_NEXT_GENEVE_ENCAP,
 	L2_DECAP_NEXT_MAX
 };
 

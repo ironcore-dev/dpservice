@@ -14,6 +14,7 @@ struct rte_eth_conf port_conf = {
 				DEV_TX_OFFLOAD_UDP_CKSUM   |
 				DEV_TX_OFFLOAD_TCP_CKSUM   |
 				DEV_TX_OFFLOAD_SCTP_CKSUM  |
+				DEV_TX_OFFLOAD_OUTER_UDP_CKSUM| 
 				DEV_TX_OFFLOAD_TCP_TSO,
 	},
 	.rx_adv_conf = {

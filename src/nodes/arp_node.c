@@ -62,7 +62,6 @@ static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		init_dp_mbuf_priv1(mbuf0);
 		if (handle_arp(mbuf0))
 			rte_node_enqueue_x1(graph, node, arp_node.next_index[mbuf0->port] , *objs);
 		else

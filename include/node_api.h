@@ -23,6 +23,7 @@ struct dp_flow {
 	uint32_t				dst_addr;
 	uint32_t				src_addr;
 	uint8_t					l4_type;
+	uint8_t					geneve_hdr;
 	uint8_t					icmp_type;
 };
 

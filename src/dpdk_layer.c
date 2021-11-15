@@ -6,8 +6,9 @@
 #include "nodes/rx_node_priv.h"
 #include "nodes/arp_node_priv.h"
 #include "nodes/dhcp_node.h"
-#include "nodes/ipv4_lookup_priv.h"
 #include "nodes/l2_decap_node.h"
+#include "nodes/ipv6_encap_node.h"
+#include "nodes/geneve_encap_node.h"
 
 static volatile bool force_quit;
 
@@ -16,13 +17,45 @@ static const char * const default_patterns[] = {
 	"cls",
 	"arp",
 	"ipv4_lookup",
+	"ipv6_lookup",
 	"dhcp",
 	"l2_decap",
+	"ipv6_encap",
+	"ipv6_decap",
+	"geneve_encap",
+	"geneve_decap",
 	"tx-*",
 	"drop",
 };
 
 static struct dp_dpdk_layer dp_layer;
+/*TODO these shouldnt be hardcoded */
+static struct underlay_conf gen_conf = {
+	.dst_port = 6081,
+	.src_port = 6081,
+	.rsvd1 = 0,
+	.vni[0] = 0xde,
+	.vni[1] = 0xde,
+	.vni[2] = 0xde,
+	.trgt_ip6[0] = 0x2a,
+	.trgt_ip6[1] = 0x10,
+	.trgt_ip6[2] = 0xaf,
+	.trgt_ip6[3] = 0xc0,
+	.trgt_ip6[4] = 0xe0,
+	.trgt_ip6[5] = 0x1f,
+	.trgt_ip6[6] = 0x00,
+	.trgt_ip6[7] = 0xf4,
+	.trgt_ip6[15] = 0x03,
+	.src_ip6[0] = 0x2a,
+	.src_ip6[1] = 0x10,
+	.src_ip6[2] = 0xaf,
+	.src_ip6[3] = 0xc0,
+	.src_ip6[4] = 0xe0,
+	.src_ip6[5] = 0x1f,
+	.src_ip6[6] = 0x00,
+	.src_ip6[7] = 0xf4,
+	.src_ip6[15] = 0x02,
+};
 
 static void signal_handler(int signum)
 {
@@ -201,7 +234,7 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 
 static int dp_init_graph()
 {
-	struct rte_node_register *rx_node, *tx_node, *arp_node;
+	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node;
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
@@ -231,6 +264,7 @@ static int dp_init_graph()
 	rx_node = rx_node_get();
 	arp_node = arp_node_get();
 	l2_decap_node = l2_decap_node_get();
+	ipv6_encap_node = ipv6_encap_node_get();
 	dhcp_node = dhcp_node_get();
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
 		snprintf(name, sizeof(name), "%u-%u", i, 0);
@@ -238,7 +272,7 @@ static int dp_init_graph()
 		id = rte_node_clone(rx_node->id, name);
 		if (id == RTE_NODE_ID_INVALID)
 			return -EIO;
-		rx_cfg.port_id = i;
+		rx_cfg.port_id = dp_layer.ports[i]->dp_port_id;
 		rx_cfg.queue_id = 0;
 		rx_cfg.node_id = id;
 		ret = config_rx_node(&rx_cfg);
@@ -261,13 +295,22 @@ static int dp_init_graph()
 				i, rte_node_edge_count(dhcp_node->id) - 1);
 			if (ret < 0)
 				return ret;
+			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,
+			&next_nodes, 1);
+			ret = l2_decap_set_next(
+				i, rte_node_edge_count(l2_decap_node->id) - 1);
+			if (ret < 0)
+				return ret;
 		}
-		rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,
-		&next_nodes, 1);
-		ret = l2_decap_set_next(
-			i, rte_node_edge_count(l2_decap_node->id) - 1);
-		if (ret < 0)
-			return ret;
+
+		if (dp_layer.ports[i]->dp_p_type == DP_PORT_PF) {
+			rte_node_edge_update(ipv6_encap_node->id, RTE_EDGE_ID_INVALID,
+			&next_nodes, 1);
+			ret = ipv6_encap_set_next(
+				i, rte_node_edge_count(ipv6_encap_node->id) - 1);
+			if (ret < 0)
+				return ret;
+		}
 	}	
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {
 		FILE *f;
@@ -314,7 +357,6 @@ int dp_prepare(struct dp_port_ext *ports, int port_count)
 	/* TODO setunderlay and configure uplink will be done. Parameter should be struct config */
 
 	ret = dp_initialize_vfs(ports, port_count);
-	ret = dp_init_graph();
 	return ret;
 }
 
@@ -335,5 +377,10 @@ int dp_allocate_vf(int port_id)
 
 int dp_configure_vf(int port_id)
 {
+	dp_init_graph();
 	return 0;
+}
+
+ __rte_always_inline struct underlay_conf *get_underlay_conf() {
+	return &gen_conf;
 }

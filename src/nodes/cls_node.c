@@ -4,11 +4,13 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "dp_mbuf_dyn.h"
 
 enum
 {
 	CLS_NEXT_ARP,
 	CLS_NEXT_IPV4_LOOKUP,
+	CLS_NEXT_IPV6_LOOKUP,
 	CLS_NEXT_DROP,
 	CLS_NEXT_MAX
 };
@@ -28,6 +30,21 @@ static const uint8_t p_nxt[256] __rte_cache_aligned = {
 
 	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN | RTE_PTYPE_L2_ETHER] =
 		CLS_NEXT_IPV4_LOOKUP,
+	
+	[RTE_PTYPE_L3_IPV6] = CLS_NEXT_IPV6_LOOKUP,
+
+	[RTE_PTYPE_L3_IPV6_EXT] = CLS_NEXT_IPV6_LOOKUP,
+
+	[RTE_PTYPE_L3_IPV6_EXT_UNKNOWN] = CLS_NEXT_IPV6_LOOKUP,
+
+	[RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L2_ETHER] =
+		CLS_NEXT_IPV6_LOOKUP,
+
+	[RTE_PTYPE_L3_IPV6_EXT | RTE_PTYPE_L2_ETHER] =
+		CLS_NEXT_IPV6_LOOKUP,
+
+	[RTE_PTYPE_L3_IPV6_EXT_UNKNOWN | RTE_PTYPE_L2_ETHER] =
+		CLS_NEXT_IPV6_LOOKUP,
 };
 
 struct cls_node_ctx
@@ -84,12 +101,16 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 	pkts = (struct rte_mbuf **)objs;
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		init_dp_mbuf_priv1(mbuf0);
 		comp = (mbuf0->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
 		/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
 		if (comp == RTE_PTYPE_L2_ETHER && is_arp(mbuf0))
 			next_index = CLS_NEXT_ARP;
 		else if (p_nxt[comp] == CLS_NEXT_IPV4_LOOKUP) { 
+			/* TODO Drop ipv4 packets coming from PF ports */
 			next_index = CLS_NEXT_IPV4_LOOKUP;
+		} else if (p_nxt[comp] == CLS_NEXT_IPV6_LOOKUP) {
+			next_index = CLS_NEXT_IPV6_LOOKUP;
 		}	
 		rte_node_enqueue_x1(graph, node, next_index, *objs);
 	}	
@@ -107,6 +128,7 @@ static struct rte_node_register cls_node_base = {
 		{
 			[CLS_NEXT_ARP] = "arp",
 			[CLS_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
+			[CLS_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 			[CLS_NEXT_DROP] = "drop",
 		},
 };

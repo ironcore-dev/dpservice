@@ -10,7 +10,6 @@ extern "C" {
 enum
 {
 	RX_NEXT_CLS,
-	RX_NEXT_DROP,
 	RX_NEXT_MAX
 };
 

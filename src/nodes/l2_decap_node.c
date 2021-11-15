@@ -25,17 +25,12 @@ static int l2_decap_node_init(const struct rte_graph *graph, struct rte_node *no
 static __rte_always_inline int handle_l2_decap(struct rte_mbuf *m)
 {
 	struct dp_flow *df;
-	struct dp_mbuf_priv1 *dp_mbuf_p1 = NULL;
 
-	dp_mbuf_p1 = get_dp_mbuf_priv1(m);
-	if (!dp_mbuf_p1) {
-		printf("Can not get private pointer\n");
-		return -1;
-	}
-	df = dp_mbuf_p1->flow_ptr;
+	df = get_dp_flow_ptr(m);
 
 	/* Pop the ethernet header */
-	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
+	if (!df->geneve_hdr)
+		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 
 	return df->nxt_hop;
 } 
@@ -54,8 +49,10 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		ret = handle_l2_decap(mbuf0);
-		if (ret >= 0)
+		if (ret > 0)
 			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret] , *objs);
+		else if (ret == DP_PORT_PF)
+			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, *objs);
 		else
 			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_DROP, *objs);
 	}	
@@ -79,6 +76,7 @@ static struct rte_node_register l2_decap_node_base = {
 	.next_nodes =
 		{
 			[L2_DECAP_NEXT_DROP] = "drop",
+			[L2_DECAP_NEXT_GENEVE_ENCAP] = "geneve_encap",
 		},
 };
 

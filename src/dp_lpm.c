@@ -2,7 +2,17 @@
 
 
 static struct macip_entry mac_ip_table[DP_MAX_PORTS];
-static struct rte_lpm *ipv4_l3fwd_lpm_lookup_struct[DP_NB_SOCKETS]; 
+static struct rte_lpm *ipv4_l3fwd_lpm_lookup_struct[DP_NB_SOCKETS];
+
+/*TODO This should come from neighbour discovery */
+static struct rte_ether_addr pf_neigh_mac = 
+								{.addr_bytes[0] = 0x90,
+								.addr_bytes[1] = 0x3c,
+								.addr_bytes[2] = 0xb3,
+								.addr_bytes[3] = 0x33,
+								.addr_bytes[4] = 0x72,
+								.addr_bytes[5] = 0xfb,
+								};
 
 uint32_t dp_get_ip4(uint16_t portid)
 {
@@ -65,6 +75,8 @@ void setup_lpm(const int socketid)
 	char s[64];
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	/* TODO this should be called by neighbour discovery */
+	dp_set_neigh_mac (DP_PF_PORT, &pf_neigh_mac);
 	/* create the LPM table */
 	config_ipv4.max_rules = IPV4_L3FWD_LPM_MAX_RULES;
 	config_ipv4.number_tbl8s = IPV4_L3FWD_LPM_NUMBER_TBL8S;
@@ -86,5 +98,5 @@ int lpm_get_ip4_dst_port(const struct rte_ipv4_hdr *ipv4_hdr, int socketid)
 	if (rte_lpm_lookup(ipv4_l3fwd_lpm_lookup_struct[socketid], dst_ip, &next_hop) == 0)
 		return next_hop;
 	else
-		return 0;
+		return DP_PF_PORT;
 } 

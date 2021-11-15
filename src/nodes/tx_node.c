@@ -149,25 +149,19 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 static __rte_always_inline int handle_flow(struct rte_mbuf *m)
 {
 	struct dp_flow *df;
-	struct dp_mbuf_priv1 *dp_mbuf_p1 = NULL;
 
-	dp_mbuf_p1 = get_dp_mbuf_priv1(m);
-	if (!dp_mbuf_p1) {
-		printf("Can not get private pointer\n");
-		return 0;
-	}
-
-	df = dp_mbuf_p1->flow_ptr;
+	df = get_dp_flow_ptr(m);
 	if (df && df->valid)
 		handle_offload(m, df);
 	rte_free(df);
 	return 1;
 }
 
-static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id)
+static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 {
 	struct rte_ether_hdr *eth_hdr;
 	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
+	eth_hdr->ether_type = htons(eth_type);
 	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->d_addr);
 	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->s_addr);
 }
@@ -194,8 +188,12 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (mbuf0->port != port)
-			rewrite_eth_hdr(mbuf0, port);
+		if (mbuf0->port != port) {
+			if (port == DP_PF_PORT) {
+				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
+			} else
+				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV4);
+		}	
 		handle_flow(mbuf0);
 	}	
 

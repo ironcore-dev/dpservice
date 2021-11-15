@@ -8,7 +8,8 @@
 
 /* Dummy function to configure the data plane hard-coded
  * TODO: This should be done via some kind of RPC mechanism*/
-#define DP_PF_NAME	"enp59s0f0"
+#define DP_PF_NAME		"enp59s0f0"
+#define DP_PF2_NAME		"enp59s0f1np1"
 #define DP_PF_MAC	0x43f72e8dead
 void dp_hard_configure()
 {
@@ -20,6 +21,8 @@ void dp_hard_configure()
 	memcpy(pf_port.port_name, DP_PF_NAME, strlen(DP_PF_NAME));
 	memcpy(pf_port.port_mac.addr_bytes, &mac, sizeof(mac));
 	pf_port.port_mtu = 9100;
+	dp_prepare(&pf_port, 1);
+	memcpy(pf_port.port_name, DP_PF2_NAME, strlen(DP_PF2_NAME));
 	dp_prepare(&pf_port, 1);
 	ret = dp_allocate_vf(0);
 	dp_configure_vf(ret);
