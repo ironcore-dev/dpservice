@@ -14,10 +14,23 @@ static struct rte_ether_addr pf_neigh_mac =
 								.addr_bytes[5] = 0xfb,
 								};
 
+static uint8_t port_ip6s[DP_MAX_PORTS][16] = {
+	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25},
+	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25},
+	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25}
+};
+
 uint32_t dp_get_ip4(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return mac_ip_table[portid].own_ip;
+}
+
+
+uint8_t* dp_get_ip6(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return mac_ip_table[portid].own_ipv6;
 }
 
 int dp_add_route(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
@@ -44,6 +57,20 @@ void dp_set_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
 	mac_ip_table[portid].own_ip = ip;
 	mac_ip_table[portid].depth = depth;
 } 
+
+void dp_set_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	rte_memcpy(&mac_ip_table[portid].own_ipv6, ipv6, 16);
+	mac_ip_table[portid].depth = depth;
+}
+
+void dp_set_neigh_ip6(uint16_t portid, uint8_t* ipv6)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	rte_memcpy(&mac_ip_table[portid].neigh_ipv6, ipv6, 16);
+}
 
 void dp_set_mac(uint16_t portid)
 {
@@ -99,4 +126,4 @@ int lpm_get_ip4_dst_port(const struct rte_ipv4_hdr *ipv4_hdr, int socketid)
 		return next_hop;
 	else
 		return DP_PF_PORT;
-} 
+}

@@ -5,6 +5,7 @@
 #include "nodes/tx_node_priv.h"
 #include "nodes/rx_node_priv.h"
 #include "nodes/arp_node_priv.h"
+#include "nodes/ipv6_nd_node.h"
 #include "nodes/dhcp_node.h"
 #include "nodes/l2_decap_node.h"
 #include "nodes/ipv6_encap_node.h"
@@ -16,6 +17,7 @@ static const char * const default_patterns[] = {
 	"rx-*",
 	"cls",
 	"arp",
+	"ipv6_nd",
 	"ipv4_lookup",
 	"ipv6_lookup",
 	"dhcp",
@@ -63,6 +65,7 @@ static void signal_handler(int signum)
 		printf("\n\nSignal %d received, preparing to exit...\n",
 		       signum);
 		force_quit = true;
+
 	}
 }
 
@@ -91,6 +94,7 @@ int dp_dpdk_init(int argc, char **argv)
 
 	setup_lpm(rte_socket_id());
 	force_quit = false;
+
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
@@ -222,7 +226,7 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 				dp_port_prepare(DP_PORT_PF, pf_port_id, port_id, &dp_port_ext);
 			}
 
-			snprintf(ifname_v, sizeof(ifname_v), "%s_", dp_port_ext.port_name);
+			snprintf(ifname_v, sizeof(ifname_v), "enp59s0f0_");
 			if ((strstr(ifname, ifname_v) != NULL) && (done < 2)) { 
 				dp_port_prepare(DP_PORT_VF, pf_port_id, port_id, &dp_port_ext);
 				done++;
@@ -235,7 +239,7 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 static int dp_init_graph()
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
-	struct rte_node_register *dhcp_node, *l2_decap_node;
+	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
@@ -263,6 +267,7 @@ static int dp_init_graph()
 	tx_node = tx_node_get();
 	rx_node = rx_node_get();
 	arp_node = arp_node_get();
+	ipv6_nd_node = ipv6_nd_node_get();
 	l2_decap_node = l2_decap_node_get();
 	ipv6_encap_node = ipv6_encap_node_get();
 	dhcp_node = dhcp_node_get();
@@ -287,6 +292,12 @@ static int dp_init_graph()
 						&next_nodes, 1);
 			ret = arp_set_next(
 				i, rte_node_edge_count(arp_node->id) - 1);
+			if (ret < 0)
+				return ret;
+			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID,
+						&next_nodes, 1);
+			ret = ipv6_nd_set_next(
+				i, rte_node_edge_count(ipv6_nd_node->id) - 1);
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(dhcp_node->id, RTE_EDGE_ID_INVALID,

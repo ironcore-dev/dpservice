@@ -5,10 +5,12 @@
 #include <rte_mbuf.h>
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
+#include "nodes/ipv6_nd_node.h"
 
 enum
 {
 	CLS_NEXT_ARP,
+	CLS_NEXT_IPV6_ND,
 	CLS_NEXT_IPV4_LOOKUP,
 	CLS_NEXT_IPV6_LOOKUP,
 	CLS_NEXT_DROP,
@@ -84,6 +86,26 @@ static __rte_always_inline int is_arp(struct rte_mbuf *m){
 	return 1;
 } 
 
+static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m){
+	struct rte_ether_hdr *req_eth_hdr;
+	struct rte_ipv6_hdr *req_ipv6_hdr;
+	struct icmp6hdr *req_icmp6_hdr;
+
+	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
+	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr + 1);
+	uint8_t type = req_icmp6_hdr->icmp6_type ;
+
+	if(type != NDISC_NEIGHBOUR_SOLICITATION){ 
+		printf("ipv6 ND:%d == %d\n",type,NDISC_NEIGHBOUR_SOLICITATION);
+		return 0;
+			}
+
+	return 1;
+
+} 
+
+
 static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 													 struct rte_node *node,
 													 void **objs,
@@ -98,7 +120,6 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 	/* Speculative next */
 	next_index = CLS_NEXT_DROP;
 
-	pkts = (struct rte_mbuf **)objs;
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		init_dp_mbuf_priv1(mbuf0);
@@ -106,6 +127,8 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 		/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
 		if (comp == RTE_PTYPE_L2_ETHER && is_arp(mbuf0))
 			next_index = CLS_NEXT_ARP;
+		else if (is_ipv6_nd(mbuf0)) 
+			next_index = CLS_NEXT_IPV6_ND;
 		else if (p_nxt[comp] == CLS_NEXT_IPV4_LOOKUP) { 
 			/* TODO Drop ipv4 packets coming from PF ports */
 			next_index = CLS_NEXT_IPV4_LOOKUP;
@@ -127,6 +150,7 @@ static struct rte_node_register cls_node_base = {
 	.next_nodes =
 		{
 			[CLS_NEXT_ARP] = "arp",
+			[CLS_NEXT_IPV6_ND] = "ipv6_nd",
 			[CLS_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
 			[CLS_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 			[CLS_NEXT_DROP] = "drop",
