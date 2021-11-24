@@ -190,7 +190,100 @@ static int dp_port_prepare(dp_port_type type, int p_port_id, int port_id,
 		dp_cfg_ethdev(port_id);
 	}
 	return 0;	
-} 
+}
+
+
+static int dp_port_flow_isolate(int port_id)
+{
+	struct rte_flow_error error;
+	int set = 1;
+
+	/* Poisoning to make sure PMDs update it in case of error. */
+	memset(&error, 0x66, sizeof(error));
+	if (rte_flow_isolate(port_id, set, &error))
+		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	printf("Ingress traffic on port %u is %s to the defined flow rules\n",
+			port_id,
+			set ? "now restricted" : "not restricted anymore");
+	return 0;
+}
+
+static void dp_install_isolated_mode(int port_id)
+{
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+	struct rte_flow_item_ipv6 ipv6_spec;
+	struct rte_flow_item_ipv6 ipv6_mask;
+	struct rte_flow_item_udp udp_spec;
+	struct rte_flow_item_udp udp_mask;
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[4];
+	struct rte_flow_action action[2];
+	struct underlay_conf *u_conf;
+	struct rte_flow_action_queue q;
+	uint8_t	dst_addr[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
+						   "\xff\xff\xff\xff\xff\xff\xff\xff";
+	int pattern_cnt = 0, res;
+	struct rte_flow *flow;
+
+	u_conf = get_underlay_conf();
+
+	attr.ingress = 1;
+	attr.priority = 0;
+	attr.transfer = 0;
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = htons(RTE_ETHER_TYPE_IPV6);
+	eth_mask.type = htons(0xffff);
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[pattern_cnt].spec = &eth_spec;
+	pattern[pattern_cnt].mask = &eth_mask;
+	pattern_cnt++;
+
+	memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
+	memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
+	ipv6_spec.hdr.proto = DP_IP_PROTO_UDP;
+	rte_memcpy(ipv6_spec.hdr.dst_addr, u_conf->src_ip6, sizeof(ipv6_spec.hdr.dst_addr));
+	ipv6_mask.hdr.proto = 0xff;
+	rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ipv6_spec.hdr.dst_addr));
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
+	pattern[pattern_cnt].spec = &ipv6_spec;
+	pattern[pattern_cnt].mask = &ipv6_mask;
+	pattern_cnt++;
+
+	memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
+	memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
+	udp_spec.hdr.dst_port = htons(u_conf->src_port);
+	udp_spec.hdr.src_port = htons(u_conf->dst_port);
+	udp_mask.hdr.dst_port = 0xffff;
+	udp_mask.hdr.src_port = 0xffff;
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
+	pattern[pattern_cnt].spec = &udp_spec;
+	pattern[pattern_cnt].mask = &udp_mask;
+	pattern_cnt++;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
+	pattern_cnt++;
+
+	action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	q.index = 0;
+	action[0].conf = &q; 
+	action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+	struct rte_flow_error error;
+	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
+
+	if (res) { 
+		printf("Isolete flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	} else {
+		printf("Isolate flow validated on port %d \n ", port_id);
+		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
+		if (!flow)
+			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+}
 
 static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 {
@@ -223,7 +316,9 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 			if_indextoname(dev_info.if_index, ifname);
 			if (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0) {
 				pf_port_id = port_id;
+				dp_port_flow_isolate(port_id);
 				dp_port_prepare(DP_PORT_PF, pf_port_id, port_id, &dp_port_ext);
+				dp_install_isolated_mode(port_id);
 			}
 
 			snprintf(ifname_v, sizeof(ifname_v), "enp59s0f0_");

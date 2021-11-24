@@ -120,13 +120,13 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 	}
 	/* >8 End of Configuring RX and TX queues connected to single port. */
 
-	/* Setting the RX port to promiscuous mode. 8< */
-	ret = rte_eth_promiscuous_enable(port_id);
-	if (ret != 0)
-		rte_exit(EXIT_FAILURE,
-				":: promiscuous mode enable failed: err=%s, port=%u\n",
-				rte_strerror(-ret), port_id);
-	/* >8 End of setting the RX port to promiscuous mode. */
+	if (port->dp_p_type == DP_PORT_VF) {
+		ret = rte_eth_promiscuous_enable(port_id);
+		if (ret != 0)
+			rte_exit(EXIT_FAILURE,
+					":: promiscuous mode enable failed: err=%s, port=%u\n",
+					rte_strerror(-ret), port_id);
+	}	
 
 	dp_set_mac(port_id);
 	dp_set_ip4(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
