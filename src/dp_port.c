@@ -26,10 +26,17 @@ struct rte_eth_conf port_conf = {
 };
 
 #define DP_IP_MASK 24
+#define DP_IPV6_MASK 64
 static uint32_t port_ip4s[DP_MAX_PORTS] = {
 	RTE_IPV4(192, 168, 120, 1), /* Port 0 */
 	RTE_IPV4(192, 168, 123, 1), /* Port 1 */
 	RTE_IPV4(192, 168, 124, 1), /* Port 2 */
+};
+
+static uint8_t port_ip6s[DP_MAX_PORTS][16] = {
+	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25},
+	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25},
+	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25}
 };
 
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
@@ -123,6 +130,7 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 
 	dp_set_mac(port_id);
 	dp_set_ip4(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
+	dp_set_ip6(port_id, port_ip6s[port_id], DP_IPV6_MASK, rte_eth_dev_socket_id(port_id));
 	dp_add_route(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
 	/* Starting the port. 8< */
 	ret = rte_eth_dev_start(port_id);

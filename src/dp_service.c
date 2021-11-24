@@ -8,9 +8,13 @@
 
 /* Dummy function to configure the data plane hard-coded
  * TODO: This should be done via some kind of RPC mechanism*/
-#define DP_PF_NAME		"enp59s0f0"
-#define DP_PF2_NAME		"enp59s0f1np1"
+#define DP_PF_NAME	"enp59s0f0"
+#define DP_PF2_NAME	"enp59s0f1np1"
 #define DP_PF_MAC	0x43f72e8dead
+#define DP_PF_NAME_1	"enp59s0f0np0"
+#define DP_VF_NAME	"enp59s0f0"
+#define DP_PF_MAC_1	0x43f72e8cfca
+
 void dp_hard_configure()
 {
 	struct dp_port_ext pf_port;
