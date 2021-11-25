@@ -96,13 +96,10 @@ static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m){
 	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr + 1);
 	uint8_t type = req_icmp6_hdr->icmp6_type ;
 
-	if(type != NDISC_NEIGHBOUR_SOLICITATION){ 
-		printf("ipv6 ND:%d == %d\n",type,NDISC_NEIGHBOUR_SOLICITATION);
+	if (type != NDISC_NEIGHBOUR_SOLICITATION)
 		return 0;
-			}
 
 	return 1;
-
 } 
 
 

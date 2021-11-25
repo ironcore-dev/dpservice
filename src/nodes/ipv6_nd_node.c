@@ -44,7 +44,7 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,16);
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,16);
 
-	dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
+	//dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
 	dp_set_neigh_ip6(m->port, req_ipv6_hdr->dst_addr);
 	
 	req_icmp6_hdr = &(nd_msg->icmph);
@@ -67,7 +67,7 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	req_icmp6_hdr->icmp6_cksum	= 0;
 	req_icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_icmp6_hdr);
 
-	printf("NA msg: type: %d\n",req_icmp6_hdr->icmp6_type);
+	//printf("NA msg: type: %d\n",req_icmp6_hdr->icmp6_type);
 
 	return 1;
 
