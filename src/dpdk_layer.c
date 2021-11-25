@@ -2,6 +2,7 @@
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
 #include "dp_lpm.h"
+#include "dp_util.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/rx_node_priv.h"
 #include "nodes/arp_node_priv.h"
@@ -149,7 +150,7 @@ int dp_dpdk_main_loop()
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
 
 	/* Accumulate and print stats on main until exit */
-	if (rte_graph_has_stats_feature())
+	if (dp_is_stats_enabled() && rte_graph_has_stats_feature())
 		print_stats();
 
 	return 0;
@@ -285,6 +286,18 @@ static void dp_install_isolated_mode(int port_id)
 	}
 }
 
+static void dp_get_vf_name_from_pf_name(char *vf_name /* out */, char *pf_name /* in */)
+{
+	int pf_len = strnlen(pf_name, IFNAMSIZ);
+	char temp[IFNAMSIZ];
+	
+	memcpy(temp, pf_name, IFNAMSIZ);
+	if (pf_len > 3 && (temp[pf_len - 3] == 'n') && (temp[pf_len - 2] == 'p'))
+		temp[pf_len - 3] = '\0';
+	
+	snprintf(vf_name, IFNAMSIZ + 1, "%s_", temp);
+}
+
 static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 {
 	uint32_t ret, cnt, pf_port_id = 0;
@@ -321,7 +334,7 @@ static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
 				dp_install_isolated_mode(port_id);
 			}
 
-			snprintf(ifname_v, sizeof(ifname_v), "enp59s0f0_");
+			dp_get_vf_name_from_pf_name(ifname_v, dp_port_ext.port_name);
 			if ((strstr(ifname, ifname_v) != NULL) && (done < 2)) { 
 				dp_port_prepare(DP_PORT_VF, pf_port_id, port_id, &dp_port_ext);
 				done++;
