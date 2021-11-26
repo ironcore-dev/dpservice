@@ -43,7 +43,7 @@ static uint32_t add_dhcp_option(uint8_t *pos, void *value, uint8_t opt, uint8_t 
 		pos = pos + sizeof(temp);
 		*pos = 0;
 		pos++;
-		temp = htonl(RTE_IPV4(169, 254, 0, 1));
+		temp = htonl(dp_get_gw_ip4());
 		rte_memcpy(pos, &temp, sizeof(temp));
 	} else {
 		rte_memcpy(pos, value, size);
@@ -81,8 +81,8 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	rte_ether_addr_copy(&incoming_eth_hdr->s_addr, &incoming_eth_hdr->d_addr);
 
 	rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
-	incoming_ipv4_hdr->src_addr = htonl(dp_get_ip4(m->port));
-	incoming_ipv4_hdr->dst_addr = htonl(dp_get_ip4(m->port) + 1);
+	incoming_ipv4_hdr->src_addr = htonl(dp_get_gw_ip4());
+	incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port) + 1);
 	incoming_ipv4_hdr->hdr_checksum = 0;
 	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) + 
 										    sizeof(struct rte_udp_hdr) + sizeof(struct rte_ipv4_hdr));
@@ -93,14 +93,14 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	incoming_udp_hdr->dgram_cksum = rte_ipv4_phdr_cksum(incoming_ipv4_hdr, m->ol_flags);
 
 	dhcp_hdr->op = DP_BOOTP_REPLY;
-	dhcp_hdr->yiaddr = htonl(dp_get_ip4(m->port) + 1);
-	dhcp_hdr->siaddr  = htonl(dp_get_ip4(m->port));
-	dhcp_hdr->giaddr = htonl(dp_get_ip4(m->port));
+	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port) + 1);
+	dhcp_hdr->siaddr  = htonl(dp_get_gw_ip4());
+	dhcp_hdr->giaddr = htonl(dp_get_gw_ip4());
 	rte_memcpy(dhcp_hdr->chaddr, dp_get_mac(m->port), 6);
 	memset(dhcp_hdr->vend, 0, sizeof(dhcp_hdr->vend));
 	dhcp_hdr->magic = htonl(DHCP_MAGIC_COOKIE);
 
-	dhcp_srv_ident = htonl(dp_get_ip4(m->port));
+	dhcp_srv_ident = htonl(dp_get_gw_ip4());
 	net_mask = htonl(DP_DHCP_MASK);
 	mtu = htons(DP_DHCP_MTU_VALUE);
 	if (dhcp_packet_count[m->port] != 0) {
@@ -110,10 +110,10 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_type, DP_DHCP_MSG_TYPE, 1);
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
 	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
-	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
-	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &net_mask, DP_DHCP_SUBNET_MASK, 4);
-	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &mtu, DP_DHCP_MTU, 2);
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
+	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &net_mask, DP_DHCP_SUBNET_MASK, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &mtu, DP_DHCP_MTU, 2);
+	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
 
 	dhcp_hdr->vend[vend_pos] = DP_DHCP_END;
 

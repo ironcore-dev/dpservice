@@ -30,7 +30,7 @@ static __rte_always_inline int handle_arp(struct rte_mbuf *m)
 	struct rte_ether_addr  tmp_addr; 
 	uint32_t temp_ip;
 
-	if (requested_ip == dp_get_ip4(m->port)) {
+	if (requested_ip == dp_get_gw_ip4()) {
 		rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->d_addr);
 
 		rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);

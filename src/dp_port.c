@@ -129,7 +129,7 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 	}	
 
 	dp_set_mac(port_id);
-	dp_set_ip4(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
+	dp_set_dhcp_range_ip4(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
 	dp_set_ip6(port_id, port_ip6s[port_id], DP_IPV6_MASK, rte_eth_dev_socket_id(port_id));
 	dp_add_route(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
 	/* Starting the port. 8< */

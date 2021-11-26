@@ -4,7 +4,8 @@
 static struct macip_entry mac_ip_table[DP_MAX_PORTS];
 static struct rte_lpm *ipv4_l3fwd_lpm_lookup_struct[DP_NB_SOCKETS];
 
-/*TODO This should come from neighbour discovery */
+static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
+/*TODO This should come from netlink */
 static struct rte_ether_addr pf_neigh_mac = 
 								{.addr_bytes[0] = 0x90,
 								.addr_bytes[1] = 0x3c,
@@ -20,7 +21,11 @@ static uint8_t port_ip6s[DP_MAX_PORTS][16] = {
 	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25}
 };
 
-uint32_t dp_get_ip4(uint16_t portid)
+uint32_t dp_get_gw_ip4() {
+	return dp_router_gw_ip4;
+}
+
+uint32_t dp_get_dhcp_range_ip4(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return mac_ip_table[portid].own_ip;
@@ -50,7 +55,7 @@ int dp_add_route(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
 	return ret;
 }
 
-void dp_set_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
+void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
 {
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
