@@ -135,7 +135,7 @@ static void print_stats(void)
 		/* Clear screen and move to top left */
 		printf("%s%s", clr, topLeft);
 		rte_graph_cluster_stats_get(stats, 0);
-		rte_delay_ms(1E3);
+		sleep(1);
 	}
 
 	rte_graph_cluster_stats_destroy(stats);

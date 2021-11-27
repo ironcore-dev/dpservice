@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package dpdkonmetal;
+
+message Empty {}
+
+message Status {
+    int32 error = 1;
+    string message = 2;
+}
+
+service PrintHelloWorldService {
+	rpc QueryHelloWorld(Empty) returns (Status);
+}

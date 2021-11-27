@@ -5,3 +5,5 @@ src/*.swp
 src/*.swo
 src/nodes/*.swp
 src/nodes/*.swo
+proto/*.h
+proto/*.cc
