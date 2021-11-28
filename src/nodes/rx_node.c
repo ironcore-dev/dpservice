@@ -17,6 +17,7 @@ int config_rx_node(struct rx_node_config *cfg)
 	ethdev_rx_main.node_ctx[idx].port_id  = cfg->port_id;
 	ethdev_rx_main.node_ctx[idx].queue_id  = cfg->queue_id;
 	ethdev_rx_main.node_ctx[idx].node_id  = cfg->node_id;
+	ethdev_rx_main.node_ctx[idx].grpc_queue  = cfg->grpc_queue;
 
 	return 0;
 }
@@ -35,6 +36,7 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	}
 	ctx->port_id = ethdev_rx_main.node_ctx[port_id].port_id;
 	ctx->queue_id = ethdev_rx_main.node_ctx[port_id].queue_id;
+	ctx->grpc_queue = ethdev_rx_main.node_ctx[port_id].grpc_queue;
 	ctx->next = RX_NEXT_CLS;
 
 	printf("rx_node: init, port_id: %u, queue_id: %u\n", ctx->port_id,
@@ -42,6 +44,26 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 	RTE_SET_USED(graph);
 
+	return 0;
+}
+
+static __rte_always_inline uint16_t handle_grpc_queue(struct rte_node *node, struct rx_node_ctx *ctx)
+{
+	struct rte_mbuf **pkts, *mbuf0;
+	int count, i, *value;
+
+	count = rte_ring_dequeue_burst(ctx->grpc_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
+
+	if (count == 0)
+		return 0;
+	pkts = (struct rte_mbuf **)node->objs;
+
+	for (i = 0; i < count; i++) {
+		mbuf0 = pkts[i];
+		value = rte_pktmbuf_mtod(mbuf0, int*);
+		printf("Received value via grpc queue %x\n ", *value);
+		rte_pktmbuf_free(mbuf0);
+	}
 	return 0;
 }
 
@@ -55,6 +77,9 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 	port = ctx->port_id;
 	queue = ctx->queue_id;
 	next_index = ctx->next;
+
+	if (ctx->grpc_queue)
+		handle_grpc_queue(node, ctx);
 
 	/* Get pkts from port */
 	count = rte_eth_rx_burst(port, queue, (struct rte_mbuf **)node->objs,

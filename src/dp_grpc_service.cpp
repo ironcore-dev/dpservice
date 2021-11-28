@@ -1,7 +1,14 @@
 #include "dp_grpc_service.h"
+#include <rte_mbuf.h>
 
 
-void GRPCService::run(std::string listen_address) {
+GRPCService::GRPCService(struct dp_dpdk_layer* dp_layer)
+{
+	this->dpdk_layer = dp_layer;
+}
+
+void GRPCService::run(std::string listen_address) 
+{
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
 	builder.RegisterService(this);
@@ -10,7 +17,18 @@ void GRPCService::run(std::string listen_address) {
 	server->Wait();
 }
 
-grpc::Status GRPCService::QueryHelloWorld(ServerContext* context, const Empty* request, Status* response) {
-	std::cout << "Hello World !! " << std::endl;
+grpc::Status GRPCService::QueryHelloWorld(ServerContext* context, const Empty* request, Status* response)
+{
+	rte_mbuf *grpc_buf;
+	int *test_value;
+
+	std::cout << "GRPC method called !! " << std::endl;
+
+	grpc_buf = rte_pktmbuf_alloc(this->dpdk_layer->rte_mempool);
+	test_value = rte_pktmbuf_mtod(grpc_buf, int*);
+	*test_value = 0xdeadbeef;
+
+	if (rte_ring_sp_enqueue(this->dpdk_layer->grpc_queue, grpc_buf))
+		return grpc::Status::CANCELLED;
 	return grpc::Status::OK;
 }

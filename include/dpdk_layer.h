@@ -35,6 +35,7 @@ struct dp_dpdk_layer {
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
 	rte_graph_t 					graph_id;
+	struct rte_ring					*grpc_queue;
 };
 
 struct underlay_conf {
@@ -66,6 +67,7 @@ int dp_allocate_vf(int port_id);
 int dp_configure_vf(int port_id);
 
 struct underlay_conf *get_underlay_conf();
+struct dp_dpdk_layer *get_dpdk_layer();
 
 #ifdef __cplusplus
 }

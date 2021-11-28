@@ -15,11 +15,13 @@
 
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
-	GRPCService *grpc_svc = new GRPCService();
+	GRPCService *grpc_svc = new GRPCService(get_dpdk_layer());
 
 	grpc_svc->run("[::]:1337");
 
 	delete grpc_svc;
+
+	return NULL;
 }
 
 

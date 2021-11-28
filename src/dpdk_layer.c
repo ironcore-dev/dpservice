@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "dpdk_layer.h"
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
@@ -88,6 +89,9 @@ int dp_dpdk_init(int argc, char **argv)
 
 	dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
 	dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
+	dp_layer.grpc_queue = rte_ring_create("grpc_queue", 256, rte_socket_id(), 0);
+	if (!dp_layer.grpc_queue)
+		printf("Error creating grpc queue\n");
 
 	if (rte_mbuf_dyn_flow_register() < 0)
 		printf("Error registering private mbuf field\n");
@@ -387,6 +391,7 @@ static int dp_init_graph()
 		rx_cfg.port_id = dp_layer.ports[i]->dp_port_id;
 		rx_cfg.queue_id = 0;
 		rx_cfg.node_id = id;
+		rx_cfg.grpc_queue = dp_layer.grpc_queue;
 		ret = config_rx_node(&rx_cfg);
 
 		snprintf(name, sizeof(name), "%u", i);
@@ -499,6 +504,12 @@ int dp_configure_vf(int port_id)
 	return 0;
 }
 
- __rte_always_inline struct underlay_conf *get_underlay_conf() {
+ __rte_always_inline struct underlay_conf *get_underlay_conf()
+ {
 	return &gen_conf;
+}
+
+struct dp_dpdk_layer *get_dpdk_layer()
+{
+	return &dp_layer;
 }
