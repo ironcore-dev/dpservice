@@ -1,7 +1,7 @@
 #ifndef __INCLUDE_DP_LPM_PRIV_H__
 #define __INCLUDE_DP_LPM_PRIV_H__
 
-#include <rte_lpm.h>
+#include <rte_rib.h>
 #include "dpdk_layer.h"
 
 #ifdef __cplusplus
@@ -19,8 +19,7 @@ extern "C" {
 #define DP_IP6_HOP_LIMIT	0x40
 #define DP_IP6_VTC_FLOW		0x60000000
 
-#define IPV4_L3FWD_LPM_MAX_RULES	1024
-#define IPV4_L3FWD_LPM_NUMBER_TBL8S	(1 << 8)
+#define IPV4_DP_RIB_MAX_RULES	1024
 
 
 struct macip_entry {

@@ -2,7 +2,7 @@
 
 
 static struct macip_entry mac_ip_table[DP_MAX_PORTS];
-static struct rte_lpm *ipv4_l3fwd_lpm_lookup_struct[DP_NB_SOCKETS];
+static struct rte_rib *ipv4_rib_lookup_struct[DP_NB_SOCKETS];
 
 static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 /*TODO This should come from netlink */
@@ -40,16 +40,23 @@ uint8_t* dp_get_ip6(uint16_t portid)
 
 int dp_add_route(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
 {
-	int ret;
+	struct rte_rib_node *node;
+	int ret = 0;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
-	ret = rte_lpm_add(ipv4_l3fwd_lpm_lookup_struct[socketid], ip,
-					  depth, portid);
-
-	if (ret < 0) {
+	node = rte_rib_insert(ipv4_rib_lookup_struct[socketid], ip,
+					  depth);
+	if (node) {
+		ret = rte_rib_set_nh(node, portid);
+		if (ret < 0) {
+			rte_exit(EXIT_FAILURE,
+				"Unable to add entry %u to the DP RIB table on socket %d\n",
+				portid, socketid);
+	}
+	} else {
 		rte_exit(EXIT_FAILURE,
-			"Unable to add entry %u to the l3fwd LPM table on socket %d\n",
+			"Unable to add entry %u to the DP RIB table on socket %d\n",
 			portid, socketid);
 	}
 	return ret;
@@ -103,32 +110,37 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 
 void setup_lpm(const int socketid)
 {
-	struct rte_lpm_config config_ipv4;
+	struct rte_rib_conf config_ipv4;
 	char s[64];
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	/* TODO this should be called by neighbour discovery */
 	dp_set_neigh_mac (DP_PF_PORT, &pf_neigh_mac);
 	/* create the LPM table */
-	config_ipv4.max_rules = IPV4_L3FWD_LPM_MAX_RULES;
-	config_ipv4.number_tbl8s = IPV4_L3FWD_LPM_NUMBER_TBL8S;
-	config_ipv4.flags = 0;
-	snprintf(s, sizeof(s), "IPV4_DP_LPM_%d", socketid);
-	ipv4_l3fwd_lpm_lookup_struct[socketid] =
-			rte_lpm_create(s, socketid, &config_ipv4);
-	if (ipv4_l3fwd_lpm_lookup_struct[socketid] == NULL)
+	config_ipv4.max_nodes = IPV4_DP_RIB_MAX_RULES;
+	config_ipv4.ext_sz = sizeof(uint64_t);
+
+	snprintf(s, sizeof(s), "IPV4_DP_RIB_%d", socketid);
+	ipv4_rib_lookup_struct[socketid] =
+			rte_rib_create(s, socketid, &config_ipv4);
+	if (ipv4_rib_lookup_struct[socketid] == NULL)
 		rte_exit(EXIT_FAILURE,
-			"Unable to create the l3fwd LPM table on socket %d\n",
+			"Unable to create the DP RIB table on socket %d\n",
 			socketid);
 }
 
 int lpm_get_ip4_dst_port(const struct rte_ipv4_hdr *ipv4_hdr, int socketid)
 {
 	uint32_t dst_ip = rte_be_to_cpu_32(ipv4_hdr->dst_addr);
-	uint32_t next_hop;
+	struct rte_rib_node *node;
+	uint64_t next_hop;
+	int ret;
 
-	if (rte_lpm_lookup(ipv4_l3fwd_lpm_lookup_struct[socketid], dst_ip, &next_hop) == 0)
+	node = rte_rib_lookup(ipv4_rib_lookup_struct[socketid], dst_ip);
+
+	if (node) {
+		ret = rte_rib_get_nh(node, &next_hop);
 		return next_hop;
-	else
+	}	else
 		return DP_PF_PORT;
 }
