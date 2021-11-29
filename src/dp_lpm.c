@@ -134,13 +134,11 @@ int lpm_get_ip4_dst_port(const struct rte_ipv4_hdr *ipv4_hdr, int socketid)
 	uint32_t dst_ip = rte_be_to_cpu_32(ipv4_hdr->dst_addr);
 	struct rte_rib_node *node;
 	uint64_t next_hop;
-	int ret;
 
 	node = rte_rib_lookup(ipv4_rib_lookup_struct[socketid], dst_ip);
 
-	if (node) {
-		ret = rte_rib_get_nh(node, &next_hop);
+	if (node && (rte_rib_get_nh(node, &next_hop) == 0))
 		return next_hop;
-	}	else
-		return DP_PF_PORT;
+
+	return DP_PF_PORT;
 }

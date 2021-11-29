@@ -40,26 +40,9 @@ static struct underlay_conf gen_conf = {
 	.dst_port = 6081,
 	.src_port = 6081,
 	.rsvd1 = 0,
-	.vni[0] = 0xde,
-	.vni[1] = 0xde,
-	.vni[2] = 0xde,
-	.trgt_ip6[0] = 0x2a,
-	.trgt_ip6[1] = 0x10,
-	.trgt_ip6[2] = 0xaf,
-	.trgt_ip6[3] = 0xc0,
-	.trgt_ip6[4] = 0xe0,
-	.trgt_ip6[5] = 0x1f,
-	.trgt_ip6[6] = 0x02,
-	.trgt_ip6[7] = 0x09,
-	.src_ip6[0] = 0x2a,
-	.src_ip6[1] = 0x10,
-	.src_ip6[2] = 0xaf,
-	.src_ip6[3] = 0xc0,
-	.src_ip6[4] = 0xe0,
-	.src_ip6[5] = 0x1f,
-	.src_ip6[6] = 0x00,
-	.src_ip6[7] = 0xf4,
-	.src_ip6[15] = 0x02,
+	.vni = {0},
+	.trgt_ip6 = {0},
+	.src_ip6 = {0},
 };
 
 static void signal_handler(int signum)
@@ -518,6 +501,12 @@ int dp_configure_vf(int port_id)
  {
 	return &gen_conf;
 }
+
+ __rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
+ {
+	gen_conf = *u_conf;
+}
+
 
 struct dp_dpdk_layer *get_dpdk_layer()
 {

@@ -6,20 +6,29 @@
 #include <string.h>
 #include <stdlib.h>
 #include <net/if.h>
-
+#include "rte_ip.h"
 #include "dp_util.h"
+#include "dpdk_layer.h"
+
+#define DP_MAX_IP6_CHAR	40
+#define DP_MAX_VNI_STR	12
 
 static int debug_mode = 0;
 static int no_offload = 0;
 static int no_stats = 0;
-char pf0name[IF_NAMESIZE] = {0};
-char pf1name[IF_NAMESIZE] = {0};
+static char pf0name[IF_NAMESIZE] = {0};
+static char pf1name[IF_NAMESIZE] = {0};
+static char ip6_str[DP_MAX_IP6_CHAR] = {0};
+static char vni_str[DP_MAX_IP6_CHAR] = {0};
 
 static const char short_options[] = "d" /* debug */
 				    "D"	 /* promiscuous */;
 
 #define CMD_LINE_OPT_PF0		"pf0"
 #define CMD_LINE_OPT_PF1		"pf1"
+#define CMD_LINE_OPT_IPV6		"ipv6"
+#define CMD_LINE_OPT_T_IPV6		"t_ipv6"
+#define CMD_LINE_OPT_VNI		"vni"
 #define CMD_LINE_OPT_NO_OFFLOAD	"no-offload"
 #define CMD_LINE_OPT_NO_STATS	"no-stats"
 
@@ -27,6 +36,9 @@ enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
 	CMD_LINE_OPT_PF0_NUM,
 	CMD_LINE_OPT_PF1_NUM,
+	CMD_LINE_OPT_IPV6_NUM,
+	CMD_LINE_OPT_T_IPV6_NUM,
+	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_NO_OFFLOAD_NUM,
 	CMD_LINE_OPT_NO_STATS_NUM,
 };
@@ -34,6 +46,9 @@ enum {
 static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PF0, 1, 0, CMD_LINE_OPT_PF0_NUM},
 	{CMD_LINE_OPT_PF1, 1, 0, CMD_LINE_OPT_PF1_NUM},
+	{CMD_LINE_OPT_IPV6, 1, 0, CMD_LINE_OPT_IPV6_NUM},
+	{CMD_LINE_OPT_T_IPV6, 1, 0, CMD_LINE_OPT_T_IPV6_NUM},
+	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
 	{NULL, 0, 0, 0},
@@ -49,6 +64,9 @@ static void dp_print_usage(const char *prgname)
 		" [-D]"
 		" --pf0=pf0_ifname"
 		" --pf0=pf0_ifname"
+		" --ipv6=underlay_ipv6"
+		" --t_ipv6=target_ipv6"
+		" --vni=vnet_id"
 		" [--no-stats]"
 		" [--no-offload]\n",
 		prgname);
@@ -59,7 +77,7 @@ int dp_parse_args(int argc, char **argv)
 	char *prgname = argv[0];
 	int option_index;
 	char **argvopt;
-	int opt, ret;
+	int opt, ret, temp;
 
 	argvopt = argv;
 
@@ -81,6 +99,22 @@ int dp_parse_args(int argc, char **argv)
 
 		case CMD_LINE_OPT_PF1_NUM:
 			strncpy(pf1name, optarg, IFNAMSIZ);
+			break;
+
+		case CMD_LINE_OPT_IPV6_NUM:
+			strncpy(ip6_str, optarg, DP_MAX_IP6_CHAR - 1);
+			inet_pton(AF_INET6, ip6_str, get_underlay_conf()->src_ip6);
+			break;
+
+		case CMD_LINE_OPT_T_IPV6_NUM:
+			strncpy(ip6_str, optarg, DP_MAX_IP6_CHAR - 1);
+			inet_pton(AF_INET6, ip6_str, get_underlay_conf()->trgt_ip6);
+			break;
+
+		case CMD_LINE_OPT_VNI_NUM:
+			strncpy(vni_str, optarg, DP_MAX_VNI_STR - 1);
+			temp = atoi(vni_str);
+			memcpy(get_underlay_conf()->vni, &temp, sizeof(get_underlay_conf()->vni));
 			break;
 
 		case CMD_LINE_OPT_NO_OFFLOAD_NUM:

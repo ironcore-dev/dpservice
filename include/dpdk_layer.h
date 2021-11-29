@@ -66,6 +66,7 @@ int dp_prepare(struct dp_port_ext *ports, int port_count);
 int dp_allocate_vf(int port_id);
 int dp_configure_vf(int port_id);
 
+void set_underlay_conf(struct underlay_conf *u_conf);
 struct underlay_conf *get_underlay_conf();
 struct dp_dpdk_layer *get_dpdk_layer();
 
