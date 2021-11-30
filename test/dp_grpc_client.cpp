@@ -8,14 +8,14 @@
 
 using grpc::Channel;
 using grpc::ClientContext;
-using dpdkonmetal::PrintHelloWorldService;
+using dpdkonmetal::DPDKonmetal;
 using dpdkonmetal::Status;
 using dpdkonmetal::Empty;
 
 class GRPCClient {
 public:
 	GRPCClient(std::shared_ptr<Channel> channel)
-		: stub_(PrintHelloWorldService::NewStub(channel)) {}
+		: stub_(DPDKonmetal::NewStub(channel)) {}
 		void SayHello() {
 			Empty request;
 			Status reply;
@@ -25,7 +25,7 @@ public:
 	}
 
 private:
-	std::unique_ptr<PrintHelloWorldService::Stub> stub_;
+	std::unique_ptr<DPDKonmetal::Stub> stub_;
 };
 
 int main(int argc, char** argv) {

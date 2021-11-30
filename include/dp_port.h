@@ -6,8 +6,7 @@
 #include <net/if.h>
 
 #include <rte_ethdev.h>
-
-#include "dpdk_layer.h"
+#include <rte_graph.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +37,7 @@ struct dp_port {
 
 struct dp_port* get_dp_vf_port_with_id(int port_id,
 									   struct dp_dpdk_layer *dp_layer);
+int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name);
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer,
 							   dp_port_type type);
 int dp_port_init(struct dp_port* port, int p_port_id, int port_id, 

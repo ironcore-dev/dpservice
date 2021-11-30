@@ -54,17 +54,14 @@ struct underlay_conf {
 	};
 };
 
-struct dp_port_ext;
-
 /* Functions for internal processing */
 int dp_dpdk_init(int argc, char **argv);
+int dp_init_graph();
 int dp_dpdk_main_loop();
 void dp_dpdk_exit();
 
 /* Functions for the control plane */
-int dp_prepare(struct dp_port_ext *ports, int port_count);
-int dp_allocate_vf(int port_id);
-int dp_configure_vf(int port_id);
+int dp_init_interface(struct dp_port_ext *port, dp_port_type type);
 
 void set_underlay_conf(struct underlay_conf *u_conf);
 struct underlay_conf *get_underlay_conf();

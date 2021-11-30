@@ -32,3 +32,9 @@ grpc::Status GRPCService::QueryHelloWorld(ServerContext* context, const Empty* r
 		return grpc::Status::CANCELLED;
 	return grpc::Status::OK;
 }
+
+grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response)
+{
+	return grpc::Status::OK;
+}
+

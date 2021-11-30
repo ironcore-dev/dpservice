@@ -15,6 +15,7 @@
 #include "nodes/geneve_encap_node.h"
 
 static volatile bool force_quit;
+static int last_assigned_vf_idx = 0;
 
 static const char * const default_patterns[] = {
 	"rx-*",
@@ -286,53 +287,57 @@ static void dp_get_vf_name_from_pf_name(char *vf_name /* out */, char *pf_name /
 	snprintf(vf_name, IFNAMSIZ + 1, "%s_", temp);
 }
 
-static int dp_initialize_vfs(struct dp_port_ext *ports, int port_count)
+int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 {
-	uint32_t ret, cnt, pf_port_id = 0;
-	uint16_t nr_ports;
+	uint32_t ret, cnt = 0, pf_port_id = 0;
+	uint16_t nr_ports, port_id;;
 	struct dp_port_ext dp_port_ext;
 	char ifname[IF_NAMESIZE] = {0};
 	char ifname_v[IF_NAMESIZE + 1] = {0};
-	static int done = 0; 
 
 	nr_ports = rte_eth_dev_count_avail();
 	if (nr_ports == 0)
 		rte_exit(EXIT_FAILURE, ":: no Ethernet ports found\n");
 
-	for (cnt = 0; cnt < port_count; cnt++) {
-		uint16_t port_id;
+	dp_port_ext = *port;
+	printf("Looking for VFs of PF %s \n", dp_port_ext.port_name);
 
-		dp_port_ext = *ports;
-		printf("Looking for VFs of PF %s \n", dp_port_ext.port_name);
+	RTE_ETH_FOREACH_DEV(port_id) {
+		struct rte_eth_dev_info dev_info;
 
-		RTE_ETH_FOREACH_DEV(port_id) {
-			struct rte_eth_dev_info dev_info;
+		ret = rte_eth_dev_info_get(port_id, &dev_info);
+		if (ret != 0)
+			rte_exit(EXIT_FAILURE,
+					"Error during getting device (port %u) info: %s\n",
+					port_id, strerror(-ret));
 
-			ret = rte_eth_dev_info_get(port_id, &dev_info);
-			if (ret != 0)
-				rte_exit(EXIT_FAILURE,
-						"Error during getting device (port %u) info: %s\n",
-						port_id, strerror(-ret));
-
-			if_indextoname(dev_info.if_index, ifname);
-			if (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0) {
-				pf_port_id = port_id;
-				dp_port_flow_isolate(port_id);
-				dp_port_prepare(DP_PORT_PF, pf_port_id, port_id, &dp_port_ext);
-				dp_install_isolated_mode(port_id);
-			}
-
-			dp_get_vf_name_from_pf_name(ifname_v, dp_port_ext.port_name);
-			if ((strstr(ifname, ifname_v) != NULL) && (done < 2)) { 
-				dp_port_prepare(DP_PORT_VF, pf_port_id, port_id, &dp_port_ext);
-				done++;
-			}	
+		if_indextoname(dev_info.if_index, ifname);
+		if ((type == DP_PORT_PF) && (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0)) {
+			pf_port_id = port_id;
+			dp_port_flow_isolate(port_id);
+			dp_port_prepare(type, pf_port_id, port_id, &dp_port_ext);
+			dp_install_isolated_mode(port_id);
+			return 0;
 		}
+
+		dp_get_vf_name_from_pf_name(ifname_v, dp_port_ext.port_name);
+		if ((type == DP_PORT_VF) && 
+			(strstr(ifname, ifname_v) != NULL)) {
+			if (cnt == last_assigned_vf_idx) {
+				pf_port_id = dp_get_pf_port_id_with_name(&dp_layer, dp_port_ext.port_name);
+				if (pf_port_id < 0)
+					return 0;
+				dp_port_prepare(type, pf_port_id, port_id, &dp_port_ext);
+				last_assigned_vf_idx++;
+				return 0;
+			}
+			cnt++;
+		}	
 	}
 	return 0;
 }
 
-static int dp_init_graph()
+int dp_init_graph()
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
@@ -383,26 +388,26 @@ static int dp_init_graph()
 
 		snprintf(name, sizeof(name), "%u", i);
 		id = rte_node_clone(tx_node->id, name);
-		tx_node_data->nodes[i] = id;
+		tx_node_data->nodes[dp_layer.ports[i]->dp_port_id] = id;
 
 		snprintf(name, sizeof(name), "tx-%u", i);
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF) {
 			rte_node_edge_update(arp_node->id, RTE_EDGE_ID_INVALID,
 						&next_nodes, 1);
 			ret = arp_set_next(
-				i, rte_node_edge_count(arp_node->id) - 1);
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(arp_node->id) - 1);
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID,
 						&next_nodes, 1);
 			ret = ipv6_nd_set_next(
-				i, rte_node_edge_count(ipv6_nd_node->id) - 1);
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(ipv6_nd_node->id) - 1);
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(dhcp_node->id, RTE_EDGE_ID_INVALID,
 			&next_nodes, 1);
 			ret = dhcp_set_next(
-				i, rte_node_edge_count(dhcp_node->id) - 1);
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(dhcp_node->id) - 1);
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(dhcpv6_node->id, RTE_EDGE_ID_INVALID,
@@ -414,7 +419,7 @@ static int dp_init_graph()
 			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,
 			&next_nodes, 1);
 			ret = l2_decap_set_next(
-				i, rte_node_edge_count(l2_decap_node->id) - 1);
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(l2_decap_node->id) - 1);
 			if (ret < 0)
 				return ret;
 		}
@@ -464,36 +469,6 @@ static int dp_init_graph()
 					dp_layer.graph_name);
 	}
 
-	return 0;
-} 
-
-int dp_prepare(struct dp_port_ext *ports, int port_count)
-{
-	int ret;
-	/* TODO setunderlay and configure uplink will be done. Parameter should be struct config */
-
-	ret = dp_initialize_vfs(ports, port_count);
-	return ret;
-}
-
-int dp_allocate_vf(int port_id)
-{
-	struct dp_port *dp_port;
-	int ret = 0;
-
-	dp_port = get_dp_vf_port_with_id(port_id, &dp_layer);
-
-	if (dp_port){ 
-		dp_port_allocate(dp_port);
-		ret = dp_port->dp_port_id;
-	}	
-
-	return ret;
-}
-
-int dp_configure_vf(int port_id)
-{
-	dp_init_graph();
 	return 0;
 }
 

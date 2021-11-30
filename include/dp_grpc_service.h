@@ -18,17 +18,20 @@ using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
 
-using dpdkonmetal::PrintHelloWorldService;
+using dpdkonmetal::DPDKonmetal;
 using dpdkonmetal::Status;
 using dpdkonmetal::Empty;
+using dpdkonmetal::AddMachineRequest;
+using dpdkonmetal::AddMachineResponse;
 
-class GRPCService final : public PrintHelloWorldService::Service {
+class GRPCService final : public DPDKonmetal::Service {
 private:
 	struct dp_dpdk_layer* dpdk_layer;
 public:
 	explicit GRPCService(struct dp_dpdk_layer* dp_layer);
 	void run(std::string listen_address);
 	grpc::Status QueryHelloWorld(ServerContext* context, const Empty* request, Status* response) override;
+	grpc::Status addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response) override;
 };
 
 #endif //__INCLUDE_DP_GRPC_SERVICE_H

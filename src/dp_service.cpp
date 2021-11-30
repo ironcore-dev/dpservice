@@ -25,21 +25,25 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 }
 
 
-void dp_hard_configure()
+static void dp_init_pfs()
 {
 	struct dp_port_ext pf_port;
 	long int mac = DP_PF_MAC;
-	int ret;
 
 	memset(&pf_port, 0, sizeof(pf_port));
 	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
 	memcpy(pf_port.port_mac.addr_bytes, &mac, sizeof(mac));
 	pf_port.port_mtu = 9100;
-	dp_prepare(&pf_port, 1);
+	dp_init_interface(&pf_port, DP_PORT_PF);
 	memcpy(pf_port.port_name, dp_get_pf1_name(), IFNAMSIZ);
-	dp_prepare(&pf_port, 1);
-	ret = dp_allocate_vf(0);
-	dp_configure_vf(ret);
+	dp_init_interface(&pf_port, DP_PORT_PF);
+
+	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+	dp_init_interface(&pf_port, DP_PORT_VF);
+
+	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+	dp_init_interface(&pf_port, DP_PORT_VF);
+	dp_init_graph();
 }
 
 int main(int argc, char **argv)
@@ -55,9 +59,7 @@ int main(int argc, char **argv)
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid dp_service parameters\n");
 
-	/* Test */
-	dp_hard_configure();
-	/* Test */
+	dp_init_pfs();
 
 	ret = rte_ctrl_thread_create(&tid, "grpc-thread", NULL,
 							dp_handle_grpc, NULL);

@@ -1,14 +1,266 @@
 syntax = "proto3";
 
 package dpdkonmetal;
+option go_package = "./dpdkproto";
+
+enum MachineType {
+	VirtualMachine = 0;
+	BareMetalMachine = 1;
+}
+
+enum IPVersion {
+	IPv4 = 0;
+	IPv6 = 1;
+}
+
+enum Protocol {
+	Undefined = 0;  // "Undefined" will set up a layer 3 firewall rule and does not filter on layer 4 protocol details.
+	ICMP = 1;
+	TCP = 6;
+	UDP = 17;
+	ICMPv6 = 58;
+	SCTP = 132;
+}
+
+enum TrafficDirection {
+	Ingress = 0;
+	Egress = 1;
+}
+
+enum FirewallAction {
+	Drop = 0;
+	Accept = 1;
+}
+
+message Status {
+	int32 error = 1;
+	string message = 2;
+}
 
 message Empty {}
 
-message Status {
-    int32 error = 1;
-    string message = 2;
+message Prefix {
+	IPVersion ipVersion = 1;
+	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
+	uint32 prefixLength = 3;  // max length is 32 for IPv4 and 128 for IPv6
 }
 
-service PrintHelloWorldService {
-	rpc QueryHelloWorld(Empty) returns (Status);
+message InitConfig {
+	Prefix underlayIPv6Prefix = 1;   // prefix in the underlay network that is routed to the DPDK app
+	repeated string uplinkPorts = 2; // Linux name of the NICs that are connected to the Leaf Switches
+	repeated string pfNames = 3;     // Linux name of the Physical Functions, that Virtual Functions will be derived from
+}
+
+message PXEConfig {
+	string nextServer = 1;
+	string bootFileName = 2;
+}
+
+// Firewall Rules can be inserted and removed while the machine is running. In the C code probably it makes sense to use linked lists.
+// Firewall rules have an order and may result in accepting or dropping a packet.
+// When a packet matches a firewall rule, the defined action is taken. No further firewall rules will be evaluated thereafter.
+message FirewallRule {
+	// ruleID: UUID - empty when inserting new rule
+	bytes ruleID = 1;
+
+	// insertAfterRuleID: UUID reference to next FirewallRule
+	// used to define the order when inserting new rules
+	// when 0 or empty, insert the rule on the firewall rules list's first position
+	bytes insertAfterRuleID = 2;
+
+	TrafficDirection direction = 3;
+	FirewallAction action = 4;
+
+	IPVersion ipVersion = 5;
+	Prefix sourcePrefix = 6;
+	Prefix destinationPrefix = 7;
+
+	Protocol protocol = 8;
+
+	// TCP / UDP / SCTP filters
+	int32 sourcePortRangeLower = 9;        // -1 matches all source ports
+	int32 sourcePortRangeUpper = 10;
+	int32 destinationPortRangeLower = 11;  // -1 matches all destination ports
+	int32 destinationPortRangeUpper = 12;
+
+	// ICMP filters
+	int32 icmpCode = 13;  // -1 matches all ICMP Codes
+	int32 icmpType = 14;  // -1 matches all ICMP Types
+}
+
+message IPConfig {
+	IPVersion ipVersion = 1;
+
+	// DHCP Options
+	bytes primaryAddress = 2;
+	uint32 mtu = 3;
+	string dhcpHostname = 4;
+	string dhcpDomainname = 5;
+	PXEConfig pxeConfig = 6;
+	repeated string ntp = 7;
+	repeated bytes dns = 8;
+
+	repeated FirewallRule firewallRules = 9;
+	repeated Prefix machinePrefixes = 10;
+}
+
+message ThrottlingConfig {
+	uint32 ingressPacketsPerSecond = 1;
+	uint32 ingressMegabitsPerSecond = 2;
+
+	uint32 egressPacketsPerSecond = 3;
+	uint32 egressMegabitsPerSecond = 4;
+
+	uint32 maxOpenFlows = 5;
+}
+
+message AddMachineRequest {
+	// machineType defines whether a Bare Metal Machine or a Virtual Machine is created.
+	// Both instance types cannot be mixed during a session.
+	// Maximum number of instantiated bare metal machines is 1.
+	// Maximum number of Virtual Machines is not defined.
+	MachineType machineType = 1;
+
+	bytes machineID = 2;
+	uint32 vni = 3;
+	IPConfig ipv4Config = 4;
+	IPConfig ipv6Config = 5;
+	ThrottlingConfig throttlingConfig = 6;
+}
+
+message Machine {
+	bytes machineID = 1;
+	uint32 vni = 2;
+	bytes primaryIPv4Address = 3;
+	bytes primaryIPv6Address = 4;
+	ThrottlingConfig throttlingConfig = 5;
+}
+
+message MachineIDMsg {
+	bytes machineID = 1;
+}
+
+message MachinesMsg {
+	repeated Machine machines = 1;
+}
+
+message RuleIDMsg {
+	bytes ruleID = 1;
+}
+
+message ThrottlingConfigMsg {
+	MachineIDMsg machine_id = 1;
+	ThrottlingConfig throttlingConfig = 2;
+}
+
+message MachinePrefixMsg {
+	MachineIDMsg machine_id = 1;
+	Prefix prefix = 2;
+}
+
+message PrefixesMsg {
+	repeated Prefix prefixes = 1;
+}
+
+message VNIMsg {
+	uint32 vni = 1;
+}
+
+message VNIRouteMsg {
+	VNIMsg vni = 1;
+	Route route = 2;
+}
+
+message RoutesMsg {
+	repeated Route routes = 1;
+}
+
+message FirewallRuleMsg {
+	bytes machineID = 1;
+	FirewallRule rule = 2;
+}
+
+message FirewallRulesMsg {
+	repeated FirewallRule rules = 1;
+}
+
+message BoolMsg {
+	bool bool_val = 1;
+}
+
+message VirtualFunction {
+	string name = 1;      // Linux VF NIC device name
+	uint32 domain = 2;    // PCIe Domain
+	uint32 bus = 3;       // PCIe Bus
+	uint32 slot = 4;      // PCIe Slot
+	uint32 function = 5;  // PCIe Function
+}
+
+message AddMachineResponse {
+	Status status = 1;
+	VirtualFunction vf = 2; // Holds VF information when a VM has been created.
+}
+
+message Route {
+	IPVersion ipVersion = 1;
+	Prefix prefix = 2;
+	uint32 nexthopVNI = 3;
+	bytes nexthopAddress = 4;
+	uint32 weight = 5;
+}
+
+
+service DPDKonmetal {
+	//// INITIALIZATION
+	// initialized indicates if the DPDK app has been initialized already.
+	rpc initialized(Empty) returns (BoolMsg) {}
+
+	// init will be called once for initial set up of the DPDK app.
+	// init returns an error if the DPDK app has been initialized already. So check if it got initialized before calling init.
+	rpc init(InitConfig) returns (Status) {}
+
+
+
+	//// MACHINES
+	rpc listMachines(Empty) returns (MachinesMsg) {}
+
+	// addMachine creates and configures a VF (hypervisor case) or PF (bare metal) for the new machine.
+	// If the machine's VNet is not known to the DPDK app yet, the VNet and its routing table will be intialized.
+	// After calling addMachine() the Client has to make sure that the routing table of the corresponding VNet is filled (use listRoutes and addRoute as required).
+	rpc addMachine(AddMachineRequest) returns (AddMachineResponse) {}
+
+	// deleteMachine removes all networking configuration of a machine from the DPDK app.
+	// The VF will be released and can be reused for other VMs.
+	// If the machine was the last machine of a VNet on this hypervisor, the VNet and its routes will be freed from the DPDK app.
+	rpc deleteMachine(MachineIDMsg) returns (Status) {}
+
+	// updateThrottlingConfig changes a machine's throttling configuration during runtime.
+	rpc updateThrottlingConfig(ThrottlingConfigMsg) returns (Status) {}
+
+	// listMachinePrefixes returns a list of prefixes, that will be routed to the machine by the DPDK app.
+	// For example this could be a node's Kubernetes Pod CIDR.
+	rpc listMachinePrefixes(MachineIDMsg) returns (PrefixesMsg) {}
+	rpc addMachinePrefix(MachinePrefixMsg) returns (Status) {}
+	rpc deleteMachinePrefix(MachinePrefixMsg) returns (Status) {}
+
+
+
+	//// ROUTES
+	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}
+
+	// addRoutes adds a new route to a VNet's routing table (identified by VNI).
+	// If the DPDK application does not hold any machine in the specified VNet, an error will be returned.
+	rpc addRoute(VNIRouteMsg) returns (Status) {}
+
+	// deleteRoute removes a route from a VNet.
+	// If the route does not exist, an error will be returned.
+	rpc deleteRoute(VNIRouteMsg) returns (Status) {}
+
+
+
+	//// FIREWALL
+	rpc listFirewallRules(MachineIDMsg) returns (FirewallRulesMsg) {}
+	rpc addFirewallRule(FirewallRuleMsg) returns (Status) {}
+	rpc deleteFirewallRule(RuleIDMsg) returns (Status) {}
+	rpc QueryHelloWorld(Empty) returns (Status) {};
 }

@@ -143,8 +143,23 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 	if (port->dp_p_type == DP_PORT_VF)
 		memcpy(port->vf_name, ifname, IF_NAMESIZE);
 	port->dp_port_id = port_id;
+	port->dp_port_ext = *port_details;
 	return 0;
 }
+
+int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name)
+{
+	int i;
+
+	/* Find first not allocated vfport */
+	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
+		if ((strncmp(dp_layer->ports[i]->dp_port_ext.port_name, pf_name, IF_NAMESIZE) == 0) && 
+			dp_layer->ports[i]->dp_p_type == DP_PORT_PF)
+			return dp_layer->ports[i]->dp_port_id;
+	}
+	return -1;
+}
+
 
 struct dp_port* get_dp_vf_port_with_id(int port_id, struct dp_dpdk_layer *dp_layer)
 {
