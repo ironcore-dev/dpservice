@@ -5,6 +5,7 @@
 #include <rte_graph_worker.h>
 
 #include <signal.h>
+#include <pthread.h>
 
 #include "dp_port.h"
 
@@ -62,10 +63,12 @@ void dp_dpdk_exit();
 
 /* Functions for the control plane */
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type);
+void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type);
 
 void set_underlay_conf(struct underlay_conf *u_conf);
 struct underlay_conf *get_underlay_conf();
 struct dp_dpdk_layer *get_dpdk_layer();
+pthread_t *dp_get_ctrl_thread_id();
 
 #ifdef __cplusplus
 }

@@ -32,14 +32,29 @@ struct macip_entry {
 	uint8_t	neigh_ipv6[16];
 };
 
-void setup_lpm(const int socketid);
-int lpm_get_ip4_dst_port(const struct rte_ipv4_hdr *ipv4_hdr, int socketid);
+struct vm_entry {
+	struct rte_rib		*ipv4_rib[DP_NB_SOCKETS];
+	struct macip_entry	info;
+	int					vni;
+	int					machine_id;
+	uint8_t				vm_ready;
+};
+
+struct vm_route {
+	int		vni;
+	uint8_t	nh_ipv6[16];
+};
+
+void setup_lpm(int port_id, int machine_id, int vni, const int socketid);
+int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct rte_ipv4_hdr *ipv4_hdr,
+						 struct vm_route *r, int socketid);
 
 uint32_t dp_get_gw_ip4();
 uint8_t* dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_ip6(uint16_t portid);
-int dp_add_route(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
+int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
+				 uint8_t* ip6, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
 void dp_set_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid);
 void dp_set_neigh_ip6(uint16_t portid, uint8_t* ipv6);

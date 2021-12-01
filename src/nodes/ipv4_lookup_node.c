@@ -26,18 +26,23 @@ static int ipv4_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 
 static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 {
+	struct rte_flow_item_geneve *geneve_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 	struct rte_icmp_hdr *icmp_hdr;
 	struct dp_flow df;
 	struct dp_flow *df_ptr;
-	int ret = 0;
+	struct vm_route route;
+	int ret = 0, t_vni = 0;
 
 	memset(&df, 0, sizeof(struct dp_flow));
 
 	if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2)) {
+		geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
+		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
+		rte_memcpy(&t_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
 	} else {
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 										  sizeof(struct rte_ether_hdr));
@@ -67,7 +72,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		df.l4_type = ipv4_hdr->next_proto_id;
 	}
 
-	ret = lpm_get_ip4_dst_port(ipv4_hdr, rte_eth_dev_socket_id(m->port));
+	ret = lpm_get_ip4_dst_port(m->port, t_vni, ipv4_hdr, &route, rte_eth_dev_socket_id(m->port));
 	if (ret >= 0) {
 		df.nxt_hop = ret;
 		df_ptr = alloc_dp_flow_ptr(m);
@@ -77,6 +82,11 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		df.attr.priority = 0;
 		df.attr.transfer = 1;
 		rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
+		if (!t_vni) /* VM -> Outer world */
+			df_ptr->dst_vni = route.vni;
+		else /* Outer world -> VM */
+			df_ptr->dst_vni = t_vni;
+		rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
 		/* TODO disable whole offloading for now till PF ports are handled as well */
 		df_ptr->valid = 0;
 		if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2))

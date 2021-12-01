@@ -6,4 +6,4 @@ dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'nodes/arp_node.c',
 			  '../proto/dpdk.grpc.pb.cc', '../proto/dpdk.pb.cc', 'dp_grpc_service.cpp']
 
 executable('dp_service', dp_sources, include_directories : [inc, proto_inc],
-			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep] )
+			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep] )

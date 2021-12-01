@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>
+#include <pthread.h>
 #include <sys/queue.h>
 
 #include "dpdk_layer.h"
@@ -25,30 +26,36 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 }
 
 
-static void dp_init_pfs()
+static void dp_init_interfaces()
 {
 	struct dp_port_ext pf_port;
 	long int mac = DP_PF_MAC;
+	int i;
 
 	memset(&pf_port, 0, sizeof(pf_port));
-	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
 	memcpy(pf_port.port_mac.addr_bytes, &mac, sizeof(mac));
 	pf_port.port_mtu = 9100;
+
+	/* Init the PFs which were received via command line */
+	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
 	dp_init_interface(&pf_port, DP_PORT_PF);
+	dp_start_interface(&pf_port, DP_PORT_PF);
+
 	memcpy(pf_port.port_name, dp_get_pf1_name(), IFNAMSIZ);
 	dp_init_interface(&pf_port, DP_PORT_PF);
+	dp_start_interface(&pf_port, DP_PORT_PF);
 
 	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
-	dp_init_interface(&pf_port, DP_PORT_VF);
 
-	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
-	dp_init_interface(&pf_port, DP_PORT_VF);
+	/* Only init the max. possible VFs, GRPC will kick them off later */
+	for (i = 0; i < 2; i++)
+		dp_init_interface(&pf_port, DP_PORT_VF);
+
 	dp_init_graph();
 }
 
 int main(int argc, char **argv)
 {
-	static pthread_t tid;
 	int ret;
 
 	ret = dp_dpdk_init(argc, argv);
@@ -59,15 +66,17 @@ int main(int argc, char **argv)
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid dp_service parameters\n");
 
-	dp_init_pfs();
+	dp_init_interfaces();
 
-	ret = rte_ctrl_thread_create(&tid, "grpc-thread", NULL,
+	ret = rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL,
 							dp_handle_grpc, NULL);
 	if (ret < 0)
 			rte_exit(EXIT_FAILURE,
 					"Cannot create grpc thread\n");
 
 	dp_dpdk_main_loop();
+
+	pthread_join(*dp_get_ctrl_thread_id(), NULL);
 
 	dp_dpdk_exit();
 

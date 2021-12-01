@@ -25,9 +25,8 @@ static int geneve_decap_node_init(const struct rte_graph *graph, struct rte_node
 
 static __rte_always_inline int handle_geneve_decap(struct rte_mbuf *m)
 {
-	/* Pop the udp and geneve header */
+	/* Pop the udp header */
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_udp_hdr));
-	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 	return 1;
 } 
 

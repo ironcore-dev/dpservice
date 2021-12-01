@@ -25,13 +25,17 @@ struct rte_eth_conf port_conf = {
 					},
 };
 
-#define DP_IP_MASK 24
 #define DP_IPV6_MASK 64
-static uint32_t port_ip4s[DP_MAX_PORTS] = {
-	RTE_IPV4(192, 168, 120, 1), /* Port 0 */
-	RTE_IPV4(192, 168, 123, 1), /* Port 1 */
-	RTE_IPV4(192, 168, 124, 1), /* Port 2 */
-};
+
+/*TODO This should come from netlink */
+static struct rte_ether_addr pf_neigh_mac = 
+								{.addr_bytes[0] = 0x90,
+								.addr_bytes[1] = 0x3c,
+								.addr_bytes[2] = 0xb3,
+								.addr_bytes[3] = 0x33,
+								.addr_bytes[4] = 0x72,
+								.addr_bytes[5] = 0xfb,
+								};
 
 static uint8_t port_ip6s[DP_MAX_PORTS][16] = {
 	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25},
@@ -128,18 +132,13 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 					rte_strerror(-ret), port_id);
 	}	
 
+	/* TODO PF underlay mac, this should be called by neighbour discovery */
+	if (port->dp_p_type == DP_PORT_PF)
+		dp_set_neigh_mac (port_id, &pf_neigh_mac);
+
 	dp_set_mac(port_id);
-	dp_set_dhcp_range_ip4(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
 	dp_set_ip6(port_id, port_ip6s[port_id], DP_IPV6_MASK, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, port_ip4s[port_id], DP_IP_MASK, rte_eth_dev_socket_id(port_id));
-	/* Starting the port. 8< */
-	ret = rte_eth_dev_start(port_id);
-	if (ret < 0) {
-		rte_exit(EXIT_FAILURE,
-				"rte_eth_dev_start:err=%d, port=%u\n",
-				ret, port_id);
-	}
-	/* >8 End of starting the port. */
+
 	if (port->dp_p_type == DP_PORT_VF)
 		memcpy(port->vf_name, ifname, IF_NAMESIZE);
 	port->dp_port_id = port_id;
@@ -151,7 +150,6 @@ int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name)
 {
 	int i;
 
-	/* Find first not allocated vfport */
 	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
 		if ((strncmp(dp_layer->ports[i]->dp_port_ext.port_name, pf_name, IF_NAMESIZE) == 0) && 
 			dp_layer->ports[i]->dp_p_type == DP_PORT_PF)
@@ -161,14 +159,13 @@ int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name)
 }
 
 
-struct dp_port* get_dp_vf_port_with_id(int port_id, struct dp_dpdk_layer *dp_layer)
+struct dp_port* dp_get_next_avail_vf_port(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
 	int i;
 
 	/* Find first not allocated vfport */
 	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if (dp_layer->ports[i]->dp_p_port_id == port_id && 
-			dp_layer->ports[i]->dp_p_type == DP_PORT_VF &&
+		if ((dp_layer->ports[i]->dp_p_type == type) &&
 			!dp_layer->ports[i]->dp_allocated)
 			return dp_layer->ports[i];
 	} 
@@ -176,9 +173,43 @@ struct dp_port* get_dp_vf_port_with_id(int port_id, struct dp_dpdk_layer *dp_lay
 	return NULL;
 }
 
-void dp_port_allocate(struct dp_port* port)
+int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
-	port->dp_allocated = 1;
+	int i;
+
+	/* Find first not allocated vfport */
+	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
+		if ((dp_layer->ports[i]->dp_p_type == type) &&
+			!dp_layer->ports[i]->dp_allocated)
+			return dp_layer->ports[i]->dp_port_id;
+	} 
+
+	return -1;
+}
+
+int dp_port_allocate(struct dp_dpdk_layer *dp_layer, struct dp_port_ext *port_ext, dp_port_type type)
+{
+	struct dp_port* vf_port;
+	int port_id = -1, ret;
+
+	if (type == DP_PORT_PF) {
+		port_id = dp_get_pf_port_id_with_name(dp_layer, port_ext->port_name);
+	} else {
+		vf_port = dp_get_next_avail_vf_port(dp_layer, type);
+		if (vf_port) {
+			port_id = vf_port->dp_port_id;
+			vf_port->dp_allocated = 1;
+		} else {
+			return port_id;
+		}
+	}
+	ret = rte_eth_dev_start(port_id);
+	if (ret < 0) {
+		rte_exit(EXIT_FAILURE,
+				"rte_eth_dev_start:err=%d, port=%u\n",
+				ret, port_id);
+	}
+	return port_id;
 }
 
 void dp_port_exit()

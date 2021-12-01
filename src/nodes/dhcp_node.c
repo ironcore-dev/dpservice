@@ -82,7 +82,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 
 	rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
 	incoming_ipv4_hdr->src_addr = htonl(dp_get_gw_ip4());
-	incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port) + 1);
+	incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port));
 	incoming_ipv4_hdr->hdr_checksum = 0;
 	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) + 
 										    sizeof(struct rte_udp_hdr) + sizeof(struct rte_ipv4_hdr));
@@ -93,7 +93,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	incoming_udp_hdr->dgram_cksum = rte_ipv4_phdr_cksum(incoming_ipv4_hdr, m->ol_flags);
 
 	dhcp_hdr->op = DP_BOOTP_REPLY;
-	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port) + 1);
+	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port));
 	dhcp_hdr->siaddr  = htonl(dp_get_gw_ip4());
 	dhcp_hdr->giaddr = htonl(dp_get_gw_ip4());
 	rte_memcpy(dhcp_hdr->chaddr, dp_get_mac(m->port), 6);

@@ -47,7 +47,6 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,16);
 
 	dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
-	//printf(RTE_ETHER_ADDR_PRT_FMT,RTE_ETHER_ADDR_BYTES(&req_eth_hdr->d_addr));
 	dp_set_neigh_ip6(m->port, req_ipv6_hdr->dst_addr);
 
 	

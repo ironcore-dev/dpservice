@@ -41,7 +41,7 @@ static __rte_always_inline int handle_geneve_encap(struct rte_mbuf *m)
 	df = get_dp_flow_ptr(m);
 	udp_hdr->src_port = htons(u_conf->src_port);
 
-	memcpy(geneve_hdr->vni, u_conf->vni, sizeof(u_conf->vni));
+	memcpy(geneve_hdr->vni, &df->dst_vni, sizeof(geneve_hdr->vni));
 	geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
 	geneve_hdr->protocol = htons(RTE_ETHER_TYPE_IPV4);
 	return 1;

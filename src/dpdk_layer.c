@@ -16,6 +16,7 @@
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
+static pthread_t ctrl_thread_tid;
 
 static const char * const default_patterns[] = {
 	"rx-*",
@@ -52,7 +53,7 @@ static void signal_handler(int signum)
 		printf("\n\nSignal %d received, preparing to exit...\n",
 		       signum);
 		force_quit = true;
-
+		pthread_cancel(ctrl_thread_tid);
 	}
 }
 
@@ -82,7 +83,6 @@ int dp_dpdk_init(int argc, char **argv)
 	if (rte_mbuf_dyn_flow_register() < 0)
 		printf("Error registering private mbuf field\n");
 
-	setup_lpm(rte_socket_id());
 	force_quit = false;
 
 	signal(SIGINT, signal_handler);
@@ -132,8 +132,30 @@ static void print_stats(void)
 }
 
 int dp_dpdk_main_loop()
-{
-	printf("DPDK main loop started\n ");	
+{/*
+	struct dp_port_ext pf_port;
+	int port_id, vni = 100, t_vni = 100, machine_id = 50;
+	int ip_addr = RTE_IPV4(172, 34, 0, 1);
+	uint8_t trgt_ip6[16];*/
+
+	printf("DPDK main loop started\n ");
+
+/*	port_id = dp_get_next_avail_vf_id(&dp_layer, DP_PORT_VF);
+	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+	dp_set_dhcp_range_ip4(port_id, ip_addr, 32, rte_eth_dev_socket_id(port_id));
+	dp_add_route(port_id, vni, 0, ip_addr, NULL, 32, rte_eth_dev_socket_id(port_id));
+	dp_start_interface(&pf_port, DP_PORT_VF);
+
+	ip_addr = RTE_IPV4(172, 35, 2, 4);
+	port_id = dp_get_next_avail_vf_id(&dp_layer, DP_PORT_VF);
+	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+	dp_set_dhcp_range_ip4(port_id, ip_addr, 32, rte_eth_dev_socket_id(port_id));
+	dp_add_route(port_id, vni, 0, ip_addr, NULL, 32, rte_eth_dev_socket_id(port_id));
+	dp_start_interface(&pf_port, DP_PORT_VF);
+
+	ip_addr = RTE_IPV4(192, 168, 129, 0);
+	inet_pton(AF_INET6, "2a10:afc0:e01f:209::", trgt_ip6);
+	dp_add_route(DP_PF_PORT, vni, t_vni, ip_addr, trgt_ip6, 24, rte_eth_dev_socket_id(port_id)); */
 
 	/* Launch per-lcore init on every worker lcore */
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
@@ -316,7 +338,6 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 			pf_port_id = port_id;
 			dp_port_flow_isolate(port_id);
 			dp_port_prepare(type, pf_port_id, port_id, &dp_port_ext);
-			dp_install_isolated_mode(port_id);
 			return 0;
 		}
 
@@ -482,8 +503,24 @@ int dp_init_graph()
 	gen_conf = *u_conf;
 }
 
+void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type)
+{
+	int port_id;
+	port_id = dp_port_allocate(&dp_layer, port_ext, type);
+	if (port_id < 0) {
+		printf("Can not allocate port\n ");
+		return;
+	}
+	if (type == DP_PORT_PF)
+		dp_install_isolated_mode(port_id);
+}
 
 struct dp_dpdk_layer *get_dpdk_layer()
 {
 	return &dp_layer;
+}
+
+pthread_t *dp_get_ctrl_thread_id()
+{
+	return &ctrl_thread_tid;
 }

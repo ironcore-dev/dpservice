@@ -1,4 +1,7 @@
 #include "dp_grpc_service.h"
+#include "dp_util.h"
+#include "dp_lpm.h"
+#include "dp_port.h"
 #include <rte_mbuf.h>
 
 
@@ -30,11 +33,59 @@ grpc::Status GRPCService::QueryHelloWorld(ServerContext* context, const Empty* r
 
 	if (rte_ring_sp_enqueue(this->dpdk_layer->grpc_queue, grpc_buf))
 		return grpc::Status::CANCELLED;
+
+	return grpc::Status::OK;
+}
+
+grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response)
+{
+	int vni, t_vni, port_id = 0;
+	uint8_t t_ip6[16];
+	struct in_addr ip_addr;
+	Route route;
+	VNIMsg vni_msg;
+	Prefix prefix;
+
+	vni_msg = request->vni();
+	route = request->route();
+	prefix = route.prefix();
+	vni = vni_msg.vni();
+	t_vni = route.nexthopvni();
+
+	inet_aton(prefix.address().c_str(), &ip_addr);
+	inet_pton(AF_INET6, route.nexthopaddress().c_str(), t_ip6);
+	printf("VNI %d  IPv4 %x length %d target ip6 %s target vni %d\n", vni, ntohl(ip_addr.s_addr), 
+		    prefix.prefixlength(), route.nexthopaddress().c_str(), t_vni);
+
+	dp_add_route(port_id, vni, t_vni, ntohl(ip_addr.s_addr), t_ip6, prefix.prefixlength(), rte_eth_dev_socket_id(port_id));
+
 	return grpc::Status::OK;
 }
 
 grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response)
 {
+	struct dp_port_ext pf_port;
+	IPConfig ipv4_conf;
+	int vni, port_id, machine_id;
+	struct in_addr ip_addr;
+
+	std::cout << "GRPC AddMachine called !! " << std::endl;
+	memset(&pf_port, 0, sizeof(pf_port));
+	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+
+	vni = request->vni();
+	ipv4_conf = request->ipv4config();
+	inet_aton(ipv4_conf.primaryaddress().c_str(), &ip_addr);
+	machine_id = atoi(request->machineid().c_str());
+	printf("VNI %d  IPv4 %x machine id %d\n", vni, ntohl(ip_addr.s_addr), machine_id);
+
+	port_id = dp_get_next_avail_vf_id(this->dpdk_layer, DP_PORT_VF);
+	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+	dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
+	dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
+
+	dp_start_interface(&pf_port, DP_PORT_VF);
+
 	return grpc::Status::OK;
 }
 
