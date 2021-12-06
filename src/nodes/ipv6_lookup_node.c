@@ -7,6 +7,7 @@
 #include "node_api.h"
 #include "nodes/ipv6_lookup_node.h"
 #include "nodes/dhcp_node.h"
+#include "nodes/dhcpv6_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 
@@ -36,7 +37,10 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 		u_conf = get_underlay_conf();
 		if (ntohs(udp_hdr->dst_port) == u_conf->src_port){
 			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-			return 1;
+			ret = IPV6_LOOKUP_NEXT_IPV6_DECAP;
+		}
+		else if (ntohs(udp_hdr->dst_port) == DHCPV6_SERVER_PORT) {
+			ret = IPV6_LOOKUP_NEXT_DHCPV6;
 		}
 	}
 
@@ -58,8 +62,7 @@ static __rte_always_inline uint16_t ipv6_lookup_node_process(struct rte_graph *g
 		mbuf0 = pkts[i];
 		route = handle_ipv6_lookup(mbuf0);
 		if (route)
-			rte_node_enqueue_x1(graph, node, IPV6_LOOKUP_NEXT_IPV6_DECAP, 
-								*objs);
+			rte_node_enqueue_x1(graph, node, route, *objs); 
 		else
 			rte_node_enqueue_x1(graph, node, IPV6_LOOKUP_NEXT_DROP, *objs);
 	}	
@@ -84,6 +87,7 @@ static struct rte_node_register ipv6_lookup_node_base = {
 		{
 			[IPV6_LOOKUP_NEXT_DROP] = "drop",
 			[IPV6_LOOKUP_NEXT_IPV6_DECAP] = "ipv6_decap",
+			[IPV6_LOOKUP_NEXT_DHCPV6] = "dhcpv6",
 		},
 };
 
