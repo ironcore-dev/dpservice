@@ -9,7 +9,7 @@
 #include "dp_lpm.h"
 
 struct dhcp_node_main dhcp_node;
-static int dhcp_packet_count[DP_MAX_PORTS] = {0};
+static uint8_t msg_type;
 
 static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -52,6 +52,25 @@ static uint32_t add_dhcp_option(uint8_t *pos, void *value, uint8_t opt, uint8_t 
 	return size + 2;
 }
 
+static void parse_options(struct dp_dhcp_header *dhcp_pkt, uint16_t tot_op_len){
+	uint8_t op;
+	uint8_t op_len;
+	for(int i = 0; i < tot_op_len; i+= op_len) {
+		op = dhcp_pkt->options[i];
+		i++;
+		op_len = dhcp_pkt->options[i];
+		i++;
+		switch(op) {
+			case DP_DHCP_MSG_TYPE:
+				msg_type = dhcp_pkt->options[i];
+			break;
+			default:
+			break;
+		}
+	}
+	return;
+}
+
 static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 {
 	struct dp_dhcp_header *dhcp_hdr;
@@ -62,7 +81,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	uint32_t dhcp_lease = DP_DHCP_INFINITE;
 	uint32_t dhcp_srv_ident, net_mask;
 	uint8_t vend_pos = 0;
-	uint16_t mtu;
+	uint16_t mtu, options_len;
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	incoming_ipv4_hdr = (struct rte_ipv4_hdr*) (incoming_eth_hdr + 1);
@@ -72,6 +91,9 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 									   + sizeof(struct rte_ipv4_hdr)
 									   + sizeof(struct rte_udp_hdr));
 
+	
+	options_len = rte_pktmbuf_data_len(m) - DHCP_FIXED_LEN - sizeof(struct rte_ether_hdr);
+	parse_options(dhcp_hdr, options_len);
 	
 	m->ol_flags = PKT_TX_IPV4 | PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM;
 	m->l2_len = sizeof(struct rte_ether_hdr);
@@ -92,32 +114,40 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	incoming_udp_hdr->src_port =  htons(DP_BOOTP_SRV_PORT);
 	incoming_udp_hdr->dgram_cksum = rte_ipv4_phdr_cksum(incoming_ipv4_hdr, m->ol_flags);
 
+	switch(msg_type) {
+		case DHCPDISCOVER:
+			dhcp_type = DP_DHCP_OFFER;
+			break;
+		case DHCPREQUEST:
+			dhcp_type = DP_DHCP_ACK;
+			dp_set_neigh_mac(m->port, &incoming_eth_hdr->s_addr);
+			break;
+		default:
+			return 0;
+
+	}
 	dhcp_hdr->op = DP_BOOTP_REPLY;
 	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port));
 	dhcp_hdr->siaddr  = htonl(dp_get_gw_ip4());
 	dhcp_hdr->giaddr = htonl(dp_get_gw_ip4());
 	rte_memcpy(dhcp_hdr->chaddr, dp_get_mac(m->port), 6);
-	memset(dhcp_hdr->vend, 0, sizeof(dhcp_hdr->vend));
+	memset(dhcp_hdr->options, 0, sizeof(dhcp_hdr->options));
 	dhcp_hdr->magic = htonl(DHCP_MAGIC_COOKIE);
 
 	dhcp_srv_ident = htonl(dp_get_gw_ip4());
 	net_mask = htonl(DP_DHCP_MASK);
 	mtu = htons(DP_DHCP_MTU_VALUE);
-	if (dhcp_packet_count[m->port] != 0) {
-		dp_set_neigh_mac(m->port, &incoming_eth_hdr->s_addr);
-		dhcp_type = DP_DHCP_ACK;
-	}	
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_type, DP_DHCP_MSG_TYPE, 1);
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &net_mask, DP_DHCP_SUBNET_MASK, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &mtu, DP_DHCP_MTU, 2);
+
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_type, DP_DHCP_MSG_TYPE, 1);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &net_mask, DP_DHCP_SUBNET_MASK, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &mtu, DP_DHCP_MTU, 2);
 	//vend_pos += add_dhcp_option(&dhcp_hdr->vend[vend_pos] , &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
 
-	dhcp_hdr->vend[vend_pos] = DP_DHCP_END;
+	dhcp_hdr->options[vend_pos] = DP_DHCP_END;
 
-	dhcp_packet_count[m->port]++; 
 	return 1;
 } 
 
