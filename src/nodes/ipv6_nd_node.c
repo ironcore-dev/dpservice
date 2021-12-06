@@ -30,13 +30,15 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	struct nd_msg *nd_msg;
 	struct icmp6hdr *req_icmp6_hdr;
 	uint8_t* own_ip6 = dp_get_ip6(m->port);
+	uint8_t* rt_ip = dp_get_gw_ip6();
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
 	nd_msg = (struct nd_msg*) (req_ipv6_hdr + 1);
 
-	if((memcmp(&nd_msg->target, own_ip6,16)) != 0) {
-		return 0;
+	if((memcmp(&nd_msg->target, own_ip6, 16)) != 0) {
+		printf("target mismatch:%d\n",m->port);
+		//return 0;
 	}
 	rte_ether_addr_copy(&req_eth_hdr->s_addr, &req_eth_hdr->d_addr);
 	rte_memcpy(req_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
@@ -44,30 +46,39 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,16);
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,16);
 
-	//dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
+	dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
+	//printf(RTE_ETHER_ADDR_PRT_FMT,RTE_ETHER_ADDR_BYTES(&req_eth_hdr->d_addr));
 	dp_set_neigh_ip6(m->port, req_ipv6_hdr->dst_addr);
+
 	
 	req_icmp6_hdr = &(nd_msg->icmph);
 	uint8_t type = req_icmp6_hdr->icmp6_type ;
 
-	if( type != NDISC_NEIGHBOUR_SOLICITATION) {
+	if( type != NDISC_NEIGHBOUR_SOLICITATION && type != NDISC_ROUTER_SOLICITATION) {
 		return 0;
 
 	}
-	req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
-	req_icmp6_hdr->icmp6_solicited	= 1;
-	req_icmp6_hdr->icmp6_override	= 1;
+	if( type == NDISC_NEIGHBOUR_SOLICITATION) {
+		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
+		req_icmp6_hdr->icmp6_solicited	= 1;
+		req_icmp6_hdr->icmp6_override	= 1;
+		// set target lladdr option and MAC
+		nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
+		nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
+		rte_memcpy(&nd_msg->opt[2],req_eth_hdr->s_addr.addr_bytes,6);
+	} else if (type == NDISC_ROUTER_SOLICITATION) {
+		req_icmp6_hdr->icmp6_type = NDISC_ROUTER_ADVERTISEMENT;
+		req_icmp6_hdr->icmp6_managed	= 1;
+		req_icmp6_hdr->icmp6_other	= 1;
+		req_icmp6_hdr->icmp6_rt_lifetime = 0xffff;
+		rte_memcpy(req_ipv6_hdr->src_addr, rt_ip,16);
 
-	// set target lladdr option and MAC
-	nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
-	nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
-	rte_memcpy(&nd_msg->opt[2],req_eth_hdr->s_addr.addr_bytes,6);
+	}
 
 	//L4 cksum calculation 
 	req_icmp6_hdr->icmp6_cksum	= 0;
 	req_icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_icmp6_hdr);
 
-	//printf("NA msg: type: %d\n",req_icmp6_hdr->icmp6_type);
 
 	return 1;
 

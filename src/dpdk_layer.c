@@ -9,6 +9,7 @@
 #include "nodes/arp_node_priv.h"
 #include "nodes/ipv6_nd_node.h"
 #include "nodes/dhcp_node.h"
+#include "nodes/dhcpv6_node.h"
 #include "nodes/l2_decap_node.h"
 #include "nodes/ipv6_encap_node.h"
 #include "nodes/geneve_encap_node.h"
@@ -23,6 +24,7 @@ static const char * const default_patterns[] = {
 	"ipv4_lookup",
 	"ipv6_lookup",
 	"dhcp",
+	"dhcpv6",
 	"l2_decap",
 	"ipv6_encap",
 	"ipv6_decap",
@@ -351,6 +353,7 @@ static int dp_init_graph()
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
+	struct rte_node_register *dhcpv6_node;
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
@@ -382,6 +385,7 @@ static int dp_init_graph()
 	l2_decap_node = l2_decap_node_get();
 	ipv6_encap_node = ipv6_encap_node_get();
 	dhcp_node = dhcp_node_get();
+	dhcpv6_node = dhcpv6_node_get();
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
 		snprintf(name, sizeof(name), "%u-%u", i, 0);
 		/* Clone a new rx node with same edges as parent */
@@ -416,6 +420,12 @@ static int dp_init_graph()
 			&next_nodes, 1);
 			ret = dhcp_set_next(
 				i, rte_node_edge_count(dhcp_node->id) - 1);
+			if (ret < 0)
+				return ret;
+			rte_node_edge_update(dhcpv6_node->id, RTE_EDGE_ID_INVALID,
+			&next_nodes, 1);
+			ret = dhcpv6_set_next(
+				i, rte_node_edge_count(dhcpv6_node->id) - 1);
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,

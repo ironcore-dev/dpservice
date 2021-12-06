@@ -13,6 +13,8 @@ extern "C" {
 /*
  *	ICMP codes for neighbour discovery messages
  */
+#define NDISC_ROUTER_SOLICITATION	133
+#define NDISC_ROUTER_ADVERTISEMENT	134
 #define NDISC_NEIGHBOUR_SOLICITATION	135
 #define NDISC_NEIGHBOUR_ADVERTISEMENT	136
 
@@ -62,6 +64,9 @@ struct icmp6hdr {
 #define icmp6_override		icmp6_dataun.u_nd_advt.override
 #define icmp6_ndiscreserved	icmp6_dataun.u_nd_advt.reserved
 #define icmp6_hop_limit		icmp6_dataun.u_nd_ra.hop_limit
+#define icmp6_managed		icmp6_dataun.u_nd_ra.managed
+#define icmp6_other		icmp6_dataun.u_nd_ra.other
+#define icmp6_rt_lifetime	icmp6_dataun.u_nd_ra.rt_lifetime
 };
 
 

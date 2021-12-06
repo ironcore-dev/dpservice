@@ -36,6 +36,7 @@ void setup_lpm(const int socketid);
 int lpm_get_ip4_dst_port(const struct rte_ipv4_hdr *ipv4_hdr, int socketid);
 
 uint32_t dp_get_gw_ip4();
+uint8_t* dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_ip6(uint16_t portid);
 int dp_add_route(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
