@@ -4,15 +4,6 @@ static struct vm_entry vm_table[DP_MAX_PORTS];
 
 static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static uint8_t dp_router_gw_ip6[16] = {0xfe,0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
-/*TODO This should come from netlink */
-static struct rte_ether_addr pf_neigh_mac = 
-								{.addr_bytes[0] = 0x90,
-								.addr_bytes[1] = 0x3c,
-								.addr_bytes[2] = 0xb3,
-								.addr_bytes[3] = 0x33,
-								.addr_bytes[4] = 0x72,
-								.addr_bytes[5] = 0xfb,
-								};
 
 uint32_t dp_get_gw_ip4() {
 	return dp_router_gw_ip4;

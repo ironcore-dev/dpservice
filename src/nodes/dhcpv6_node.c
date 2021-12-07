@@ -12,7 +12,6 @@ struct dhcpv6_node_main dhcpv6_node;
 static struct client_id cid;
 static struct server_id  sid;
 static struct ia_option recv_ia;
-static struct ia_addr_option recv_ia_addr;
 static struct rapid_commit rapid;
 uint8_t client_id_len;
 
