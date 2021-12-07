@@ -18,7 +18,14 @@ extern "C" {
 #define DP_DHCP_SUBNET_MASK	0x01
 #define DP_DHCP_MTU			0x1A
 
+/* DHCP message types. */
+#define DHCPDISCOVER	1
+#define DHCPOFFER	2
+#define DHCPREQUEST	3
+#define DHCPDECLINE	4
+#define DHCPACK	5
 #define DP_DHCP_LEASE_MSG	0x33
+
 #define DP_DHCP_ROUTER		0x03
 #define DP_DHCP_END			0xFF
 #define DP_DHCP_OFFER		0x02
@@ -28,6 +35,16 @@ extern "C" {
 #define DP_DHCP_MTU_VALUE	0x005DC
 
 #define DHCP_MAGIC_COOKIE 0x63825363
+
+#define DHCP_UDP_OVERHEAD	(20 + /* IP header */			\
+			    	8)   /* UDP header */
+#define DHCP_FIXED_NON_UDP	236 + 4 /* Magic cookie 4 bytes */
+#define DHCP_FIXED_LEN	(DHCP_FIXED_NON_UDP + DHCP_UDP_OVERHEAD)
+#define DHCP_MTU_MAX	1500
+#define DHCP_MTU_MIN	576
+
+#define DHCP_MAX_OPTION_LEN	(DHCP_MTU_MAX - DHCP_FIXED_LEN)
+#define DHCP_MIN_OPTION_LEN     (DHCP_MTU_MIN - DHCP_FIXED_LEN)
 
 #define DHCP_HEADER_LEN 236
 
@@ -47,7 +64,7 @@ struct dp_dhcp_header {
 	char		sname[64];
 	char		file[128];
 	uint32_t	magic;
-	uint8_t		vend[60];
+	uint8_t		options[DHCP_MIN_OPTION_LEN];
 };
 #define DP_DHCP_HEADER_LEN == sizeof(struct dp_dhcp_header))
 
