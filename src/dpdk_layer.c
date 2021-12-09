@@ -267,10 +267,8 @@ static void dp_install_isolated_mode(int port_id)
 
 	memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
 	memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
-	udp_spec.hdr.dst_port = htons(u_conf->src_port);
-	udp_spec.hdr.src_port = htons(u_conf->dst_port);
+	udp_spec.hdr.dst_port = htons(u_conf->dst_port);
 	udp_mask.hdr.dst_port = 0xffff;
-	udp_mask.hdr.src_port = 0xffff;
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
 	pattern[pattern_cnt].spec = &udp_spec;
 	pattern[pattern_cnt].mask = &udp_mask;
@@ -434,7 +432,7 @@ int dp_init_graph()
 			rte_node_edge_update(dhcpv6_node->id, RTE_EDGE_ID_INVALID,
 			&next_nodes, 1);
 			ret = dhcpv6_set_next(
-				i, rte_node_edge_count(dhcpv6_node->id) - 1);
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(dhcpv6_node->id) - 1);
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,

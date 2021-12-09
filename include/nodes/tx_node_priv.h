@@ -13,6 +13,13 @@ enum
 	TX_NEXT_MAX
 };
 
+enum
+{
+	DP_ROUTE_TO_VM,
+	DP_ROUTE_TO_VM_DECAPPED,
+	DP_ROUTE_TO_PF_ENCAPPED,
+};
+
 struct tx_node_ctx
 {
 	uint16_t port_id;

@@ -47,8 +47,6 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 
 	udp_hdr->dgram_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
 	udp_hdr->dgram_cksum = rte_ipv6_phdr_cksum(ipv6_hdr, m->ol_flags);
-	/*TODO do not offload yet but this needs to be offloaded */
-	df->valid = 0;
 
 	return 1;
 } 

@@ -20,10 +20,8 @@ struct dp_flow {
 	uint8_t					nxt_hop;
 	uint16_t				dst_port;
 	uint16_t				src_port;
-	union {
-		uint32_t			dst_addr;
-		uint8_t				dst_addr6[16];
-	};
+	uint32_t				dst_addr;
+	uint8_t					dst_addr6[16];
 	uint32_t				src_addr;
 	uint32_t				dst_vni;
 	uint8_t					l4_type;

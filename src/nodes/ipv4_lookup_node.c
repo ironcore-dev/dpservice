@@ -86,11 +86,16 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 			df_ptr->dst_vni = route.vni;
 		else /* Outer world -> VM */
 			df_ptr->dst_vni = t_vni;
-		rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
-		/* TODO disable whole offloading for now till PF ports are handled as well */
-		df_ptr->valid = 0;
-		if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2))
+
+		if (df_ptr->nxt_hop == DP_PF_PORT)
+			rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
+		/* TODO disabled pf ingress offloading for now till PF ports are handled as well */
+		if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2)) {
 			df_ptr->geneve_hdr = 1;
+			df_ptr->valid = 0;
+		} else {
+			df_ptr->valid = 1;
+		}
 	}
 	return ret;
 }

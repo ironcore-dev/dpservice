@@ -37,6 +37,8 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
+	struct underlay_conf *u_conf = get_underlay_conf();
+	int res = 0, route_direct = DP_ROUTE_TO_VM;
 	struct rte_flow_action_set_mac flow_mac;
 	struct rte_flow_item_eth eth_spec;
 	struct rte_flow_item_eth eth_mask;
@@ -49,9 +51,20 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
 	struct rte_flow *flow;
-	int res;
+	int encap_size = sizeof(struct rte_ether_hdr) +
+					 sizeof(struct rte_ipv6_hdr) +
+					 sizeof(struct rte_udp_hdr) +
+					 sizeof(struct rte_flow_item_geneve);
+	uint8_t encap_hdr[encap_size];
+	uint8_t decap_hdr[sizeof(struct rte_ether_hdr)];
 
-	if (df->nxt_hop != DP_PF_PORT) { 
+	/* First find out the packet direction */
+	if (df->nxt_hop == DP_PF_PORT)
+		route_direct = DP_ROUTE_TO_PF_ENCAPPED;
+	else if ((df->nxt_hop > DP_PF_PORT) && (df->geneve_hdr))
+		route_direct = DP_ROUTE_TO_VM_DECAPPED;
+
+	if ((route_direct == DP_ROUTE_TO_VM) || (route_direct == DP_ROUTE_TO_PF_ENCAPPED)) {
 		memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
 		memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
 		eth_spec.type = htons(RTE_ETHER_TYPE_IPV4);
@@ -106,41 +119,75 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 			df->pattern[df->pattern_cnt].mask = &icmp_mask;
 			df->pattern_cnt++;
 		}
+	}
+	df->pattern[df->pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
+	df->pattern_cnt++;
 
-		df->pattern[df->pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
-		df->pattern_cnt++;
+	if (route_direct == DP_ROUTE_TO_PF_ENCAPPED) {
+		memset(encap_hdr, 0, encap_size);
+		memset(decap_hdr, 0, sizeof(struct rte_ether_hdr));
+		df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_DECAP;
+		struct rte_flow_action_raw_decap raw_decap = {.data = decap_hdr, .size = sizeof(struct rte_ether_hdr)};
+		df->action[df->action_cnt].conf = &raw_decap;
+		df->action_cnt++;
 
+		df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_ENCAP;
+		struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *) encap_hdr;
+		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->d_addr);
+		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->s_addr);
+		new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
+
+		struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr*)(&encap_hdr[sizeof(struct rte_ether_hdr)]);
+		new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
+		new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
+		new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
+		rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
+		rte_memcpy(new_ipv6_hdr->dst_addr, df->dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
+
+		struct rte_udp_hdr *new_udp_hdr = (struct rte_udp_hdr*)(new_ipv6_hdr + 1);
+		new_udp_hdr->src_port = htons(u_conf->src_port); /* TODO this should come via df pointer */
+		new_udp_hdr->dst_port = htons(u_conf->dst_port);
+		//new_udp_hdr->dgram_cksum = 0x2525;
+
+		struct rte_flow_item_geneve *new_geneve_hdr = (struct rte_flow_item_geneve*)(new_udp_hdr + 1);
+		rte_memcpy(new_geneve_hdr->vni, &df->dst_vni, sizeof(new_geneve_hdr->vni));
+		new_geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
+		new_geneve_hdr->protocol = htons(RTE_ETHER_TYPE_IPV4);
+
+		struct rte_flow_action_raw_encap raw_encap = {.data = encap_hdr, .size = encap_size};
+		df->action[df->action_cnt].conf = &raw_encap;
+		df->action_cnt++;
+	} else if (route_direct == DP_ROUTE_TO_VM) {
 		df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_DST;
 		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), (struct rte_ether_addr *)flow_mac.mac_addr);
 		df->action[df->action_cnt].conf = &flow_mac;
 		df->action_cnt++;
-		
+
 		df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_SRC;
 		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), (struct rte_ether_addr *)flow_mac.mac_addr);
 		df->action[df->action_cnt].conf = &flow_mac;
 		df->action_cnt++;
-
-		df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_PORT_ID;
-		struct rte_flow_action_port_id nport_id = {.original = 0, .reserved= 0, .id = df->nxt_hop};
-		df->action[df->action_cnt].conf = &nport_id;
-		df->action_cnt++;
-		df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_END;
-		df->action_cnt++;
-
-		struct rte_flow_error error;
-		res = rte_flow_validate(m->port, &df->attr, df->pattern, df->action, &error);
-
-		if (res) { 
-			printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
-			return 0;
-		} else {
-			printf("Flow validated on port %d targeting port %d \n ", m->port, df->nxt_hop);
-			flow = rte_flow_create(m->port, &df->attr, df->pattern, df->action, &error);
-			if (!flow)
-				printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
-		}
-		return 1;
 	}
+	df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_PORT_ID;
+	struct rte_flow_action_port_id nport_id = {.original = 0, .reserved= 0, .id = df->nxt_hop};
+	df->action[df->action_cnt].conf = &nport_id;
+	df->action_cnt++;
+	df->action[df->action_cnt].type = RTE_FLOW_ACTION_TYPE_END;
+	df->action_cnt++;
+
+	struct rte_flow_error error;
+	res = rte_flow_validate(m->port, &df->attr, df->pattern, df->action, &error);
+
+	if (res) { 
+		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+		return 0;
+	} else {
+		printf("Flow validated on port %d targeting port %d \n ", m->port, df->nxt_hop);
+		flow = rte_flow_create(m->port, &df->attr, df->pattern, df->action, &error);
+		if (!flow)
+			printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+	return 1;
 
 	return 0;
 }
