@@ -139,6 +139,14 @@ int dp_parse_args(int argc, char **argv)
 	return ret;
 }
 
+int dp_is_offload_enabled()
+{
+	if (no_offload)
+		return 0;
+	else
+		return 1;
+}
+
 int dp_is_stats_enabled()
 {
 	if (no_stats)

@@ -8,6 +8,7 @@
 #include "nodes/ipv4_lookup_priv.h"
 #include "nodes/dhcp_node.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_util.h"
 #include "dp_lpm.h"
 
 struct ipv4_lookup_node_main ipv4_lookup_node;
@@ -87,12 +88,9 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 
 		if (df_ptr->nxt_hop == DP_PF_PORT)
 			rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
-		/* TODO disabled pf ingress offloading for now till PF ports are handled as well */
-		if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2)) {
+
+		if (dp_is_offload_enabled())
 			df_ptr->valid = 1;
-		} else {
-			df_ptr->valid = 1;
-		}
 	}
 	return ret;
 }
