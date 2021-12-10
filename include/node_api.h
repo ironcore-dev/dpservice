@@ -8,14 +8,7 @@
 extern "C" {
 #endif
 
-#define DP_MAX_PATT_ACT	4
-
 struct dp_flow {
-	struct rte_flow_attr	attr;
-	struct rte_flow_item	pattern[DP_MAX_PATT_ACT];
-	struct rte_flow_action	action[DP_MAX_PATT_ACT];
-	uint8_t					pattern_cnt;
-	uint8_t					action_cnt;
 	uint8_t					valid;
 	uint8_t					nxt_hop;
 	uint16_t				dst_port;

@@ -43,34 +43,35 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
 		rte_memcpy(&t_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
+		df.geneve_hdr = 1;
 	} else {
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 										  sizeof(struct rte_ether_hdr));
-		if (ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP) {
-			tcp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *,
-								sizeof(struct rte_ether_hdr)
-								+ sizeof(struct rte_ipv4_hdr));
-			df.dst_port = tcp_hdr->dst_port;
-			df.src_port = tcp_hdr->src_port;
-		} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
-			udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
-											sizeof(struct rte_ether_hdr)
-											+ sizeof(struct rte_ipv4_hdr));
-			if (ntohs(udp_hdr->dst_port) == DP_BOOTP_SRV_PORT)
-				 return DP_ROUTE_DHCP;
-			df.dst_port = udp_hdr->dst_port;
-			df.src_port = udp_hdr->src_port;
-		} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_ICMP) {
-			icmp_hdr = (struct rte_icmp_hdr *)rte_pktmbuf_mtod_offset(m,
-											struct rte_udp_hdr *,
-											sizeof(struct rte_ether_hdr)
-											+ sizeof(struct rte_ipv4_hdr));
-			df.icmp_type = icmp_hdr->icmp_type;
-		}
-		df.dst_addr = ipv4_hdr->dst_addr;
-		df.src_addr = ipv4_hdr->src_addr;
-		df.l4_type = ipv4_hdr->next_proto_id;
 	}
+	if (ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP) {
+		tcp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *,
+							sizeof(struct rte_ether_hdr)
+							+ sizeof(struct rte_ipv4_hdr));
+		df.dst_port = tcp_hdr->dst_port;
+		df.src_port = tcp_hdr->src_port;
+	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
+		udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
+										sizeof(struct rte_ether_hdr)
+										+ sizeof(struct rte_ipv4_hdr));
+		if ((ntohs(udp_hdr->dst_port) == DP_BOOTP_SRV_PORT) && !df.geneve_hdr)
+				return DP_ROUTE_DHCP;
+		df.dst_port = udp_hdr->dst_port;
+		df.src_port = udp_hdr->src_port;
+	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_ICMP) {
+		icmp_hdr = (struct rte_icmp_hdr *)rte_pktmbuf_mtod_offset(m,
+										struct rte_udp_hdr *,
+										sizeof(struct rte_ether_hdr)
+										+ sizeof(struct rte_ipv4_hdr));
+		df.icmp_type = icmp_hdr->icmp_type;
+	}
+	df.dst_addr = ipv4_hdr->dst_addr;
+	df.src_addr = ipv4_hdr->src_addr;
+	df.l4_type = ipv4_hdr->next_proto_id;
 
 	ret = lpm_get_ip4_dst_port(m->port, t_vni, ipv4_hdr, &route, rte_eth_dev_socket_id(m->port));
 	if (ret >= 0) {
@@ -78,9 +79,6 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		df_ptr = alloc_dp_flow_ptr(m);
 		if (!df_ptr)
 			return DP_ROUTE_DROP;
-		df.attr.ingress = 1;
-		df.attr.priority = 0;
-		df.attr.transfer = 1;
 		rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
 		if (!t_vni) /* VM -> Outer world */
 			df_ptr->dst_vni = route.vni;
@@ -91,8 +89,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 			rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
 		/* TODO disabled pf ingress offloading for now till PF ports are handled as well */
 		if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2)) {
-			df_ptr->geneve_hdr = 1;
-			df_ptr->valid = 0;
+			df_ptr->valid = 1;
 		} else {
 			df_ptr->valid = 1;
 		}
