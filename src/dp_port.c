@@ -95,7 +95,7 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 
 	/* Configuring number of RX and TX queues connected to single port. 8< */
 	for (i = 0; i < port->dp_layer->nr_rx_queues; i++) {
-		ret = rte_eth_rx_queue_setup(port_id, i, 512,
+		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
 									rte_eth_dev_socket_id(port_id),
 									&rxq_conf,
 									port->dp_layer->rte_mempool);
@@ -113,7 +113,7 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 	txq_conf.offloads = port_conf.txmode.offloads;
 
 	for (i = 0; i < port->dp_layer->nr_tx_queues; i++) {
-		ret = rte_eth_tx_queue_setup(port_id, i, 512,
+		ret = rte_eth_tx_queue_setup(port_id, i, 2048,
 									rte_eth_dev_socket_id(port_id),
 									&txq_conf);
 		if (ret != 0) {

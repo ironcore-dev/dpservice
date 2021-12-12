@@ -16,7 +16,7 @@ extern "C" {
 #define DP_MAX_VF_PRO_PORT	4
 #define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
 #define DP_NR_RX_QUEUES		1
-#define DP_NR_TX_QUEUES		2
+#define DP_NR_TX_QUEUES		1
 #define MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		1
 

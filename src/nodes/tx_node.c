@@ -282,7 +282,6 @@ static __rte_always_inline int handle_flow(struct rte_mbuf *m)
 	df = get_dp_flow_ptr(m);
 	if (df && df->valid)
 		handle_offload(m, df);
-	rte_free(df);
 	return 1;
 }
 

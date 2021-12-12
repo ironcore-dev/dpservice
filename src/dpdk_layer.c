@@ -80,9 +80,6 @@ int dp_dpdk_init(int argc, char **argv)
 	if (!dp_layer.grpc_queue)
 		printf("Error creating grpc queue\n");
 
-	if (rte_mbuf_dyn_flow_register() < 0)
-		printf("Error registering private mbuf field\n");
-
 	force_quit = false;
 
 	signal(SIGINT, signal_handler);
