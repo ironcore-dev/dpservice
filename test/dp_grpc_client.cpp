@@ -53,7 +53,7 @@ static int length;
 #define CMD_LINE_OPT_T_VNI			"t_vni"
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
 #define CMD_LINE_OPT_ADD_ROUTE		"addroute"
-#define CMD_LINE_OPT_PRIMARY_IPV6	"t_ipv6"
+#define CMD_LINE_OPT_PRIMARY_IPV6	"ipv6"
 #define CMD_LINE_OPT_LENGTH			"length"
 
 enum {
@@ -167,11 +167,14 @@ public:
 			AddMachineResponse response;
 			ClientContext context;
 			IPConfig *ip_config = new IPConfig();
+			IPConfig *ipv6_config = new IPConfig();
 
 			ip_config->set_primaryaddress(ip_str);
+			ipv6_config->set_primaryaddress(ip6_str);
 			request.set_machineid(machine_str);
 			request.set_vni(vni);
 			request.set_allocated_ipv4config(ip_config);
+			request.set_allocated_ipv6config(ipv6_config);
 			request.set_machinetype(dpdkonmetal::MachineType::VirtualMachine);
 			stub_->addMachine(&context, request, &response);
 	}
@@ -214,7 +217,7 @@ int main(int argc, char** argv)
 	case DP_CMD_ADD_MACHINE:
 		dpdk_client.AddMachine();
 		std::cout << "Addmachine called " << std::endl;
-		printf("IP %s\n", ip_str);
+		printf("IP %s, IPv6 %s\n", ip_str,ip6_str);
 		break;
 	case DP_CMD_ADD_ROUTE:
 		dpdk_client.AddRoute();

@@ -14,6 +14,7 @@ static struct server_id  sid;
 static struct ia_option recv_ia;
 static struct rapid_commit rapid;
 uint8_t client_id_len;
+static uint8_t port_id;
 
 
 void parse_options(struct dhcpv6_packet* dhcp_pkt, uint8_t len) {
@@ -49,7 +50,7 @@ void prepare_ia_option() {
 	recv_ia.val.addrv6.len = htons(sizeof(struct ia_addr));
 	recv_ia.val.addrv6.addr.time_1 = INFINITY;
 	recv_ia.val.addrv6.addr.time_2 = INFINITY;
-	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_ip6(2),16);
+	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_ip6(port_id),16);
 
 	recv_ia.val.addrv6.addr.code.op = htons(DP_STATUS_CODE);
 	recv_ia.val.addrv6.addr.code.len = htons(2);
@@ -78,6 +79,7 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	uint8_t* own_ip6 = dp_get_ip6(m->port);
 	uint8_t offset = 0;
 	uint8_t index = 0;
+	port_id = m->port;
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
