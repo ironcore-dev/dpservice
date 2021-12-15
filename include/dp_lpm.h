@@ -53,6 +53,7 @@ uint32_t dp_get_gw_ip4();
 uint8_t* dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_ip6(uint16_t portid);
+uint8_t* dp_get_neigh_ip6(uint16_t portid);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 uint8_t* ip6, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);

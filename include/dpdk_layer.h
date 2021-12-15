@@ -3,6 +3,8 @@
 
 #include <rte_node_eth_api.h>
 #include <rte_graph_worker.h>
+#include <rte_timer.h>
+#include <rte_cycles.h>
 
 #include <signal.h>
 #include <pthread.h>
@@ -37,6 +39,7 @@ struct dp_dpdk_layer {
 	struct							rte_graph *graph;
 	rte_graph_t 					graph_id;
 	struct rte_ring					*grpc_queue;
+	struct rte_ring					*periodic_msg_queue;
 };
 
 struct underlay_conf {

@@ -26,6 +26,12 @@ uint8_t* dp_get_ip6(uint16_t portid)
 	return vm_table[portid].info.own_ipv6;
 }
 
+uint8_t* dp_get_neigh_ip6(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].info.neigh_ipv6;
+}
+
 static struct rte_rib* get_lpm(int vni, const int socketid)
 {
 	int i;

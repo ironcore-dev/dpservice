@@ -2,14 +2,13 @@
 #define __INCLUDE_IPV6_ND_NODE_H__
 
 #include "dpdk_layer.h"
-//#include <linux/icmpv6.h>
-//#include <linux/in6.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
+#define DP_IP_PROTO_ICMPV6 0x3a
 /*
  *	ICMP codes for neighbour discovery messages
  */
@@ -74,6 +73,17 @@ struct nd_msg {
 	struct icmp6hdr	icmph;
 	struct in6_addr	target;
 	uint8_t	opt[];
+};
+
+struct rs_msg {
+	struct icmp6hdr	icmph;
+	uint8_t	opt[];
+};
+
+struct ra_msg {
+        struct icmp6hdr		icmph;
+	uint32_t	reachable_time;
+	uint32_t	retrans_timer;
 };
 
 

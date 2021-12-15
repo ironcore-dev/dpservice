@@ -92,7 +92,13 @@ static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m){
 	struct icmp6hdr *req_icmp6_hdr;
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	if ( req_eth_hdr->ether_type != htons(RTE_ETHER_TYPE_IPV6)) 
+		return 0;
+	
 	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
+	if ( req_ipv6_hdr->proto != DP_IP_PROTO_ICMPV6) 
+		return 0;
+
 	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr + 1);
 	uint8_t type = req_icmp6_hdr->icmp6_type ;
 

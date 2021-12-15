@@ -13,13 +13,18 @@
 #include "nodes/l2_decap_node.h"
 #include "nodes/ipv6_encap_node.h"
 #include "nodes/geneve_encap_node.h"
+#include "nodes/rx_periodic_node.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
 static pthread_t ctrl_thread_tid;
+static struct rte_timer timer;
+static uint64_t timer_res;
+static struct rte_mbuf *pkt_buf;
 
 static const char * const default_patterns[] = {
 	"rx-*",
+	"rx-periodic",
 	"cls",
 	"arp",
 	"ipv6_nd",
@@ -57,9 +62,58 @@ static void signal_handler(int signum)
 	}
 }
 
+static void timer_cb () {
+	struct rte_ether_hdr *eth_hdr;
+	struct rte_ipv6_hdr *ipv6_hdr;
+	struct rs_msg *rs_msg;
+	struct icmp6hdr *icmp6_hdr;
+	uint16_t pkt_size;
+
+	pkt_buf = rte_pktmbuf_alloc(dp_layer.rte_mempool);
+	if(pkt_buf == NULL) {
+		printf("rte_mbuf allocation failed\n");
+	}
+	
+	eth_hdr = rte_pktmbuf_mtod(pkt_buf, struct rte_ether_hdr *);
+	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
+	rs_msg = (struct rs_msg*) (ipv6_hdr + 1);
+
+	memset(&eth_hdr->s_addr, 0xFF, RTE_ETHER_ADDR_LEN);
+    memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
+	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
+
+	ipv6_hdr->proto = 0x3a; //ICMP6
+	ipv6_hdr->vtc_flow = htonl(0x60000000);
+	ipv6_hdr->hop_limits = 255;
+	memset(ipv6_hdr->src_addr,0xff,16);
+	memset(ipv6_hdr->dst_addr,0xff,16);
+	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr));
+
+	
+	icmp6_hdr = &(rs_msg->icmph);
+	memset(icmp6_hdr,0,sizeof(struct icmp6hdr));
+	icmp6_hdr->icmp6_type = 133;
+	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + sizeof(struct ra_msg);
+	pkt_buf->data_len = pkt_size;
+    pkt_buf->pkt_len = pkt_size;
+
+	// send pkt to all allocated VFs
+	for (int i = 0; i < dp_layer.dp_port_cnt; i++) {
+		if ((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
+			dp_layer.ports[i]->dp_allocated) {
+			pkt_buf->port = dp_layer.ports[i]->dp_port_id;
+			rte_ring_sp_enqueue(dp_layer.periodic_msg_queue, pkt_buf);
+
+			}
+	}
+
+}
+
 int dp_dpdk_init(int argc, char **argv)
 {
 	int ret;
+	uint64_t hz;
+	uint8_t lcore_id;
 
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0)
@@ -79,6 +133,19 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.grpc_queue = rte_ring_create("grpc_queue", 256, rte_socket_id(), 0);
 	if (!dp_layer.grpc_queue)
 		printf("Error creating grpc queue\n");
+	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 256, rte_socket_id(), 0);
+	if (!dp_layer.periodic_msg_queue)
+		printf("Error creating periodic_msg_queue queue\n");
+
+	// init the timer subsystem
+	rte_timer_subsystem_init();
+	//init the timer
+	rte_timer_init(&timer);
+
+	hz = rte_get_timer_hz();
+	timer_res = hz * 10; // 10 seconds
+	lcore_id = rte_lcore_id();
+	rte_timer_reset(&timer, hz*30, PERIODICAL, lcore_id, timer_cb, NULL);
 
 	force_quit = false;
 
@@ -88,14 +155,16 @@ int dp_dpdk_init(int argc, char **argv)
 	return ret;
 }
 
+
 static int graph_main_loop()
 {	
 	struct rte_graph *graph;
-
-	while (!force_quit) {
-			graph = dp_layer.graph;
-			rte_graph_walk(graph);
-	}
+	
+	while (!force_quit) {	
+		graph = dp_layer.graph;
+		rte_graph_walk(graph);	
+		}	
+	
 	return 0;
 }
 
@@ -118,14 +187,29 @@ static void print_stats(void)
 	if (stats == NULL)
 		rte_exit(EXIT_FAILURE, "Unable to create stats object\n");
 
-	while (!force_quit) {
-		/* Clear screen and move to top left */
-		printf("%s%s", clr, topLeft);
-		rte_graph_cluster_stats_get(stats, 0);
-		sleep(1);
-	}
+	/* Clear screen and move to top left */
+	printf("%s%s", clr, topLeft);
+	rte_graph_cluster_stats_get(stats, 0);
+	sleep(1);
 
 	rte_graph_cluster_stats_destroy(stats);
+}
+
+static int main_core_loop() {
+	uint64_t prev_tsc=0, cur_tsc;
+	while (!force_quit) {
+		/* Accumulate and print stats on main until exit */
+		if (dp_is_stats_enabled() && rte_graph_has_stats_feature()) {
+			print_stats();
+	}
+		cur_tsc = rte_get_timer_cycles();
+		if((cur_tsc - prev_tsc) > timer_res) {
+			rte_timer_manage();
+			prev_tsc = cur_tsc;
+		}
+	}
+	
+	return 0;
 }
 
 int dp_dpdk_main_loop()
@@ -134,6 +218,7 @@ int dp_dpdk_main_loop()
 	int port_id, vni = 100, t_vni = 100, machine_id = 50;
 	int ip_addr = RTE_IPV4(172, 34, 0, 1);
 	uint8_t trgt_ip6[16];*/
+	
 
 	printf("DPDK main loop started\n ");
 
@@ -154,12 +239,12 @@ int dp_dpdk_main_loop()
 	inet_pton(AF_INET6, "2a10:afc0:e01f:209::", trgt_ip6);
 	dp_add_route(DP_PF_PORT, vni, t_vni, ip_addr, trgt_ip6, 24, rte_eth_dev_socket_id(port_id)); */
 
+	
 	/* Launch per-lcore init on every worker lcore */
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
 
-	/* Accumulate and print stats on main until exit */
-	if (dp_is_stats_enabled() && rte_graph_has_stats_feature())
-		print_stats();
+	/* Launch timer loop on main core */
+	main_core_loop();
 
 	return 0;
 }
@@ -362,6 +447,7 @@ int dp_init_graph()
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
 	struct rx_node_config rx_cfg;
+	struct rx_periodic_node_config rx_periodic_cfg;
 	int ret, i, id;
 	struct rte_graph_param graph_conf;
 	const char **node_patterns;
@@ -390,6 +476,12 @@ int dp_init_graph()
 	ipv6_encap_node = ipv6_encap_node_get();
 	dhcp_node = dhcp_node_get();
 	dhcpv6_node = dhcpv6_node_get();
+
+	rx_periodic_cfg.periodic_msg_queue = dp_layer.periodic_msg_queue;
+	//rx_periodic_cfg.queue_id = 0;
+	ret = config_rx_periodic_node(&rx_periodic_cfg);
+
+
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
 		snprintf(name, sizeof(name), "%u-%u", i, 0);
 		/* Clone a new rx node with same edges as parent */
