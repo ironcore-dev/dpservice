@@ -415,10 +415,10 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 
 		if_indextoname(dev_info.if_index, ifname);
 		if ((type == DP_PORT_PF) && (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0)) {
-			pf_port_id = port_id;
 			dp_port_flow_isolate(port_id);
-			dp_port_prepare(type, pf_port_id, port_id, &dp_port_ext);
-			return 0;
+			dp_port_prepare(type, port_id, &dp_port_ext);
+			dp_add_pf_port_id(port_id);
+			return port_id;
 		}
 
 		dp_get_vf_name_from_pf_name(ifname_v, dp_port_ext.port_name);
@@ -427,15 +427,15 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 			if (cnt == last_assigned_vf_idx) {
 				pf_port_id = dp_get_pf_port_id_with_name(&dp_layer, dp_port_ext.port_name);
 				if (pf_port_id < 0)
-					return 0;
+					return -1;
 				dp_port_prepare(type, pf_port_id, port_id, &dp_port_ext);
 				last_assigned_vf_idx++;
-				return 0;
+				return port_id;
 			}
 			cnt++;
 		}	
 	}
-	return 0;
+	return -1;
 }
 
 int dp_init_graph()
@@ -483,7 +483,7 @@ int dp_init_graph()
 
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
-		snprintf(name, sizeof(name), "%u-%u", i, 0);
+		snprintf(name, sizeof(name), "%u-%u", dp_layer.ports[i]->dp_port_id, 0);
 		/* Clone a new rx node with same edges as parent */
 		id = rte_node_clone(rx_node->id, name);
 		if (id == RTE_NODE_ID_INVALID)
@@ -494,11 +494,12 @@ int dp_init_graph()
 		rx_cfg.grpc_queue = dp_layer.grpc_queue;
 		ret = config_rx_node(&rx_cfg);
 
-		snprintf(name, sizeof(name), "%u", i);
+		snprintf(name, sizeof(name), "%u", dp_layer.ports[i]->dp_port_id);
 		id = rte_node_clone(tx_node->id, name);
 		tx_node_data->nodes[dp_layer.ports[i]->dp_port_id] = id;
+		tx_node_data->port_ids[dp_layer.ports[i]->dp_port_id] = dp_layer.ports[i]->dp_port_id;
 
-		snprintf(name, sizeof(name), "tx-%u", i);
+		snprintf(name, sizeof(name), "tx-%u", dp_layer.ports[i]->dp_port_id);
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF) {
 			rte_node_edge_update(arp_node->id, RTE_EDGE_ID_INVALID,
 						&next_nodes, 1);
@@ -536,7 +537,7 @@ int dp_init_graph()
 			rte_node_edge_update(ipv6_encap_node->id, RTE_EDGE_ID_INVALID,
 			&next_nodes, 1);
 			ret = ipv6_encap_set_next(
-				i, rte_node_edge_count(ipv6_encap_node->id) - 1);
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(ipv6_encap_node->id) - 1);
 			if (ret < 0)
 				return ret;
 		}

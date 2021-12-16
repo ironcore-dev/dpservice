@@ -29,6 +29,7 @@ struct tx_node_ctx
 
 struct ethdev_tx_node_main {
 	uint32_t nodes[DP_MAX_PORTS];
+	uint16_t port_ids[DP_MAX_PORTS];
 };
 
 struct ethdev_tx_node_main *tx_node_data_get(void);

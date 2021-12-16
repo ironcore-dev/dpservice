@@ -30,7 +30,7 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 	for (i = 0; i < DP_MAX_PORTS; i++) {
 		if (ethdev_rx_main.node_ctx[i].node_id == node->id) {
-			port_id = i;
+			port_id = ethdev_rx_main.node_ctx[i].port_id;
 			break;
 		}
 	}

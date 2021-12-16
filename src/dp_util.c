@@ -20,6 +20,7 @@ static char pf0name[IF_NAMESIZE] = {0};
 static char pf1name[IF_NAMESIZE] = {0};
 static char ip6_str[DP_MAX_IP6_CHAR] = {0};
 static char vni_str[DP_MAX_IP6_CHAR] = {0};
+static uint16_t pf_ports[DP_MAX_PF_PORT][2] = {0};
 
 static const char short_options[] = "d" /* debug */
 				    "D"	 /* promiscuous */;
@@ -163,4 +164,36 @@ char *dp_get_pf0_name()
 char *dp_get_pf1_name()
 {
 	return pf1name;
+}
+
+void dp_add_pf_port_id(uint16_t id)
+{
+	int i;
+
+	for (i = 0; i < DP_MAX_PF_PORT; i++)
+		if (!pf_ports[i][1]) {
+			pf_ports[i][0] = id;
+			pf_ports[i][1] = 1;
+			return;
+		}
+}
+
+__rte_always_inline bool dp_is_pf_port_id(uint16_t id)
+{
+	int i;
+
+	for (i = 0; i < DP_MAX_PF_PORT; i++)
+		if (pf_ports[i][1] && (pf_ports[i][0] == id))
+			return true;
+	return false;
+}
+
+__rte_always_inline uint16_t dp_get_pf0_port_id()
+{
+	return pf_ports[0][0];
+}
+
+__rte_always_inline uint16_t dp_get_pf1_port_id()
+{
+	return pf_ports[1][0];
 }

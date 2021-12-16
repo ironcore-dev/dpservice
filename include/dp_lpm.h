@@ -8,8 +8,6 @@
 extern "C" {
 #endif
 
-#define DP_PF_PORT			 0
-#define DP_PF_PORT2			 5
 #define DP_ROUTE_DHCP		-2
 #define DP_ROUTE_DROP		-3
 

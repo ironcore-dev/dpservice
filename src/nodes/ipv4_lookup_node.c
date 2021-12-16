@@ -39,7 +39,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 
 	memset(&df, 0, sizeof(struct dp_flow));
 
-	if ((m->port == DP_PF_PORT) || (m->port == DP_PF_PORT2)) {
+	if (dp_is_pf_port_id(m->port)) {
 		geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
@@ -86,7 +86,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		else /* Outer world -> VM */
 			df_ptr->dst_vni = t_vni;
 
-		if (df_ptr->nxt_hop == DP_PF_PORT)
+		if (dp_is_pf_port_id(df_ptr->nxt_hop))
 			rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
 
 		if (dp_is_offload_enabled())

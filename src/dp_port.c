@@ -1,5 +1,6 @@
 #include "dp_port.h"
 #include "dp_lpm.h"
+#include "dp_util.h"
 
 /* Ethernet port configured with default settings. 8< */
 struct rte_eth_conf port_conf = {
@@ -126,6 +127,7 @@ int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_por
 
 	if (port->dp_p_type == DP_PORT_VF) {
 		ret = rte_eth_promiscuous_enable(port_id);
+		printf("Setting interface number %d in promiscuous mode \n", port_id);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
 					":: promiscuous mode enable failed: err=%s, port=%u\n",

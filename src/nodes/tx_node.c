@@ -7,6 +7,7 @@
 #include "node_api.h"
 #include "nodes/tx_node_priv.h"
 #include "dp_lpm.h"
+#include "dp_util.h"
 #include "dp_mbuf_dyn.h"
 
 #define DP_MAX_PATT_ACT	6
@@ -24,7 +25,7 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	/* Find our port id */
 	for (i = 0; i < DP_MAX_PORTS; i++) {
 		if (ethdev_tx_main.nodes[i] == node->id) {
-			port_id = i;
+			port_id = ethdev_tx_main.port_ids[i];
 			break;
 		}
 	}
@@ -78,9 +79,9 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	attr.priority = 0;
 	attr.transfer = 1;
 	/* First find out the packet direction */
-	if (df->nxt_hop == DP_PF_PORT)
+	if (dp_is_pf_port_id(df->nxt_hop))
 		route_direct = DP_ROUTE_TO_PF_ENCAPPED;
-	else if ((df->nxt_hop > DP_PF_PORT) && (df->geneve_hdr))
+	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->geneve_hdr))
 		route_direct = DP_ROUTE_TO_VM_DECAPPED;
 
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
@@ -317,7 +318,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		if (mbuf0->port != port) {
-			if (port == DP_PF_PORT) {
+			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
 			} else
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV4);

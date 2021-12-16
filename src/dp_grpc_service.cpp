@@ -57,7 +57,7 @@ grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* re
 	printf("VNI %d  IPv4 %x length %d target ip6 %s target vni %d\n", vni, ntohl(ip_addr.s_addr), 
 		    prefix.prefixlength(), route.nexthopaddress().c_str(), t_vni);
 
-	dp_add_route(port_id, vni, t_vni, ntohl(ip_addr.s_addr), t_ip6, prefix.prefixlength(), rte_eth_dev_socket_id(port_id));
+	dp_add_route(dp_get_pf0_port_id(), vni, t_vni, ntohl(ip_addr.s_addr), t_ip6, prefix.prefixlength(), rte_eth_dev_socket_id(port_id));
 
 	return grpc::Status::OK;
 }

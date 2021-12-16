@@ -1,4 +1,5 @@
 #include "dp_lpm.h"
+#include "dp_util.h"
 
 static struct vm_entry vm_table[DP_MAX_PORTS];
 
@@ -67,7 +68,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 				portid, socketid);
 		}
 		/* This is an external route */
-		if (portid == DP_PF_PORT) {
+		if (dp_is_pf_port_id(portid)) {
 			route = rte_rib_get_ext(node);
 			route->vni = t_vni;
 			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
@@ -175,7 +176,7 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct rte_ipv4_hdr *ipv4
 	if (node) {
 		if (rte_rib_get_nh(node, &next_hop) != 0)
 			return DP_ROUTE_DROP;
-		if (next_hop == DP_PF_PORT)
+		if (dp_is_pf_port_id(next_hop))
 			*r = *(struct vm_route *)rte_rib_get_ext(node);
 		return next_hop;
 	}

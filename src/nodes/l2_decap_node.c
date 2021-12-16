@@ -7,6 +7,7 @@
 #include "nodes/l2_decap_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_util.h"
 
 struct l2_decap_node_main l2_decap_node;
 
@@ -49,15 +50,13 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		ret = handle_l2_decap(mbuf0);
-		if (ret > 0)
+		if (!dp_is_pf_port_id(ret))
 			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret] , *objs);
-		else if (ret == DP_PORT_PF)
+		else 
 			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, *objs);
-		else
-			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_DROP, *objs);
-	}	
+	}
 
-    return cnt;
+	return cnt;
 }
 
 int l2_decap_set_next(uint16_t port_id, uint16_t next_index)
