@@ -87,12 +87,15 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	printf("VNI %d  IPv4 %x machine id %d\n", vni, ntohl(ip_addr.s_addr), machine_id);
 
 	port_id = dp_get_next_avail_vf_id(this->dpdk_layer, DP_PORT_VF);
-	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-	dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
-	dp_set_ip6(port_id, ipv6_addr, 32, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
-	dp_start_interface(&pf_port, DP_PORT_VF);
-
+	if ( port_id >= 0) {
+		setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+		dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
+		dp_set_ip6(port_id, ipv6_addr, 32, rte_eth_dev_socket_id(port_id));
+		dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
+		dp_start_interface(&pf_port, DP_PORT_VF);
+	} else {
+		printf("Invalid port id: %d\n",port_id);
+	}
 	return grpc::Status::OK;
 }
 

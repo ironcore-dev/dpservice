@@ -79,7 +79,7 @@ static void timer_cb () {
 	rs_msg = (struct rs_msg*) (ipv6_hdr + 1);
 
 	memset(&eth_hdr->s_addr, 0xFF, RTE_ETHER_ADDR_LEN);
-    memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
+    	memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = 0x3a; //ICMP6
@@ -101,11 +101,13 @@ static void timer_cb () {
 	for (int i = 0; i < dp_layer.dp_port_cnt; i++) {
 		if ((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
 			dp_layer.ports[i]->dp_allocated) {
-			pkt_buf->port = dp_layer.ports[i]->dp_port_id;
-			rte_ring_sp_enqueue(dp_layer.periodic_msg_queue, pkt_buf);
+			struct rte_mbuf *clone_buf = rte_pktmbuf_copy(pkt_buf,dp_layer.rte_mempool,0,UINT32_MAX);
+			clone_buf->port = dp_layer.ports[i]->dp_port_id;
+			rte_ring_sp_enqueue(dp_layer.periodic_msg_queue, clone_buf);
 
 			}
 	}
+	
 
 }
 
