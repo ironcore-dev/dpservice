@@ -61,7 +61,7 @@ struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type
 }
 
 
-int dp_port_init(struct dp_port* port, int p_port_id, int port_id, struct dp_port_ext *port_details)
+int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_details)
 {
 	char ifname[IF_NAMESIZE] = {0};
 	struct rte_eth_txconf txq_conf;

@@ -272,14 +272,14 @@ static int dp_cfg_ethdev(int port_id)
 	return 0;
 }
 
-static int dp_port_prepare(dp_port_type type, int p_port_id, int port_id, 
+static int dp_port_prepare(dp_port_type type, int port_id, 
 						   struct dp_port_ext *port_ext)
 {
 	struct dp_port *dp_port;
 
 	dp_port = dp_port_create(&dp_layer, type);
 	if (dp_port){
-		dp_port_init(dp_port, p_port_id, port_id, port_ext);
+		dp_port_init(dp_port, port_id, port_ext);
 		dp_layer.ports[dp_layer.dp_port_cnt++] = dp_port;
 		dp_cfg_ethdev(port_id);
 	}
@@ -377,25 +377,12 @@ static void dp_install_isolated_mode(int port_id)
 	}
 }
 
-static void dp_get_vf_name_from_pf_name(char *vf_name /* out */, char *pf_name /* in */)
-{
-	int pf_len = strnlen(pf_name, IFNAMSIZ);
-	char temp[IFNAMSIZ];
-	
-	memcpy(temp, pf_name, IFNAMSIZ);
-	if (pf_len > 3 && (temp[pf_len - 3] == 'n') && (temp[pf_len - 2] == 'p'))
-		temp[pf_len - 3] = '\0';
-	
-	snprintf(vf_name, IFNAMSIZ + 1, "%s_", temp);
-}
-
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 {
-	uint32_t ret, cnt = 0, pf_port_id = 0;
+	uint32_t ret, cnt = 0;
 	uint16_t nr_ports, port_id;;
 	struct dp_port_ext dp_port_ext;
 	char ifname[IF_NAMESIZE] = {0};
-	char ifname_v[IF_NAMESIZE + 1] = {0};
 
 	nr_ports = rte_eth_dev_count_avail();
 	if (nr_ports == 0)
@@ -421,14 +408,10 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 			return port_id;
 		}
 
-		dp_get_vf_name_from_pf_name(ifname_v, dp_port_ext.port_name);
 		if ((type == DP_PORT_VF) && 
-			(strstr(ifname, ifname_v) != NULL)) {
+			(strstr(ifname, dp_port_ext.port_name) != NULL)) {
 			if (cnt == last_assigned_vf_idx) {
-				pf_port_id = dp_get_pf_port_id_with_name(&dp_layer, dp_port_ext.port_name);
-				if (pf_port_id < 0)
-					return -1;
-				dp_port_prepare(type, pf_port_id, port_id, &dp_port_ext);
+				dp_port_prepare(type, port_id, &dp_port_ext);
 				last_assigned_vf_idx++;
 				return port_id;
 			}

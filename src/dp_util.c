@@ -18,6 +18,7 @@ static int no_offload = 0;
 static int no_stats = 0;
 static char pf0name[IF_NAMESIZE] = {0};
 static char pf1name[IF_NAMESIZE] = {0};
+static char vf_pattern[IF_NAMESIZE] = {0};
 static char ip6_str[DP_MAX_IP6_CHAR] = {0};
 static char vni_str[DP_MAX_IP6_CHAR] = {0};
 static uint16_t pf_ports[DP_MAX_PF_PORT][2] = {0};
@@ -28,7 +29,7 @@ static const char short_options[] = "d" /* debug */
 #define CMD_LINE_OPT_PF0		"pf0"
 #define CMD_LINE_OPT_PF1		"pf1"
 #define CMD_LINE_OPT_IPV6		"ipv6"
-#define CMD_LINE_OPT_T_IPV6		"t_ipv6"
+#define CMD_LINE_OPT_VF_PATTERN	"vf-pattern"
 #define CMD_LINE_OPT_VNI		"vni"
 #define CMD_LINE_OPT_NO_OFFLOAD	"no-offload"
 #define CMD_LINE_OPT_NO_STATS	"no-stats"
@@ -38,7 +39,7 @@ enum {
 	CMD_LINE_OPT_PF0_NUM,
 	CMD_LINE_OPT_PF1_NUM,
 	CMD_LINE_OPT_IPV6_NUM,
-	CMD_LINE_OPT_T_IPV6_NUM,
+	CMD_LINE_OPT_VF_PATTERN_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_NO_OFFLOAD_NUM,
 	CMD_LINE_OPT_NO_STATS_NUM,
@@ -48,7 +49,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PF0, 1, 0, CMD_LINE_OPT_PF0_NUM},
 	{CMD_LINE_OPT_PF1, 1, 0, CMD_LINE_OPT_PF1_NUM},
 	{CMD_LINE_OPT_IPV6, 1, 0, CMD_LINE_OPT_IPV6_NUM},
-	{CMD_LINE_OPT_T_IPV6, 0, 0, CMD_LINE_OPT_T_IPV6_NUM},
+	{CMD_LINE_OPT_VF_PATTERN, 1, 0, CMD_LINE_OPT_VF_PATTERN_NUM},
 	{CMD_LINE_OPT_VNI, 0, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
@@ -66,8 +67,7 @@ static void dp_print_usage(const char *prgname)
 		" --pf0=pf0_ifname"
 		" --pf0=pf0_ifname"
 		" --ipv6=underlay_ipv6"
-		" --t_ipv6=target_ipv6"
-		" --vni=vnet_id"
+		" --vf-pattern=eth*"
 		" [--no-stats]"
 		" [--no-offload]\n",
 		prgname);
@@ -107,9 +107,8 @@ int dp_parse_args(int argc, char **argv)
 			inet_pton(AF_INET6, ip6_str, get_underlay_conf()->src_ip6);
 			break;
 
-		case CMD_LINE_OPT_T_IPV6_NUM:
-			strncpy(ip6_str, optarg, DP_MAX_IP6_CHAR - 1);
-			inet_pton(AF_INET6, ip6_str, get_underlay_conf()->trgt_ip6);
+		case CMD_LINE_OPT_VF_PATTERN_NUM:
+			strncpy(vf_pattern, optarg, IFNAMSIZ);
 			break;
 
 		case CMD_LINE_OPT_VNI_NUM:
@@ -165,6 +164,12 @@ char *dp_get_pf1_name()
 {
 	return pf1name;
 }
+
+char *dp_get_vf_pattern()
+{
+	return vf_pattern;
+}
+
 
 void dp_add_pf_port_id(uint16_t id)
 {
