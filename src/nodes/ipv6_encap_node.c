@@ -43,7 +43,7 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	ipv6_hdr->payload_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
-	rte_memcpy(ipv6_hdr->dst_addr, df->dst_addr6, sizeof(ipv6_hdr->dst_addr));
+	rte_memcpy(ipv6_hdr->dst_addr, df->ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
 
 	udp_hdr->dgram_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
 	udp_hdr->dgram_cksum = rte_ipv6_phdr_cksum(ipv6_hdr, m->ol_flags);

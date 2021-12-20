@@ -38,6 +38,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	int ret = 0, t_vni = 0;
 
 	memset(&df, 0, sizeof(struct dp_flow));
+	df.l3_type = RTE_ETHER_TYPE_IPV4;
 
 	if (dp_is_pf_port_id(m->port)) {
 		geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
@@ -70,8 +71,8 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 										+ sizeof(struct rte_ipv4_hdr));
 		df.icmp_type = icmp_hdr->icmp_type;
 	}
-	df.dst_addr = ipv4_hdr->dst_addr;
-	df.src_addr = ipv4_hdr->src_addr;
+	df.dst.dst_addr = ipv4_hdr->dst_addr;
+	df.src.src_addr = ipv4_hdr->src_addr;
 	df.l4_type = ipv4_hdr->next_proto_id;
 
 	ret = lpm_get_ip4_dst_port(m->port, t_vni, ipv4_hdr, &route, rte_eth_dev_socket_id(m->port));
@@ -87,7 +88,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 			df_ptr->dst_vni = t_vni;
 
 		if (dp_is_pf_port_id(df_ptr->nxt_hop))
-			rte_memcpy(df_ptr->dst_addr6, route.nh_ipv6, sizeof(df_ptr->dst_addr6));
+			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
 
 		if (dp_is_offload_enabled())
 			df_ptr->valid = 1;

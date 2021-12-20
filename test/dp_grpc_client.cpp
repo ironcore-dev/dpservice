@@ -35,6 +35,7 @@ typedef enum {
 } cmd_type;
 
 static char ip6_str[40] = {0};
+static char t_ip6_str[40] = {0};
 static char vni_str[30] = {0};
 static char len_str[30] = {0};
 static char t_vni_str[30] = {0};
@@ -52,8 +53,9 @@ static int length;
 #define CMD_LINE_OPT_VNI			"vni"
 #define CMD_LINE_OPT_T_VNI			"t_vni"
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
-#define CMD_LINE_OPT_ADD_ROUTE		"addroute"
 #define CMD_LINE_OPT_PRIMARY_IPV6	"ipv6"
+#define CMD_LINE_OPT_ADD_ROUTE		"addroute"
+#define CMD_LINE_OPT_T_PRIMARY_IPV6	"t_ipv6"
 #define CMD_LINE_OPT_LENGTH			"length"
 
 enum {
@@ -64,6 +66,7 @@ enum {
 	CMD_LINE_OPT_T_VNI_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV4_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV6_NUM,
+	CMD_LINE_OPT_T_PRIMARY_IPV6_NUM,
 	CMD_LINE_OPT_LENGTH_NUM,
 };
 
@@ -74,6 +77,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV4, 1, 0, CMD_LINE_OPT_PRIMARY_IPV4_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV6, 1, 0, CMD_LINE_OPT_PRIMARY_IPV6_NUM},
+	{CMD_LINE_OPT_T_PRIMARY_IPV6, 1, 0, CMD_LINE_OPT_T_PRIMARY_IPV6_NUM},
 	{CMD_LINE_OPT_LENGTH, 1, 0, CMD_LINE_OPT_LENGTH_NUM},
 	{NULL, 0, 0, 0},
 };
@@ -132,6 +136,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV6_NUM:
 			strncpy(ip6_str, optarg, 39);
+			break;
+		case CMD_LINE_OPT_T_PRIMARY_IPV6_NUM:
+			strncpy(t_ip6_str, optarg, 39);
 			break;
 		case CMD_LINE_OPT_LENGTH_NUM:
 			strncpy(len_str, optarg, 29);

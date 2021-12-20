@@ -139,7 +139,7 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 		dp_set_neigh_mac (port_id, &pf_neigh_mac);
 
 	dp_set_mac(port_id);
-	dp_set_ip6(port_id, port_ip6s[port_id], DP_IPV6_MASK, rte_eth_dev_socket_id(port_id));
+	dp_set_dhcp_range_ip6(port_id, port_ip6s[port_id], DP_IPV6_MASK, rte_eth_dev_socket_id(port_id));
 
 	if (port->dp_p_type == DP_PORT_VF)
 		memcpy(port->vf_name, ifname, IF_NAMESIZE);

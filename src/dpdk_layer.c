@@ -14,6 +14,7 @@
 #include "nodes/ipv6_encap_node.h"
 #include "nodes/geneve_encap_node.h"
 #include "nodes/rx_periodic_node.h"
+#include "nodes/ipv6_lookup_node.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
@@ -79,7 +80,7 @@ static void timer_cb () {
 	rs_msg = (struct rs_msg*) (ipv6_hdr + 1);
 
 	memset(&eth_hdr->s_addr, 0xFF, RTE_ETHER_ADDR_LEN);
-    	memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
+	memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = 0x3a; //ICMP6
@@ -108,7 +109,6 @@ static void timer_cb () {
 			}
 	}
 	
-
 }
 
 int dp_dpdk_init(int argc, char **argv)
