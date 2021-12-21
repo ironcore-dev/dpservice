@@ -7,3 +7,4 @@ src/nodes/*.swp
 src/nodes/*.swo
 proto/*.h
 proto/*.cc
+__*

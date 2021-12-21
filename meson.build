@@ -11,69 +11,17 @@ thread_dep = dependency('threads')
 
 protoc = find_program('protoc')
 grpc_cpp = find_program('grpc_cpp_plugin')
+pytest = find_program('pytest', required : false)
 
-
-grpc_pb_cc = custom_target('grpc_pb_cc',
-  input: ['proto/dpdk.proto'],
-  output: ['@BASENAME@.pb.cc'],
-  command: [
-    protoc,
-	'--proto_path=../proto',
-    '--cpp_out=../proto',
-    '@INPUT@',
-  ],
-  build_by_default: true,
-    install : true,
-  install_dir : 'proto'
-)
-
-grpc_pb_h = custom_target('grpc_pb_h',
-  input: ['proto/dpdk.proto'],
-  output: ['@BASENAME@.pb.h'],
-  command: [
-    protoc,
-	'--proto_path=../proto',
-    '--cpp_out=../proto',
-    '@INPUT@',
-  ],
-  build_by_default: true,
-  install : true,
-  install_dir : 'proto'
-)
-
-grpc_pb_cc2 = custom_target('grpc_pb_cc2',
-  input: ['proto/dpdk.proto'],
-  output: ['@BASENAME@.grpc.pb.cc'],
-  command: [
-    protoc,
-	'--proto_path=../proto',
-	'--grpc_out=../proto',
-	'--plugin=protoc-gen-grpc=' + grpc_cpp.path(),
-    '@INPUT@',
-  ],
-  build_by_default: true,
-    install : true,
-  install_dir : 'proto'
-)
-
-grpc_pb_h2 = custom_target('grpc_pb_h2',
-  input: ['proto/dpdk.proto'],
-  output: ['@BASENAME@.grpc.pb.h'],
-  command: [
-    protoc,
-	'--proto_path=../proto',
-	'--grpc_out=../proto',
-	'--plugin=protoc-gen-grpc=' + grpc_cpp.path(),
-    '@INPUT@',
-  ],
-  build_by_default: true,
-    install : true,
-  install_dir : 'proto'
-)
+if not pytest.found()
+  message('Without pytest, the tests can not be run')
+endif
 
 inc = include_directories('include')
-proto_inc = include_directories('proto')
 
+subdir('proto')
 subdir('include')
 subdir('src')
 subdir('test')
+
+test('test', files('test/run_test'))
