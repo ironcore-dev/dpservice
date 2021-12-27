@@ -203,7 +203,7 @@ public:
 			route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
 			route->set_nexthopvni(t_vni);
 			route->set_weight(100);
-			route->set_nexthopaddress(ip6_str);
+			route->set_nexthopaddress(t_ip6_str);
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->addRoute(&context, request, &reply);
