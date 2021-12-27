@@ -66,8 +66,10 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 {
 	struct dp_port_ext pf_port;
 	IPConfig ipv4_conf;
+	IPConfig ipv6_conf;
 	int vni, port_id, machine_id;
 	struct in_addr ip_addr;
+	uint8_t ipv6_addr[16];
 
 	std::cout << "GRPC AddMachine called !! " << std::endl;
 	memset(&pf_port, 0, sizeof(pf_port));
@@ -76,16 +78,26 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	vni = request->vni();
 	ipv4_conf = request->ipv4config();
 	inet_aton(ipv4_conf.primaryaddress().c_str(), &ip_addr);
+	ipv6_conf = request->ipv6config();
+	uint8_t ret = inet_pton(AF_INET6, ipv6_conf.primaryaddress().c_str(), &ipv6_addr);
+	if(ret < 0)
+		printf("IPv6 address not in proper format\n");
+
 	machine_id = atoi(request->machineid().c_str());
 	printf("VNI %d  IPv4 %x machine id %d\n", vni, ntohl(ip_addr.s_addr), machine_id);
 
 	port_id = dp_get_next_avail_vf_id(this->dpdk_layer, DP_PORT_VF);
-	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-	dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
-
-	dp_start_interface(&pf_port, DP_PORT_VF);
-
+	if ( port_id >= 0) {
+		setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+		setup_lpm6(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+		dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
+		dp_set_dhcp_range_ip6(port_id, ipv6_addr, 128, rte_eth_dev_socket_id(port_id));
+		dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
+		dp_add_route6(port_id, vni, 0,ipv6_addr , NULL, 128, rte_eth_dev_socket_id(port_id));
+		dp_start_interface(&pf_port, DP_PORT_VF);
+	} else {
+		printf("Invalid port id: %d\n",port_id);
+	}
 	return grpc::Status::OK;
 }
 

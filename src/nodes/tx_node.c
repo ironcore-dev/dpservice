@@ -6,6 +6,7 @@
 #include <rte_mbuf.h>
 #include "node_api.h"
 #include "nodes/tx_node_priv.h"
+#include "nodes/ipv6_nd_node.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "dp_mbuf_dyn.h"
@@ -59,6 +60,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	struct rte_flow_item_ipv6 ipv6_mask;
 	struct rte_flow_item_icmp icmp_spec;
 	struct rte_flow_item_icmp icmp_mask;
+	struct rte_flow_item_icmp6 icmp6_spec;
+	struct rte_flow_item_icmp6 icmp6_mask;
 	struct rte_flow_item_tcp tcp_spec;
 	struct rte_flow_item_tcp tcp_mask;
 	struct rte_flow_item_udp udp_spec;
@@ -86,7 +89,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
-	if (route_direct == DP_ROUTE_TO_VM_DECAPPED)
+	
+	if (route_direct == DP_ROUTE_TO_VM_DECAPPED || df->l3_type == RTE_ETHER_TYPE_IPV6)
 		eth_spec.type = htons(RTE_ETHER_TYPE_IPV6);
 	else
 		eth_spec.type = htons(RTE_ETHER_TYPE_IPV4);
@@ -133,7 +137,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
 		memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 		ipv4_spec.hdr.next_proto_id = df->l4_type;
-		ipv4_spec.hdr.dst_addr = df->dst_addr;
+		ipv4_spec.hdr.dst_addr = df->dst.dst_addr;
 		ipv4_mask.hdr.next_proto_id = 0xff;
 		ipv4_mask.hdr.dst_addr = 0xffffffff;
 		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
@@ -141,16 +145,31 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		pattern[pattern_cnt].mask = &ipv4_mask;
 		pattern_cnt++;
 	} else {
-		memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
-		memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
-		ipv4_spec.hdr.next_proto_id = df->l4_type;
-		ipv4_spec.hdr.dst_addr = df->dst_addr;
-		ipv4_mask.hdr.next_proto_id = 0xff;
-		ipv4_mask.hdr.dst_addr = 0xffffffff;
-		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
-		pattern[pattern_cnt].spec = &ipv4_spec;
-		pattern[pattern_cnt].mask = &ipv4_mask;
-		pattern_cnt++;
+		
+		if ( df->l3_type == RTE_ETHER_TYPE_IPV6 ) {
+			
+			memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
+			memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
+			ipv6_spec.hdr.proto = df->l4_type;
+			rte_memcpy(ipv6_spec.hdr.dst_addr,  df->dst.dst_addr6,sizeof(ipv6_spec.hdr.dst_addr));
+			ipv6_mask.hdr.proto = 0xff;
+			memset(ipv6_mask.hdr.dst_addr, 0xff,16);
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
+			pattern[pattern_cnt].spec = &ipv6_spec;
+			pattern[pattern_cnt].mask = &ipv6_mask;
+			pattern_cnt++;
+		} else {
+			memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
+			memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
+			ipv4_spec.hdr.next_proto_id = df->l4_type;
+			ipv4_spec.hdr.dst_addr = df->dst.dst_addr;
+			ipv4_mask.hdr.next_proto_id = 0xff;
+			ipv4_mask.hdr.dst_addr = 0xffffffff;
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
+			pattern[pattern_cnt].spec = &ipv4_spec;
+			pattern[pattern_cnt].mask = &ipv4_mask;
+			pattern_cnt++;
+		}
 	}
 
 	if (route_direct != DP_ROUTE_TO_VM_DECAPPED) {
@@ -188,6 +207,17 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 			pattern[pattern_cnt].mask = &icmp_mask;
 			pattern_cnt++;
 		}
+		if (df->l4_type == DP_IP_PROTO_ICMPV6) { 
+			memset(&icmp6_spec, 0, sizeof(struct rte_flow_item_icmp6));
+			memset(&icmp6_mask, 0, sizeof(struct rte_flow_item_icmp6));
+			icmp6_spec.type = df->icmp_type;
+			icmp6_mask.type = 0xff;
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP6;
+			pattern[pattern_cnt].spec = &icmp6_spec;
+			pattern[pattern_cnt].mask = &icmp6_mask;
+			pattern_cnt++;
+		}
+		
 	}
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
@@ -212,7 +242,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 		new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
 		rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
-		rte_memcpy(new_ipv6_hdr->dst_addr, df->dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
+		rte_memcpy(new_ipv6_hdr->dst_addr, df->ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
 
 		struct rte_udp_hdr *new_udp_hdr = (struct rte_udp_hdr*)(new_ipv6_hdr + 1);
 		new_udp_hdr->src_port = htons(u_conf->src_port); /* TODO this should come via df pointer */
@@ -276,16 +306,6 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 }
 
 
-static __rte_always_inline int handle_flow(struct rte_mbuf *m)
-{
-	struct dp_flow *df;
-
-	df = get_dp_flow_ptr(m);
-	if (df && df->valid)
-		handle_offload(m, df);
-	return 1;
-}
-
 static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 {
 	struct rte_ether_hdr *eth_hdr;
@@ -304,6 +324,8 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	struct rte_mbuf *mbuf0, **pkts;
 	uint16_t port, queue;
 	uint16_t sent_count, i;
+	struct dp_flow *df;
+
 
 	RTE_SET_USED(objs);
 	RTE_SET_USED(cnt);
@@ -314,16 +336,17 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 
 	pkts = (struct rte_mbuf **)objs;
 
-
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (mbuf0->port != port) {
+		df = get_dp_flow_ptr(mbuf0);
+		if (mbuf0->port != port) {	
 			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-			} else
-				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV4);
-		}	
-		handle_flow(mbuf0);
+			} else 
+				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
+		}
+		if (df && df->valid)
+			handle_offload(mbuf0, df);	
 	}	
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,

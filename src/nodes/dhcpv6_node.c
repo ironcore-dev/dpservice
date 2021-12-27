@@ -14,6 +14,7 @@ static struct server_id  sid;
 static struct ia_option recv_ia;
 static struct rapid_commit rapid;
 uint8_t client_id_len;
+static uint8_t port_id;
 
 
 void parse_options(struct dhcpv6_packet* dhcp_pkt, uint8_t len) {
@@ -49,7 +50,7 @@ void prepare_ia_option() {
 	recv_ia.val.addrv6.len = htons(sizeof(struct ia_addr));
 	recv_ia.val.addrv6.addr.time_1 = INFINITY;
 	recv_ia.val.addrv6.addr.time_2 = INFINITY;
-	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_ip6(2),16);
+	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_dhcp_range_ip6(port_id),16);
 
 	recv_ia.val.addrv6.addr.code.op = htons(DP_STATUS_CODE);
 	recv_ia.val.addrv6.addr.code.len = htons(2);
@@ -75,9 +76,10 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	struct rte_udp_hdr *req_udp_hdr;
 	struct dhcpv6_packet *dhcp_pkt;
 	uint8_t type, recv_len, options_len;
-	uint8_t* own_ip6 = dp_get_ip6(m->port);
+	uint8_t* own_ip6 = dp_get_gw_ip6(m->port);
 	uint8_t offset = 0;
 	uint8_t index = 0;
+	port_id = m->port;
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
@@ -94,8 +96,8 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	rte_ether_addr_copy(&req_eth_hdr->s_addr, &req_eth_hdr->d_addr);
 	rte_memcpy(req_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
 
-	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,16);
-	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,16);
+	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,sizeof(req_ipv6_hdr->dst_addr));
+	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,sizeof(req_ipv6_hdr->src_addr));
 	req_udp_hdr->src_port = htons(DHCPV6_SERVER_PORT);
 	req_udp_hdr->dst_port = htons(DHCPV6_CLIENT_PORT);
 	req_udp_hdr->dgram_cksum = 0;
@@ -155,14 +157,15 @@ static __rte_always_inline uint16_t dhcpv6_node_process(struct rte_graph *graph,
 													 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
-	int i;
+	int i, ret = 0;
 
 	pkts = (struct rte_mbuf **)objs;
 
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (handle_dhcpv6(mbuf0))
+		ret = handle_dhcpv6(mbuf0);
+		if (ret > 0)
 			rte_node_enqueue_x1(graph, node, dhcpv6_node.next_index[mbuf0->port] , *objs);
 		else
 			rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, *objs);

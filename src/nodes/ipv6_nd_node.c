@@ -34,7 +34,6 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	struct nd_msg *nd_msg;
 	struct ra_msg *req_ra_msg;
 	struct icmp6hdr *req_icmp6_hdr;
-	uint8_t* own_ip6 = dp_get_ip6(m->port);
 	uint8_t* rt_ip = dp_get_gw_ip6();
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
@@ -42,14 +41,14 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr +1);
 	
 	rte_ether_addr_copy(&req_eth_hdr->s_addr, &req_eth_hdr->d_addr);
-	rte_memcpy(req_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
+	rte_memcpy(req_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), sizeof(req_eth_hdr->s_addr.addr_bytes));
 
-	if((memcmp(req_ipv6_hdr->src_addr,dp_unspec_ipv6,16) == 0)) {
-		rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,16);		
+	if((memcmp(req_ipv6_hdr->src_addr,dp_unspec_ipv6,sizeof(req_ipv6_hdr->src_addr)) == 0)) {
+		rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,sizeof(req_ipv6_hdr->dst_addr));		
 	} else { 
-		rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,16);
+		rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,sizeof(req_ipv6_hdr->dst_addr));
 	}
-	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,16);
+	rte_memcpy(req_ipv6_hdr->src_addr, rt_ip,sizeof(req_ipv6_hdr->src_addr));
 
 	uint8_t type = req_icmp6_hdr->icmp6_type ;
 
@@ -59,14 +58,12 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	}
 	if( type == NDISC_NEIGHBOUR_SOLICITATION) {
 		nd_msg = (struct nd_msg*) (req_ipv6_hdr + 1);
-		if((memcmp(&nd_msg->target, own_ip6, 16)) != 0) {
-			print_addr(nd_msg->target.s6_addr);
-			print_addr(own_ip6);
+		if((memcmp(&nd_msg->target, rt_ip, sizeof(nd_msg->target))) != 0) {
 			return 0;
 		}
 
 		dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
-		dp_set_neigh_ip6(m->port, req_ipv6_hdr->dst_addr);
+		dp_set_vm_ip6(m->port, req_ipv6_hdr->dst_addr);
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
 		req_icmp6_hdr->icmp6_solicited	= 1;
 		req_icmp6_hdr->icmp6_override	= 1;
@@ -80,16 +77,16 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 		req_icmp6_hdr->icmp6_managed	= 1;
 		req_icmp6_hdr->icmp6_other	= 1;
 		req_icmp6_hdr->icmp6_rt_lifetime = 0xffff;
-		rte_memcpy(req_ipv6_hdr->src_addr, rt_ip,16);
+	
 		req_ra_msg->reachable_time = 0;
 		req_ra_msg->retrans_timer = 0;
 		req_ipv6_hdr->payload_len = htons(sizeof(struct ra_msg));
 		req_icmp6_hdr->icmp6_hop_limit = 255;
 		
 		/* Periodic RA msg case */
-		if((memcmp(req_eth_hdr->d_addr.addr_bytes,dp_dummy_mac,6) == 0)) {	
-			rte_memcpy(req_eth_hdr->d_addr.addr_bytes, dp_mc_mac, 6);
-			rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,16);	
+		if((memcmp(req_eth_hdr->d_addr.addr_bytes,dp_dummy_mac,sizeof(req_eth_hdr->d_addr.addr_bytes)) == 0)) {	
+			rte_memcpy(req_eth_hdr->d_addr.addr_bytes, dp_mc_mac, sizeof(req_eth_hdr->d_addr.addr_bytes));
+			rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,sizeof(req_ipv6_hdr->dst_addr));	
 		}
 
 	}
