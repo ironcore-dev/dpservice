@@ -1,4 +1,5 @@
 build/*
+builddir/*
 .vscode/*
 worker_*.dot
 src/*.swp

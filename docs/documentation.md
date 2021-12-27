@@ -12,7 +12,7 @@ test client (CLI) which can connect to the GRPC server. See the examples below.
 - Currently IPv4 overlay and IPv6 underlay support. IPv6 overlay support in progress.
 
 ## Prerequisites
-Working DPDK installation to link to and a SmartNIC to  operate on. (Currently only Mellanox)
+Working DPDK installation with huge pages support to link to and a SmartNIC to operate on. (Currently only Mellanox)
 
 ## Building
 
@@ -21,11 +21,33 @@ This project uses meson and ninja to build the C application. On the top level d
     meson build
     ninja -C build
 
+## How to run dpservice
 Run the application as root or use sudo:
 
-    sudo ./build/src/dpservice -l 0,1 -- --pf0=ens1f0np0 --pf1=ens1f1np1 --ipv6=2a10:afc0:e01f:209::
-pf0 and pf1 are the ethernet names of the uplink ports of the hypervisor on the smartnic. ipv6 is the underlay ipv6 address which should be used by the DP service for egress packets leaving the smartnic.
+    sudo ./build/src/dpservice -l 0,1 -- --pf0=ens1f0np0 --pf1=ens1f1np1 --vf_pattern=enp59s0f0_ --ipv6=2a10:afc0:e01f:209:: --no-stats --no-offload 
+**pf0** and **pf1** are the ethernet names of the uplink ports of the hypervisor on the smartnic. **ipv6** is the underlay ipv6 address which should be used by the DP service for egress/ingress packets leaving/coming to the smartnic.
 
+
+**vf_pattern** defines the prefix used by the virtual functions created by the smartnic and which need to be controlled by the dpservice. **no-stats** disables the graph framework statistics printed to the console. **no-offload** disables the offloading to the smartnic. (For the NICs which do not support 
+rte_flow)
+
+
+**no-stats** and **no-offload** are optional parameters. The other ones are mandatory.
+
+
+## Automated Testing
+
+The test infrastructure uses [pytest](https://docs.pytest.org/) and [scapy](https://scapy.net/).
+Please make sure that these tools are installed before you start the test. meson build system checks also for the existence of these tools during build phase.
+
+
+Test can be started in the build directory after the dp service is built. The test will need root rights and uses TAP interfaces behind the scenes. So no SmartNIC is neceded for the tests to run.
+
+    cd ./build
+	meson test -v
+
+
+This will list all the test cases which are passed and failed.
 
 ## How to use GRPC test client
 
