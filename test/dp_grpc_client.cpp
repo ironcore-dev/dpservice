@@ -42,6 +42,7 @@ static char t_vni_str[30] = {0};
 static char machine_str[30] = {0};
 static char route_str[30] = {0};
 static char ip_str[30] = {0};
+static uint8_t version;
 
 static int command;
 static int debug_mode;
@@ -57,6 +58,7 @@ static int length;
 #define CMD_LINE_OPT_ADD_ROUTE		"addroute"
 #define CMD_LINE_OPT_T_PRIMARY_IPV6	"t_ipv6"
 #define CMD_LINE_OPT_LENGTH			"length"
+
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -133,9 +135,11 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV4_NUM:
 			strncpy(ip_str, optarg, 29);
+			version = dpdkonmetal::IPVersion::IPv4;
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV6_NUM:
 			strncpy(ip6_str, optarg, 39);
+			version = dpdkonmetal::IPVersion::IPv6;
 			break;
 		case CMD_LINE_OPT_T_PRIMARY_IPV6_NUM:
 			strncpy(t_ip6_str, optarg, 39);
@@ -195,9 +199,13 @@ public:
 			Prefix *prefix = new Prefix();
 
 			vni_msg->set_vni(vni);
-
-			prefix->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-			prefix->set_address(ip_str);
+			prefix->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4) {
+				prefix->set_address(ip_str);
+			} else {
+				prefix->set_address(ip6_str);
+			}
+			//prefix->set_address(ip_str);
 			prefix->set_prefixlength(length);
 			route->set_allocated_prefix(prefix);
 			route->set_ipversion(dpdkonmetal::IPVersion::IPv6);

@@ -333,7 +333,6 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	/* Get Tx port id */
 	port = ctx->port_id;
 	queue = ctx->queue_id;
-
 	pkts = (struct rte_mbuf **)objs;
 
 	for (i = 0; i < cnt; i++) {

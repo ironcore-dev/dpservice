@@ -26,12 +26,12 @@ static int l2_decap_node_init(const struct rte_graph *graph, struct rte_node *no
 static __rte_always_inline int handle_l2_decap(struct rte_mbuf *m)
 {
 	struct dp_flow *df;
-
 	df = get_dp_flow_ptr(m);
 
 	/* Pop the ethernet header */
-	if (!df->geneve_hdr)
+	if (!df->geneve_hdr) {
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
+	}
 
 	return df->nxt_hop;
 } 

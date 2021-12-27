@@ -39,11 +39,13 @@ static __rte_always_inline int handle_geneve_encap(struct rte_mbuf *m)
 	udp_hdr->dst_port = htons(u_conf->dst_port);
 	/* TODO compute here from df values inner 5 tuple a CRC16 hash instead as src port */
 	df = get_dp_flow_ptr(m);
+	df->geneve_hdr = 1;
 	udp_hdr->src_port = htons(u_conf->src_port);
 
 	memcpy(geneve_hdr->vni, &df->dst_vni, sizeof(geneve_hdr->vni));
 	geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
-	geneve_hdr->protocol = htons(RTE_ETHER_TYPE_IPV4);
+	geneve_hdr->protocol = htons(df->l3_type);
+	
 	return 1;
 } 
 

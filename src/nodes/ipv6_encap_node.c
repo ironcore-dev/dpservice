@@ -71,7 +71,6 @@ static __rte_always_inline uint16_t ipv6_encap_node_process(struct rte_graph *gr
 		else
 			rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_DROP, *objs);
 	}	
-
 	return cnt;
 }
 
