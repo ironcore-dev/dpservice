@@ -58,6 +58,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	struct rte_flow_item_ipv4 ipv4_mask;
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
+	struct rte_flow_item_ipv6 ol_ipv6_spec;
+	struct rte_flow_item_ipv6 ol_ipv6_mask;
 	struct rte_flow_item_icmp icmp_spec;
 	struct rte_flow_item_icmp icmp_mask;
 	struct rte_flow_item_icmp6 icmp6_spec;
@@ -81,6 +83,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	attr.ingress = 1;
 	attr.priority = 0;
 	attr.transfer = 1;
+	
 	/* First find out the packet direction */
 	if (dp_is_pf_port_id(df->nxt_hop))
 		route_direct = DP_ROUTE_TO_PF_ENCAPPED;
@@ -90,10 +93,11 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
 	
-	if (route_direct == DP_ROUTE_TO_VM_DECAPPED || df->l3_type == RTE_ETHER_TYPE_IPV6)
+	if (route_direct == DP_ROUTE_TO_VM_DECAPPED || df->l3_type == RTE_ETHER_TYPE_IPV6)	
 		eth_spec.type = htons(RTE_ETHER_TYPE_IPV6);
 	else
-		eth_spec.type = htons(RTE_ETHER_TYPE_IPV4);
+		eth_spec.type = htons(df->l3_type);
+
 	eth_mask.type = htons(0xffff);
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[pattern_cnt].spec = &eth_spec;
@@ -124,7 +128,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		memset(&gen_spec, 0, sizeof(struct rte_flow_item_geneve));
 		memset(&gen_mask, 0, sizeof(struct rte_flow_item_geneve));
 		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_GENEVE;
-		gen_spec.protocol = htons(RTE_ETHER_TYPE_IPV4);
+		gen_spec.protocol = htons(df->l3_type);
 		rte_memcpy(gen_spec.vni, &df->dst_vni, sizeof(gen_spec.vni));
 		gen_mask.vni[0] = 0xFF;
 		gen_mask.vni[1] = 0xFF;
@@ -133,17 +137,31 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		pattern[pattern_cnt].spec = &gen_spec;
 		pattern[pattern_cnt].mask = &gen_mask;
 		pattern_cnt++;
+		if ( df->l3_type == RTE_ETHER_TYPE_IPV6 ) {
+			/* overlay IPv6 flow */
+			memset(&ol_ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
+			memset(&ol_ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
+			ol_ipv6_spec.hdr.proto =  df->l4_type;
+			rte_memcpy(ol_ipv6_spec.hdr.dst_addr, df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr));
+			ol_ipv6_mask.hdr.proto = 0xff;
+			memset(ol_ipv6_mask.hdr.dst_addr, 0xff, sizeof(ol_ipv6_spec.hdr.dst_addr));
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
+			pattern[pattern_cnt].spec = &ol_ipv6_spec;
+			pattern[pattern_cnt].mask = &ol_ipv6_mask;
+			pattern_cnt++;
+		} else {
+			memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
+			memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
+			ipv4_spec.hdr.next_proto_id = df->l4_type;
+			ipv4_spec.hdr.dst_addr = df->dst.dst_addr;
+			ipv4_mask.hdr.next_proto_id = 0xff;
+			ipv4_mask.hdr.dst_addr = 0xffffffff;
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
+			pattern[pattern_cnt].spec = &ipv4_spec;
+			pattern[pattern_cnt].mask = &ipv4_mask;
+			pattern_cnt++;
+		}
 
-		memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
-		memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
-		ipv4_spec.hdr.next_proto_id = df->l4_type;
-		ipv4_spec.hdr.dst_addr = df->dst.dst_addr;
-		ipv4_mask.hdr.next_proto_id = 0xff;
-		ipv4_mask.hdr.dst_addr = 0xffffffff;
-		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
-		pattern[pattern_cnt].spec = &ipv4_spec;
-		pattern[pattern_cnt].mask = &ipv4_mask;
-		pattern_cnt++;
 	} else {
 		
 		if ( df->l3_type == RTE_ETHER_TYPE_IPV6 ) {
@@ -153,7 +171,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 			ipv6_spec.hdr.proto = df->l4_type;
 			rte_memcpy(ipv6_spec.hdr.dst_addr,  df->dst.dst_addr6,sizeof(ipv6_spec.hdr.dst_addr));
 			ipv6_mask.hdr.proto = 0xff;
-			memset(ipv6_mask.hdr.dst_addr, 0xff,16);
+			memset(ipv6_mask.hdr.dst_addr, 0xff,sizeof(ipv6_mask.hdr.dst_addr));
 			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 			pattern[pattern_cnt].spec = &ipv6_spec;
 			pattern[pattern_cnt].mask = &ipv6_mask;
@@ -251,7 +269,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		struct rte_flow_item_geneve *new_geneve_hdr = (struct rte_flow_item_geneve*)(new_udp_hdr + 1);
 		rte_memcpy(new_geneve_hdr->vni, &df->dst_vni, sizeof(new_geneve_hdr->vni));
 		new_geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
-		new_geneve_hdr->protocol = htons(RTE_ETHER_TYPE_IPV4);
+		new_geneve_hdr->protocol = htons(df->l3_type);
 
 		struct rte_flow_action_raw_encap raw_encap = {.data = encap_hdr, .size = encap_size};
 		action[action_cnt].conf = &raw_encap;
@@ -276,7 +294,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *) decap_hdr;
 		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->d_addr);
 		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->s_addr);
-		new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV4);
+		new_eth_hdr->ether_type = htons(df->l3_type);
 		struct rte_flow_action_raw_encap raw_encap = {.data = decap_hdr, .size = sizeof(struct rte_ether_hdr)};
 		action[action_cnt].conf = &raw_encap;
 		action_cnt++;

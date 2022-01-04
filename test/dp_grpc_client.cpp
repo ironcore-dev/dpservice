@@ -42,7 +42,7 @@ static char t_vni_str[30] = {0};
 static char machine_str[30] = {0};
 static char route_str[30] = {0};
 static char ip_str[30] = {0};
-static uint8_t version;
+static IPVersion version;
 
 static int command;
 static int debug_mode;

@@ -3,7 +3,6 @@
 #include "dp_lpm.h"
 #include "dp_port.h"
 #include <rte_mbuf.h>
-#include "../proto/dpdk.grpc.pb.h"
 
 
 GRPCService::GRPCService(struct dp_dpdk_layer* dp_layer)
@@ -63,7 +62,7 @@ grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* re
 		    prefix.prefixlength(), route.nexthopaddress().c_str(), t_vni);
 	}
 	else {
-		int ret = inet_pton(AF_INET6, prefix.address().c_str(), ip6_addr);
+		inet_pton(AF_INET6, prefix.address().c_str(), ip6_addr);
 		dp_add_route6(dp_get_pf0_port_id(), vni, t_vni, ip6_addr, t_ip6, prefix.prefixlength(), rte_eth_dev_socket_id(port_id));
 		printf("VNI %d  IPv6 %s length %d target ip6 %s target vni %d\n", vni, prefix.address().c_str(), 
 		    prefix.prefixlength(), route.nexthopaddress().c_str(), t_vni);
