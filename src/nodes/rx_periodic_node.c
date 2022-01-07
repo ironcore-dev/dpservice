@@ -6,6 +6,7 @@
 #include "nodes/rx_periodic_node.h"
 #include "node_api.h"
 #include "nodes/ipv6_nd_node.h"
+#include <unistd.h>
 
 static struct rx_periodic_node_ctx node_ctx;
 
@@ -71,10 +72,12 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 	next_index = ctx->next;
 
 	count = rte_ring_dequeue_burst(ctx->periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
-
 	if (!count)
 		return 0;
 	node->idx = count;
+	
+	printf("sats:in rx periodic q: %d\n",count);
+	
 	/* Enqueue to next node */
 	rte_node_next_stream_move(graph, node, next_index);
 

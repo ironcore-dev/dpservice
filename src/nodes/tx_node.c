@@ -358,6 +358,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 		df = get_dp_flow_ptr(mbuf0);
 		if (mbuf0->port != port) {	
 			if (dp_is_pf_port_id(port)) {
+				printf("sats:in eth rewrite\n");
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
 			} else 
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);		

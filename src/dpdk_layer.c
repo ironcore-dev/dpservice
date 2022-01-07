@@ -87,12 +87,12 @@ static void trigger_garp() {
 	if(pkt == NULL) {
 		printf("rte_mbuf allocation failed\n");
 	}
+	printf("sats:in trigger garp\n");
 	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	eth_hdr->ether_type = htons(0x0806);
 	arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
-	printf("sats:in trigger gARP\n");
 	arp_hdr->arp_opcode = htons(1);
-	memset(eth_hdr->s_addr.addr_bytes, 0xff, 6);
+	memset(eth_hdr->s_addr.addr_bytes, 0xff, RTE_ETHER_ADDR_LEN);
 	arp_hdr->arp_hardware = htons(1);
 	arp_hdr->arp_protocol = htons(RTE_ETHER_TYPE_IPV4);
 	arp_hdr->arp_hlen = 6;
@@ -111,20 +111,51 @@ static void trigger_garp() {
 }
 
 static void trigger_ns(){	
+	struct rte_ether_hdr *eth_hdr;
+	struct rte_ipv6_hdr *ipv6_hdr;
+	struct nd_msg *ns_msg;
+	struct icmp6hdr *icmp6_hdr;
+	uint16_t pkt_size;
+	struct rte_mbuf *pkt;
 
+	pkt = rte_pktmbuf_alloc(dp_layer.rte_mempool);
+	if(pkt == NULL) {
+		printf("rte_mbuf allocation failed\n");
+	}
+	printf("sats:in trigger ns\n");
+	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
+	ns_msg = (struct nd_msg*) (ipv6_hdr + 1);
+
+	memset(&eth_hdr->s_addr, 0xff, RTE_ETHER_ADDR_LEN);
+	memset(&eth_hdr->d_addr, 0xff, RTE_ETHER_ADDR_LEN);
+	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
+
+	ipv6_hdr->proto = 0x3a; //ICMP6
+	ipv6_hdr->vtc_flow = htonl(0x60000000);
+	ipv6_hdr->hop_limits = 255;
+	memset(ipv6_hdr->src_addr,0xff,16);
+	memset(ipv6_hdr->dst_addr,0xff,16);
+	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr)) + sizeof(struct in6_addr);
+
+	
+	icmp6_hdr = &(ns_msg->icmph);
+	memset(icmp6_hdr,0,sizeof(struct icmp6hdr));
+	icmp6_hdr->icmp6_type = 135;
+	rte_memcpy(&ns_msg->target,dp_get_gw_ip6(),sizeof(ns_msg->target));
+	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
+	pkt->data_len = pkt_size;
+    pkt->pkt_len = pkt_size;
+
+	send_to_all_vfs(pkt);
 	return;
 }
 
 static void announce_addr(){
 	static uint8_t count = 0;
 	printf("sats:in announce addr\n");
-	//if(count < 3){
-		trigger_garp();
+		trigger_garp();	
 		trigger_ns();
-	//	count++;
-	//} else {
-	//	rte_timer_stop(&addr_timer);
-	//}
 	return;
 }
 
@@ -144,8 +175,8 @@ static void timer_cb () {
 	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
 	rs_msg = (struct rs_msg*) (ipv6_hdr + 1);
 
-	memset(&eth_hdr->s_addr, 0xFF, RTE_ETHER_ADDR_LEN);
-	memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
+	memset(&eth_hdr->s_addr, 0xff, RTE_ETHER_ADDR_LEN);
+	memset(&eth_hdr->d_addr, 0xff, RTE_ETHER_ADDR_LEN);
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = 0x3a; //ICMP6
@@ -173,6 +204,7 @@ static void timer_cb () {
 
 			}
 	}
+	announce_addr();
 	
 }
 
@@ -200,7 +232,7 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.grpc_queue = rte_ring_create("grpc_queue", 256, rte_socket_id(), 0);
 	if (!dp_layer.grpc_queue)
 		printf("Error creating grpc queue\n");
-	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 256, rte_socket_id(), 0);
+	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 256, rte_socket_id(), RING_F_SP_ENQ|RING_F_SC_DEQ);
 	if (!dp_layer.periodic_msg_queue)
 		printf("Error creating periodic_msg_queue queue\n");
 
@@ -208,13 +240,13 @@ int dp_dpdk_init(int argc, char **argv)
 	rte_timer_subsystem_init();
 	//init the timer
 	rte_timer_init(&timer);
-	rte_timer_init(&addr_timer);
+	//rte_timer_init(&addr_timer);
 
 	hz = rte_get_timer_hz();
-	timer_res = hz * 5; // 5 seconds
+	timer_res = hz * 10; // 10 seconds
 	lcore_id = rte_lcore_id();
 	rte_timer_reset(&timer, hz*30, PERIODICAL, lcore_id, timer_cb, NULL);
-	rte_timer_reset(&addr_timer, hz*10, PERIODICAL, lcore_id, announce_addr, NULL);
+	//rte_timer_reset(&addr_timer, hz*30, PERIODICAL, lcore_id, announce_addr, NULL);
 
 	force_quit = false;
 

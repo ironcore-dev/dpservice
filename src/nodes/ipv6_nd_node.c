@@ -61,16 +61,32 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 		if((memcmp(&nd_msg->target, rt_ip, sizeof(nd_msg->target))) != 0) {
 			return 0;
 		}
+		if((memcmp(req_eth_hdr->d_addr.addr_bytes,dp_dummy_mac,6)) == 0) {
+			printf("sats: periodic case\n");
+			req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
+			req_icmp6_hdr->icmp6_solicited	= 0;
+			req_icmp6_hdr->icmp6_override	= 1;
+			req_icmp6_hdr->icmp6_router = 1;
+			rte_memcpy(req_eth_hdr->d_addr.addr_bytes, dp_mc_mac, sizeof(req_eth_hdr->d_addr.addr_bytes));
+			rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,sizeof(req_ipv6_hdr->dst_addr));
 
-		dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
-		dp_set_vm_ip6(m->port, req_ipv6_hdr->dst_addr);
-		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
-		req_icmp6_hdr->icmp6_solicited	= 1;
-		req_icmp6_hdr->icmp6_override	= 1;
-		// set target lladdr option and MAC
-		nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
-		nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
-		rte_memcpy(&nd_msg->opt[2],req_eth_hdr->s_addr.addr_bytes,6);
+			req_ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr) + sizeof(struct in6_addr));
+			req_icmp6_hdr->icmp6_hop_limit = 255;
+			
+		} else {
+			printf("sats: normal case\n");
+			dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
+			dp_set_vm_ip6(m->port, req_ipv6_hdr->dst_addr);
+			req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
+			req_icmp6_hdr->icmp6_solicited	= 1;
+			req_icmp6_hdr->icmp6_override	= 1;
+			// set target lladdr option and MAC
+			nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
+			nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
+			rte_memcpy(&nd_msg->opt[2],req_eth_hdr->s_addr.addr_bytes,6);
+			
+
+		}
 	} else if (type == NDISC_ROUTER_SOLICITATION) {
 		req_ra_msg = (struct ra_msg*) (req_ipv6_hdr + 1);
 		req_icmp6_hdr->icmp6_type = NDISC_ROUTER_ADVERTISEMENT;
@@ -94,6 +110,9 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	//L4 cksum calculation 
 	req_icmp6_hdr->icmp6_cksum	= 0;
 	req_icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_icmp6_hdr);
+	print_addr(req_ipv6_hdr->dst_addr);
+	print_addr(req_ipv6_hdr->src_addr);
+
 	return 1;
 
 } 
