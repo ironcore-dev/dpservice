@@ -20,6 +20,7 @@ static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
 static pthread_t ctrl_thread_tid;
 static struct rte_timer timer;
+static struct rte_timer addr_timer;
 static uint64_t timer_res;
 static struct rte_mbuf *pkt_buf;
 
@@ -61,6 +62,70 @@ static void signal_handler(int signum)
 		force_quit = true;
 		pthread_cancel(ctrl_thread_tid);
 	}
+}
+
+ void send_to_all_vfs(struct rte_mbuf* pkt){
+	// send pkt to all allocated VFs
+	for (int i = 0; i < dp_layer.dp_port_cnt; i++) {
+		if ((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
+			dp_layer.ports[i]->dp_allocated) {
+			struct rte_mbuf *clone_buf = rte_pktmbuf_copy(pkt,dp_layer.rte_mempool,0,UINT32_MAX);
+			clone_buf->port = dp_layer.ports[i]->dp_port_id;
+			rte_ring_sp_enqueue(dp_layer.periodic_msg_queue, clone_buf);
+
+			}
+	}
+	return;
+ }
+
+static void trigger_garp() {
+	struct rte_ether_hdr *eth_hdr;
+	struct rte_arp_hdr *arp_hdr;
+	struct rte_mbuf *pkt;
+
+	pkt = rte_pktmbuf_alloc(dp_layer.rte_mempool);
+	if(pkt == NULL) {
+		printf("rte_mbuf allocation failed\n");
+	}
+	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+	eth_hdr->ether_type = htons(0x0806);
+	arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
+	printf("sats:in trigger gARP\n");
+	arp_hdr->arp_opcode = htons(1);
+	memset(eth_hdr->s_addr.addr_bytes, 0xff, 6);
+	arp_hdr->arp_hardware = htons(1);
+	arp_hdr->arp_protocol = htons(RTE_ETHER_TYPE_IPV4);
+	arp_hdr->arp_hlen = 6;
+	arp_hdr->arp_plen = 4;
+	arp_hdr->arp_data.arp_sip = htonl(dp_get_gw_ip4());
+	arp_hdr->arp_data.arp_tip = htonl(dp_get_gw_ip4());
+
+	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_arp_hdr);
+	pkt->pkt_len = pkt->data_len;
+	pkt->packet_type = RTE_PTYPE_L2_ETHER;
+
+	send_to_all_vfs(pkt);
+	
+	return;
+
+}
+
+static void trigger_ns(){	
+
+	return;
+}
+
+static void announce_addr(){
+	static uint8_t count = 0;
+	printf("sats:in announce addr\n");
+	//if(count < 3){
+		trigger_garp();
+		trigger_ns();
+	//	count++;
+	//} else {
+	//	rte_timer_stop(&addr_timer);
+	//}
+	return;
 }
 
 static void timer_cb () {
@@ -143,11 +208,13 @@ int dp_dpdk_init(int argc, char **argv)
 	rte_timer_subsystem_init();
 	//init the timer
 	rte_timer_init(&timer);
+	rte_timer_init(&addr_timer);
 
 	hz = rte_get_timer_hz();
-	timer_res = hz * 10; // 10 seconds
+	timer_res = hz * 5; // 5 seconds
 	lcore_id = rte_lcore_id();
 	rte_timer_reset(&timer, hz*30, PERIODICAL, lcore_id, timer_cb, NULL);
+	rte_timer_reset(&addr_timer, hz*10, PERIODICAL, lcore_id, announce_addr, NULL);
 
 	force_quit = false;
 
