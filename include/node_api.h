@@ -27,11 +27,17 @@ struct dp_flow {
 	uint8_t					l4_type;
 	uint8_t					geneve_hdr;
 	uint8_t					icmp_type;
+	uint8_t					periodic_type;
 };
 
 struct dp_mbuf_priv1 {
 	struct dp_flow *flow_ptr;
 };
+
+typedef enum {
+ 	DP_PER_TYPE_ND_RA,
+ 	DP_PER_TYPE_DIRECT_TX,
+ } dp_periodic_type;
 
 #ifdef __cplusplus
 }

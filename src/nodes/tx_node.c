@@ -14,6 +14,7 @@
 #define DP_MAX_PATT_ACT	6
 
 static struct ethdev_tx_node_main ethdev_tx_main;
+static struct dp_flow *df;
 static 	uint8_t	dst_addr[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
 						   "\xff\xff\xff\xff\xff\xff\xff\xff";
 
@@ -327,9 +328,18 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 {
 	struct rte_ether_hdr *eth_hdr;
-	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
+	if(df->periodic_type != DP_PER_TYPE_DIRECT_TX) {
+		eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
+		rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->d_addr);
+	} else {
+		eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+		if(eth_type == RTE_ETHER_TYPE_ARP){
+			struct rte_arp_hdr *arp_hdr;
+			arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
+			rte_memcpy(arp_hdr->arp_data.arp_sha.addr_bytes, dp_get_mac(port_id), RTE_ETHER_ADDR_LEN);
+		}
+	}
 	eth_hdr->ether_type = htons(eth_type);
-	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->d_addr);
 	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->s_addr);
 }
 
@@ -342,8 +352,6 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	struct rte_mbuf *mbuf0, **pkts;
 	uint16_t port, queue;
 	uint16_t sent_count, i;
-	struct dp_flow *df;
-
 
 	RTE_SET_USED(objs);
 	RTE_SET_USED(cnt);
@@ -356,9 +364,8 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
-		if (mbuf0->port != port) {	
+		if (mbuf0->port != port || df->periodic_type == DP_PER_TYPE_DIRECT_TX) {
 			if (dp_is_pf_port_id(port)) {
-				printf("sats:in eth rewrite\n");
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
 			} else 
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
