@@ -25,9 +25,19 @@ static int geneve_decap_node_init(const struct rte_graph *graph, struct rte_node
 
 static __rte_always_inline int handle_geneve_decap(struct rte_mbuf *m)
 {
+	uint8_t route;
+	struct rte_flow_item_geneve *geneve_hdr;
+	
 	/* Pop the udp header */
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_udp_hdr));
-	return 1;
+	geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
+
+	if ( ntohs(geneve_hdr->protocol) == RTE_ETHER_TYPE_IPV6)
+		route = GENEVE_DECAP_NEXT_IPV6_LOOKUP;
+	else
+		route = GENEVE_DECAP_NEXT_IPV4_LOOKUP;
+
+	return route;
 } 
 
 static __rte_always_inline uint16_t geneve_decap_node_process(struct rte_graph *graph,
@@ -37,14 +47,16 @@ static __rte_always_inline uint16_t geneve_decap_node_process(struct rte_graph *
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	int i;
+	uint8_t ret;
 
 	pkts = (struct rte_mbuf **)objs;
 
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (handle_geneve_decap(mbuf0))
-			rte_node_enqueue_x1(graph, node, GENEVE_DECAP_NEXT_IPV4_LOOKUP, *objs);
+		ret = handle_geneve_decap(mbuf0);
+		if (ret > 0)
+			rte_node_enqueue_x1(graph, node, ret, *objs);
 		else
 			rte_node_enqueue_x1(graph, node, GENEVE_DECAP_NEXT_DROP, *objs);
 	}	
@@ -68,6 +80,7 @@ static struct rte_node_register geneve_decap_node_base = {
 		{
 			[GENEVE_DECAP_NEXT_DROP] = "drop",
 			[GENEVE_DECAP_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
+			[GENEVE_DECAP_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 		},
 };
 

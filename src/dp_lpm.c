@@ -284,7 +284,8 @@ int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6
 	if (node) {
 		if (rte_rib6_get_nh(node, &next_hop) != 0)
 			return DP_ROUTE_DROP;
-		
+		if (dp_is_pf_port_id(next_hop))
+			*r = *(struct vm_route *)rte_rib6_get_ext(node);
 		 return next_hop;
 	}
 
