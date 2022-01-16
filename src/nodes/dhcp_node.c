@@ -165,10 +165,10 @@ static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		if (handle_dhcp(mbuf0))
-			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port] , *objs);
+			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port] , mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, *objs);
-		rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);
+		rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);
 	}	
 
     return cnt;

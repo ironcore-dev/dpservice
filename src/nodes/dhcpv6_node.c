@@ -166,10 +166,10 @@ static __rte_always_inline uint16_t dhcpv6_node_process(struct rte_graph *graph,
 		mbuf0 = pkts[i];
 		ret = handle_dhcpv6(mbuf0);
 		if (ret > 0)
-			rte_node_enqueue_x1(graph, node, dhcpv6_node.next_index[mbuf0->port] , *objs);
+			rte_node_enqueue_x1(graph, node, dhcpv6_node.next_index[mbuf0->port] , mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, *objs);
-		rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
+		rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
 	}	
 
     return cnt;

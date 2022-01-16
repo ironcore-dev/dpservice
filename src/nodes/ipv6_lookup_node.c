@@ -135,9 +135,9 @@ static __rte_always_inline uint16_t ipv6_lookup_node_process(struct rte_graph *g
 		mbuf0 = pkts[i];
 		route = handle_ipv6_lookup(mbuf0);
 		if (route > 0)
-			rte_node_enqueue_x1(graph, node, route, *objs);
+			rte_node_enqueue_x1(graph, node, route, mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, IPV6_LOOKUP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV6_LOOKUP_NEXT_DROP, mbuf0);
 	}	
 
 	return cnt;

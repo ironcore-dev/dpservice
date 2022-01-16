@@ -138,7 +138,7 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 		} else if (p_nxt[comp] == CLS_NEXT_IPV6_LOOKUP) {
 			next_index = CLS_NEXT_IPV6_LOOKUP;
 		}	
-		rte_node_enqueue_x1(graph, node, next_index, *objs);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
 
 	return cnt;

@@ -51,9 +51,9 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 		mbuf0 = pkts[i];
 		ret = handle_l2_decap(mbuf0);
 		if (!dp_is_pf_port_id(ret))
-			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret] , *objs);
+			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret], mbuf0);
 		else 
-			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, *objs);
+			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, mbuf0);
 	}
 
 	return cnt;

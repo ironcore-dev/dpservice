@@ -63,9 +63,9 @@ static __rte_always_inline uint16_t geneve_encap_node_process(struct rte_graph *
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		if (handle_geneve_encap(mbuf0))
-			rte_node_enqueue_x1(graph, node, GENEVE_ENCAP_NEXT_IPV6_ENCAP, *objs);
+			rte_node_enqueue_x1(graph, node, GENEVE_ENCAP_NEXT_IPV6_ENCAP, mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, GENEVE_ENCAP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, GENEVE_ENCAP_NEXT_DROP, mbuf0);
 	}	
 
     return cnt;

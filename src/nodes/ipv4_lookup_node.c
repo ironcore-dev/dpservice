@@ -112,11 +112,11 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 		route = handle_ipv4_lookup(mbuf0);
 		if (route >= 0) 
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_L2_DECAP, 
-								*objs);
+								mbuf0);
 		else if (route == DP_ROUTE_DHCP)
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
 	}	
 
     return cnt;

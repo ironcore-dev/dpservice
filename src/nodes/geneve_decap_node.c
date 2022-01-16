@@ -56,9 +56,9 @@ static __rte_always_inline uint16_t geneve_decap_node_process(struct rte_graph *
 		mbuf0 = pkts[i];
 		ret = handle_geneve_decap(mbuf0);
 		if (ret > 0)
-			rte_node_enqueue_x1(graph, node, ret, *objs);
+			rte_node_enqueue_x1(graph, node, ret, mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, GENEVE_DECAP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, GENEVE_DECAP_NEXT_DROP, mbuf0);
 	}	
 
     return cnt;

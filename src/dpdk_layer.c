@@ -170,7 +170,63 @@ static int graph_main_loop()
 	return 0;
 }
 
-static void print_stats(void)
+static void print_link_info(int port_id, char *out, size_t out_size)
+{
+	struct rte_eth_stats stats;
+	struct rte_ether_addr mac_addr;
+	struct rte_eth_link eth_link;
+	uint16_t mtu;
+	int ret;
+
+	memset(&stats, 0, sizeof(stats));
+	rte_eth_stats_get(port_id, &stats);
+
+	ret = rte_eth_macaddr_get(port_id, &mac_addr);
+	if (ret != 0) {
+		snprintf(out, out_size, "\n%d: MAC address get failed: %s",
+			 port_id, rte_strerror(-ret));
+		return;
+	}
+
+	ret = rte_eth_link_get(port_id, &eth_link);
+	if (ret < 0) {
+		snprintf(out, out_size, "\n%d: link get failed: %s",
+			 port_id, rte_strerror(-ret));
+		return;
+	}
+
+	rte_eth_dev_get_mtu(port_id, &mtu);
+
+	snprintf(out, out_size,
+		"\n"
+		"%s: flags=<%s> mtu %u\n"
+		"\tether %02X:%02X:%02X:%02X:%02X:%02X rxqueues %u txqueues %u\n"
+		"\tport# %u  speed %s\n"
+		"\tRX packets %" PRIu64"  bytes %" PRIu64"\n"
+		"\tRX errors %" PRIu64"  missed %" PRIu64"  no-mbuf %" PRIu64"\n"
+		"\tTX packets %" PRIu64"  bytes %" PRIu64"\n"
+		"\tTX errors %" PRIu64"\n",
+		"pf0",
+		eth_link.link_status == 0 ? "DOWN" : "UP",
+		mtu,
+		mac_addr.addr_bytes[0], mac_addr.addr_bytes[1],
+		mac_addr.addr_bytes[2], mac_addr.addr_bytes[3],
+		mac_addr.addr_bytes[4], mac_addr.addr_bytes[5],
+		1,
+		1,
+		port_id,
+		rte_eth_link_speed_to_str(eth_link.link_speed),
+		stats.ipackets,
+		stats.ibytes,
+		stats.ierrors,
+		stats.imissed,
+		stats.rx_nombuf,
+		stats.opackets,
+		stats.obytes,
+		stats.oerrors);
+}
+
+static void print_stats(char *msg_out, size_t msg_len)
 {
 	const char topLeft[] = {27, '[', '1', ';', '1', 'H', '\0'};
 	const char clr[] = {27, '[', '2', 'J', '\0'};
@@ -192,6 +248,10 @@ static void print_stats(void)
 	/* Clear screen and move to top left */
 	printf("%s%s", clr, topLeft);
 	rte_graph_cluster_stats_get(stats, 0);
+	print_link_info(0, msg_out, msg_len);
+	//if (strlen(msg_out))
+	//	printf("%s", msg_out);
+	
 	sleep(1);
 
 	rte_graph_cluster_stats_destroy(stats);
@@ -199,11 +259,16 @@ static void print_stats(void)
 
 static int main_core_loop() {
 	uint64_t prev_tsc=0, cur_tsc;
+	char *msg_out = NULL;
+	size_t msg_out_len_max = 400;
+
+	msg_out = malloc(msg_out_len_max + 1);
+
 	while (!force_quit) {
 		/* Accumulate and print stats on main until exit */
 		if (dp_is_stats_enabled() && rte_graph_has_stats_feature()) {
-			print_stats();
-	}
+			print_stats(msg_out, msg_out_len_max);
+		}
 		cur_tsc = rte_get_timer_cycles();
 		if((cur_tsc - prev_tsc) > timer_res) {
 			rte_timer_manage();
@@ -211,6 +276,7 @@ static int main_core_loop() {
 		}
 	}
 	
+	free(msg_out);
 	return 0;
 }
 

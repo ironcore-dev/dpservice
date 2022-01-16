@@ -110,9 +110,9 @@ static __rte_always_inline uint16_t ipv6_nd_node_process(struct rte_graph *graph
 		mbuf0 = pkts[i];
 		init_dp_mbuf_priv1(mbuf0);
 		if (handle_nd(mbuf0))
-			rte_node_enqueue_x1(graph, node, ipv6_nd_node.next_index[mbuf0->port] , *objs);
+			rte_node_enqueue_x1(graph, node, ipv6_nd_node.next_index[mbuf0->port], mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, IPV6_ND_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV6_ND_NEXT_DROP, mbuf0);
 	}	
 
 	return cnt;

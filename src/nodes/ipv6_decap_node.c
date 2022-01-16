@@ -44,9 +44,9 @@ static __rte_always_inline uint16_t ipv6_decap_node_process(struct rte_graph *gr
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		if (handle_ipv6_decap(mbuf0))
-			rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_GENEVE_DECAP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_GENEVE_DECAP, mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_DROP, mbuf0);
 	}	
 
 	return cnt;

@@ -67,9 +67,9 @@ static __rte_always_inline uint16_t ipv6_encap_node_process(struct rte_graph *gr
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
 		if (handle_ipv6_encap(mbuf0, df))
-			rte_node_enqueue_x1(graph, node, ipv6_encap_node.next_index[df->nxt_hop] , *objs);
+			rte_node_enqueue_x1(graph, node, ipv6_encap_node.next_index[df->nxt_hop], mbuf0);
 		else
-			rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_DROP, *objs);
+			rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_DROP, mbuf0);
 	}	
 
 	return cnt;
