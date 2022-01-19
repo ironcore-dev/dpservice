@@ -1,2 +1,2 @@
 #!/bin/bash
-pytest -v --build_path=$1 ../test/
+pytest -v --build_path=$1 ../test/ -s
