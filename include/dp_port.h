@@ -44,6 +44,7 @@ int dp_port_init(struct dp_port* port, int port_id,
 				 struct dp_port_ext *port_details);
 int dp_port_allocate(struct dp_dpdk_layer *dp_layer, struct dp_port_ext *port_ext,
 					 dp_port_type type);
+void print_link_info(int port_id, char *out, size_t out_size);
 void dp_port_exit();
 
 #ifdef __cplusplus

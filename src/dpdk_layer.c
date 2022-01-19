@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include "rte_malloc.h"
 #include "dpdk_layer.h"
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
@@ -63,11 +64,59 @@ static void signal_handler(int signum)
 	}
 }
 
+static void port_flow_aged(int port_id)
+{
+	int nb_context, total = 0, idx;
+	struct rte_flow_error error;
+	struct rte_flow **flow;
+	void **contexts;
+
+	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
+
+	if (total <= 0)
+		return;
+
+	contexts = rte_zmalloc("aged_ctx", sizeof(void *) * total,
+			       RTE_CACHE_LINE_SIZE);
+	if (contexts == NULL)
+		return;
+
+	nb_context = rte_flow_get_aged_flows(port_id, contexts,
+					     total, &error);
+	if (nb_context != total)
+		goto free;
+
+	for (idx = 0; idx < nb_context; idx++) {
+		flow = (struct rte_flow**)(struct rte_flow*)contexts[idx];
+		if (!flow || !*flow)
+			continue;
+		rte_flow_destroy(port_id, *flow, &error);
+		free(flow);
+	}
+
+free:
+	rte_free(contexts);
+}
+
+static void trigger_flow_age_check() {
+	int i;
+
+	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
+		if (((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
+			dp_layer.ports[i]->dp_allocated) || 
+			(dp_layer.ports[i]->dp_p_type == DP_PORT_PF)) {
+				port_flow_aged(dp_layer.ports[i]->dp_port_id);
+			}
+	}
+}
+
 static void timer_cb () {
- 	trigger_nd_ra();
- 	trigger_garp();
- 	trigger_nd_unsol_adv();
- }
+
+	trigger_nd_ra();
+	trigger_garp();
+	trigger_nd_unsol_adv();
+	trigger_flow_age_check();
+}
 
 int dp_dpdk_init(int argc, char **argv)
 {
@@ -121,68 +170,12 @@ static int graph_main_loop()
 {	
 	struct rte_graph *graph;
 	
-	while (!force_quit) {	
+	while (!force_quit) {
 		graph = dp_layer.graph;
 		rte_graph_walk(graph);	
-		}	
+	}
 	
 	return 0;
-}
-
-static void print_link_info(int port_id, char *out, size_t out_size)
-{
-	struct rte_eth_stats stats;
-	struct rte_ether_addr mac_addr;
-	struct rte_eth_link eth_link;
-	uint16_t mtu;
-	int ret;
-
-	memset(&stats, 0, sizeof(stats));
-	rte_eth_stats_get(port_id, &stats);
-
-	ret = rte_eth_macaddr_get(port_id, &mac_addr);
-	if (ret != 0) {
-		snprintf(out, out_size, "\n%d: MAC address get failed: %s",
-			 port_id, rte_strerror(-ret));
-		return;
-	}
-
-	ret = rte_eth_link_get(port_id, &eth_link);
-	if (ret < 0) {
-		snprintf(out, out_size, "\n%d: link get failed: %s",
-			 port_id, rte_strerror(-ret));
-		return;
-	}
-
-	rte_eth_dev_get_mtu(port_id, &mtu);
-
-	snprintf(out, out_size,
-		"\n"
-		"%s: flags=<%s> mtu %u\n"
-		"\tether %02X:%02X:%02X:%02X:%02X:%02X rxqueues %u txqueues %u\n"
-		"\tport# %u  speed %s\n"
-		"\tRX packets %" PRIu64"  bytes %" PRIu64"\n"
-		"\tRX errors %" PRIu64"  missed %" PRIu64"  no-mbuf %" PRIu64"\n"
-		"\tTX packets %" PRIu64"  bytes %" PRIu64"\n"
-		"\tTX errors %" PRIu64"\n",
-		"pf0",
-		eth_link.link_status == 0 ? "DOWN" : "UP",
-		mtu,
-		mac_addr.addr_bytes[0], mac_addr.addr_bytes[1],
-		mac_addr.addr_bytes[2], mac_addr.addr_bytes[3],
-		mac_addr.addr_bytes[4], mac_addr.addr_bytes[5],
-		1,
-		1,
-		port_id,
-		rte_eth_link_speed_to_str(eth_link.link_speed),
-		stats.ipackets,
-		stats.ibytes,
-		stats.ierrors,
-		stats.imissed,
-		stats.rx_nombuf,
-		stats.opackets,
-		stats.obytes,
-		stats.oerrors);
 }
 
 static void print_stats(char *msg_out, size_t msg_len)
@@ -209,7 +202,7 @@ static void print_stats(char *msg_out, size_t msg_len)
 	rte_graph_cluster_stats_get(stats, 0);
 	print_link_info(0, msg_out, msg_len);
 	//if (strlen(msg_out))
-	//	printf("%s", msg_out);
+	//bb	printf("%s", msg_out);
 	
 	sleep(1);
 

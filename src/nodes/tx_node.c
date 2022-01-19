@@ -69,7 +69,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	struct rte_flow_item_tcp tcp_mask;
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
-	struct rte_flow *flow;
+	struct rte_flow *flow, **dyn_flow = NULL;
 	int encap_size = sizeof(struct rte_ether_hdr) +
 					 sizeof(struct rte_ipv6_hdr) +
 					 sizeof(struct rte_udp_hdr) +
@@ -300,6 +300,11 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		action[action_cnt].conf = &raw_encap;
 		action_cnt++;
 	}
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_AGE;
+	dyn_flow = malloc(sizeof(struct rte_flow*));
+	struct rte_flow_action_age flow_age = {.timeout = 60, .reserved= 0, .context = dyn_flow};
+	action[action_cnt].conf = &flow_age;
+	action_cnt++;
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_PORT_ID;
 	struct rte_flow_action_port_id nport_id = {.original = 0, .reserved= 0, .id = df->nxt_hop};
 	action[action_cnt].conf = &nport_id;
@@ -312,15 +317,20 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 
 	if (res) { 
 		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
-		return 0;
+		goto err;
 	} else {
 		printf("Flow validated on port %d targeting port %d \n ", m->port, df->nxt_hop);
 		flow = rte_flow_create(m->port, &attr, pattern, action, &error);
-		if (!flow)
+		if (!flow) {
 			printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+			goto err;
+		}
+		*dyn_flow = flow;
 	}
-	return 1;
 
+	return 1;
+err:
+	free(dyn_flow);
 	return 0;
 }
 

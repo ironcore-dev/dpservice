@@ -148,6 +148,62 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	return 0;
 }
 
+void print_link_info(int port_id, char *out, size_t out_size)
+{
+	struct rte_eth_stats stats;
+	struct rte_ether_addr mac_addr;
+	struct rte_eth_link eth_link;
+	uint16_t mtu;
+	int ret;
+
+	memset(&stats, 0, sizeof(stats));
+	rte_eth_stats_get(port_id, &stats);
+
+	ret = rte_eth_macaddr_get(port_id, &mac_addr);
+	if (ret != 0) {
+		snprintf(out, out_size, "\n%d: MAC address get failed: %s",
+			 port_id, rte_strerror(-ret));
+		return;
+	}
+
+	ret = rte_eth_link_get(port_id, &eth_link);
+	if (ret < 0) {
+		snprintf(out, out_size, "\n%d: link get failed: %s",
+			 port_id, rte_strerror(-ret));
+		return;
+	}
+
+	rte_eth_dev_get_mtu(port_id, &mtu);
+
+	snprintf(out, out_size,
+		"\n"
+		"%s: flags=<%s> mtu %u\n"
+		"\tether %02X:%02X:%02X:%02X:%02X:%02X rxqueues %u txqueues %u\n"
+		"\tport# %u  speed %s\n"
+		"\tRX packets %" PRIu64"  bytes %" PRIu64"\n"
+		"\tRX errors %" PRIu64"  missed %" PRIu64"  no-mbuf %" PRIu64"\n"
+		"\tTX packets %" PRIu64"  bytes %" PRIu64"\n"
+		"\tTX errors %" PRIu64"\n",
+		"pf0",
+		eth_link.link_status == 0 ? "DOWN" : "UP",
+		mtu,
+		mac_addr.addr_bytes[0], mac_addr.addr_bytes[1],
+		mac_addr.addr_bytes[2], mac_addr.addr_bytes[3],
+		mac_addr.addr_bytes[4], mac_addr.addr_bytes[5],
+		1,
+		1,
+		port_id,
+		rte_eth_link_speed_to_str(eth_link.link_speed),
+		stats.ipackets,
+		stats.ibytes,
+		stats.ierrors,
+		stats.imissed,
+		stats.rx_nombuf,
+		stats.opackets,
+		stats.obytes,
+		stats.oerrors);
+}
+
 int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name)
 {
 	int i;
