@@ -14,8 +14,6 @@
 struct ipv6_nd_node_main ipv6_nd_node;
 static uint8_t dp_unspec_ipv6[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
-static uint8_t dp_dummy_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
-static uint8_t dp_mc_mac[6] = {0x33,0x33,0x00,0x00,0x00,0x01};
  
 static int ipv6_nd_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -61,7 +59,6 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 		if((memcmp(&nd_msg->target, rt_ip, sizeof(nd_msg->target))) != 0) {
 			return 0;
 		}
-
 		dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
 		dp_set_vm_ip6(m->port, req_ipv6_hdr->dst_addr);
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
@@ -82,18 +79,12 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 		req_ra_msg->retrans_timer = 0;
 		req_ipv6_hdr->payload_len = htons(sizeof(struct ra_msg));
 		req_icmp6_hdr->icmp6_hop_limit = 255;
-		
-		/* Periodic RA msg case */
-		if((memcmp(req_eth_hdr->d_addr.addr_bytes,dp_dummy_mac,sizeof(req_eth_hdr->d_addr.addr_bytes)) == 0)) {	
-			rte_memcpy(req_eth_hdr->d_addr.addr_bytes, dp_mc_mac, sizeof(req_eth_hdr->d_addr.addr_bytes));
-			rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,sizeof(req_ipv6_hdr->dst_addr));	
-		}
-
 	}
 
 	//L4 cksum calculation 
 	req_icmp6_hdr->icmp6_cksum	= 0;
 	req_icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_icmp6_hdr);
+
 	return 1;
 
 } 

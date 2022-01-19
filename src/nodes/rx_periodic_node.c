@@ -6,8 +6,11 @@
 #include "nodes/rx_periodic_node.h"
 #include "node_api.h"
 #include "nodes/ipv6_nd_node.h"
+#include "dp_mbuf_dyn.h"
+#include <unistd.h>
 
 static struct rx_periodic_node_ctx node_ctx;
+static struct rx_periodic_node_main rx_periodic_node;
 
 int config_rx_periodic_node(struct rx_periodic_node_config *cfg)
 {
@@ -31,52 +34,32 @@ static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
-/* static __rte_always_inline uint16_t handle_msg_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx)
-{
-	struct rte_mbuf **pkts, *mbuf0;
-	int count, i;
-    uint8_t comp = 0;
-    struct rte_ether_hdr *req_eth_hdr;
-	struct rte_ipv6_hdr *req_ipv6_hdr;
-	struct icmp6hdr *req_icmp6_hdr;
-
-	count = rte_ring_dequeue_burst(ctx->periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
-
-	if (count == 0)
-		return 0;
-
-	pkts = (struct rte_mbuf **)node->objs;
-
-	for (i = 0; i < count; i++) {
-		mbuf0 = pkts[i];
-		
-        init_dp_mbuf_priv1(mbuf0);
-        
-
-	req_eth_hdr = rte_pktmbuf_mtod(mbuf0, struct rte_ether_hdr *);
-	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
-	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr + 1);
-	uint8_t type = req_icmp6_hdr->icmp6_type ;
-
-	}
-	return 0;
-} */
-
 static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 												   struct rte_node *node,
 												   struct rx_periodic_node_ctx *ctx)
 {
+	struct rte_mbuf **pkts, *mbuf0;
 	uint16_t count, next_index;
+	struct dp_flow *df_ptr;
+ 	int i;
 
 	next_index = ctx->next;
 
 	count = rte_ring_dequeue_burst(ctx->periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
-
 	if (!count)
 		return 0;
-	node->idx = count;
-	/* Enqueue to next node */
-	rte_node_next_stream_move(graph, node, next_index);
+	
+	pkts = (struct rte_mbuf **)node->objs;
+ 	for (i = 0; i < count; i++) {
+ 		node->idx = 1;
+ 		mbuf0 = pkts[i];
+ 		df_ptr = alloc_dp_flow_ptr(mbuf0);
+ 		if (!df_ptr)
+ 			continue;
+ 		if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX)
+ 			next_index = rx_periodic_node.next_index[mbuf0->port];
+ 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
+ 	}
 
 	return count;
 }
@@ -96,7 +79,11 @@ static __rte_always_inline uint16_t rx_periodic_node_process(struct rte_graph *g
 	return n_pkts;
 }
 
-
+int rx_periodic_set_next(uint16_t port_id, uint16_t next_index)
+ {
+ 	rx_periodic_node.next_index[port_id] = next_index;
+ 	return 0;
+ }
 
 static struct rte_node_register rx_periodic_node_base = {
 	.name = "rx-periodic",

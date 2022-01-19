@@ -4,6 +4,7 @@
 #include "node_api.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
+#include "dp_periodic_msg.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/rx_node_priv.h"
 #include "nodes/arp_node_priv.h"
@@ -21,7 +22,6 @@ static int last_assigned_vf_idx = 0;
 static pthread_t ctrl_thread_tid;
 static struct rte_timer timer;
 static uint64_t timer_res;
-static struct rte_mbuf *pkt_buf;
 
 static const char * const default_patterns[] = {
 	"rx-*",
@@ -64,52 +64,10 @@ static void signal_handler(int signum)
 }
 
 static void timer_cb () {
-	struct rte_ether_hdr *eth_hdr;
-	struct rte_ipv6_hdr *ipv6_hdr;
-	struct rs_msg *rs_msg;
-	struct icmp6hdr *icmp6_hdr;
-	uint16_t pkt_size;
-
-	pkt_buf = rte_pktmbuf_alloc(dp_layer.rte_mempool);
-	if(pkt_buf == NULL) {
-		printf("rte_mbuf allocation failed\n");
-	}
-	
-	eth_hdr = rte_pktmbuf_mtod(pkt_buf, struct rte_ether_hdr *);
-	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
-	rs_msg = (struct rs_msg*) (ipv6_hdr + 1);
-
-	memset(&eth_hdr->s_addr, 0xFF, RTE_ETHER_ADDR_LEN);
-	memset(&eth_hdr->d_addr, 0xFF, RTE_ETHER_ADDR_LEN);
-	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
-
-	ipv6_hdr->proto = 0x3a; //ICMP6
-	ipv6_hdr->vtc_flow = htonl(0x60000000);
-	ipv6_hdr->hop_limits = 255;
-	memset(ipv6_hdr->src_addr,0xff,16);
-	memset(ipv6_hdr->dst_addr,0xff,16);
-	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr));
-
-	
-	icmp6_hdr = &(rs_msg->icmph);
-	memset(icmp6_hdr,0,sizeof(struct icmp6hdr));
-	icmp6_hdr->icmp6_type = 133;
-	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + sizeof(struct ra_msg);
-	pkt_buf->data_len = pkt_size;
-    pkt_buf->pkt_len = pkt_size;
-
-	// send pkt to all allocated VFs
-	for (int i = 0; i < dp_layer.dp_port_cnt; i++) {
-		if ((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
-			dp_layer.ports[i]->dp_allocated) {
-			struct rte_mbuf *clone_buf = rte_pktmbuf_copy(pkt_buf,dp_layer.rte_mempool,0,UINT32_MAX);
-			clone_buf->port = dp_layer.ports[i]->dp_port_id;
-			rte_ring_sp_enqueue(dp_layer.periodic_msg_queue, clone_buf);
-
-			}
-	}
-	
-}
+ 	trigger_nd_ra();
+ 	trigger_garp();
+ 	trigger_nd_unsol_adv();
+ }
 
 int dp_dpdk_init(int argc, char **argv)
 {
@@ -135,7 +93,7 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.grpc_queue = rte_ring_create("grpc_queue", 256, rte_socket_id(), 0);
 	if (!dp_layer.grpc_queue)
 		printf("Error creating grpc queue\n");
-	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 256, rte_socket_id(), 0);
+	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 256, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.periodic_msg_queue)
 		printf("Error creating periodic_msg_queue queue\n");
 
@@ -143,6 +101,7 @@ int dp_dpdk_init(int argc, char **argv)
 	rte_timer_subsystem_init();
 	//init the timer
 	rte_timer_init(&timer);
+	
 
 	hz = rte_get_timer_hz();
 	timer_res = hz * 10; // 10 seconds
@@ -493,7 +452,7 @@ int dp_init_graph()
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
-	struct rte_node_register *dhcpv6_node;
+	struct rte_node_register *dhcpv6_node, *rx_periodic_node;;
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
@@ -527,11 +486,10 @@ int dp_init_graph()
 	ipv6_encap_node = ipv6_encap_node_get();
 	dhcp_node = dhcp_node_get();
 	dhcpv6_node = dhcpv6_node_get();
+	rx_periodic_node = rx_periodic_node_get();
 
 	rx_periodic_cfg.periodic_msg_queue = dp_layer.periodic_msg_queue;
-	//rx_periodic_cfg.queue_id = 0;
 	ret = config_rx_periodic_node(&rx_periodic_cfg);
-
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
 		snprintf(name, sizeof(name), "%u-%u", dp_layer.ports[i]->dp_port_id, 0);
@@ -558,6 +516,12 @@ int dp_init_graph()
 				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(arp_node->id) - 1);
 			if (ret < 0)
 				return ret;
+			rte_node_edge_update(rx_periodic_node->id, RTE_EDGE_ID_INVALID,
+ 						&next_nodes, 1);
+ 			ret = rx_periodic_set_next(
+ 				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(arp_node->id) - 1);
+ 			if (ret < 0)
+ 				return ret;
 			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID,
 						&next_nodes, 1);
 			ret = ipv6_nd_set_next(
