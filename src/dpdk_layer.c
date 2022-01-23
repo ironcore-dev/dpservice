@@ -233,33 +233,10 @@ static int main_core_loop() {
 }
 
 int dp_dpdk_main_loop()
-{/*
-	struct dp_port_ext pf_port;
-	int port_id, vni = 100, t_vni = 100, machine_id = 50;
-	int ip_addr = RTE_IPV4(172, 34, 0, 1);
-	uint8_t trgt_ip6[16];*/
-	
+{
 
 	printf("DPDK main loop started\n ");
 
-/*	port_id = dp_get_next_avail_vf_id(&dp_layer, DP_PORT_VF);
-	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-	dp_set_dhcp_range_ip4(port_id, ip_addr, 32, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, vni, 0, ip_addr, NULL, 32, rte_eth_dev_socket_id(port_id));
-	dp_start_interface(&pf_port, DP_PORT_VF);
-
-	ip_addr = RTE_IPV4(172, 35, 2, 4);
-	port_id = dp_get_next_avail_vf_id(&dp_layer, DP_PORT_VF);
-	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-	dp_set_dhcp_range_ip4(port_id, ip_addr, 32, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, vni, 0, ip_addr, NULL, 32, rte_eth_dev_socket_id(port_id));
-	dp_start_interface(&pf_port, DP_PORT_VF);
-
-	ip_addr = RTE_IPV4(192, 168, 129, 0);
-	inet_pton(AF_INET6, "2a10:afc0:e01f:209::", trgt_ip6);
-	dp_add_route(DP_PF_PORT, vni, t_vni, ip_addr, trgt_ip6, 24, rte_eth_dev_socket_id(port_id)); */
-
-	
 	/* Launch per-lcore init on every worker lcore */
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
 
@@ -298,7 +275,7 @@ static int dp_port_prepare(dp_port_type type, int port_id,
 	struct dp_port *dp_port;
 
 	dp_port = dp_port_create(&dp_layer, type);
-	if (dp_port){
+	if (dp_port) {
 		dp_port_init(dp_port, port_id, port_ext);
 		dp_layer.ports[dp_layer.dp_port_cnt++] = dp_port;
 		dp_cfg_ethdev(port_id);
