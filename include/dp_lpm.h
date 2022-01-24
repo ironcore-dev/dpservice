@@ -6,6 +6,7 @@
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include "dpdk_layer.h"
+#include "node_api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,7 +67,7 @@ void dp_get_flow_data(uint16_t portid, struct flow_key *key, void **data);
 void dp_add_flow_data(uint16_t portid, struct flow_key *key, void *data);
 void dp_add_flow(uint16_t portid, struct flow_key *key);
 bool dp_flow_exists(uint16_t portid, struct flow_key *key);
-void dp_build_flow_key(struct flow_key *key /* out */, const struct rte_ipv4_hdr *ipv4_hdr /* in */);
+void dp_build_flow_key(struct flow_key *key /* out */, const struct dp_flow *df_ptr /* in */);
 
 
 void setup_lpm(int port_id, int machine_id, int vni, const int socketid);

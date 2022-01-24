@@ -34,6 +34,7 @@ static const char * const default_patterns[] = {
 	"ipv6_lookup",
 	"dhcp",
 	"dhcpv6",
+	"firewall",
 	"l2_decap",
 	"ipv6_encap",
 	"ipv6_decap",
@@ -52,6 +53,7 @@ static struct underlay_conf gen_conf = {
 	.vni = {0},
 	.trgt_ip6 = {0},
 	.src_ip6 = {0},
+	.default_port = 443,
 };
 
 static void signal_handler(int signum)

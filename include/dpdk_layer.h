@@ -57,6 +57,7 @@ struct underlay_conf {
 		uint32_t	trgt_ip4;
 		uint8_t		trgt_ip6[16];
 	};
+	uint16_t default_port;
 };
 
 /* Functions for internal processing */

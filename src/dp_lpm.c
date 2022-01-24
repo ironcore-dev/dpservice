@@ -35,26 +35,20 @@ static void init_lcore_flowtable(uint16_t portid)
 
 void dp_build_flow_key(struct flow_key *key /* out */, const struct dp_flow *df_ptr /* in */)
 {
-	struct rte_tcp_hdr *tcp;
-	struct rte_udp_hdr *udp;
 
 	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
 	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
 	key->proto = df_ptr->l4_type;
 
-	switch (ipv4_hdr->next_proto_id) {
+	switch (df_ptr->l4_type) {
 		case IPPROTO_TCP:
-				tcp = (struct rte_tcp_hdr *)((unsigned char *)ipv4_hdr +
-										sizeof(struct rte_ipv4_hdr));
-				key->port_dst = rte_be_to_cpu_16(tcp->dst_port);
-				key->port_src = rte_be_to_cpu_16(tcp->src_port);
+				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
+				key->port_src = rte_be_to_cpu_16(df_ptr->src_port);
 				break;
 
 		case IPPROTO_UDP:
-				udp = (struct rte_udp_hdr *)((unsigned char *)ipv4_hdr +
-										sizeof(struct rte_ipv4_hdr));
-				key->port_dst = rte_be_to_cpu_16(udp->dst_port);
-				key->port_src = rte_be_to_cpu_16(udp->src_port);
+				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
+				key->port_src = rte_be_to_cpu_16(df_ptr->src_port);
 				break;
 
 		default:

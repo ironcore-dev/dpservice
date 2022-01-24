@@ -53,24 +53,17 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 										  sizeof(struct rte_ether_hdr));
 	}
 	if (ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP) {
-		tcp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *,
-							sizeof(struct rte_ether_hdr)
-							+ sizeof(struct rte_ipv4_hdr));
+		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 		df.dst_port = tcp_hdr->dst_port;
 		df.src_port = tcp_hdr->src_port;
 	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
-		udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
-										sizeof(struct rte_ether_hdr)
-										+ sizeof(struct rte_ipv4_hdr));
+		udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr + 1);
 		if ((ntohs(udp_hdr->dst_port) == DP_BOOTP_SRV_PORT) && !df.geneve_hdr)
 				return DP_ROUTE_DHCP;
 		df.dst_port = udp_hdr->dst_port;
 		df.src_port = udp_hdr->src_port;
 	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_ICMP) {
-		icmp_hdr = (struct rte_icmp_hdr *)rte_pktmbuf_mtod_offset(m,
-										struct rte_udp_hdr *,
-										sizeof(struct rte_ether_hdr)
-										+ sizeof(struct rte_ipv4_hdr));
+		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
 		df.icmp_type = icmp_hdr->icmp_type;
 	}
 	df.dst.dst_addr = ipv4_hdr->dst_addr;
@@ -89,10 +82,11 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		else /* Outer world -> VM */
 			df_ptr->dst_vni = t_vni;
 
-		dp_build_flow_key(&key, df_ptr);
-		if (!dp_flow_exists(m->port, &key))
-			dp_add_flow(m->port, &key);
-
+		if (!dp_is_pf_port_id(m->port) && (df_ptr->l4_type != DP_IP_PROTO_ICMP)) {
+			dp_build_flow_key(&key, df_ptr);
+			if (!dp_flow_exists(m->port, &key))
+				dp_add_flow(m->port, &key);
+		}
 		if (dp_is_pf_port_id(df_ptr->nxt_hop))
 			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
 		else
@@ -123,6 +117,8 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 								mbuf0);
 		else if (route == DP_ROUTE_DHCP)
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
+		else if (route == DP_ROUTE_FIREWALL)
+			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_FIREWALL, mbuf0);
 		else
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
 	}	
@@ -148,6 +144,7 @@ static struct rte_node_register ipv4_lookup_node_base = {
 			[IPV4_LOOKUP_NEXT_DROP] = "drop",
 			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
 			[IPV4_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
+			[IPV4_LOOKUP_NEXT_FIREWALL] = "firewall",
 		},
 };
 
