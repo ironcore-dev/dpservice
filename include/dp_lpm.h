@@ -3,6 +3,8 @@
 
 #include <rte_rib.h>
 #include <rte_rib6.h>
+#include <rte_hash.h>
+#include <rte_jhash.h>
 #include "dpdk_layer.h"
 
 #ifdef __cplusplus
@@ -11,6 +13,7 @@ extern "C" {
 
 #define DP_ROUTE_DHCP		-2
 #define DP_ROUTE_DROP		-3
+#define DP_ROUTE_FIREWALL	-4
 
 #define DP_IP_PROTO_UDP		0x11
 #define DP_IP_PROTO_TCP		0x06
@@ -20,6 +23,10 @@ extern "C" {
 
 #define IPV4_DP_RIB_MAX_RULES	1024
 #define IPV6_DP_RIB_MAX_RULES	1024
+
+#define FLOW_MAX	1*1024*1024UL
+#define ALL_32_BITS	0xffffffff
+#define BIT_8_TO_15	0x0000ff00
 
 
 struct macip_entry {
@@ -35,6 +42,7 @@ struct macip_entry {
 struct vm_entry {
 	struct rte_rib		*ipv4_rib[DP_NB_SOCKETS];
 	struct rte_rib6		*ipv6_rib[DP_NB_SOCKETS];
+	struct rte_hash		*ipv4_flow_tbl;
 	struct macip_entry	info;
 	int					vni;
 	int					machine_id;
@@ -45,6 +53,21 @@ struct vm_route {
 	int		vni;
 	uint8_t	nh_ipv6[16];
 };
+
+struct flow_key {
+	uint32_t ip_dst;
+	uint32_t ip_src;
+	uint16_t port_dst;
+	uint16_t port_src;
+	uint8_t  proto;
+} __rte_packed;
+
+void dp_get_flow_data(uint16_t portid, struct flow_key *key, void **data);
+void dp_add_flow_data(uint16_t portid, struct flow_key *key, void *data);
+void dp_add_flow(uint16_t portid, struct flow_key *key);
+bool dp_flow_exists(uint16_t portid, struct flow_key *key);
+void dp_build_flow_key(struct flow_key *key /* out */, const struct rte_ipv4_hdr *ipv4_hdr /* in */);
+
 
 void setup_lpm(int port_id, int machine_id, int vni, const int socketid);
 void setup_lpm6(int port_id, int machine_id, int vni, const int socketid);

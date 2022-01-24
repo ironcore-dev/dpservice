@@ -35,8 +35,10 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	struct dp_flow df;
 	struct dp_flow *df_ptr;
 	struct vm_route route;
+	struct flow_key key;
 	int ret = 0, t_vni = 0;
 
+	memset(&key, 0, sizeof(struct flow_key));
 	memset(&df, 0, sizeof(struct dp_flow));
 	df.l3_type = RTE_ETHER_TYPE_IPV4;
 
@@ -87,8 +89,14 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		else /* Outer world -> VM */
 			df_ptr->dst_vni = t_vni;
 
+		dp_build_flow_key(&key, df_ptr);
+		if (!dp_flow_exists(m->port, &key))
+			dp_add_flow(m->port, &key);
+
 		if (dp_is_pf_port_id(df_ptr->nxt_hop))
 			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
+		else
+			ret = DP_ROUTE_FIREWALL;
 
 		if (dp_is_offload_enabled())
 			df_ptr->valid = 1;

@@ -48,7 +48,7 @@ static void dp_init_interfaces()
 	memcpy(pf_port.port_name, dp_get_vf_pattern(), IFNAMSIZ);
 
 	/* Only init the max. possible VFs, GRPC will kick them off later */
-	for (i = 0; i < 2; i++)
+	for (i = 0; i < DP_ACTIVE_VF_PORT; i++)
 		dp_init_interface(&pf_port, DP_PORT_VF);
 
 	dp_init_graph();
