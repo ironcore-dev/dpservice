@@ -69,8 +69,9 @@ static void signal_handler(int signum)
 static void port_flow_aged(int port_id)
 {
 	int nb_context, total = 0, idx;
+	struct flow_age_ctx *agectx = NULL;
+	struct flow_value *flow_val = NULL;
 	struct rte_flow_error error;
-	struct rte_flow **flow;
 	void **contexts;
 
 	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
@@ -89,11 +90,22 @@ static void port_flow_aged(int port_id)
 		goto free;
 
 	for (idx = 0; idx < nb_context; idx++) {
-		flow = (struct rte_flow**)(struct rte_flow*)contexts[idx];
-		if (!flow || !*flow)
+		agectx = (struct flow_age_ctx*)contexts[idx];
+		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, *flow, &error);
-		free(flow);
+		rte_flow_destroy(port_id, agectx->rteflow, &error);
+		dp_get_flow_data(agectx->port, &agectx->fkey, (void**)&flow_val);
+		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d hash key %p  rte_flow inserted on port %d\n", 
+			 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey, port_id);
+		if (!flow_val) {
+			rte_free(agectx);
+			continue;
+		}
+		if (rte_atomic32_dec_and_test(&flow_val->flow_cnt)) {
+			dp_delete_flow(agectx->port, &agectx->fkey);
+			rte_free(flow_val);
+		}
+		rte_free(agectx);
 	}
 
 free:

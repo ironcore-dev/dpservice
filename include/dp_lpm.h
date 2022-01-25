@@ -5,6 +5,7 @@
 #include <rte_rib6.h>
 #include <rte_hash.h>
 #include <rte_jhash.h>
+#include <rte_flow.h>
 #include "dpdk_layer.h"
 #include "node_api.h"
 
@@ -60,14 +61,29 @@ struct flow_key {
 	uint32_t ip_src;
 	uint16_t port_dst;
 	uint16_t port_src;
+	uint16_t port_start;
+	uint16_t port_end;
 	uint8_t  proto;
 } __rte_packed;
+
+struct flow_value {
+	uint16_t		installed_port;
+	uint16_t		flow_state;
+	rte_atomic32_t	flow_cnt;
+};
+
+struct flow_age_ctx {
+	struct flow_key	fkey;
+	struct rte_flow	*rteflow;
+	uint16_t		port;
+};
 
 void dp_get_flow_data(uint16_t portid, struct flow_key *key, void **data);
 void dp_add_flow_data(uint16_t portid, struct flow_key *key, void *data);
 void dp_add_flow(uint16_t portid, struct flow_key *key);
+void dp_delete_flow(uint16_t portid, struct flow_key *key);
 bool dp_flow_exists(uint16_t portid, struct flow_key *key);
-void dp_build_flow_key(struct flow_key *key /* out */, const struct dp_flow *df_ptr /* in */);
+void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 
 
 void setup_lpm(int port_id, int machine_id, int vni, const int socketid);

@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_util.h"
 #include "nodes/firewall_node.h"
 
 
@@ -27,15 +28,31 @@ static __rte_always_inline int handle_firewall(struct rte_mbuf *m)
 	struct flow_key key;
 	df_ptr = get_dp_flow_ptr(m);
 
+	/* Connections to the outer world are always allowed */
+	if (dp_is_pf_port_id(df_ptr->nxt_hop))
+		goto pass_packet;
+
+	/* Check other constraints per target VM/port in a helper function */
 	if (htons(u_conf->default_port) == df_ptr->dst_port)
-			return DP_FIREWL_PASS_PACKET;
+		goto pass_packet;
 
-	if (df_ptr->l4_type != DP_IP_PROTO_ICMP) {
-		dp_build_flow_key(&key, df_ptr);
-		if (!dp_flow_exists(df_ptr->nxt_hop, &key))
-			return DP_FIREWL_DROP_PACKET;
+	/* ICMP packets are always allowed */
+	if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
+		goto pass_packet;
+
+	/* Flows which were already seen are allowed */
+	dp_build_flow_key(&key, m);
+	if (!dp_flow_exists(df_ptr->nxt_hop, &key))
+		return DP_FIREWL_DROP_PACKET;
+	else
+		return DP_FIREWL_PASS_PACKET;
+
+pass_packet:
+	if (!dp_is_pf_port_id(m->port)) {
+		dp_build_flow_key(&key, m);
+		if (!dp_flow_exists(m->port, &key))
+			dp_add_flow(m->port, &key);
 	}
-
 	return DP_FIREWL_PASS_PACKET;
 }
 

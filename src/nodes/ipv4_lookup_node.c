@@ -82,15 +82,10 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		else /* Outer world -> VM */
 			df_ptr->dst_vni = t_vni;
 
-		if (!dp_is_pf_port_id(m->port) && (df_ptr->l4_type != DP_IP_PROTO_ICMP)) {
-			dp_build_flow_key(&key, df_ptr);
-			if (!dp_flow_exists(m->port, &key))
-				dp_add_flow(m->port, &key);
-		}
 		if (dp_is_pf_port_id(df_ptr->nxt_hop))
 			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
-		else
-			ret = DP_ROUTE_FIREWALL;
+
+		ret = DP_ROUTE_FIREWALL;
 
 		if (dp_is_offload_enabled())
 			df_ptr->valid = 1;
