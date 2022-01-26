@@ -43,10 +43,21 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 
 	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
-	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
+
+	if (df_ptr->flags.nat == DP_NAT_SNAT) {
+		key->ip_src = rte_be_to_cpu_32(dp_get_vm_nat_ip(m->port));
+	} else {
+		key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
+	}
 	key->proto = df_ptr->l4_type;
-	key->port_start = m->port;
-	key->port_end = df_ptr->nxt_hop;
+
+	if (df_ptr->flags.nat == DP_NAT_DNAT || df_ptr->flags.nat == DP_NAT_SNAT) {
+		key->port_start = 0;
+		key->port_end = 0;
+	} else {
+		key->port_start = m->port;
+		key->port_end = df_ptr->nxt_hop;
+	}
 
 	switch (df_ptr->l4_type) {
 		case IPPROTO_TCP:
@@ -153,6 +164,28 @@ uint8_t* dp_get_vm_ip6(uint16_t portid)
 	return vm_table[portid].info.vm_ipv6;
 }
 
+bool dp_is_vm_natted(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return (vm_table[portid].info.nat != DP_NAT_OFF);
+}
+
+uint32_t dp_get_vm_nat_ip(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return htonl(vm_table[portid].info.virt_ip);
+}
+
+uint16_t dp_get_vm_port_id_per_nat_ip(uint32_t nat_ip)
+{
+	int i;
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready && (vm_table[i].info.virt_ip == nat_ip))
+			return i;
+	return -1;
+}
+
 static struct rte_rib* get_lpm(int vni, const int socketid)
 {
 	int i;
@@ -248,6 +281,13 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 	}
 	return ret;
 
+}
+
+void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	vm_table[portid].info.virt_ip = ip;
+	vm_table[portid].info.nat = DP_NAT_ON;
 }
 
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)

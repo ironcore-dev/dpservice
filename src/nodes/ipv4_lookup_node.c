@@ -35,10 +35,8 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	struct dp_flow df;
 	struct dp_flow *df_ptr;
 	struct vm_route route;
-	struct flow_key key;
 	int ret = 0, t_vni = 0;
 
-	memset(&key, 0, sizeof(struct flow_key));
 	memset(&df, 0, sizeof(struct dp_flow));
 	df.l3_type = RTE_ETHER_TYPE_IPV4;
 
@@ -47,7 +45,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
 		rte_memcpy(&t_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
-		df.geneve_hdr = 1;
+		df.flags.geneve_hdr = 1;
 	} else {
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 										  sizeof(struct rte_ether_hdr));
@@ -58,7 +56,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		df.src_port = tcp_hdr->src_port;
 	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
 		udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr + 1);
-		if ((ntohs(udp_hdr->dst_port) == DP_BOOTP_SRV_PORT) && !df.geneve_hdr)
+		if ((ntohs(udp_hdr->dst_port) == DP_BOOTP_SRV_PORT) && !df.flags.geneve_hdr)
 				return DP_ROUTE_DHCP;
 		df.dst_port = udp_hdr->dst_port;
 		df.src_port = udp_hdr->src_port;
@@ -71,9 +69,9 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	df.l4_type = ipv4_hdr->next_proto_id;
 
 	ret = lpm_get_ip4_dst_port(m->port, t_vni, ipv4_hdr, &route, rte_eth_dev_socket_id(m->port));
+	df_ptr = alloc_dp_flow_ptr(m);
 	if (ret >= 0) {
 		df.nxt_hop = ret;
-		df_ptr = alloc_dp_flow_ptr(m);
 		if (!df_ptr)
 			return DP_ROUTE_DROP;
 		rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
@@ -81,15 +79,25 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 			df_ptr->dst_vni = route.vni;
 		else /* Outer world -> VM */
 			df_ptr->dst_vni = t_vni;
-
-		if (dp_is_pf_port_id(df_ptr->nxt_hop))
-			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
-
 		ret = DP_ROUTE_FIREWALL;
+		if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
+			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
+			if (dp_is_vm_natted(m->port)) {
+				ret = DP_ROUTE_NAT;
+				df_ptr->flags.nat = DP_NAT_SNAT;
+			}
+		}
 
 		if (dp_is_offload_enabled())
-			df_ptr->valid = 1;
+			df_ptr->flags.valid = 1;
+	} else {
+		if (dp_is_pf_port_id(m->port)) {
+				ret = DP_ROUTE_NAT;
+				rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
+				df_ptr->flags.nat = DP_NAT_DNAT;
+		}
 	}
+
 	return ret;
 }
 
@@ -114,6 +122,8 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
 		else if (route == DP_ROUTE_FIREWALL)
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_FIREWALL, mbuf0);
+		else if (route == DP_ROUTE_NAT)
+			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT, mbuf0);
 		else
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
 	}	
@@ -140,6 +150,7 @@ static struct rte_node_register ipv4_lookup_node_base = {
 			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
 			[IPV4_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
 			[IPV4_LOOKUP_NEXT_FIREWALL] = "firewall",
+			[IPV4_LOOKUP_NEXT_NAT] = "nat",
 		},
 };
 

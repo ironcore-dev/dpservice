@@ -67,8 +67,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	struct rte_flow_item_icmp6 icmp6_mask;
 	struct rte_flow_item_tcp tcp_spec;
 	struct rte_flow_item_tcp tcp_mask;
-	struct rte_flow_item_raw raw_spec;
-	struct rte_flow_item_raw raw_mask;
+	//struct rte_flow_item_raw raw_spec;
+	//struct rte_flow_item_raw raw_mask;
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
 	struct rte_flow *flow;
@@ -92,7 +92,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	/* First find out the packet direction */
 	if (dp_is_pf_port_id(df->nxt_hop))
 		route_direct = DP_ROUTE_TO_PF_ENCAPPED;
-	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->geneve_hdr))
+	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->flags.geneve_hdr))
 		route_direct = DP_ROUTE_TO_VM_DECAPPED;
 
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
@@ -404,7 +404,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			} else 
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
 		}
-		if (df && df->valid)
+		if (df && df->flags.valid)
 			handle_offload(mbuf0, df);	
 	}	
 

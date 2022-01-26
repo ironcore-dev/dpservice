@@ -35,6 +35,7 @@ static const char * const default_patterns[] = {
 	"dhcp",
 	"dhcpv6",
 	"firewall",
+	"nat",
 	"l2_decap",
 	"ipv6_encap",
 	"ipv6_decap",
