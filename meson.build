@@ -29,3 +29,7 @@ subdir('include')
 subdir('src')
 subdir('test')
 test('test', files('test/run_test'), args : [meson.current_build_dir()])
+
+run_target('cppcheck', command : ['cppcheck', '--project=' + 
+  join_paths(meson.build_root(), 'compile_commands.json')])
+
