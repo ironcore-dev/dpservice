@@ -26,7 +26,7 @@ int config_rx_node(struct rx_node_config *cfg)
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
-	int i, port_id;
+	int i, port_id = 0;
 
 	for (i = 0; i < DP_MAX_PORTS; i++) {
 		if (ethdev_rx_main.node_ctx[i].node_id == node->id) {
