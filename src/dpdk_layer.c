@@ -4,6 +4,7 @@
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
 #include "dp_lpm.h"
+#include "dp_flow.h"
 #include "dp_util.h"
 #include "dp_periodic_msg.h"
 #include "nodes/tx_node_priv.h"
@@ -67,52 +68,6 @@ static void signal_handler(int signum)
 	}
 }
 
-static void port_flow_aged(int port_id)
-{
-	int nb_context, total = 0, idx;
-	struct flow_age_ctx *agectx = NULL;
-	struct flow_value *flow_val = NULL;
-	struct rte_flow_error error;
-	void **contexts;
-
-	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
-
-	if (total <= 0)
-		return;
-
-	contexts = rte_zmalloc("aged_ctx", sizeof(void *) * total,
-			       RTE_CACHE_LINE_SIZE);
-	if (contexts == NULL)
-		return;
-
-	nb_context = rte_flow_get_aged_flows(port_id, contexts,
-					     total, &error);
-	if (nb_context != total)
-		goto free;
-
-	for (idx = 0; idx < nb_context; idx++) {
-		agectx = (struct flow_age_ctx*)contexts[idx];
-		if (!agectx)
-			continue;
-		rte_flow_destroy(port_id, agectx->rteflow, &error);
-		dp_get_flow_data(agectx->port, &agectx->fkey, (void**)&flow_val);
-		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d hash key %p  rte_flow inserted on port %d\n", 
-			 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey, port_id);
-		if (!flow_val) {
-			rte_free(agectx);
-			continue;
-		}
-		if (rte_atomic32_dec_and_test(&flow_val->flow_cnt)) {
-			dp_delete_flow(agectx->port, &agectx->fkey);
-			rte_free(flow_val);
-		}
-		rte_free(agectx);
-	}
-
-free:
-	rte_free(contexts);
-}
-
 static void trigger_flow_age_check() {
 	int i;
 
@@ -120,7 +75,7 @@ static void trigger_flow_age_check() {
 		if (((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
 			dp_layer.ports[i]->dp_allocated) || 
 			(dp_layer.ports[i]->dp_p_type == DP_PORT_PF)) {
-				port_flow_aged(dp_layer.ports[i]->dp_port_id);
+				dp_process_aged_flows(dp_layer.ports[i]->dp_port_id);
 			}
 	}
 }

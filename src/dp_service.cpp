@@ -7,6 +7,7 @@
 
 #include "dpdk_layer.h"
 #include "dp_util.h"
+#include "dp_flow.h"
 #include "dp_grpc_service.h"
 
 /* Dummy function to configure the data plane hard-coded
@@ -52,6 +53,7 @@ static void dp_init_interfaces()
 		dp_init_interface(&pf_port, DP_PORT_VF);
 
 	dp_init_graph();
+	dp_init_flowtable(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 }
 
 int main(int argc, char **argv)

@@ -7,6 +7,7 @@
 #include "node_api.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/ipv6_nd_node.h"
+#include "dp_flow.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "dp_mbuf_dyn.h"
@@ -348,7 +349,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 		}
 		dp_build_flow_key(&agectx->fkey, m);
 		agectx->rteflow = flow;
-		dp_get_flow_data(m->port, &agectx->fkey, (void**)&flow_val);
+		dp_get_flow_data(&agectx->fkey, (void**)&flow_val);
 		if (!flow_val) {
 			flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 			rte_atomic32_clear(&flow_val->flow_cnt);
@@ -357,7 +358,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 			rte_atomic32_inc(&flow_val->flow_cnt);
 			printf("Inserting flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  hash key %p \n", 
 				 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey);
-			dp_add_flow_data(agectx->port, &agectx->fkey, flow_val);
+			dp_add_flow_data(&agectx->fkey, flow_val);
 		}
 	}
 

@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_flow.h"
 #include "dp_util.h"
 #include "nodes/nat_node.h"
 
@@ -49,7 +50,7 @@ static __rte_always_inline int handle_nat(struct rte_mbuf *m)
 			ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			dp_build_flow_key(&key, m);
-			if (dp_flow_exists(m->port, &key)) {
+			if (dp_flow_exists(&key)) {
 				df_ptr->nxt_hop = dp_get_vm_port_id_per_nat_ip(ntohl(ipv4_hdr->dst_addr));
 				if (df_ptr->nxt_hop < 0)
 					return -1;

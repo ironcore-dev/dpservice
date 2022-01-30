@@ -27,15 +27,12 @@ extern "C" {
 #define IPV4_DP_RIB_MAX_RULES	1024
 #define IPV6_DP_RIB_MAX_RULES	1024
 
-#define FLOW_MAX	1*1024*1024UL
-#define ALL_32_BITS	0xffffffff
-#define BIT_8_TO_15	0x0000ff00
-
-
 #define DP_NAT_OFF	0
 #define DP_NAT_ON	1
 #define DP_NAT_SNAT	2
 #define DP_NAT_DNAT	3
+
+#define VM_MACHINE_ID_STR_LEN 64
 
 struct macip_entry {
 	struct rte_ether_addr	own_mac;
@@ -65,36 +62,6 @@ struct vm_route {
 	uint8_t	nh_ipv6[16];
 };
 
-struct flow_key {
-	uint32_t ip_dst;
-	uint32_t ip_src;
-	uint16_t port_dst;
-	uint16_t port_src;
-	uint16_t port_start;
-	uint16_t port_end;
-	uint8_t  proto;
-} __rte_packed;
-
-struct flow_value {
-	uint16_t		installed_port;
-	uint16_t		flow_state;
-	rte_atomic32_t	flow_cnt;
-};
-
-struct flow_age_ctx {
-	struct flow_key	fkey;
-	struct rte_flow	*rteflow;
-	uint16_t		port;
-};
-
-void dp_get_flow_data(uint16_t portid, struct flow_key *key, void **data);
-void dp_add_flow_data(uint16_t portid, struct flow_key *key, void *data);
-void dp_add_flow(uint16_t portid, struct flow_key *key);
-void dp_delete_flow(uint16_t portid, struct flow_key *key);
-bool dp_flow_exists(uint16_t portid, struct flow_key *key);
-void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
-
-
 void setup_lpm(int port_id, int machine_id, int vni, const int socketid);
 void setup_lpm6(int port_id, int machine_id, int vni, const int socketid);
 int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct rte_ipv4_hdr *ipv4_hdr,
@@ -102,6 +69,7 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct rte_ipv4_hdr *ipv4
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
 						 struct vm_route *r, int socketid);
 
+void dp_init_vm_handle_tbl(uint16_t portid);
 uint32_t dp_get_gw_ip4();
 uint8_t* dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);

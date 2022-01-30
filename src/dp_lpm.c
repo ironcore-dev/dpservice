@@ -1,139 +1,14 @@
 #include "dp_lpm.h"
+#include "dp_flow.h"
 #include "dp_util.h"
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
 
 static struct vm_entry vm_table[DP_MAX_PORTS];
-static struct rte_hash *ipv4_flow_tbl = NULL;
 
 static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static uint8_t dp_router_gw_ip6[16] = {0xfe,0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
-
-static void init_lcore_flowtable(uint16_t portid)
-{
-	int socket_id;
-
-	struct rte_hash_parameters ipv4_table_params = {
-		.name = NULL,
-		.entries = FLOW_MAX / DP_ACTIVE_VF_PORT,
-		.key_len =  sizeof(struct flow_key),
-		.hash_func = rte_jhash,
-		.hash_func_init_val = 0xfee1900d,
-		.extra_flag = 0,
-	};
-	char s[64];
-
-	if (ipv4_flow_tbl)
-		return;
-
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	socket_id = rte_eth_dev_socket_id(portid);
-	snprintf(s, sizeof(s), "ipv4_flow_table_%u", portid);
-	ipv4_table_params.name = s;
-	ipv4_table_params.socket_id = socket_id;
-	ipv4_flow_tbl = rte_hash_create(&ipv4_table_params);
-	if(!ipv4_flow_tbl)
-		rte_exit(EXIT_FAILURE, "create ipv4 flow table failed\n");
-}
-
-void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
-{
-	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
-
-	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
-
-	if (df_ptr->flags.nat == DP_NAT_SNAT) {
-		key->ip_src = rte_be_to_cpu_32(dp_get_vm_nat_ip(m->port));
-	} else {
-		key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
-	}
-	key->proto = df_ptr->l4_type;
-
-	if (df_ptr->flags.nat == DP_NAT_DNAT || df_ptr->flags.nat == DP_NAT_SNAT) {
-		key->port_start = 0;
-		key->port_end = 0;
-	} else {
-		key->port_start = m->port;
-		key->port_end = df_ptr->nxt_hop;
-	}
-
-	switch (df_ptr->l4_type) {
-		case IPPROTO_TCP:
-				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
-				key->port_src = rte_be_to_cpu_16(df_ptr->src_port);
-				break;
-
-		case IPPROTO_UDP:
-				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
-				key->port_src = rte_be_to_cpu_16(df_ptr->src_port);
-				break;
-
-		default:
-				key->port_dst = 0;
-				key->port_src = 0;
-				break;
-	}
-
-	if (key->ip_src > key->ip_dst) {
-		uint32_t ip_tmp;
-		uint16_t port_tmp;
-		ip_tmp = key->ip_src;
-		key->ip_src = key->ip_dst;
-		key->ip_dst = ip_tmp;
-		port_tmp = key->port_src;
-		key->port_src = key->port_dst;
-		key->port_dst = port_tmp;
-		port_tmp = key->port_start;
-		key->port_start = key->port_end;
-		key->port_end = port_tmp;
-	}
-}
-
-bool dp_flow_exists(uint16_t portid, struct flow_key *key)
-{
-	int ret;
-
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	ret = rte_hash_lookup(ipv4_flow_tbl, key);
-	if (ret < 0)
-		return false;
-	return true;
-}
-
-void dp_add_flow(uint16_t portid, struct flow_key *key)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port %d add key failed\n", portid);
-}
-
-void dp_delete_flow(uint16_t portid, struct flow_key *key)
-{
-	int pos;
-
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	pos = rte_hash_del_key(ipv4_flow_tbl, key);
-	if (pos < 0)
-		printf("Hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
-}
-
-void dp_add_flow_data(uint16_t portid, struct flow_key *key, void* data)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	if (rte_hash_add_key_data(ipv4_flow_tbl, key, data) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port %d add data failed\n", portid);
-}
-
-void dp_get_flow_data(uint16_t portid, struct flow_key *key, void **data)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	if (rte_hash_lookup_data(ipv4_flow_tbl, key, data) < 0)
-		data = NULL;
-}
 
 uint32_t dp_get_gw_ip4()
 {
@@ -362,7 +237,6 @@ void setup_lpm(int port_id, int machine_id, int vni, const int socketid)
 	vm_table[port_id].ipv4_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].machine_id = machine_id;
-	init_lcore_flowtable(port_id);
 	vm_table[port_id].vm_ready = 1;
 }
 

@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_flow.h"
 #include "dp_util.h"
 #include "nodes/firewall_node.h"
 
@@ -42,7 +43,7 @@ static __rte_always_inline int handle_firewall(struct rte_mbuf *m)
 
 	/* Flows which were already seen are allowed */
 	dp_build_flow_key(&key, m);
-	if (!dp_flow_exists(df_ptr->nxt_hop, &key))
+	if (!dp_flow_exists(&key))
 		return DP_FIREWL_DROP_PACKET;
 	else
 		return DP_FIREWL_PASS_PACKET;
@@ -50,8 +51,8 @@ static __rte_always_inline int handle_firewall(struct rte_mbuf *m)
 pass_packet:
 	if (!dp_is_pf_port_id(m->port)) {
 		dp_build_flow_key(&key, m);
-		if (!dp_flow_exists(m->port, &key))
-			dp_add_flow(m->port, &key);
+		if (!dp_flow_exists(&key))
+			dp_add_flow(&key);
 	}
 	return DP_FIREWL_PASS_PACKET;
 }

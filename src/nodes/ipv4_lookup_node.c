@@ -10,6 +10,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "dp_lpm.h"
+#include "dp_flow.h"
 
 struct ipv4_lookup_node_main ipv4_lookup_node;
 

@@ -102,7 +102,6 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 		setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
 		setup_lpm6(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
 		dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
-		dp_set_vm_nat_ip(port_id, 0xac201409);
 		dp_set_dhcp_range_ip6(port_id, ipv6_addr, 128, rte_eth_dev_socket_id(port_id));
 		dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
 		dp_add_route6(port_id, vni, 0,ipv6_addr , NULL, 128, rte_eth_dev_socket_id(port_id));
