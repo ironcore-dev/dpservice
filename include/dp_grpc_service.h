@@ -18,17 +18,7 @@ using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
 
-using dpdkonmetal::DPDKonmetal;
-using dpdkonmetal::Status;
-using dpdkonmetal::Empty;
-using dpdkonmetal::AddMachineRequest;
-using dpdkonmetal::AddMachineResponse;
-using dpdkonmetal::IPConfig;
-using dpdkonmetal::Route;
-using dpdkonmetal::VNIRouteMsg;
-using dpdkonmetal::VNIMsg;
-using dpdkonmetal::Prefix;
-using dpdkonmetal::IPVersion;
+using namespace dpdkonmetal;
 
 class GRPCService final : public DPDKonmetal::Service {
 private:
@@ -39,6 +29,9 @@ public:
 	grpc::Status QueryHelloWorld(ServerContext* context, const Empty* request, Status* response) override;
 	grpc::Status addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response) override;
 	grpc::Status addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response) override;
+	grpc::Status addMachineVIP(ServerContext* context, const MachineVIPMsg* request, Status* response) override;
+	grpc::Status getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response) override;
+	grpc::Status delMachineVIP(ServerContext* context, const MachineIDMsg* request, Status* response) override;
 };
 
 #endif //__INCLUDE_DP_GRPC_SERVICE_H

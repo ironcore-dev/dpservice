@@ -53,7 +53,6 @@ struct vm_entry {
 	struct rte_hash		*ipv4_flow_tbl;
 	struct macip_entry	info;
 	int					vni;
-	int					machine_id;
 	uint8_t				vm_ready;
 };
 
@@ -62,14 +61,18 @@ struct vm_route {
 	uint8_t	nh_ipv6[16];
 };
 
-void setup_lpm(int port_id, int machine_id, int vni, const int socketid);
-void setup_lpm6(int port_id, int machine_id, int vni, const int socketid);
+void setup_lpm(int port_id, int vni, const int socketid);
+void setup_lpm6(int port_id, int vni, const int socketid);
 int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct rte_ipv4_hdr *ipv4_hdr,
 						 struct vm_route *r, int socketid);
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
 						 struct vm_route *r, int socketid);
 
-void dp_init_vm_handle_tbl(uint16_t portid);
+void dp_init_vm_handle_tbl(int socket_id);
+void dp_map_vm_handle(void *key, uint16_t portid);
+int dp_get_portid_with_vm_handle(void *key);
+void dp_del_portid_with_vm_handle(void *key);
+
 uint32_t dp_get_gw_ip4();
 uint8_t* dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
@@ -88,6 +91,7 @@ void dp_set_mac(uint16_t portid);
 struct rte_ether_addr *dp_get_mac(uint16_t portid);
 void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr* neigh);
 void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip);
+void dp_del_vm_nat_ip(uint16_t portid);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_is_vm_natted(uint16_t portid);
 #ifdef __cplusplus

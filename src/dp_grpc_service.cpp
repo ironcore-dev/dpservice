@@ -75,10 +75,11 @@ grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* re
 
 grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response)
 {
+	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
 	struct dp_port_ext pf_port;
 	IPConfig ipv4_conf;
 	IPConfig ipv6_conf;
-	int vni, port_id, machine_id;
+	int vni, port_id;
 	struct in_addr ip_addr;
 	uint8_t ipv6_addr[16];
 
@@ -94,13 +95,14 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	if(ret < 0)
 		printf("IPv6 address not in proper format\n");
 
-	machine_id = atoi(request->machineid().c_str());
-	printf("VNI %d  IPv4 %x machine id %d\n", vni, ntohl(ip_addr.s_addr), machine_id);
+	printf("VNI %d  IPv4 %x\n", vni, ntohl(ip_addr.s_addr));
 
+	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
 	port_id = dp_get_next_avail_vf_id(this->dpdk_layer, DP_PORT_VF);
 	if ( port_id >= 0) {
-		setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-		setup_lpm6(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
+		dp_map_vm_handle(machine_id_bytes, port_id);
+		setup_lpm(port_id, vni, rte_eth_dev_socket_id(port_id));
+		setup_lpm6(port_id, vni, rte_eth_dev_socket_id(port_id));
 		dp_set_dhcp_range_ip4(port_id, ntohl(ip_addr.s_addr), 32, rte_eth_dev_socket_id(port_id));
 		dp_set_dhcp_range_ip6(port_id, ipv6_addr, 128, rte_eth_dev_socket_id(port_id));
 		dp_add_route(port_id, vni, 0, ntohl(ip_addr.s_addr), NULL, 32, rte_eth_dev_socket_id(port_id));
@@ -112,3 +114,45 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	return grpc::Status::OK;
 }
 
+grpc::Status GRPCService::addMachineVIP(ServerContext* context, const MachineVIPMsg* request, Status* response)
+{
+	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
+	struct in_addr vip_addr;
+	int port_id;
+
+	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
+	port_id = dp_get_portid_with_vm_handle(machine_id_bytes);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return grpc::Status::CANCELLED;
+
+	if (request->machinevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		inet_aton(request->machinevipip().address().c_str(), &vip_addr);
+		dp_set_vm_nat_ip(port_id, ntohl(vip_addr.s_addr));
+	}
+
+	return grpc::Status::OK;
+}
+
+grpc::Status GRPCService::getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response)
+{
+	return grpc::Status::OK;
+}
+
+grpc::Status GRPCService::delMachineVIP(ServerContext* context, const MachineIDMsg* request, Status* response)
+{
+	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
+	int port_id;
+
+	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
+	port_id = dp_get_portid_with_vm_handle(machine_id_bytes);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return grpc::Status::CANCELLED;
+
+	dp_del_vm_nat_ip(port_id);
+
+	return grpc::Status::OK;
+}

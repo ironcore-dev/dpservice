@@ -140,6 +140,16 @@ message MachineIDMsg {
 	bytes machineID = 1;
 }
 
+message MachineVIPIP {
+	IPVersion ipVersion = 1;
+	bytes address = 2;	// Can be both ipv4 and ipv6
+}
+
+message MachineVIPMsg {
+	bytes machineID = 1;
+	MachineVIPIP machineVIPIP = 2;
+}
+
 message MachinesMsg {
 	repeated Machine machines = 1;
 }
@@ -243,7 +253,10 @@ service DPDKonmetal {
 	rpc addMachinePrefix(MachinePrefixMsg) returns (Status) {}
 	rpc deleteMachinePrefix(MachinePrefixMsg) returns (Status) {}
 
-
+	// NAT related, add/get/del Virtual IP for a given Machine
+	rpc addMachineVIP(MachineVIPMsg) returns (Status) {}
+	rpc getMachineVIP(MachineIDMsg) returns (MachineVIPIP) {}
+	rpc delMachineVIP(MachineIDMsg) returns (Status) {}
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}
