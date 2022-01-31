@@ -7,6 +7,8 @@
 #include "node_api.h"
 #include "nodes/ipv6_nd_node.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_util.h"
+#include "dp_flow.h"
 #include <unistd.h>
 
 static struct rx_periodic_node_ctx node_ctx;
@@ -34,6 +36,13 @@ static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
+static __rte_always_inline void check_aged_flows(uint16_t portid)
+{
+	dp_process_aged_flows(dp_get_pf0_port_id());
+	dp_process_aged_flows(dp_get_pf1_port_id());
+	dp_process_aged_flows(portid);
+}
+
 static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 												   struct rte_node *node,
 												   struct rx_periodic_node_ctx *ctx)
@@ -56,8 +65,10 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
  		df_ptr = alloc_dp_flow_ptr(mbuf0);
  		if (!df_ptr)
  			continue;
- 		if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX)
+ 		if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
+			check_aged_flows(mbuf0->port);
  			next_index = rx_periodic_node.next_index[mbuf0->port];
+		}
  		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
  	}
 

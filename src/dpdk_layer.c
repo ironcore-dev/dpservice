@@ -4,7 +4,6 @@
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
 #include "dp_lpm.h"
-#include "dp_flow.h"
 #include "dp_util.h"
 #include "dp_periodic_msg.h"
 #include "nodes/tx_node_priv.h"
@@ -68,24 +67,11 @@ static void signal_handler(int signum)
 	}
 }
 
-static void trigger_flow_age_check() {
-	int i;
-
-	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
-		if (((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
-			dp_layer.ports[i]->dp_allocated) || 
-			(dp_layer.ports[i]->dp_p_type == DP_PORT_PF)) {
-				dp_process_aged_flows(dp_layer.ports[i]->dp_port_id);
-			}
-	}
-}
-
-static void timer_cb () {
-
+static void timer_cb()
+{
 	trigger_nd_ra();
 	trigger_garp();
 	trigger_nd_unsol_adv();
-	trigger_flow_age_check();
 }
 
 int dp_dpdk_init(int argc, char **argv)
