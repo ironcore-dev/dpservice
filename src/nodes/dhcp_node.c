@@ -95,14 +95,14 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	options_len = rte_pktmbuf_data_len(m) - DHCP_FIXED_LEN - sizeof(struct rte_ether_hdr);
 	parse_options(dhcp_hdr, options_len);
 	
-	m->ol_flags = PKT_TX_IPV4 | PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM;
+	m->ol_flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = sizeof(struct rte_ipv4_hdr);
 	m->pkt_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr) + sizeof(struct dp_dhcp_header);
 	m->data_len = m->pkt_len; 
-	rte_ether_addr_copy(&incoming_eth_hdr->s_addr, &incoming_eth_hdr->d_addr);
+	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
 
-	rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
+	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
 	incoming_ipv4_hdr->src_addr = htonl(dp_get_gw_ip4());
 	incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port));
 	incoming_ipv4_hdr->hdr_checksum = 0;
@@ -120,7 +120,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 			break;
 		case DHCPREQUEST:
 			dhcp_type = DP_DHCP_ACK;
-			dp_set_neigh_mac(m->port, &incoming_eth_hdr->s_addr);
+			dp_set_neigh_mac(m->port, &incoming_eth_hdr->src_addr);
 			break;
 		default:
 			return 0;

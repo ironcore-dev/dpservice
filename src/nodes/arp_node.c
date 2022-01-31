@@ -31,8 +31,8 @@ static __rte_always_inline int handle_arp(struct rte_mbuf *m)
 	uint32_t temp_ip;
 
 	if (requested_ip == dp_get_gw_ip4()) {
-		rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->d_addr);
-		rte_memcpy(incoming_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
+		rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->dst_addr);
+		rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
 		incoming_arp_hdr->arp_opcode = htons(2);
 		rte_memcpy(tmp_addr.addr_bytes, incoming_arp_hdr->arp_data.arp_sha.addr_bytes, 
 					RTE_ETHER_ADDR_LEN);

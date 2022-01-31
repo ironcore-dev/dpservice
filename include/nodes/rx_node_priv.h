@@ -15,10 +15,11 @@ enum
 
 struct rx_node_ctx
 {
-	uint16_t node_id;
-	uint16_t port_id;
-	uint16_t queue_id;
-	uint16_t next;
+	uint16_t	node_id;
+	uint16_t	port_id;
+	uint16_t	queue_id;
+	uint16_t	next;
+	bool		enabled;
 	struct rte_ring *grpc_queue;
 };
 
@@ -36,6 +37,7 @@ struct ethdev_rx_node_main {
 
 int config_rx_node(struct rx_node_config* cfg);
 struct rte_node_register *rx_node_get(void);
+void enable_rx_node(uint16_t portid);
 #ifdef __cplusplus
 }
 #endif

@@ -34,7 +34,7 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	if (!ipv6_hdr)
 		return 0;
 
-	m->ol_flags = PKT_TX_IPV6 | PKT_TX_UDP_CKSUM;
+	m->ol_flags = RTE_MBUF_F_TX_IPV6 | RTE_MBUF_F_TX_UDP_CKSUM;
 	m->outer_l2_len = sizeof(struct rte_ether_hdr);
 	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
 

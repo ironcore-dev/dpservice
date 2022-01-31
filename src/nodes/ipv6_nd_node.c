@@ -38,8 +38,8 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
 	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr +1);
 	
-	rte_ether_addr_copy(&req_eth_hdr->s_addr, &req_eth_hdr->d_addr);
-	rte_memcpy(req_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), sizeof(req_eth_hdr->s_addr.addr_bytes));
+	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
+	rte_memcpy(req_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), sizeof(req_eth_hdr->src_addr.addr_bytes));
 
 	if((memcmp(req_ipv6_hdr->src_addr,dp_unspec_ipv6,sizeof(req_ipv6_hdr->src_addr)) == 0)) {
 		rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6,sizeof(req_ipv6_hdr->dst_addr));		
@@ -59,7 +59,7 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 		if((memcmp(&nd_msg->target, rt_ip, sizeof(nd_msg->target))) != 0) {
 			return 0;
 		}
-		dp_set_neigh_mac(m->port, &req_eth_hdr->d_addr);
+		dp_set_neigh_mac(m->port, &req_eth_hdr->dst_addr);
 		dp_set_vm_ip6(m->port, req_ipv6_hdr->dst_addr);
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
 		req_icmp6_hdr->icmp6_solicited	= 1;
@@ -67,7 +67,7 @@ static __rte_always_inline int handle_nd(struct rte_mbuf *m)
 		// set target lladdr option and MAC
 		nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
 		nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
-		rte_memcpy(&nd_msg->opt[2],req_eth_hdr->s_addr.addr_bytes,6);
+		rte_memcpy(&nd_msg->opt[2],req_eth_hdr->src_addr.addr_bytes,6);
 	} else if (type == NDISC_ROUTER_SOLICITATION) {
 		req_ra_msg = (struct ra_msg*) (req_ipv6_hdr + 1);
 		req_icmp6_hdr->icmp6_type = NDISC_ROUTER_ADVERTISEMENT;

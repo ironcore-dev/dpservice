@@ -22,7 +22,7 @@ void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t et
 				struct rte_mbuf *clone_buf = rte_pktmbuf_copy(pkt,dp_layer->rte_mempool, 0, UINT32_MAX);
 				clone_buf->port = dp_layer->ports[i]->dp_port_id;
 				eth_hdr = rte_pktmbuf_mtod(clone_buf, struct rte_ether_hdr *);
-				rte_ether_addr_copy(dp_get_mac(clone_buf->port), &eth_hdr->s_addr);
+				rte_ether_addr_copy(dp_get_mac(clone_buf->port), &eth_hdr->src_addr);
 				if(eth_type == RTE_ETHER_TYPE_ARP) {
 					struct rte_arp_hdr *arp_hdr;
 					arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
@@ -57,7 +57,7 @@ void trigger_garp()
 
 	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	eth_hdr->ether_type = htons(0x0806);
-	memset(eth_hdr->d_addr.addr_bytes, 0xff, RTE_ETHER_ADDR_LEN);
+	memset(eth_hdr->dst_addr.addr_bytes, 0xff, RTE_ETHER_ADDR_LEN);
 
 	arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
 	arp_hdr->arp_opcode = htons(1);
@@ -98,7 +98,7 @@ void trigger_nd_unsol_adv()
 	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
 	ns_msg = (struct nd_msg*) (ipv6_hdr + 1);
 
-	rte_memcpy(eth_hdr->d_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->d_addr.addr_bytes));
+	rte_memcpy(eth_hdr->dst_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->dst_addr.addr_bytes));
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = 0x3a; //ICMP6
@@ -150,8 +150,8 @@ void trigger_nd_ra()
 	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
 	ra_msg = (struct ra_msg*) (ipv6_hdr + 1);
 
-	memset(&eth_hdr->s_addr, 0xff, RTE_ETHER_ADDR_LEN);
-	rte_memcpy(eth_hdr->d_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->d_addr.addr_bytes));
+	memset(&eth_hdr->src_addr, 0xff, RTE_ETHER_ADDR_LEN);
+	rte_memcpy(eth_hdr->dst_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->dst_addr.addr_bytes));
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = 0x3a; //ICMP6

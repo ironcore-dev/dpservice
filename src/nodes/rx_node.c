@@ -18,10 +18,17 @@ int config_rx_node(struct rx_node_config *cfg)
 	ethdev_rx_main.node_ctx[idx].queue_id  = cfg->queue_id;
 	ethdev_rx_main.node_ctx[idx].node_id  = cfg->node_id;
 	ethdev_rx_main.node_ctx[idx].grpc_queue  = cfg->grpc_queue;
+	ethdev_rx_main.node_ctx[idx].enabled = false;
 
 	return 0;
 }
 
+void enable_rx_node(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	ethdev_rx_main.node_ctx[portid].enabled = true;
+}
 
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -71,7 +78,7 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 												   struct rte_node *node,
 												   struct rx_node_ctx *ctx)
 {
-	uint16_t count, next_index;
+	uint16_t count = 0, next_index;
 	uint16_t port, queue;
 
 	port = ctx->port_id;
@@ -82,8 +89,9 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 		handle_grpc_queue(node, ctx);
 
 	/* Get pkts from port */
-	count = rte_eth_rx_burst(port, queue, (struct rte_mbuf **)node->objs,
-								RTE_GRAPH_BURST_SIZE);
+	if (ethdev_rx_main.node_ctx[ctx->port_id].enabled)
+		count = rte_eth_rx_burst(port, queue, (struct rte_mbuf **)node->objs,
+									RTE_GRAPH_BURST_SIZE);
 
 	if (!count)
 		return 0;

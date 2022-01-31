@@ -272,8 +272,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 
 		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_ENCAP;
 		struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *) encap_hdr;
-		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->d_addr);
-		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->s_addr);
+		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
+		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
 		new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 		struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr*)(&encap_hdr[sizeof(struct rte_ether_hdr)]);
@@ -313,8 +313,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 
 		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_ENCAP;
 		struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *) decap_hdr;
-		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->d_addr);
-		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->s_addr);
+		rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
+		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
 		new_eth_hdr->ether_type = htons(df->l3_type);
 		struct rte_flow_action_raw_encap raw_encap = {.data = decap_hdr, .size = sizeof(struct rte_ether_hdr)};
 		action[action_cnt].conf = &raw_encap;
@@ -373,9 +373,9 @@ static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t por
 {
 	struct rte_ether_hdr *eth_hdr;
 	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
-	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->d_addr);
+	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->dst_addr);
 	eth_hdr->ether_type = htons(eth_type);
-	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->s_addr);
+	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->src_addr);
 }
 
 static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,

@@ -542,6 +542,8 @@ void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type)
 	}
 	if (type == DP_PORT_PF)
 		dp_install_isolated_mode(port_id);
+
+	enable_rx_node(port_id);
 }
 
 struct dp_dpdk_layer *get_dpdk_layer()

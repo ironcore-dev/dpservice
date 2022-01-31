@@ -11,11 +11,6 @@
 #include "dp_lpm.h"
 #include "dp_grpc_service.h"
 
-/* Dummy function to configure the data plane hard-coded
- * TODO: This should be done via some kind of RPC mechanism*/
-#define DP_PF_MAC	0x43f72e8dead
-#define DP_PF_MAC_1	0x43f72e8cfca
-
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
 	GRPCService *grpc_svc = new GRPCService(get_dpdk_layer());
@@ -30,30 +25,29 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 
 static void dp_init_interfaces()
 {
-	struct dp_port_ext pf_port;
-	long int mac = DP_PF_MAC;
+	struct dp_port_ext pf0_port, pf1_port, vf_port;
 	int i;
 
-	memset(&pf_port, 0, sizeof(pf_port));
-	memcpy(pf_port.port_mac.addr_bytes, &mac, sizeof(mac));
-	pf_port.port_mtu = 9100;
+	memset(&pf0_port, 0, sizeof(pf0_port));
+	memset(&pf1_port, 0, sizeof(pf1_port));
+	memset(&vf_port, 0, sizeof(vf_port));
 
 	/* Init the PFs which were received via command line */
-	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
-	dp_init_interface(&pf_port, DP_PORT_PF);
-	dp_start_interface(&pf_port, DP_PORT_PF);
+	memcpy(pf0_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+	dp_init_interface(&pf0_port, DP_PORT_PF);
 
-	memcpy(pf_port.port_name, dp_get_pf1_name(), IFNAMSIZ);
-	dp_init_interface(&pf_port, DP_PORT_PF);
-	dp_start_interface(&pf_port, DP_PORT_PF);
+	memcpy(pf1_port.port_name, dp_get_pf1_name(), IFNAMSIZ);
+	dp_init_interface(&pf1_port, DP_PORT_PF);
 
-	memcpy(pf_port.port_name, dp_get_vf_pattern(), IFNAMSIZ);
+	memcpy(vf_port.port_name, dp_get_vf_pattern(), IFNAMSIZ);
 
 	/* Only init the max. possible VFs, GRPC will kick them off later */
 	for (i = 0; i < DP_ACTIVE_VF_PORT; i++)
-		dp_init_interface(&pf_port, DP_PORT_VF);
+		dp_init_interface(&vf_port, DP_PORT_VF);
 
 	dp_init_graph();
+	dp_start_interface(&pf0_port, DP_PORT_PF);
+	dp_start_interface(&pf1_port, DP_PORT_PF);
 	dp_init_flowtable(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_vm_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 }

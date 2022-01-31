@@ -93,8 +93,8 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	//printf("DHCP msg type:%d\n",type);
 	//printf("DHCP msg len:%d, %d\n",recv_len, options_len);
 	parse_options(dhcp_pkt, options_len);
-	rte_ether_addr_copy(&req_eth_hdr->s_addr, &req_eth_hdr->d_addr);
-	rte_memcpy(req_eth_hdr->s_addr.addr_bytes, dp_get_mac(m->port), 6);
+	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
+	rte_memcpy(req_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
 
 	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,sizeof(req_ipv6_hdr->dst_addr));
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,sizeof(req_ipv6_hdr->src_addr));
@@ -124,7 +124,7 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	sid.len = htons(sizeof(struct duid_t));
 	sid.id.type = htons(DP_DUID_LL);
 	sid.id.hw_type = htons(DP_DUMMY_HW_ID);
-	rte_ether_addr_copy(&req_eth_hdr->d_addr, &sid.id.mac);
+	rte_ether_addr_copy(&req_eth_hdr->dst_addr, &sid.id.mac);
 
 	prepare_ia_option();
 
