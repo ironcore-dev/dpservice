@@ -16,6 +16,7 @@ extern "C" {
 #endif
 #define DP_MAX_PF_PORT		2
 #define DP_MAX_VF_PRO_PORT	10
+#define DP_ACTIVE_VF_PORT	2
 #define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
 #define DP_NR_RX_QUEUES		1
 #define DP_NR_TX_QUEUES		1
@@ -56,6 +57,7 @@ struct underlay_conf {
 		uint32_t	trgt_ip4;
 		uint8_t		trgt_ip6[16];
 	};
+	uint16_t default_port;
 };
 
 /* Functions for internal processing */

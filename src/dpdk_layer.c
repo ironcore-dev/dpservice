@@ -4,6 +4,7 @@
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
 #include "dp_lpm.h"
+#include "dp_flow.h"
 #include "dp_util.h"
 #include "dp_periodic_msg.h"
 #include "nodes/tx_node_priv.h"
@@ -34,6 +35,8 @@ static const char * const default_patterns[] = {
 	"ipv6_lookup",
 	"dhcp",
 	"dhcpv6",
+	"firewall",
+	"nat",
 	"l2_decap",
 	"ipv6_encap",
 	"ipv6_decap",
@@ -52,6 +55,7 @@ static struct underlay_conf gen_conf = {
 	.vni = {0},
 	.trgt_ip6 = {0},
 	.src_ip6 = {0},
+	.default_port = 443,
 };
 
 static void signal_handler(int signum)
@@ -64,40 +68,6 @@ static void signal_handler(int signum)
 	}
 }
 
-static void port_flow_aged(int port_id)
-{
-	int nb_context, total = 0, idx;
-	struct rte_flow_error error;
-	struct rte_flow **flow;
-	void **contexts;
-
-	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
-
-	if (total <= 0)
-		return;
-
-	contexts = rte_zmalloc("aged_ctx", sizeof(void *) * total,
-			       RTE_CACHE_LINE_SIZE);
-	if (contexts == NULL)
-		return;
-
-	nb_context = rte_flow_get_aged_flows(port_id, contexts,
-					     total, &error);
-	if (nb_context != total)
-		goto free;
-
-	for (idx = 0; idx < nb_context; idx++) {
-		flow = (struct rte_flow**)(struct rte_flow*)contexts[idx];
-		if (!flow || !*flow)
-			continue;
-		rte_flow_destroy(port_id, *flow, &error);
-		free(flow);
-	}
-
-free:
-	rte_free(contexts);
-}
-
 static void trigger_flow_age_check() {
 	int i;
 
@@ -105,7 +75,7 @@ static void trigger_flow_age_check() {
 		if (((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) &&
 			dp_layer.ports[i]->dp_allocated) || 
 			(dp_layer.ports[i]->dp_p_type == DP_PORT_PF)) {
-				port_flow_aged(dp_layer.ports[i]->dp_port_id);
+				dp_process_aged_flows(dp_layer.ports[i]->dp_port_id);
 			}
 	}
 }
@@ -233,33 +203,10 @@ static int main_core_loop() {
 }
 
 int dp_dpdk_main_loop()
-{/*
-	struct dp_port_ext pf_port;
-	int port_id, vni = 100, t_vni = 100, machine_id = 50;
-	int ip_addr = RTE_IPV4(172, 34, 0, 1);
-	uint8_t trgt_ip6[16];*/
-	
+{
 
 	printf("DPDK main loop started\n ");
 
-/*	port_id = dp_get_next_avail_vf_id(&dp_layer, DP_PORT_VF);
-	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-	dp_set_dhcp_range_ip4(port_id, ip_addr, 32, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, vni, 0, ip_addr, NULL, 32, rte_eth_dev_socket_id(port_id));
-	dp_start_interface(&pf_port, DP_PORT_VF);
-
-	ip_addr = RTE_IPV4(172, 35, 2, 4);
-	port_id = dp_get_next_avail_vf_id(&dp_layer, DP_PORT_VF);
-	setup_lpm(port_id, machine_id, vni, rte_eth_dev_socket_id(port_id));
-	dp_set_dhcp_range_ip4(port_id, ip_addr, 32, rte_eth_dev_socket_id(port_id));
-	dp_add_route(port_id, vni, 0, ip_addr, NULL, 32, rte_eth_dev_socket_id(port_id));
-	dp_start_interface(&pf_port, DP_PORT_VF);
-
-	ip_addr = RTE_IPV4(192, 168, 129, 0);
-	inet_pton(AF_INET6, "2a10:afc0:e01f:209::", trgt_ip6);
-	dp_add_route(DP_PF_PORT, vni, t_vni, ip_addr, trgt_ip6, 24, rte_eth_dev_socket_id(port_id)); */
-
-	
 	/* Launch per-lcore init on every worker lcore */
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
 
@@ -298,7 +245,7 @@ static int dp_port_prepare(dp_port_type type, int port_id,
 	struct dp_port *dp_port;
 
 	dp_port = dp_port_create(&dp_layer, type);
-	if (dp_port){
+	if (dp_port) {
 		dp_port_init(dp_port, port_id, port_ext);
 		dp_layer.ports[dp_layer.dp_port_cnt++] = dp_port;
 		dp_cfg_ethdev(port_id);

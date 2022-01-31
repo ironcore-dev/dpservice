@@ -1,17 +1,77 @@
 #include "dp_lpm.h"
+#include "dp_flow.h"
 #include "dp_util.h"
+#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
 
 static struct vm_entry vm_table[DP_MAX_PORTS];
+static struct rte_hash *vm_handle_tbl = NULL;
 
 static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static uint8_t dp_router_gw_ip6[16] = {0xfe,0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
 
-uint32_t dp_get_gw_ip4() {
+void dp_init_vm_handle_tbl(int socket_id)
+{
+	struct rte_hash_parameters handle_table_params = {
+		.name = NULL,
+		.entries = DP_MAX_PORTS,
+		.key_len =  VM_MACHINE_ID_STR_LEN,
+		.hash_func = rte_jhash,
+		.hash_func_init_val = 0xfee1900d,
+		.extra_flag = 0,
+	};
+	char s[64];
+
+	snprintf(s, sizeof(s), "vm_handle_table_%u", socket_id);
+	handle_table_params.name = s;
+	handle_table_params.socket_id = socket_id;
+	vm_handle_tbl = rte_hash_create(&handle_table_params);
+	if(!vm_handle_tbl)
+		rte_exit(EXIT_FAILURE, "create vm handle table failed\n");
+}
+
+void dp_map_vm_handle(void *key, uint16_t portid)
+{
+	uint16_t *p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
+
+	if (!p_port_id)
+		rte_exit(EXIT_FAILURE, "vm handle for port %d malloc data failed\n", portid);
+
+	*p_port_id = portid;
+	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0)
+		rte_exit(EXIT_FAILURE, "vm handle for port %d add data failed\n", portid);
+}
+
+int dp_get_portid_with_vm_handle(void *key)
+{
+	uint16_t *p_port_id;
+	uint16_t ret_val;
+
+	if (rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id) < 0)
+		return -1;
+	ret_val = *p_port_id;
+
+	return ret_val;
+}
+
+void dp_del_portid_with_vm_handle(void *key)
+{
+	uint16_t *p_port_id;
+
+	if (rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id) < 0)
+		return;
+
+	rte_free(p_port_id);
+}
+
+uint32_t dp_get_gw_ip4()
+{
 	return dp_router_gw_ip4;
 }
 
-uint8_t* dp_get_gw_ip6() {
+uint8_t* dp_get_gw_ip6()
+{
 	return dp_router_gw_ip6;
 }
 
@@ -32,6 +92,28 @@ uint8_t* dp_get_vm_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.vm_ipv6;
+}
+
+bool dp_is_vm_natted(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return (vm_table[portid].info.nat != DP_NAT_OFF);
+}
+
+uint32_t dp_get_vm_nat_ip(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return htonl(vm_table[portid].info.virt_ip);
+}
+
+uint16_t dp_get_vm_port_id_per_nat_ip(uint32_t nat_ip)
+{
+	int i;
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready && (vm_table[i].info.virt_ip == nat_ip))
+			return i;
+	return -1;
 }
 
 static struct rte_rib* get_lpm(int vni, const int socketid)
@@ -131,6 +213,20 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 
 }
 
+void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	vm_table[portid].info.virt_ip = ip;
+	vm_table[portid].info.nat = DP_NAT_ON;
+}
+
+void dp_del_vm_nat_ip(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	vm_table[portid].info.nat = DP_NAT_OFF;
+	vm_table[portid].info.virt_ip = 0;
+}
+
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
 {
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
@@ -177,7 +273,7 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 	return &vm_table[portid].info.neigh_mac;
 } 
 
-void setup_lpm(int port_id, int machine_id, int vni, const int socketid)
+void setup_lpm(int port_id, int vni, const int socketid)
 {
 	struct rte_rib_conf config_ipv4;
 	struct rte_rib* root;
@@ -202,11 +298,10 @@ void setup_lpm(int port_id, int machine_id, int vni, const int socketid)
 	}
 	vm_table[port_id].ipv4_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
-	vm_table[port_id].machine_id = machine_id;  
 	vm_table[port_id].vm_ready = 1;
 }
 
-void setup_lpm6(int port_id, int machine_id, int vni, const int socketid)
+void setup_lpm6(int port_id, int vni, const int socketid)
 {
 	struct rte_rib6_conf config_ipv6;
 	struct rte_rib6* root;
@@ -233,7 +328,6 @@ void setup_lpm6(int port_id, int machine_id, int vni, const int socketid)
 	}
 	vm_table[port_id].ipv6_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
-	vm_table[port_id].machine_id = machine_id;  
 	vm_table[port_id].vm_ready = 1;
 }
 

@@ -21,13 +21,16 @@ struct dp_flow {
 	uint32_t				dst_vni;
 	uint16_t				dst_port;
 	uint16_t				src_port;
-	uint8_t					valid;
 	uint8_t					nxt_hop;
 	uint16_t 				l3_type;
 	uint8_t					l4_type;
-	uint8_t					geneve_hdr;
 	uint8_t					icmp_type;
 	uint8_t					periodic_type;
+	struct {
+		uint8_t				geneve_hdr : 1;
+		uint8_t				valid : 1;
+		uint8_t				nat : 2;
+	} flags;
 };
 
 struct dp_mbuf_priv1 {

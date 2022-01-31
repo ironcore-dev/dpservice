@@ -13,17 +13,7 @@
 
 using grpc::Channel;
 using grpc::ClientContext;
-using dpdkonmetal::DPDKonmetal;
-using dpdkonmetal::Status;
-using dpdkonmetal::Empty;
-using dpdkonmetal::AddMachineResponse;
-using dpdkonmetal::AddMachineRequest;
-using dpdkonmetal::IPConfig;
-using dpdkonmetal::VNIRouteMsg;
-using dpdkonmetal::VNIMsg;
-using dpdkonmetal::Route;
-using dpdkonmetal::Prefix;
-using dpdkonmetal::IPVersion;
+using namespace dpdkonmetal;
 
 static const char short_options[] = "d" /* debug */
 				    "D"	 /* promiscuous */;
@@ -32,6 +22,8 @@ typedef enum {
 	DP_CMD_NONE,
 	DP_CMD_ADD_MACHINE,
 	DP_CMD_ADD_ROUTE,
+	DP_CMD_ADD_VIP,
+	DP_CMD_DEL_VIP,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -58,6 +50,8 @@ static int length;
 #define CMD_LINE_OPT_ADD_ROUTE		"addroute"
 #define CMD_LINE_OPT_T_PRIMARY_IPV6	"t_ipv6"
 #define CMD_LINE_OPT_LENGTH			"length"
+#define CMD_LINE_OPT_ADD_VIP		"addvip"
+#define CMD_LINE_OPT_DEL_VIP		"delvip"
 
 
 enum {
@@ -70,6 +64,8 @@ enum {
 	CMD_LINE_OPT_PRIMARY_IPV6_NUM,
 	CMD_LINE_OPT_T_PRIMARY_IPV6_NUM,
 	CMD_LINE_OPT_LENGTH_NUM,
+	CMD_LINE_OPT_ADD_VIP_NUM,
+	CMD_LINE_OPT_DEL_VIP_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -81,6 +77,8 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PRIMARY_IPV6, 1, 0, CMD_LINE_OPT_PRIMARY_IPV6_NUM},
 	{CMD_LINE_OPT_T_PRIMARY_IPV6, 1, 0, CMD_LINE_OPT_T_PRIMARY_IPV6_NUM},
 	{CMD_LINE_OPT_LENGTH, 1, 0, CMD_LINE_OPT_LENGTH_NUM},
+	{CMD_LINE_OPT_ADD_VIP, 1, 0, CMD_LINE_OPT_ADD_VIP_NUM},
+	{CMD_LINE_OPT_DEL_VIP, 1, 0, CMD_LINE_OPT_DEL_VIP_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -148,6 +146,14 @@ int parse_args(int argc, char **argv)
 			strncpy(len_str, optarg, 29);
 			length = atoi(len_str);
 			break;
+		case CMD_LINE_OPT_ADD_VIP_NUM:
+			command = DP_CMD_ADD_VIP;
+			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_DEL_VIP_NUM:
+			command = DP_CMD_DEL_VIP;
+			strncpy(machine_str, optarg, 29);
+			break;
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -205,7 +211,6 @@ public:
 			} else {
 				prefix->set_address(ip6_str);
 			}
-			//prefix->set_address(ip_str);
 			prefix->set_prefixlength(length);
 			route->set_allocated_prefix(prefix);
 			route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
@@ -215,6 +220,29 @@ public:
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->addRoute(&context, request, &reply);
+	}
+
+	void AddVIP() {
+			MachineVIPMsg request;
+			Status reply;
+			ClientContext context;
+			MachineVIPIP *vip_ip = new MachineVIPIP();
+
+			request.set_machineid(machine_str);
+			vip_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				vip_ip->set_address(ip_str);
+			request.set_allocated_machinevipip(vip_ip);
+			stub_->addMachineVIP(&context, request, &reply);
+	}
+
+	void DelVIP() {
+			MachineIDMsg request;
+			Status reply;
+			ClientContext context;
+
+			request.set_machineid(machine_str);
+			stub_->delMachineVIP(&context, request, &reply);
 	}
 
 private:
@@ -238,6 +266,14 @@ int main(int argc, char** argv)
 		dpdk_client.AddRoute();
 		std::cout << "Addroute called " << std::endl;
 		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", ip_str, length, vni, ip6_str, t_vni);
+		break;
+	case DP_CMD_ADD_VIP:
+		dpdk_client.AddVIP();
+		std::cout << "Addvip called " << std::endl;
+		break;
+	case DP_CMD_DEL_VIP:
+		dpdk_client.DelVIP();
+		std::cout << "Delvip called " << std::endl;
 		break;
 	default:
 		break;

@@ -29,7 +29,7 @@ static __rte_always_inline int handle_l2_decap(struct rte_mbuf *m)
 	df = get_dp_flow_ptr(m);
 
 	/* Pop the ethernet header */
-	if (!df->geneve_hdr) {
+	if (!df->flags.geneve_hdr) {
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 	}
 

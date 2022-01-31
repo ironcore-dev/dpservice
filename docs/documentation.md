@@ -52,9 +52,17 @@ This will list all the test cases which are passed and failed.
 ## How to use GRPC test client
 
 ### Add Virtual Machine
-	./build/test/dp_grpc_client --addmachine 1 --vni 100 --ipv4 172.32.4.9
-This adds a virtual machine with VNI 100 (Virtual Network Identifier) and IPv4 overlay 172.32.4.9
-### Add Route
-	./build/test/dp_grpc_client --addroute 1 --vni 100 --ipv4 192.168.129.0 --length 24 --t_vni 200 --t_ipv6 2a10:afc0:e01f:209::
+	./build/test/dp_grpc_client --addmachine testvm1 --vni 100 --ipv4 172.32.4.9
+This adds a virtual machine with VNI 100 (Virtual Network Identifier) and IPv4 overlay 172.32.4.9 and assigns the name "testvm1" to the VM.
+Use this name in order to address the VM again.
+### Add Route 
+	./build/test/dp_grpc_client --addroute testvm1 --vni 100 --ipv4 192.168.129.0 --length 24 --t_vni 200 --t_ipv6 2a10:afc0:e01f:209::
 This adds a route to VNI 100 with overlay prefix 192.168.129.0/24 on the current hypervisor which can be routed to a vni 200 on another hypervisor with an underlay IPv6 address 2a10:afc0:e01f:209::
 
+### Add Virtual IP to VM
+	./build/test/dp_grpc_client --addvip testvm1 --ipv4 172.32.20.2
+This adds a virtual ip to VM "testvm1" which will be used for egress traffic of the VM as a source address. (SNAT)
+
+### Delete Virtual IP from VM
+	./build/test/dp_grpc_client --delvip testvm1
+This deletes the virtual ip of the VM "testvm1". After deletion the VM will continue its original IP address which was obtained via DHCP. If there is no virtual IP assigned then this command does nothing.

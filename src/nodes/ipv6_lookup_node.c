@@ -46,12 +46,12 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 	memset(&df, 0, sizeof(struct dp_flow));
 	if (dp_is_pf_port_id(m->port)) {
 		df_ptr = get_dp_flow_ptr(m);
-		if(df_ptr && df_ptr->geneve_hdr) {
+		if(df_ptr && df_ptr->flags.geneve_hdr) {
 	 		geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
 	 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 	 		ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr*);
 	 		rte_memcpy(&t_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
-	 		df.geneve_hdr = 1;
+	 		df.flags.geneve_hdr = 1;
 		} else {
 			ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
 								sizeof(struct rte_ether_hdr));
@@ -72,7 +72,7 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 		if (ntohs(udp_hdr->dst_port) == u_conf->src_port){
 			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 			df_ptr = alloc_dp_flow_ptr(m);
-			df_ptr->geneve_hdr = 1;
+			df_ptr->flags.geneve_hdr = 1;
 			return IPV6_LOOKUP_NEXT_IPV6_DECAP;
 		}
 		else if (ntohs(udp_hdr->dst_port) == DHCPV6_SERVER_PORT) {
@@ -113,7 +113,7 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 
 	
 		if (dp_is_offload_enabled())
-			df_ptr->valid = 1;
+			df_ptr->flags.valid = 1;
 	}
 	ret = IPV6_LOOKUP_NEXT_L2_DECAP;
 

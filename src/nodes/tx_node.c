@@ -7,6 +7,7 @@
 #include "node_api.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/ipv6_nd_node.h"
+#include "dp_flow.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "dp_mbuf_dyn.h"
@@ -41,7 +42,7 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct dp_flow *df)
 {
 	struct underlay_conf *u_conf = get_underlay_conf();
 	int res = 0, route_direct = DP_ROUTE_TO_VM;
@@ -67,9 +68,13 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	struct rte_flow_item_icmp6 icmp6_mask;
 	struct rte_flow_item_tcp tcp_spec;
 	struct rte_flow_item_tcp tcp_mask;
+	//struct rte_flow_item_raw raw_spec;
+	//struct rte_flow_item_raw raw_mask;
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
-	struct rte_flow *flow, **dyn_flow = NULL;
+	struct rte_flow *flow;
+	struct flow_age_ctx *agectx = NULL;
+	struct flow_value *flow_val = NULL;
 	int encap_size = sizeof(struct rte_ether_hdr) +
 					 sizeof(struct rte_ipv6_hdr) +
 					 sizeof(struct rte_udp_hdr) +
@@ -88,7 +93,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 	/* First find out the packet direction */
 	if (dp_is_pf_port_id(df->nxt_hop))
 		route_direct = DP_ROUTE_TO_PF_ENCAPPED;
-	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->geneve_hdr))
+	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->flags.geneve_hdr))
 		route_direct = DP_ROUTE_TO_VM_DECAPPED;
 
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
@@ -236,7 +241,22 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 			pattern[pattern_cnt].mask = &icmp6_mask;
 			pattern_cnt++;
 		}
-		
+	} else {
+	/*	if (df->l4_type == DP_IP_PROTO_TCP) {
+			memset(&raw_spec, 0, sizeof(struct rte_flow_item_raw));
+			memset(&raw_mask, 0, sizeof(struct rte_flow_item_raw));
+			raw_spec.relative = 1;
+			raw_spec.length = 4;
+			raw_spec.search = 0;
+			raw_spec..hdr.dst_port = df->dst_port;
+			raw_spec.hdr.src_port = df->src_port;
+			tcp_mask.hdr.dst_port = 0xffff;
+			tcp_mask.hdr.src_port = 0xffff;
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_RAW;
+			pattern[pattern_cnt].spec = &tcp_spec;
+			pattern[pattern_cnt].mask = &tcp_mask;
+			pattern_cnt++;
+		} */
 	}
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
@@ -301,8 +321,10 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 		action_cnt++;
 	}
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_AGE;
-	dyn_flow = malloc(sizeof(struct rte_flow*));
-	struct rte_flow_action_age flow_age = {.timeout = 60, .reserved= 0, .context = dyn_flow};
+	agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
+	if (!agectx)
+		return 0;
+	struct rte_flow_action_age flow_age = {.timeout = 60, .reserved= 0, .context = agectx};
 	action[action_cnt].conf = &flow_age;
 	action_cnt++;
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_PORT_ID;
@@ -325,12 +347,24 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, struct dp_flow
 			printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
 			goto err;
 		}
-		*dyn_flow = flow;
+		dp_build_flow_key(&agectx->fkey, m);
+		agectx->rteflow = flow;
+		dp_get_flow_data(&agectx->fkey, (void**)&flow_val);
+		if (!flow_val) {
+			flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
+			rte_atomic32_clear(&flow_val->flow_cnt);
+		}
+		if (flow_val) {
+			rte_atomic32_inc(&flow_val->flow_cnt);
+			printf("Inserting flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  hash key %p \n", 
+				 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey);
+			dp_add_flow_data(&agectx->fkey, flow_val);
+		}
 	}
 
 	return 1;
 err:
-	free(dyn_flow);
+	rte_free(agectx);
 	return 0;
 }
 
@@ -371,7 +405,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			} else 
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
 		}
-		if (df && df->valid)
+		if (df && df->flags.valid)
 			handle_offload(mbuf0, df);	
 	}	
 
