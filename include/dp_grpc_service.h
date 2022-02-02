@@ -28,6 +28,7 @@ public:
 	void run(std::string listen_address);
 	grpc::Status QueryHelloWorld(ServerContext* context, const Empty* request, Status* response) override;
 	grpc::Status addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response) override;
+	grpc::Status deleteMachine(ServerContext* context, const MachineIDMsg* request, Status* response) override;
 	grpc::Status addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response) override;
 	grpc::Status addMachineVIP(ServerContext* context, const MachineVIPMsg* request, Status* response) override;
 	grpc::Status getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response) override;

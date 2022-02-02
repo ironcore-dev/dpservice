@@ -138,6 +138,17 @@ static struct rte_rib6* get_lpm6(int vni, const int socketid)
 	return NULL;
 }
 
+static bool dp_is_more_vm_in_vni_avail(int portid)
+{
+	int i;
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if ((i != portid) && vm_table[i].vm_ready && 
+			(vm_table[i].vni == vm_table[portid].vni))
+			return true;
+	return false;
+}
+
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
 				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid)
 {
@@ -271,7 +282,7 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return &vm_table[portid].info.neigh_mac;
-} 
+}
 
 void setup_lpm(int port_id, int vni, const int socketid)
 {
@@ -384,4 +395,22 @@ int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6
 	}
 
 	return DP_ROUTE_DROP;
+}
+
+void dp_del_vm(int portid, int socketid)
+{
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	if(dp_is_more_vm_in_vni_avail(portid)) {
+		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
+	} else {
+		vm_table[portid].vm_ready = 0;
+		if (vm_table[portid].ipv6_rib)
+			rte_rib6_free(vm_table[portid].ipv6_rib[socketid]);
+		if (vm_table[portid].ipv4_rib)
+			rte_rib_free(vm_table[portid].ipv4_rib[socketid]);
+		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
+		dp_set_mac(portid);
+	}
 }

@@ -546,6 +546,22 @@ void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type)
 	enable_rx_node(port_id);
 }
 
+void dp_stop_interface(int portid, dp_port_type type)
+{
+	int ret;
+
+	disable_rx_node(portid);
+
+	ret = rte_eth_dev_stop(portid);
+	if (ret < 0) {
+		rte_exit(EXIT_FAILURE,
+				"rte_eth_dev_stop:err=%d, port=%u\n",
+				ret, portid);
+	}
+	if(!dp_port_deallocate(&dp_layer, type))
+		printf("Port deallocation failed for port %d \n", portid);
+}
+
 struct dp_dpdk_layer *get_dpdk_layer()
 {
 	return &dp_layer;

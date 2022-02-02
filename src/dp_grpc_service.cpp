@@ -114,6 +114,25 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	return grpc::Status::OK;
 }
 
+grpc::Status GRPCService::deleteMachine(ServerContext* context, const MachineIDMsg* request, Status* response)
+{
+	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
+	int port_id;
+
+	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
+	port_id = dp_get_portid_with_vm_handle(machine_id_bytes);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return grpc::Status::CANCELLED;
+
+	dp_stop_interface(port_id, DP_PORT_VF);
+	dp_del_portid_with_vm_handle(machine_id_bytes);
+	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
+
+	return grpc::Status::OK;
+}
+
 grpc::Status GRPCService::addMachineVIP(ServerContext* context, const MachineVIPMsg* request, Status* response)
 {
 	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
@@ -153,6 +172,7 @@ grpc::Status GRPCService::delMachineVIP(ServerContext* context, const MachineIDM
 		return grpc::Status::CANCELLED;
 
 	dp_del_vm_nat_ip(port_id);
+	dp_del_portid_with_vm_handle(machine_id_bytes);
 
 	return grpc::Status::OK;
 }

@@ -50,7 +50,6 @@ struct macip_entry {
 struct vm_entry {
 	struct rte_rib		*ipv4_rib[DP_NB_SOCKETS];
 	struct rte_rib6		*ipv6_rib[DP_NB_SOCKETS];
-	struct rte_hash		*ipv4_flow_tbl;
 	struct macip_entry	info;
 	int					vni;
 	uint8_t				vm_ready;
@@ -94,6 +93,7 @@ void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip);
 void dp_del_vm_nat_ip(uint16_t portid);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_is_vm_natted(uint16_t portid);
+void dp_del_vm(int portid, int socketid);
 #ifdef __cplusplus
 }
 #endif

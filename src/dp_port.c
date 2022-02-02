@@ -38,12 +38,6 @@ static struct rte_ether_addr pf_neigh_mac =
 								.addr_bytes[5] = 0xfb,
 								};
 
-static uint8_t port_ip6s[DP_MAX_PORTS][16] = {
-	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x25},
-	{0xfe,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x26},
-	{0x20,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0xb8,0x66,0xc7,0xff,0xfe,0xd5,0xce,0x27}
-};
-
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
 	struct dp_port* port;
@@ -139,7 +133,6 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 		dp_set_neigh_mac (port_id, &pf_neigh_mac);
 
 	dp_set_mac(port_id);
-	dp_set_dhcp_range_ip6(port_id, port_ip6s[port_id], DP_IPV6_MASK, rte_eth_dev_socket_id(port_id));
 
 	if (port->dp_p_type == DP_PORT_VF)
 		memcpy(port->vf_name, ifname, IF_NAMESIZE);
@@ -243,6 +236,32 @@ int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 	} 
 
 	return -1;
+}
+
+static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
+{
+	int i;
+
+	/* Find the corresponding internal vf port structure */
+	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
+		if (dp_layer->ports[i]->dp_allocated && 
+			 (dp_layer->ports[i]->dp_port_id == portid))
+			return dp_layer->ports[i];
+	} 
+
+	return NULL;
+}
+
+int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, dp_port_type type)
+{
+	struct dp_port* vf_port = dp_get_vf_port_per_id(dp_layer, type);
+
+	if (!vf_port)
+		return 0;
+
+	vf_port->dp_allocated = 0;
+
+	return 1;
 }
 
 int dp_port_allocate(struct dp_dpdk_layer *dp_layer, struct dp_port_ext *port_ext, dp_port_type type)

@@ -21,6 +21,7 @@ static const char short_options[] = "d" /* debug */
 typedef enum {
 	DP_CMD_NONE,
 	DP_CMD_ADD_MACHINE,
+	DP_CMD_DEL_MACHINE,
 	DP_CMD_ADD_ROUTE,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
@@ -43,6 +44,7 @@ static int t_vni;
 static int length;
 
 #define CMD_LINE_OPT_ADD_MACHINE	"addmachine"
+#define CMD_LINE_OPT_DEL_MACHINE	"delmachine"
 #define CMD_LINE_OPT_VNI			"vni"
 #define CMD_LINE_OPT_T_VNI			"t_vni"
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
@@ -57,6 +59,7 @@ static int length;
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
 	CMD_LINE_OPT_ADD_MACHINE_NUM,
+	CMD_LINE_OPT_DEL_MACHINE_NUM,
 	CMD_LINE_OPT_ADD_ROUTE_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
@@ -70,6 +73,7 @@ enum {
 
 static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_MACHINE, 1, 0, CMD_LINE_OPT_ADD_MACHINE_NUM},
+	{CMD_LINE_OPT_DEL_MACHINE, 1, 0, CMD_LINE_OPT_DEL_MACHINE_NUM},
 	{CMD_LINE_OPT_ADD_ROUTE, 1, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
@@ -116,6 +120,11 @@ int parse_args(int argc, char **argv)
 		/* Long options */
 		case CMD_LINE_OPT_ADD_MACHINE_NUM:
 			command = DP_CMD_ADD_MACHINE;
+			strncpy(machine_str, optarg, 29);
+			break;
+
+		case CMD_LINE_OPT_DEL_MACHINE_NUM:
+			command = DP_CMD_DEL_MACHINE;
 			strncpy(machine_str, optarg, 29);
 			break;
 
@@ -245,6 +254,15 @@ public:
 			stub_->delMachineVIP(&context, request, &reply);
 	}
 
+	void DelMachine() {
+			MachineIDMsg request;
+			Status reply;
+			ClientContext context;
+
+			request.set_machineid(machine_str);
+			stub_->deleteMachine(&context, request, &reply);
+	}
+
 private:
 	std::unique_ptr<DPDKonmetal::Stub> stub_;
 };
@@ -261,6 +279,10 @@ int main(int argc, char** argv)
 		dpdk_client.AddMachine();
 		std::cout << "Addmachine called " << std::endl;
 		printf("IP %s, IPv6 %s\n", ip_str,ip6_str);
+		break;
+	case DP_CMD_DEL_MACHINE:
+		dpdk_client.DelMachine();
+		std::cout << "Delmachine called " << std::endl;
 		break;
 	case DP_CMD_ADD_ROUTE:
 		dpdk_client.AddRoute();

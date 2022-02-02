@@ -30,6 +30,13 @@ void enable_rx_node(uint16_t portid)
 	ethdev_rx_main.node_ctx[portid].enabled = true;
 }
 
+void disable_rx_node(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	ethdev_rx_main.node_ctx[portid].enabled = false;
+}
+
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;

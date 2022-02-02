@@ -38,6 +38,7 @@ struct ethdev_rx_node_main {
 int config_rx_node(struct rx_node_config* cfg);
 struct rte_node_register *rx_node_get(void);
 void enable_rx_node(uint16_t portid);
+void disable_rx_node(uint16_t portid);
 #ifdef __cplusplus
 }
 #endif
