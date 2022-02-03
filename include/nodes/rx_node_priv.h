@@ -20,7 +20,6 @@ struct rx_node_ctx
 	uint16_t	queue_id;
 	uint16_t	next;
 	bool		enabled;
-	struct rte_ring *grpc_queue;
 };
 
 struct rx_node_config
@@ -28,7 +27,6 @@ struct rx_node_config
 	uint16_t node_id;
 	uint16_t port_id;
 	uint16_t queue_id;
-	struct rte_ring *grpc_queue;
 };
 
 struct ethdev_rx_node_main {

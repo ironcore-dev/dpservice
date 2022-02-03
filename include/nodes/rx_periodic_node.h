@@ -18,12 +18,16 @@ struct rx_periodic_node_ctx
 	uint16_t queue_id;
 	uint16_t next;
 	struct rte_ring *periodic_msg_queue;
+	struct rte_ring *grpc_tx;
+	struct rte_ring *grpc_rx;
 };
 
 struct rx_periodic_node_config
 {
 	uint16_t queue_id;
 	struct rte_ring *periodic_msg_queue;
+	struct rte_ring *grpc_tx;
+	struct rte_ring *grpc_rx;
 };
 
 struct rx_periodic_node_main {

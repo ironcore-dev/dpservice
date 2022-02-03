@@ -1,13 +1,17 @@
 #include "dp_grpc_service.h"
+#include "dp_async_grpc.h"
 #include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_port.h"
 #include <rte_mbuf.h>
 
 
-GRPCService::GRPCService(struct dp_dpdk_layer* dp_layer)
+GRPCService::GRPCService()
 {
-	this->dpdk_layer = dp_layer;
+}
+
+GRPCService::~GRPCService()
+{
 }
 
 void GRPCService::run(std::string listen_address) 
@@ -15,26 +19,23 @@ void GRPCService::run(std::string listen_address)
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
 	builder.RegisterService(this);
-	std::unique_ptr<Server> server(builder.BuildAndStart());
+	this->cq_ = builder.AddCompletionQueue();
+	this->server_= builder.BuildAndStart();
 	std::cout << "Server listening on " << listen_address << std::endl;
-	server->Wait();
+	HandleRpcs();
 }
 
-grpc::Status GRPCService::QueryHelloWorld(ServerContext* context, const Empty* request, Status* response)
+void GRPCService::HandleRpcs()
 {
-	rte_mbuf *grpc_buf;
-	int *test_value;
+	void* tag;
+	bool ok;
+	new HelloCall(this, cq_.get());
 
-	std::cout << "GRPC method called !! " << std::endl;
-
-	grpc_buf = rte_pktmbuf_alloc(this->dpdk_layer->rte_mempool);
-	test_value = rte_pktmbuf_mtod(grpc_buf, int*);
-	*test_value = 0xdeadbeef;
-
-	if (rte_ring_sp_enqueue(this->dpdk_layer->grpc_queue, grpc_buf))
-		return grpc::Status::CANCELLED;
-
-	return grpc::Status::OK;
+	while (true) {
+		GPR_ASSERT(cq_->Next(&tag, &ok));
+		GPR_ASSERT(ok);
+		while (static_cast<BaseCall*>(tag)->Proceed() < 0) {};
+	}
 }
 
 grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response)
@@ -79,7 +80,7 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	struct dp_port_ext pf_port;
 	IPConfig ipv4_conf;
 	IPConfig ipv6_conf;
-	int vni, port_id;
+	int vni, port_id = 0;
 	struct in_addr ip_addr;
 	uint8_t ipv6_addr[16];
 
@@ -98,7 +99,7 @@ grpc::Status GRPCService::addMachine(ServerContext* context, const AddMachineReq
 	printf("VNI %d  IPv4 %x\n", vni, ntohl(ip_addr.s_addr));
 
 	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
-	port_id = dp_get_next_avail_vf_id(this->dpdk_layer, DP_PORT_VF);
+	//port_id = dp_get_next_avail_vf_id(this->dpdk_layer, DP_PORT_VF);
 	if ( port_id >= 0) {
 		dp_map_vm_handle(machine_id_bytes, port_id);
 		setup_lpm(port_id, vni, rte_eth_dev_socket_id(port_id));

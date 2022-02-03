@@ -39,7 +39,8 @@ struct dp_dpdk_layer {
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
 	rte_graph_t 					graph_id;
-	struct rte_ring					*grpc_queue;
+	struct rte_ring					*grpc_tx_queue;
+	struct rte_ring					*grpc_rx_queue;
 	struct rte_ring					*periodic_msg_queue;
 };
 

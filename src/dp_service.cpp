@@ -13,7 +13,7 @@
 
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
-	GRPCService *grpc_svc = new GRPCService(get_dpdk_layer());
+	GRPCService *grpc_svc = new GRPCService();
 
 	grpc_svc->run("[::]:1337");
 
