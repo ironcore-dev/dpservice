@@ -46,6 +46,17 @@ static int dp_process_hello(dp_request *req, dp_reply *rep)
 
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->add_vip.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return EXIT_FAILURE;
+
+	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		dp_set_vm_nat_ip(port_id, ntohl(req->add_vip.vip.vip_addr));
+	}
 	return EXIT_SUCCESS;
 }
 

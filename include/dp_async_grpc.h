@@ -54,6 +54,19 @@ public:
 	int Proceed() override;
 };
 
+class AddVIPCall final : BaseCall {
+	ServerContext ctx_;
+	MachineVIPMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
 
+public:
+	AddVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADDVIP), responder_(&ctx_) {
+		service_->RequestaddMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
 
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H

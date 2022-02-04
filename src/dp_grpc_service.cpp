@@ -30,6 +30,7 @@ void GRPCService::HandleRpcs()
 	void* tag;
 	bool ok;
 	new HelloCall(this, cq_.get());
+	new AddVIPCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

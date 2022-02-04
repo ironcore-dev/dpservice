@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <rte_mbuf.h>
+#include "dp_lpm.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +29,7 @@ typedef struct dp_vip {
 		uint32_t	vip_addr;
 		uint8_t		vip_addr6[16];
 	} vip;
+	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_vip;
 
 typedef struct dp_request {
