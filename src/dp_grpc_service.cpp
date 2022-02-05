@@ -32,6 +32,7 @@ void GRPCService::HandleRpcs()
 	new HelloCall(this, cq_.get());
 	new AddVIPCall(this, cq_.get());
 	new AddMachineCall(this, cq_.get());
+	new DelMachineCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));
@@ -72,25 +73,6 @@ grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* re
 	}
 
 
-
-	return grpc::Status::OK;
-}
-
-grpc::Status GRPCService::deleteMachine(ServerContext* context, const MachineIDMsg* request, Status* response)
-{
-	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
-	int port_id;
-
-	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
-	port_id = dp_get_portid_with_vm_handle(machine_id_bytes);
-
-	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return grpc::Status::CANCELLED;
-
-	dp_stop_interface(port_id, DP_PORT_VF);
-	dp_del_portid_with_vm_handle(machine_id_bytes);
-	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
 
 	return grpc::Status::OK;
 }

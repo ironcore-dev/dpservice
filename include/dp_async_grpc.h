@@ -84,4 +84,19 @@ public:
 	int Proceed() override;
 };
 
+class DelMachineCall final : BaseCall {
+	ServerContext ctx_;
+	MachineIDMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelMachineCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELMACHINE), responder_(&ctx_) {
+		service_->RequestdeleteMachine(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H

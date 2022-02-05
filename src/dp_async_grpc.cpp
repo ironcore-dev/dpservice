@@ -34,8 +34,8 @@ int HelloCall::Proceed()
 
 int AddVIPCall::Proceed()
 {
-	dp_request request;
-	dp_reply reply;
+	dp_request request = {0};
+	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
@@ -70,8 +70,8 @@ int AddVIPCall::Proceed()
 
 int AddMachineCall::Proceed()
 {
-	dp_request request;
-	dp_reply reply;
+	dp_request request = {0};
+	dp_reply reply = {0};
 	VirtualFunction *vf = new VirtualFunction();
 	grpc::Status ret = grpc::Status::OK;
 
@@ -103,6 +103,35 @@ int AddMachineCall::Proceed()
 		vf->set_slot(reply.vf_pci.slot);
 		vf->set_function(reply.vf_pci.function);
 		reply_.set_allocated_vf(vf);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int DelMachineCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply= {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelMachineCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.del_machine.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machineid().c_str());
+		printf("GRPC delmachine called \n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		printf("GRPC delmachine reply received \n");
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
