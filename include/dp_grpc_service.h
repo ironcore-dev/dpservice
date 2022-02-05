@@ -22,10 +22,8 @@ public:
 	~GRPCService();
 	void run(std::string listen_address);
 	void HandleRpcs();
-	grpc::Status addMachine(ServerContext* context, const AddMachineRequest* request, AddMachineResponse* response) override;
 	grpc::Status deleteMachine(ServerContext* context, const MachineIDMsg* request, Status* response) override;
 	grpc::Status addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response) override;
-	grpc::Status addMachineVIP(ServerContext* context, const MachineVIPMsg* request, Status* response) override;
 	grpc::Status getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response) override;
 	grpc::Status delMachineVIP(ServerContext* context, const MachineIDMsg* request, Status* response) override;
 };

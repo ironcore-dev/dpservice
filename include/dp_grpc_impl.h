@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <rte_mbuf.h>
 #include "dp_lpm.h"
+#include "dp_util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +16,7 @@ typedef enum {
 	DP_REQ_TYPE_ADDVIP,
 	DP_REQ_TYPE_DELVIP,
 	DP_REQ_TYPE_GETVIP,
+	DP_REQ_TYPE_ADDMACHINE,
 } dp_req_type;
 
 typedef struct dp_com_head {
@@ -32,19 +34,36 @@ typedef struct dp_vip {
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_vip;
 
+typedef struct dp_addmachine {
+	uint32_t	ip4_addr;
+	uint8_t		ip6_addr6[16];
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+	uint32_t	vni;
+} dp_addmachine;
+
 typedef struct dp_request {
 	dp_com_head com_head;
 	union {
-		uint32_t hello;
-		dp_vip add_vip;
+		uint32_t		hello;
+		dp_vip			add_vip;
+		dp_addmachine	add_machine;
 	};
 } dp_request;
+
+typedef struct dp_vf_pci {
+	char		name[IFNAMSIZ];
+	uint32_t	domain;
+	uint32_t	bus;
+	uint32_t	slot;
+	uint32_t	function;
+} dp_vf_pci;
 
 typedef struct dp_reply {
 	dp_com_head com_head;
 	union {
-		uint32_t hello;
-		dp_vip get_vip;
+		uint32_t	hello;
+		dp_vip		get_vip;
+		dp_vf_pci	vf_pci;
 	};
 } dp_reply;
 

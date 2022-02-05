@@ -69,4 +69,19 @@ public:
 	int Proceed() override;
 };
 
+class AddMachineCall final : BaseCall {
+	ServerContext ctx_;
+	AddMachineRequest request_;
+	AddMachineResponse reply_;
+	ServerAsyncResponseWriter<AddMachineResponse> responder_;
+
+public:
+	AddMachineCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADDMACHINE), responder_(&ctx_) {
+		service_->RequestaddMachine(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H

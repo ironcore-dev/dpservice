@@ -60,6 +60,40 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 	return EXIT_SUCCESS;
 }
 
+static int dp_process_addmachine(dp_request *req, dp_reply *rep)
+{
+	struct dp_port_ext pf_port;
+	int port_id;
+
+	memset(&pf_port, 0, sizeof(pf_port));
+	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+
+	port_id = dp_get_next_avail_vf_id(get_dpdk_layer(), DP_PORT_VF);
+	if ( port_id >= 0) {
+		dp_map_vm_handle(req->add_machine.machine_id, port_id);
+		setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id));
+		setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id));
+		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), 32, 
+							  rte_eth_dev_socket_id(port_id));
+		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, 128,
+							  rte_eth_dev_socket_id(port_id));
+		dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr), 
+					 NULL, 32, rte_eth_dev_socket_id(port_id));
+		dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
+					  NULL, 128, rte_eth_dev_socket_id(port_id));
+		dp_start_interface(&pf_port, DP_PORT_VF);
+
+		/* TODO get the pci info of this port and fill it accordingly */
+		rep->vf_pci.bus = 2;
+		rep->vf_pci.domain = 2;
+		rep->vf_pci.function = 2;
+		rte_eth_dev_get_name_by_port(port_id, rep->vf_pci.name);
+	} else {
+		return EXIT_FAILURE;
+	}
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
 	return EXIT_SUCCESS;
@@ -83,6 +117,9 @@ int dp_process_request(struct rte_mbuf *m)
 			break;
 		case DP_REQ_TYPE_GETVIP:
 			ret = dp_process_getvip(req, &rep);
+			break;
+		case DP_REQ_TYPE_ADDMACHINE:
+			ret = dp_process_addmachine(req, &rep);
 			break;
 		default:
 			break;
