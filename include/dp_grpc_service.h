@@ -24,7 +24,6 @@ public:
 	void HandleRpcs();
 	grpc::Status addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response) override;
 	grpc::Status getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response) override;
-	grpc::Status delMachineVIP(ServerContext* context, const MachineIDMsg* request, Status* response) override;
 };
 
 #endif //__INCLUDE_DP_GRPC_SERVICE_H

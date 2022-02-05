@@ -10,7 +10,6 @@ int HelloCall::Proceed()
 
 	if (status_ == REQUEST) {
 		new HelloCall(service_, cq_);
-		//Fill from request_ into request
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.hello = 0xdeadbeef;
 		printf("GRPC Hello sent %x \n", request.hello);
@@ -22,7 +21,6 @@ int HelloCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		printf("GRPC Hello received %x \n", reply.hello);
-		// Fill into reply_ from reply
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -57,7 +55,35 @@ int AddVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		printf("GRPC addvip reply received \n");
-		// Fill into reply_ from reply
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int DelVIPCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelVIPCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machineid().c_str());
+		printf("GRPC delvip called \n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		printf("GRPC delvip reply received \n");
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

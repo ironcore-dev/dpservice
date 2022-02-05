@@ -60,6 +60,22 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 	return EXIT_SUCCESS;
 }
 
+static int dp_process_delvip(dp_request *req, dp_reply *rep)
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return EXIT_FAILURE;
+
+	dp_del_vm_nat_ip(port_id);
+	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
+
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
 	struct dp_port_ext pf_port;
@@ -130,6 +146,9 @@ int dp_process_request(struct rte_mbuf *m)
 			break;
 		case DP_REQ_TYPE_ADDVIP:
 			ret = dp_process_addvip(req, &rep);
+			break;
+		case DP_REQ_TYPE_DELVIP:
+			ret = dp_process_delvip(req, &rep);
 			break;
 		case DP_REQ_TYPE_GETVIP:
 			ret = dp_process_getvip(req, &rep);

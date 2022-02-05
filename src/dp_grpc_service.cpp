@@ -31,6 +31,7 @@ void GRPCService::HandleRpcs()
 	bool ok;
 	new HelloCall(this, cq_.get());
 	new AddVIPCall(this, cq_.get());
+	new DelVIPCall(this, cq_.get());
 	new AddMachineCall(this, cq_.get());
 	new DelMachineCall(this, cq_.get());
 
@@ -79,23 +80,5 @@ grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* re
 
 grpc::Status GRPCService::getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response)
 {
-	return grpc::Status::OK;
-}
-
-grpc::Status GRPCService::delMachineVIP(ServerContext* context, const MachineIDMsg* request, Status* response)
-{
-	char machine_id_bytes[VM_MACHINE_ID_STR_LEN] = {0};
-	int port_id;
-
-	snprintf(machine_id_bytes, VM_MACHINE_ID_STR_LEN, "%s", request->machineid().c_str());
-	port_id = dp_get_portid_with_vm_handle(machine_id_bytes);
-
-	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return grpc::Status::CANCELLED;
-
-	dp_del_vm_nat_ip(port_id);
-	dp_del_portid_with_vm_handle(machine_id_bytes);
-
 	return grpc::Status::OK;
 }

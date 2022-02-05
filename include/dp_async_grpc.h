@@ -69,6 +69,21 @@ public:
 	int Proceed() override;
 };
 
+class DelVIPCall final : BaseCall {
+	ServerContext ctx_;
+	MachineIDMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELVIP), responder_(&ctx_) {
+		service_->RequestdelMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class AddMachineCall final : BaseCall {
 	ServerContext ctx_;
 	AddMachineRequest request_;
