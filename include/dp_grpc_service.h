@@ -23,7 +23,6 @@ public:
 	void run(std::string listen_address);
 	void HandleRpcs();
 	grpc::Status addRoute(ServerContext* context, const VNIRouteMsg* request, Status* response) override;
-	grpc::Status getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response) override;
 };
 
 #endif //__INCLUDE_DP_GRPC_SERVICE_H

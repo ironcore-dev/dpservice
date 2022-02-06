@@ -50,6 +50,10 @@ typedef struct dp_delvip {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_delvip;
 
+typedef struct dp_getvip {
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_getvip;
+
 typedef struct dp_request {
 	dp_com_head com_head;
 	union {
@@ -58,6 +62,7 @@ typedef struct dp_request {
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
 		dp_delvip		del_vip;
+		dp_getvip		get_vip;
 	};
 } dp_request;
 

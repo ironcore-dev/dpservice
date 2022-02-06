@@ -25,6 +25,7 @@ typedef enum {
 	DP_CMD_ADD_ROUTE,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
+	DP_CMD_GET_VIP,
 	DP_CMD_DEL_TEST,
 } cmd_type;
 
@@ -55,6 +56,7 @@ static int length;
 #define CMD_LINE_OPT_LENGTH			"length"
 #define CMD_LINE_OPT_ADD_VIP		"addvip"
 #define CMD_LINE_OPT_DEL_VIP		"delvip"
+#define CMD_LINE_OPT_GET_VIP		"getvip"
 #define CMD_LINE_OPT_TEST			"test"
 
 
@@ -71,6 +73,7 @@ enum {
 	CMD_LINE_OPT_LENGTH_NUM,
 	CMD_LINE_OPT_ADD_VIP_NUM,
 	CMD_LINE_OPT_DEL_VIP_NUM,
+	CMD_LINE_OPT_GET_VIP_NUM,
 	CMD_LINE_OPT_TEST_NUM,
 };
 
@@ -86,6 +89,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_LENGTH, 1, 0, CMD_LINE_OPT_LENGTH_NUM},
 	{CMD_LINE_OPT_ADD_VIP, 1, 0, CMD_LINE_OPT_ADD_VIP_NUM},
 	{CMD_LINE_OPT_DEL_VIP, 1, 0, CMD_LINE_OPT_DEL_VIP_NUM},
+	{CMD_LINE_OPT_GET_VIP, 1, 0, CMD_LINE_OPT_GET_VIP_NUM},
 	{CMD_LINE_OPT_TEST, 1, 0, CMD_LINE_OPT_TEST_NUM},
 	{NULL, 0, 0, 0},
 };
@@ -165,6 +169,10 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_DEL_VIP_NUM:
 			command = DP_CMD_DEL_VIP;
+			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_GET_VIP_NUM:
+			command = DP_CMD_GET_VIP;
 			strncpy(machine_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_TEST_NUM:
@@ -263,6 +271,16 @@ public:
 			stub_->delMachineVIP(&context, request, &reply);
 	}
 
+	void GetVIP() {
+			MachineIDMsg request;
+			MachineVIPIP reply;
+			ClientContext context;
+
+			request.set_machineid(machine_str);
+			stub_->getMachineVIP(&context, request, &reply);
+			printf("Received VIP %s \n", reply.address().c_str());
+	}
+
 	void DelMachine() {
 			MachineIDMsg request;
 			Status reply;
@@ -305,6 +323,10 @@ int main(int argc, char** argv)
 	case DP_CMD_DEL_VIP:
 		dpdk_client.DelVIP();
 		std::cout << "Delvip called " << std::endl;
+		break;
+	case DP_CMD_GET_VIP:
+		std::cout << "Getvip called " << std::endl;
+		dpdk_client.GetVIP();
 		break;
 	case DP_CMD_DEL_TEST:
 		dpdk_client.SayHello();

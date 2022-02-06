@@ -128,6 +128,16 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 
 static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return EXIT_FAILURE;
+
+	rep->get_vip.vip.vip_addr = dp_get_vm_nat_ip(port_id);
+
 	return EXIT_SUCCESS;
 }
 

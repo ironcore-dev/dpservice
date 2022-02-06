@@ -32,6 +32,7 @@ void GRPCService::HandleRpcs()
 	new HelloCall(this, cq_.get());
 	new AddVIPCall(this, cq_.get());
 	new DelVIPCall(this, cq_.get());
+	new GetVIPCall(this, cq_.get());
 	new AddMachineCall(this, cq_.get());
 	new DelMachineCall(this, cq_.get());
 
@@ -75,10 +76,5 @@ grpc::Status GRPCService::addRoute(ServerContext* context, const VNIRouteMsg* re
 
 
 
-	return grpc::Status::OK;
-}
-
-grpc::Status GRPCService::getMachineVIP(ServerContext* context, const MachineIDMsg* request, MachineVIPIP* response)
-{
 	return grpc::Status::OK;
 }

@@ -93,6 +93,38 @@ int DelVIPCall::Proceed()
 	return 0;
 }
 
+int GetVIPCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	struct in_addr addr;
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new GetVIPCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machineid().c_str());
+		printf("GRPC getvip called \n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		printf("GRPC getvip reply received \n");
+		reply_.set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		addr.s_addr = reply.get_vip.vip.vip_addr;
+		reply_.set_address(inet_ntoa(addr));
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
 
 int AddMachineCall::Proceed()
 {
