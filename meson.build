@@ -3,10 +3,10 @@ project('dp_service', 'c', 'cpp',
   version : '0.0.1',
   license : 'MIT')
 add_global_arguments('-DDEBUG=true', language : 'c')
-dpdk_dep = dependency('libdpdk')
-proto_dep = dependency('protobuf')
-grpc_dep = dependency('grpc')
-grpccpp_dep = dependency('grpc++')
+dpdk_dep = dependency('libdpdk', version : '>=21.11.0')
+proto_dep = dependency('protobuf', version : '>=3.12.4')
+grpc_dep = dependency('grpc', version : '>=10.0.0')
+grpccpp_dep = dependency('grpc++', version : '>=1.30.2')
 thread_dep = dependency('threads')
 
 protoc = find_program('protoc')
