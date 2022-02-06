@@ -18,6 +18,7 @@ typedef enum {
 	DP_REQ_TYPE_GETVIP,
 	DP_REQ_TYPE_ADDMACHINE,
 	DP_REQ_TYPE_DELMACHINE,
+	DP_REQ_TYPE_ADDROUTE,
 } dp_req_type;
 
 typedef struct dp_com_head {
@@ -42,6 +43,23 @@ typedef struct dp_addmachine {
 	uint32_t	vni;
 } dp_addmachine;
 
+typedef struct dp_addroute {
+	uint32_t	pfx_ip_type;
+	union {
+		uint32_t	addr;
+		uint8_t		addr6[16];
+	} pfx_ip;
+	uint32_t	pfx_length;
+	uint32_t	trgt_hop_ip_type;
+	union {
+		uint32_t	addr;
+		uint8_t		addr6[16];
+	} trgt_ip;
+	uint32_t	vni;
+	uint32_t	trgt_vni;
+	uint32_t	weight;
+} dp_addroute;
+
 typedef struct dp_delmachine {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_delmachine;
@@ -63,6 +81,7 @@ typedef struct dp_request {
 		dp_delmachine	del_machine;
 		dp_delvip		del_vip;
 		dp_getvip		get_vip;
+		dp_addroute		add_route;
 	};
 } dp_request;
 

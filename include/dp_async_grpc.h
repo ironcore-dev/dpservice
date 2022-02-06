@@ -129,4 +129,19 @@ public:
 	int Proceed() override;
 };
 
+class AddRouteCall final : BaseCall {
+	ServerContext ctx_;
+	VNIRouteMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	AddRouteCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADDROUTE), responder_(&ctx_) {
+		service_->RequestaddRoute(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H
