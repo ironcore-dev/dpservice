@@ -144,4 +144,18 @@ public:
 	int Proceed() override;
 };
 
+class ListMachinesCall final : BaseCall {
+	ServerContext ctx_;
+	Empty request_;
+	MachinesMsg reply_;
+	ServerAsyncResponseWriter<MachinesMsg> responder_;
+
+public:
+	ListMachinesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LISTMACHINE), responder_(&ctx_) {
+		service_->RequestlistMachines(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H

@@ -240,3 +240,47 @@ int AddRouteCall::Proceed()
 	}
 	return 0;
 }
+
+int ListMachinesCall::Proceed()
+{
+	dp_request request = {0};
+	struct rte_mbuf *mbuf = NULL;
+	struct dp_reply *reply;
+	Machine *machine;
+	struct in_addr addr;
+	dp_vm_info *vm_info;
+	int i;
+	grpc::Status ret = grpc::Status::OK;
+	char buf[INET6_ADDRSTRLEN];
+
+	if (status_ == REQUEST) {
+		new ListMachinesCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		printf("GRPC listmachines called \n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker_with_mbuf(&mbuf))
+			return -1;
+		printf("GRPC listmachines reply received \n");
+		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		for (i = 0; i < reply->com_head.msg_count; i++) {
+			machine = reply_.add_machines();
+			vm_info = &((&reply->vm_info)[i]);
+			addr.s_addr = htonl(vm_info->ip_addr);
+			machine->set_primaryipv4address(inet_ntoa(addr));
+			inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
+			machine->set_primaryipv6address(buf);
+			machine->set_machineid((char *)vm_info->machine_id);
+			machine->set_vni(vm_info->vni);
+		}
+		rte_pktmbuf_free(mbuf);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}

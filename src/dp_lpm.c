@@ -38,6 +38,8 @@ void dp_map_vm_handle(void *key, uint16_t portid)
 	if (!p_port_id)
 		rte_exit(EXIT_FAILURE, "vm handle for port %d malloc data failed\n", portid);
 
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	rte_memcpy(vm_table[portid].machineid, key, sizeof(vm_table[portid].machineid));
 	*p_port_id = portid;
 	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0)
 		rte_exit(EXIT_FAILURE, "vm handle for port %d add data failed\n", portid);
@@ -75,17 +77,38 @@ uint8_t* dp_get_gw_ip6()
 	return dp_router_gw_ip6;
 }
 
+int dp_get_active_vm_ports(int* act_ports)
+{
+	int i, count = 0;
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready)
+			act_ports[count++] = i;
+	return count;
+}
+
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.own_ip;
 }
 
-
 uint8_t* dp_get_dhcp_range_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.dhcp_ipv6;
+}
+
+uint8_t* dp_get_vm_machineid(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].machineid;
+}
+
+int dp_get_vm_vni(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].vni;
 }
 
 uint8_t* dp_get_vm_ip6(uint16_t portid)

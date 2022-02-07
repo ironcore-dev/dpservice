@@ -52,6 +52,7 @@ struct vm_entry {
 	struct rte_rib6		*ipv6_rib[DP_NB_SOCKETS];
 	struct macip_entry	info;
 	int					vni;
+	uint8_t				machineid[VM_MACHINE_ID_STR_LEN];
 	uint8_t				vm_ready;
 };
 
@@ -94,6 +95,9 @@ void dp_del_vm_nat_ip(uint16_t portid);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_is_vm_natted(uint16_t portid);
 void dp_del_vm(int portid, int socketid);
+int dp_get_active_vm_ports(int* act_ports);
+uint8_t* dp_get_vm_machineid(uint16_t portid);
+int dp_get_vm_vni(uint16_t portid);
 #ifdef __cplusplus
 }
 #endif

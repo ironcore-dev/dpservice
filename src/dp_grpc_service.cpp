@@ -36,6 +36,7 @@ void GRPCService::HandleRpcs()
 	new AddRouteCall(this, cq_.get());
 	new AddMachineCall(this, cq_.get());
 	new DelMachineCall(this, cq_.get());
+	new ListMachinesCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

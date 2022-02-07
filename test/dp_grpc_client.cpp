@@ -22,6 +22,7 @@ typedef enum {
 	DP_CMD_NONE,
 	DP_CMD_ADD_MACHINE,
 	DP_CMD_DEL_MACHINE,
+	DP_CMD_GET_MACHINE,
 	DP_CMD_ADD_ROUTE,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
@@ -47,6 +48,7 @@ static int length;
 
 #define CMD_LINE_OPT_ADD_MACHINE	"addmachine"
 #define CMD_LINE_OPT_DEL_MACHINE	"delmachine"
+#define CMD_LINE_OPT_GET_MACHINE	"getmachines"
 #define CMD_LINE_OPT_VNI			"vni"
 #define CMD_LINE_OPT_T_VNI			"t_vni"
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
@@ -64,6 +66,7 @@ enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
 	CMD_LINE_OPT_ADD_MACHINE_NUM,
 	CMD_LINE_OPT_DEL_MACHINE_NUM,
+	CMD_LINE_OPT_GET_MACHINE_NUM,
 	CMD_LINE_OPT_ADD_ROUTE_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
@@ -80,6 +83,7 @@ enum {
 static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_MACHINE, 1, 0, CMD_LINE_OPT_ADD_MACHINE_NUM},
 	{CMD_LINE_OPT_DEL_MACHINE, 1, 0, CMD_LINE_OPT_DEL_MACHINE_NUM},
+	{CMD_LINE_OPT_GET_MACHINE, 0, 0, CMD_LINE_OPT_GET_MACHINE_NUM},
 	{CMD_LINE_OPT_ADD_ROUTE, 1, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
@@ -130,12 +134,13 @@ int parse_args(int argc, char **argv)
 			command = DP_CMD_ADD_MACHINE;
 			strncpy(machine_str, optarg, 29);
 			break;
-
 		case CMD_LINE_OPT_DEL_MACHINE_NUM:
 			command = DP_CMD_DEL_MACHINE;
 			strncpy(machine_str, optarg, 29);
 			break;
-
+		case CMD_LINE_OPT_GET_MACHINE_NUM:
+			command = DP_CMD_GET_MACHINE;
+			break;
 		case CMD_LINE_OPT_ADD_ROUTE_NUM:
 			command = DP_CMD_ADD_ROUTE;
 			strncpy(route_str, optarg, 29);
@@ -290,6 +295,22 @@ public:
 			stub_->deleteMachine(&context, request, &reply);
 	}
 
+	void GetMachines() {
+			Empty request;
+			MachinesMsg reply;
+			ClientContext context;
+			int i;
+
+			stub_->listMachines(&context, request, &reply);
+			for (i = 0; i < reply.machines_size(); i++)
+			{
+				printf("Machine %s ipv4 %s ipv6 %s vni %d\n", reply.machines(i).machineid().c_str(),
+					reply.machines(i).primaryipv4address().c_str(), 
+					reply.machines(i).primaryipv6address().c_str(),
+					reply.machines(i).vni());
+			}
+	}
+
 private:
 	std::unique_ptr<DPDKonmetal::Stub> stub_;
 };
@@ -310,6 +331,10 @@ int main(int argc, char** argv)
 	case DP_CMD_DEL_MACHINE:
 		dpdk_client.DelMachine();
 		std::cout << "Delmachine called " << std::endl;
+		break;
+	case DP_CMD_GET_MACHINE:
+		std::cout << "Getmachine called " << std::endl;
+		dpdk_client.GetMachines();
 		break;
 	case DP_CMD_ADD_ROUTE:
 		dpdk_client.AddRoute();

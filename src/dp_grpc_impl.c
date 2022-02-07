@@ -29,12 +29,25 @@ int dp_recv_from_worker(dp_reply *rep)
 	return EXIT_FAILURE;
 }
 
+int dp_recv_from_worker_with_mbuf(struct rte_mbuf **mbuf)
+{
+	struct rte_mbuf *m;
+
+	if (!rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void**)&m)) {
+		*mbuf = m;
+		return EXIT_SUCCESS;
+	}
+
+	return EXIT_FAILURE;
+}
+
 __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 									  uint8_t is_chained, uint8_t count)
 {
 	head->com_type = type;
 	head->buf_count = count;
 	head->is_chained = is_chained;
+	head->msg_count = 0;
 }
 
 static int dp_process_hello(dp_request *req, dp_reply *rep)
@@ -156,6 +169,32 @@ static int dp_process_addroute(dp_request *req, dp_reply *rep)
 	return EXIT_SUCCESS;
 }
 
+static int dp_process_listmachine(dp_request *req, dp_reply *rep)
+{
+	int act_ports[DP_MAX_PORTS];
+	dp_vm_info *vm_info;
+	int i, count;
+
+	count = dp_get_active_vm_ports(act_ports);
+
+	if (!count)
+		return EXIT_SUCCESS;
+	/* TODO in case the reply extends a single mbuf, we should send several mbufs and chain them */
+	rep->com_head.msg_count = count;
+	for (i = 0; i < count; i++) {
+		vm_info = &((&rep->vm_info)[i]);
+		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]);
+		rte_memcpy(vm_info->ip6_addr, dp_get_dhcp_range_ip6(act_ports[i]),
+				   sizeof(vm_info->ip6_addr));
+		vm_info->vni = dp_get_vm_vni(act_ports[i]);
+		rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(act_ports[i]),
+			sizeof(vm_info->machine_id));
+	}
+	
+
+	return EXIT_SUCCESS;
+}
+
 int dp_process_request(struct rte_mbuf *m)
 {
 	dp_request* req;
@@ -187,13 +226,19 @@ int dp_process_request(struct rte_mbuf *m)
 		case DP_REQ_TYPE_ADDROUTE:
 			ret = dp_process_addroute(req, &rep);
 			break;
+		case DP_REQ_TYPE_LISTMACHINE:
+			ret = dp_process_listmachine(NULL, rte_pktmbuf_mtod(m, dp_reply*));
+			break;
 		default:
 			break;
 	}
-	rep.com_head = req->com_head;
-	
-	p_rep = rte_pktmbuf_mtod(m, dp_reply*);
-	*p_rep = rep;
+	/* For requests without any parameter (like listmachine), the reply */
+	/* is directly written into the mbuf in the process function */
+	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE) {
+		rep.com_head.com_type = req->com_head.com_type;
+		p_rep = rte_pktmbuf_mtod(m, dp_reply*);
+		*p_rep = rep;
+	}
 	rte_ring_sp_enqueue(get_dpdk_layer()->grpc_rx_queue, m);
 
 	return ret;
