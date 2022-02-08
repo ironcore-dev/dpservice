@@ -24,6 +24,7 @@ typedef enum {
 	DP_CMD_DEL_MACHINE,
 	DP_CMD_GET_MACHINE,
 	DP_CMD_ADD_ROUTE,
+	DP_CMD_DEL_ROUTE,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
@@ -54,6 +55,7 @@ static int length;
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
 #define CMD_LINE_OPT_PRIMARY_IPV6	"ipv6"
 #define CMD_LINE_OPT_ADD_ROUTE		"addroute"
+#define CMD_LINE_OPT_DEL_ROUTE		"delroute"
 #define CMD_LINE_OPT_T_PRIMARY_IPV6	"t_ipv6"
 #define CMD_LINE_OPT_LENGTH			"length"
 #define CMD_LINE_OPT_ADD_VIP		"addvip"
@@ -68,6 +70,7 @@ enum {
 	CMD_LINE_OPT_DEL_MACHINE_NUM,
 	CMD_LINE_OPT_GET_MACHINE_NUM,
 	CMD_LINE_OPT_ADD_ROUTE_NUM,
+	CMD_LINE_OPT_DEL_ROUTE_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV4_NUM,
@@ -85,6 +88,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_DEL_MACHINE, 1, 0, CMD_LINE_OPT_DEL_MACHINE_NUM},
 	{CMD_LINE_OPT_GET_MACHINE, 0, 0, CMD_LINE_OPT_GET_MACHINE_NUM},
 	{CMD_LINE_OPT_ADD_ROUTE, 1, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
+	{CMD_LINE_OPT_DEL_ROUTE, 1, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV4, 1, 0, CMD_LINE_OPT_PRIMARY_IPV4_NUM},
@@ -143,6 +147,10 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_ROUTE_NUM:
 			command = DP_CMD_ADD_ROUTE;
+			strncpy(route_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_DEL_ROUTE_NUM:
+			command = DP_CMD_DEL_ROUTE;
 			strncpy(route_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_VNI_NUM:
@@ -253,6 +261,32 @@ public:
 			stub_->addRoute(&context, request, &reply);
 	}
 
+	void DelRoute() {
+			VNIRouteMsg request;
+			Status reply;
+			ClientContext context;
+			VNIMsg *vni_msg = new VNIMsg();
+			Route *route = new Route();
+			Prefix *prefix = new Prefix();
+
+			vni_msg->set_vni(vni);
+			prefix->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4) {
+				prefix->set_address(ip_str);
+			} else {
+				prefix->set_address(ip6_str);
+			}
+			prefix->set_prefixlength(length);
+			route->set_allocated_prefix(prefix);
+			route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			route->set_nexthopvni(t_vni);
+			route->set_weight(100);
+			route->set_nexthopaddress(t_ip6_str);
+			request.set_allocated_route(route);
+			request.set_allocated_vni(vni_msg);
+			stub_->deleteRoute(&context, request, &reply);
+	}
+
 	void AddVIP() {
 			MachineVIPMsg request;
 			Status reply;
@@ -340,6 +374,10 @@ int main(int argc, char** argv)
 		dpdk_client.AddRoute();
 		std::cout << "Addroute called " << std::endl;
 		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", ip_str, length, vni, ip6_str, t_vni);
+		break;
+	case DP_CMD_DEL_ROUTE:
+		dpdk_client.DelRoute();
+		std::cout << "Delroute called " << std::endl;
 		break;
 	case DP_CMD_ADD_VIP:
 		dpdk_client.AddVIP();

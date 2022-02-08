@@ -209,9 +209,31 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	return ret;
 }
 
-int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
-				 uint8_t* ext_ip6, uint8_t depth, int socketid) {
+int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
+				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid)
+{
+	struct rte_rib_node *node;
+	struct rte_rib *root;
 
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	root = get_lpm(vni, socketid);
+	if (!root)
+		return EXIT_FAILURE;
+
+	node = rte_rib_lookup_exact(root, ip, depth);
+	if (node)
+		rte_rib_remove(root, ip, depth);
+	else
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
+}
+
+int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
+				 uint8_t* ext_ip6, uint8_t depth, int socketid)
+{
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -244,7 +266,28 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 			portid, socketid);
 	}
 	return ret;
+}
 
+int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
+				 uint8_t* ext_ip6, uint8_t depth, int socketid)
+{
+	struct rte_rib6_node *node;
+	struct rte_rib6 *root;
+
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	root = get_lpm6(vni, socketid);
+	if (!root)
+		return EXIT_FAILURE;
+
+	node = rte_rib6_lookup_exact(root, ipv6, depth);
+	if (node)
+		rte_rib6_remove(root, ipv6, depth);
+	else
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
 }
 
 void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip)
@@ -426,6 +469,10 @@ void dp_del_vm(int portid, int socketid)
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	if(dp_is_more_vm_in_vni_avail(portid)) {
+		dp_del_route(portid, vm_table[portid].vni, 0,
+					 vm_table[portid].info.own_ip, NULL, 32, socketid);
+		dp_del_route6(portid, vm_table[portid].vni, 0,
+				vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
 		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	} else {
 		vm_table[portid].vm_ready = 0;

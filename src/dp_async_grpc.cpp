@@ -208,20 +208,20 @@ int AddRouteCall::Proceed()
 	if (status_ == REQUEST) {
 		new AddRouteCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		request.add_route.vni = request_.vni().vni();
-		request.add_route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
-		request.add_route.trgt_vni = request_.route().nexthopvni();
+		request.route.vni = request_.vni().vni();
+		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+		request.route.trgt_vni = request_.route().nexthopvni();
 		inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
-				  request.add_route.trgt_ip.addr6);
-		request.add_route.pfx_length = request_.route().prefix().prefixlength();
+				  request.route.trgt_ip.addr6);
+		request.route.pfx_length = request_.route().prefix().prefixlength();
 		if(request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.route().prefix().address().c_str(),
-					  (in_addr*)&request.add_route.pfx_ip.addr);
+					  (in_addr*)&request.route.pfx_ip.addr);
 		} else {
-			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
+			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
 			inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
-					  request.add_route.pfx_ip.addr6);
+					  request.route.pfx_ip.addr6);
 		}
 		printf("GRPC addroute called \n");
 		dp_send_to_worker(&request);
@@ -232,6 +232,47 @@ int AddRouteCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		printf("GRPC addroute reply received \n");
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int DelRouteCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply= {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelRouteCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		request.route.vni = request_.vni().vni();
+		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+		request.route.trgt_vni = request_.route().nexthopvni();
+		inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
+				  request.route.trgt_ip.addr6);
+		request.route.pfx_length = request_.route().prefix().prefixlength();
+		if(request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.route().prefix().address().c_str(),
+					  (in_addr*)&request.route.pfx_ip.addr);
+		} else {
+			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
+			inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
+					  request.route.pfx_ip.addr6);
+		}
+		printf("GRPC delroute called \n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		printf("GRPC delroute reply received \n");
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

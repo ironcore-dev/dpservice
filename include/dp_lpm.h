@@ -82,7 +82,11 @@ uint32_t dp_get_vm_nat_ip(uint16_t portid);
 uint16_t dp_get_vm_port_id_per_nat_ip(uint32_t nat_ip);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 uint8_t* ip6, uint8_t depth, int socketid);
+int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
+				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid);
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
+				 uint8_t* ext_ip6, uint8_t depth, int socketid);
+int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid);

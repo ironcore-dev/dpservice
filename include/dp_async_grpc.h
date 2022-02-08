@@ -144,6 +144,21 @@ public:
 	int Proceed() override;
 };
 
+class DelRouteCall final : BaseCall {
+	ServerContext ctx_;
+	VNIRouteMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelRouteCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELROUTE), responder_(&ctx_) {
+		service_->RequestdeleteRoute(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class ListMachinesCall final : BaseCall {
 	ServerContext ctx_;
 	Empty request_;

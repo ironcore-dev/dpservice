@@ -34,6 +34,7 @@ void GRPCService::HandleRpcs()
 	new DelVIPCall(this, cq_.get());
 	new GetVIPCall(this, cq_.get());
 	new AddRouteCall(this, cq_.get());
+	new DelRouteCall(this, cq_.get());
 	new AddMachineCall(this, cq_.get());
 	new DelMachineCall(this, cq_.get());
 	new ListMachinesCall(this, cq_.get());

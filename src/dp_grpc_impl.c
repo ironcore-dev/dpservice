@@ -156,17 +156,33 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 
 static int dp_process_addroute(dp_request *req, dp_reply *rep)
 {
-	if(req->add_route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_add_route(dp_get_pf0_port_id(), req->add_route.vni, req->add_route.trgt_vni,
-					 ntohl(req->add_route.pfx_ip.addr), req->add_route.trgt_ip.addr6,
-					 req->add_route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
-	}
-	else {
-		dp_add_route6(dp_get_pf0_port_id(), req->add_route.vni, req->add_route.trgt_vni,
-					  req->add_route.pfx_ip.addr6, req->add_route.trgt_ip.addr6,
-					  req->add_route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	if(req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		dp_add_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
+					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	} else {
+		dp_add_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	}
 	return EXIT_SUCCESS;
+}
+
+static int dp_process_delroute(dp_request *req, dp_reply *rep)
+{
+	int ret;
+
+	if(req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_del_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
+					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	} else {
+		ret = dp_del_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	}
+
+	return ret;
 }
 
 static int dp_process_listmachine(dp_request *req, dp_reply *rep)
@@ -225,6 +241,9 @@ int dp_process_request(struct rte_mbuf *m)
 			break;
 		case DP_REQ_TYPE_ADDROUTE:
 			ret = dp_process_addroute(req, &rep);
+			break;
+		case DP_REQ_TYPE_DELROUTE:
+			ret = dp_process_delroute(req, &rep);
 			break;
 		case DP_REQ_TYPE_LISTMACHINE:
 			ret = dp_process_listmachine(NULL, rte_pktmbuf_mtod(m, dp_reply*));

@@ -19,6 +19,7 @@ typedef enum {
 	DP_REQ_TYPE_ADDMACHINE,
 	DP_REQ_TYPE_DELMACHINE,
 	DP_REQ_TYPE_ADDROUTE,
+	DP_REQ_TYPE_DELROUTE,
 	DP_REQ_TYPE_LISTMACHINE,
 } dp_req_type;
 
@@ -61,7 +62,7 @@ typedef struct dp_addroute {
 	uint32_t	vni;
 	uint32_t	trgt_vni;
 	uint32_t	weight;
-} dp_addroute;
+} dp_route;
 
 typedef struct dp_delmachine {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
@@ -84,7 +85,7 @@ typedef struct dp_request {
 		dp_delmachine	del_machine;
 		dp_delvip		del_vip;
 		dp_getvip		get_vip;
-		dp_addroute		add_route;
+		dp_route		route;
 	};
 } dp_request;
 
