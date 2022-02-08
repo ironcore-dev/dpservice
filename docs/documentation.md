@@ -24,7 +24,7 @@ This project uses meson and ninja to build the C application. On the top level d
 ## How to run dpservice
 Run the application as root or use sudo:
 
-    sudo ./build/src/dp_service -l 0,1 -- --pf0=ens1f0np0 --pf1=ens1f1np1 --vf_pattern=enp59s0f0_ --ipv6=2a10:afc0:e01f:209:: --no-stats --no-offload 
+    sudo ./build/src/dp_service -l 0,1 -- --pf0=ens1f0np0 --pf1=ens1f1np1 --vf-pattern=enp59s0f0_ --ipv6=2a10:afc0:e01f:209:: --no-stats --no-offload 
 **pf0** and **pf1** are the ethernet names of the uplink ports of the hypervisor on the smartnic. **ipv6** is the underlay ipv6 address which should be used by the DP service for egress/ingress packets leaving/coming to the smartnic.
 
 
