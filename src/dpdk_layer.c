@@ -264,6 +264,10 @@ static void dp_install_isolated_mode(int port_id)
 	struct rte_flow_item_eth eth_mask;
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
+
+	struct rte_flow_item_ipv6_ext ipv6_ext_spec;
+	struct rte_flow_item_ipv6_ext ipv6_ext_mask;
+	
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
 	struct rte_flow_attr attr;
@@ -294,23 +298,33 @@ static void dp_install_isolated_mode(int port_id)
 
 	memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
 	memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
-	ipv6_spec.hdr.proto = DP_IP_PROTO_UDP;
+	// ipv6_spec.hdr.proto = DP_IP_PROTO_UDP;
+	ipv6_spec.has_route_ext=1;
 	rte_memcpy(ipv6_spec.hdr.dst_addr, u_conf->src_ip6, sizeof(ipv6_spec.hdr.dst_addr));
-	ipv6_mask.hdr.proto = 0xff;
+	// ipv6_mask.hdr.proto = 0xff;
 	rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ipv6_spec.hdr.dst_addr));
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 	pattern[pattern_cnt].spec = &ipv6_spec;
 	pattern[pattern_cnt].mask = &ipv6_mask;
 	pattern_cnt++;
 
-	memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
-	memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
-	udp_spec.hdr.dst_port = htons(u_conf->dst_port);
-	udp_mask.hdr.dst_port = 0xffff;
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
-	pattern[pattern_cnt].spec = &udp_spec;
-	pattern[pattern_cnt].mask = &udp_mask;
-	pattern_cnt++;
+	// memset(&ipv6_ext_spec,0,sizeof(struct rte_flow_item_ipv6_ext));
+	// memset(&ipv6_ext_mask,0,sizeof(struct rte_flow_item_ipv6_ext));
+	// ipv6_ext_spec.next_hdr=DP_IP_PROTO_SIPSR;
+	// ipv6_ext_mask.next_hdr=0xff;
+	// pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6_EXT;
+	// pattern[pattern_cnt].spec = &ipv6_ext_spec;
+	// pattern[pattern_cnt].mask = &ipv6_ext_mask;
+	// pattern_cnt++;
+
+	// memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
+	// memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
+	// udp_spec.hdr.dst_port = htons(u_conf->dst_port);
+	// udp_mask.hdr.dst_port = 0xffff;
+	// pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
+	// pattern[pattern_cnt].spec = &udp_spec;
+	// pattern[pattern_cnt].mask = &udp_mask;
+	// pattern_cnt++;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
 	pattern_cnt++;

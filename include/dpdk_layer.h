@@ -21,7 +21,7 @@ extern "C" {
 #define DP_NR_RX_QUEUES		1
 #define DP_NR_TX_QUEUES		1
 #define MEMPOOL_CACHE_SIZE	256
-#define DP_NB_SOCKETS		1
+#define DP_NB_SOCKETS		2
 
 #define NB_MBUF(nports)                  \
 	RTE_MAX((2 * 1 * 1024 +              \

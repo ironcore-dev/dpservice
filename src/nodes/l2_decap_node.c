@@ -29,7 +29,8 @@ static __rte_always_inline int handle_l2_decap(struct rte_mbuf *m)
 	df = get_dp_flow_ptr(m);
 
 	/* Pop the ethernet header */
-	if (!df->flags.geneve_hdr) {
+	// if (!df->flags.geneve_hdr || !df->flags.srv6_hdr) {
+	if ( !df->flags.srv6_hdr) {
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 	}
 
@@ -43,6 +44,8 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	int i, ret;
+	
+	struct dp_flow *df;
 
 	pkts = (struct rte_mbuf **)objs;
 
@@ -50,10 +53,20 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		ret = handle_l2_decap(mbuf0);
-		if (!dp_is_pf_port_id(ret))
+		if (!dp_is_pf_port_id(ret)) {
 			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret], mbuf0);
-		else 
-			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, mbuf0);
+		}
+		else {
+			df = get_dp_flow_ptr(mbuf0);
+
+			if (df->flags.encap_type==DP_ENCAP_TYPE_GENEVE){
+				rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, mbuf0);
+			}
+			else if (df->flags.encap_type==DP_ENCAP_TYPE_SRV6) {
+				rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_SRV6_ENCAP, mbuf0);
+			}
+
+		}
 	}
 
 	return cnt;
@@ -76,6 +89,7 @@ static struct rte_node_register l2_decap_node_base = {
 		{
 			[L2_DECAP_NEXT_DROP] = "drop",
 			[L2_DECAP_NEXT_GENEVE_ENCAP] = "geneve_encap",
+			[L2_DECAP_NEXT_SRV6_ENCAP] = "srv6_encap",
 		},
 };
 

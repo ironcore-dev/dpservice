@@ -27,7 +27,9 @@ struct dp_flow {
 	uint8_t					icmp_type;
 	uint8_t					periodic_type;
 	struct {
+		uint8_t             encap_type : 2;
 		uint8_t				geneve_hdr : 1;
+		uint8_t             srv6_hdr : 1;
 		uint8_t				valid : 1;
 		uint8_t				nat : 2;
 	} flags;

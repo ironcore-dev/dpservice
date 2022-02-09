@@ -42,10 +42,11 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 	struct vm_route route;
 	struct dp_flow df;
 	struct dp_flow *df_ptr;
-
+  
 	memset(&df, 0, sizeof(struct dp_flow));
 	if (dp_is_pf_port_id(m->port)) {
 		df_ptr = get_dp_flow_ptr(m);
+		// ??? in which case, this would happen?
 		if(df_ptr && df_ptr->flags.geneve_hdr) {
 	 		geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
 	 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
@@ -69,6 +70,7 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 									sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
 		u_conf = get_underlay_conf();
 		
+		// ??? is it better to say ntohs(udp_hdr->dst_port) == GENEVE_UDP_PORT?
 		if (ntohs(udp_hdr->dst_port) == u_conf->src_port){
 			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 			df_ptr = alloc_dp_flow_ptr(m);
@@ -92,6 +94,13 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 									sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
 		df.icmp_type = icmp_hdr->icmp6_type;
 
+	} else if (ipv6_hdr->proto == DP_IP_PROTO_SIPSR){
+			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
+			df_ptr = alloc_dp_flow_ptr(m);
+			df_ptr->flags.encap_type = DP_ENCAP_TYPE_SRV6;
+			df_ptr->flags.geneve_hdr = 0;
+			df_ptr->flags.srv6_hdr=1;
+			return IPV6_LOOKUP_NEXT_IPV6_DECAP;
 	}
 	rte_memcpy(df.dst.dst_addr6, ipv6_hdr->dst_addr,sizeof(df.dst.dst_addr6));
 	rte_memcpy(df.src.src_addr6, ipv6_hdr->src_addr,sizeof(df.src.src_addr6));
