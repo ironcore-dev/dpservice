@@ -25,6 +25,7 @@ typedef enum {
 	DP_CMD_GET_MACHINE,
 	DP_CMD_ADD_ROUTE,
 	DP_CMD_DEL_ROUTE,
+	DP_CMD_GET_ROUTE,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
@@ -56,6 +57,7 @@ static int length;
 #define CMD_LINE_OPT_PRIMARY_IPV6	"ipv6"
 #define CMD_LINE_OPT_ADD_ROUTE		"addroute"
 #define CMD_LINE_OPT_DEL_ROUTE		"delroute"
+#define CMD_LINE_OPT_GET_ROUTE		"listroutes"
 #define CMD_LINE_OPT_T_PRIMARY_IPV6	"t_ipv6"
 #define CMD_LINE_OPT_LENGTH			"length"
 #define CMD_LINE_OPT_ADD_VIP		"addvip"
@@ -71,6 +73,7 @@ enum {
 	CMD_LINE_OPT_GET_MACHINE_NUM,
 	CMD_LINE_OPT_ADD_ROUTE_NUM,
 	CMD_LINE_OPT_DEL_ROUTE_NUM,
+	CMD_LINE_OPT_GET_ROUTE_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV4_NUM,
@@ -89,6 +92,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_GET_MACHINE, 0, 0, CMD_LINE_OPT_GET_MACHINE_NUM},
 	{CMD_LINE_OPT_ADD_ROUTE, 1, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
 	{CMD_LINE_OPT_DEL_ROUTE, 1, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
+	{CMD_LINE_OPT_GET_ROUTE, 0, 0, CMD_LINE_OPT_GET_ROUTE_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV4, 1, 0, CMD_LINE_OPT_PRIMARY_IPV4_NUM},
@@ -152,6 +156,9 @@ int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_DEL_ROUTE_NUM:
 			command = DP_CMD_DEL_ROUTE;
 			strncpy(route_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_GET_ROUTE_NUM:
+			command = DP_CMD_GET_ROUTE;
 			break;
 		case CMD_LINE_OPT_VNI_NUM:
 			strncpy(vni_str, optarg, 29);
@@ -287,6 +294,25 @@ public:
 			stub_->deleteRoute(&context, request, &reply);
 	}
 
+	void ListRoutes() {
+			VNIMsg request;
+			RoutesMsg reply;
+			ClientContext context;
+			int i;
+
+			request.set_vni(vni);
+
+			stub_->listRoutes(&context, request, &reply);
+			for (i = 0; i < reply.routes_size(); i++)
+			{
+				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
+					reply.routes(i).prefix().address().c_str(),
+					reply.routes(i).prefix().prefixlength(), 
+					reply.routes(i).nexthopvni(),
+					reply.routes(i).nexthopaddress().c_str());
+			}
+	}
+
 	void AddVIP() {
 			MachineVIPMsg request;
 			Status reply;
@@ -374,6 +400,10 @@ int main(int argc, char** argv)
 		dpdk_client.AddRoute();
 		std::cout << "Addroute called " << std::endl;
 		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", ip_str, length, vni, ip6_str, t_vni);
+		break;
+	case DP_CMD_GET_ROUTE:
+		std::cout << "Listroute called " << std::endl;
+		dpdk_client.ListRoutes();
 		break;
 	case DP_CMD_DEL_ROUTE:
 		dpdk_client.DelRoute();

@@ -1,6 +1,8 @@
 #include "dp_async_grpc.h"
 #include "dp_grpc_impl.h"
+#include <arpa/inet.h>
 #include <rte_mbuf.h>
+#include <rte_ether.h>
 
 int HelloCall::Proceed()
 {
@@ -273,6 +275,62 @@ int DelRouteCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		printf("GRPC delroute reply received \n");
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int ListRoutesCall::Proceed()
+{
+	dp_request request = {0};
+	struct rte_mbuf *mbuf = NULL;
+	struct dp_reply *reply;
+	struct in_addr addr;
+	dp_route *rp_route;
+	Prefix *pfx;
+	Route *route;
+	grpc::Status ret = grpc::Status::OK;
+	int i;
+	char buf[INET6_ADDRSTRLEN];
+
+	if (status_ == REQUEST) {
+		new ListRoutesCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		request.route.vni = request_.vni();
+		printf("GRPC listroutes called \n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker_with_mbuf(&mbuf))
+			return -1;
+		printf("GRPC listroutes reply received \n");
+		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		for (i = 0; i < reply->com_head.msg_count; i++) {
+			route = reply_.add_routes();
+			rp_route = &((&reply->route)[i]);
+			
+			if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
+				route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			else
+				route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+
+			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+				addr.s_addr = htonl(rp_route->pfx_ip.addr);
+				pfx = new Prefix();
+				pfx->set_address(inet_ntoa(addr));
+				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+				pfx->set_prefixlength(rp_route->pfx_length);
+				route->set_allocated_prefix(pfx);
+			}
+			route->set_nexthopvni(rp_route->trgt_vni);
+			inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
+			route->set_nexthopaddress(buf);
+		}
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

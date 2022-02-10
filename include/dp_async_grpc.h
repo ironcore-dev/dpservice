@@ -159,6 +159,21 @@ public:
 	int Proceed() override;
 };
 
+class ListRoutesCall final : BaseCall {
+	ServerContext ctx_;
+	VNIMsg request_;
+	RoutesMsg reply_;
+	ServerAsyncResponseWriter<RoutesMsg> responder_;
+
+public:
+	ListRoutesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LISTROUTE), responder_(&ctx_) {
+		service_->RequestlistRoutes(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class ListMachinesCall final : BaseCall {
 	ServerContext ctx_;
 	Empty request_;

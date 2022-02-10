@@ -1,6 +1,5 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
-#include "dp_util.h"
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
@@ -229,6 +228,43 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 		return EXIT_FAILURE;
 
 	return EXIT_SUCCESS;
+}
+
+void dp_list_routes(int vni, struct dp_reply *rep, int socketid)
+{
+	struct rte_rib_node *node = NULL;
+	struct vm_route *route;
+	struct rte_rib *root;
+	dp_route *rp_route;
+	uint64_t next_hop;
+	uint32_t ipv4 = 0;
+	uint8_t depth = 0;
+
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+
+	root = get_lpm(vni, socketid);
+	if (!root)
+		return;
+
+	rep->com_head.msg_count = 0;
+	do {
+		node = rte_rib_get_nxt(root, RTE_IPV4(0,0,0,0), 0, node, RTE_RIB_GET_NXT_ALL);
+		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
+			dp_is_pf_port_id(next_hop)) {
+			rp_route = &((&rep->route)[rep->com_head.msg_count]);
+			rep->com_head.msg_count++;
+			rte_rib_get_ip(node, &ipv4);
+			rte_rib_get_depth(node, &depth);
+			rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			rp_route->pfx_ip.addr = ipv4;
+			rp_route->pfx_length = depth;
+			route = (struct vm_route *)rte_rib_get_ext(node);
+			rp_route->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+			rp_route->trgt_vni = route->vni;
+			rte_memcpy(rp_route->trgt_ip.addr6, route->nh_ipv6,
+						sizeof(rp_route->trgt_ip.addr6));
+		}
+	} while (node != NULL);
 }
 
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,

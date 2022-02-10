@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <rte_mbuf.h>
-#include "dp_lpm.h"
+#include <net/if.h>
 #include "dp_util.h"
 
 #ifdef __cplusplus
@@ -20,6 +20,7 @@ typedef enum {
 	DP_REQ_TYPE_DELMACHINE,
 	DP_REQ_TYPE_ADDROUTE,
 	DP_REQ_TYPE_DELROUTE,
+	DP_REQ_TYPE_LISTROUTE,
 	DP_REQ_TYPE_LISTMACHINE,
 } dp_req_type;
 
@@ -47,6 +48,18 @@ typedef struct dp_addmachine {
 	uint32_t	vni;
 } dp_addmachine;
 
+typedef struct dp_delmachine {
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_delmachine;
+
+typedef struct dp_delvip {
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_delvip;
+
+typedef struct dp_getvip {
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_getvip;
+
 typedef struct dp_addroute {
 	uint32_t	pfx_ip_type;
 	union {
@@ -63,18 +76,6 @@ typedef struct dp_addroute {
 	uint32_t	trgt_vni;
 	uint32_t	weight;
 } dp_route;
-
-typedef struct dp_delmachine {
-	char		machine_id[VM_MACHINE_ID_STR_LEN];
-} dp_delmachine;
-
-typedef struct dp_delvip {
-	char		machine_id[VM_MACHINE_ID_STR_LEN];
-} dp_delvip;
-
-typedef struct dp_getvip {
-	char		machine_id[VM_MACHINE_ID_STR_LEN];
-} dp_getvip;
 
 typedef struct dp_request {
 	dp_com_head com_head;
@@ -111,6 +112,7 @@ typedef struct dp_reply {
 		dp_vip		get_vip;
 		dp_vf_pci	vf_pci;
 		dp_vm_info	vm_info;
+		dp_route	route;
 	};
 } dp_reply;
 

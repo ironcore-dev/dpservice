@@ -1,3 +1,4 @@
+#include "dp_lpm.h"
 #include "dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
@@ -206,7 +207,14 @@ static int dp_process_listmachine(dp_request *req, dp_reply *rep)
 		rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(act_ports[i]),
 			sizeof(vm_info->machine_id));
 	}
-	
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_listroute(dp_request *req, dp_reply *rep)
+{
+	uint32_t vni = req->route.vni;
+
+	dp_list_routes(vni, rep, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 
 	return EXIT_SUCCESS;
 }
@@ -245,6 +253,9 @@ int dp_process_request(struct rte_mbuf *m)
 		case DP_REQ_TYPE_DELROUTE:
 			ret = dp_process_delroute(req, &rep);
 			break;
+		case DP_REQ_TYPE_LISTROUTE:
+			ret = dp_process_listroute(req, rte_pktmbuf_mtod(m, dp_reply*));
+			break;
 		case DP_REQ_TYPE_LISTMACHINE:
 			ret = dp_process_listmachine(NULL, rte_pktmbuf_mtod(m, dp_reply*));
 			break;
@@ -253,7 +264,8 @@ int dp_process_request(struct rte_mbuf *m)
 	}
 	/* For requests without any parameter (like listmachine), the reply */
 	/* is directly written into the mbuf in the process function */
-	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE) {
+	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE &&
+		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE) {
 		rep.com_head.com_type = req->com_head.com_type;
 		p_rep = rte_pktmbuf_mtod(m, dp_reply*);
 		*p_rep = rep;
