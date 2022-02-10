@@ -12,7 +12,6 @@ extern "C" {
 
 typedef enum {
 	DP_REQ_TYPE_NONE,
-	DP_REQ_TYPE_HELLO,
 	DP_REQ_TYPE_ADDVIP,
 	DP_REQ_TYPE_DELVIP,
 	DP_REQ_TYPE_GETVIP,
@@ -80,7 +79,6 @@ typedef struct dp_addroute {
 typedef struct dp_request {
 	dp_com_head com_head;
 	union {
-		uint32_t		hello;
 		dp_vip			add_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
@@ -108,7 +106,6 @@ typedef struct dp_vm_info {
 typedef struct dp_reply {
 	dp_com_head com_head;
 	union {
-		uint32_t	hello;
 		dp_vip		get_vip;
 		dp_vf_pci	vf_pci;
 		dp_vm_info	vm_info;

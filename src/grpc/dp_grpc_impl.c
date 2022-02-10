@@ -51,13 +51,6 @@ __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 	head->msg_count = 0;
 }
 
-static int dp_process_hello(dp_request *req, dp_reply *rep)
-{
-	printf("On worker thread side received %x \n", req->hello);
-	rep->hello = 0xbeeffeed;
-	return EXIT_SUCCESS;
-}
-
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
 	int port_id;
@@ -229,9 +222,6 @@ int dp_process_request(struct rte_mbuf *m)
 
 	switch (req->com_head.com_type)
 	{
-		case DP_REQ_TYPE_HELLO:
-			ret = dp_process_hello(req, &rep);
-			break;
 		case DP_REQ_TYPE_ADDVIP:
 			ret = dp_process_addvip(req, &rep);
 			break;

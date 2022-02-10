@@ -39,21 +39,6 @@ public:
 	virtual ~BaseCall() = default;
 };
 
-class HelloCall final : BaseCall {
-	ServerContext ctx_;
-	Empty request_;
-	Status reply_;
-	ServerAsyncResponseWriter<Status> responder_;
-
-public:
-	HelloCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_HELLO), responder_(&ctx_) {
-		service_->RequestQueryHelloWorld(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
 class AddVIPCall final : BaseCall {
 	ServerContext ctx_;
 	MachineVIPMsg request_;
