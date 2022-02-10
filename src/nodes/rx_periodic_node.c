@@ -9,7 +9,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "dp_flow.h"
-#include "dp_grpc_impl.h"
+#include "grpc/dp_grpc_impl.h"
 #include <unistd.h>
 
 static struct rx_periodic_node_ctx node_ctx;

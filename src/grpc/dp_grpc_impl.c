@@ -1,5 +1,5 @@
 #include "dp_lpm.h"
-#include "dp_grpc_impl.h"
+#include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
 

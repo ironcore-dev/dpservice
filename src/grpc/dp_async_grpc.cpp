@@ -1,5 +1,5 @@
-#include "dp_async_grpc.h"
-#include "dp_grpc_impl.h"
+#include "grpc/dp_async_grpc.h"
+#include "grpc/dp_grpc_impl.h"
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
 #include <rte_ether.h>

@@ -9,7 +9,7 @@
 #include "dpdk_layer.h"
 #include "node_api.h"
 #include "dp_util.h"
-#include "dp_grpc_impl.h"
+#include "grpc/dp_grpc_impl.h"
 
 #ifdef __cplusplus
 extern "C" {
