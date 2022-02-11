@@ -29,7 +29,6 @@ typedef enum {
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
-	DP_CMD_DEL_TEST,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -38,7 +37,6 @@ static char vni_str[30] = {0};
 static char len_str[30] = {0};
 static char t_vni_str[30] = {0};
 static char machine_str[30] = {0};
-static char route_str[30] = {0};
 static char ip_str[30] = {0};
 static IPVersion version;
 
@@ -63,7 +61,6 @@ static int length;
 #define CMD_LINE_OPT_ADD_VIP		"addvip"
 #define CMD_LINE_OPT_DEL_VIP		"delvip"
 #define CMD_LINE_OPT_GET_VIP		"getvip"
-#define CMD_LINE_OPT_TEST			"test"
 
 
 enum {
@@ -83,15 +80,14 @@ enum {
 	CMD_LINE_OPT_ADD_VIP_NUM,
 	CMD_LINE_OPT_DEL_VIP_NUM,
 	CMD_LINE_OPT_GET_VIP_NUM,
-	CMD_LINE_OPT_TEST_NUM,
 };
 
 static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_MACHINE, 1, 0, CMD_LINE_OPT_ADD_MACHINE_NUM},
 	{CMD_LINE_OPT_DEL_MACHINE, 1, 0, CMD_LINE_OPT_DEL_MACHINE_NUM},
 	{CMD_LINE_OPT_GET_MACHINE, 0, 0, CMD_LINE_OPT_GET_MACHINE_NUM},
-	{CMD_LINE_OPT_ADD_ROUTE, 1, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
-	{CMD_LINE_OPT_DEL_ROUTE, 1, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
+	{CMD_LINE_OPT_ADD_ROUTE, 0, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
+	{CMD_LINE_OPT_DEL_ROUTE, 0, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
 	{CMD_LINE_OPT_GET_ROUTE, 0, 0, CMD_LINE_OPT_GET_ROUTE_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
@@ -102,7 +98,6 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_VIP, 1, 0, CMD_LINE_OPT_ADD_VIP_NUM},
 	{CMD_LINE_OPT_DEL_VIP, 1, 0, CMD_LINE_OPT_DEL_VIP_NUM},
 	{CMD_LINE_OPT_GET_VIP, 1, 0, CMD_LINE_OPT_GET_VIP_NUM},
-	{CMD_LINE_OPT_TEST, 1, 0, CMD_LINE_OPT_TEST_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -151,11 +146,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_ROUTE_NUM:
 			command = DP_CMD_ADD_ROUTE;
-			strncpy(route_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_DEL_ROUTE_NUM:
 			command = DP_CMD_DEL_ROUTE;
-			strncpy(route_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_GET_ROUTE_NUM:
 			command = DP_CMD_GET_ROUTE;
@@ -193,10 +186,6 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_GET_VIP_NUM:
 			command = DP_CMD_GET_VIP;
-			strncpy(machine_str, optarg, 29);
-			break;
-		case CMD_LINE_OPT_TEST_NUM:
-			command = DP_CMD_DEL_TEST;
 			strncpy(machine_str, optarg, 29);
 			break;
 		default:
@@ -420,10 +409,6 @@ int main(int argc, char** argv)
 	case DP_CMD_GET_VIP:
 		std::cout << "Getvip called " << std::endl;
 		dpdk_client.GetVIP();
-		break;
-	case DP_CMD_DEL_TEST:
-		dpdk_client.SayHello();
-		std::cout << "Test called" << std::endl;
 		break;
 	default:
 		break;
