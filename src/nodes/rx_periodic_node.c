@@ -9,6 +9,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "dp_flow.h"
+#include "grpc/dp_grpc_impl.h"
 #include <unistd.h>
 
 static struct rx_periodic_node_ctx node_ctx;
@@ -16,7 +17,10 @@ static struct rx_periodic_node_main rx_periodic_node;
 
 int config_rx_periodic_node(struct rx_periodic_node_config *cfg)
 {
-    node_ctx.periodic_msg_queue = cfg->periodic_msg_queue;
+	node_ctx.periodic_msg_queue = cfg->periodic_msg_queue;
+	node_ctx.grpc_tx = cfg->grpc_tx;
+	node_ctx.grpc_rx = cfg->grpc_rx;
+
 	return 0;
 }
 
@@ -26,6 +30,8 @@ static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node 
 	
 	
 	ctx->periodic_msg_queue = node_ctx.periodic_msg_queue;
+	ctx->grpc_rx = node_ctx.grpc_rx;
+	ctx->grpc_tx = node_ctx.grpc_tx;
 	ctx->next = RX_PERIODIC_NEXT_CLS;
 
 	printf("rx_periodic_node: init, queue_id: %u\n",
@@ -43,6 +49,24 @@ static __rte_always_inline void check_aged_flows(uint16_t portid)
 	dp_process_aged_flows(portid);
 }
 
+static __rte_always_inline uint16_t handle_grpc_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx)
+{
+	struct rte_mbuf **pkts, *mbuf0;
+	int count, i;
+
+	count = rte_ring_dequeue_burst(node_ctx.grpc_tx, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
+
+	if (count == 0)
+		return 0;
+	pkts = (struct rte_mbuf **)node->objs;
+
+	for (i = 0; i < count; i++) {
+		mbuf0 = pkts[i];
+		dp_process_request(mbuf0);
+	}
+	return 0;
+}
+
 static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 												   struct rte_node *node,
 												   struct rx_periodic_node_ctx *ctx)
@@ -53,6 +77,9 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
  	int i;
 
 	next_index = ctx->next;
+
+	if (node_ctx.grpc_tx)
+		handle_grpc_queue(node, ctx);
 
 	count = rte_ring_dequeue_burst(ctx->periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
 	if (!count)

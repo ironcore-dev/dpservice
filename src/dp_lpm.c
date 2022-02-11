@@ -1,6 +1,5 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
-#include "dp_util.h"
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
@@ -38,6 +37,8 @@ void dp_map_vm_handle(void *key, uint16_t portid)
 	if (!p_port_id)
 		rte_exit(EXIT_FAILURE, "vm handle for port %d malloc data failed\n", portid);
 
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	rte_memcpy(vm_table[portid].machineid, key, sizeof(vm_table[portid].machineid));
 	*p_port_id = portid;
 	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0)
 		rte_exit(EXIT_FAILURE, "vm handle for port %d add data failed\n", portid);
@@ -75,17 +76,38 @@ uint8_t* dp_get_gw_ip6()
 	return dp_router_gw_ip6;
 }
 
+int dp_get_active_vm_ports(int* act_ports)
+{
+	int i, count = 0;
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready)
+			act_ports[count++] = i;
+	return count;
+}
+
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.own_ip;
 }
 
-
 uint8_t* dp_get_dhcp_range_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.dhcp_ipv6;
+}
+
+uint8_t* dp_get_vm_machineid(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].machineid;
+}
+
+int dp_get_vm_vni(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].vni;
 }
 
 uint8_t* dp_get_vm_ip6(uint16_t portid)
@@ -186,9 +208,68 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	return ret;
 }
 
-int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
-				 uint8_t* ext_ip6, uint8_t depth, int socketid) {
+int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
+				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid)
+{
+	struct rte_rib_node *node;
+	struct rte_rib *root;
 
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	root = get_lpm(vni, socketid);
+	if (!root)
+		return EXIT_FAILURE;
+
+	node = rte_rib_lookup_exact(root, ip, depth);
+	if (node)
+		rte_rib_remove(root, ip, depth);
+	else
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
+}
+
+void dp_list_routes(int vni, struct dp_reply *rep, int socketid)
+{
+	struct rte_rib_node *node = NULL;
+	struct vm_route *route;
+	struct rte_rib *root;
+	dp_route *rp_route;
+	uint64_t next_hop;
+	uint32_t ipv4 = 0;
+	uint8_t depth = 0;
+
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+
+	root = get_lpm(vni, socketid);
+	if (!root)
+		return;
+
+	rep->com_head.msg_count = 0;
+	do {
+		node = rte_rib_get_nxt(root, RTE_IPV4(0,0,0,0), 0, node, RTE_RIB_GET_NXT_ALL);
+		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
+			dp_is_pf_port_id(next_hop)) {
+			rp_route = &((&rep->route)[rep->com_head.msg_count]);
+			rep->com_head.msg_count++;
+			rte_rib_get_ip(node, &ipv4);
+			rte_rib_get_depth(node, &depth);
+			rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			rp_route->pfx_ip.addr = ipv4;
+			rp_route->pfx_length = depth;
+			route = (struct vm_route *)rte_rib_get_ext(node);
+			rp_route->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+			rp_route->trgt_vni = route->vni;
+			rte_memcpy(rp_route->trgt_ip.addr6, route->nh_ipv6,
+						sizeof(rp_route->trgt_ip.addr6));
+		}
+	} while (node != NULL);
+}
+
+int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
+				 uint8_t* ext_ip6, uint8_t depth, int socketid)
+{
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -221,7 +302,28 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 			portid, socketid);
 	}
 	return ret;
+}
 
+int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
+				 uint8_t* ext_ip6, uint8_t depth, int socketid)
+{
+	struct rte_rib6_node *node;
+	struct rte_rib6 *root;
+
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+
+	root = get_lpm6(vni, socketid);
+	if (!root)
+		return EXIT_FAILURE;
+
+	node = rte_rib6_lookup_exact(root, ipv6, depth);
+	if (node)
+		rte_rib6_remove(root, ipv6, depth);
+	else
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
 }
 
 void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip)
@@ -403,6 +505,10 @@ void dp_del_vm(int portid, int socketid)
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	if(dp_is_more_vm_in_vni_avail(portid)) {
+		dp_del_route(portid, vm_table[portid].vni, 0,
+					 vm_table[portid].info.own_ip, NULL, 32, socketid);
+		dp_del_route6(portid, vm_table[portid].vni, 0,
+				vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
 		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	} else {
 		vm_table[portid].vm_ready = 0;

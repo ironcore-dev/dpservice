@@ -8,6 +8,8 @@
 #include <rte_flow.h>
 #include "dpdk_layer.h"
 #include "node_api.h"
+#include "dp_util.h"
+#include "grpc/dp_grpc_impl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,8 +34,6 @@ extern "C" {
 #define DP_NAT_SNAT	2
 #define DP_NAT_DNAT	3
 
-#define VM_MACHINE_ID_STR_LEN 64
-
 struct macip_entry {
 	struct rte_ether_addr	own_mac;
 	struct rte_ether_addr	neigh_mac;
@@ -52,6 +52,7 @@ struct vm_entry {
 	struct rte_rib6		*ipv6_rib[DP_NB_SOCKETS];
 	struct macip_entry	info;
 	int					vni;
+	uint8_t				machineid[VM_MACHINE_ID_STR_LEN];
 	uint8_t				vm_ready;
 };
 
@@ -81,8 +82,13 @@ uint32_t dp_get_vm_nat_ip(uint16_t portid);
 uint16_t dp_get_vm_port_id_per_nat_ip(uint32_t nat_ip);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 uint8_t* ip6, uint8_t depth, int socketid);
+int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
+				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid);
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
+int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
+				 uint8_t* ext_ip6, uint8_t depth, int socketid);
+void dp_list_routes(int vni, dp_reply *rep, int socketid);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid);
 void dp_set_vm_ip6(uint16_t portid, uint8_t* ipv6);
@@ -94,6 +100,9 @@ void dp_del_vm_nat_ip(uint16_t portid);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_is_vm_natted(uint16_t portid);
 void dp_del_vm(int portid, int socketid);
+int dp_get_active_vm_ports(int* act_ports);
+uint8_t* dp_get_vm_machineid(uint16_t portid);
+int dp_get_vm_vni(uint16_t portid);
 #ifdef __cplusplus
 }
 #endif

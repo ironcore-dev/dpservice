@@ -9,11 +9,11 @@
 #include "dp_util.h"
 #include "dp_flow.h"
 #include "dp_lpm.h"
-#include "dp_grpc_service.h"
+#include "grpc/dp_grpc_service.h"
 
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
-	GRPCService *grpc_svc = new GRPCService(get_dpdk_layer());
+	GRPCService *grpc_svc = new GRPCService();
 
 	grpc_svc->run("[::]:1337");
 

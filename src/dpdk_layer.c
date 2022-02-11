@@ -95,10 +95,13 @@ int dp_dpdk_init(int argc, char **argv)
 
 	dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
 	dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
-	dp_layer.grpc_queue = rte_ring_create("grpc_queue", 256, rte_socket_id(), 0);
-	if (!dp_layer.grpc_queue)
-		printf("Error creating grpc queue\n");
-	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 256, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	if (!dp_layer.grpc_tx_queue)
+		printf("Error creating grpc tx queue\n");
+	dp_layer.grpc_rx_queue = rte_ring_create("grpc_rx_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	if (!dp_layer.grpc_rx_queue)
+		printf("Error creating grpc rx queue\n");
+	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.periodic_msg_queue)
 		printf("Error creating periodic_msg_queue queue\n");
 
@@ -415,6 +418,8 @@ int dp_init_graph()
 	rx_periodic_node = rx_periodic_node_get();
 
 	rx_periodic_cfg.periodic_msg_queue = dp_layer.periodic_msg_queue;
+	rx_periodic_cfg.grpc_tx = dp_layer.grpc_tx_queue;
+	rx_periodic_cfg.grpc_rx = dp_layer.grpc_rx_queue;
 	ret = config_rx_periodic_node(&rx_periodic_cfg);
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
@@ -426,7 +431,6 @@ int dp_init_graph()
 		rx_cfg.port_id = dp_layer.ports[i]->dp_port_id;
 		rx_cfg.queue_id = 0;
 		rx_cfg.node_id = id;
-		rx_cfg.grpc_queue = dp_layer.grpc_queue;
 		ret = config_rx_node(&rx_cfg);
 
 		snprintf(name, sizeof(name), "%u", dp_layer.ports[i]->dp_port_id);
