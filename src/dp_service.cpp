@@ -8,6 +8,7 @@
 #include "dpdk_layer.h"
 #include "dp_util.h"
 #include "dp_flow.h"
+#include "dp_version.h"
 #include "dp_lpm.h"
 #include "grpc/dp_grpc_service.h"
 
@@ -56,6 +57,7 @@ int main(int argc, char **argv)
 {
 	int ret;
 
+	printf("Starting DP Service version %s\n", DP_SERVICE_VERSION);
 	ret = dp_dpdk_init(argc, argv);
 	argc -= ret;
 	argv += ret;
