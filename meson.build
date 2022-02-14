@@ -1,6 +1,6 @@
 project('dp_service', 'c', 'cpp',
   default_options : ['c_args=-Wno-deprecated-declarations', 'cpp_args=-fpermissive'],
-  version : '0.0.1',
+  version: run_command('cat', 'include/dp_version.h').stdout().strip().split(' ').get(2).split('"').get(1),
   license : 'MIT')
 add_global_arguments('-DDEBUG=true', language : 'c')
 dpdk_dep = dependency('libdpdk', version : '>=21.11.0')
