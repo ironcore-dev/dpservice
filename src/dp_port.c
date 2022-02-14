@@ -1,6 +1,7 @@
 #include "dp_port.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
+#include "dp_netlink.h"
 
 /* Ethernet port configured with default settings. 8< */
 struct rte_eth_conf port_conf = {
@@ -26,18 +27,6 @@ struct rte_eth_conf port_conf = {
 					},
 };
 
-#define DP_IPV6_MASK 64
-
-/*TODO This should come from netlink */
-static struct rte_ether_addr pf_neigh_mac = 
-								{.addr_bytes[0] = 0x90,
-								.addr_bytes[1] = 0x3c,
-								.addr_bytes[2] = 0xb3,
-								.addr_bytes[3] = 0x33,
-								.addr_bytes[4] = 0x72,
-								.addr_bytes[5] = 0xfb,
-								};
-
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
 	struct dp_port* port;
@@ -57,6 +46,7 @@ struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type
 
 int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_details)
 {
+	struct rte_ether_addr pf_neigh_mac;
 	char ifname[IF_NAMESIZE] = {0};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
@@ -128,9 +118,10 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 					rte_strerror(-ret), port_id);
 	}	
 
-	/* TODO PF underlay mac, this should be called by neighbour discovery */
-	if (port->dp_p_type == DP_PORT_PF)
-		dp_set_neigh_mac (port_id, &pf_neigh_mac);
+	if (port->dp_p_type == DP_PORT_PF) {
+		dp_get_pf_neigh_mac(dev_info.if_index, &pf_neigh_mac);
+		dp_set_neigh_mac(port_id, &pf_neigh_mac);
+	}
 
 	dp_set_mac(port_id);
 
