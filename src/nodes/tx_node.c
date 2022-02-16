@@ -12,7 +12,7 @@
 #include "dp_util.h"
 #include "dp_mbuf_dyn.h"
 
-#define DP_MAX_PATT_ACT	6
+#define DP_MAX_PATT_ACT	7
 
 static struct ethdev_tx_node_main ethdev_tx_main;
 static struct dp_flow *df;
@@ -68,8 +68,6 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	struct rte_flow_item_icmp6 icmp6_mask;
 	struct rte_flow_item_tcp tcp_spec;
 	struct rte_flow_item_tcp tcp_mask;
-	//struct rte_flow_item_raw raw_spec;
-	//struct rte_flow_item_raw raw_mask;
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
 	struct rte_flow *flow;
@@ -196,67 +194,49 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 		}
 	}
 
-	if (route_direct != DP_ROUTE_TO_VM_DECAPPED) {
-		if (df->l4_type == DP_IP_PROTO_TCP) {
-			memset(&tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
-			memset(&tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
-			tcp_spec.hdr.dst_port = df->dst_port;
-			tcp_spec.hdr.src_port = df->src_port;
-			tcp_mask.hdr.dst_port = 0xffff;
-			tcp_mask.hdr.src_port = 0xffff;
-			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
-			pattern[pattern_cnt].spec = &tcp_spec;
-			pattern[pattern_cnt].mask = &tcp_mask;
-			pattern_cnt++;
-		}
-		if (df->l4_type == DP_IP_PROTO_UDP) {
-			memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
-			memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
-			udp_spec.hdr.dst_port = df->dst_port;
-			udp_spec.hdr.src_port = df->src_port;
-			udp_mask.hdr.dst_port = 0xffff;
-			udp_mask.hdr.src_port = 0xffff;
-			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
-			pattern[pattern_cnt].spec = &udp_spec;
-			pattern[pattern_cnt].mask = &udp_mask;
-			pattern_cnt++;
-		}
-		if (df->l4_type == DP_IP_PROTO_ICMP) {
-			memset(&icmp_spec, 0, sizeof(struct rte_flow_item_icmp));
-			memset(&icmp_mask, 0, sizeof(struct rte_flow_item_icmp));
-			icmp_spec.hdr.icmp_type = df->icmp_type;
-			icmp_mask.hdr.icmp_type = 0xff;
-			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP;
-			pattern[pattern_cnt].spec = &icmp_spec;
-			pattern[pattern_cnt].mask = &icmp_mask;
-			pattern_cnt++;
-		}
-		if (df->l4_type == DP_IP_PROTO_ICMPV6) { 
-			memset(&icmp6_spec, 0, sizeof(struct rte_flow_item_icmp6));
-			memset(&icmp6_mask, 0, sizeof(struct rte_flow_item_icmp6));
-			icmp6_spec.type = df->icmp_type;
-			icmp6_mask.type = 0xff;
-			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP6;
-			pattern[pattern_cnt].spec = &icmp6_spec;
-			pattern[pattern_cnt].mask = &icmp6_mask;
-			pattern_cnt++;
-		}
-	} else {
-	/*	if (df->l4_type == DP_IP_PROTO_TCP) {
-			memset(&raw_spec, 0, sizeof(struct rte_flow_item_raw));
-			memset(&raw_mask, 0, sizeof(struct rte_flow_item_raw));
-			raw_spec.relative = 1;
-			raw_spec.length = 4;
-			raw_spec.search = 0;
-			raw_spec..hdr.dst_port = df->dst_port;
-			raw_spec.hdr.src_port = df->src_port;
-			tcp_mask.hdr.dst_port = 0xffff;
-			tcp_mask.hdr.src_port = 0xffff;
-			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_RAW;
-			pattern[pattern_cnt].spec = &tcp_spec;
-			pattern[pattern_cnt].mask = &tcp_mask;
-			pattern_cnt++;
-		} */
+	if (df->l4_type == DP_IP_PROTO_TCP) {
+		memset(&tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
+		memset(&tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
+		tcp_spec.hdr.dst_port = df->dst_port;
+		tcp_spec.hdr.src_port = df->src_port;
+		tcp_mask.hdr.dst_port = 0xffff;
+		tcp_mask.hdr.src_port = 0xffff;
+		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
+		pattern[pattern_cnt].spec = &tcp_spec;
+		pattern[pattern_cnt].mask = &tcp_mask;
+		pattern_cnt++;
+	}
+	if (df->l4_type == DP_IP_PROTO_UDP) {
+		memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
+		memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
+		udp_spec.hdr.dst_port = df->dst_port;
+		udp_spec.hdr.src_port = df->src_port;
+		udp_mask.hdr.dst_port = 0xffff;
+		udp_mask.hdr.src_port = 0xffff;
+		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
+		pattern[pattern_cnt].spec = &udp_spec;
+		pattern[pattern_cnt].mask = &udp_mask;
+		pattern_cnt++;
+	}
+	if (df->l4_type == DP_IP_PROTO_ICMP) {
+		memset(&icmp_spec, 0, sizeof(struct rte_flow_item_icmp));
+		memset(&icmp_mask, 0, sizeof(struct rte_flow_item_icmp));
+		icmp_spec.hdr.icmp_type = df->icmp_type;
+		icmp_mask.hdr.icmp_type = 0xff;
+		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP;
+		pattern[pattern_cnt].spec = &icmp_spec;
+		pattern[pattern_cnt].mask = &icmp_mask;
+		pattern_cnt++;
+	}
+	if (df->l4_type == DP_IP_PROTO_ICMPV6) {
+		memset(&icmp6_spec, 0, sizeof(struct rte_flow_item_icmp6));
+		memset(&icmp6_mask, 0, sizeof(struct rte_flow_item_icmp6));
+		icmp6_spec.type = df->icmp_type;
+		icmp6_mask.type = 0xff;
+		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP6;
+		pattern[pattern_cnt].spec = &icmp6_spec;
+		pattern[pattern_cnt].mask = &icmp6_mask;
+		pattern_cnt++;
 	}
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
