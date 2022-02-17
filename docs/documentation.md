@@ -21,6 +21,11 @@ This project uses meson and ninja to build the C application. On the top level d
     meson build
     ninja -C build
 
+### **Building docker image**
+
+    meson dist --no-tests    //To build dp_service dist package
+    sudo docker build --build-arg DPS_VER=1.0.0 -t debian11/dpservice:1.0 .
+
 ## **How to run dpservice**
 Run the application as root or use sudo:
 
