@@ -12,6 +12,8 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 
+#include "dp_rte_flow.h"
+
 struct ipv4_lookup_node_main ipv4_lookup_node;
 
 static int ipv4_lookup_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -28,91 +30,62 @@ static int ipv4_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 
 static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 {
-	struct rte_flow_item_geneve *geneve_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	struct rte_udp_hdr *udp_hdr;
-	struct rte_tcp_hdr *tcp_hdr;
-	struct rte_icmp_hdr *icmp_hdr;
-	struct dp_flow df;
 	struct dp_flow *df_ptr;
 	struct vm_route route;
 	int ret = 0;
-	uint32_t t_vni = 0;
-	// uint32_t vni_ns = htons(df->dst_vni);
-
-	memset(&df, 0, sizeof(struct dp_flow));
-	df.l3_type = RTE_ETHER_TYPE_IPV4;
-
-	if (dp_is_pf_port_id(m->port)) {
-		// geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
-		// rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
-		struct dp_flow *curr_df = get_dp_flow_ptr(m);
+	
+	df_ptr = get_dp_flow_ptr(m);
+	if (df_ptr->flags.flow_type==DP_FLOW_TYPE_INCOMING){
+		// printf("got a decaped packet \n");
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
-		t_vni=curr_df->dst_vni;
-		// printf("got vni value %u \n",t_vni);
-		// rte_memcpy(&t_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
-		df.flags.geneve_hdr = 0;
-		df.flags.srv6_hdr=1;
-
-	} else {
+		// printf("proto in ipv4: %#x \n",ipv4_hdr->next_proto_id);
+	}
+	else
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 										  sizeof(struct rte_ether_hdr));
-	}
-	// copy flow information into df data structure, so that corresponding operations can be offloaded
-	if (ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP) {
-		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
-		df.dst_port = tcp_hdr->dst_port;
-		df.src_port = tcp_hdr->src_port;
-	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
-		udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr + 1);
-		if ((ntohs(udp_hdr->dst_port) == DP_BOOTP_SRV_PORT) && !df.flags.geneve_hdr)
-				return DP_ROUTE_DHCP;
-		df.dst_port = udp_hdr->dst_port;
-		df.src_port = udp_hdr->src_port;
-	} else if (ipv4_hdr->next_proto_id == DP_IP_PROTO_ICMP) {
-		// printf("got icmp ipv4 packet \n");
-		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
-		df.icmp_type = icmp_hdr->icmp_type;
-	}
-	df.dst.dst_addr = ipv4_hdr->dst_addr;
-	df.src.src_addr = ipv4_hdr->src_addr;
-	df.l4_type = ipv4_hdr->next_proto_id;
 
-	ret = lpm_get_ip4_dst_port(m->port, t_vni, ipv4_hdr, &route, rte_eth_dev_socket_id(m->port));
-	df_ptr = alloc_dp_flow_ptr(m);
-	// hack: fix the encap type to srv6 
-	if (ret >= 0) {
-		// printf("succssfully get route and next hop %u \n",ret);
-		df.nxt_hop = ret;
-		if (!df_ptr)
-			return DP_ROUTE_DROP;
-		rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
-		if (!t_vni) /* VM -> Outer world */
-			df_ptr->dst_vni = route.vni;
-		else /* Outer world -> VM */
-			df_ptr->dst_vni = t_vni;
-		ret = DP_ROUTE_FIREWALL;
-		if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
-			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
-			if (dp_is_vm_natted(m->port)) {
-				ret = DP_ROUTE_NAT;
-				df_ptr->flags.nat = DP_NAT_SNAT;
-			}
+	if (extract_inner_l3_header(m,ipv4_hdr,0)<0){
+		printf("failed to extract dp info from inner l3 header \n");
+		return DP_ROUTE_DROP;
 		}
-		df_ptr->flags.encap_type=DP_ENCAP_TYPE_SRV6;
-		if (dp_is_offload_enabled())
-			df_ptr->flags.valid = 1;
-	} else {
 
-		// ??? when to reach this branch?
-		if (dp_is_pf_port_id(m->port)) {
-				ret = DP_ROUTE_NAT;
-				rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
-				df_ptr->flags.nat = DP_NAT_DNAT;
-		}
+	if (extract_inner_l4_header(m,ipv4_hdr+1,0)<0){
+		printf("failed to extract dp info from inner l4 header \n");
+		return DP_ROUTE_DROP;
 	}
 
-	// printf("ret value is %d \n",ret);
+	//TODO: add broadcast routes when machine is added
+	if (df_ptr->l4_type==DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port)==DP_BOOTP_SRV_PORT){
+		return DP_ROUTE_DHCP;
+	}
+	
+	
+	ret = lpm_get_ip4_dst_port(m->port, df_ptr->tun_info.dst_vni, ipv4_hdr,&route, rte_eth_dev_socket_id(m->port));
+	
+	df_ptr->nxt_hop = ret;
+	// printf("route searching result %d \n",ret);
+
+	if (df_ptr->flags.flow_type!=DP_FLOW_TYPE_INCOMING){
+		df_ptr->tun_info.dst_vni = route.vni;
+	}
+
+	ret = DP_ROUTE_FIREWALL;
+	if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
+		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+		if (dp_is_vm_natted(m->port)) {
+			ret = DP_ROUTE_NAT;
+			df_ptr->flags.nat = DP_NAT_SNAT;
+		}
+		df_ptr->flags.flow_type=DP_FLOW_TYPE_OUTGOING;
+	}
+	
+	if (!df_ptr->flags.flow_type)
+		df_ptr->flags.flow_type=DP_FLOW_TYPE_LOCAL;
+	
+	if (dp_is_offload_enabled())
+		df_ptr->flags.valid = 1;
+
 	return ret;
 }
 
@@ -131,16 +104,22 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 		mbuf0 = pkts[i];
 		route = handle_ipv4_lookup(mbuf0);
 		if (route >= 0) 
+			//this is not going to reach
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_L2_DECAP, 
 								mbuf0);
 		else if (route == DP_ROUTE_DHCP)
+			// the ethernet header cannot be removed is due to dhcp node needs mac info
+			// TODO: extract mac info in cls node
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
-		else if (route == DP_ROUTE_FIREWALL)
+		else if (route == DP_ROUTE_FIREWALL){
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_FIREWALL, mbuf0);
+		}
 		else if (route == DP_ROUTE_NAT)
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT, mbuf0);
-		else
+		else{
+			printf("packet is dropped during ipv4 lookup \n");
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
+		}
 	}	
 
     return cnt;

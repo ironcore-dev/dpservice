@@ -13,6 +13,8 @@
 #include "dp_lpm.h"
 #include "dp_util.h"
 
+#include "dp_rte_flow.h"
+
 struct ipv6_lookup_node_main ipv6_lookup_node;
 
 
@@ -30,101 +32,71 @@ static int ipv6_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 
 static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 {
-	struct underlay_conf *u_conf;
-	struct rte_flow_item_geneve *geneve_hdr;
-	struct rte_udp_hdr *udp_hdr;
+
 	int ret = 0;
 	int t_vni =0;
 	
 	struct rte_ipv6_hdr *ipv6_hdr;
-	struct rte_tcp_hdr *tcp_hdr;
-	struct icmp6hdr *icmp_hdr;
 	struct vm_route route;
-	struct dp_flow df;
 	struct dp_flow *df_ptr;
+
+	ret = DP_ROUTE_DROP;
   
-	memset(&df, 0, sizeof(struct dp_flow));
-	if (dp_is_pf_port_id(m->port)) {
-		df_ptr = get_dp_flow_ptr(m);
-		// ??? in which case, this would happen?
-		if(df_ptr && df_ptr->flags.geneve_hdr) {
-	 		geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
-	 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
-	 		ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr*);
-	 		rte_memcpy(&t_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
-	 		df.flags.geneve_hdr = 1;
-		} else {
-			ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
-								sizeof(struct rte_ether_hdr));
-		}
-	 } else {
+	
+	df_ptr = get_dp_flow_ptr(m);
+	if (df_ptr->flags.flow_type==DP_FLOW_TYPE_INCOMING){
+		t_vni=df_ptr->tun_info.dst_vni;
+		ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr*);
+	}
+	else
 		ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
-								sizeof(struct rte_ether_hdr));
+										  sizeof(struct rte_ether_hdr));
+
+	// if (df_ptr->flags.flow_type!=DP_FLOW_TYPE_INCOMING){
+	if (extract_inner_l3_header(m,ipv6_hdr,0)<0){
+		printf("failed to extract dp info from inner l3 header \n");
+			return IPV6_LOOKUP_NEXT_DROP;
+		}
+
+	if (extract_inner_l4_header(m,ipv6_hdr+1,0)<0){
+		printf("failed to extract dp info from inner l4 header \n");
+		return IPV6_LOOKUP_NEXT_DROP;
 	}
 
-	df.l3_type = RTE_ETHER_TYPE_IPV6;
-	df.l4_type = ipv6_hdr->proto;
-
-	if(ipv6_hdr->proto == DP_IP_PROTO_UDP ) {
-		udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
-									sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
-		u_conf = get_underlay_conf();
-		
-		// ??? is it better to say ntohs(udp_hdr->dst_port) == GENEVE_UDP_PORT?
-		if (ntohs(udp_hdr->dst_port) == u_conf->src_port){
-			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-			df_ptr = alloc_dp_flow_ptr(m);
-			df_ptr->flags.geneve_hdr = 1;
-			return IPV6_LOOKUP_NEXT_IPV6_DECAP;
+	//TODO: add broadcast routes when machine is added
+	if (df_ptr->l4_type==DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port)==DHCPV6_SERVER_PORT){
+		return IPV6_LOOKUP_NEXT_DHCPV6;
 		}
-		else if (ntohs(udp_hdr->dst_port) == DHCPV6_SERVER_PORT) {
-			return IPV6_LOOKUP_NEXT_DHCPV6;
-		} else {
-			df.dst_port = udp_hdr->dst_port;
-			df.src_port = udp_hdr->src_port;
-			
-		}
-	} else if (ipv6_hdr->proto == DP_IP_PROTO_TCP ) {
-		tcp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *,
-									sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
-		df.dst_port = tcp_hdr->dst_port;
-		df.src_port = tcp_hdr->src_port;
-	} else if (ipv6_hdr->proto == DP_IP_PROTO_ICMPV6 ) {
-		icmp_hdr = rte_pktmbuf_mtod_offset(m, struct icmp6hdr *,
-									sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
-		df.icmp_type = icmp_hdr->icmp6_type;
-
-	} else if (ipv6_hdr->proto == DP_IP_PROTO_SIPSR){
-			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-			df_ptr = alloc_dp_flow_ptr(m);
-			df_ptr->flags.encap_type = DP_ENCAP_TYPE_SRV6;
-			df_ptr->flags.geneve_hdr = 0;
-			df_ptr->flags.srv6_hdr=1;
-			return IPV6_LOOKUP_NEXT_IPV6_DECAP;
-	}
-	rte_memcpy(df.dst.dst_addr6, ipv6_hdr->dst_addr,sizeof(df.dst.dst_addr6));
-	rte_memcpy(df.src.src_addr6, ipv6_hdr->src_addr,sizeof(df.src.src_addr6));
-	df.l4_type = ipv6_hdr->proto;
+	// }
 
 	ret = lpm_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
-	if (ret >= 0) {
-		df.nxt_hop = ret;
-		df_ptr = alloc_dp_flow_ptr(m);
-		if (!df_ptr)
-			return DP_ROUTE_DROP;
-		rte_memcpy(df_ptr, &df, sizeof(struct dp_flow));
-		if (!t_vni) /* VM -> Outer world */
-			df_ptr->dst_vni = route.vni;
-		else /* Outer world -> VM */
-			df_ptr->dst_vni = t_vni;
-		if (dp_is_pf_port_id(df_ptr->nxt_hop))
-			rte_memcpy(df_ptr->ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->ul_dst_addr6));
-
 	
+	if (ret >= 0){
+		df_ptr->nxt_hop = ret;
+
+		if (df_ptr->flags.flow_type!=DP_FLOW_TYPE_INCOMING){
+			df_ptr->tun_info.dst_vni = route.vni;
+		}
+
+		if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
+			rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+			if (dp_is_vm_natted(m->port)) {
+				ret = DP_ROUTE_NAT;
+				df_ptr->flags.nat = DP_NAT_SNAT;
+			}
+			df_ptr->flags.flow_type=DP_FLOW_TYPE_OUTGOING;
+		}
+		
+		if (!df_ptr->flags.flow_type)
+			df_ptr->flags.flow_type=DP_FLOW_TYPE_LOCAL;
+		
+		ret = IPV6_LOOKUP_NEXT_L2_DECAP;
+		
 		if (dp_is_offload_enabled())
 			df_ptr->flags.valid = 1;
 	}
-	ret = IPV6_LOOKUP_NEXT_L2_DECAP;
+	
+	
 
 	return ret;
 }

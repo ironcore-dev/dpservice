@@ -12,6 +12,9 @@
 #include "dp_util.h"
 #include "dp_mbuf_dyn.h"
 
+#include "nodes/srv6_common.h"
+#include "dp_rte_flow.h"
+
 #define DP_MAX_PATT_ACT	7
 
 static struct ethdev_tx_node_main ethdev_tx_main;
@@ -73,11 +76,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	struct rte_flow *flow;
 	struct flow_age_ctx *agectx = NULL;
 	struct flow_value *flow_val = NULL;
-	int encap_size = sizeof(struct rte_ether_hdr) +
-					 sizeof(struct rte_ipv6_hdr) +
-					 sizeof(struct rte_udp_hdr) +
-					 sizeof(struct rte_flow_item_geneve);
-	uint8_t encap_hdr[encap_size];
+	int encap_size=0;
+
 	uint8_t decap_hdr[sizeof(struct rte_ether_hdr)];
 
 	memset(&pattern, 0, sizeof(pattern));
@@ -91,7 +91,8 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	/* First find out the packet direction */
 	if (dp_is_pf_port_id(df->nxt_hop))
 		route_direct = DP_ROUTE_TO_PF_ENCAPPED;
-	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->flags.geneve_hdr))
+	// else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->flags.geneve_hdr))
+	else if ((!dp_is_pf_port_id(df->nxt_hop)) && (df->flags.flow_type==DP_FLOW_TYPE_INCOMING))
 		route_direct = DP_ROUTE_TO_VM_DECAPPED;
 
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
@@ -108,39 +109,48 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	pattern[pattern_cnt].mask = &eth_mask;
 	pattern_cnt++;
 
+	struct rte_ipv4_hdr inner_ipv4_hdr;
+
 	if (route_direct == DP_ROUTE_TO_VM_DECAPPED) {
-		memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
+
+		memset(&ipv6_spec, 0,sizeof(struct rte_flow_item_ipv6));
 		memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
-		ipv6_spec.hdr.proto =  DP_IP_PROTO_UDP;
-		rte_memcpy(ipv6_spec.hdr.dst_addr, u_conf->src_ip6, sizeof(ipv6_spec.hdr.dst_addr));
+
+		ipv6_spec.hdr.proto = df->tun_info.proto_id;
+		rte_memcpy(ipv6_spec.hdr.dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_spec.hdr.dst_addr));
+		//mask
 		ipv6_mask.hdr.proto = 0xff;
-		rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ipv6_spec.hdr.dst_addr));
+		rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ipv6_mask.hdr.dst_addr));
 		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 		pattern[pattern_cnt].spec = &ipv6_spec;
 		pattern[pattern_cnt].mask = &ipv6_mask;
 		pattern_cnt++;
 
-		memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
-		memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
-		udp_spec.hdr.dst_port = htons(u_conf->dst_port);
-		udp_mask.hdr.dst_port = 0xffff;
-		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
-		pattern[pattern_cnt].spec = &udp_spec;
-		pattern[pattern_cnt].mask = &udp_mask;
-		pattern_cnt++;
+		if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
+			memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
+			memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
+			udp_spec.hdr.dst_port = htons(u_conf->dst_port);
+			udp_mask.hdr.dst_port = 0xffff;
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
+			pattern[pattern_cnt].spec = &udp_spec;
+			pattern[pattern_cnt].mask = &udp_mask;
+			pattern_cnt++;
 
-		memset(&gen_spec, 0, sizeof(struct rte_flow_item_geneve));
-		memset(&gen_mask, 0, sizeof(struct rte_flow_item_geneve));
-		pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_GENEVE;
-		gen_spec.protocol = htons(df->l3_type);
-		rte_memcpy(gen_spec.vni, &df->dst_vni, sizeof(gen_spec.vni));
-		gen_mask.vni[0] = 0xFF;
-		gen_mask.vni[1] = 0xFF;
-		gen_mask.vni[2] = 0xFF;
-		gen_mask.protocol = 0xFFFF;
-		pattern[pattern_cnt].spec = &gen_spec;
-		pattern[pattern_cnt].mask = &gen_mask;
-		pattern_cnt++;
+			memset(&gen_spec, 0, sizeof(struct rte_flow_item_geneve));
+			memset(&gen_mask, 0, sizeof(struct rte_flow_item_geneve));
+			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_GENEVE;
+			gen_spec.protocol = htons(df->l3_type);
+			rte_memcpy(gen_spec.vni, &df->tun_info.dst_vni, sizeof(gen_spec.vni));
+			gen_mask.vni[0] = 0xFF;
+			gen_mask.vni[1] = 0xFF;
+			gen_mask.vni[2] = 0xFF;
+			gen_mask.protocol = 0xFFFF;
+			pattern[pattern_cnt].spec = &gen_spec;
+			pattern[pattern_cnt].mask = &gen_mask;
+			pattern_cnt++;
+
+		}
+
 		if ( df->l3_type == RTE_ETHER_TYPE_IPV6 ) {
 			/* overlay IPv6 flow */
 			memset(&ol_ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
@@ -148,12 +158,13 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 			ol_ipv6_spec.hdr.proto =  df->l4_type;
 			rte_memcpy(ol_ipv6_spec.hdr.dst_addr, df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr));
 			ol_ipv6_mask.hdr.proto = 0xff;
-			memset(ol_ipv6_mask.hdr.dst_addr, 0xff, sizeof(ol_ipv6_spec.hdr.dst_addr));
+			rte_memcpy(ol_ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ol_ipv6_spec.hdr.dst_addr));
 			pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 			pattern[pattern_cnt].spec = &ol_ipv6_spec;
 			pattern[pattern_cnt].mask = &ol_ipv6_mask;
 			pattern_cnt++;
 		} else {
+			memset(&inner_ipv4_hdr,0,sizeof(struct rte_ipv4_hdr));
 			memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
 			memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 			ipv4_spec.hdr.next_proto_id = df->l4_type;
@@ -242,8 +253,20 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
 	pattern_cnt++;
 
+	if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
+		encap_size= sizeof(struct rte_ether_hdr) +
+				sizeof(struct rte_ipv6_hdr) +
+				sizeof(struct rte_udp_hdr) +
+				sizeof(struct rte_flow_item_geneve);
+	}else if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_IPIP){
+		encap_size = sizeof(struct rte_ether_hdr) +
+				sizeof(struct rte_ipv6_hdr);
+	}
+	uint8_t encap_hdr[encap_size];
+	memset(encap_hdr, 0, encap_size);
+
 	if (route_direct == DP_ROUTE_TO_PF_ENCAPPED) {
-		memset(encap_hdr, 0, encap_size);
+
 		memset(decap_hdr, 0, sizeof(struct rte_ether_hdr));
 		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_DECAP;
 		struct rte_flow_action_raw_decap raw_decap = {.data = decap_hdr, .size = sizeof(struct rte_ether_hdr)};
@@ -256,21 +279,26 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 		rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
 		new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
+		// struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr*)(new_eth_hdr+1);
 		struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr*)(&encap_hdr[sizeof(struct rte_ether_hdr)]);
 		new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 		new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-		new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
+		new_ipv6_hdr->proto = df->tun_info.proto_id;
+		// new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
 		rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
-		rte_memcpy(new_ipv6_hdr->dst_addr, df->ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
+		rte_memcpy(new_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
 
-		struct rte_udp_hdr *new_udp_hdr = (struct rte_udp_hdr*)(new_ipv6_hdr + 1);
-		new_udp_hdr->src_port = htons(u_conf->src_port); /* TODO this should come via df pointer */
-		new_udp_hdr->dst_port = htons(u_conf->dst_port);
+		if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
+			struct rte_udp_hdr *new_udp_hdr = (struct rte_udp_hdr*)(new_ipv6_hdr + 1);
+			new_udp_hdr->src_port = df->tun_info.src_port; 
+			new_udp_hdr->dst_port = df->tun_info.dst_port;
 
-		struct rte_flow_item_geneve *new_geneve_hdr = (struct rte_flow_item_geneve*)(new_udp_hdr + 1);
-		rte_memcpy(new_geneve_hdr->vni, &df->dst_vni, sizeof(new_geneve_hdr->vni));
-		new_geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
-		new_geneve_hdr->protocol = htons(df->l3_type);
+			struct rte_flow_item_geneve *new_geneve_hdr = (struct rte_flow_item_geneve*)(new_udp_hdr + 1);
+			rte_memcpy(new_geneve_hdr->vni, &df->tun_info.dst_vni, sizeof(new_geneve_hdr->vni));
+			new_geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
+			new_geneve_hdr->protocol = htons(df->l3_type);
+
+		}
 
 		struct rte_flow_action_raw_encap raw_encap = {.data = encap_hdr, .size = encap_size};
 		action[action_cnt].conf = &raw_encap;
@@ -394,6 +422,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 
 	/* Redirect unsent pkts to drop node */
 	if (sent_count != cnt) {
+		printf("drop packets in tx_node \n");
 		rte_node_enqueue(graph, node, TX_NEXT_DROP,
 				 &objs[sent_count], cnt - sent_count);
 	}

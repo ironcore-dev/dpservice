@@ -37,8 +37,8 @@ static __rte_always_inline int handle_srv6_encap(struct rte_mbuf *m)
 	// udp_hdr->dst_port = htons(u_conf->dst_port);
 	/* TODO compute here from df values inner 5 tuple a CRC16 hash instead as src port */
 	df = get_dp_flow_ptr(m);
-	df->flags.geneve_hdr = 0;
-    df->flags.srv6_hdr = 1;
+	// df->flags.geneve_hdr = 0;
+    // df->flags.srv6_hdr = 1;
 
     srv6_hdr->next_hdr=DP_IP_PROTO_IPv4_ENCAP;
     srv6_hdr->hdr_ext_length=(uint8_t)2;
@@ -50,8 +50,8 @@ static __rte_always_inline int handle_srv6_encap(struct rte_mbuf *m)
 
 
     // uint32_t vni_ns = htons(df->dst_vni);
-    uint32_t vni_ns =df->dst_vni;
-    memcpy(srv6_hdr->last_segment.locator,df->ul_dst_addr6,8);
+    uint32_t vni_ns =df->tun_info.dst_vni;
+    memcpy(srv6_hdr->last_segment.locator,df->tun_info.ul_dst_addr6,8);
     memcpy(srv6_hdr->last_segment.function,&vni_ns,4);
     memset(srv6_hdr->last_segment.function+4,0,4);
 	// memcpy(geneve_hdr->vni, &df->dst_vni, sizeof(geneve_hdr->vni));

@@ -7,6 +7,7 @@
 #include "nodes/ipv6_decap_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_rte_flow.h"
 
 struct ipv6_decap_node_main ipv6_decap_node;
 
@@ -45,13 +46,10 @@ static __rte_always_inline uint16_t ipv6_decap_node_process(struct rte_graph *gr
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
 		if (handle_ipv6_decap(mbuf0)) {
-			if (df->flags.encap_type==DP_ENCAP_TYPE_GENEVE){
-				rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_GENEVE_DECAP, mbuf0);
-			}else if (df->flags.encap_type==DP_ENCAP_TYPE_SRV6){
+
+				df->flags.flow_type=DP_FLOW_TYPE_INCOMING;
 				rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_SRV6_DECAP, mbuf0);
-			} else {
-				rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_DROP, mbuf0);
-			}
+		
 		}
 		else {
 			rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_DROP, mbuf0);
@@ -77,7 +75,6 @@ static struct rte_node_register ipv6_decap_node_base = {
 	.next_nodes =
 		{
 			[IPV6_DECAP_NEXT_DROP] = "drop",
-			[IPV6_DECAP_NEXT_GENEVE_DECAP] = "geneve_decap",
 			[IPV6_DECAP_NEXT_SRV6_DECAP] = "srv6_decap",
 		},
 };

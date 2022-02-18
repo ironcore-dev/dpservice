@@ -10,6 +10,7 @@
 
 #include "nodes/srv6_common.h"
 #include "nodes/srv6_decap_node.h"
+#include "dp_rte_flow.h"
 
 
 struct srv6_decap_node_main srv6_decap_node;
@@ -32,10 +33,11 @@ static __rte_always_inline int handle_srv6_decap(struct rte_mbuf *m)
 	struct segment_routing_hdr *srv6_hdr;
 	struct dp_flow *df;
 	
+	
 	srv6_hdr = rte_pktmbuf_mtod(m, struct segment_routing_hdr*);
 	df = get_dp_flow_ptr(m);
 
-	memcpy(&df->dst_vni,srv6_hdr->last_segment.function,4);
+	memcpy(&df->tun_info.dst_vni,srv6_hdr->last_segment.function,4);
 
 	if (srv6_hdr->next_hdr == DP_IP_PROTO_IPv4_ENCAP){
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct segment_routing_hdr));
@@ -46,8 +48,49 @@ static __rte_always_inline int handle_srv6_decap(struct rte_mbuf *m)
 		route = SRV6_DECAP_NEXT_IPV6_LOOKUP;
 
 	}
+	return route;
+} 
 
+static __rte_always_inline int handle_srv6_decap_ext(struct rte_mbuf *m)
+{
+	uint8_t route;
+	// struct rte_ipv6_hdr *ipv6_hdr;
+	struct segment_routing_hdr *srv6_hdr;
+	struct dp_flow *df;
+	int result = -1;
 
+	result = extract_outer_ipv6_header(m,NULL,0);
+	if (result<0){
+		printf("failed to extract outer ipv6 header \n");
+		return SRV6_DECAP_NEXT_DROP;
+	}
+
+	if (result!=DP_IP_PROTO_SIPSR){
+		printf("not a srv6 packet, send to ipv6 lookup \n");
+		return SRV6_DECAP_NEXT_IPV6_LOOKUP;
+	}
+	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
+	
+	srv6_hdr = rte_pktmbuf_mtod(m, struct segment_routing_hdr*);
+	df = get_dp_flow_ptr(m);
+	
+	if (extract_outer_srv6_header(m,srv6_hdr,0)<0){
+
+		printf("failed to extract from srv6 header \n");
+		return SRV6_DECAP_NEXT_DROP;
+	}
+
+	df->flags.flow_type=DP_FLOW_TYPE_INCOMING;
+	if (srv6_hdr->next_hdr == DP_IP_PROTO_IPv4_ENCAP){
+		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct segment_routing_hdr));
+		// printf("decaped a srv6 packet and send to ipv4 lookup \n");
+		route = SRV6_DECAP_NEXT_IPV4_LOOKUP;
+
+	}
+	else{
+		route = SRV6_DECAP_NEXT_IPV6_LOOKUP;
+
+	}
 	return route;
 } 
 
@@ -65,21 +108,19 @@ static __rte_always_inline uint16_t srv6_decap_node_process(struct rte_graph *gr
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		ret = handle_srv6_decap(mbuf0);
+		// ret = handle_srv6_decap(mbuf0);
+		ret = handle_srv6_decap_ext(mbuf0);
+
 		if (ret > 0)
 			rte_node_enqueue_x1(graph, node, ret, mbuf0);
-		else
+		else{
+			printf("packet is dropped during srv6 decap \n");
 			rte_node_enqueue_x1(graph, node, SRV6_DECAP_NEXT_DROP, mbuf0);
+		}
 	}	
 
     return cnt;
 }
-
-// int srv6_decap_set_next(uint16_t port_id, uint16_t next_index)
-// {
-// 	srv6_decap_node.next_index[port_id] = next_index;
-// 	return 0;
-// }
 
 static struct rte_node_register srv6_decap_node_base = {
 	.name = "srv6_decap",

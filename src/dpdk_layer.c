@@ -14,9 +14,9 @@
 #include "nodes/dhcpv6_node.h"
 #include "nodes/l2_decap_node.h"
 #include "nodes/ipv6_encap_node.h"
-#include "nodes/geneve_encap_node.h"
 #include "nodes/rx_periodic_node.h"
 #include "nodes/ipv6_lookup_node.h"
+#include "dp_rte_flow.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
@@ -39,8 +39,9 @@ static const char * const default_patterns[] = {
 	"l2_decap",
 	"ipv6_encap",
 	"ipv6_decap",
-	"geneve_encap",
-	"geneve_decap",
+	"geneve_tunnel",
+	"ipip_tunnel",
+	"overlay_switch",
 	"tx-*",
 	"drop",
 };
@@ -90,6 +91,7 @@ int dp_dpdk_init(int argc, char **argv)
 												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
+
 	if (dp_layer.rte_mempool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
@@ -258,25 +260,20 @@ static int dp_port_flow_isolate(int port_id)
 	return 0;
 }
 
-static void dp_install_isolated_mode(int port_id)
+static void dp_install_isolated_mode_ipip(int port_id,uint8_t proto_id)
 {
 	struct rte_flow_item_eth eth_spec;
 	struct rte_flow_item_eth eth_mask;
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
-
-	struct rte_flow_item_ipv6_ext ipv6_ext_spec;
-	struct rte_flow_item_ipv6_ext ipv6_ext_mask;
 	
-	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[4];
 	struct rte_flow_action action[2];
-	struct underlay_conf *u_conf;
 	struct rte_flow_action_queue q;
-	uint8_t	dst_addr[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
-						   "\xff\xff\xff\xff\xff\xff\xff\xff";
+	uint8_t	dst_addr_64[8] = "\xff\xff\xff\xff\xff\xff\xff\xff";
+	struct underlay_conf *u_conf;
+
 	int pattern_cnt = 0, res;
 	struct rte_flow *flow;
 
@@ -298,33 +295,16 @@ static void dp_install_isolated_mode(int port_id)
 
 	memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
 	memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
-	// ipv6_spec.hdr.proto = DP_IP_PROTO_UDP;
-	ipv6_spec.has_route_ext=1;
-	rte_memcpy(ipv6_spec.hdr.dst_addr, u_conf->src_ip6, sizeof(ipv6_spec.hdr.dst_addr));
-	// ipv6_mask.hdr.proto = 0xff;
-	rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ipv6_spec.hdr.dst_addr));
+	
+	rte_memcpy(ipv6_spec.hdr.dst_addr, u_conf->src_ip6, 8);
+	ipv6_spec.hdr.proto = proto_id;
+	rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr_64, 8);
+	
+	ipv6_mask.hdr.proto = 0xff;
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 	pattern[pattern_cnt].spec = &ipv6_spec;
 	pattern[pattern_cnt].mask = &ipv6_mask;
 	pattern_cnt++;
-
-	// memset(&ipv6_ext_spec,0,sizeof(struct rte_flow_item_ipv6_ext));
-	// memset(&ipv6_ext_mask,0,sizeof(struct rte_flow_item_ipv6_ext));
-	// ipv6_ext_spec.next_hdr=DP_IP_PROTO_SIPSR;
-	// ipv6_ext_mask.next_hdr=0xff;
-	// pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6_EXT;
-	// pattern[pattern_cnt].spec = &ipv6_ext_spec;
-	// pattern[pattern_cnt].mask = &ipv6_ext_mask;
-	// pattern_cnt++;
-
-	// memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
-	// memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
-	// udp_spec.hdr.dst_port = htons(u_conf->dst_port);
-	// udp_mask.hdr.dst_port = 0xffff;
-	// pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
-	// pattern[pattern_cnt].spec = &udp_spec;
-	// pattern[pattern_cnt].mask = &udp_mask;
-	// pattern_cnt++;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
 	pattern_cnt++;
@@ -345,6 +325,109 @@ static void dp_install_isolated_mode(int port_id)
 		if (!flow)
 			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
 	}
+}
+
+static void dp_install_isolated_mode_geneve(int port_id)
+{
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+
+	struct rte_flow_item_ipv6 ipv6_spec;
+	struct rte_flow_item_ipv6 ipv6_mask;
+	
+	struct rte_flow_item_udp udp_spec;
+	struct rte_flow_item_udp udp_mask;
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[4];
+	struct rte_flow_action action[2];
+	struct underlay_conf *u_conf;
+	struct rte_flow_action_queue q;
+	uint8_t	dst_addr[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
+						   "\xff\xff\xff\xff\xff\xff\xff\xff";
+
+	int pattern_cnt = 0, res;
+	struct rte_flow *flow;
+
+	u_conf = get_underlay_conf();
+
+	memset(&attr,0, sizeof(struct rte_flow_attr));
+	attr.ingress = 1;
+	attr.priority = 0;
+	attr.transfer = 0;
+	
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+	
+	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = htons(RTE_ETHER_TYPE_IPV6);
+	eth_mask.type = htons(0xffff);
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[pattern_cnt].spec = &eth_spec;
+	pattern[pattern_cnt].mask = &eth_mask;
+	pattern_cnt++;
+
+	memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
+	memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
+	
+	
+	rte_memcpy(ipv6_spec.hdr.dst_addr, u_conf->src_ip6, sizeof(ipv6_spec.hdr.dst_addr));
+	ipv6_spec.hdr.proto = DP_IP_PROTO_UDP;
+
+	rte_memcpy(ipv6_mask.hdr.dst_addr, dst_addr, sizeof(ipv6_spec.hdr.dst_addr));
+	
+	ipv6_mask.hdr.proto = 0xff;
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
+	pattern[pattern_cnt].spec = &ipv6_spec;
+	pattern[pattern_cnt].mask = &ipv6_mask;
+	pattern_cnt++;
+
+
+	memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
+	memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
+	udp_spec.hdr.dst_port = htons(u_conf->dst_port);
+	udp_mask.hdr.dst_port = 0xffff;
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
+	pattern[pattern_cnt].spec = &udp_spec;
+	pattern[pattern_cnt].mask = &udp_mask;
+	pattern_cnt++;
+
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
+	pattern_cnt++;
+
+	action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	q.index = 0;
+	action[0].conf = &q; 
+	action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+	struct rte_flow_error error;
+	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
+
+	if (res) { 
+		printf("Isolete flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	} else {
+		printf("Isolate flow validated on port %d \n ", port_id);
+		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
+		if (!flow)
+			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+}
+
+static void dp_install_isolated_mode(int port_id)
+{
+	
+	if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_IPIP){
+		printf("Init isolation flow rule for IPinIP tunnels \n");
+		dp_install_isolated_mode_ipip(port_id,DP_IP_PROTO_IPv4_ENCAP);
+		dp_install_isolated_mode_ipip(port_id,DP_IP_PROTO_IPv6_ENCAP);
+	}
+	
+	if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
+		printf("Init isolation flow rule for GENEVE tunnels \n");
+		dp_install_isolated_mode_geneve(port_id);
+	}
+
 }
 
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
