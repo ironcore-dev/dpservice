@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 #define DP_MAX_PF_PORT		2
-#define DP_MAX_VF_PRO_PORT	10
+#define DP_MAX_VF_PRO_PORT	32
 #define DP_ACTIVE_VF_PORT	2
 #define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
 #define DP_NR_RX_QUEUES		1

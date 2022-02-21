@@ -27,7 +27,7 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 static void dp_init_interfaces()
 {
 	struct dp_port_ext pf0_port, pf1_port, vf_port;
-	int i;
+	int i, active_vfs;
 
 	memset(&pf0_port, 0, sizeof(pf0_port));
 	memset(&pf1_port, 0, sizeof(pf1_port));
@@ -42,8 +42,12 @@ static void dp_init_interfaces()
 
 	memcpy(vf_port.port_name, dp_get_vf_pattern(), IFNAMSIZ);
 
+	active_vfs = dp_get_num_of_vfs();
+	if (active_vfs > DP_MAX_VF_PRO_PORT)
+		rte_exit(EXIT_FAILURE, "In kernel %d VFs defined but we support max %d.\n",
+				 active_vfs, DP_MAX_VF_PRO_PORT);
 	/* Only init the max. possible VFs, GRPC will kick them off later */
-	for (i = 0; i < DP_ACTIVE_VF_PORT; i++)
+	for (i = 0; i < active_vfs; i++)
 		dp_init_interface(&vf_port, DP_PORT_VF);
 
 	dp_init_graph();

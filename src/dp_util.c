@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <net/if.h>
 #include "rte_ip.h"
 #include "dp_util.h"
@@ -25,6 +27,10 @@ static uint16_t pf_ports[DP_MAX_PF_PORT][2] = {0};
 
 static const char short_options[] = "d" /* debug */
 				    "D"	 /* promiscuous */;
+
+#define DP_SYSFS_PREFIX_MLX_VF_COUNT	"/sys/class/net/"
+#define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"
+#define DP_SYSFS_STR_LEN				256
 
 #define CMD_LINE_OPT_PF0		"pf0"
 #define CMD_LINE_OPT_PF1		"pf1"
@@ -181,6 +187,34 @@ void dp_add_pf_port_id(uint16_t id)
 			pf_ports[i][1] = 1;
 			return;
 		}
+}
+
+int dp_get_num_of_vfs()
+{
+	int ret = DP_ACTIVE_VF_PORT; /* Default value */
+	char *filename;
+	FILE *fp;
+
+	filename = malloc(DP_SYSFS_STR_LEN);
+
+	if (!filename)
+		goto out;
+
+	snprintf(filename, DP_SYSFS_STR_LEN, "%s%s%s", DP_SYSFS_PREFIX_MLX_VF_COUNT,
+			 dp_get_pf0_name(), DP_SYSFS_SUFFIX_MLX_VF_COUNT);
+
+	fp = fopen(filename, "r");
+
+	if (!fp)
+		goto err;
+
+	fscanf(fp, "%d", &ret);
+
+	fclose(fp);
+err:
+	free(filename);
+out:
+	return ret;
 }
 
 __rte_always_inline bool dp_is_pf_port_id(uint16_t id)
