@@ -120,7 +120,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 			break;
 		case DHCPREQUEST:
 			dhcp_type = DP_DHCP_ACK;
-			dp_set_neigh_mac(m->port, &incoming_eth_hdr->src_addr);
+			dp_set_neigh_mac(m->port, &incoming_eth_hdr->dst_addr);
 			break;
 		default:
 			return 0;
@@ -130,7 +130,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port));
 	dhcp_hdr->siaddr  = htonl(dp_get_gw_ip4());
 	dhcp_hdr->giaddr = htonl(dp_get_gw_ip4());
-	rte_memcpy(dhcp_hdr->chaddr, dp_get_mac(m->port), 6);
+	rte_memcpy(dhcp_hdr->chaddr, incoming_eth_hdr->dst_addr.addr_bytes, 6);
 	memset(dhcp_hdr->options, 0, sizeof(dhcp_hdr->options));
 	dhcp_hdr->magic = htonl(DHCP_MAGIC_COOKIE);
 
