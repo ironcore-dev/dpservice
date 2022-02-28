@@ -278,15 +278,15 @@ static void dp_install_isolated_mode(int port_id)
 
 	u_conf = get_underlay_conf();
 
+	memset(&attr, 0, sizeof(struct rte_flow_attr));
 	attr.ingress = 1;
-	attr.priority = 0;
-	attr.transfer = 0;
+
 	memset(pattern, 0, sizeof(pattern));
 	memset(action, 0, sizeof(action));
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
-	eth_spec.type = htons(RTE_ETHER_TYPE_IPV6);
-	eth_mask.type = htons(0xffff);
+	eth_spec.type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
+	eth_mask.type = 0xffff;
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[pattern_cnt].spec = &eth_spec;
 	pattern[pattern_cnt].mask = &eth_mask;

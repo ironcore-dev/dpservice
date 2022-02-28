@@ -1,12 +1,12 @@
 project('dp_service', 'c', 'cpp',
-  default_options : ['c_args=-Wno-deprecated-declarations', 'cpp_args=-fpermissive'],
+  default_options : ['c_args=-Wno-deprecated-declarations -Werror', 'cpp_args=-fpermissive'],
   version: run_command('cat', 'include/dp_version.h').stdout().strip().split(' ').get(2).split('"').get(1),
   license : 'MIT')
 add_global_arguments('-DDEBUG=true', language : 'c')
 dpdk_dep = dependency('libdpdk', version : '>=21.11.0')
-proto_dep = dependency('protobuf', version : '>=3.12.4')
-grpc_dep = dependency('grpc', version : '>=10.0.0')
-grpccpp_dep = dependency('grpc++', version : '>=1.30.2')
+proto_dep = dependency('protobuf')
+grpc_dep = dependency('grpc')
+grpccpp_dep = dependency('grpc++')
 thread_dep = dependency('threads')
 
 protoc = find_program('protoc')
