@@ -104,7 +104,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	uint32_t dhcp_srv_ident, net_mask;
 	uint8_t vend_pos = 0;
 	uint16_t mtu, options_len;
-	uint32_t pxe_srv_ip = htonl(RTE_IPV4(172,32,4,9));
+	uint32_t pxe_srv_ip = 0;
 	char pxe_srv_ip_str[INET_ADDRSTRLEN];
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
@@ -127,10 +127,12 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
 	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
 	incoming_ipv4_hdr->src_addr = htonl(dp_get_gw_ip4());
-	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode))
+	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode)) {
+		pxe_srv_ip = htonl(dp_get_vm_pxe_ip4(m->port));
 		incoming_ipv4_hdr->dst_addr = htonl(0xFFFFFFFF);
-	else
+	} else {
 		incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port));
+	}
 	incoming_ipv4_hdr->hdr_checksum = 0;
 	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) + 
 										    sizeof(struct rte_udp_hdr) + sizeof(struct rte_ipv4_hdr));
@@ -163,11 +165,11 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	memset(dhcp_hdr->options, 0, sizeof(dhcp_hdr->options));
 	if (IS_PXE_TFTP(pxe_mode))
 		snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s",
-				 "ipxe/x86_64/ipxe.new");
+				 DP_PXE_TFTP_PATH);
 	if (IS_PXE_HTTP(pxe_mode)) {
 		inet_ntop(AF_INET, &pxe_srv_ip, pxe_srv_ip_str, INET_ADDRSTRLEN);
 		snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
-				 "http://", pxe_srv_ip_str, "/ipxe/boot.ipxe");
+				 "http://", pxe_srv_ip_str, dp_get_vm_pxe_str(m->port));
 	}
 	dhcp_hdr->magic = htonl(DHCP_MAGIC_COOKIE);
 	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode))

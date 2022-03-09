@@ -55,6 +55,7 @@ extern "C" {
 
 #define DP_USER_CLASS_INF_COMP_STR	"iPXE"
 #define DP_VND_CLS_IDT_COMP_STR		"PXEClient:Arch:00007"
+#define DP_PXE_TFTP_PATH			"ipxe/x86_64/ipxe.new"
 
 struct dp_dhcp_header {
 	uint8_t		op;

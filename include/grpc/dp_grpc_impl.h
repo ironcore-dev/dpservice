@@ -45,6 +45,8 @@ typedef struct dp_addmachine {
 	uint8_t		ip6_addr6[16];
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 	uint32_t	vni;
+	uint32_t	ip4_pxe_addr;
+	char		pxe_str[VM_MACHINE_PXE_STR_LEN];
 } dp_addmachine;
 
 typedef struct dp_delmachine {

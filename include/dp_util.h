@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #define VM_MACHINE_ID_STR_LEN 64
+#define VM_MACHINE_PXE_STR_LEN 32
 
 int dp_parse_args(int argc, char **argv);
 char *dp_get_pf0_name();

@@ -98,6 +98,9 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id));
 		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), 32, 
 							  rte_eth_dev_socket_id(port_id));
+		dp_set_vm_pxe_ip4(port_id, ntohl(req->add_machine.ip4_pxe_addr),
+							  rte_eth_dev_socket_id(port_id));
+		dp_set_vm_pxe_str(port_id, req->add_machine.pxe_str);
 		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, 128,
 							  rte_eth_dev_socket_id(port_id));
 		dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr), 
