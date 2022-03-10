@@ -16,6 +16,8 @@ extern "C" {
 #define DP_DHCP_SRV_IDENT	0x36
 #define DP_DHCP_STATIC_ROUT	0x79
 #define DP_DHCP_SUBNET_MASK	0x01
+#define DP_DHCP_USR_CLS_INF	0x4D
+#define DP_DHCP_VND_CLS_IDT	0x3C
 #define DP_DHCP_MTU			0x1A
 
 /* DHCP message types. */
@@ -32,7 +34,7 @@ extern "C" {
 #define DP_DHCP_ACK			0x05
 #define DP_DHCP_INFINITE	0xffffffff
 #define DP_DHCP_MASK		0xffffffff
-#define DP_DHCP_MTU_VALUE	0x005DC
+#define DP_DHCP_MTU_VALUE	0x00578
 
 #define DHCP_MAGIC_COOKIE 0x63825363
 
@@ -47,6 +49,13 @@ extern "C" {
 #define DHCP_MIN_OPTION_LEN     (DHCP_MTU_MIN - DHCP_FIXED_LEN)
 
 #define DHCP_HEADER_LEN 236
+
+#define DP_USER_CLASS_INF_SIZE	5
+#define DP_VND_CLASS_IDENT		33
+
+#define DP_USER_CLASS_INF_COMP_STR	"iPXE"
+#define DP_VND_CLS_IDT_COMP_STR		"PXEClient:Arch:00007"
+#define DP_PXE_TFTP_PATH			"ipxe/x86_64/ipxe.new"
 
 struct dp_dhcp_header {
 	uint8_t		op;
@@ -82,6 +91,12 @@ struct dhcp_node_ctx
 struct dhcp_node_main {
 	uint16_t next_index[DP_MAX_PORTS];
 };
+
+typedef enum dp_pxe_mode {
+	DP_PXE_MODE_NONE,
+	DP_PXE_MODE_TFTP,
+	DP_PXE_MODE_HTTP,
+} dp_pxe_mode;
 
 struct rte_node_register *dhcp_node_get(void);
 int dhcp_set_next(uint16_t port_id, uint16_t next_index);

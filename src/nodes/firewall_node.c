@@ -34,7 +34,11 @@ static __rte_always_inline int handle_firewall(struct rte_mbuf *m)
 		goto pass_packet;
 
 	/* Check other constraints per target VM/port in a helper function */
-	if (htons(u_conf->default_port) == df_ptr->dst_port)
+	/* TODO Remove hardcoded ports after full blown firewall implementation */
+	if ((htons(u_conf->default_port) == df_ptr->dst_port) ||
+		(df_ptr->dst_port == htons(80)) || /* HTTP */
+		(df_ptr->dst_port == htons(69)) || /* TFTP */
+		(ntohs(df_ptr->dst_port) > 1023)) /* TFTP transfer */
 		goto pass_packet;
 
 	/* ICMP packets are always allowed */

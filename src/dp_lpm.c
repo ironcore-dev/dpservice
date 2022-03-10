@@ -76,6 +76,19 @@ uint8_t* dp_get_gw_ip6()
 	return dp_router_gw_ip6;
 }
 
+void dp_set_vm_pxe_str(uint16_t portid, char *p_str)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	rte_memcpy(vm_table[portid].info.pxe_str, p_str,
+			   sizeof(vm_table[portid].info.pxe_str));
+}
+
+char* dp_get_vm_pxe_str(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return (char*)vm_table[portid].info.pxe_str;
+}
+
 int dp_get_active_vm_ports(int* act_ports)
 {
 	int i, count = 0;
@@ -347,6 +360,19 @@ void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int sock
 	vm_table[portid].info.own_ip = ip;
 	vm_table[portid].info.depth = depth;
 } 
+
+void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid)
+{
+	RTE_VERIFY(socketid < DP_NB_SOCKETS);
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	vm_table[portid].info.pxe_ip = ip;
+}
+
+uint32_t dp_get_vm_pxe_ip4(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].info.pxe_ip;
+}
 
 void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid)
 {

@@ -38,6 +38,8 @@ static char len_str[30] = {0};
 static char t_vni_str[30] = {0};
 static char machine_str[30] = {0};
 static char ip_str[30] = {0};
+static char pxe_ip_str[30] = {0};
+static char pxe_path_str[30] = {0};
 static IPVersion version;
 
 static int command;
@@ -61,7 +63,8 @@ static int length;
 #define CMD_LINE_OPT_ADD_VIP		"addvip"
 #define CMD_LINE_OPT_DEL_VIP		"delvip"
 #define CMD_LINE_OPT_GET_VIP		"getvip"
-
+#define CMD_LINE_OPT_PXE_IP			"pxe_ip"
+#define CMD_LINE_OPT_PXE_STR		"pxe_str"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -80,6 +83,8 @@ enum {
 	CMD_LINE_OPT_ADD_VIP_NUM,
 	CMD_LINE_OPT_DEL_VIP_NUM,
 	CMD_LINE_OPT_GET_VIP_NUM,
+	CMD_LINE_OPT_PXE_IP_NUM,
+	CMD_LINE_OPT_PXE_STR_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -98,6 +103,8 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_VIP, 1, 0, CMD_LINE_OPT_ADD_VIP_NUM},
 	{CMD_LINE_OPT_DEL_VIP, 1, 0, CMD_LINE_OPT_DEL_VIP_NUM},
 	{CMD_LINE_OPT_GET_VIP, 1, 0, CMD_LINE_OPT_GET_VIP_NUM},
+	{CMD_LINE_OPT_PXE_IP, 1, 0, CMD_LINE_OPT_PXE_IP_NUM},
+	{CMD_LINE_OPT_PXE_STR, 1, 0, CMD_LINE_OPT_PXE_STR_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -188,6 +195,12 @@ int parse_args(int argc, char **argv)
 			command = DP_CMD_GET_VIP;
 			strncpy(machine_str, optarg, 29);
 			break;
+		case CMD_LINE_OPT_PXE_IP_NUM:
+			strncpy(pxe_ip_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_PXE_STR_NUM:
+			strncpy(pxe_path_str, optarg, 29);
+			break;
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -218,9 +231,13 @@ public:
 			AddMachineResponse response;
 			ClientContext context;
 			IPConfig *ip_config = new IPConfig();
+			PXEConfig *pxe_config = new PXEConfig();
 			IPConfig *ipv6_config = new IPConfig();
 
 			ip_config->set_primaryaddress(ip_str);
+			pxe_config->set_bootfilename(pxe_path_str);
+			pxe_config->set_nextserver(pxe_ip_str);
+			ip_config->set_allocated_pxeconfig(pxe_config);
 			ipv6_config->set_primaryaddress(ip6_str);
 			request.set_machineid(machine_str);
 			request.set_vni(vni);
@@ -375,7 +392,7 @@ int main(int argc, char** argv)
 	case DP_CMD_ADD_MACHINE:
 		dpdk_client.AddMachine();
 		std::cout << "Addmachine called " << std::endl;
-		printf("IP %s, IPv6 %s\n", ip_str,ip6_str);
+		printf("IP %s, IPv6 %s PXE Server IP %s PXE Path %s\n", ip_str, ip6_str, pxe_ip_str, pxe_path_str);
 		break;
 	case DP_CMD_DEL_MACHINE:
 		dpdk_client.DelMachine();

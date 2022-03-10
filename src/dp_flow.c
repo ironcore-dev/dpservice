@@ -41,11 +41,12 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 	key->proto = df_ptr->l4_type;
 
 	if (df_ptr->flags.nat == DP_NAT_DNAT || df_ptr->flags.nat == DP_NAT_SNAT) {
-		key->port_start = 0;
-		key->port_end = 0;
+		key->if_idx = 0;
 	} else {
-		key->port_start = m->port;
-		key->port_end = df_ptr->nxt_hop;
+		if (dp_is_pf_port_id(df_ptr->nxt_hop))
+			key->if_idx = m->port;
+		else
+			key->if_idx = df_ptr->nxt_hop;
 	}
 
 	switch (df_ptr->l4_type) {
@@ -74,9 +75,6 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 		port_tmp = key->port_src;
 		key->port_src = key->port_dst;
 		key->port_dst = port_tmp;
-		port_tmp = key->port_start;
-		key->port_start = key->port_end;
-		key->port_end = port_tmp;
 	}
 }
 
@@ -93,7 +91,7 @@ bool dp_flow_exists(struct flow_key *key)
 void dp_add_flow(struct flow_key *key)
 {
 	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port %d add key failed\n", key->port_start);
+		rte_exit(EXIT_FAILURE, "flow table for port %d add key failed\n", key->if_idx);
 }
 
 void dp_delete_flow(struct flow_key *key)
@@ -110,7 +108,7 @@ void dp_delete_flow(struct flow_key *key)
 void dp_add_flow_data(struct flow_key *key, void* data)
 {
 	if (rte_hash_add_key_data(ipv4_flow_tbl, key, data) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port %d add data failed\n", key->port_start);
+		rte_exit(EXIT_FAILURE, "flow table for port %d add data failed\n", key->if_idx);
 }
 
 void dp_get_flow_data(struct flow_key *key, void **data)

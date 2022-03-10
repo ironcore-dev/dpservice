@@ -17,6 +17,6 @@ __rte_always_inline struct dp_flow * alloc_dp_flow_ptr(struct rte_mbuf *m)
 
 __rte_always_inline void init_dp_mbuf_priv1(struct rte_mbuf *m)
 {
-	if (!m)
-		memset(m + 1, 0, sizeof(struct dp_flow));
+	if (m)
+		memset((void*)(m + 1), 0, sizeof(struct dp_flow));
 }

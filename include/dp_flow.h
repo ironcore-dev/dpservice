@@ -19,8 +19,7 @@ struct flow_key {
 	uint32_t ip_src;
 	uint16_t port_dst;
 	uint16_t port_src;
-	uint16_t port_start;
-	uint16_t port_end;
+	uint16_t if_idx;
 	uint8_t  proto;
 } __rte_packed;
 

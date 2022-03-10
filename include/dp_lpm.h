@@ -42,9 +42,11 @@ struct macip_entry {
 	uint32_t	virt_ip;
 	uint8_t		depth;
 	uint8_t		nat;
-	uint8_t	dhcp_ipv6[16];
-	uint8_t	vm_ipv6[16];
-	uint8_t	virt_ipv6[16];
+	uint8_t		dhcp_ipv6[16];
+	uint8_t		vm_ipv6[16];
+	uint8_t		virt_ipv6[16];
+	uint32_t	pxe_ip;
+	uint8_t		pxe_str[VM_MACHINE_PXE_STR_LEN];
 };
 
 struct vm_entry {
@@ -103,6 +105,10 @@ void dp_del_vm(int portid, int socketid);
 int dp_get_active_vm_ports(int* act_ports);
 uint8_t* dp_get_vm_machineid(uint16_t portid);
 int dp_get_vm_vni(uint16_t portid);
+uint32_t dp_get_vm_pxe_ip4(uint16_t portid);
+void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid);
+char* dp_get_vm_pxe_str(uint16_t portid);
+void dp_set_vm_pxe_str(uint16_t portid, char *p_str);
 #ifdef __cplusplus
 }
 #endif
