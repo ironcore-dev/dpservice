@@ -457,7 +457,10 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 
 		if_indextoname(dev_info.if_index, ifname);
 		if ((type == DP_PORT_PF) && (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0)) {
-			dp_port_flow_isolate(port_id);
+			
+			if (get_op_env()!=DP_OP_ENV_SCAPYTEST)
+				dp_port_flow_isolate(port_id);
+			
 			dp_port_prepare(type, port_id, &dp_port_ext);
 			dp_add_pf_port_id(port_id);
 			return port_id;
