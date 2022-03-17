@@ -36,7 +36,7 @@ static __rte_always_inline uint16_t ipv6_decap_node_process(struct rte_graph *gr
 													 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
-	struct dp_flow *df;
+	// struct dp_flow *df;
 	int i;
 
 
@@ -44,11 +44,13 @@ static __rte_always_inline uint16_t ipv6_decap_node_process(struct rte_graph *gr
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		df = get_dp_flow_ptr(mbuf0);
+		// df = get_dp_flow_ptr(mbuf0);
 		if (handle_ipv6_decap(mbuf0)) {
 
-				df->flags.flow_type=DP_FLOW_TYPE_INCOMING;
-				rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_SRV6_DECAP, mbuf0);
+			//TODO: this node is now useless, thus will be removed
+			printf("packets wrongly enters ipv6_decap \n");
+				// df->flags.flow_type=DP_FLOW_TYPE_INCOMING;
+				// rte_node_enqueue_x1(graph, node, IPV6_DECAP_NEXT_SRV6_DECAP, mbuf0);
 		
 		}
 		else {
@@ -75,7 +77,6 @@ static struct rte_node_register ipv6_decap_node_base = {
 	.next_nodes =
 		{
 			[IPV6_DECAP_NEXT_DROP] = "drop",
-			[IPV6_DECAP_NEXT_SRV6_DECAP] = "srv6_decap",
 		},
 };
 

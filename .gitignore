@@ -9,3 +9,4 @@ src/nodes/*.swo
 proto/*.h
 proto/*.cc
 __*
+*.pcap

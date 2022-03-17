@@ -5,29 +5,31 @@
 #include "dp_rte_flow.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-enum
-{
-	IPIP_TUNNEL_NEXT_DROP,
-    IPIP_TUNNEL_NEXT_IPV6_ENCAP,
-    IPIP_TUNNEL_NEXT_IPV4_LOOKUP,
-    IPIP_TUNNEL_NEXT_IPV6_LOOKUP,
-	IPIP_TUNNEL_NEXT_MAX
-};
+	enum
+	{
+		IPIP_TUNNEL_NEXT_DROP,
+		IPIP_TUNNEL_NEXT_IPV6_ENCAP,
+		IPIP_TUNNEL_NEXT_IPV4_LOOKUP,
+		IPIP_TUNNEL_NEXT_IPV6_LOOKUP,
+		IPIP_TUNNEL_NEXT_MAX
+	};
 
-struct ipip_tunnel_node_ctx
-{
-	uint16_t next;
-};
+	struct ipip_tunnel_node_ctx
+	{
+		uint16_t next;
+	};
 
-struct ipip_tunnel_node_main {
-	uint16_t next_index[DP_MAX_PORTS];
-};
+	struct ipip_tunnel_node_main
+	{
+		uint16_t next_index[DP_MAX_PORTS];
+	};
 
-struct rte_node_register *ipip_tunnel_node_get(void);
-int ipip_tunnel_set_next(uint16_t port_id, uint16_t next_index);
+	struct rte_node_register *ipip_tunnel_node_get(void);
+	int ipip_tunnel_set_next(uint16_t port_id, uint16_t next_index);
 
 #ifdef __cplusplus
 }

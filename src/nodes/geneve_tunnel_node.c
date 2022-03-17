@@ -75,9 +75,6 @@ static __rte_always_inline int handle_geneve_tunnel_decap(struct rte_mbuf *m,str
     rte_memcpy(&df->tun_info.dst_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
 	// df->tun_info.dst_vni = tmp_vni >> 8;
 
-	// printf("tmp_vni inside geneve header is %#x \n",tmp_vni);
-	printf("dst_vni inside geneve header is %#x \n",df->tun_info.dst_vni);
-
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 	if (ntohs(geneve_hdr->protocol) == RTE_ETHER_TYPE_IPV6){
 		df->l3_type=RTE_ETHER_TYPE_IPV6;

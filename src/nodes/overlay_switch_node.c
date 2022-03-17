@@ -10,7 +10,6 @@
 #include "dp_util.h"
 #include "dp_rte_flow.h"
 
-
 struct overlay_switch_node_main overlay_switch_node;
 
 static int overlay_switch_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -24,18 +23,18 @@ static int overlay_switch_node_init(const struct rte_graph *graph, struct rte_no
 	return 0;
 }
 
-static __rte_always_inline bool is_encaped_geneve_pkt(struct rte_mbuf *m){
+static __rte_always_inline bool is_encaped_geneve_pkt(struct rte_mbuf *m)
+{
 
 	struct rte_udp_hdr *udp_hdr;
 	struct underlay_conf *u_conf;
 
 	u_conf = get_underlay_conf();
-	udp_hdr=rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
-										  sizeof(struct rte_ipv6_hdr));
-		
+	udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
+									  sizeof(struct rte_ipv6_hdr));
+
 	// 	// ??? is it better to say ntohs(udp_hdr->dst_port) == GENEVE_UDP_PORT?
 	return ntohs(udp_hdr->dst_port) == u_conf->src_port;
-
 }
 
 static __rte_always_inline int handle_overlay_switch(struct rte_mbuf *m)
@@ -46,69 +45,74 @@ static __rte_always_inline int handle_overlay_switch(struct rte_mbuf *m)
 
 	df = get_dp_flow_ptr(m);
 
-	if (df->flags.flow_type==DP_FLOW_TYPE_OUTGOING){
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+	{
 		// printf("outgoing packets \n");
 
-		if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_IPIP){
+		if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP)
+		{
 			// printf("sent to ipip tunnel node \n");
 			ret = OVERLAY_SWITCH_NEXT_IPIP;
 			return ret;
 		}
 
-		if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
+		if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
+		{
 			ret = OVERLAY_SWITCH_NEXT_GENEVE;
 			return ret;
 		}
-
 	}
 
-	if (df->flags.flow_type==DP_FLOW_TYPE_INCOMING){
-	
-		proto_id = extract_outer_ipv6_header(m,NULL,0);
-		if (proto_id<0){
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+	{
+
+		proto_id = extract_outer_ipv6_header(m, NULL, 0);
+		if (proto_id < 0)
+		{
 			printf("failed to extract outer ipv6 header \n");
 			return ret;
 		}
 
 		// rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
 
-		if ((proto_id ==DP_IP_PROTO_IPv4_ENCAP || proto_id ==DP_IP_PROTO_IPv6_ENCAP) && get_overlay_type()==DP_FLOW_OVERLAY_TYPE_IPIP){
+		if ((proto_id == DP_IP_PROTO_IPv4_ENCAP || proto_id == DP_IP_PROTO_IPv6_ENCAP) && get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP)
+		{
 			ret = OVERLAY_SWITCH_NEXT_IPIP;
-			df->l3_type=(proto_id==DP_IP_PROTO_IPv4_ENCAP)? RTE_ETHER_TYPE_IPV4 : RTE_ETHER_TYPE_IPV6;
+			df->l3_type = (proto_id == DP_IP_PROTO_IPv4_ENCAP) ? RTE_ETHER_TYPE_IPV4 : RTE_ETHER_TYPE_IPV6;
 			return ret;
 		}
 
-		if (proto_id==DP_IP_PROTO_UDP && is_encaped_geneve_pkt(m) && get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
-			ret=OVERLAY_SWITCH_NEXT_GENEVE;
+		if (proto_id == DP_IP_PROTO_UDP && is_encaped_geneve_pkt(m) && get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
+		{
+			ret = OVERLAY_SWITCH_NEXT_GENEVE;
 			return ret;
 		}
 
 		// printf("not a srv6 or ipip packet, send to ipv6 lookup \n");
-		ret=OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
-
+		ret = OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
 	}
 
 	return ret;
-} 
+}
 
 static __rte_always_inline uint16_t overlay_switch_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+																struct rte_node *node,
+																void **objs,
+																uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	int i, ret;
-	
+
 	// struct dp_flow *df;
 
 	pkts = (struct rte_mbuf **)objs;
 
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < cnt; i++)
+	{
 		mbuf0 = pkts[i];
 		ret = handle_overlay_switch(mbuf0);
-	
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
 
+		rte_node_enqueue_x1(graph, node, ret, mbuf0);
 	}
 
 	return cnt;
@@ -132,10 +136,8 @@ static struct rte_node_register overlay_switch_node_base = {
 			[OVERLAY_SWITCH_NEXT_DROP] = "drop",
 			[OVERLAY_SWITCH_NEXT_GENEVE] = "geneve_tunnel",
 			[OVERLAY_SWITCH_NEXT_IPIP] = "ipip_tunnel",
-			[OVERLAY_SWITCH_NEXT_SRV6_ENCAP] = "srv6_encap",
-			[OVERLAY_SWITCH_NEXT_SRV6_DECAP] = "srv6_decap",
 			[OVERLAY_SWITCH_NEXT_IPV6_LOOKUP] = "ipv6_lookup", // for unrecognized ipv5 packets, normally it is not needed
-			
+
 		},
 };
 

@@ -12,7 +12,6 @@
 #include "dp_util.h"
 #include "dp_mbuf_dyn.h"
 
-#include "nodes/srv6_common.h"
 #include "dp_rte_flow.h"
 
 #define DP_MAX_PATT_ACT	7
@@ -422,7 +421,6 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 
 	/* Redirect unsent pkts to drop node */
 	if (sent_count != cnt) {
-		printf("drop packets in tx_node \n");
 		rte_node_enqueue(graph, node, TX_NEXT_DROP,
 				 &objs[sent_count], cnt - sent_count);
 	}

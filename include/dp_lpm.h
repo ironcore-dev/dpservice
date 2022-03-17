@@ -36,7 +36,7 @@ extern "C" {
 #define IPV6_DP_RIB_MAX_RULES	1024
 
 #define DP_ENCAP_TYPE_GENEVE 1
-#define DP_ENCAP_TYPE_SRV6 2
+// #define DP_ENCAP_TYPE_SRV6 2
 
 #define DP_NAT_OFF	0
 #define DP_NAT_ON	1
