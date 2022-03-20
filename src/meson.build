@@ -3,6 +3,7 @@ dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'nodes/arp_node.c',
 			  'nodes/arp_node.c','nodes/ipv6_nd_node.c', 'nodes/tx_node.c', 'nodes/ipv4_lookup_node.c', 'nodes/l2_decap_node.c',
 			  'dp_mbuf_dyn.c', 'dp_lpm.c', 'nodes/ipv6_encap_node.c', 'nodes/firewall_node.c',
 			  'nodes/ipv6_lookup_node.c', 'nodes/ipv6_decap_node.c', 'nodes/geneve_tunnel_node.c','nodes/overlay_switch_node.c','nodes/ipip_tunnel_node.c','dp_util.c','dp_periodic_msg.c', 
+			  'nodes/conntrack_node.c', 'nodes/dnat_node.c',
 			  'nodes/nat_node.c', 'grpc/dp_grpc_service.cpp', 'grpc/dp_async_grpc.cpp', 'grpc/dp_grpc_impl.c', 'dp_flow.c',
 			  'dp_netlink.c','dp_rte_flow.c']
 

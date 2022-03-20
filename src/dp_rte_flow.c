@@ -49,14 +49,10 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	df = get_dp_flow_ptr(pkt);
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
 	{
-		if (hdr != NULL)
-		{
+		if (hdr)
 			ipv4_hdr = (struct rte_ipv4_hdr *)hdr;
-		}
 		else
-		{
 			ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, offset);
-		}
 
 		df->src.src_addr = ipv4_hdr->src_addr;
 		df->dst.dst_addr = ipv4_hdr->dst_addr;
@@ -66,14 +62,10 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	}
 	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 	{
-		if (hdr != NULL)
-		{
+		if (hdr)
 			ipv6_hdr = (struct rte_ipv6_hdr *)hdr;
-		}
 		else
-		{
 			ipv6_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv6_hdr *, offset);
-		}
 
 		rte_memcpy(df->dst.dst_addr6, ipv6_hdr->dst_addr, sizeof(df->dst.dst_addr6));
 		rte_memcpy(df->src.src_addr6, ipv6_hdr->src_addr, sizeof(df->src.src_addr6));
