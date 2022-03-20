@@ -37,7 +37,7 @@ static const char * const default_patterns[] = {
 	"conntrack",
 	"dnat",
 	"firewall",
-	"nat",
+	"snat",
 	"l2_decap",
 	"ipv6_encap",
 	"ipv6_decap",

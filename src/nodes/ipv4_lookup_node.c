@@ -124,7 +124,7 @@ static struct rte_node_register ipv4_lookup_node_base = {
 			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
 			[IPV4_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
 			[IPV4_LOOKUP_NEXT_FIREWALL] = "firewall",
-			[IPV4_LOOKUP_NEXT_NAT] = "nat",
+			[IPV4_LOOKUP_NEXT_NAT] = "snat",
 		},
 };
 

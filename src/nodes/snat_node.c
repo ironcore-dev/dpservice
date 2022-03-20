@@ -7,14 +7,14 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_util.h"
-#include "nodes/nat_node.h"
+#include "nodes/snat_node.h"
 
 
-static int nat_node_init(const struct rte_graph *graph, struct rte_node *node)
+static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
-	struct nat_node_ctx *ctx = (struct nat_node_ctx *)node->ctx;
+	struct snat_node_ctx *ctx = (struct snat_node_ctx *)node->ctx;
 
-	ctx->next = NAT_NEXT_DROP;
+	ctx->next = SNAT_NEXT_DROP;
 
 
 	RTE_SET_USED(graph);
@@ -22,7 +22,7 @@ static int nat_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline int handle_nat(struct rte_mbuf *m)
+static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 {
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
@@ -67,7 +67,7 @@ static __rte_always_inline int handle_nat(struct rte_mbuf *m)
 	return 1;
 }
 
-static __rte_always_inline uint16_t nat_node_process(struct rte_graph *graph,
+static __rte_always_inline uint16_t snat_node_process(struct rte_graph *graph,
 													 struct rte_node *node,
 													 void **objs,
 													 uint16_t cnt)
@@ -78,15 +78,15 @@ static __rte_always_inline uint16_t nat_node_process(struct rte_graph *graph,
 
 	pkts = (struct rte_mbuf **)objs;
 	/* Speculative next */
-	next_index = NAT_NEXT_DROP;
+	next_index = SNAT_NEXT_DROP;
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		ret = handle_nat(mbuf0);
+		ret = handle_snat(mbuf0);
 		if (ret == 1)
-			next_index = NAT_NEXT_L2_DECAP;
+			next_index = SNAT_NEXT_L2_DECAP;
 		else if (ret == 0)
-			next_index = NAT_NEXT_FIREWALL;
+			next_index = SNAT_NEXT_FIREWALL;
 
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
@@ -94,23 +94,23 @@ static __rte_always_inline uint16_t nat_node_process(struct rte_graph *graph,
 	return cnt;
 }
 
-static struct rte_node_register nat_node_base = {
-	.name = "nat",
-	.init = nat_node_init,
-	.process = nat_node_process,
+static struct rte_node_register snat_node_base = {
+	.name = "snat",
+	.init = snat_node_init,
+	.process = snat_node_process,
 
-	.nb_edges = NAT_NEXT_MAX,
+	.nb_edges = SNAT_NEXT_MAX,
 	.next_nodes =
 		{
-			[NAT_NEXT_L2_DECAP] = "l2_decap",
-			[NAT_NEXT_FIREWALL] = "firewall",
-			[NAT_NEXT_DROP] = "drop",
+			[SNAT_NEXT_L2_DECAP] = "l2_decap",
+			[SNAT_NEXT_FIREWALL] = "firewall",
+			[SNAT_NEXT_DROP] = "drop",
 		},
 };
 
-struct rte_node_register *nat_node_get(void)
+struct rte_node_register *snat_node_get(void)
 {
-	return &nat_node_base;
+	return &snat_node_base;
 }
 
-RTE_NODE_REGISTER(nat_node_base);
+RTE_NODE_REGISTER(snat_node_base);
