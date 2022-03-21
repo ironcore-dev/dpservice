@@ -24,6 +24,34 @@ static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 {
+	struct rte_ipv4_hdr *ipv4_hdr;
+	struct rte_tcp_hdr *tcp_hdr;
+	struct dp_flow *df_ptr;
+	struct flow_key key;
+	struct flow_value *cntrack = NULL;
+
+	memset(&key, 0, sizeof(struct flow_key));
+	df_ptr = get_dp_flow_ptr(m);
+
+	if (df_ptr->conntrack)
+		cntrack = df_ptr->conntrack;
+
+	if (!cntrack)
+		return 1;
+
+	/* We already know what to do */
+	if (cntrack->flow_status == DP_FLOW_STATUS_SRC_NAT &&
+		cntrack->dir == DP_FLOW_DIR_REPLY) {
+		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
+					sizeof(struct rte_ether_hdr));
+		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
+		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
+		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
+		ipv4_hdr->hdr_checksum = 0;
+		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
+		tcp_hdr->cksum = 0;
+		tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+	}
 	return 1;
 }
 

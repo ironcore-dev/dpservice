@@ -140,7 +140,7 @@ static struct rte_node_register geneve_tunnel_node_base = {
 		{
 			[GENEVE_TUNNEL_NEXT_DROP] = "drop",
 			[GENEVE_TUNNEL_NEXT_IPV6_ENCAP] = "ipv6_encap",
-			[GENEVE_TUNNEL_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
+			[GENEVE_TUNNEL_NEXT_IPV4_LOOKUP] = "conntrack",
 			[GENEVE_TUNNEL_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 		},
 };

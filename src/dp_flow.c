@@ -40,15 +40,6 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 	}
 	key->proto = df_ptr->l4_type;
 
-	if (df_ptr->flags.nat == DP_NAT_DNAT || df_ptr->flags.nat == DP_NAT_SNAT) {
-		key->if_idx = 0;
-	} else {
-		if (dp_is_pf_port_id(df_ptr->nxt_hop))
-			key->if_idx = m->port;
-		else
-			key->if_idx = df_ptr->nxt_hop;
-	}
-
 	switch (df_ptr->l4_type) {
 		case IPPROTO_TCP:
 				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
@@ -65,17 +56,19 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 				key->port_src = 0;
 				break;
 	}
+}
 
-	if (key->ip_src > key->ip_dst) {
-		uint32_t ip_tmp;
-		uint16_t port_tmp;
-		ip_tmp = key->ip_src;
-		key->ip_src = key->ip_dst;
-		key->ip_dst = ip_tmp;
-		port_tmp = key->port_src;
-		key->port_src = key->port_dst;
-		key->port_dst = port_tmp;
-	}
+void dp_invert_flow_key(struct flow_key *key /* in / out */)
+{
+	uint32_t ip_tmp;
+	uint16_t port_tmp;
+
+	ip_tmp = key->ip_src;
+	key->ip_src = key->ip_dst;
+	key->ip_dst = ip_tmp;
+	port_tmp = key->port_src;
+	key->port_src = key->port_dst;
+	key->port_dst = port_tmp;
 }
 
 bool dp_flow_exists(struct flow_key *key)
@@ -91,7 +84,7 @@ bool dp_flow_exists(struct flow_key *key)
 void dp_add_flow(struct flow_key *key)
 {
 	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port %d add key failed\n", key->if_idx);
+		rte_exit(EXIT_FAILURE, "flow table for port add key failed\n");
 }
 
 void dp_delete_flow(struct flow_key *key)
@@ -108,13 +101,24 @@ void dp_delete_flow(struct flow_key *key)
 void dp_add_flow_data(struct flow_key *key, void* data)
 {
 	if (rte_hash_add_key_data(ipv4_flow_tbl, key, data) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port %d add data failed\n", key->if_idx);
+		rte_exit(EXIT_FAILURE, "flow table for port add data failed\n");
 }
 
 void dp_get_flow_data(struct flow_key *key, void **data)
 {
 	if (rte_hash_lookup_data(ipv4_flow_tbl, key, data) < 0)
 		data = NULL;
+}
+
+bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
+{
+
+	if ((key1->proto != key2->proto) || (key1->ip_src != key2->ip_src)
+		|| (key1->ip_dst != key2->ip_dst) || (key1->port_dst != key2->port_dst)
+		|| (key1->port_src != key2->port_src))
+		return false;
+
+	return true;
 }
 
 void dp_process_aged_flows(int port_id)

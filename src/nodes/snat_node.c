@@ -28,42 +28,50 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key key;
+	struct flow_value *cntrack = NULL;
 
 	memset(&key, 0, sizeof(struct flow_key));
 	df_ptr = get_dp_flow_ptr(m);
 
+	if (df_ptr->conntrack)
+		cntrack = df_ptr->conntrack;
 
-	if (df_ptr->flags.nat == DP_NAT_SNAT) {
-		if (df_ptr->l4_type == DP_IP_PROTO_TCP) {
+	if (!cntrack)
+		return 1;
+
+	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
+		if (dp_is_vm_natted(m->port) && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-											sizeof(struct rte_ether_hdr));
+								sizeof(struct rte_ether_hdr));
 			ipv4_hdr->src_addr = dp_get_vm_nat_ip(m->port);
+			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			ipv4_hdr->hdr_checksum = 0;
 			ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
 			tcp_hdr->cksum = 0;
 			tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
-			return 0;
+
+			/* Expect the new destination in this conntrack object */
+			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
+			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
+			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 		}
-	} else if (df_ptr->flags.nat == DP_NAT_DNAT) {
-		if (df_ptr->l4_type == DP_IP_PROTO_TCP) {
-			ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr*);
-			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
-			dp_build_flow_key(&key, m);
-			if (dp_flow_exists(&key)) {
-				df_ptr->nxt_hop = dp_get_vm_port_id_per_nat_ip(ntohl(ipv4_hdr->dst_addr));
-				if (df_ptr->nxt_hop < 0)
-					return -1;
-				ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(df_ptr->nxt_hop));
-				ipv4_hdr->hdr_checksum = 0;
-				ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
-				tcp_hdr->cksum = 0;
-				tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);;
-			}
-			return 1;
-		}
-		return -1;
-	} 
+		return 1;
+	}
+	/* We already know what to do */
+	if (cntrack->flow_status == DP_FLOW_STATUS_SRC_NAT &&
+		cntrack->dir == DP_FLOW_DIR_ORG) {
+		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
+					sizeof(struct rte_ether_hdr));
+		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
+		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
+		ipv4_hdr->hdr_checksum = 0;
+		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
+		tcp_hdr->cksum = 0;
+		tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+	}
 	return 1;
 }
 

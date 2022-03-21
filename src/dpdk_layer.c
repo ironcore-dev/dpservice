@@ -90,7 +90,7 @@ int dp_dpdk_init(int argc, char **argv)
 	memset(&dp_layer, 0, sizeof(struct dp_dpdk_layer));
 
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS), 
-												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE,
+												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE + 32,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
 
