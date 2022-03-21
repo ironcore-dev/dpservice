@@ -15,7 +15,7 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
-#define DP_MAX_PATT_ACT	7
+#define DP_MAX_PATT_ACT 7
 
 static struct ethdev_tx_node_main ethdev_tx_main;
 static struct dp_flow *df;
@@ -76,26 +76,34 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 		if (mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) {
 			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-			} else 
-				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
+			}
+			else
+				rewrite_eth_hdr(mbuf0, port, df->l3_type);
 		}
+
+		// cannot offload traffic forwarding from pf1 to vf of pf0
+		if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+			if (mbuf0->port != dp_get_pf0_port_id())
+				df->flags.valid = 0;
+		}
+
 		if (df && df->flags.valid && df->conntrack)
 			dp_handle_traffic_forward_offloading(mbuf0, df);
-	}	
+	}
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,
-				 cnt);
+								cnt);
 
 	/* Redirect unsent pkts to drop node */
 	if (sent_count != cnt) {
 		rte_node_enqueue(graph, node, TX_NEXT_DROP,
-				 &objs[sent_count], cnt - sent_count);
+						&objs[sent_count], cnt - sent_count);
 	}
 
 	return sent_count;
 }
 
-struct ethdev_tx_node_main * tx_node_data_get(void)
+struct ethdev_tx_node_main *tx_node_data_get(void)
 {
 	return &ethdev_tx_main;
 }

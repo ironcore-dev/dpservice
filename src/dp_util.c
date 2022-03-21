@@ -19,6 +19,7 @@
 #define DP_OP_ENV_OPT_SIZE 10
 #define DP_CONF_FILE_SIZE 64
 #define DP_LINE_SIZE 128
+#define DP_WCMP_FRAC_SIZE 5
 
 static int debug_mode = 0;
 static int no_offload = 0;
@@ -26,6 +27,8 @@ static int no_conntrack = 0;
 static int no_stats = 0;
 static int tunnel_opt = DP_FLOW_OVERLAY_TYPE_IPIP;
 static int op_env = DP_OP_ENV_HARDWARE;
+static double wcmp_frac = 1.0;
+static int wcmp_enabled = 0;
 static char pf0name[IF_NAMESIZE] = {0};
 static char pf1name[IF_NAMESIZE] = {0};
 static char vf_pattern[IF_NAMESIZE] = {0};
@@ -35,6 +38,7 @@ static uint16_t pf_ports[DP_MAX_PF_PORT][2] = {0};
 static char tunnel_opt_str[DP_TUNNEL_OPT_SIZE] = {0};
 static char op_env_opt_str[DP_OP_ENV_OPT_SIZE] = {0};
 static char conf_file_str[DP_CONF_FILE_SIZE] = {0};
+static char wcmp_frac_opt_str[DP_WCMP_FRAC_SIZE] = {0};
 
 static const char short_options[] = "d" /* debug */
 									"D" /* promiscuous */;
@@ -57,6 +61,7 @@ static const char op_env_opt_scapytest[] = "scapytest";
 #define CMD_LINE_OPT_NO_OFFLOAD "no-offload"
 #define CMD_LINE_OPT_NO_CONNTRACK "no-conntrack"
 #define CMD_LINE_OPT_NO_STATS "no-stats"
+#define CMD_LINE_OPT_WCMP_FRAC "wcmp-frac"
 
 enum
 {
@@ -72,6 +77,7 @@ enum
 	CMD_LINE_OPT_NO_CONNTRACK_NUM,
 	CMD_LINE_OPT_NO_STATS_NUM,
 	CMD_LINE_OPT_CONF_FILE_NUM,
+	CMD_LINE_OPT_WCMP_FRAC_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -81,7 +87,8 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_VF_PATTERN, 1, 0, CMD_LINE_OPT_VF_PATTERN_NUM},
 	{CMD_LINE_OPT_TUNNEL_OPT, 1, 0, CMD_LINE_OPT_TUNNEL_OPT_NUM},
 	{CMD_LINE_OPT_OP_ENV, 1, 0, CMD_LINE_OPT_OP_ENV_NUM},
-	{CMD_LINE_OPT_VNI, 0, 0, CMD_LINE_OPT_VNI_NUM},
+	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
+	{CMD_LINE_OPT_WCMP_FRAC, 1, 0, CMD_LINE_OPT_WCMP_FRAC_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
 	{CMD_LINE_OPT_NO_CONNTRACK, 0, 0, CMD_LINE_OPT_NO_CONNTRACK_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
@@ -101,6 +108,7 @@ static void dp_print_usage(const char *prgname)
 			" --ipv6=underlay_ipv6"
 			" --vf-pattern=eth*"
 			" [--tun_opt]=ipip/geneve"
+			" [--wcmp-frac]=[0.0-1.0]"
 			" [--op_env]=scapytest/hardware"
 			" [--conf-file]=/file_path"
 			" [--no-stats]"
@@ -215,6 +223,7 @@ int dp_parse_args(int argc, char **argv)
 			strncpy(conf_file_str, optarg, DP_CONF_FILE_SIZE);
 			break;
 		
+
 		case CMD_LINE_OPT_OP_ENV_NUM:
 			strncpy(op_env_opt_str, optarg, DP_OP_ENV_OPT_SIZE);
 			if (!strcmp(op_env_opt_str, op_env_opt_scapytest))
@@ -232,6 +241,12 @@ int dp_parse_args(int argc, char **argv)
 			strncpy(vni_str, optarg, DP_MAX_VNI_STR - 1);
 			temp = atoi(vni_str);
 			memcpy(get_underlay_conf()->vni, &temp, sizeof(get_underlay_conf()->vni));
+			break;
+
+		case CMD_LINE_OPT_WCMP_FRAC_NUM:
+			strncpy(wcmp_frac_opt_str, optarg, DP_WCMP_FRAC_SIZE - 1);
+			wcmp_enabled = 1;
+			wcmp_frac = strtod(wcmp_frac_opt_str, NULL);
 			break;
 
 		case CMD_LINE_OPT_NO_OFFLOAD_NUM:
@@ -287,6 +302,16 @@ int get_overlay_type()
 int get_op_env()
 {
 	return op_env;
+}
+
+int dp_is_wcmp_enabled()
+{
+	return wcmp_enabled;
+}
+
+double dp_get_wcmp_frac()
+{
+	return wcmp_frac;
 }
 
 int dp_is_stats_enabled()

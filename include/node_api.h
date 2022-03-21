@@ -26,10 +26,14 @@ struct dp_flow {
 		uint8_t		src_addr6[16];
 	} src;
 	uint32_t	nat_addr;
-	uint8_t		l4_type;
-	uint16_t	dst_port;
-	uint16_t	src_port;
-	uint8_t		icmp_type;
+	
+	uint8_t					l4_type;
+	uint16_t				dst_port;
+	uint16_t				src_port;
+	
+	uint8_t					icmp_type;
+	uint32_t                dp_flow_hash;
+
 	struct {
 		uint8_t		ul_src_addr6[16];
 		uint8_t		ul_dst_addr6[16];

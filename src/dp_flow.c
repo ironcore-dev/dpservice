@@ -187,5 +187,12 @@ void dp_process_aged_flows_non_offload()
 		if (unlikely((cur - flow_val->timestamp) > timeout))
 			dp_free_flow(flow_val);
 	}
+}
+
+hash_sig_t dp_get_flow_hash_value(struct flow_key *key){
+
+	//It is not necessary to first test if this key exists, since for now, this function
+	// is always called after either a flow is checked or added in the firewall node.
+	return rte_hash_hash(ipv4_flow_tbl,key);
 
 }

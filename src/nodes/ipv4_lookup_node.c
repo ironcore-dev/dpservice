@@ -11,6 +11,7 @@
 #include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_flow.h"
+#include "dp_multi_path.h"
 
 #include "rte_flow/dp_rte_flow.h"
 
@@ -61,6 +62,17 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	if (dp_is_offload_enabled())
 		df_ptr->flags.valid = 1;
 
+	// rewrite outgoing port if WCMP algorithm decides to do so
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
+		if (dp_is_wcmp_enabled()) {
+			egress_pf_port selected_port = calculate_port_by_hash(df_ptr->dp_flow_hash);
+			if (selected_port == PEER_PORT) {
+				df_ptr->nxt_hop = dp_get_pf1_port_id();
+				df_ptr->flags.valid = 0;
+			}
+		}
+	}
+	
 	return ret;
 }
 
@@ -79,8 +91,8 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 	{
 		mbuf0 = pkts[i];
 		route = handle_ipv4_lookup(mbuf0);
-		if (route >= 0) 
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT, 
+		if (route >= 0)
+			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT,
 								mbuf0);
 		else if (route == DP_ROUTE_DHCP)
 			// the ethernet header cannot be removed is due to dhcp node needs mac info
