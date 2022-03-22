@@ -21,6 +21,8 @@ bool dp_is_pf_port_id(uint16_t id);
 void dp_add_pf_port_id(uint16_t id);
 int dp_get_num_of_vfs();
 
+int get_overlay_type();
+
 #ifdef __cplusplus
 }
 #endif

@@ -8,6 +8,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
+#include "dp_rte_flow.h"
 
 struct l2_decap_node_main l2_decap_node;
 
@@ -29,7 +30,7 @@ static __rte_always_inline int handle_l2_decap(struct rte_mbuf *m)
 	df = get_dp_flow_ptr(m);
 
 	/* Pop the ethernet header */
-	if (!df->flags.geneve_hdr) {
+	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING) {
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 	}
 
@@ -43,17 +44,20 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	int i, ret;
-
+	
 	pkts = (struct rte_mbuf **)objs;
 
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		ret = handle_l2_decap(mbuf0);
-		if (!dp_is_pf_port_id(ret))
+		if (!dp_is_pf_port_id(ret)) {
 			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret], mbuf0);
-		else 
-			rte_node_enqueue_x1(graph, node, L2_DECAP_NEXT_GENEVE_ENCAP, mbuf0);
+		}
+		else {
+			rte_node_enqueue_x1(graph, node, L2_DECAP_OVERLAY_SWITCH, mbuf0);
+
+		}
 	}
 
 	return cnt;
@@ -75,7 +79,7 @@ static struct rte_node_register l2_decap_node_base = {
 	.next_nodes =
 		{
 			[L2_DECAP_NEXT_DROP] = "drop",
-			[L2_DECAP_NEXT_GENEVE_ENCAP] = "geneve_encap",
+			[L2_DECAP_OVERLAY_SWITCH]="overlay_switch",
 		},
 };
 

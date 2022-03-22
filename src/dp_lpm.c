@@ -543,6 +543,7 @@ void dp_del_vm(int portid, int socketid)
 		if (vm_table[portid].ipv4_rib)
 			rte_rib_free(vm_table[portid].ipv4_rib[socketid]);
 		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
+		// own mac address in the vm_entry needs to be refilled due to the above cleaning process
 		dp_set_mac(portid);
 	}
 }

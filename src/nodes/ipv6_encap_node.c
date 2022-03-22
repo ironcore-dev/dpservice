@@ -26,27 +26,23 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 {
 	struct underlay_conf *u_conf = get_underlay_conf();
 	struct rte_ipv6_hdr *ipv6_hdr;
-	struct rte_udp_hdr *udp_hdr;
 
-	udp_hdr = rte_pktmbuf_mtod(m, struct rte_udp_hdr *);
+    m->outer_l2_len = sizeof(struct rte_ether_hdr);
+    m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
+
 	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
 
 	if (!ipv6_hdr)
-		return 0;
+			return 0;
 
-	m->ol_flags = RTE_MBUF_F_TX_IPV6 | RTE_MBUF_F_TX_UDP_CKSUM;
-	m->outer_l2_len = sizeof(struct rte_ether_hdr);
-	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
-
-	ipv6_hdr->proto = DP_IP_PROTO_UDP;
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	ipv6_hdr->payload_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
-	rte_memcpy(ipv6_hdr->dst_addr, df->ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
+	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
+	ipv6_hdr->proto = df->tun_info.proto_id;
 
-	udp_hdr->dgram_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
-	udp_hdr->dgram_cksum = rte_ipv6_phdr_cksum(ipv6_hdr, m->ol_flags);
+	m->ol_flags = RTE_MBUF_F_TX_IPV6;
 
 	return 1;
 } 
@@ -66,10 +62,13 @@ static __rte_always_inline uint16_t ipv6_encap_node_process(struct rte_graph *gr
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
-		if (handle_ipv6_encap(mbuf0, df))
+		if (handle_ipv6_encap(mbuf0, df)){
 			rte_node_enqueue_x1(graph, node, ipv6_encap_node.next_index[df->nxt_hop], mbuf0);
-		else
+		}
+		else {
 			rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_DROP, mbuf0);
+
+		}
 	}	
 
 	return cnt;
