@@ -59,9 +59,11 @@ This will list all the test cases which are passed and failed.
 
 ### **Add Virtual Machine**
 ----
-	./build/test/dp_grpc_client --addmachine testvm1 --vni 100 --ipv4 172.32.4.9
+	./build/test/dp_grpc_client --addmachine testvm1 --vni 100 --ipv4 172.32.4.9 [--ipv6 2010::1 --pxe_ip 192.168.129.1 --pxe_str /ipxe/boot.ipxe]
 This adds a virtual machine with VNI 100 (Virtual Network Identifier) and IPv4 overlay 172.32.4.9 and assigns the name "testvm1" to the VM. It also prints the PCI details of the to virtual machine assigned virtual port. (with --ipv6 also an overlay IPv6 assignment possible. Overlay dual stack possible.)
-Use the name "testvm1" in order to address this VM again.
+Use the name "testvm1" in order to address this VM again.  
+	In case the VM needs to pxe-boot, the options for the pxe-boot can be added to --addmachine parameters as shown in the example. (--pxe_ip is the 
+	overlay IP where tftp and http pxe servers are residing, --pxe_str is the path for ipxe file on http server.)
 <br><br>
 
 ### **Delete Virtual Machine**
