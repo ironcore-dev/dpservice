@@ -470,9 +470,9 @@ void setup_lpm6(int port_id, int vni, const int socketid)
 	vm_table[port_id].vm_ready = 1;
 }
 
-int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct rte_ipv4_hdr *ipv4_hdr, struct vm_route *r, int socketid)
+int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
 {
-	uint32_t dst_ip = rte_be_to_cpu_32(ipv4_hdr->dst_addr);
+	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;

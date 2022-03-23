@@ -182,7 +182,7 @@ static struct rte_node_register cls_node_base = {
 		{
 			[CLS_NEXT_ARP] = "arp",
 			[CLS_NEXT_IPV6_ND] = "ipv6_nd",
-			[CLS_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
+			[CLS_NEXT_IPV4_LOOKUP] = "conntrack",
 			[CLS_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 			[CLS_NEXT_OVERLAY_SWITCH] = "overlay_switch",
 			[CLS_NEXT_DROP] = "drop",

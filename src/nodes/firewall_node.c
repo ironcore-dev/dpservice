@@ -24,40 +24,6 @@ static int firewall_node_init(const struct rte_graph *graph, struct rte_node *no
 
 static __rte_always_inline int handle_firewall(struct rte_mbuf *m)
 {
-	struct underlay_conf *u_conf = get_underlay_conf();
-	struct dp_flow *df_ptr;
-	struct flow_key key;
-	df_ptr = get_dp_flow_ptr(m);
-
-	/* Connections to the outer world are always allowed */
-	if (dp_is_pf_port_id(df_ptr->nxt_hop))
-		goto pass_packet;
-
-	/* Check other constraints per target VM/port in a helper function */
-	/* TODO Remove hardcoded ports after full blown firewall implementation */
-	if ((htons(u_conf->default_port) == df_ptr->dst_port) ||
-		(df_ptr->dst_port == htons(80)) || /* HTTP */
-		(df_ptr->dst_port == htons(69)) || /* TFTP */
-		(ntohs(df_ptr->dst_port) > 1023)) /* TFTP transfer */
-		goto pass_packet;
-
-	/* ICMP packets are always allowed */
-	if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
-		goto pass_packet;
-
-	/* Flows which were already seen are allowed */
-	dp_build_flow_key(&key, m);
-	if (!dp_flow_exists(&key))
-		return DP_FIREWL_DROP_PACKET;
-	else
-		return DP_FIREWL_PASS_PACKET;
-
-pass_packet:
-	if (!dp_is_pf_port_id(m->port)) {
-		dp_build_flow_key(&key, m);
-		if (!dp_flow_exists(&key))
-			dp_add_flow(&key);
-	}
 	return DP_FIREWL_PASS_PACKET;
 }
 

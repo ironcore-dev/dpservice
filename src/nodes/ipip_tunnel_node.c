@@ -120,7 +120,7 @@ static struct rte_node_register ipip_tunnel_node_base = {
 		{
 			[IPIP_TUNNEL_NEXT_DROP] = "drop",
 			[IPIP_TUNNEL_NEXT_IPV6_ENCAP] = "ipv6_encap",
-			[IPIP_TUNNEL_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
+			[IPIP_TUNNEL_NEXT_IPV4_LOOKUP] = "conntrack",
 			[IPIP_TUNNEL_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 		},
 };

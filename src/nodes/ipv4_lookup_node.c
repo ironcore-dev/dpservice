@@ -29,59 +29,29 @@ static int ipv4_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 
 static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 {
-	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df_ptr;
 	struct vm_route route;
 	int ret = 0;
 
 	df_ptr = get_dp_flow_ptr(m);
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-	{
-		// printf("got a decaped packet \n");
-		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
-		// printf("proto in ipv4: %#x \n",ipv4_hdr->next_proto_id);
-	}
-	else
-		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-										   sizeof(struct rte_ether_hdr));
-
-	if (extract_inner_l3_header(m, ipv4_hdr, 0) < 0)
-	{
-		printf("failed to extract dp info from inner l3 header \n");
+	if (!df_ptr)
 		return DP_ROUTE_DROP;
-	}
-
-	if (extract_inner_l4_header(m, ipv4_hdr + 1, 0) < 0)
-	{
-		printf("failed to extract dp info from inner l4 header \n");
-		return DP_ROUTE_DROP;
-	}
 
 	// TODO: add broadcast routes when machine is added
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
-	{
 		return DP_ROUTE_DHCP;
-	}
 
-	ret = lpm_get_ip4_dst_port(m->port, df_ptr->tun_info.dst_vni, ipv4_hdr, &route, rte_eth_dev_socket_id(m->port));
+	ret = lpm_get_ip4_dst_port(m->port, df_ptr->tun_info.dst_vni, df_ptr, &route, rte_eth_dev_socket_id(m->port));
+	if (ret < 0)
+		return DP_ROUTE_DROP;
 
 	df_ptr->nxt_hop = ret;
-	// printf("route searching result %d \n",ret);
 
 	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
-	{
 		df_ptr->tun_info.dst_vni = route.vni;
-	}
 
-	ret = DP_ROUTE_FIREWALL;
-	if (dp_is_pf_port_id(df_ptr->nxt_hop))
-	{
+	if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
 		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-		if (dp_is_vm_natted(m->port))
-		{
-			ret = DP_ROUTE_NAT;
-			df_ptr->flags.nat = DP_NAT_SNAT;
-		}
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	}
 
@@ -109,25 +79,15 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 	{
 		mbuf0 = pkts[i];
 		route = handle_ipv4_lookup(mbuf0);
-		if (route >= 0)
-			// this is not going to reach
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_L2_DECAP,
+		if (route >= 0) 
+			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT, 
 								mbuf0);
 		else if (route == DP_ROUTE_DHCP)
 			// the ethernet header cannot be removed is due to dhcp node needs mac info
 			// TODO: extract mac info in cls node
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
-		else if (route == DP_ROUTE_FIREWALL)
-		{
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_FIREWALL, mbuf0);
-		}
-		else if (route == DP_ROUTE_NAT)
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT, mbuf0);
 		else
-		{
-			printf("packet is dropped during ipv4 lookup \n");
 			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
-		}
 	}
 
 	return cnt;
@@ -152,7 +112,7 @@ static struct rte_node_register ipv4_lookup_node_base = {
 			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
 			[IPV4_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
 			[IPV4_LOOKUP_NEXT_FIREWALL] = "firewall",
-			[IPV4_LOOKUP_NEXT_NAT] = "nat",
+			[IPV4_LOOKUP_NEXT_NAT] = "snat",
 		},
 };
 
