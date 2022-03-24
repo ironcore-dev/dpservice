@@ -13,47 +13,53 @@
 #include "dpdk_layer.h"
 #include "dp_rte_flow.h"
 
-#define DP_MAX_IP6_CHAR	40
-#define DP_MAX_VNI_STR	12
+#define DP_MAX_IP6_CHAR 40
+#define DP_MAX_VNI_STR 12
 #define DP_TUNNEL_OPT_SIZE 8
+#define DP_OP_ENV_OPT_SIZE 10
 
 static int debug_mode = 0;
 static int no_offload = 0;
 static int no_stats = 0;
 static int tunnel_opt = DP_FLOW_OVERLAY_TYPE_IPIP;
+static int op_env = DP_OP_ENV_HARDWARE;
 static char pf0name[IF_NAMESIZE] = {0};
 static char pf1name[IF_NAMESIZE] = {0};
 static char vf_pattern[IF_NAMESIZE] = {0};
 static char ip6_str[DP_MAX_IP6_CHAR] = {0};
 static char vni_str[DP_MAX_IP6_CHAR] = {0};
 static uint16_t pf_ports[DP_MAX_PF_PORT][2] = {0};
-static char tunnel_opt_str[DP_TUNNEL_OPT_SIZE]={0};
+static char tunnel_opt_str[DP_TUNNEL_OPT_SIZE] = {0};
+static char op_env_opt_str[DP_OP_ENV_OPT_SIZE] = {0};
 
 static const char short_options[] = "d" /* debug */
-				    "D"	 /* promiscuous */;
+									"D" /* promiscuous */;
+static const char tunnel_opt_geneve[] = "geneve";
+static const char op_env_opt_scapytest[] = "scapytest";
 
-#define DP_SYSFS_PREFIX_MLX_VF_COUNT	"/sys/class/net/"
-#define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"
-#define DP_SYSFS_STR_LEN				256
-static const char tunnel_opt_geneve[]="geneve";
+#define DP_SYSFS_PREFIX_MLX_VF_COUNT "/sys/class/net/"
+#define DP_SYSFS_SUFFIX_MLX_VF_COUNT "/device/sriov_numvfs"
+#define DP_SYSFS_STR_LEN 256
 
-#define CMD_LINE_OPT_PF0		"pf0"
-#define CMD_LINE_OPT_PF1		"pf1"
-#define CMD_LINE_OPT_IPV6		"ipv6"
-#define CMD_LINE_OPT_VF_PATTERN	"vf-pattern"
+#define CMD_LINE_OPT_PF0 "pf0"
+#define CMD_LINE_OPT_PF1 "pf1"
+#define CMD_LINE_OPT_IPV6 "ipv6"
+#define CMD_LINE_OPT_VF_PATTERN "vf-pattern"
 #define CMD_LINE_OPT_TUNNEL_OPT "tun_opt"
-#define CMD_LINE_OPT_VNI		"vni"
-#define CMD_LINE_OPT_NO_OFFLOAD	"no-offload"
-#define CMD_LINE_OPT_NO_STATS	"no-stats"
+#define CMD_LINE_OPT_OP_ENV "op_env"
+#define CMD_LINE_OPT_VNI "vni"
+#define CMD_LINE_OPT_NO_OFFLOAD "no-offload"
+#define CMD_LINE_OPT_NO_STATS "no-stats"
 
-
-enum {
+enum
+{
 	CMD_LINE_OPT_MIN_NUM = 256,
 	CMD_LINE_OPT_PF0_NUM,
 	CMD_LINE_OPT_PF1_NUM,
 	CMD_LINE_OPT_IPV6_NUM,
 	CMD_LINE_OPT_VF_PATTERN_NUM,
 	CMD_LINE_OPT_TUNNEL_OPT_NUM,
+	CMD_LINE_OPT_OP_ENV_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_NO_OFFLOAD_NUM,
 	CMD_LINE_OPT_NO_STATS_NUM,
@@ -64,29 +70,30 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PF1, 1, 0, CMD_LINE_OPT_PF1_NUM},
 	{CMD_LINE_OPT_IPV6, 1, 0, CMD_LINE_OPT_IPV6_NUM},
 	{CMD_LINE_OPT_VF_PATTERN, 1, 0, CMD_LINE_OPT_VF_PATTERN_NUM},
-	{CMD_LINE_OPT_TUNNEL_OPT,1,0,CMD_LINE_OPT_TUNNEL_OPT_NUM},
+	{CMD_LINE_OPT_TUNNEL_OPT, 1, 0, CMD_LINE_OPT_TUNNEL_OPT_NUM},
+	{CMD_LINE_OPT_OP_ENV, 1, 0, CMD_LINE_OPT_OP_ENV_NUM},
 	{CMD_LINE_OPT_VNI, 0, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
 	{NULL, 0, 0, 0},
 };
 
-
 /* Display usage */
 static void dp_print_usage(const char *prgname)
 {
 	fprintf(stderr,
-		"%s [EAL options] --"
-		" -d"
-		" [-D]"
-		" --pf0=pf0_ifname"
-		" --pf0=pf0_ifname"
-		" --ipv6=underlay_ipv6"
-		" --vf-pattern=eth*"
-		" [--tun_opt]=ipip/geneve"
-		" [--no-stats]"
-		" [--no-offload]\n",
-		prgname);
+			"%s [EAL options] --"
+			" -d"
+			" [-D]"
+			" --pf0=pf0_ifname"
+			" --pf0=pf0_ifname"
+			" --ipv6=underlay_ipv6"
+			" --vf-pattern=eth*"
+			" [--tun_opt]=ipip/geneve"
+			" [--op_env]=scapytest/hardware"
+			" [--no-stats]"
+			" [--no-offload]\n",
+			prgname);
 }
 
 int dp_parse_args(int argc, char **argv)
@@ -100,9 +107,11 @@ int dp_parse_args(int argc, char **argv)
 
 	/* Error or normal output strings. */
 	while ((opt = getopt_long(argc, argvopt, short_options, lgopts,
-				  &option_index)) != EOF) {
+							  &option_index)) != EOF)
+	{
 
-		switch (opt) {
+		switch (opt)
+		{
 		case 'd':
 		/* Intended fallthrough */
 		case 'D':
@@ -127,12 +136,28 @@ int dp_parse_args(int argc, char **argv)
 			strncpy(vf_pattern, optarg, IFNAMSIZ);
 			break;
 
-	   case CMD_LINE_OPT_TUNNEL_OPT_NUM:
+		case CMD_LINE_OPT_TUNNEL_OPT_NUM:
 			strncpy(tunnel_opt_str, optarg, DP_TUNNEL_OPT_SIZE);
-			if (!strcmp(tunnel_opt_str,tunnel_opt_geneve)){
-				tunnel_opt=DP_FLOW_OVERLAY_TYPE_GENEVE;
-			}else{
-				tunnel_opt=DP_FLOW_OVERLAY_TYPE_IPIP;
+			if (!strcmp(tunnel_opt_str, tunnel_opt_geneve))
+			{
+				tunnel_opt = DP_FLOW_OVERLAY_TYPE_GENEVE;
+			}
+			else
+			{
+				tunnel_opt = DP_FLOW_OVERLAY_TYPE_IPIP;
+			}
+
+			break;
+		
+		case CMD_LINE_OPT_OP_ENV_NUM:
+			strncpy(op_env_opt_str, optarg, DP_OP_ENV_OPT_SIZE);
+			if (!strcmp(op_env_opt_str, op_env_opt_scapytest))
+			{
+				op_env = DP_OP_ENV_SCAPYTEST;
+			}
+			else
+			{
+				op_env = DP_OP_ENV_HARDWARE;
 			}
 
 			break;
@@ -173,9 +198,15 @@ int dp_is_offload_enabled()
 		return 1;
 }
 
-int get_overlay_type(){
-    return tunnel_opt;
-};
+int get_overlay_type()
+{
+	return tunnel_opt;
+}
+
+int get_op_env()
+{
+	return op_env;
+}
 
 int dp_is_stats_enabled()
 {
@@ -200,13 +231,13 @@ char *dp_get_vf_pattern()
 	return vf_pattern;
 }
 
-
 void dp_add_pf_port_id(uint16_t id)
 {
 	int i;
 
 	for (i = 0; i < DP_MAX_PF_PORT; i++)
-		if (!pf_ports[i][1]) {
+		if (!pf_ports[i][1])
+		{
 			pf_ports[i][0] = id;
 			pf_ports[i][1] = 1;
 			return;

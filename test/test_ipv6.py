@@ -6,13 +6,19 @@ from scapy.config import conf
 
 import pytest, shlex, subprocess, time
 from config import *
+import multiprocessing
 
 @pytest.fixture()
 def add_machine(build_path):
-	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine 1 --vni 100 --ipv6 2001::10"
+	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine 1 --vni 100 --ipv4 172.32.10.5 --ipv6 2001::10"
+	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute 1 --vni 100 --ipv6 2002::123 --length 128 --t_vni 100 --t_ipv6 2a10:afc0:e01f:f408::1"
 	subprocess.run(shlex.split("ip link set dev "+vf0_tap+" up"))
+	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" up"))
 	subprocess.run(shlex.split(add_machine_cmd))
 	time.sleep(1)
+	subprocess.run(shlex.split(add_ipv6_route_cmd))
+	time.sleep(1)
+
 
 def test_nd(add_machine):
     answer = neighsol(gw_ip6, vf0_ipv6, iface=vf0_tap, timeout=2)
@@ -20,7 +26,7 @@ def test_nd(add_machine):
     print(mac)
     assert(mac == vf0_mac)
 
-def test_dhcp6(capsys,add_machine):
+def test_dhcp6(capsys):
     eth = Ether(dst=mc_mac)
     ip6 = IPv6(dst=gw_ip6)
     udp = UDP(sport=546,dport=547)
@@ -55,7 +61,46 @@ def test_dhcp6(capsys,add_machine):
 
 
 
+def is_encaped_icmpv6_pkt(pkt):
+    if IPv6 in pkt:
+        pktipv6=pkt[IPv6]
+        if pktipv6.dst==ul_actual_dst and pktipv6.nh==0x29:
+            # if ICMP in pkt:
+            return True
+    return False
 
+def is_icmpv6echo_pkt(pkt):
+    if ICMPv6EchoReply in pkt:
+        return True
+    return False
+
+def ipv6_in_ipv6_responder():
+	pkt_list = sniff(count=1,lfilter=is_encaped_icmpv6_pkt,iface=pf0_tap)
+	pkt=pkt_list[0]
+	# pkt.show()
+
+	pktether=pkt.getlayer(Ether)
+	pktipv6 = pkt.getlayer(IPv6,1)
+	pktip= pkt.getlayer(IPv6,2)
+
+	reply_pkt = Ether(dst=pktether.src,src=pktether.dst,type=0x86DD)/IPv6(dst=ul_actual_src,src=ul_target_ipv6,nh=0x29)/IPv6(dst=pktip.src,src=pktip.dst,nh=58)/ICMPv6EchoReply(type=129)
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf0_tap)
+
+
+def test_IPv6inIPv6(capsys):
+	d=multiprocessing.Process(name="sniffer",target=ipv6_in_ipv6_responder)
+	d.daemon=False
+	d.start()
+
+	time.sleep(1)
+
+	icmp_echo_pkt = Ether(dst=pf0_mac,src=vf0_mac,type=0x86DD)/IPv6(dst="2002::123",src="2001::10",nh=58)/ICMPv6EchoRequest()
+	sendp(icmp_echo_pkt,iface=vf0_tap)
+	
+	pkt_list = sniff(count=1,lfilter=is_icmpv6echo_pkt,iface=vf0_tap,timeout=2)
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive icmp reply!')
 
 
 

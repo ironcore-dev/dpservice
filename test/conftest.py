@@ -16,7 +16,7 @@ def build_path(request):
 def prepare_env(request, build_path):
 	dp_service_cmd = build_path+"/src/dp_service -l 0,1 --vdev=net_tap0,iface="+pf0_tap+",mac=\""+pf0_mac+"\" "\
 		"--vdev=net_tap1,iface="+pf1_tap+",mac=\""+pf1_mac+"\" --vdev=net_tap2,iface="+vf0_tap+",mac=\""+vf0_mac+"\"   -- "\
-		"--pf0="+pf0_tap+" --pf1="+pf1_tap+" --vf-pattern="+vf_patt+" --ipv6="+ul_ipv6+" --no-offload --no-stats"
+		"--pf0="+pf0_tap+" --pf1="+pf1_tap+" --vf-pattern="+vf_patt+" --ipv6="+ul_ipv6+" --no-offload --no-stats"+" --op_env=scapytest"
 	cmd = shlex.split(dp_service_cmd)
 	process = subprocess.Popen(cmd, 
 								stdout=subprocess.PIPE,
