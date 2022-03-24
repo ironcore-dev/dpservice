@@ -30,9 +30,8 @@ static __rte_always_inline int handle_l2_decap(struct rte_mbuf *m)
 	df = get_dp_flow_ptr(m);
 
 	/* Pop the ethernet header */
-	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING) {
+	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-	}
 
 	return df->nxt_hop;
 } 
@@ -51,13 +50,10 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		ret = handle_l2_decap(mbuf0);
-		if (!dp_is_pf_port_id(ret)) {
+		if (!dp_is_pf_port_id(ret))
 			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret], mbuf0);
-		}
-		else {
+		else
 			rte_node_enqueue_x1(graph, node, L2_DECAP_OVERLAY_SWITCH, mbuf0);
-
-		}
 	}
 
 	return cnt;
@@ -79,7 +75,7 @@ static struct rte_node_register l2_decap_node_base = {
 	.next_nodes =
 		{
 			[L2_DECAP_NEXT_DROP] = "drop",
-			[L2_DECAP_OVERLAY_SWITCH]="overlay_switch",
+			[L2_DECAP_OVERLAY_SWITCH] = "overlay_switch",
 		},
 };
 

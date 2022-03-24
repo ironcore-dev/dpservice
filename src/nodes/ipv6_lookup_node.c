@@ -45,30 +45,20 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 	{
 		t_vni = df_ptr->tun_info.dst_vni;
 		ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *);
-	}
-	else
+	} else {
 		ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
 										   sizeof(struct rte_ether_hdr));
-
-	// if (df_ptr->flags.flow_type!=DP_FLOW_TYPE_INCOMING){
-	if (extract_inner_l3_header(m, ipv6_hdr, 0) < 0)
-	{
-		printf("failed to extract dp info from inner l3 header \n");
-		return IPV6_LOOKUP_NEXT_DROP;
 	}
+
+	if (extract_inner_l3_header(m, ipv6_hdr, 0) < 0)
+		return IPV6_LOOKUP_NEXT_DROP;
 
 	if (extract_inner_l4_header(m, ipv6_hdr + 1, 0) < 0)
-	{
-		printf("failed to extract dp info from inner l4 header \n");
 		return IPV6_LOOKUP_NEXT_DROP;
-	}
 
 	// TODO: add broadcast routes when machine is added
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DHCPV6_SERVER_PORT)
-	{
 		return IPV6_LOOKUP_NEXT_DHCPV6;
-	}
-	// }
 
 	ret = lpm_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
 
@@ -77,18 +67,11 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 		df_ptr->nxt_hop = ret;
 
 		if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
-		{
 			df_ptr->tun_info.dst_vni = route.vni;
-		}
 
 		if (dp_is_pf_port_id(df_ptr->nxt_hop))
 		{
 			rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-			if (dp_is_vm_natted(m->port))
-			{
-				ret = DP_ROUTE_NAT;
-				df_ptr->flags.nat = DP_NAT_SNAT;
-			}
 			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		}
 
@@ -130,7 +113,6 @@ static __rte_always_inline uint16_t ipv6_lookup_node_process(struct rte_graph *g
 
 int ipv6_lookup_set_next(uint16_t port_id, uint16_t next_index)
 {
-
 	ipv6_lookup_node.next_index[port_id] = next_index;
 	return 0;
 }
@@ -144,7 +126,6 @@ static struct rte_node_register ipv6_lookup_node_base = {
 	.next_nodes =
 		{
 			[IPV6_LOOKUP_NEXT_DROP] = "drop",
-			[IPV6_LOOKUP_NEXT_IPV6_DECAP] = "ipv6_decap",
 			[IPV6_LOOKUP_NEXT_DHCPV6] = "dhcpv6",
 			[IPV6_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
 		},

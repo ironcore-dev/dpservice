@@ -132,28 +132,15 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 		init_dp_mbuf_priv1(mbuf0);
 		comp = (mbuf0->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
 		/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
-		
-		// printf("packet_type is %#x \n",mbuf0->packet_type);
-	
 		if (comp == RTE_PTYPE_L2_ETHER && is_arp(mbuf0))
 			next_index = CLS_NEXT_ARP;
 		else if (is_ipv6_nd(mbuf0)) 
 			next_index = CLS_NEXT_IPV6_ND;
-		/* RTE_PTYPE_TUNNEL_IP flag is not supported by Mellanox driver,
-		 thus this short-cut is not working for now. supprisingly, this 
-		 its RTE_PTYPE_L3_IPV6_EXT_UNKNOWN flag is marked */
-		// else if (mbuf0->packet_type & RTE_PTYPE_TUNNEL_IP){
-		// 	printf("got a ipip tunnel packet \n");
-		// 	// extract_ethernet_header(mbuf0);
-		// 	rte_pktmbuf_adj(mbuf0, (uint16_t)sizeof(struct rte_ether_hdr));
-		// 	next_index=CLS_NEXT_OVERLAY_SWITCH;
-		// }
 		else if (p_nxt[comp] == CLS_NEXT_IPV4_LOOKUP) { 
 			/* TODO Drop ipv4 packets coming from PF ports */
 			extract_inner_ethernet_header(mbuf0);
 			next_index = CLS_NEXT_IPV4_LOOKUP;
 		} else if (p_nxt[comp] == CLS_NEXT_IPV6_LOOKUP) {
-
 			df = get_dp_flow_ptr(mbuf0);
 			if (dp_is_pf_port_id(mbuf0->port)){
 				df->flags.flow_type=DP_FLOW_TYPE_INCOMING;

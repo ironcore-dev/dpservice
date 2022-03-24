@@ -53,14 +53,10 @@ static __rte_always_inline int handle_ipip_tunnel_decap(struct rte_mbuf *m, stru
 	df->tun_info.dst_vni = ntohl(vni_ns);
 
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv4_ENCAP)
-	{
 		route = IPIP_TUNNEL_NEXT_IPV4_LOOKUP;
-	}
 
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP)
-	{
 		route = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
-	}
 
 	if (route != IPIP_TUNNEL_NEXT_DROP)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
@@ -86,17 +82,10 @@ static __rte_always_inline uint16_t ipip_tunnel_node_process(struct rte_graph *g
 		df = get_dp_flow_ptr(mbuf0);
 
 		if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-		{
 			ret = handle_ipip_tunnel_encap(mbuf0, df);
-		}
 
 		if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		{
 			ret = handle_ipip_tunnel_decap(mbuf0, df);
-		}
-
-		if (ret == IPIP_TUNNEL_NEXT_DROP)
-			printf("packet is dropped during ipip decap \n");
 
 		rte_node_enqueue_x1(graph, node, ret, mbuf0);
 	}

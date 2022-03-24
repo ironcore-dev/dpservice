@@ -95,7 +95,6 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 
 int ipv4_lookup_set_next(uint16_t port_id, uint16_t next_index)
 {
-
 	ipv4_lookup_node.next_index[port_id] = next_index;
 	return 0;
 }
@@ -110,8 +109,6 @@ static struct rte_node_register ipv4_lookup_node_base = {
 		{
 			[IPV4_LOOKUP_NEXT_DROP] = "drop",
 			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
-			[IPV4_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
-			[IPV4_LOOKUP_NEXT_FIREWALL] = "firewall",
 			[IPV4_LOOKUP_NEXT_NAT] = "snat",
 		},
 };

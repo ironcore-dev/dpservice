@@ -44,8 +44,6 @@ static __rte_always_inline uint16_t firewall_node_process(struct rte_graph *grap
 		mbuf0 = pkts[i];
 		if (handle_firewall(mbuf0))
 			next_index = FIREWALL_NEXT_L2_DECAP;
-		else
-			printf("drop a packet by firewall \n");
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
 

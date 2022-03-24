@@ -59,7 +59,6 @@ static __rte_always_inline int handle_geneve_tunnel_decap(struct rte_mbuf *m,str
 {
 	uint8_t route=GENEVE_TUNNEL_NEXT_DROP;
 	struct rte_flow_item_geneve *geneve_hdr;
-	// uint32_t tmp_vni = 0;
 	struct rte_udp_hdr *udp_hdr;
 
 
@@ -72,16 +71,15 @@ static __rte_always_inline int handle_geneve_tunnel_decap(struct rte_mbuf *m,str
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_udp_hdr));
 	
 	geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
-    rte_memcpy(&df->tun_info.dst_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
-	// df->tun_info.dst_vni = tmp_vni >> 8;
+	rte_memcpy(&df->tun_info.dst_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
 
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
-	if (ntohs(geneve_hdr->protocol) == RTE_ETHER_TYPE_IPV6){
-		df->l3_type=RTE_ETHER_TYPE_IPV6;
+	if (ntohs(geneve_hdr->protocol) == RTE_ETHER_TYPE_IPV6) {
+		df->l3_type = RTE_ETHER_TYPE_IPV6;
 		route = GENEVE_TUNNEL_NEXT_IPV6_LOOKUP;
 	}
-	else{
-		df->l3_type=RTE_ETHER_TYPE_IPV4;
+	else {
+		df->l3_type = RTE_ETHER_TYPE_IPV4;
 		route = GENEVE_TUNNEL_NEXT_IPV4_LOOKUP;
 	}
 
@@ -95,7 +93,7 @@ static __rte_always_inline uint16_t geneve_tunnel_node_process(struct rte_graph 
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	int i;
-	uint8_t ret=GENEVE_TUNNEL_NEXT_DROP;
+	uint8_t ret = GENEVE_TUNNEL_NEXT_DROP;
 	struct dp_flow *df;
 
 	pkts = (struct rte_mbuf **)objs;
@@ -105,16 +103,11 @@ static __rte_always_inline uint16_t geneve_tunnel_node_process(struct rte_graph 
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
 
-		if (df->flags.flow_type==DP_FLOW_TYPE_OUTGOING){
+		if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
 			ret = handle_geneve_tunnel_encap(mbuf0,df);
-		}
 
-		if (df->flags.flow_type==DP_FLOW_TYPE_INCOMING){
+		if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 			ret = handle_geneve_tunnel_decap(mbuf0,df);
-		}
-
-		// if (ret == GENEVE_TUNNEL_NEXT_DROP)
-		// 	printf("packet is dropped inside the geneve nod \n");
 		
 		rte_node_enqueue_x1(graph, node, ret, mbuf0);
 	}	
