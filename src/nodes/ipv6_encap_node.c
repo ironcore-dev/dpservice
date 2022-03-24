@@ -33,7 +33,7 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
 
 	if (!ipv6_hdr)
-			return 0;
+		return 0;
 
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	ipv6_hdr->payload_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
@@ -62,13 +62,10 @@ static __rte_always_inline uint16_t ipv6_encap_node_process(struct rte_graph *gr
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
-		if (handle_ipv6_encap(mbuf0, df)){
+		if (handle_ipv6_encap(mbuf0, df))
 			rte_node_enqueue_x1(graph, node, ipv6_encap_node.next_index[df->nxt_hop], mbuf0);
-		}
-		else {
+		else
 			rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_DROP, mbuf0);
-
-		}
 	}	
 
 	return cnt;

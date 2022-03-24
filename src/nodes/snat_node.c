@@ -27,10 +27,8 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df_ptr;
-	struct flow_key key;
 	struct flow_value *cntrack = NULL;
 
-	memset(&key, 0, sizeof(struct flow_key));
 	df_ptr = get_dp_flow_ptr(m);
 
 	if (df_ptr->conntrack)
@@ -92,8 +90,6 @@ static __rte_always_inline uint16_t snat_node_process(struct rte_graph *graph,
 		mbuf0 = pkts[i];
 		ret = handle_snat(mbuf0);
 		if (ret == 1)
-			next_index = SNAT_NEXT_L2_DECAP;
-		else if (ret == 0)
 			next_index = SNAT_NEXT_FIREWALL;
 
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
@@ -110,7 +106,6 @@ static struct rte_node_register snat_node_base = {
 	.nb_edges = SNAT_NEXT_MAX,
 	.next_nodes =
 		{
-			[SNAT_NEXT_L2_DECAP] = "l2_decap",
 			[SNAT_NEXT_FIREWALL] = "firewall",
 			[SNAT_NEXT_DROP] = "drop",
 		},

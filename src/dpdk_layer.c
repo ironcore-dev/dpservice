@@ -40,7 +40,6 @@ static const char * const default_patterns[] = {
 	"snat",
 	"l2_decap",
 	"ipv6_encap",
-	"ipv6_decap",
 	"geneve_tunnel",
 	"ipip_tunnel",
 	"overlay_switch",
