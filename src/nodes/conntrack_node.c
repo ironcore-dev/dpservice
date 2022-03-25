@@ -9,6 +9,7 @@
 #include "dp_util.h"
 #include "dp_rte_flow.h"
 #include "nodes/conntrack_node.h"
+#include "nodes/dhcp_node.h"
 
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -45,8 +46,11 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if (extract_inner_l4_header(m, ipv4_hdr + 1, 0) < 0)
 		return DP_ROUTE_DROP;
 
+	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
+		return ret;
+
 	/* Do not enable conntrack yet */
-	return ret;
+	//return ret;
 
 	if ((df_ptr->l4_type == DP_IP_PROTO_TCP) || (df_ptr->l4_type == DP_IP_PROTO_UDP)) {
 		memset(&key, 0, sizeof(struct flow_key));
@@ -56,6 +60,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			/* Add original direction to conntrack table */
 			dp_add_flow(&key);
 			flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
+			printf("Allocate the conntrack %p \n", flow_val);
 			rte_atomic32_clear(&flow_val->flow_cnt);
 			flow_val->flow_key[DP_FLOW_DIR_ORG] = key;
 			flow_val->flow_state = DP_FLOW_STATE_NEW;
