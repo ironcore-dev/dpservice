@@ -44,9 +44,13 @@ static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node 
 
 static __rte_always_inline void check_aged_flows(uint16_t portid)
 {
-	dp_process_aged_flows(dp_get_pf0_port_id());
-	dp_process_aged_flows(dp_get_pf1_port_id());
-	dp_process_aged_flows(portid);
+	if (dp_is_offload_enabled()) { 
+		dp_process_aged_flows(dp_get_pf0_port_id());
+		dp_process_aged_flows(dp_get_pf1_port_id());
+		dp_process_aged_flows(portid);
+	} else {
+		dp_process_aged_flows_non_offload();
+	}
 }
 
 static __rte_always_inline uint16_t handle_grpc_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx)

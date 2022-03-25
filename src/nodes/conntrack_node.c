@@ -86,6 +86,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 				flow_val->dir = DP_FLOW_DIR_ORG;
 			}
 		}
+		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;
 	}
 	return ret;

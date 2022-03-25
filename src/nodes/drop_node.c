@@ -22,10 +22,7 @@ static __rte_always_inline void prepare_drop(struct rte_mbuf *m)
 	if (cntrack->flow_state != DP_FLOW_STATE_NEW)
 		return;
 
-	printf("Free the conntrack %p \n", cntrack);
-	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
-	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
-	rte_free(cntrack);
+	dp_free_flow(cntrack);
 }
 
 static uint16_t drop_node_process(struct rte_graph *graph,
