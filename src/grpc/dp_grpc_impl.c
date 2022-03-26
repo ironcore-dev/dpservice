@@ -1,4 +1,5 @@
 #include "dp_lpm.h"
+#include "dp_nat.h"
 #include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
@@ -62,7 +63,9 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		return EXIT_FAILURE;
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_set_vm_nat_ip(port_id, ntohl(req->add_vip.vip.vip_addr));
+		dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+						  ntohl(req->add_vip.vip.vip_addr),
+						  dp_get_vm_vni(port_id));
 	}
 	return EXIT_SUCCESS;
 }
@@ -77,8 +80,7 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 	if (port_id < 0)
 		return EXIT_FAILURE;
 
-	dp_del_vm_nat_ip(port_id);
-	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
+	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 
 	return EXIT_SUCCESS;
 }
@@ -146,7 +148,8 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 	if (port_id < 0)
 		return EXIT_FAILURE;
 
-	rep->get_vip.vip.vip_addr = dp_get_vm_nat_ip(port_id);
+	rep->get_vip.vip.vip_addr = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+												  dp_get_vm_vni(port_id));
 
 	return EXIT_SUCCESS;
 }

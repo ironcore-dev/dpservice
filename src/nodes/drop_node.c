@@ -44,9 +44,6 @@ static uint16_t drop_node_process(struct rte_graph *graph,
 		rte_pktmbuf_free(mbuf0);
 	}
 
-
-	rte_pktmbuf_free_bulk((struct rte_mbuf **)objs, nb_objs);
-
 	return nb_objs;
 }
 

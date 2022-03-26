@@ -143,7 +143,7 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 		} else if (p_nxt[comp] == CLS_NEXT_IPV6_LOOKUP) {
 			df = get_dp_flow_ptr(mbuf0);
 			if (dp_is_pf_port_id(mbuf0->port)){
-				df->flags.flow_type=DP_FLOW_TYPE_INCOMING;
+				df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 				extract_outter_ethernet_header(mbuf0);
 				rte_pktmbuf_adj(mbuf0, (uint16_t)sizeof(struct rte_ether_hdr));
 				next_index = CLS_NEXT_OVERLAY_SWITCH;

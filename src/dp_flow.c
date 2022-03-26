@@ -34,12 +34,8 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 
 	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
+	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
 
-	if (df_ptr->flags.nat == DP_NAT_SNAT) {
-		key->ip_src = rte_be_to_cpu_32(dp_get_vm_nat_ip(m->port));
-	} else {
-		key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
-	}
 	key->proto = df_ptr->l4_type;
 
 	switch (df_ptr->l4_type) {

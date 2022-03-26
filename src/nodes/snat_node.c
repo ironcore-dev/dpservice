@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_nat.h"
 #include "dp_flow.h"
 #include "dp_util.h"
 #include "nodes/snat_node.h"
@@ -28,6 +29,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_value *cntrack = NULL;
+	uint32_t src_ip;
 
 	df_ptr = get_dp_flow_ptr(m);
 
@@ -38,10 +40,13 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		return 1;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
-		if (dp_is_vm_natted(m->port) && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
+		src_ip = ntohl(df_ptr->src.src_addr);
+		if (dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port))
+		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
+
 			ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 								sizeof(struct rte_ether_hdr));
-			ipv4_hdr->src_addr = dp_get_vm_nat_ip(m->port);
+			ipv4_hdr->src_addr = dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port));
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			ipv4_hdr->hdr_checksum = 0;

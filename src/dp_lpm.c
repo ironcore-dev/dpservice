@@ -129,28 +129,6 @@ uint8_t* dp_get_vm_ip6(uint16_t portid)
 	return vm_table[portid].info.vm_ipv6;
 }
 
-bool dp_is_vm_natted(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return (vm_table[portid].info.nat != DP_NAT_OFF);
-}
-
-uint32_t dp_get_vm_nat_ip(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return htonl(vm_table[portid].info.virt_ip);
-}
-
-uint16_t dp_get_vm_port_id_per_nat_ip(uint32_t nat_ip)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready && (vm_table[i].info.virt_ip == nat_ip))
-			return i;
-	return -1;
-}
-
 static struct rte_rib* get_lpm(int vni, const int socketid)
 {
 	int i;
@@ -337,20 +315,6 @@ int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 		return EXIT_FAILURE;
 
 	return EXIT_SUCCESS;
-}
-
-void dp_set_vm_nat_ip(uint16_t portid, uint32_t ip)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	vm_table[portid].info.virt_ip = ip;
-	vm_table[portid].info.nat = DP_NAT_ON;
-}
-
-void dp_del_vm_nat_ip(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	vm_table[portid].info.nat = DP_NAT_OFF;
-	vm_table[portid].info.virt_ip = 0;
 }
 
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)

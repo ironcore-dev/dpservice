@@ -1,4 +1,4 @@
-dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'nodes/arp_node.c',
+dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'nodes/arp_node.c',
 			  'nodes/drop_node.c', 'nodes/rx_node.c','nodes/rx_periodic_node.c', 'nodes/cls_node.c','nodes/dhcp_node.c','nodes/dhcpv6_node.c',
 			  'nodes/arp_node.c','nodes/ipv6_nd_node.c', 'nodes/tx_node.c', 'nodes/ipv4_lookup_node.c', 'nodes/l2_decap_node.c',
 			  'dp_mbuf_dyn.c', 'dp_lpm.c', 'nodes/ipv6_encap_node.c', 'nodes/firewall_node.c',
