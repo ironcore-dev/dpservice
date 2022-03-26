@@ -23,6 +23,11 @@ bool dp_is_ip_snatted(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 void dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni);
 
+void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni);
+bool dp_is_ip_dnatted(uint32_t d_ip, uint32_t vni);
+uint32_t dp_get_vm_dnat_ip(uint32_t d_ip, uint32_t vni);
+void dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni);
+
 #ifdef __cplusplus
 }
 #endif

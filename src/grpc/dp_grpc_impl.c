@@ -63,8 +63,11 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		return EXIT_FAILURE;
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+		/*dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 						  ntohl(req->add_vip.vip.vip_addr),
+						  dp_get_vm_vni(port_id));*/
+		dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
+						  dp_get_dhcp_range_ip4(port_id),
 						  dp_get_vm_vni(port_id));
 	}
 	return EXIT_SUCCESS;
@@ -80,7 +83,26 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 	if (port_id < 0)
 		return EXIT_FAILURE;
 
-	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+	//dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+	//dp_del_vm_dnat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_getvip(dp_request *req, dp_reply *rep)
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		return EXIT_FAILURE;
+
+	//rep->get_vip.vip.vip_addr = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+	//											  dp_get_vm_vni(port_id));
+	//rep->get_vip.vip.vip_addr = dp_get_vm_dnat_ip(dp_get_dhcp_range_ip4(port_id),
+	//											  dp_get_vm_vni(port_id));
 
 	return EXIT_SUCCESS;
 }
@@ -135,22 +157,6 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 	dp_stop_interface(port_id, DP_PORT_VF);
 	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
-	return EXIT_SUCCESS;
-}
-
-static int dp_process_getvip(dp_request *req, dp_reply *rep)
-{
-	int port_id;
-
-	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
-
-	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return EXIT_FAILURE;
-
-	rep->get_vip.vip.vip_addr = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
-												  dp_get_vm_vni(port_id));
-
 	return EXIT_SUCCESS;
 }
 

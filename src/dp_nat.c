@@ -108,3 +108,78 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 	else
 		rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 }
+
+
+bool dp_is_ip_dnatted(uint32_t d_ip, uint32_t vni)
+{
+	struct nat_key nkey;
+	int ret;
+
+	nkey.ip = d_ip;
+	nkey.vni = vni;
+
+	ret = rte_hash_lookup(ipv4_dnat_tbl, &nkey);
+	if (ret < 0)
+		return false;
+	return true;
+}
+
+uint32_t dp_get_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
+{
+	struct nat_key nkey;
+	uint32_t *dnat_ip;
+
+	nkey.ip = d_ip;
+	nkey.vni = vni;
+
+	if (rte_hash_lookup_data(ipv4_dnat_tbl, &nkey, (void**)&dnat_ip) < 0)
+		return 0;
+
+	return *dnat_ip;
+}
+
+void dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni)
+{
+	struct nat_key nkey;
+	uint32_t *v_ip;
+
+	nkey.ip = d_ip;
+	nkey.vni = vni;
+
+	if (rte_hash_add_key(ipv4_dnat_tbl, &nkey) < 0)
+		goto err;
+
+	v_ip = rte_zmalloc("dnat_val", sizeof(uint32_t), RTE_CACHE_LINE_SIZE);
+	if (!v_ip)
+		goto err;
+
+	*v_ip = vm_ip;
+	if (rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, v_ip) < 0)
+		goto out;
+
+	return;
+out:
+	rte_free(v_ip);
+err:
+	printf("dnat table add ip failed\n");
+}
+
+void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
+{
+	struct nat_key nkey;
+	uint32_t *vm_ip;
+	int pos;
+
+	nkey.ip = d_ip;
+	nkey.vni = vni;
+
+	if (rte_hash_lookup_data(ipv4_dnat_tbl, &nkey, (void**)&vm_ip) < 0)
+		return;
+	rte_free(vm_ip);
+
+	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
+	if (pos < 0)
+		printf("DNAT hash key already deleted \n");
+	else
+		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
+}

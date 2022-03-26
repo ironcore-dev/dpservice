@@ -46,7 +46,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 
 			ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 								sizeof(struct rte_ether_hdr));
-			ipv4_hdr->src_addr = dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port));
+			ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port)));
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			ipv4_hdr->hdr_checksum = 0;
@@ -69,6 +69,21 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 					sizeof(struct rte_ether_hdr));
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
+		df_ptr->src.src_addr = ipv4_hdr->src_addr;
+		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
+		ipv4_hdr->hdr_checksum = 0;
+		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
+		tcp_hdr->cksum = 0;
+		tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+	}
+
+	if (cntrack->flow_status == DP_FLOW_STATUS_DST_NAT &&
+		cntrack->dir == DP_FLOW_DIR_REPLY) {
+		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
+					sizeof(struct rte_ether_hdr));
+		printf("DNAT state established (Called in snat) \n");
+		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst);
+		df_ptr->src.src_addr = ipv4_hdr->src_addr;
 		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 		ipv4_hdr->hdr_checksum = 0;
 		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
