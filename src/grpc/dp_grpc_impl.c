@@ -63,12 +63,12 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		return EXIT_FAILURE;
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		/*dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+		dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 						  ntohl(req->add_vip.vip.vip_addr),
-						  dp_get_vm_vni(port_id));*/
-		dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
-						  dp_get_dhcp_range_ip4(port_id),
 						  dp_get_vm_vni(port_id));
+		/*dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
+						  dp_get_dhcp_range_ip4(port_id),
+						  dp_get_vm_vni(port_id));*/
 	}
 	return EXIT_SUCCESS;
 }

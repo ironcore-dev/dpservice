@@ -46,15 +46,16 @@ struct flow_value {
 	uint16_t		flow_status;
 	uint16_t		flow_state;
 	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
-	uint8_t			dir;
+	uint16_t		dir;
+	uint16_t		port;
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
+	struct rte_flow	*rteflow[DP_FLOW_DIR_MAX];
 };
 
 struct flow_age_ctx {
-	struct flow_key	fkey;
-	struct rte_flow	*rteflow;
-	uint16_t		port;
+	struct flow_value	*cntrack;
+	uint16_t			dir;
 };
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);

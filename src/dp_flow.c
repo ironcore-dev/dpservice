@@ -119,11 +119,18 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 	return true;
 }
 
+void dp_free_flow(struct flow_value *cntrack)
+{
+	printf("Free the conntrack %p \n", cntrack);
+	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
+	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
+	rte_free(cntrack);
+}
+
 void dp_process_aged_flows(int port_id)
 {
 	int nb_context, total = 0, idx;
 	struct flow_age_ctx *agectx = NULL;
-	struct flow_value *flow_val = NULL;
 	struct rte_flow_error error;
 	void **contexts;
 
@@ -146,31 +153,15 @@ void dp_process_aged_flows(int port_id)
 		agectx = (struct flow_age_ctx*)contexts[idx];
 		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, agectx->rteflow, &error);
-		dp_get_flow_data(&agectx->fkey, (void**)&flow_val);
-		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d hash key %p  rte_flow inserted on port %d\n", 
-			 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey, port_id);
-		if (!flow_val) {
-			rte_free(agectx);
-			continue;
-		}
-		if (rte_atomic32_dec_and_test(&flow_val->flow_cnt)) {
-			dp_delete_flow(&agectx->fkey);
-			rte_free(flow_val);
-		}
+		rte_flow_destroy(port_id, agectx->cntrack->rteflow[agectx->dir], &error);
+		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  rte_flow inserted on port %d\n", 
+			 agectx->cntrack->rteflow[agectx->dir], rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
+		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+			dp_free_flow(agectx->cntrack);
 		rte_free(agectx);
 	}
-
 free:
 	rte_free(contexts);
-}
-
-void dp_free_flow(struct flow_value *cntrack)
-{
-	printf("Free the conntrack %p \n", cntrack);
-	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
-	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
-	rte_free(cntrack);
 }
 
 void dp_process_aged_flows_non_offload()
