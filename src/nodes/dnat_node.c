@@ -50,7 +50,6 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 		if (dp_is_ip_dnatted(dst_ip, vni)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-			printf("DNAT state new \n");
 			ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 								sizeof(struct rte_ether_hdr));
 			ipv4_hdr->dst_addr = htonl(dp_get_vm_dnat_ip(dst_ip, vni));
