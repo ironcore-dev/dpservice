@@ -72,6 +72,9 @@ int main(int argc, char **argv)
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid dp_service parameters\n");
 
+	if (!dp_is_conntrack_enabled() && dp_is_offload_enabled())
+		rte_exit(EXIT_FAILURE, "Disabled conntrack requires disabled offloading !\n");
+
 	dp_init_interfaces();
 
 	ret = rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL,

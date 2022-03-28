@@ -49,8 +49,8 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
 		return ret;
 
-	/* Do not enable conntrack yet */
-	//return ret;
+	if (!dp_is_conntrack_enabled())
+		return ret;
 
 	if ((df_ptr->l4_type == DP_IP_PROTO_TCP) || (df_ptr->l4_type == DP_IP_PROTO_UDP)) {
 		memset(&key, 0, sizeof(struct flow_key));
