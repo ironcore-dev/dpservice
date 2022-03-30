@@ -60,7 +60,6 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			/* Add original direction to conntrack table */
 			dp_add_flow(&key);
 			flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
-			printf("Allocate the conntrack %p \n", flow_val);
 			rte_atomic32_clear(&flow_val->flow_cnt);
 			flow_val->flow_key[DP_FLOW_DIR_ORG] = key;
 			flow_val->flow_state = DP_FLOW_STATE_NEW;
@@ -107,7 +106,7 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 		route = handle_conntrack(mbuf0);
 
 		if (route >= 0) 
-			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DNAT, 
+			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_LB, 
 								mbuf0);
 		else
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DROP, mbuf0);
@@ -124,8 +123,7 @@ static struct rte_node_register conntrack_node_base = {
 	.nb_edges = CONNTRACK_NEXT_MAX,
 	.next_nodes =
 		{
-			[CONNTRACK_NEXT_DNAT] = "dnat",
-			//[CONNTRACK_NEXT_LB] = "lb",
+			[CONNTRACK_NEXT_LB] = "lb",
 			[CONNTRACK_NEXT_DROP] = "drop",
 		},
 };
