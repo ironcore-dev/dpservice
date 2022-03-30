@@ -6,6 +6,7 @@
 #include <rte_errno.h>
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
+static uint64_t timeout = 0;
 
 void dp_init_flowtable(int socket_id)
 {
@@ -25,6 +26,7 @@ void dp_init_flowtable(int socket_id)
 	ipv4_flow_tbl = rte_hash_create(&ipv4_table_params);
 	if(!ipv4_flow_tbl)
 		rte_exit(EXIT_FAILURE, "create ipv4 flow table failed\n");
+	timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT ;
 }
 
 void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
@@ -32,12 +34,8 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 
 	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
+	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
 
-	if (df_ptr->flags.nat == DP_NAT_SNAT) {
-		key->ip_src = rte_be_to_cpu_32(dp_get_vm_nat_ip(m->port));
-	} else {
-		key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
-	}
 	key->proto = df_ptr->l4_type;
 
 	switch (df_ptr->l4_type) {
@@ -121,11 +119,17 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 	return true;
 }
 
+void dp_free_flow(struct flow_value *cntrack)
+{
+	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
+	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
+	rte_free(cntrack);
+}
+
 void dp_process_aged_flows(int port_id)
 {
 	int nb_context, total = 0, idx;
 	struct flow_age_ctx *agectx = NULL;
-	struct flow_value *flow_val = NULL;
 	struct rte_flow_error error;
 	void **contexts;
 
@@ -148,21 +152,30 @@ void dp_process_aged_flows(int port_id)
 		agectx = (struct flow_age_ctx*)contexts[idx];
 		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, agectx->rteflow, &error);
-		dp_get_flow_data(&agectx->fkey, (void**)&flow_val);
-		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d hash key %p  rte_flow inserted on port %d\n", 
-			 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey, port_id);
-		if (!flow_val) {
-			rte_free(agectx);
-			continue;
-		}
-		if (rte_atomic32_dec_and_test(&flow_val->flow_cnt)) {
-			dp_delete_flow(&agectx->fkey);
-			rte_free(flow_val);
-		}
+		rte_flow_destroy(port_id, agectx->cntrack->rteflow[agectx->dir], &error);
+		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  rte_flow inserted on port %d\n", 
+			 agectx->cntrack->rteflow[agectx->dir], rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
+		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+			dp_free_flow(agectx->cntrack);
 		rte_free(agectx);
 	}
-
 free:
 	rte_free(contexts);
+}
+
+void dp_process_aged_flows_non_offload()
+{
+	struct flow_value *flow_val = NULL;
+	const void *next_key;
+	uint32_t iter = 0;
+	uint64_t cur;
+
+	cur = rte_rdtsc();
+	/* iterate through the hash table */
+	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
+						    (void**)&flow_val, &iter) >= 0) {
+		if (unlikely((cur - flow_val->timestamp) > timeout))
+			dp_free_flow(flow_val);
+	}
+
 }

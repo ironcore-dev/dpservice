@@ -10,6 +10,7 @@
 #include "dp_flow.h"
 #include "dp_version.h"
 #include "dp_lpm.h"
+#include "dp_nat.h"
 #include "grpc/dp_grpc_service.h"
 
 static void *dp_handle_grpc(__rte_unused void *arg)
@@ -54,6 +55,7 @@ static void dp_init_interfaces()
 	dp_start_interface(&pf0_port, DP_PORT_PF);
 	dp_start_interface(&pf1_port, DP_PORT_PF);
 	dp_init_flowtable(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	dp_init_nat_tables(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_vm_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 }
 
@@ -69,6 +71,9 @@ int main(int argc, char **argv)
 	ret = dp_parse_args(argc, argv);
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid dp_service parameters\n");
+
+	if (!dp_is_conntrack_enabled() && dp_is_offload_enabled())
+		rte_exit(EXIT_FAILURE, "Disabled conntrack requires disabled offloading !\n");
 
 	dp_init_interfaces();
 

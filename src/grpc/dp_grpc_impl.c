@@ -1,4 +1,5 @@
 #include "dp_lpm.h"
+#include "dp_nat.h"
 #include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
@@ -53,21 +54,34 @@ __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
-	int port_id;
-
-	port_id = dp_get_portid_with_vm_handle(req->add_vip.machine_id);
-
-	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return EXIT_FAILURE;
-
-	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_set_vm_nat_ip(port_id, ntohl(req->add_vip.vip.vip_addr));
+	if (req->add_vip.ip_type_vip == RTE_ETHER_TYPE_IPV4) {
+		if (req->add_vip.nat_type == DP_NAT_SNAT)
+			dp_set_vm_snat_ip(ntohl(req->add_vip.nat.nat_addr),
+							ntohl(req->add_vip.vip.vip_addr),
+							req->add_vip.vni);
+		else if (req->add_vip.nat_type == DP_NAT_DNAT)
+			dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
+							ntohl(req->add_vip.nat.nat_addr),
+							req->add_vip.vni);
+		else
+			return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
 }
 
 static int dp_process_delvip(dp_request *req, dp_reply *rep)
+{
+
+	if (req->del_vip.ip_type_vip == RTE_ETHER_TYPE_IPV4) {
+		if (req->del_vip.nat_type == DP_NAT_SNAT)
+			dp_del_vm_snat_ip(ntohl(req->del_vip.nat.nat_addr), req->del_vip.vni);
+		else if (req->del_vip.nat_type == DP_NAT_DNAT)
+			dp_del_vm_dnat_ip(ntohl(req->del_vip.vip.vip_addr), req->del_vip.vni);
+	}
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
 	int port_id;
 
@@ -77,8 +91,10 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 	if (port_id < 0)
 		return EXIT_FAILURE;
 
-	dp_del_vm_nat_ip(port_id);
-	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
+	//rep->get_vip.vip.vip_addr = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+	//											  dp_get_vm_vni(port_id));
+	//rep->get_vip.vip.vip_addr = dp_get_vm_dnat_ip(dp_get_dhcp_range_ip4(port_id),
+	//											  dp_get_vm_vni(port_id));
 
 	return EXIT_SUCCESS;
 }
@@ -133,21 +149,6 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 	dp_stop_interface(port_id, DP_PORT_VF);
 	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
-	return EXIT_SUCCESS;
-}
-
-static int dp_process_getvip(dp_request *req, dp_reply *rep)
-{
-	int port_id;
-
-	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
-
-	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return EXIT_FAILURE;
-
-	rep->get_vip.vip.vip_addr = dp_get_vm_nat_ip(port_id);
-
 	return EXIT_SUCCESS;
 }
 

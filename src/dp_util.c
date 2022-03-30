@@ -20,6 +20,7 @@
 
 static int debug_mode = 0;
 static int no_offload = 0;
+static int no_conntrack = 0;
 static int no_stats = 0;
 static int tunnel_opt = DP_FLOW_OVERLAY_TYPE_IPIP;
 static int op_env = DP_OP_ENV_HARDWARE;
@@ -49,6 +50,7 @@ static const char op_env_opt_scapytest[] = "scapytest";
 #define CMD_LINE_OPT_OP_ENV "op_env"
 #define CMD_LINE_OPT_VNI "vni"
 #define CMD_LINE_OPT_NO_OFFLOAD "no-offload"
+#define CMD_LINE_OPT_NO_CONNTRACK "no-conntrack"
 #define CMD_LINE_OPT_NO_STATS "no-stats"
 
 enum
@@ -62,6 +64,7 @@ enum
 	CMD_LINE_OPT_OP_ENV_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_NO_OFFLOAD_NUM,
+	CMD_LINE_OPT_NO_CONNTRACK_NUM,
 	CMD_LINE_OPT_NO_STATS_NUM,
 };
 
@@ -74,6 +77,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_OP_ENV, 1, 0, CMD_LINE_OPT_OP_ENV_NUM},
 	{CMD_LINE_OPT_VNI, 0, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
+	{CMD_LINE_OPT_NO_CONNTRACK, 0, 0, CMD_LINE_OPT_NO_CONNTRACK_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
 	{NULL, 0, 0, 0},
 };
@@ -92,6 +96,7 @@ static void dp_print_usage(const char *prgname)
 			" [--tun_opt]=ipip/geneve"
 			" [--op_env]=scapytest/hardware"
 			" [--no-stats]"
+			" [--no-conntrack]"
 			" [--no-offload]\n",
 			prgname);
 }
@@ -172,6 +177,10 @@ int dp_parse_args(int argc, char **argv)
 			no_offload = 1;
 			break;
 
+		case CMD_LINE_OPT_NO_CONNTRACK_NUM:
+			no_conntrack = 1;
+			break;
+
 		case CMD_LINE_OPT_NO_STATS_NUM:
 			no_stats = 1;
 			break;
@@ -193,6 +202,14 @@ int dp_parse_args(int argc, char **argv)
 int dp_is_offload_enabled()
 {
 	if (no_offload)
+		return 0;
+	else
+		return 1;
+}
+
+int dp_is_conntrack_enabled()
+{
+	if (no_conntrack)
 		return 0;
 	else
 		return 1;

@@ -12,7 +12,8 @@
 extern "C" {
 #endif
 
-#define FLOW_MAX	1*1024*1024UL
+#define FLOW_MAX				1*1024*1024UL
+#define DP_FLOW_DEFAULT_TIMEOUT	30 /* In seconds */
 
 enum {
 	DP_FLOW_DIR_ORG,
@@ -45,14 +46,16 @@ struct flow_value {
 	uint16_t		flow_status;
 	uint16_t		flow_state;
 	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
-	uint8_t			dir;
+	uint16_t		dir;
+	uint16_t		port;
+	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
+	struct rte_flow	*rteflow[DP_FLOW_DIR_MAX];
 };
 
 struct flow_age_ctx {
-	struct flow_key	fkey;
-	struct rte_flow	*rteflow;
-	uint16_t		port;
+	struct flow_value	*cntrack;
+	uint16_t			dir;
 };
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
@@ -65,6 +68,8 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 void dp_invert_flow_key(struct flow_key *key /* in / out */);
 void dp_init_flowtable(int socket_id);
 void dp_process_aged_flows(int port_id);
+void dp_process_aged_flows_non_offload();
+void dp_free_flow(struct flow_value *cntrack);
 
 #ifdef __cplusplus
 }

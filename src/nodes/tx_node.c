@@ -74,8 +74,7 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 	struct rte_flow_item_udp udp_mask;
 	struct rte_flow *flow;
 	struct flow_age_ctx *agectx = NULL;
-	struct flow_value *flow_val = NULL;
-	int encap_size=0;
+	int encap_size = 0;
 
 	uint8_t decap_hdr[sizeof(struct rte_ether_hdr)];
 
@@ -354,19 +353,11 @@ static __rte_always_inline int handle_offload(struct rte_mbuf *m, const struct d
 			printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
 			goto err;
 		}
-		dp_build_flow_key(&agectx->fkey, m);
-		agectx->rteflow = flow;
-		dp_get_flow_data(&agectx->fkey, (void**)&flow_val);
-		if (!flow_val) {
-			flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
-			rte_atomic32_clear(&flow_val->flow_cnt);
-		}
-		if (flow_val) {
-			rte_atomic32_inc(&flow_val->flow_cnt);
-			printf("Inserting flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  hash key %p \n", 
-				 agectx->rteflow, rte_atomic32_read(&flow_val->flow_cnt), &agectx->fkey);
-			dp_add_flow_data(&agectx->fkey, flow_val);
-		}
+		agectx->cntrack = df->conntrack;
+		agectx->dir = agectx->cntrack->dir;
+		agectx->cntrack->rteflow[agectx->dir] = flow;
+		agectx->cntrack->port = m->port; 
+		rte_atomic32_inc(&agectx->cntrack->flow_cnt);
 	}
 
 	return 1;
@@ -412,7 +403,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			} else 
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
 		}
-		if (df && df->flags.valid)
+		if (df && df->flags.valid && df->conntrack)
 			handle_offload(mbuf0, df);	
 	}	
 

@@ -38,6 +38,9 @@ static char len_str[30] = {0};
 static char t_vni_str[30] = {0};
 static char machine_str[30] = {0};
 static char ip_str[30] = {0};
+static char vip_ip_str[30] = {0};
+static char nat_ip_str[30] = {0};
+static char nat_type_str[30] = {0};
 static char pxe_ip_str[30] = {0};
 static char pxe_path_str[30] = {0};
 static IPVersion version;
@@ -53,6 +56,8 @@ static int length;
 #define CMD_LINE_OPT_GET_MACHINE	"getmachines"
 #define CMD_LINE_OPT_VNI			"vni"
 #define CMD_LINE_OPT_T_VNI			"t_vni"
+#define CMD_LINE_OPT_VIP_IPV4		"vip_ipv4"
+#define CMD_LINE_OPT_NAT_IPV4		"nat_ipv4"
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
 #define CMD_LINE_OPT_PRIMARY_IPV6	"ipv6"
 #define CMD_LINE_OPT_ADD_ROUTE		"addroute"
@@ -62,7 +67,8 @@ static int length;
 #define CMD_LINE_OPT_LENGTH			"length"
 #define CMD_LINE_OPT_ADD_VIP		"addvip"
 #define CMD_LINE_OPT_DEL_VIP		"delvip"
-#define CMD_LINE_OPT_GET_VIP		"getvip"
+#define CMD_LINE_OPT_GET_VIP		"listvips"
+#define CMD_LINE_OPT_NAT_TYPE		"nat_type"
 #define CMD_LINE_OPT_PXE_IP			"pxe_ip"
 #define CMD_LINE_OPT_PXE_STR		"pxe_str"
 
@@ -77,12 +83,15 @@ enum {
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV4_NUM,
+	CMD_LINE_OPT_NAT_IPV4_NUM,
+	CMD_LINE_OPT_VIP_IPV4_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV6_NUM,
 	CMD_LINE_OPT_T_PRIMARY_IPV6_NUM,
 	CMD_LINE_OPT_LENGTH_NUM,
 	CMD_LINE_OPT_ADD_VIP_NUM,
 	CMD_LINE_OPT_DEL_VIP_NUM,
 	CMD_LINE_OPT_GET_VIP_NUM,
+	CMD_LINE_OPT_NAT_TYPE_NUM,
 	CMD_LINE_OPT_PXE_IP_NUM,
 	CMD_LINE_OPT_PXE_STR_NUM,
 };
@@ -97,12 +106,15 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV4, 1, 0, CMD_LINE_OPT_PRIMARY_IPV4_NUM},
+	{CMD_LINE_OPT_NAT_IPV4, 1, 0, CMD_LINE_OPT_NAT_IPV4_NUM},
+	{CMD_LINE_OPT_VIP_IPV4, 1, 0, CMD_LINE_OPT_VIP_IPV4_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV6, 1, 0, CMD_LINE_OPT_PRIMARY_IPV6_NUM},
 	{CMD_LINE_OPT_T_PRIMARY_IPV6, 1, 0, CMD_LINE_OPT_T_PRIMARY_IPV6_NUM},
 	{CMD_LINE_OPT_LENGTH, 1, 0, CMD_LINE_OPT_LENGTH_NUM},
-	{CMD_LINE_OPT_ADD_VIP, 1, 0, CMD_LINE_OPT_ADD_VIP_NUM},
-	{CMD_LINE_OPT_DEL_VIP, 1, 0, CMD_LINE_OPT_DEL_VIP_NUM},
+	{CMD_LINE_OPT_ADD_VIP, 0, 0, CMD_LINE_OPT_ADD_VIP_NUM},
+	{CMD_LINE_OPT_DEL_VIP, 0, 0, CMD_LINE_OPT_DEL_VIP_NUM},
 	{CMD_LINE_OPT_GET_VIP, 1, 0, CMD_LINE_OPT_GET_VIP_NUM},
+	{CMD_LINE_OPT_NAT_TYPE, 1, 0, CMD_LINE_OPT_NAT_TYPE_NUM},
 	{CMD_LINE_OPT_PXE_IP, 1, 0, CMD_LINE_OPT_PXE_IP_NUM},
 	{CMD_LINE_OPT_PXE_STR, 1, 0, CMD_LINE_OPT_PXE_STR_NUM},
 	{NULL, 0, 0, 0},
@@ -172,6 +184,14 @@ int parse_args(int argc, char **argv)
 			strncpy(ip_str, optarg, 29);
 			version = dpdkonmetal::IPVersion::IPv4;
 			break;
+		case CMD_LINE_OPT_VIP_IPV4_NUM:
+			strncpy(vip_ip_str, optarg, 29);
+			version = dpdkonmetal::IPVersion::IPv4;
+			break;
+		case CMD_LINE_OPT_NAT_IPV4_NUM:
+			strncpy(nat_ip_str, optarg, 29);
+			version = dpdkonmetal::IPVersion::IPv4;
+			break;
 		case CMD_LINE_OPT_PRIMARY_IPV6_NUM:
 			strncpy(ip6_str, optarg, 39);
 			version = dpdkonmetal::IPVersion::IPv6;
@@ -185,15 +205,16 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_VIP_NUM:
 			command = DP_CMD_ADD_VIP;
-			strncpy(machine_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_DEL_VIP_NUM:
 			command = DP_CMD_DEL_VIP;
-			strncpy(machine_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_GET_VIP_NUM:
 			command = DP_CMD_GET_VIP;
 			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_NAT_TYPE_NUM:
+			strncpy(nat_type_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_PXE_IP_NUM:
 			strncpy(pxe_ip_str, optarg, 29);
@@ -320,36 +341,59 @@ public:
 	}
 
 	void AddVIP() {
-			MachineVIPMsg request;
+			VIPMsg request;
 			Status reply;
 			ClientContext context;
-			MachineVIPIP *vip_ip = new MachineVIPIP();
+			VipIP *vip_ip = new VipIP();
+			NatIP *nat_ip = new NatIP();
 
-			request.set_machineid(machine_str);
+			request.set_vni(vni);
 			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				vip_ip->set_address(ip_str);
-			request.set_allocated_machinevipip(vip_ip);
-			stub_->addMachineVIP(&context, request, &reply);
+			if(version == dpdkonmetal::IPVersion::IPv4) {
+				vip_ip->set_address(vip_ip_str);
+				nat_ip->set_ipversion(version);
+				nat_ip->set_address(nat_ip_str);
+			}
+			request.set_allocated_vipip(vip_ip);
+			request.set_allocated_natip(nat_ip);
+			if (strncmp("SNAT", nat_type_str, sizeof(nat_type_str)) == 0)
+				request.set_nattype(dpdkonmetal::NatType::SNAT);
+			else
+				request.set_nattype(dpdkonmetal::NatType::DNAT);
+			stub_->addVIP(&context, request, &reply);
 	}
 
 	void DelVIP() {
-			MachineIDMsg request;
+			VIPMsg request;
 			Status reply;
 			ClientContext context;
+			VipIP *vip_ip = new VipIP();
+			NatIP *nat_ip = new NatIP();
 
-			request.set_machineid(machine_str);
-			stub_->delMachineVIP(&context, request, &reply);
+			request.set_vni(vni);
+			vip_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4) {
+				vip_ip->set_address(vip_ip_str);
+				nat_ip->set_ipversion(version);
+				nat_ip->set_address(nat_ip_str);
+			}
+			request.set_allocated_vipip(vip_ip);
+			request.set_allocated_natip(nat_ip);
+			if (strncmp("SNAT", nat_type_str, sizeof(nat_type_str)) == 0)
+				request.set_nattype(dpdkonmetal::NatType::SNAT);
+			else
+				request.set_nattype(dpdkonmetal::NatType::DNAT);
+			stub_->delVIP(&context, request, &reply);
 	}
 
 	void GetVIP() {
-			MachineIDMsg request;
+			/*MachineIDMsg request;
 			MachineVIPIP reply;
 			ClientContext context;
 
 			request.set_machineid(machine_str);
 			stub_->getMachineVIP(&context, request, &reply);
-			printf("Received VIP %s \n", reply.address().c_str());
+			printf("Received VIP %s \n", reply.address().c_str());*/
 	}
 
 	void DelMachine() {
@@ -417,6 +461,7 @@ int main(int argc, char** argv)
 		break;
 	case DP_CMD_ADD_VIP:
 		dpdk_client.AddVIP();
+		printf("Add VIP called with VIP ip %s NAT ip %s NAT type %s vni %d\n", vip_ip_str, nat_ip_str, nat_type_str, vni);
 		std::cout << "Addvip called " << std::endl;
 		break;
 	case DP_CMD_DEL_VIP:
@@ -424,8 +469,8 @@ int main(int argc, char** argv)
 		std::cout << "Delvip called " << std::endl;
 		break;
 	case DP_CMD_GET_VIP:
-		std::cout << "Getvip called " << std::endl;
-		dpdk_client.GetVIP();
+		std::cout << "Getvip not implemented yet " << std::endl;
+		//dpdk_client.GetVIP();
 		break;
 	default:
 		break;

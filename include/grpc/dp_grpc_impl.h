@@ -32,12 +32,18 @@ typedef struct dp_com_head {
 } dp_com_head;
 
 typedef struct dp_vip {
-	uint32_t ip_type;
+	uint32_t	ip_type_vip;
+	uint32_t	ip_type_nat;
+	uint32_t	nat_type;
+	uint32_t	vni;
 	union {
 		uint32_t	vip_addr;
 		uint8_t		vip_addr6[16];
 	} vip;
-	char machine_id[VM_MACHINE_ID_STR_LEN];
+	union {
+		uint32_t	nat_addr;
+		uint8_t		nat_addr6[16];
+	} nat;
 } dp_vip;
 
 typedef struct dp_addmachine {
@@ -84,7 +90,7 @@ typedef struct dp_request {
 		dp_vip			add_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
-		dp_delvip		del_vip;
+		dp_vip			del_vip;
 		dp_getvip		get_vip;
 		dp_route		route;
 	};
