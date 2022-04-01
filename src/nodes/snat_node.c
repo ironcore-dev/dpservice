@@ -81,6 +81,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		cntrack->dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 					sizeof(struct rte_ether_hdr));
+		printf("DNAT state established (Called in snat) \n");
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst);
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
 		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);

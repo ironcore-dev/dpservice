@@ -41,14 +41,14 @@ public:
 
 class AddVIPCall final : BaseCall {
 	ServerContext ctx_;
-	VIPMsg request_;
+	MachineVIPMsg request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
 	AddVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_ADDVIP), responder_(&ctx_) {
-		service_->RequestaddVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestaddMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -56,14 +56,14 @@ public:
 
 class DelVIPCall final : BaseCall {
 	ServerContext ctx_;
-	VIPMsg request_;
+	MachineIDMsg request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
 	DelVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DELVIP), responder_(&ctx_) {
-		service_->RequestdelVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdelMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -71,14 +71,14 @@ public:
 
 class GetVIPCall final : BaseCall {
 	ServerContext ctx_;
-	Empty request_;
-	VIPsMsg reply_;
-	ServerAsyncResponseWriter<VIPsMsg> responder_;
+	MachineIDMsg request_;
+	MachineVIPIP reply_;
+	ServerAsyncResponseWriter<MachineVIPIP> responder_;
 
 public:
 	GetVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_GETVIP), responder_(&ctx_) {
-		service_->RequestlistVIPs(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestgetMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;

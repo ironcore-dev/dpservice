@@ -1,6 +1,5 @@
 #include "grpc/dp_async_grpc.h"
 #include "grpc/dp_grpc_impl.h"
-#include "dp_nat.h"
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
 #include <rte_ether.h>
@@ -14,21 +13,13 @@ int AddVIPCall::Proceed()
 	if (status_ == REQUEST) {
 		new AddVIPCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		if (request_.vipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type_vip = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.vipip().address().c_str(),
+		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machineid().c_str());
+		if (request_.machinevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.machinevipip().address().c_str(),
 					  (in_addr*)&request.add_vip.vip.vip_addr);
 		}
-		if (request_.natip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type_nat = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natip().address().c_str(),
-					  (in_addr*)&request.add_vip.nat.nat_addr);
-		}
-		if (request_.nattype() == dpdkonmetal::NatType::SNAT)
-			request.add_vip.nat_type = DP_NAT_SNAT;
-		if (request_.nattype() == dpdkonmetal::NatType::DNAT)
-			request.add_vip.nat_type = DP_NAT_DNAT;
-		request.add_vip.vni = request_.vni();
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -54,21 +45,8 @@ int DelVIPCall::Proceed()
 	if (status_ == REQUEST) {
 		new DelVIPCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		if (request_.vipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type_vip = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.vipip().address().c_str(),
-					  (in_addr*)&request.add_vip.vip.vip_addr);
-		}
-		if (request_.natip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type_nat = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natip().address().c_str(),
-					  (in_addr*)&request.add_vip.nat.nat_addr);
-		}
-		if (request_.nattype() == dpdkonmetal::NatType::SNAT)
-			request.add_vip.nat_type = DP_NAT_SNAT;
-		if (request_.nattype() == dpdkonmetal::NatType::DNAT)
-			request.add_vip.nat_type = DP_NAT_DNAT;
-		request.add_vip.vni = request_.vni();
+		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machineid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -86,7 +64,7 @@ int DelVIPCall::Proceed()
 }
 
 int GetVIPCall::Proceed()
-{/*
+{
 	dp_request request = {0};
 	dp_reply reply = {0};
 	struct in_addr addr;
@@ -112,7 +90,7 @@ int GetVIPCall::Proceed()
 	} else {
 		GPR_ASSERT(status_ == FINISH);
 		delete this;
-	}*/
+	}
 	return 0;
 }
 
