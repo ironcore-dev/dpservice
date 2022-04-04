@@ -140,32 +140,14 @@ message MachineIDMsg {
 	bytes machineID = 1;
 }
 
-enum NatType {
-	SNAT = 0;
-	DNAT = 1;
-}
-
-message VipIP {
+message MachineVIPIP {
 	IPVersion ipVersion = 1;
 	bytes address = 2;	// Can be both ipv4 and ipv6
 }
 
-message NatIP {
-	IPVersion ipVersion = 1;
-	bytes address = 2;	// Can be both ipv4 and ipv6
-}
-
-// SNAT change natIP src to vipIP for egress
-// DNAT change vipIP dst to natIP for ingress
-message VIPMsg {
-	NatIP natIP = 1;
-	VipIP vipIP = 2;
-	uint32 vni = 3;
-	NatType natType = 4;
-}
-
-message VIPsMsg {
-	repeated VIPMsg vips = 1;
+message MachineVIPMsg {
+	bytes machineID = 1;
+	MachineVIPIP machineVIPIP = 2;
 }
 
 message MachinesMsg {
@@ -271,10 +253,10 @@ service DPDKonmetal {
 	rpc addMachinePrefix(MachinePrefixMsg) returns (Status) {}
 	rpc deleteMachinePrefix(MachinePrefixMsg) returns (Status) {}
 
-	// NAT related, add/get/del Virtual IP in a VNI
-	rpc addVIP(VIPMsg) returns (Status) {}
-	rpc listVIPs(Empty) returns (VIPsMsg) {}
-	rpc delVIP(VIPMsg) returns (Status) {}
+	// NAT related, add/get/del Virtual IP for a given Machine
+	rpc addMachineVIP(MachineVIPMsg) returns (Status) {}
+	rpc getMachineVIP(MachineIDMsg) returns (MachineVIPIP) {}
+	rpc delMachineVIP(MachineIDMsg) returns (Status) {}
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}
