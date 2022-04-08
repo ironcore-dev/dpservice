@@ -9,7 +9,7 @@
 #include "dpdk_layer.h"
 
 #include "nodes/ipip_tunnel_node.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 struct ipip_tunnel_node_main ipip_tunnel_node;
 

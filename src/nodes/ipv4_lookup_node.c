@@ -12,7 +12,7 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 struct ipv4_lookup_node_main ipv4_lookup_node;
 

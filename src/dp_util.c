@@ -11,7 +11,7 @@
 #include "rte_ip.h"
 #include "dp_util.h"
 #include "dpdk_layer.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 #define DP_MAX_IP6_CHAR 40
 #define DP_MAX_VNI_STR 12

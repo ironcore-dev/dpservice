@@ -8,7 +8,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 struct overlay_switch_node_main overlay_switch_node;
 

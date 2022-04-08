@@ -7,7 +7,7 @@ extern "C"
 #endif
 
 #include "dpdk_layer.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 	enum
 	{
