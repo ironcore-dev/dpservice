@@ -8,6 +8,7 @@
 #include "dp_nat.h"
 #include "dp_flow.h"
 #include "dp_util.h"
+#include "dp_rte_flow.h"
 #include "nodes/snat_node.h"
 
 
@@ -43,9 +44,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		src_ip = ntohl(df_ptr->src.src_addr);
 		if (dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port))
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-
-			ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-								sizeof(struct rte_ether_hdr));
+			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port)));
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
@@ -66,8 +65,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	/* We already know what to do */
 	if (cntrack->flow_status == DP_FLOW_STATUS_SRC_NAT &&
 		cntrack->dir == DP_FLOW_DIR_ORG) {
-		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-					sizeof(struct rte_ether_hdr));
+		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
 		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
@@ -77,11 +75,9 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
 	}
 
-	if (cntrack->flow_status == DP_FLOW_STATUS_DST_NAT &&
-		cntrack->dir == DP_FLOW_DIR_REPLY) {
-		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-					sizeof(struct rte_ether_hdr));
-		printf("DNAT state established (Called in snat) \n");
+	if (((cntrack->flow_status == DP_FLOW_STATUS_DST_NAT) || (cntrack->flow_status == DP_FLOW_STATUS_DST_LB))
+		&& (cntrack->dir == DP_FLOW_DIR_REPLY)) {
+		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst);
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
 		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);

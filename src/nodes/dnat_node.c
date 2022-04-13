@@ -8,6 +8,7 @@
 #include "dp_nat.h"
 #include "dp_flow.h"
 #include "dp_util.h"
+#include "dp_rte_flow.h"
 #include "nodes/dnat_node.h"
 
 
@@ -50,9 +51,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 		if (dp_is_ip_dnatted(dst_ip, vni)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-			printf("DNAT state new \n");
-			ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-								sizeof(struct rte_ether_hdr));
+			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dp_get_vm_dnat_ip(dst_ip, vni));
 			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
@@ -73,8 +72,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_NAT &&
 		cntrack->dir == DP_FLOW_DIR_ORG) {
-		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-					sizeof(struct rte_ether_hdr));
+		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src);
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
@@ -87,8 +85,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 	/* We already know what to do */
 	if (cntrack->flow_status == DP_FLOW_STATUS_SRC_NAT &&
 		cntrack->dir == DP_FLOW_DIR_REPLY) {
-		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-					sizeof(struct rte_ether_hdr));
+		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);

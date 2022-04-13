@@ -31,6 +31,7 @@ enum {
 	DP_FLOW_STATUS_NONE,
 	DP_FLOW_STATUS_SRC_NAT,
 	DP_FLOW_STATUS_DST_NAT,
+	DP_FLOW_STATUS_DST_LB,
 };
 
 struct flow_key {

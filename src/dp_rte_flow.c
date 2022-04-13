@@ -40,6 +40,22 @@ uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt)
 	return df->l3_type;
 }
 
+struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m)
+{
+	struct rte_ipv4_hdr *ipv4_hdr;
+	struct dp_flow *df_ptr;
+
+	df_ptr = get_dp_flow_ptr(m);
+
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	else
+		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
+										   sizeof(struct rte_ether_hdr));
+
+	return ipv4_hdr;
+}
+
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 {
 	struct dp_flow *df;

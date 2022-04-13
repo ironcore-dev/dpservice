@@ -29,6 +29,7 @@ uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt);
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, ipv4/ipv6 header
 int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset,  tcp/udp/icmp header
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
+struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m);
 
 // functions to craft actions/patterns are added later
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer);
