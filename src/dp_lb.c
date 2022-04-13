@@ -1,8 +1,11 @@
+#include <time.h>
+#include <stdlib.h>
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_common.h>
 #include <rte_errno.h>
 #include <rte_malloc.h>
+#include "dp_flow.h"
 #include "dp_lb.h"
 
 static struct rte_hash *ipv4_lb_tbl = NULL;
@@ -27,6 +30,11 @@ void dp_init_lb_tables(int socket_id)
 		rte_exit(EXIT_FAILURE, "create ipv4 lb table failed\n");
 }
 
+bool dp_is_lb_enabled()
+{
+	return (rte_hash_count(ipv4_lb_tbl) > 0);
+}
+
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni)
 {
 	struct lb_key nkey;
@@ -43,47 +51,125 @@ bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni)
 
 uint32_t dp_get_vm_lb_ip(uint32_t vm_ip, uint32_t vni)
 {
-	struct lb_key nkey;
-	uint32_t *lb_ip;
-
+	//struct lb_key nkey;
+	uint32_t *lb_ip = NULL;
+/*
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_ip) < 0)
-		return 0;
+		return 0;*/
 
 	return *lb_ip;
 }
 
-void dp_set_vm_lb_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
+static int dp_lb_last_free_pos(struct lb_value *val)
 {
-	struct lb_key nkey;
-	uint32_t *lb_ip;
+	int ret = -1, k;
 
-	nkey.ip = vm_ip;
+	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
+		if (val->back_end_ips[k] == 0)
+			break;
+	}
+	if (k != DP_LB_MAX_IPS_PER_VIP)
+		ret = k;
+
+	return ret;
+}
+
+static int dp_lb_rr_backend(struct lb_value *val)
+{
+	int ret = -1, k;
+
+	if (val->back_end_cnt == 1) {
+		for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++)
+			if (val->back_end_ips[k] != 0)
+				break;
+		if (k != DP_LB_MAX_IPS_PER_VIP)
+			ret = k;
+	} else {
+		for (k = val->last_sel_pos; k < DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos; k++)
+			if ((val->back_end_ips[k % DP_LB_MAX_IPS_PER_VIP] != 0) && (k != val->last_sel_pos))
+				break;
+
+		if (k != (DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos))
+			ret = k % DP_LB_MAX_IPS_PER_VIP;
+	}
+
+	return ret;
+}
+
+uint32_t dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, struct flow_key *fkey)
+{
+	struct lb_value *lb_val = NULL;
+	struct lb_key nkey;
+	int pos, ret = 0;
+
+	nkey.ip = v_ip;
 	nkey.vni = vni;
 
-	if (rte_hash_add_key(ipv4_lb_tbl, &nkey) < 0)
-		goto err;
-
-	lb_ip = rte_zmalloc("lb_val", sizeof(uint32_t), RTE_CACHE_LINE_SIZE);
-	if (!lb_ip)
-		goto err;
-
-	*lb_ip = s_ip;
-	if (rte_hash_add_key_data(ipv4_lb_tbl, &nkey, lb_ip) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
 		goto out;
 
+	/* TODO This is just temporary. Round robin.
+	   This doesn't distribute the load evenly. 
+	   Use maglev hashing and 5 Tuple fkey for 
+	   backend selection */
+	pos = dp_lb_rr_backend(lb_val);
+
+	if (pos < 0)
+		goto out;
+
+	lb_val->last_sel_pos = pos;
+	ret = lb_val->back_end_ips[pos];
+
+out:
+	return ret;
+}
+
+void dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
+{
+	struct lb_value *lb_val = NULL;
+	struct lb_key nkey;
+	int pos;
+
+	nkey.ip = v_ip;
+	nkey.vni = vni;
+
+	if (!dp_is_ip_lb(v_ip, vni)) {
+		if (rte_hash_add_key(ipv4_lb_tbl, &nkey) < 0)
+			goto err;
+
+		lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
+		if (!lb_val)
+			goto err;
+		lb_val->vip_maglev_tbl = NULL;
+		pos = dp_lb_last_free_pos(lb_val);
+		if (pos < 0)
+			goto out;
+		lb_val->back_end_ips[pos] = back_ip;
+
+		if (rte_hash_add_key_data(ipv4_lb_tbl, &nkey, lb_val) < 0)
+			goto out;
+	} else {
+		if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
+			goto err;
+		pos = dp_lb_last_free_pos(lb_val);
+		if (pos < 0)
+			goto err;
+		lb_val->back_end_ips[pos] = back_ip;
+	}
+	lb_val->back_end_cnt++;
 	return;
 out:
-	rte_free(lb_ip);
+	rte_free(lb_val);
 err:
 	printf("lb table add ip failed\n");
 }
 
 void dp_del_vm_lb_ip(uint32_t vm_ip, uint32_t vni)
 {
-	struct lb_key nkey;
+/*	struct lb_key nkey;
 	uint32_t *lb_ip;
 	int pos;
 
@@ -98,5 +184,5 @@ void dp_del_vm_lb_ip(uint32_t vm_ip, uint32_t vni)
 	if (pos < 0)
 		printf("LB hash key already deleted \n");
 	else
-		rte_hash_free_key_with_position(ipv4_lb_tbl, pos);
+		rte_hash_free_key_with_position(ipv4_lb_tbl, pos); */
 }

@@ -29,6 +29,7 @@ void GRPCService::HandleRpcs()
 {
 	void* tag;
 	bool ok;
+	new AddLBVIPCall(this, cq_.get());
 	new AddVIPCall(this, cq_.get());
 	new DelVIPCall(this, cq_.get());
 	new GetVIPCall(this, cq_.get());

@@ -145,9 +145,24 @@ message MachineVIPIP {
 	bytes address = 2;	// Can be both ipv4 and ipv6
 }
 
+message LBIP {
+	IPVersion ipVersion = 1;
+	bytes address = 2;	// Can be both ipv4 and ipv6
+}
+
 message MachineVIPMsg {
 	bytes machineID = 1;
 	MachineVIPIP machineVIPIP = 2;
+}
+
+message LBMsg {
+	LBIP lbVipIP = 1;
+	uint32 vni = 2;
+	LBIP lbBackendIP = 3;
+}
+
+message LBBackendMsg {
+	repeated LBIP backends = 1;
 }
 
 message MachinesMsg {
@@ -257,6 +272,11 @@ service DPDKonmetal {
 	rpc addMachineVIP(MachineVIPMsg) returns (Status) {}
 	rpc getMachineVIP(MachineIDMsg) returns (MachineVIPIP) {}
 	rpc delMachineVIP(MachineIDMsg) returns (Status) {}
+
+	// LB related, add/list/del backend IPs for a given LB IP
+	rpc addLBVIP(LBMsg) returns (Status) {}
+	rpc getLBVIPBackends(LBMsg) returns (LBBackendMsg) {}
+	rpc delLBVIP(LBMsg) returns (Status) {}
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}

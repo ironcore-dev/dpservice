@@ -33,12 +33,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	int ret = 0;
 
 	df_ptr = get_dp_flow_ptr(m);
-
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
-	else
-		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
-										   sizeof(struct rte_ether_hdr));
+	ipv4_hdr = dp_get_ipv4_hdr(m);
 
 	if (extract_inner_l3_header(m, ipv4_hdr, 0) < 0)
 		return DP_ROUTE_DROP;
