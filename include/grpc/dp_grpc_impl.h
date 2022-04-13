@@ -12,6 +12,7 @@ extern "C" {
 
 typedef enum {
 	DP_REQ_TYPE_NONE,
+	DP_REQ_TYPE_ADDLBVIP,
 	DP_REQ_TYPE_ADDVIP,
 	DP_REQ_TYPE_DELVIP,
 	DP_REQ_TYPE_GETVIP,
@@ -39,6 +40,19 @@ typedef struct dp_vip {
 	} vip;
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_vip;
+
+typedef struct dp_lb_vip {
+	uint32_t ip_type;
+	union {
+		uint32_t	vip_addr;
+		uint8_t		vip_addr6[16];
+	} vip;
+	uint32_t	vni;
+	union {
+		uint32_t	back_addr;
+		uint8_t		back_addr6[16];
+	} back;
+} dp_lb_vip;
 
 typedef struct dp_addmachine {
 	uint32_t	ip4_addr;
@@ -82,6 +96,7 @@ typedef struct dp_request {
 	dp_com_head com_head;
 	union {
 		dp_vip			add_vip;
+		dp_lb_vip		add_lb_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
 		dp_delvip		del_vip;

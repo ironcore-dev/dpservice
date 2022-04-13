@@ -53,6 +53,17 @@ __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 	head->msg_count = 0;
 }
 
+static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
+{
+	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV4)
+		dp_set_lb_back_ip(ntohl(req->add_lb_vip.vip.vip_addr),
+						  ntohl(req->add_lb_vip.back.back_addr), req->add_lb_vip.vni);
+	else
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
 	int port_id;
@@ -236,6 +247,9 @@ int dp_process_request(struct rte_mbuf *m)
 
 	switch (req->com_head.com_type)
 	{
+		case DP_REQ_TYPE_ADDLBVIP:
+			ret = dp_process_add_lb_vip(req, &rep);
+			break;
 		case DP_REQ_TYPE_ADDVIP:
 			ret = dp_process_addvip(req, &rep);
 			break;

@@ -121,7 +121,6 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 
 void dp_free_flow(struct flow_value *cntrack)
 {
-	printf("Free the conntrack %p \n", cntrack);
 	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
 	rte_free(cntrack);

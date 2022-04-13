@@ -54,6 +54,21 @@ public:
 	int Proceed() override;
 };
 
+class AddLBVIPCall final : BaseCall {
+	ServerContext ctx_;
+	LBMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	AddLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADDLBVIP), responder_(&ctx_) {
+		service_->RequestaddLBVIP(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class DelVIPCall final : BaseCall {
 	ServerContext ctx_;
 	MachineIDMsg request_;
