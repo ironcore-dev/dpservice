@@ -38,7 +38,10 @@ struct flow_key {
 	uint32_t ip_dst;
 	uint32_t ip_src;
 	uint16_t port_dst;
-	uint16_t port_src;
+	union {
+		uint16_t port_src;
+		uint16_t type_src; /* ICMP */
+	} src;
 	/*TODO Add vni also to the key */
 	uint8_t  proto;
 } __rte_packed;
