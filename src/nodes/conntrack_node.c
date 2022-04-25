@@ -47,7 +47,8 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if (!dp_is_conntrack_enabled())
 		return ret;
 
-	if ((df_ptr->l4_type == DP_IP_PROTO_TCP) || (df_ptr->l4_type == DP_IP_PROTO_UDP)) {
+	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
+		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
 		memset(&key, 0, sizeof(struct flow_key));
 
 		dp_build_flow_key(&key, m);

@@ -4,6 +4,7 @@
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
+#include <rte_icmp.h>
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static uint64_t timeout = 0;
@@ -40,19 +41,21 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 
 	switch (df_ptr->l4_type) {
 		case IPPROTO_TCP:
-				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
-				key->port_src = rte_be_to_cpu_16(df_ptr->src_port);
-				break;
-
+			key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
+			key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
+			break;
 		case IPPROTO_UDP:
-				key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
-				key->port_src = rte_be_to_cpu_16(df_ptr->src_port);
-				break;
-
+			key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
+			key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
+			break;
+		case IPPROTO_ICMP:
+			key->port_dst = 0;
+			key->src.type_src = df_ptr->icmp_type;
+			break;
 		default:
-				key->port_dst = 0;
-				key->port_src = 0;
-				break;
+			key->port_dst = 0;
+			key->src.port_src = 0;
+			break;
 	}
 }
 
@@ -64,9 +67,16 @@ void dp_invert_flow_key(struct flow_key *key /* in / out */)
 	ip_tmp = key->ip_src;
 	key->ip_src = key->ip_dst;
 	key->ip_dst = ip_tmp;
-	port_tmp = key->port_src;
-	key->port_src = key->port_dst;
-	key->port_dst = port_tmp;
+	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
+		port_tmp = key->src.port_src;
+		key->src.port_src = key->port_dst;
+		key->port_dst = port_tmp;
+	} else if (key->proto == IPPROTO_ICMP) {
+		if (key->src.type_src == RTE_IP_ICMP_ECHO_REPLY)
+			key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
+		if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
+			key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
+	}
 }
 
 bool dp_flow_exists(struct flow_key *key)
@@ -113,7 +123,7 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 
 	if ((key1->proto != key2->proto) || (key1->ip_src != key2->ip_src)
 		|| (key1->ip_dst != key2->ip_dst) || (key1->port_dst != key2->port_dst)
-		|| (key1->port_src != key2->port_src))
+		|| (key1->src.port_src != key2->src.port_src))
 		return false;
 
 	return true;
