@@ -28,7 +28,6 @@ static int lb_node_init(const struct rte_graph *graph, struct rte_node *node)
 static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 {
 	struct rte_ipv4_hdr *ipv4_hdr;
-	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key key;
 	struct flow_value *cntrack = NULL;
@@ -58,11 +57,7 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dp_lb_get_backend_ip(dst_ip, vni, NULL));
 			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
-			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
-			ipv4_hdr->hdr_checksum = 0;
-			ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
-			tcp_hdr->cksum = 0;
-			tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+			dp_nat_chg_ip(df_ptr, ipv4_hdr);
 
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
@@ -80,11 +75,7 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src);
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
-		tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
-		ipv4_hdr->hdr_checksum = 0;
-		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
-		tcp_hdr->cksum = 0;
-		tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+		dp_nat_chg_ip(df_ptr, ipv4_hdr);
 	}
 
 	return 1;
