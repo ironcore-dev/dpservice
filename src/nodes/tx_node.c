@@ -80,8 +80,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);		
 		}
 		if (df && df->flags.valid && df->conntrack)
-		// if (df && df->flags.valid)
-			dp_handle_traffic_forward_offloading(mbuf0,df);
+			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}	
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,

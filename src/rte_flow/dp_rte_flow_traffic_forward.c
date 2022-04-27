@@ -144,9 +144,10 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
 	struct rte_flow_action_age flow_age;
-	if (agectx)
-		action_cnt = create_flow_age_action(action, action_cnt,
-											&flow_age, 60, agectx);
+	if (!agectx)
+		return 0;
+	action_cnt = create_flow_age_action(action, action_cnt,
+										&flow_age, 60, agectx);
 
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
@@ -312,9 +313,12 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
 	struct rte_flow_action_age flow_age;
-	if (agectx)
-		action_cnt = create_flow_age_action(action, action_cnt,
+	if (!agectx)
+		return 0;
+
+	action_cnt = create_flow_age_action(action, action_cnt,
 											&flow_age, 60, agectx);
+
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
 	action_cnt = create_send_to_port_action(action, action_cnt,
@@ -433,9 +437,10 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
 	struct rte_flow_action_age flow_age;
-	if (agectx)
-		action_cnt = create_flow_age_action(action, action_cnt,
-											&flow_age, 60, agectx);
+	if (!agectx)
+		return 0;
+	action_cnt = create_flow_age_action(action, action_cnt,
+										&flow_age, 60, agectx);
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
 	action_cnt = create_send_to_port_action(action, action_cnt,
@@ -446,8 +451,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	// validate and install rte flow
 	struct rte_flow *flow = NULL;
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
-	if (!flow)
-	{
+	if (!flow) {
 		free_allocated_agectx(agectx);
 		return 0;
 	}
@@ -461,19 +465,13 @@ int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
 {
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
-	{
 		return dp_handle_local_traffic_forward(m, df);
-	}
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-	{
 		return dp_handle_tunnel_decap_offload(m, df);
-	}
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-	{
 		return dp_handle_tunnel_encap_offload(m, df);
-	}
 
 	return 0;
 }
