@@ -7,7 +7,7 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_util.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 #include "nodes/conntrack_node.h"
 #include "nodes/dhcp_node.h"
 

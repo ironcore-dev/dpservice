@@ -8,7 +8,7 @@
 #include "dp_nat.h"
 #include "dp_flow.h"
 #include "dp_util.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 #include "nodes/dnat_node.h"
 
 

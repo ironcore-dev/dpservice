@@ -2,7 +2,7 @@
 #define __INCLUDE_IPIP_TUNNEL_NODE_H
 
 #include "dpdk_layer.h"
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 #ifdef __cplusplus
 extern "C"

@@ -7,7 +7,7 @@
 #include "dp_mbuf_dyn.h"
 #include "nodes/ipv6_nd_node.h"
 
-#include "dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow.h"
 
 enum
 {

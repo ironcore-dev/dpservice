@@ -6,7 +6,7 @@ dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'dp_lb.
 			  'nodes/overlay_switch_node.c','nodes/ipip_tunnel_node.c','dp_util.c','dp_periodic_msg.c', 
 			  'nodes/conntrack_node.c', 'nodes/dnat_node.c', 'nodes/lb_node.c',
 			  'nodes/snat_node.c', 'grpc/dp_grpc_service.cpp', 'grpc/dp_async_grpc.cpp', 'grpc/dp_grpc_impl.c', 'dp_flow.c',
-			  'dp_netlink.c','dp_rte_flow.c']
+			  'dp_netlink.c','rte_flow/dp_rte_flow.c','rte_flow/dp_rte_flow_init.c','rte_flow/dp_rte_flow_traffic_forward.c']
 
 executable('dp_service', [dp_sources, grpc_generated], include_directories : [inc],
 			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep] )
