@@ -3,6 +3,10 @@
 #include <rte_common.h>
 #include <rte_errno.h>
 #include <rte_malloc.h>
+#include <rte_ip.h>
+#include <rte_tcp.h>
+#include <rte_udp.h>
+#include "node_api.h"
 #include "dp_nat.h"
 
 static struct rte_hash *ipv4_dnat_tbl = NULL;
@@ -182,4 +186,31 @@ void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
 		printf("DNAT hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
+}
+
+void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr)
+{
+	struct rte_udp_hdr *udp_hdr;
+	struct rte_tcp_hdr *tcp_hdr;
+
+	ipv4_hdr->hdr_checksum = 0;
+	ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
+	
+	switch (df_ptr->l4_type)
+	{
+		case IPPROTO_TCP:
+			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
+			tcp_hdr->cksum = 0;
+			tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+		break;
+		case IPPROTO_UDP:
+			udp_hdr =  (struct rte_udp_hdr *)(ipv4_hdr + 1);
+			udp_hdr->dgram_cksum = 0;
+			udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
+		break;
+		case IPPROTO_ICMP:
+		break;
+		default:
+		break;
+	}
 }
