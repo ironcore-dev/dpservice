@@ -24,6 +24,9 @@ extern "C"
 #define DP_FLOW_OVERLAY_TYPE_IPIP	2
 #define DP_FLOW_OVERLAY_TYPE_SRV6	3
 
+#define DP_IS_SRC false
+#define DP_IS_DST true
+
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
 uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt);
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, ipv4/ipv6 header
@@ -49,11 +52,9 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								uint8_t proto);
 
 int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								struct rte_flow_item_ipv4 *ipv4_spec,
-								struct rte_flow_item_ipv4 *ipv4_mask,
-								uint32_t *src, size_t nr_src_mask_len,
-								uint32_t *dst, size_t nr_dst_mask_len,
-								uint8_t proto);
+							  struct rte_flow_item_ipv4 *ipv4_spec,
+							  struct rte_flow_item_ipv4 *ipv4_mask,
+							  struct dp_flow *df, bool dir);
 
 int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_udp *udp_spec,
@@ -98,6 +99,10 @@ int create_dst_mac_set_action(struct rte_flow_action *action, int action_cnt,
 int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
 							  struct rte_flow_action_set_mac *src_mac_set_action,
 							  struct rte_ether_addr *src_mac);
+
+int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
+						   struct rte_flow_action_set_ipv4 *ipv4_action,
+						   uint32_t ipv4, bool dir);
 
 int create_send_to_port_action(struct rte_flow_action *action, int action_cnt,
 								struct rte_flow_action_port_id *send_to_port_action,
