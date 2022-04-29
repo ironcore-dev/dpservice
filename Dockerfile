@@ -1,9 +1,10 @@
-ARG OS_VER=11-slim
+FROM debian:11-slim as builder
+
 ARG DPDK_VER=21.11
 ARG DPS_VER
-FROM debian:${OS_VER}
-MAINTAINER sachin
-WORKDIR /
+
+WORKDIR /workspace
+
 # Install prerequisite packages
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
@@ -17,7 +18,6 @@ make \
 gcc \
 g++ \
 ethtool \
-iproute2 \
 pciutils \
 procps \
 ninja-build \
@@ -31,21 +31,38 @@ pkg-config \
 protobuf-compiler-grpc \
 libgrpc++1 \
 libgrpc++-dev \
-linux-headers-$(uname -r) \
+linux-headers-${OSARCH} \
 && rm -rf /var/lib/apt/lists/*
+
 # Download and compile DPDK
-ARG DPDK_VER
-RUN cd /usr/src/ &&  wget http://git.dpdk.org/dpdk/snapshot/dpdk-${DPDK_VER}.zip && unzip dpdk-${DPDK_VER}.zip
-ENV DPDK_DIR=/usr/src/dpdk-${DPDK_VER}
+RUN wget http://git.dpdk.org/dpdk/snapshot/dpdk-${DPDK_VER}.zip
+RUN unzip dpdk-${DPDK_VER}.zip
+
+ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
+
 RUN cd $DPDK_DIR && meson build
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
+
 ARG DPS_VER
-ADD /dp_service-${DPS_VER}.tar.xz /tmp/
-RUN cd /tmp/dp_service-${DPS_VER} && meson build
-RUN cd /tmp/dp_service-${DPS_VER}/build && ninja
-# Remove unnecessary packages and files
-RUN rm -fr ${DPDK_DIR}* && rm -f /tmp/dp_service-${DPS_VER}.tar.gz
-RUN apt-get -y remove gcc unzip wget make
-RUN apt-get -y autoremove
-RUN apt-get -y clean
+COPY . .
+RUN meson build
+RUN cd ./build && ninja
+
+FROM debian:11-slim
+WORKDIR /
+COPY --from=builder /workspace/build/src/dp_service .
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /lib/* /lib/
+RUN ldconfig
+
+RUN apt-get update && apt-get install -y --no-install-recommends ON \
+libibverbs-dev \
+numactl \
+libnuma1 \
+pciutils \
+procps \
+libgrpc++1 \
+&& rm -rf /var/lib/apt/lists/*
+
+ENTRYPOINT ["/dp_service"]
