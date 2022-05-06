@@ -63,6 +63,8 @@ RUN cd ./build && ninja
 FROM debian:11-slim
 WORKDIR /
 COPY --from=builder /workspace/build/src/dp_service .
+COPY --from=builder /workspace/build/test/dp_grpc_client .
+COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
 RUN ldconfig
@@ -74,6 +76,7 @@ libnuma1 \
 pciutils \
 procps \
 libgrpc++1 \
+iproute2 \
 && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/dp_service"]

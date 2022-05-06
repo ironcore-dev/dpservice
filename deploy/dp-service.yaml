@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dp-service
+  namespace: default
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      name: dp-service-v1
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: dp-service-v1
+    spec:
+      initContainers:
+      - name: init-dp-service-v1
+        image: onmetal/net
+        imagePullPolicy: IfNotPresent
+        command: ['/prepare.sh']
+        volumeMounts:
+        - mountPath: /dev
+          name: hugepages
+        - mountPath: /tmp
+          name: temp
+        securityContext:
+          privileged: true
+      containers:
+      - args:
+        - -l 0,1
+        - --
+        - --no-stats
+        - --no-offload
+        image: onmetal/net
+        imagePullPolicy: IfNotPresent
+        name: dp-service-v1
+        resources:
+          limits:
+            hugepages-1Gi: 4Gi
+            memory: 1Gi
+          requests:
+            memory: 1Gi
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /dev
+          name: hugepages
+        - mountPath: /tmp
+          name: temp
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /dev
+          type: ""
+        name: hugepages
+      - hostPath:
+          path: /tmp
+          type: ""
+        name: temp
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
