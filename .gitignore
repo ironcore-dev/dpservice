@@ -10,3 +10,4 @@ proto/*.h
 proto/*.cc
 __*
 *.pcap
+.idea/

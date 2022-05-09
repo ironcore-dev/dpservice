@@ -2,21 +2,19 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: dp-service
-  namespace: default
 spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      name: dp-service-v1
+      name: dp-service
   template:
     metadata:
-      creationTimestamp: null
       labels:
-        name: dp-service-v1
+        name: dp-service
     spec:
       initContainers:
-      - name: init-dp-service-v1
-        image: onmetal/net
+      - name: init-dp-service
+        image: dp-service
         imagePullPolicy: IfNotPresent
         command: ['/prepare.sh']
         volumeMounts:
@@ -32,9 +30,9 @@ spec:
         - --
         - --no-stats
         - --no-offload
-        image: onmetal/net
+        image: dp-service
         imagePullPolicy: IfNotPresent
-        name: dp-service-v1
+        name: dp-service
         resources:
           limits:
             hugepages-1Gi: 4Gi
