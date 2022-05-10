@@ -1,4 +1,5 @@
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
+#include "dp_nat.h"
 
 static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
@@ -42,9 +43,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	{
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
-												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
-												df->l4_type);
+												df, DP_IS_DST);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -240,9 +239,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	{
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
-												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
-												df->l4_type);
+												df, DP_IS_DST);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -380,9 +377,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	{
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
-												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
-												df->l4_type);
+												df, DP_IS_DST);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -434,6 +429,16 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	struct rte_flow_action_set_mac set_src_mac;
 	action_cnt = create_src_mac_set_action(action, action_cnt,
 										   &set_src_mac, dp_get_mac(df->nxt_hop));
+
+	struct rte_flow_action_set_ipv4 set_ipv4;
+	if (df->flags.nat == DP_NAT_CHG_DST_IP)
+		action_cnt = create_ipv4_set_action(action, action_cnt,
+										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
+
+	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
+		action_cnt = create_ipv4_set_action(action, action_cnt,
+										    &set_ipv4, df->src.src_addr, DP_IS_SRC);
+
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
 	struct rte_flow_action_age flow_age;

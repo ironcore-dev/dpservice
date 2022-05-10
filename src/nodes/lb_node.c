@@ -56,6 +56,8 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dp_lb_get_backend_ip(dst_ip, vni, NULL));
+			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
+			df_ptr->nat_addr = df_ptr->dst.dst_addr;
 			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 			dp_nat_chg_ip(df_ptr, ipv4_hdr);
 
@@ -74,6 +76,8 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 		cntrack->dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src);
+		df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
+		df_ptr->nat_addr = df_ptr->dst.dst_addr;
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 		dp_nat_chg_ip(df_ptr, ipv4_hdr);
 	}

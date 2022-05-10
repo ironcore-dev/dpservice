@@ -25,6 +25,7 @@ struct dp_flow {
 		uint32_t	src_addr;
 		uint8_t		src_addr6[16];
 	} src;
+	uint32_t	nat_addr;
 	uint8_t		l4_type;
 	uint16_t	dst_port;
 	uint16_t	src_port;

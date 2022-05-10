@@ -1,6 +1,7 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_flow.h"
 #include "dp_lpm.h"
+#include "dp_nat.h"
 #include "nodes/dhcp_node.h"
 #include "node_api.h"
 #include "nodes/ipv6_nd_node.h"
@@ -206,6 +207,7 @@ void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint3
 	attr->priority = priority;
 	attr->transfer = transfer;
 }
+
 int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
 								  struct rte_flow_item_eth *eth_mask,
@@ -275,29 +277,26 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv4 *ipv4_spec,
 							  struct rte_flow_item_ipv4 *ipv4_mask,
-							  uint32_t *src, size_t nr_src_mask_len,
-							  uint32_t *dst, size_t nr_dst_mask_len,
-							  uint8_t proto)
+							  struct dp_flow *df, bool dir)
 {
 
 	memset(ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
 	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 
-	if (src)
-	{
-		// memcpy(&ipv4_spec->hdr.src_addr, src, nr_src_mask_len);
-		ipv4_spec->hdr.src_addr = *src;
-		memcpy(&ipv4_mask->hdr.src_addr, ipv4_addr_mask, nr_src_mask_len);
+	if (dir == DP_IS_SRC) {
+		ipv4_spec->hdr.src_addr = df->src.src_addr;
+		memcpy(&ipv4_mask->hdr.src_addr, ipv4_addr_mask, sizeof(ipv4_spec->hdr.src_addr));
 	}
 
-	if (dst)
-	{
-		// memcpy(&ipv4_spec->hdr.dst_addr, dst, nr_dst_mask_len);
-		ipv4_spec->hdr.dst_addr = *dst;
-		memcpy(&ipv4_mask->hdr.dst_addr, ipv6_addr_mask, nr_dst_mask_len);
+	if (dir == DP_IS_DST) {
+		if (df->flags.nat == DP_NAT_CHG_DST_IP)
+			ipv4_spec->hdr.dst_addr = df->nat_addr;
+		else
+			ipv4_spec->hdr.dst_addr = df->dst.dst_addr;
+		memcpy(&ipv4_mask->hdr.dst_addr, ipv4_addr_mask, sizeof(ipv4_spec->hdr.dst_addr));
 	}
 
-	ipv4_spec->hdr.next_proto_id = proto;
+	ipv4_spec->hdr.next_proto_id = df->l4_type;
 	ipv4_mask->hdr.next_proto_id = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
@@ -481,6 +480,22 @@ int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
 	rte_ether_addr_copy(src_mac, (struct rte_ether_addr *)src_mac_set_action->mac_addr);
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_SRC;
 	action[action_cnt].conf = src_mac_set_action;
+
+	return ++action_cnt;
+}
+
+int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
+						   struct rte_flow_action_set_ipv4 *ipv4_action,
+						   uint32_t ipv4, bool dir)
+{
+	ipv4_action->ipv4_addr = ipv4;
+
+	if (dir == DP_IS_DST)
+		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV4_DST;
+	else
+		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV4_SRC;
+
+	action[action_cnt].conf = ipv4_action;
 
 	return ++action_cnt;
 }

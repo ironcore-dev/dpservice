@@ -7,10 +7,11 @@ extern "C" {
 
 #define DP_NAT_TABLE_MAX	100
 
-#define DP_NAT_OFF	0
-#define DP_NAT_ON	1
-#define DP_NAT_SNAT	2
-#define DP_NAT_DNAT	3
+enum {
+	DP_NAT_CHG_NONE,
+	DP_NAT_CHG_SRC_IP,
+	DP_NAT_CHG_DST_IP,
+};
 
 struct nat_key {
 	uint32_t	ip;
