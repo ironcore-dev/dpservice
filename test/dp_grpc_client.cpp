@@ -373,6 +373,9 @@ public:
 				vip_ip->set_address(ip_str);
 			request.set_allocated_machinevipip(vip_ip);
 			stub_->addMachineVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void DelVIP() {

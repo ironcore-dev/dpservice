@@ -68,23 +68,34 @@ static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
-	int port_id;
+	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_vip.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return EXIT_FAILURE;
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_ADD_NAT;
+		goto err;
+	}
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+		ret = dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 						  ntohl(req->add_vip.vip.vip_addr),
 						  dp_get_vm_vni(port_id));
-		dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
+		if (ret)
+			goto err;
+		ret = dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
 						  dp_get_dhcp_range_ip4(port_id),
 						  dp_get_vm_vni(port_id));
+		if (ret)
+			goto err_snat;
 	}
 	return EXIT_SUCCESS;
+err_snat:
+	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+err:
+	rep->com_head.err_code = ret;
+	return ret;
 }
 
 static int dp_process_delvip(dp_request *req, dp_reply *rep)
@@ -116,8 +127,8 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 	if (port_id < 0)
 		return EXIT_FAILURE;
 
-	rep->get_vip.vip.vip_addr = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
-												  dp_get_vm_vni(port_id));
+	rep->get_vip.vip.vip_addr = htonl(dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
+														dp_get_vm_vni(port_id)));
 
 	return EXIT_SUCCESS;
 }

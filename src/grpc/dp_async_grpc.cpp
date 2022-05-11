@@ -62,6 +62,7 @@ int AddVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
