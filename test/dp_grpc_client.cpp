@@ -259,7 +259,10 @@ public:
 			request.set_allocated_ipv6config(ipv6_config);
 			request.set_machinetype(dpdkonmetal::MachineType::VirtualMachine);
 			stub_->addMachine(&context, request, &response);
-			printf("Allocated VF for you %s \n", response.vf().name().c_str());
+			if (!response.status().error())
+				printf("Allocated VF for you %s \n", response.vf().name().c_str());
+			else
+				printf("Error detected with code %d\n", response.status().error());
 	}
 
 	void AddRoute() {

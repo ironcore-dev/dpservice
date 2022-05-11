@@ -1,6 +1,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_lb.h"
+#include <dp_error.h>
 #include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
@@ -51,6 +52,7 @@ __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 	head->buf_count = count;
 	head->is_chained = is_chained;
 	head->msg_count = 0;
+	head->err_code = EXIT_SUCCESS;
 }
 
 static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
@@ -123,16 +125,25 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
 	struct dp_port_ext pf_port;
-	int port_id;
+	int port_id, err_code = EXIT_SUCCESS;
 
 	memset(&pf_port, 0, sizeof(pf_port));
 	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
 
 	port_id = dp_get_next_avail_vf_id(get_dpdk_layer(), DP_PORT_VF);
 	if ( port_id >= 0) {
-		dp_map_vm_handle(req->add_machine.machine_id, port_id);
-		setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id));
-		setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id));
+		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
+			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
+			goto err;
+		}
+		if (setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
+			err_code = DP_ERROR_VM_ADD_VM_LPM4;
+			goto handle_err;
+		}
+		if (setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
+			err_code = DP_ERROR_VM_ADD_VM_LPM6;
+			goto lpm_err;
+		}
 		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), 32, 
 							  rte_eth_dev_socket_id(port_id));
 		dp_set_vm_pxe_ip4(port_id, ntohl(req->add_machine.ip4_pxe_addr),
@@ -140,10 +151,16 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		dp_set_vm_pxe_str(port_id, req->add_machine.pxe_str);
 		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, 128,
 							  rte_eth_dev_socket_id(port_id));
-		dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr), 
-					 NULL, 32, rte_eth_dev_socket_id(port_id));
-		dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
-					  NULL, 128, rte_eth_dev_socket_id(port_id));
+		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr), 
+					 NULL, 32, rte_eth_dev_socket_id(port_id))) {
+			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT4;
+			goto lpm_err;
+		}
+		if (dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
+					  NULL, 128, rte_eth_dev_socket_id(port_id))) {
+			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT6;
+			goto route_err;
+		}
 		dp_start_interface(&pf_port, DP_PORT_VF);
 
 		/* TODO get the pci info of this port and fill it accordingly */
@@ -152,9 +169,22 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		rep->vf_pci.function = 2;
 		rte_eth_dev_get_name_by_port(port_id, rep->vf_pci.name);
 	} else {
-		return EXIT_FAILURE;
+		err_code = DP_ERROR_VM_ADD_VM_NO_VFS;
+		goto err;
 	}
 	return EXIT_SUCCESS;
+/* Rollback the changes, in case of an error */
+route_err:
+	dp_del_route(port_id, req->add_machine.vni, 0,
+				ntohl(req->route.pfx_ip.addr), NULL,
+				32, rte_eth_dev_socket_id(port_id));
+lpm_err:
+	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), DP_LPM_ROLLBACK);
+handle_err:
+	dp_del_portid_with_vm_handle(req->add_machine.machine_id);
+err:
+	rep->com_head.err_code = err_code;
+	return EXIT_FAILURE;
 }
 
 static int dp_process_delmachine(dp_request *req, dp_reply *rep)
@@ -169,7 +199,7 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 
 	dp_stop_interface(port_id, DP_PORT_VF);
 	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
-	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
+	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), !DP_LPM_ROLLBACK);
 	return EXIT_SUCCESS;
 }
 
@@ -244,6 +274,7 @@ int dp_process_request(struct rte_mbuf *m)
 	int ret = EXIT_SUCCESS;
 
 	req = rte_pktmbuf_mtod(m, dp_request*);
+	memset(&rep, 0, sizeof(dp_reply));
 
 	switch (req->com_head.com_type)
 	{

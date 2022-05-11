@@ -2,6 +2,7 @@
 #include "grpc/dp_grpc_impl.h"
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
+#include <dp_error.h>
 #include <rte_ether.h>
 
 int AddLBVIPCall::Proceed()
@@ -132,11 +133,13 @@ int AddMachineCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	VirtualFunction *vf = new VirtualFunction();
+	Status *err_status = new Status();
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new AddMachineCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		err_status->set_error(EXIT_SUCCESS);
 		request.add_machine.vni = request_.vni();
 		inet_aton(request_.ipv4config().primaryaddress().c_str(),
 				  (in_addr*)&request.add_machine.ip4_addr);
@@ -147,23 +150,28 @@ int AddMachineCall::Proceed()
 		uint8_t ret = inet_pton(AF_INET6, request_.ipv6config().primaryaddress().c_str(),
 								request.add_machine.ip6_addr6);
 		if(ret < 0)
-			printf("IPv6 address not in proper format\n");
+			err_status->set_error(DP_ERROR_VM_ADD_IPV6_FORMAT);
 
 		snprintf(request.add_machine.machine_id, VM_MACHINE_ID_STR_LEN, "%s",
 				 request_.machineid().c_str());
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
-			return -1;
-		vf->set_name(reply.vf_pci.name);
-		vf->set_bus(reply.vf_pci.bus);
-		vf->set_domain(reply.vf_pci.domain);
-		vf->set_slot(reply.vf_pci.slot);
-		vf->set_function(reply.vf_pci.function);
-		reply_.set_allocated_vf(vf);
+		if (!err_status->error()) {
+			dp_fill_head(&reply.com_head, call_type_, 0, 1);
+			if (dp_recv_from_worker(&reply))
+				return -1;
+			vf->set_name(reply.vf_pci.name);
+			vf->set_bus(reply.vf_pci.bus);
+			vf->set_domain(reply.vf_pci.domain);
+			vf->set_slot(reply.vf_pci.slot);
+			vf->set_function(reply.vf_pci.function);
+			reply_.set_allocated_vf(vf);
+			err_status->set_error(reply.com_head.err_code);
+		}
+		reply_.set_allocated_status(err_status);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
