@@ -16,6 +16,9 @@ extern "C" {
 #define DP_ERROR_VM_DEL					150
 #define DP_ERROR_VM_DEL_VM_NOT_FND		151
 #define DP_ERROR_VM_LIST				200
+#define DP_ERROR_VM_ADD_RT				250
+#define DP_ERROR_VM_ADD_RT_FAIL4		251
+#define DP_ERROR_VM_ADD_RT_FAIL6		252
 
 #ifdef __cplusplus
 }

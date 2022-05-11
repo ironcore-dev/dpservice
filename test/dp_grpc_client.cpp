@@ -289,6 +289,9 @@ public:
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->addRoute(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void DelRoute() {

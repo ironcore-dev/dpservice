@@ -240,6 +240,7 @@ int AddRouteCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
+		reply_.set_error(reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
