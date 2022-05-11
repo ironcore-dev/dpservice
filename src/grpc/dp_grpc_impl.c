@@ -189,18 +189,21 @@ err:
 
 static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 {
-	int port_id;
+	int port_id, ret = EXIT_SUCCESS;;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
 	/* This machine ID doesnt exist */
 	if (port_id < 0)
-		return EXIT_FAILURE;
+		goto err;
 
 	dp_stop_interface(port_id, DP_PORT_VF);
 	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), !DP_LPM_ROLLBACK);
-	return EXIT_SUCCESS;
+	return ret;
+err:
+	rep->com_head.err_code = DP_ERROR_VM_DEL_VM_NOT_FND;
+	return ret;
 }
 
 static int dp_process_addroute(dp_request *req, dp_reply *rep)

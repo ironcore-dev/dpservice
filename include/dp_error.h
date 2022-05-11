@@ -13,7 +13,8 @@ extern "C" {
 #define DP_ERROR_VM_ADD_VM_ADD_ROUT4	106
 #define DP_ERROR_VM_ADD_VM_ADD_ROUT6	107
 #define DP_ERROR_VM_ADD_VM_NO_VFS		108
-#define DP_ERROR_VM_DELETE				150
+#define DP_ERROR_VM_DEL					150
+#define DP_ERROR_VM_DEL_VM_NOT_FND		151
 #define DP_ERROR_VM_LIST				200
 
 #ifdef __cplusplus

@@ -395,6 +395,9 @@ public:
 
 			request.set_machineid(machine_str);
 			stub_->deleteMachine(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void GetMachines() {
