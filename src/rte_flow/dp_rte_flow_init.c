@@ -34,8 +34,6 @@ void dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	// create flow match patterns -- end
 	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
 
-	printf("pattern_cnt is %d \n", pattern_cnt);
-
 	// create flow action -- queue
 	struct rte_flow_action_queue queue_action;
 	action_cnt = create_redirect_queue_action(action, action_cnt,

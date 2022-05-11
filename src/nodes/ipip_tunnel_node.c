@@ -30,7 +30,6 @@ static __rte_always_inline int handle_ipip_tunnel_encap(struct rte_mbuf *m, stru
 
 	uint32_t vni_ns = htonl(df->tun_info.dst_vni);
 
-	// memcpy(srv6_hdr->last_segment.locator,df->tun_info.ul_dst_addr6,8);
 	memcpy(df->tun_info.ul_dst_addr6 + 8, &vni_ns, 4);
 	memset(df->tun_info.ul_dst_addr6 + 12, 0, 4);
 

@@ -63,6 +63,9 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			flow_val->dir = DP_FLOW_DIR_ORG;
 			dp_add_flow_data(&key, flow_val);
 
+			// Only the original flow (outgoing)'s hash value is recorded
+			df_ptr->dp_flow_hash=(uint32_t)dp_get_flow_hash_value(&key);
+
 			/* Add reply direction to the conntrack table */
 			dp_invert_flow_key(&key);
 			flow_val->flow_key[DP_FLOW_DIR_REPLY] = key;
@@ -80,6 +83,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 					flow_val->flow_state = DP_FLOW_STATE_ESTAB;
 				flow_val->dir = DP_FLOW_DIR_ORG;
 			}
+			df_ptr->dp_flow_hash=(uint32_t)dp_get_flow_hash_value(&key);
 		}
 		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;

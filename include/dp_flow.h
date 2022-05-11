@@ -75,6 +75,8 @@ void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload();
 void dp_free_flow(struct flow_value *cntrack);
 
+hash_sig_t dp_get_flow_hash_value(struct flow_key *key);
+
 #ifdef __cplusplus
 }
 #endif

@@ -322,6 +322,7 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 			cnt++;
 		}	
 	}
+
 	return -1;
 }
 

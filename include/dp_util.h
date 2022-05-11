@@ -29,6 +29,11 @@ int dp_get_num_of_vfs();
 int get_overlay_type();
 int get_op_env();
 
+int dp_is_wcmp_enabled();
+
+double dp_get_wcmp_frac();
+
+
 #ifdef __cplusplus
 }
 #endif

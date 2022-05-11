@@ -13,6 +13,7 @@
 #include "dp_nat.h"
 #include "dp_lb.h"
 #include "grpc/dp_grpc_service.h"
+#include "dp_multi_path.h"
 
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
@@ -24,7 +25,6 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 
 	return NULL;
 }
-
 
 static void dp_init_interfaces()
 {
@@ -59,6 +59,8 @@ static void dp_init_interfaces()
 	dp_init_nat_tables(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_lb_tables(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_vm_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	if (dp_is_wcmp_enabled())
+		fill_port_select_table(dp_get_wcmp_frac());
 }
 
 int main(int argc, char **argv)
@@ -82,8 +84,8 @@ int main(int argc, char **argv)
 	ret = rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL,
 							dp_handle_grpc, NULL);
 	if (ret < 0)
-			rte_exit(EXIT_FAILURE,
-					"Cannot create grpc thread\n");
+		rte_exit(EXIT_FAILURE,
+				"Cannot create grpc thread\n");
 
 	dp_dpdk_main_loop();
 
