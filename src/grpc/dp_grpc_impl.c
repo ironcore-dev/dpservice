@@ -235,18 +235,27 @@ err:
 
 static int dp_process_delroute(dp_request *req, dp_reply *rep)
 {
-	int ret;
+	int ret = EXIT_SUCCESS;
 
 	if(req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_del_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+		if (dp_del_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
 					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
-					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+			ret = DP_ERROR_VM_DEL_RT;
+			goto err;
+		}
 	} else {
-		ret = dp_del_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+		if (dp_del_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
 					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
-					  req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+			ret = DP_ERROR_VM_DEL_RT;
+			goto err;
+		}
 	}
 
+	return ret;
+err:
+	rep->com_head.err_code = ret;
 	return ret;
 }
 

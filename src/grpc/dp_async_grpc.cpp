@@ -280,6 +280,7 @@ int DelRouteCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker(&reply))
 			return -1;
+		reply_.set_error(reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
