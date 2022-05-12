@@ -30,18 +30,31 @@ void dp_init_vm_handle_tbl(int socket_id)
 		rte_exit(EXIT_FAILURE, "create vm handle table failed\n");
 }
 
-void dp_map_vm_handle(void *key, uint16_t portid)
+int dp_map_vm_handle(void *key, uint16_t portid)
 {
-	uint16_t *p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
+	uint16_t *p_port_id;
 
-	if (!p_port_id)
-		rte_exit(EXIT_FAILURE, "vm handle for port %d malloc data failed\n", portid);
+	p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
+	if (!p_port_id) {
+		printf("vm handle for port %d malloc data failed\n", portid);
+		return EXIT_FAILURE;
+	}
 
 	RTE_VERIFY(portid < DP_MAX_PORTS);
+	if (rte_hash_lookup(vm_handle_tbl, key) >= 0)
+		goto err;
+
 	rte_memcpy(vm_table[portid].machineid, key, sizeof(vm_table[portid].machineid));
 	*p_port_id = portid;
-	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0)
-		rte_exit(EXIT_FAILURE, "vm handle for port %d add data failed\n", portid);
+	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0) {
+		printf("vm handle for port %d add data failed\n", portid);
+		goto err;
+	}
+	return EXIT_SUCCESS;
+
+err:
+	rte_free(p_port_id);
+	return EXIT_FAILURE;
 }
 
 int dp_get_portid_with_vm_handle(void *key)
@@ -58,12 +71,11 @@ int dp_get_portid_with_vm_handle(void *key)
 
 void dp_del_portid_with_vm_handle(void *key)
 {
-	uint16_t *p_port_id;
+	uint16_t *p_port_id = NULL;
 
-	if (rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id) < 0)
-		return;
-
+	rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id);
 	rte_free(p_port_id);
+	rte_hash_del_key(vm_handle_tbl, key);
 }
 
 uint32_t dp_get_gw_ip4()
@@ -168,23 +180,24 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
 	struct rte_rib *root;
-	int ret = 0;
+	int ret = EXIT_SUCCESS;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = get_lpm(vni, socketid);
 	if (!root)
-		return -1;
+		goto err;
+
+	node = rte_rib_lookup_exact(root, ip, depth);
+	if (node)
+		goto err;
 
 	node = rte_rib_insert(root, ip, depth);
 	if (node) {
 		ret = rte_rib_set_nh(node, portid);
-		if (ret < 0) {
-			rte_exit(EXIT_FAILURE,
-				"Unable to add entry %u to the DP RIB table on socket %d\n",
-				portid, socketid);
-		}
+		if (ret < 0)
+			goto err;
 		/* This is an external route */
 		if (dp_is_pf_port_id(portid)) {
 			route = rte_rib_get_ext(node);
@@ -192,10 +205,14 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
 		}
 	} else {
-		rte_exit(EXIT_FAILURE,
-			"Unable to add entry %u to the DP RIB table on socket %d\n",
-			portid, socketid);
+		goto err;
 	}
+
+	return ret;
+err:
+	ret = EXIT_FAILURE;
+	printf("Unable to add entry %u to the DP RIB table on socket %d\n",
+		portid, socketid);
 	return ret;
 }
 
@@ -264,23 +281,25 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
-	int ret = 0;
+	int ret = EXIT_SUCCESS;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = get_lpm6(vni, socketid);
 	if (!root)
-		return -1;
+		goto err;
+
+	node = rte_rib6_lookup_exact(root, ipv6, depth);
+	if (node)
+		goto err;
 
 	node = rte_rib6_insert(root, ipv6, depth);
 	if (node) {
 		ret = rte_rib6_set_nh(node, portid);
-		if (ret < 0) {
-			rte_exit(EXIT_FAILURE,
-				"Unable to add entry %u to the DP RIB table on socket %d\n",
-				portid, socketid);
-		}
+		if (ret < 0)
+			goto err;
+
 		/* This is an external route */
 		if (dp_is_pf_port_id(portid)) {
 			route = rte_rib6_get_ext(node);
@@ -288,10 +307,13 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 			rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
 		}
 	} else {
-		rte_exit(EXIT_FAILURE,
-			"Unable to add entry %u to the DP RIB table on socket %d\n",
-			portid, socketid);
+		goto err;
 	}
+	return ret;
+err:
+	ret = EXIT_FAILURE;
+	printf("Unable to add entry %u to the DP RIB6 table on socket %d\n",
+		portid, socketid);
 	return ret;
 }
 
@@ -376,7 +398,7 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 	return &vm_table[portid].info.neigh_mac;
 }
 
-void setup_lpm(int port_id, int vni, const int socketid)
+int setup_lpm(int port_id, int vni, const int socketid)
 {
 	struct rte_rib_conf config_ipv4;
 	struct rte_rib* root;
@@ -394,17 +416,20 @@ void setup_lpm(int port_id, int vni, const int socketid)
 
 		snprintf(s, sizeof(s), "IPV4_DP_RIB_%d_%d", vni, socketid);
 		root = rte_rib_create(s, socketid, &config_ipv4);
-		if (root == NULL)
-			rte_exit(EXIT_FAILURE,
-				"Unable to create the DP RIB table on socket %d\n",
+		if (root == NULL) {
+			printf("Unable to create the DP RIB table on socket %d\n",
 				socketid);
+			return EXIT_FAILURE;
+		}
 	}
 	vm_table[port_id].ipv4_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
+
+	return EXIT_SUCCESS;
 }
 
-void setup_lpm6(int port_id, int vni, const int socketid)
+int setup_lpm6(int port_id, int vni, const int socketid)
 {
 	struct rte_rib6_conf config_ipv6;
 	struct rte_rib6* root;
@@ -423,15 +448,15 @@ void setup_lpm6(int port_id, int vni, const int socketid)
 		snprintf(s, sizeof(s), "IPV6_DP_RIB_%d_%d", vni, socketid);
 		root = rte_rib6_create(s, socketid, &config_ipv6);
 		if (root == NULL) {
-			
-			rte_exit(EXIT_FAILURE,
-				"Unable to create the DP RIB table on socket %d\n",
+			printf("Unable to create the DP RIB6 table on socket %d\n",
 				socketid);
+			return EXIT_FAILURE;
 		}
 	}
 	vm_table[port_id].ipv6_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
+	return EXIT_SUCCESS;
 }
 
 int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
@@ -489,16 +514,19 @@ int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6
 	return DP_ROUTE_DROP;
 }
 
-void dp_del_vm(int portid, int socketid)
+void dp_del_vm(int portid, int socketid, bool rollback)
 {
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	if(dp_is_more_vm_in_vni_avail(portid)) {
-		dp_del_route(portid, vm_table[portid].vni, 0,
-					 vm_table[portid].info.own_ip, NULL, 32, socketid);
-		dp_del_route6(portid, vm_table[portid].vni, 0,
-				vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
+		/* In case of rollback, just undo what setup_lpm did */
+		if (!rollback) {
+			dp_del_route(portid, vm_table[portid].vni, 0,
+						vm_table[portid].info.own_ip, NULL, 32, socketid);
+			dp_del_route6(portid, vm_table[portid].vni, 0,
+					vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
+		}
 		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	} else {
 		vm_table[portid].vm_ready = 0;

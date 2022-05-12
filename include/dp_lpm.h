@@ -37,6 +37,8 @@ extern "C" {
 
 #define DP_ENCAP_TYPE_GENEVE 1
 
+#define DP_LPM_ROLLBACK	true
+
 struct macip_entry {
 	struct rte_ether_addr	own_mac;
 	struct rte_ether_addr	neigh_mac;
@@ -64,15 +66,15 @@ struct vm_route {
 	uint8_t	nh_ipv6[16];
 };
 
-void setup_lpm(int port_id, int vni, const int socketid);
-void setup_lpm6(int port_id, int vni, const int socketid);
+int setup_lpm(int port_id, int vni, const int socketid);
+int setup_lpm6(int port_id, int vni, const int socketid);
 int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr,
 						 struct vm_route *r, int socketid);
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
 						 struct vm_route *r, int socketid);
 
 void dp_init_vm_handle_tbl(int socket_id);
-void dp_map_vm_handle(void *key, uint16_t portid);
+int dp_map_vm_handle(void *key, uint16_t portid);
 int dp_get_portid_with_vm_handle(void *key);
 void dp_del_portid_with_vm_handle(void *key);
 
@@ -97,7 +99,7 @@ void dp_set_mac(uint16_t portid);
 struct rte_ether_addr *dp_get_mac(uint16_t portid);
 void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr* neigh);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
-void dp_del_vm(int portid, int socketid);
+void dp_del_vm(int portid, int socketid, bool rollback);
 int dp_get_active_vm_ports(int* act_ports);
 uint8_t* dp_get_vm_machineid(uint16_t portid);
 int dp_get_vm_vni(uint16_t portid);

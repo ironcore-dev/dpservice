@@ -259,7 +259,10 @@ public:
 			request.set_allocated_ipv6config(ipv6_config);
 			request.set_machinetype(dpdkonmetal::MachineType::VirtualMachine);
 			stub_->addMachine(&context, request, &response);
-			printf("Allocated VF for you %s \n", response.vf().name().c_str());
+			if (!response.status().error())
+				printf("Allocated VF for you %s \n", response.vf().name().c_str());
+			else
+				printf("Error detected with code %d\n", response.status().error());
 	}
 
 	void AddRoute() {
@@ -286,6 +289,9 @@ public:
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->addRoute(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void DelRoute() {
@@ -312,6 +318,9 @@ public:
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->deleteRoute(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void ListRoutes() {
@@ -364,6 +373,9 @@ public:
 				vip_ip->set_address(ip_str);
 			request.set_allocated_machinevipip(vip_ip);
 			stub_->addMachineVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void DelVIP() {
@@ -373,6 +385,9 @@ public:
 
 			request.set_machineid(machine_str);
 			stub_->delMachineVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void GetVIP() {
@@ -382,7 +397,11 @@ public:
 
 			request.set_machineid(machine_str);
 			stub_->getMachineVIP(&context, request, &reply);
-			printf("Received VIP %s \n", reply.address().c_str());
+			if (!reply.status().error())
+				printf("Received VIP %s \n", reply.address().c_str());
+			else
+				printf("Error detected with code %d\n", reply.status().error());
+			
 	}
 
 	void DelMachine() {
@@ -392,6 +411,9 @@ public:
 
 			request.set_machineid(machine_str);
 			stub_->deleteMachine(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void GetMachines() {

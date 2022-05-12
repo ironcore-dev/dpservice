@@ -141,8 +141,9 @@ message MachineIDMsg {
 }
 
 message MachineVIPIP {
-	IPVersion ipVersion = 1;
-	bytes address = 2;	// Can be both ipv4 and ipv6
+	Status status = 1;
+	IPVersion ipVersion = 2;
+	bytes address = 3;	// Can be both ipv4 and ipv6
 }
 
 message LBIP {

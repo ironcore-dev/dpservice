@@ -29,7 +29,7 @@ typedef struct dp_com_head {
 	uint8_t is_chained;
 	uint8_t buf_count;
 	uint8_t msg_count;
-
+	uint32_t err_code;
 } dp_com_head;
 
 typedef struct dp_vip {
