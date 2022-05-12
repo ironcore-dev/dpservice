@@ -385,6 +385,9 @@ public:
 
 			request.set_machineid(machine_str);
 			stub_->delMachineVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void GetVIP() {

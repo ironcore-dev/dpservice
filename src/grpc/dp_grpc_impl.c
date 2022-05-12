@@ -100,21 +100,26 @@ err:
 
 static int dp_process_delvip(dp_request *req, dp_reply *rep)
 {
+	int port_id, ret = EXIT_SUCCESS;
 	u_int32_t vip;
-	int port_id;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return EXIT_FAILURE;
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_DEL_NAT;
+		goto err;
+	}
 
 	vip = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 							dp_get_vm_vni(port_id));
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	dp_del_vm_dnat_ip(vip, dp_get_vm_vni(port_id));
 
-	return EXIT_SUCCESS;
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
 }
 
 static int dp_process_getvip(dp_request *req, dp_reply *rep)

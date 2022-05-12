@@ -30,6 +30,7 @@ extern "C" {
 #define DP_ERROR_VM_ADD_DNAT_ALLOC		402
 #define DP_ERROR_VM_ADD_DNAT_ADD_KEY	403
 #define DP_ERROR_VM_ADD_DNAT_ADD_DATA	404
+#define DP_ERROR_VM_DEL_NAT				450
 
 #ifdef __cplusplus
 }
