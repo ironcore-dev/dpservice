@@ -31,6 +31,8 @@ extern "C" {
 #define DP_ERROR_VM_ADD_DNAT_ADD_KEY	403
 #define DP_ERROR_VM_ADD_DNAT_ADD_DATA	404
 #define DP_ERROR_VM_DEL_NAT				450
+#define DP_ERROR_VM_GET_NAT				500
+#define DP_ERROR_VM_GET_NAT_NO_IP_SET	501
 
 #ifdef __cplusplus
 }

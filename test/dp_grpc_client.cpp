@@ -397,7 +397,11 @@ public:
 
 			request.set_machineid(machine_str);
 			stub_->getMachineVIP(&context, request, &reply);
-			printf("Received VIP %s \n", reply.address().c_str());
+			if (!reply.status().error())
+				printf("Received VIP %s \n", reply.address().c_str());
+			else
+				printf("Error detected with code %d\n", reply.status().error());
+			
 	}
 
 	void DelMachine() {

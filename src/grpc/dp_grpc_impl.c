@@ -124,18 +124,28 @@ err:
 
 static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
-	int port_id;
+	int port_id, ret = EXIT_SUCCESS;;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0)
-		return EXIT_FAILURE;
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_NAT;
+		goto err;
+	}
 
 	rep->get_vip.vip.vip_addr = htonl(dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 														dp_get_vm_vni(port_id)));
 
-	return EXIT_SUCCESS;
+	if (!rep->get_vip.vip.vip_addr) {
+		ret = DP_ERROR_VM_GET_NAT_NO_IP_SET;
+		goto err;
+	}
+
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
 }
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)

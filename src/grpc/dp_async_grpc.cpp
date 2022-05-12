@@ -103,6 +103,7 @@ int GetVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
+	Status *err_status = new Status();
 	struct in_addr addr;
 	grpc::Status ret = grpc::Status::OK;
 
@@ -122,6 +123,8 @@ int GetVIPCall::Proceed()
 		addr.s_addr = reply.get_vip.vip.vip_addr;
 		reply_.set_address(inet_ntoa(addr));
 		status_ = FINISH;
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
