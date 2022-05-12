@@ -153,6 +153,32 @@ out:
 	return ret;
 }
 
+void dp_get_lb_back_ips(uint32_t v_ip, uint32_t vni, struct dp_reply *rep)
+{
+	struct lb_value *lb_val = NULL;
+	struct lb_key nkey;
+	uint32_t *rp_b_ip;
+	int k;
+
+	if (!dp_is_ip_lb(v_ip, vni))
+		return;
+
+	nkey.ip = v_ip;
+	nkey.vni = vni;
+	rep->com_head.msg_count = 0;
+
+	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
+		return;
+
+	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
+		if (lb_val->back_end_ips[k] != 0) {
+			rp_b_ip = &((&rep->back_ip)[rep->com_head.msg_count]);
+			rep->com_head.msg_count++;
+			*rp_b_ip = lb_val->back_end_ips[k];
+		}
+	}
+}
+
 int dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;

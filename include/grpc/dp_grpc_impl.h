@@ -14,6 +14,7 @@ typedef enum {
 	DP_REQ_TYPE_NONE,
 	DP_REQ_TYPE_ADDLBVIP,
 	DP_REQ_TYPE_DELLBVIP,
+	DP_REQ_TYPE_LISTLBBACKENDS,
 	DP_REQ_TYPE_ADDVIP,
 	DP_REQ_TYPE_DELVIP,
 	DP_REQ_TYPE_GETVIP,
@@ -41,6 +42,15 @@ typedef struct dp_vip {
 	} vip;
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_vip;
+
+typedef struct dp_lp_qry_lb {
+	uint32_t ip_type;
+	union {
+		uint32_t	vip_addr;
+		uint8_t		vip_addr6[16];
+	} vip;
+	uint32_t	vni;
+} dp_lp_qry_lb;
 
 typedef struct dp_lb_vip {
 	uint32_t ip_type;
@@ -98,6 +108,7 @@ typedef struct dp_request {
 	union {
 		dp_vip			add_vip;
 		dp_lb_vip		add_lb_vip;
+		dp_lp_qry_lb	qry_lb_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
 		dp_delvip		del_vip;
@@ -128,6 +139,8 @@ typedef struct dp_reply {
 		dp_vf_pci	vf_pci;
 		dp_vm_info	vm_info;
 		dp_route	route;
+		uint32_t	back_ip;
+
 	};
 } dp_reply;
 

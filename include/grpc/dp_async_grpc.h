@@ -84,6 +84,21 @@ public:
 	int Proceed() override;
 };
 
+class GetLBVIPBackendsCall final : BaseCall {
+	ServerContext ctx_;
+	LBQueryMsg request_;
+	LBBackendMsg reply_;
+	ServerAsyncResponseWriter<LBBackendMsg> responder_;
+
+public:
+	GetLBVIPBackendsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBBACKENDS), responder_(&ctx_) {
+		service_->RequestgetLBVIPBackends(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class DelVIPCall final : BaseCall {
 	ServerContext ctx_;
 	MachineIDMsg request_;
