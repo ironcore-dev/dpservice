@@ -26,9 +26,9 @@ struct lb_value {
 };
 
 void dp_init_lb_tables(int socket_id);
-void dp_del_vm_lb_back_ip(uint32_t vm_ip, uint32_t vni, uint32_t back_ip);
+int dp_del_lb_back_ip(uint32_t vm_ip, uint32_t back_ip, uint32_t vni);
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni);
-uint32_t dp_get_vm_lb_ip(uint32_t vm_ip, uint32_t vni);
+uint32_t dp_get_lb_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni);
 uint32_t dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, struct flow_key *fkey);
 bool dp_is_lb_enabled();

@@ -36,6 +36,9 @@ extern "C" {
 #define DP_ERROR_VM_ADD_LB_VIP			550
 #define DP_ERROR_VM_ADD_LB_NO_VNI_EXIST	551
 #define DP_ERROR_VM_ADD_LB_UNSUPP_IP	552
+#define DP_ERROR_VM_DEL_LB_VIP			600
+#define DP_ERROR_VM_DEL_LB_NO_VNI_EXIST	601
+#define DP_ERROR_VM_DEL_LB_UNSUPP_IP	602
 
 #ifdef __cplusplus
 }

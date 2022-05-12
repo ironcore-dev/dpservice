@@ -58,6 +58,7 @@ __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
+
 	if (!dp_is_vni_available(req->add_lb_vip.vni,
 							 rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
 		ret = DP_ERROR_VM_ADD_LB_NO_VNI_EXIST;
@@ -71,6 +72,31 @@ static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 		}
 	} else {
 		ret = DP_ERROR_VM_ADD_LB_UNSUPP_IP;
+		goto err;
+	}
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
+static int dp_process_del_lb_vip(dp_request *req, dp_reply *rep)
+{
+	int ret = EXIT_SUCCESS;
+
+	if (!dp_is_vni_available(req->add_lb_vip.vni,
+							 rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+		ret = DP_ERROR_VM_DEL_LB_NO_VNI_EXIST;
+		goto err;
+	}
+	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (dp_del_lb_back_ip(ntohl(req->add_lb_vip.vip.vip_addr),
+						  ntohl(req->add_lb_vip.back.back_addr), req->add_lb_vip.vni)) {
+			ret = DP_ERROR_VM_DEL_LB_VIP;
+			goto err;
+		}
+	} else {
+		ret = DP_ERROR_VM_DEL_LB_UNSUPP_IP;
 		goto err;
 	}
 	return EXIT_SUCCESS;
@@ -344,6 +370,9 @@ int dp_process_request(struct rte_mbuf *m)
 	{
 		case DP_REQ_TYPE_ADDLBVIP:
 			ret = dp_process_add_lb_vip(req, &rep);
+			break;
+		case DP_REQ_TYPE_DELLBVIP:
+			ret = dp_process_del_lb_vip(req, &rep);
 			break;
 		case DP_REQ_TYPE_ADDVIP:
 			ret = dp_process_addvip(req, &rep);

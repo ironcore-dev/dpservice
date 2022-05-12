@@ -30,6 +30,7 @@ typedef enum {
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
 	DP_CMD_ADD_LB_VIP,
+	DP_CMD_DEL_LB_VIP,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -69,6 +70,7 @@ static int length;
 #define CMD_LINE_OPT_BACK_IP		"back_ip"
 #define CMD_LINE_OPT_PXE_STR		"pxe_str"
 #define CMD_LINE_OPT_ADD_LB_VIP		"addlbvip"
+#define CMD_LINE_OPT_DEL_LB_VIP		"dellbvip"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -91,6 +93,7 @@ enum {
 	CMD_LINE_OPT_PXE_STR_NUM,
 	CMD_LINE_OPT_BACK_IP_NUM,
 	CMD_LINE_OPT_ADD_LB_VIP_NUM,
+	CMD_LINE_OPT_DEL_LB_VIP_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -113,6 +116,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PXE_STR, 1, 0, CMD_LINE_OPT_PXE_STR_NUM},
 	{CMD_LINE_OPT_BACK_IP, 1, 0, CMD_LINE_OPT_BACK_IP_NUM},
 	{CMD_LINE_OPT_ADD_LB_VIP, 0, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
+	{CMD_LINE_OPT_DEL_LB_VIP, 0, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -214,6 +218,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_LB_VIP_NUM:
 			command = DP_CMD_ADD_LB_VIP;
+			break;
+		case CMD_LINE_OPT_DEL_LB_VIP_NUM:
+			command = DP_CMD_DEL_LB_VIP;
 			break;
 		default:
 			dp_print_usage(prgname);
@@ -364,6 +371,28 @@ public:
 			}
 	}
 
+	void DelLBVIP() {
+			LBMsg request;
+			Status reply;
+			ClientContext context;
+			LBIP *vip_ip = new LBIP();
+			LBIP *back_ip = new LBIP();
+
+			request.set_vni(vni);
+			vip_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				vip_ip->set_address(ip_str);
+			request.set_allocated_lbvipip(vip_ip);
+
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				back_ip->set_address(back_ip_str);
+			request.set_allocated_lbbackendip(back_ip);
+			stub_->delLBVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
+	}
+
 	void AddVIP() {
 			MachineVIPMsg request;
 			Status reply;
@@ -488,6 +517,10 @@ int main(int argc, char** argv)
 	case DP_CMD_ADD_LB_VIP:
 		dpdk_client.AddLBVIP();
 		std::cout << "Addlbvip called " << std::endl;
+		break;
+	case DP_CMD_DEL_LB_VIP:
+		dpdk_client.DelLBVIP();
+		std::cout << "Dellbvip called " << std::endl;
 		break;
 	default:
 		break;
