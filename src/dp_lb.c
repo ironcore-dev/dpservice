@@ -77,6 +77,32 @@ static int dp_lb_last_free_pos(struct lb_value *val)
 	return ret;
 }
 
+static void dp_lb_delete_back_ip(struct lb_value *val, uint32_t b_ip)
+{
+	int k;
+
+	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
+		if (val->back_end_ips[k] == b_ip) {
+			val->back_end_ips[k] = 0;
+			break;
+		}
+	}
+}
+
+static bool dp_lb_back_ips_exist(struct lb_value *val)
+{
+	int k;
+
+	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
+		if (val->back_end_ips[k] != 0)
+			break;
+	}
+	if (k != DP_LB_MAX_IPS_PER_VIP)
+		return true;
+
+	return false;
+}
+
 static int dp_lb_rr_backend(struct lb_value *val)
 {
 	int ret = -1, k;
@@ -127,7 +153,7 @@ out:
 	return ret;
 }
 
-void dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
+int dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey;
@@ -142,15 +168,14 @@ void dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
 
 		lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 		if (!lb_val)
-			goto err;
+			goto err_key;
 		lb_val->vip_maglev_tbl = NULL;
 		pos = dp_lb_last_free_pos(lb_val);
 		if (pos < 0)
 			goto out;
-		lb_val->back_end_ips[pos] = back_ip;
-
 		if (rte_hash_add_key_data(ipv4_lb_tbl, &nkey, lb_val) < 0)
 			goto out;
+		lb_val->back_end_ips[pos] = back_ip;
 	} else {
 		if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
 			goto err;
@@ -160,29 +185,47 @@ void dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
 		lb_val->back_end_ips[pos] = back_ip;
 	}
 	lb_val->back_end_cnt++;
-	return;
+	return EXIT_SUCCESS;
 out:
 	rte_free(lb_val);
+err_key:
+	pos = rte_hash_del_key(ipv4_lb_tbl, &nkey);
+	if (pos < 0)
+		printf("LB hash key already deleted \n");
+	else
+		rte_hash_free_key_with_position(ipv4_lb_tbl, pos);
 err:
 	printf("lb table add ip failed\n");
+	return EXIT_FAILURE;
 }
 
-void dp_del_vm_lb_ip(uint32_t vm_ip, uint32_t vni)
+void dp_del_vm_lb_back_ip(uint32_t vm_ip, uint32_t vni, uint32_t back_ip)
 {
-/*	struct lb_key nkey;
-	uint32_t *lb_ip;
+	struct lb_value *lb_val;
+	struct lb_key nkey;
 	int pos;
 
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_ip) < 0)
-		return;
-	rte_free(lb_ip);
+	if (!dp_is_ip_lb(vm_ip, vni))
+		goto out;
 
+	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
+		goto err;
+
+	dp_lb_delete_back_ip(lb_val, back_ip);
+
+	if (dp_lb_back_ips_exist(lb_val))
+		goto out;
+
+	rte_free(lb_val);
+err:
 	pos = rte_hash_del_key(ipv4_lb_tbl, &nkey);
 	if (pos < 0)
 		printf("LB hash key already deleted \n");
 	else
-		rte_hash_free_key_with_position(ipv4_lb_tbl, pos); */
+		rte_hash_free_key_with_position(ipv4_lb_tbl, pos);
+out:
+	return;
 }

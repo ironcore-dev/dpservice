@@ -33,6 +33,9 @@ extern "C" {
 #define DP_ERROR_VM_DEL_NAT				450
 #define DP_ERROR_VM_GET_NAT				500
 #define DP_ERROR_VM_GET_NAT_NO_IP_SET	501
+#define DP_ERROR_VM_ADD_LB_VIP			550
+#define DP_ERROR_VM_ADD_LB_NO_VNI_EXIST	551
+#define DP_ERROR_VM_ADD_LB_UNSUPP_IP	552
 
 #ifdef __cplusplus
 }

@@ -359,6 +359,9 @@ public:
 				back_ip->set_address(back_ip_str);
 			request.set_allocated_lbbackendip(back_ip);
 			stub_->addLBVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
 	}
 
 	void AddVIP() {
