@@ -162,6 +162,11 @@ message LBMsg {
 	LBIP lbBackendIP = 3;
 }
 
+message LBQueryMsg {
+	LBIP lbVipIP = 1;
+	uint32 vni = 2;
+}
+
 message LBBackendMsg {
 	repeated LBIP backends = 1;
 }
@@ -276,7 +281,7 @@ service DPDKonmetal {
 
 	// LB related, add/list/del backend IPs for a given LB IP
 	rpc addLBVIP(LBMsg) returns (Status) {}
-	rpc getLBVIPBackends(LBMsg) returns (LBBackendMsg) {}
+	rpc getLBVIPBackends(LBQueryMsg) returns (LBBackendMsg) {}
 	rpc delLBVIP(LBMsg) returns (Status) {}
 
 	//// ROUTES

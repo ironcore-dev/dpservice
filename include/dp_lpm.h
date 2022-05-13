@@ -107,6 +107,7 @@ uint32_t dp_get_vm_pxe_ip4(uint16_t portid);
 void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid);
 char* dp_get_vm_pxe_str(uint16_t portid);
 void dp_set_vm_pxe_str(uint16_t portid, char *p_str);
+bool dp_is_vni_available(int vni, const int socketid);
 #ifdef __cplusplus
 }
 #endif

@@ -30,6 +30,7 @@ int AddLBVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -37,6 +38,84 @@ int AddLBVIPCall::Proceed()
 	}
 	return 0;
 }
+
+int DelLBVIPCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelLBVIPCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.lbvipip().address().c_str(),
+					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
+			inet_aton(request_.lbbackendip().address().c_str(),
+					  (in_addr*)&request.add_lb_vip.back.back_addr);
+		}
+		request.add_lb_vip.vni = request_.vni();
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int GetLBVIPBackendsCall::Proceed()
+{
+	dp_request request = {0};
+	struct rte_mbuf *mbuf = NULL;
+	struct dp_reply *reply;
+	struct in_addr addr;
+	uint32_t *rp_back_ip;
+	LBIP *back_ip;
+	grpc::Status ret = grpc::Status::OK;
+	int i;
+
+	if (status_ == REQUEST) {
+		new GetLBVIPBackendsCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.lbvipip().address().c_str(),
+					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
+		}
+		request.add_lb_vip.vni = request_.vni();
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker_with_mbuf(&mbuf))
+			return -1;
+		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		for (i = 0; i < reply->com_head.msg_count; i++) {
+			back_ip = reply_.add_backends();
+			rp_back_ip = &((&reply->back_ip)[i]);
+			addr.s_addr = htonl(*rp_back_ip);
+			back_ip->set_address(inet_ntoa(addr));
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		}
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 
 int AddVIPCall::Proceed()
 {

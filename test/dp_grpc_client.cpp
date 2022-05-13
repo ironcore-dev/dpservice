@@ -30,6 +30,8 @@ typedef enum {
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
 	DP_CMD_ADD_LB_VIP,
+	DP_CMD_DEL_LB_VIP,
+	DP_CMD_LIST_LB_VIP,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -69,6 +71,8 @@ static int length;
 #define CMD_LINE_OPT_BACK_IP		"back_ip"
 #define CMD_LINE_OPT_PXE_STR		"pxe_str"
 #define CMD_LINE_OPT_ADD_LB_VIP		"addlbvip"
+#define CMD_LINE_OPT_DEL_LB_VIP		"dellbvip"
+#define CMD_LINE_OPT_LIST_LB_VIP	"listbackips"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -91,6 +95,8 @@ enum {
 	CMD_LINE_OPT_PXE_STR_NUM,
 	CMD_LINE_OPT_BACK_IP_NUM,
 	CMD_LINE_OPT_ADD_LB_VIP_NUM,
+	CMD_LINE_OPT_DEL_LB_VIP_NUM,
+	CMD_LINE_OPT_LIST_LB_VIP_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -113,6 +119,8 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PXE_STR, 1, 0, CMD_LINE_OPT_PXE_STR_NUM},
 	{CMD_LINE_OPT_BACK_IP, 1, 0, CMD_LINE_OPT_BACK_IP_NUM},
 	{CMD_LINE_OPT_ADD_LB_VIP, 0, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
+	{CMD_LINE_OPT_DEL_LB_VIP, 0, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
+	{CMD_LINE_OPT_LIST_LB_VIP, 0, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -215,6 +223,12 @@ int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_ADD_LB_VIP_NUM:
 			command = DP_CMD_ADD_LB_VIP;
 			break;
+		case CMD_LINE_OPT_DEL_LB_VIP_NUM:
+			command = DP_CMD_DEL_LB_VIP;
+			break;
+		case CMD_LINE_OPT_LIST_LB_VIP_NUM:
+			command = DP_CMD_LIST_LB_VIP;
+			break;
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -262,7 +276,7 @@ public:
 			if (!response.status().error())
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());
 			else
-				printf("Error detected with code %d\n", response.status().error());
+				printf("Received an error %d\n", response.status().error());
 	}
 
 	void AddRoute() {
@@ -359,6 +373,52 @@ public:
 				back_ip->set_address(back_ip_str);
 			request.set_allocated_lbbackendip(back_ip);
 			stub_->addLBVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
+	}
+
+	void DelLBVIP() {
+			LBMsg request;
+			Status reply;
+			ClientContext context;
+			LBIP *vip_ip = new LBIP();
+			LBIP *back_ip = new LBIP();
+
+			request.set_vni(vni);
+			vip_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				vip_ip->set_address(ip_str);
+			request.set_allocated_lbvipip(vip_ip);
+
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				back_ip->set_address(back_ip_str);
+			request.set_allocated_lbbackendip(back_ip);
+			stub_->delLBVIP(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
+	}
+
+	void ListBackIPs() {
+			LBQueryMsg request;
+			LBBackendMsg reply;
+			ClientContext context;
+			LBIP *vip_ip = new LBIP();
+			int i;
+
+			request.set_vni(vni);
+			vip_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				vip_ip->set_address(ip_str);
+			request.set_allocated_lbvipip(vip_ip);
+
+			stub_->getLBVIPBackends(&context, request, &reply);
+			for (i = 0; i < reply.backends_size(); i++)
+			{
+				printf("Backend ip %s \n",
+					reply.backends(i).address().c_str());
+			}
 	}
 
 	void AddVIP() {
@@ -485,6 +545,14 @@ int main(int argc, char** argv)
 	case DP_CMD_ADD_LB_VIP:
 		dpdk_client.AddLBVIP();
 		std::cout << "Addlbvip called " << std::endl;
+		break;
+	case DP_CMD_DEL_LB_VIP:
+		dpdk_client.DelLBVIP();
+		std::cout << "Dellbvip called " << std::endl;
+		break;
+	case DP_CMD_LIST_LB_VIP:
+		std::cout << "List back IPs called " << std::endl;
+		dpdk_client.ListBackIPs();
 		break;
 	default:
 		break;

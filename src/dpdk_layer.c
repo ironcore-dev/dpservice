@@ -501,11 +501,15 @@ void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type)
 
 void dp_stop_interface(int portid, dp_port_type type)
 {
-	int ret;
+	int ret = 0;
 
 	disable_rx_node(portid);
 
-	ret = rte_eth_dev_stop(portid);
+	/* Tap interfaces in test environment can not be stopped */
+	/* due to a bug in dpdk tap device library. */
+	if (get_op_env() != DP_OP_ENV_SCAPYTEST)
+		ret = rte_eth_dev_stop(portid);
+
 	if (ret < 0) {
 		rte_exit(EXIT_FAILURE,
 				"rte_eth_dev_stop:err=%d, port=%u\n",

@@ -135,6 +135,17 @@ int dp_get_vm_vni(uint16_t portid)
 	return vm_table[portid].vni;
 }
 
+bool dp_is_vni_available(int vni, const int socketid)
+{
+	int i;
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready && (vm_table[i].vni == vni))
+			return true;
+
+	return false;
+}
+
 uint8_t* dp_get_vm_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
