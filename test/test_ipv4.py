@@ -124,3 +124,60 @@ def test_vf_to_vf_tcp(capsys,add_machine):
 	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf0_tap,timeout=2)
 	if len(pkt_list)==0:
 		raise AssertionError('Cannot receive icmp reply!')
+
+def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
+	cmd = shlex.split(cmd_str)
+	process = subprocess.Popen(cmd, 
+								stdout=subprocess.PIPE,
+								universal_newlines=True)
+	count = 0
+	err_found = False
+	while count < maxlines:
+		output = process.stdout.readline()
+		line = output.strip()
+		if exp_error in line:
+			err_found = True
+		count = count + 1
+	process.kill()
+	if not negate:
+		if not err_found:
+			raise AssertionError("Didn't receive expected string " + exp_error)
+	else:
+		if err_found:
+			raise AssertionError("Receive expected unexpected string " + exp_error)
+
+def test_grpc_addmachine_error_102(capsys, build_path):
+	# Try to add using an existing vm identifier
+	expected_error_str = "error 102"
+	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
+	eval_cmd_output(add_machine_test, expected_error_str)
+
+def test_grpc_addmachine_error_106(capsys, build_path):
+	# Try to add with new machine identifer but already given IPv4
+	expected_error_str = "error 106"
+	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm3_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
+	eval_cmd_output(add_machine_test, expected_error_str)
+
+def test_grpc_delmachine_error_151(capsys, build_path):
+	# Try to delete with machine identifer which doesnt exist
+	expected_str = "error 151"
+	del_machine_test = build_path+"/test/dp_grpc_client --delmachine " + vm3_name
+	eval_cmd_output(del_machine_test, expected_str)
+
+def test_grpc_add_list_delmachine(capsys, build_path):
+	# Try to add a new machine, list it, delete it and confirm the deletion with list again
+	expected_str = "net_tap4"
+	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm3_name+ " --vni "+ vni + " --ipv4 " + vf2_ip + " --ipv6 " + vf2_ipv6
+	eval_cmd_output(add_machine_test, expected_str)
+
+	expected_str = vm3_name
+	list_machine_test = build_path+"/test/dp_grpc_client --getmachines "
+	eval_cmd_output(list_machine_test, expected_str)
+
+	expected_str = "Delmachine"
+	del_machine_test = build_path+"/test/dp_grpc_client --delmachine " + vm3_name
+	eval_cmd_output(del_machine_test, expected_str)
+
+	expected_str = vm3_name
+	list_machine_test = build_path+"/test/dp_grpc_client --getmachines "
+	eval_cmd_output(list_machine_test, expected_str, negate=True)

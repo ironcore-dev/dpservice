@@ -276,7 +276,7 @@ public:
 			if (!response.status().error())
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());
 			else
-				printf("Error detected with code %d\n", response.status().error());
+				printf("Received an error %d\n", response.status().error());
 	}
 
 	void AddRoute() {
