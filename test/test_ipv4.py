@@ -181,3 +181,94 @@ def test_grpc_add_list_delmachine(capsys, build_path):
 	expected_str = vm3_name
 	list_machine_test = build_path+"/test/dp_grpc_client --getmachines "
 	eval_cmd_output(list_machine_test, expected_str, negate=True)
+
+def test_grpc_addroute_error_251(capsys, build_path):
+	# Try to add a route which is already added
+	expected_str = "error 251"
+	add_route_test = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
+	eval_cmd_output(add_route_test, expected_str)
+
+def test_grpc_list_delroutes(capsys, build_path):
+	# Try to list routes, delete one of them, list and add again
+	expected_str = ov_target_pfx
+	list_route_test = build_path+"/test/dp_grpc_client --listroutes --vni " + vni
+	eval_cmd_output(list_route_test, expected_str)
+
+	expected_str = "Delroute"
+	del_route_test = build_path+"/test/dp_grpc_client --delroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24"
+	eval_cmd_output(del_route_test, expected_str)
+
+	expected_str = ov_target_pfx
+	list_route_test = build_path+"/test/dp_grpc_client --listroutes --vni " + vni
+	eval_cmd_output(list_route_test, expected_str, negate=True)
+
+	expected_str = "error"
+	add_route_test = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
+	eval_cmd_output(add_route_test, expected_str, negate=True)
+
+def test_grpc_add_list_delVIP(capsys, build_path):
+	# Try to add VIP, list, test error cases, delete vip and list again
+	expected_str = "Addvip"
+	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
+	eval_cmd_output(add_vip_test, expected_str)
+
+	expected_str = virtual_ip
+	get_vip_test = build_path+"/test/dp_grpc_client --getvip " + vm2_name
+	eval_cmd_output(get_vip_test, expected_str)
+
+	# Try to add the same vip again
+	expected_str = "351"
+	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
+	eval_cmd_output(add_vip_test, expected_str)
+
+	# Try to add to a machine which doesnt exist
+	expected_str = "350"
+	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm3_name + " --ipv4 " + virtual_ip
+	eval_cmd_output(add_vip_test, expected_str)
+
+	expected_str = "Delvip"
+	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
+	eval_cmd_output(del_vip_test, expected_str)
+
+	expected_str = virtual_ip
+	get_vip_test = build_path+"/test/dp_grpc_client --getvip " + vm2_name
+	eval_cmd_output(get_vip_test, expected_str, negate=True)
+
+def test_grpc_add_list_delLBVIP(capsys, build_path):
+	# Try to add VIP, list, test error cases, delete vip and list again
+	expected_str = "Addlbvip"
+	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip --vni " + vni + " --ipv4 " + virtual_ip + " --back_ip " + back_ip1
+	eval_cmd_output(add_lbvip_test, expected_str)
+
+	expected_str = back_ip1
+	list_backips_test = build_path+"/test/dp_grpc_client --listbackips --vni " + vni + " --ipv4 " + virtual_ip
+	eval_cmd_output(list_backips_test, expected_str)
+
+	expected_str = "Addlbvip"
+	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip --vni " + vni + " --ipv4 " + virtual_ip + " --back_ip " + back_ip2
+	eval_cmd_output(add_lbvip_test, expected_str)
+
+	expected_str = back_ip2
+	list_backips_test = build_path+"/test/dp_grpc_client --listbackips --vni " + vni + " --ipv4 " + virtual_ip
+	eval_cmd_output(list_backips_test, expected_str)
+
+	# Add to non existent VNI
+	expected_str = "551"
+	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip --vni " + "400" + " --ipv4 " + virtual_ip + " --back_ip " + back_ip2
+	eval_cmd_output(add_lbvip_test, expected_str)
+
+	expected_str = "Dellbvip"
+	del_lbvip_test = build_path+"/test/dp_grpc_client --dellbvip --vni " + vni + " --ipv4 " + virtual_ip + " --back_ip " + back_ip1
+	eval_cmd_output(del_lbvip_test, expected_str)
+
+	expected_str = back_ip1
+	list_backips_test = build_path+"/test/dp_grpc_client --listbackips --vni " + vni + " --ipv4 " + virtual_ip
+	eval_cmd_output(list_backips_test, expected_str, negate=True)
+
+	expected_str = "Dellbvip"
+	del_lbvip_test = build_path+"/test/dp_grpc_client --dellbvip --vni " + vni + " --ipv4 " + virtual_ip + " --back_ip " + back_ip2
+	eval_cmd_output(del_lbvip_test, expected_str)
+
+	expected_str = back_ip2
+	list_backips_test = build_path+"/test/dp_grpc_client --listbackips --vni " + vni + " --ipv4 " + virtual_ip
+	eval_cmd_output(list_backips_test, expected_str, negate=True)
