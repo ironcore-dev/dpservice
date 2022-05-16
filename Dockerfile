@@ -31,6 +31,9 @@ pkg-config \
 protobuf-compiler-grpc \
 libgrpc++1 \
 libgrpc++-dev \
+python3 \
+python3-pip \
+python3-pytest \
 linux-headers-${OSARCH} \
 && rm -rf /var/lib/apt/lists/*
 
@@ -57,8 +60,10 @@ RUN cd $DPDK_DIR/build && ninja install
 
 ARG DPS_VER
 COPY . .
+RUN pip3 install assume
 RUN meson build
 RUN cd ./build && ninja
+RUN meson test -v
 
 FROM debian:11-slim
 WORKDIR /
