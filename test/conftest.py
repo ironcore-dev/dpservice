@@ -54,8 +54,8 @@ def check_dpservice(prepare_env,build_path):
 def add_machine(build_path):
 	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine " + vm1_name + " --vni "+ vni + " --ipv4 " + vf0_ip + " --ipv6 " + vf0_ipv6
 	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
-	add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni 100 --ipv4 192.168.129.0 --length 24 --t_vni 100 --t_ipv6 2a10:afc0:e01f:f408::1"
-	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni 100 --ipv6 2002::123 --length 128 --t_vni 100 --t_ipv6 2a10:afc0:e01f:f408::1"
+	add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
+	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv6 2002::123 --length 128 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
 	subprocess.run(shlex.split("ip link set dev "+vf0_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf2_tap+" up"))
