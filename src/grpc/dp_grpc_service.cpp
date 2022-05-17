@@ -29,6 +29,7 @@ void GRPCService::HandleRpcs()
 {
 	void* tag;
 	bool ok;
+	new AddPfxCall(this, cq_.get());
 	new GetLBVIPBackendsCall(this, cq_.get());
 	new AddLBVIPCall(this, cq_.get());
 	new DelLBVIPCall(this, cq_.get());

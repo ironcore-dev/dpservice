@@ -24,6 +24,9 @@ typedef enum {
 	DP_REQ_TYPE_DELROUTE,
 	DP_REQ_TYPE_LISTROUTE,
 	DP_REQ_TYPE_LISTMACHINE,
+	DP_REQ_TYPE_ADDPREFIX,
+	DP_REQ_TYPE_DELPREFIX,
+	DP_REQ_TYPE_LISTPREFIX,
 } dp_req_type;
 
 typedef struct dp_com_head {
@@ -42,6 +45,16 @@ typedef struct dp_vip {
 	} vip;
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_vip;
+
+typedef struct dp_pfx {
+	uint32_t pfx_ip_type;
+	union {
+		uint32_t	pfx_addr;
+		uint8_t		pfx_addr6[16];
+	} pfx_ip;
+	uint32_t	pfx_length;
+	char machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_pfx;
 
 typedef struct dp_lp_qry_lb {
 	uint32_t ip_type;
@@ -106,6 +119,7 @@ typedef struct dp_addroute {
 typedef struct dp_request {
 	dp_com_head com_head;
 	union {
+		dp_pfx			add_pfx;
 		dp_vip			add_vip;
 		dp_lb_vip		add_lb_vip;
 		dp_lp_qry_lb	qry_lb_vip;

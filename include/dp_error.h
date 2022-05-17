@@ -39,6 +39,9 @@ extern "C" {
 #define DP_ERROR_VM_DEL_LB_VIP			600
 #define DP_ERROR_VM_DEL_LB_NO_VNI_EXIST	601
 #define DP_ERROR_VM_DEL_LB_UNSUPP_IP	602
+#define DP_ERROR_VM_ADD_PFX				650
+#define DP_ERROR_VM_ADD_PFX_NO_VM		651
+#define DP_ERROR_VM_ADD_PFX_ROUTE		652
 
 #ifdef __cplusplus
 }
