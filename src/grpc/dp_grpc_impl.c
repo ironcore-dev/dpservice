@@ -214,6 +214,33 @@ err:
 	return ret;
 }
 
+static int dp_process_delprefix(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+
+	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_DEL_PFX_NO_VM;
+		goto err;
+	}
+
+	if(req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (dp_del_route(dp_get_pf0_port_id(), dp_get_vm_vni(port_id), 0,
+					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
+					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+			ret = DP_ERROR_VM_DEL_PFX;
+			goto err;
+		}
+	}
+
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
 	struct dp_port_ext pf_port;
@@ -437,6 +464,9 @@ int dp_process_request(struct rte_mbuf *m)
 			break;
 		case DP_REQ_TYPE_ADDPREFIX:
 			ret = dp_process_addprefix(req, &rep);
+			break;
+		case DP_REQ_TYPE_DELPREFIX:
+			ret = dp_process_delprefix(req, &rep);
 			break;
 		case DP_REQ_TYPE_ADDMACHINE:
 			ret = dp_process_addmachine(req, &rep);

@@ -274,7 +274,7 @@ def test_grpc_add_list_delLBVIP(capsys, build_path):
 	eval_cmd_output(list_backips_test, expected_str, negate=True)
 
 def test_grpc_add_list_delPfx(capsys, build_path):
-	# Try to add VIP, list, test error cases, delete vip and list again
+	# Try to add Prefix, list, test error cases, delete prefix and list again
 	expected_str = "Addprefix"
 	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)
@@ -288,7 +288,19 @@ def test_grpc_add_list_delPfx(capsys, build_path):
 	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)
 
-	# Try to add to a machine which doesnt exist
+	# Try to add/delete to/from a machine which doesnt exist
 	expected_str = "651"
 	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)
+
+	expected_str = "701"
+	del_pfx_test = build_path+"/test/dp_grpc_client --delpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 24"
+	eval_cmd_output(del_pfx_test, expected_str)
+
+	expected_str = "Delprefix"
+	del_pfx_test = build_path+"/test/dp_grpc_client --delpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
+	eval_cmd_output(del_pfx_test, expected_str)
+
+	expected_str = pfx_ip
+	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
+	eval_cmd_output(list_pfx_test, expected_str, negate=True)

@@ -150,6 +150,39 @@ int AddPfxCall::Proceed()
 	return 0;
 }
 
+int DelPfxCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply= {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelPfxCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machine_id().machineid().c_str());
+		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.prefix().address().c_str(),
+					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+		}
+		request.add_pfx.pfx_length = request_.prefix().prefixlength();
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		reply_.set_error(reply.com_head.err_code);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 int ListPfxCall::Proceed()
 {
 	dp_request request = {0};

@@ -54,6 +54,21 @@ public:
 	int Proceed() override;
 };
 
+class DelPfxCall final : BaseCall {
+	ServerContext ctx_;
+	MachinePrefixMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELPREFIX), responder_(&ctx_) {
+		service_->RequestdeleteMachinePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class ListPfxCall final : BaseCall {
 	ServerContext ctx_;
 	MachineIDMsg request_;
