@@ -249,7 +249,7 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	return EXIT_SUCCESS;
 }
 
-void dp_list_routes(int vni, struct dp_reply *rep, int socketid)
+void dp_list_routes(int vni, struct dp_reply *rep, int socketid, bool ext_routes)
 {
 	struct rte_rib_node *node = NULL;
 	struct vm_route *route;
@@ -269,7 +269,7 @@ void dp_list_routes(int vni, struct dp_reply *rep, int socketid)
 	do {
 		node = rte_rib_get_nxt(root, RTE_IPV4(0,0,0,0), 0, node, RTE_RIB_GET_NXT_ALL);
 		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
-			dp_is_pf_port_id(next_hop)) {
+			dp_is_pf_port_id(next_hop) && ext_routes) {
 			rp_route = &((&rep->route)[rep->com_head.msg_count]);
 			rep->com_head.msg_count++;
 			rte_rib_get_ip(node, &ipv4);
@@ -282,6 +282,14 @@ void dp_list_routes(int vni, struct dp_reply *rep, int socketid)
 			rp_route->trgt_vni = route->vni;
 			rte_memcpy(rp_route->trgt_ip.addr6, route->nh_ipv6,
 						sizeof(rp_route->trgt_ip.addr6));
+		} else if (node && (rte_rib_get_nh(node, &next_hop) == 0) && !ext_routes) {
+			rp_route = &((&rep->route)[rep->com_head.msg_count]);
+			rep->com_head.msg_count++;
+			rte_rib_get_ip(node, &ipv4);
+			rte_rib_get_depth(node, &depth);
+			rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			rp_route->pfx_ip.addr = ipv4;
+			rp_route->pfx_length = depth;
 		}
 	} while (node != NULL);
 }

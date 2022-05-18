@@ -150,6 +150,48 @@ int AddPfxCall::Proceed()
 	return 0;
 }
 
+int ListPfxCall::Proceed()
+{
+	dp_request request = {0};
+	struct rte_mbuf *mbuf = NULL;
+	struct dp_reply *reply;
+	struct in_addr addr;
+	dp_route *rp_route;
+	Prefix *pfx;
+	grpc::Status ret = grpc::Status::OK;
+	int i;
+
+	if (status_ == REQUEST) {
+		new ListPfxCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.machineid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker_with_mbuf(&mbuf))
+			return -1;
+		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		for (i = 0; i < reply->com_head.msg_count; i++) {
+			pfx = reply_.add_prefixes();
+			rp_route = &((&reply->route)[i]);
+			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+				addr.s_addr = htonl(rp_route->pfx_ip.addr);
+				pfx->set_address(inet_ntoa(addr));
+				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+				pfx->set_prefixlength(rp_route->pfx_length);
+			}
+		}
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 int AddVIPCall::Proceed()
 {
 	dp_request request = {0};

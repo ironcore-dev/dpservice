@@ -276,19 +276,19 @@ def test_grpc_add_list_delLBVIP(capsys, build_path):
 def test_grpc_add_list_delPfx(capsys, build_path):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	expected_str = "Addprefix"
-	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + virtual_ip + "--length 24"
+	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)
 
-#	expected_str = virtual_ip
-#	get_vip_test = build_path+"/test/dp_grpc_client --getvip " + vm2_name
-#	eval_cmd_output(get_vip_test, expected_str)
+	expected_str = pfx_ip
+	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
+	eval_cmd_output(list_pfx_test, expected_str)
 
 	# Try to add the same pfx again
 	expected_str = "652"
-	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + virtual_ip + "--length 24"
+	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)
 
 	# Try to add to a machine which doesnt exist
 	expected_str = "651"
-	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm3_name + " --ipv4 " + virtual_ip + "--length 24"
+	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)

@@ -5,6 +5,8 @@
 #include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
+#define DP_SHOW_EXT_ROUTES true
+#define DP_SHOW_INT_ROUTES false
 
 int dp_send_to_worker(dp_request *req)
 {
@@ -377,7 +379,7 @@ static int dp_process_listroute(dp_request *req, dp_reply *rep)
 {
 	uint32_t vni = req->route.vni;
 
-	dp_list_routes(vni, rep, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	dp_list_routes(vni, rep, rte_eth_dev_socket_id(dp_get_pf0_port_id()), DP_SHOW_EXT_ROUTES);
 
 	return EXIT_SUCCESS;
 }
@@ -387,6 +389,23 @@ static int dp_process_listbackips(dp_request *req, dp_reply *rep)
 
 	dp_get_lb_back_ips(ntohl(req->qry_lb_vip.vip.vip_addr), req->qry_lb_vip.vni, rep);
 
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_listpfxs(dp_request *req, dp_reply *rep)
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->get_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		goto out;
+
+	dp_list_routes(dp_get_vm_vni(port_id), rep, 
+								rte_eth_dev_socket_id(dp_get_pf0_port_id()), DP_SHOW_INT_ROUTES);
+
+out:
 	return EXIT_SUCCESS;
 }
 
@@ -434,6 +453,9 @@ int dp_process_request(struct rte_mbuf *m)
 		case DP_REQ_TYPE_LISTROUTE:
 			ret = dp_process_listroute(req, rte_pktmbuf_mtod(m, dp_reply*));
 			break;
+		case DP_REQ_TYPE_LISTPREFIX:
+			ret = dp_process_listpfxs(req, rte_pktmbuf_mtod(m, dp_reply*));
+			break;
 		case DP_REQ_TYPE_LISTLBBACKENDS:
 			ret = dp_process_listbackips(req, rte_pktmbuf_mtod(m, dp_reply*));
 			break;
@@ -447,6 +469,7 @@ int dp_process_request(struct rte_mbuf *m)
 	/* is directly written into the mbuf in the process function */
 	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE && 
+		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX && 
 		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS) {
 		rep.com_head.com_type = req->com_head.com_type;
 		p_rep = rte_pktmbuf_mtod(m, dp_reply*);

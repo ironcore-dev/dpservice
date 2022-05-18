@@ -54,6 +54,21 @@ public:
 	int Proceed() override;
 };
 
+class ListPfxCall final : BaseCall {
+	ServerContext ctx_;
+	MachineIDMsg request_;
+	PrefixesMsg reply_;
+	ServerAsyncResponseWriter<PrefixesMsg> responder_;
+
+public:
+	ListPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LISTPREFIX), responder_(&ctx_) {
+		service_->RequestlistMachinePrefixes(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class AddVIPCall final : BaseCall {
 	ServerContext ctx_;
 	MachineVIPMsg request_;

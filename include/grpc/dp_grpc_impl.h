@@ -99,6 +99,10 @@ typedef struct dp_getvip {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_getvip;
 
+typedef struct dp_getpfx {
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_getpfx;
+
 typedef struct dp_addroute {
 	uint32_t	pfx_ip_type;
 	union {
@@ -128,6 +132,7 @@ typedef struct dp_request {
 		dp_delvip		del_vip;
 		dp_getvip		get_vip;
 		dp_route		route;
+		dp_getpfx		get_pfx;
 	};
 } dp_request;
 
