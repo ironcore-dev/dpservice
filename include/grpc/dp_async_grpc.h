@@ -39,6 +39,51 @@ public:
 	virtual ~BaseCall() = default;
 };
 
+class AddPfxCall final : BaseCall {
+	ServerContext ctx_;
+	MachinePrefixMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	AddPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADDPREFIX), responder_(&ctx_) {
+		service_->RequestaddMachinePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
+class DelPfxCall final : BaseCall {
+	ServerContext ctx_;
+	MachinePrefixMsg request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELPREFIX), responder_(&ctx_) {
+		service_->RequestdeleteMachinePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
+class ListPfxCall final : BaseCall {
+	ServerContext ctx_;
+	MachineIDMsg request_;
+	PrefixesMsg reply_;
+	ServerAsyncResponseWriter<PrefixesMsg> responder_;
+
+public:
+	ListPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LISTPREFIX), responder_(&ctx_) {
+		service_->RequestlistMachinePrefixes(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class AddVIPCall final : BaseCall {
 	ServerContext ctx_;
 	MachineVIPMsg request_;

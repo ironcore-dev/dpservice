@@ -5,6 +5,8 @@
 #include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
 
+#define DP_SHOW_EXT_ROUTES true
+#define DP_SHOW_INT_ROUTES false
 
 int dp_send_to_worker(dp_request *req)
 {
@@ -187,6 +189,58 @@ err:
 	return ret;
 }
 
+static int dp_process_addprefix(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+
+	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_ADD_PFX_NO_VM;
+		goto err;
+	}
+
+	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr), 
+					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
+			ret = DP_ERROR_VM_ADD_PFX_ROUTE;
+			goto err;
+		}
+	}
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
+static int dp_process_delprefix(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+
+	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_DEL_PFX_NO_VM;
+		goto err;
+	}
+
+	if(req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (dp_del_route(dp_get_pf0_port_id(), dp_get_vm_vni(port_id), 0,
+					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
+					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+			ret = DP_ERROR_VM_DEL_PFX;
+			goto err;
+		}
+	}
+
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
 	struct dp_port_ext pf_port;
@@ -352,7 +406,7 @@ static int dp_process_listroute(dp_request *req, dp_reply *rep)
 {
 	uint32_t vni = req->route.vni;
 
-	dp_list_routes(vni, rep, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	dp_list_routes(vni, rep, rte_eth_dev_socket_id(dp_get_pf0_port_id()), DP_SHOW_EXT_ROUTES);
 
 	return EXIT_SUCCESS;
 }
@@ -362,6 +416,23 @@ static int dp_process_listbackips(dp_request *req, dp_reply *rep)
 
 	dp_get_lb_back_ips(ntohl(req->qry_lb_vip.vip.vip_addr), req->qry_lb_vip.vni, rep);
 
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_listpfxs(dp_request *req, dp_reply *rep)
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->get_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0)
+		goto out;
+
+	dp_list_routes(dp_get_vm_vni(port_id), rep, 
+								rte_eth_dev_socket_id(dp_get_pf0_port_id()), DP_SHOW_INT_ROUTES);
+
+out:
 	return EXIT_SUCCESS;
 }
 
@@ -391,6 +462,12 @@ int dp_process_request(struct rte_mbuf *m)
 		case DP_REQ_TYPE_GETVIP:
 			ret = dp_process_getvip(req, &rep);
 			break;
+		case DP_REQ_TYPE_ADDPREFIX:
+			ret = dp_process_addprefix(req, &rep);
+			break;
+		case DP_REQ_TYPE_DELPREFIX:
+			ret = dp_process_delprefix(req, &rep);
+			break;
 		case DP_REQ_TYPE_ADDMACHINE:
 			ret = dp_process_addmachine(req, &rep);
 			break;
@@ -406,6 +483,9 @@ int dp_process_request(struct rte_mbuf *m)
 		case DP_REQ_TYPE_LISTROUTE:
 			ret = dp_process_listroute(req, rte_pktmbuf_mtod(m, dp_reply*));
 			break;
+		case DP_REQ_TYPE_LISTPREFIX:
+			ret = dp_process_listpfxs(req, rte_pktmbuf_mtod(m, dp_reply*));
+			break;
 		case DP_REQ_TYPE_LISTLBBACKENDS:
 			ret = dp_process_listbackips(req, rte_pktmbuf_mtod(m, dp_reply*));
 			break;
@@ -419,6 +499,7 @@ int dp_process_request(struct rte_mbuf *m)
 	/* is directly written into the mbuf in the process function */
 	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE && 
+		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX && 
 		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS) {
 		rep.com_head.com_type = req->com_head.com_type;
 		p_rep = rte_pktmbuf_mtod(m, dp_reply*);

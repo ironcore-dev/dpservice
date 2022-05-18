@@ -32,6 +32,9 @@ typedef enum {
 	DP_CMD_ADD_LB_VIP,
 	DP_CMD_DEL_LB_VIP,
 	DP_CMD_LIST_LB_VIP,
+	DP_CMD_ADD_PFX,
+	DP_CMD_LIST_PFX,
+	DP_CMD_DEL_PFX,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -52,6 +55,9 @@ static int vni;
 static int t_vni;
 static int length;
 
+#define CMD_LINE_OPT_ADD_PFX		"addpfx"
+#define CMD_LINE_OPT_LIST_PFX		"listpfx"
+#define CMD_LINE_OPT_DEL_PFX		"delpfx"
 #define CMD_LINE_OPT_ADD_MACHINE	"addmachine"
 #define CMD_LINE_OPT_DEL_MACHINE	"delmachine"
 #define CMD_LINE_OPT_GET_MACHINE	"getmachines"
@@ -97,6 +103,9 @@ enum {
 	CMD_LINE_OPT_ADD_LB_VIP_NUM,
 	CMD_LINE_OPT_DEL_LB_VIP_NUM,
 	CMD_LINE_OPT_LIST_LB_VIP_NUM,
+	CMD_LINE_OPT_ADD_PFX_NUM,
+	CMD_LINE_OPT_LIST_PFX_NUM,
+	CMD_LINE_OPT_DEL_PFX_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -121,6 +130,9 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_LB_VIP, 0, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
 	{CMD_LINE_OPT_DEL_LB_VIP, 0, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
 	{CMD_LINE_OPT_LIST_LB_VIP, 0, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
+	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
+	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
+	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -201,6 +213,18 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_VIP_NUM:
 			command = DP_CMD_ADD_VIP;
+			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_ADD_PFX_NUM:
+			command = DP_CMD_ADD_PFX;
+			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_DEL_PFX_NUM:
+			command = DP_CMD_DEL_PFX;
+			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_LIST_PFX_NUM:
+			command = DP_CMD_LIST_PFX;
 			strncpy(machine_str, optarg, 29);
 			break;
 		case CMD_LINE_OPT_DEL_VIP_NUM:
@@ -438,6 +462,61 @@ public:
 			}
 	}
 
+	void AddPfx() {
+			MachinePrefixMsg request;
+			Status reply;
+			ClientContext context;
+			Prefix *pfx_ip = new Prefix();
+			MachineIDMsg *m_id = new MachineIDMsg();
+
+			m_id->set_machineid(machine_str);
+			request.set_allocated_machine_id(m_id);
+			pfx_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				pfx_ip->set_address(ip_str);
+			pfx_ip->set_prefixlength(length);
+			request.set_allocated_prefix(pfx_ip);
+			stub_->addMachinePrefix(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
+	}
+
+	void DelPfx() {
+			MachinePrefixMsg request;
+			Status reply;
+			ClientContext context;
+			Prefix *pfx_ip = new Prefix();
+			MachineIDMsg *m_id = new MachineIDMsg();
+
+			m_id->set_machineid(machine_str);
+			request.set_allocated_machine_id(m_id);
+			pfx_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				pfx_ip->set_address(ip_str);
+			pfx_ip->set_prefixlength(length);
+			request.set_allocated_prefix(pfx_ip);
+			stub_->deleteMachinePrefix(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
+	}
+
+	void ListPfx() {
+			MachineIDMsg request;
+			PrefixesMsg reply;
+			ClientContext context;
+			int i;
+
+			request.set_machineid(machine_str);
+			stub_->listMachinePrefixes(&context, request, &reply);
+			for (i = 0; i < reply.prefixes_size(); i++) {
+				printf("Route prefix %s len %d \n",
+					reply.prefixes(i).address().c_str(),
+					reply.prefixes(i).prefixlength());
+			}
+	}
+
 	void DelVIP() {
 			MachineIDMsg request;
 			Status reply;
@@ -553,6 +632,18 @@ int main(int argc, char** argv)
 	case DP_CMD_LIST_LB_VIP:
 		std::cout << "List back IPs called " << std::endl;
 		dpdk_client.ListBackIPs();
+		break;
+	case DP_CMD_ADD_PFX:
+		dpdk_client.AddPfx();
+		std::cout << "Addprefix called " << std::endl;
+		break;
+	case DP_CMD_DEL_PFX:
+		dpdk_client.DelPfx();
+		std::cout << "Delprefix called " << std::endl;
+		break;
+	case DP_CMD_LIST_PFX:
+		std::cout << "Listprefix called " << std::endl;
+		dpdk_client.ListPfx();
 		break;
 	default:
 		break;
