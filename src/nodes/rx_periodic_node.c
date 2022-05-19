@@ -11,31 +11,26 @@
 #include "dp_flow.h"
 #include "grpc/dp_grpc_impl.h"
 #include <unistd.h>
+#include "monitoring/dp_monitoring.h"
 
-static struct rx_periodic_node_ctx node_ctx;
 static struct rx_periodic_node_main rx_periodic_node;
+static struct rx_periodic_node_receive_queues rx_periodic_node_recv_queues;
 
 int config_rx_periodic_node(struct rx_periodic_node_config *cfg)
 {
-	node_ctx.periodic_msg_queue = cfg->periodic_msg_queue;
-	node_ctx.grpc_tx = cfg->grpc_tx;
-	node_ctx.grpc_rx = cfg->grpc_rx;
-
+	rx_periodic_node_recv_queues.periodic_msg_queue = cfg->periodic_msg_queue;
+	rx_periodic_node_recv_queues.grpc_tx = cfg->grpc_tx;
+	rx_periodic_node_recv_queues.grpc_rx = cfg->grpc_rx;
+	rx_periodic_node_recv_queues.monitoring_rx = cfg->monitoring_rx;
+	
 	return 0;
 }
 
 static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_periodic_node_ctx *ctx = (struct rx_periodic_node_ctx *)node->ctx;
-	
-	
-	ctx->periodic_msg_queue = node_ctx.periodic_msg_queue;
-	ctx->grpc_rx = node_ctx.grpc_rx;
-	ctx->grpc_tx = node_ctx.grpc_tx;
-	ctx->next = RX_PERIODIC_NEXT_CLS;
 
-	printf("rx_periodic_node: init, queue_id: %u\n",
-			ctx->queue_id);
+	ctx->next = RX_PERIODIC_NEXT_CLS;
 
 	RTE_SET_USED(graph);
 
@@ -53,12 +48,35 @@ static __rte_always_inline void check_aged_flows(uint16_t portid)
 	}
 }
 
+static __rte_always_inline uint16_t handle_monitoring_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx){
+	struct rte_mbuf *mbufs[32];
+	struct rte_mbuf *mbuf0;
+	int count=0, i;
+
+	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.monitoring_rx, (void **)mbufs, 32, NULL);
+
+	if (count == 0) {
+		return 0;
+	}
+	// pkts = (struct rte_mbuf **)node->objs;
+
+	for (i = 0; i < count; i++) {
+		mbuf0 = mbufs[i];
+		dp_process_status_msg(mbuf0);
+	}
+
+	RTE_SET_USED(ctx);
+
+	return 0;
+}
+
 static __rte_always_inline uint16_t handle_grpc_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx)
 {
 	struct rte_mbuf **pkts, *mbuf0;
 	int count, i;
 
-	count = rte_ring_dequeue_burst(node_ctx.grpc_tx, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
+	// RTE_GRAPH_BURST_SIZE seems not a good value to set, since the capacity of ring is 32.
+	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.grpc_tx, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
 
 	if (count == 0)
 		return 0;
@@ -68,8 +86,12 @@ static __rte_always_inline uint16_t handle_grpc_queue(struct rte_node *node, str
 		mbuf0 = pkts[i];
 		dp_process_request(mbuf0);
 	}
+
+	RTE_SET_USED(ctx);	
+
 	return 0;
 }
+
 
 static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 												   struct rte_node *node,
@@ -82,10 +104,14 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 
 	next_index = ctx->next;
 
-	if (node_ctx.grpc_tx)
+	// which condition grpc_tx is null? 
+	if (rx_periodic_node_recv_queues.grpc_tx)
 		handle_grpc_queue(node, ctx);
 
-	count = rte_ring_dequeue_burst(ctx->periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
+	if (rx_periodic_node_recv_queues.monitoring_rx)
+		handle_monitoring_queue(node,ctx);
+
+	count = rte_ring_dequeue_burst(rx_periodic_node_recv_queues.periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
 	if (!count)
 		return 0;
 	
@@ -113,11 +139,15 @@ static __rte_always_inline uint16_t rx_periodic_node_process(struct rte_graph *g
 {
 	struct rx_periodic_node_ctx *ctx = (struct rx_periodic_node_ctx *)node->ctx;
 	uint16_t n_pkts = 0;
+	uint16_t next_index = ctx->next;
 
 	RTE_SET_USED(objs);
 	RTE_SET_USED(cnt);
 
 	n_pkts = process_inline(graph, node, ctx);
+
+	ctx->next = next_index;
+
 	return n_pkts;
 }
 

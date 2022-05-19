@@ -17,6 +17,7 @@
 #include "nodes/rx_periodic_node.h"
 #include "nodes/ipv6_lookup_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
+#include "monitoring/dp_monitoring.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
@@ -109,6 +110,9 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.periodic_msg_queue)
 		printf("Error creating periodic_msg_queue queue\n");
+	dp_layer.monitoring_rx_queue = rte_ring_create("monitoring_rx_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	if (!dp_layer.monitoring_rx_queue)
+		printf("Error creating monitoring rx queue\n");
 
 	// init the timer subsystem
 	rte_timer_subsystem_init();
@@ -311,6 +315,9 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 			
 			dp_port_prepare(type, port_id, &dp_port_ext);
 			dp_add_pf_port_id(port_id);
+
+			// Only PF's status is handled for now since it is critical for cross-hypervisor communication
+			rte_eth_dev_callback_register(port_id,RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
 			return port_id;
 		}
 
@@ -368,9 +375,11 @@ int dp_init_graph()
 	dhcpv6_node = dhcpv6_node_get();
 	rx_periodic_node = rx_periodic_node_get();
 
+	/* it is not really needed to init queues in this way, and init can be done within node's init function */
 	rx_periodic_cfg.periodic_msg_queue = dp_layer.periodic_msg_queue;
 	rx_periodic_cfg.grpc_tx = dp_layer.grpc_tx_queue;
 	rx_periodic_cfg.grpc_rx = dp_layer.grpc_rx_queue;
+	rx_periodic_cfg.monitoring_rx = dp_layer.monitoring_rx_queue;
 	ret = config_rx_periodic_node(&rx_periodic_cfg);
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
@@ -400,7 +409,7 @@ int dp_init_graph()
 			rte_node_edge_update(rx_periodic_node->id, RTE_EDGE_ID_INVALID,
  						&next_nodes, 1);
  			ret = rx_periodic_set_next(
- 				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(arp_node->id) - 1);
+ 				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(rx_periodic_node->id) - 1);
  			if (ret < 0)
  				return ret;
 			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID,

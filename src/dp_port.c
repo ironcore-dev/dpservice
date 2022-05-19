@@ -25,6 +25,9 @@ struct rte_eth_conf port_conf = {
 					.rss_hf = ETH_RSS_IP,
 					},
 					},
+	.intr_conf = {
+		.lsc = 1, /**< lsc interrupt feature enabled */
+	},
 };
 
 struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)

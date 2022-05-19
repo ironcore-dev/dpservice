@@ -82,6 +82,8 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 	/* Enqueue to next node */
 	rte_node_next_stream_move(graph, node, next_index);
 
+	ctx->next = next_index;
+
 	return count;
 }
 
