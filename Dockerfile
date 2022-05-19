@@ -24,6 +24,8 @@ ninja-build \
 meson \
 python3-pyelftools \
 iproute2 \
+libuuid1 \
+uuid-dev \
 net-tools \
 xz-utils \
 build-essential \
@@ -75,6 +77,7 @@ numactl \
 libnuma1 \
 pciutils \
 procps \
+libuuid1 \
 libgrpc++1 \
 iproute2 \
 && rm -rf /var/lib/apt/lists/*

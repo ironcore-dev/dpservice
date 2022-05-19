@@ -35,6 +35,7 @@ typedef enum {
 	DP_CMD_ADD_PFX,
 	DP_CMD_LIST_PFX,
 	DP_CMD_DEL_PFX,
+	DP_CMD_INIT,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -55,6 +56,7 @@ static int vni;
 static int t_vni;
 static int length;
 
+#define CMD_LINE_OPT_INIT			"is_init"
 #define CMD_LINE_OPT_ADD_PFX		"addpfx"
 #define CMD_LINE_OPT_LIST_PFX		"listpfx"
 #define CMD_LINE_OPT_DEL_PFX		"delpfx"
@@ -106,6 +108,7 @@ enum {
 	CMD_LINE_OPT_ADD_PFX_NUM,
 	CMD_LINE_OPT_LIST_PFX_NUM,
 	CMD_LINE_OPT_DEL_PFX_NUM,
+	CMD_LINE_OPT_INIT_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -133,6 +136,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
 	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
 	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
+	{CMD_LINE_OPT_INIT, 0, 0, CMD_LINE_OPT_INIT_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -252,6 +256,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_LIST_LB_VIP_NUM:
 			command = DP_CMD_LIST_LB_VIP;
+			break;
+		case CMD_LINE_OPT_INIT_NUM:
+			command = DP_CMD_INIT;
 			break;
 		default:
 			dp_print_usage(prgname);
@@ -482,6 +489,15 @@ public:
 			}
 	}
 
+	void Initialized() {
+			Empty request;
+			UUIDMsg reply;
+			ClientContext context;
+
+			stub_->initialized(&context, request, &reply);
+			printf("Received UUID %s \n", reply.uuid().c_str());
+	}
+
 	void DelPfx() {
 			MachinePrefixMsg request;
 			Status reply;
@@ -644,6 +660,10 @@ int main(int argc, char** argv)
 	case DP_CMD_LIST_PFX:
 		std::cout << "Listprefix called " << std::endl;
 		dpdk_client.ListPfx();
+		break;
+	case DP_CMD_INIT:
+		std::cout << "Initialized called " << std::endl;
+		dpdk_client.Initialized();
 		break;
 	default:
 		break;

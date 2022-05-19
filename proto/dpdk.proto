@@ -215,8 +215,8 @@ message FirewallRulesMsg {
 	repeated FirewallRule rules = 1;
 }
 
-message BoolMsg {
-	bool bool_val = 1;
+message UUIDMsg {
+	string uuid = 1;
 }
 
 message VirtualFunction {
@@ -243,8 +243,9 @@ message Route {
 
 service DPDKonmetal {
 	//// INITIALIZATION
-	// initialized indicates if the DPDK app has been initialized already.
-	rpc initialized(Empty) returns (BoolMsg) {}
+	// initialized indicates if the DPDK app has been initialized already, if so an UUID is returned.
+	// this UUID gets changed in case the dp-service gets restarted.
+	rpc initialized(Empty) returns (UUIDMsg) {}
 
 	// init will be called once for initial set up of the DPDK app.
 	// init returns an error if the DPDK app has been initialized already. So check if it got initialized before calling init.

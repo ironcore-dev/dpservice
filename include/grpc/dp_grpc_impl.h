@@ -27,6 +27,7 @@ typedef enum {
 	DP_REQ_TYPE_ADDPREFIX,
 	DP_REQ_TYPE_DELPREFIX,
 	DP_REQ_TYPE_LISTPREFIX,
+	DP_REQ_TYPE_INIT,
 } dp_req_type;
 
 typedef struct dp_com_head {

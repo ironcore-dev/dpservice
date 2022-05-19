@@ -1,9 +1,31 @@
 #include "grpc/dp_async_grpc.h"
+#include "grpc/dp_grpc_service.h"
 #include "grpc/dp_grpc_impl.h"
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
 #include <dp_error.h>
 #include <rte_ether.h>
+
+int InitializedCall::Proceed()
+{
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new InitializedCall(service_, cq_);
+
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		reply_.set_uuid(grpc_service->GetUUID());
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
 
 int AddLBVIPCall::Proceed()
 {
