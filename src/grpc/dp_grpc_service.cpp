@@ -8,10 +8,14 @@
 
 GRPCService::GRPCService()
 {
+	uuid = malloc(DP_UUID_SIZE);
+	uuid_generate_random(binuuid);
+	uuid_unparse_upper(binuuid, (char*)uuid);
 }
 
 GRPCService::~GRPCService()
 {
+	free(uuid);
 }
 
 void GRPCService::run(std::string listen_address) 
@@ -25,10 +29,16 @@ void GRPCService::run(std::string listen_address)
 	HandleRpcs();
 }
 
+char* GRPCService::GetUUID()
+{
+	return (char*)uuid;
+}
+
 void GRPCService::HandleRpcs()
 {
 	void* tag;
 	bool ok;
+	new InitializedCall(this, cq_.get());
 	new DelPfxCall(this, cq_.get());
 	new ListPfxCall(this, cq_.get());
 	new AddPfxCall(this, cq_.get());

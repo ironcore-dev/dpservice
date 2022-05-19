@@ -8,6 +8,7 @@ proto_dep = dependency('protobuf')
 grpc_dep = dependency('grpc')
 grpccpp_dep = dependency('grpc++')
 thread_dep = dependency('threads')
+libuuid_dep = dependency('uuid')
 
 protoc = find_program('protoc')
 grpc_cpp = find_program('grpc_cpp_plugin')

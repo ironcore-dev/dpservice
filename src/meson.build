@@ -9,4 +9,4 @@ dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'dp_lb.
 			  'dp_netlink.c','rte_flow/dp_rte_flow.c','rte_flow/dp_rte_flow_init.c','rte_flow/dp_rte_flow_traffic_forward.c']
 
 executable('dp_service', [dp_sources, grpc_generated], include_directories : [inc],
-			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep] )
+			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep] )

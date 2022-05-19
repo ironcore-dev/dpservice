@@ -263,4 +263,19 @@ public:
 	}
 	int Proceed() override;
 };
+
+class InitializedCall final : BaseCall {
+	ServerContext ctx_;
+	Empty request_;
+	UUIDMsg reply_;
+	ServerAsyncResponseWriter<UUIDMsg> responder_;
+
+public:
+	InitializedCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_INIT), responder_(&ctx_) {
+		service_->Requestinitialized(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H
