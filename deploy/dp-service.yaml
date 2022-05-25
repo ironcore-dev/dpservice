@@ -1,7 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: system
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: dp-service
+  namespace: system
 spec:
   revisionHistoryLimit: 10
   selector:
