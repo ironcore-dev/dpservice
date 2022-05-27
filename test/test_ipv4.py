@@ -1,14 +1,16 @@
+from sys import stdout
 from scapy.all import *
 from scapy.layers.l2 import ARP
-from scapy.layers.inet import Ether
+from scapy.layers.inet import Ether, ICMP, TCP
+from scapy.layers.inet6 import IPv6
 from scapy.layers.dhcp import *
 from scapy.config import conf
+from scapy.contrib.geneve import GENEVE
 
 import pytest, shlex, subprocess, time
 from config import *
 
 import multiprocessing
-import signal
 
 def test_l2_arp(add_machine):
 	try:
@@ -56,6 +58,14 @@ def is_encaped_icmp_pkt(pkt):
 				return True
 	return False
 
+def is_geneve_encaped_icmp_pkt(pkt):
+	if IPv6 in pkt:
+		pktipv6=pkt[IPv6]
+		if pktipv6.dst==ul_actual_dst and pktipv6.nh==17:
+			if ICMP in pkt:
+				return True
+	return False
+
 def is_icmp_pkt(pkt):
 	if ICMP in pkt:
 		return True
@@ -77,21 +87,40 @@ def ipv4_in_ipv6_responder():
 	if IP in pkt:
 		pktip= pkt[IP]
 
-	reply_pkt = Ether(dst=pktether.src,src=pktether.dst,type=0x86DD)/IPv6(dst=ul_actual_src,src=ul_target_ipv6,nh=4)/IP(dst=pktip.src,src=pktip.dst)/ICMP(type=0)
+	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst) / ICMP(type=0)
 	time.sleep(1)
 	sendp(reply_pkt, iface=pf0_tap)
 
+def geneve_in_ipv6_responder():
+	pkt_list = sniff(count=1,lfilter=is_geneve_encaped_icmp_pkt, iface=pf0_tap)
+	pkt=pkt_list[0]
+	pkt.show()
 
-def test_IPv4inIPv6(capsys,add_machine):
-	d=multiprocessing.Process(name="sniffer",target=ipv4_in_ipv6_responder)
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip = pkt[IP]
+
+	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=17) / UDP(sport=6081, dport=6081) \
+				/ GENEVE(vni=0x640000, proto=0x0800) / IP(dst=pktip.src, src=pktip.dst) / ICMP(type=0)
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf0_tap)
+
+def test_IPv4inIPv6(capsys, add_machine, tun_opt):
+	d = None
+	if tun_opt == tun_type_geneve:
+		d = multiprocessing.Process(name="sniffer",target = geneve_in_ipv6_responder)
+	else:
+		d = multiprocessing.Process(name="sniffer",target = ipv4_in_ipv6_responder)
 	d.daemon=False
 	d.start()
 
 	time.sleep(1)
-
 	icmp_echo_pkt = Ether(dst=pf0_mac,src=vf0_mac,type=0x0800)/IP(dst="192.168.129.5",src="172.32.10.5")/ICMP(type=8)
 	sendp(icmp_echo_pkt,iface=vf0_tap)
-	
+
 	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=2)
 	if len(pkt_list)==0:
 		raise AssertionError('Cannot receive icmp reply!')

@@ -28,11 +28,6 @@ static __rte_always_inline int handle_ipip_tunnel_encap(struct rte_mbuf *m, stru
 {
 	uint8_t route = IPIP_TUNNEL_NEXT_DROP;
 
-	uint32_t vni_ns = htonl(df->tun_info.dst_vni);
-
-	memcpy(df->tun_info.ul_dst_addr6 + 8, &vni_ns, 4);
-	memset(df->tun_info.ul_dst_addr6 + 12, 0, 4);
-
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
 		df->tun_info.proto_id = DP_IP_PROTO_IPv4_ENCAP;
 
