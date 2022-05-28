@@ -76,6 +76,13 @@ def is_tcp_pkt(pkt):
 		return True
 	return False
 
+def is_tcp_vip_src_pkt(pkt):
+	print("I am in check")
+	if TCP in pkt:
+		if pkt[IP].src == virtual_ip:
+			return True
+	return False
+
 def ipv4_in_ipv6_responder():
 	pkt_list = sniff(count=1,lfilter=is_encaped_icmp_pkt,iface=pf0_tap)
 	pkt=pkt_list[0]
@@ -126,22 +133,38 @@ def test_IPv4inIPv6(capsys, add_machine, tun_opt):
 		raise AssertionError('Cannot receive icmp reply!')
 	
 
-def vf_to_vf_tcp_responder():
+def vf_to_vf_tcp_vf1_responder():
 	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf1_tap)
 	pkt=pkt_list[0]
-	pkt.show()
+
+	if Ether in pkt:
+		pktether = pkt[Ether]
+	if IP in pkt:
+		pktip = pkt[IP]
+	if TCP in pkt:
+		pkttcp = pkt[TCP]
+
+	reply_pkt = Ether(dst=pktether.src,src=pktether.dst,type=0x0800)/IP(dst=pktip.src,src=pktip.dst)/TCP(sport=pkttcp.dport, dport=pkttcp.sport)
+	time.sleep(1)
+	sendp(reply_pkt, iface=vf1_tap)
+
+def vf_to_vf_tcp_vf0_responder():
+	pkt_list = sniff(count=1,lfilter=is_tcp_vip_src_pkt,iface=vf0_tap)
+	pkt=pkt_list[0]
+
 	if Ether in pkt:
 		pktether=pkt[Ether]
 	if IP in pkt:
 		pktip= pkt[IP]
+	if TCP in pkt:
+		pkttcp = pkt[TCP]
 
-	reply_pkt = Ether(dst=pktether.src,src=pktether.dst,type=0x0800)/IP(dst=pktip.src,src=pktip.dst)/TCP()
+	reply_pkt = Ether(dst=pktether.src,src=pktether.dst,type=0x0800)/IP(dst=pktip.src,src=pktip.dst)/TCP(sport=pkttcp.dport, dport=pkttcp.sport)
 	time.sleep(1)
-	sendp(reply_pkt, iface=vf1_tap)
-
+	sendp(reply_pkt, iface=vf0_tap)
 
 def test_vf_to_vf_tcp(capsys,add_machine):
-	d=multiprocessing.Process(name="sniffer",target=vf_to_vf_tcp_responder)
+	d=multiprocessing.Process(name="sniffer",target=vf_to_vf_tcp_vf1_responder)
 	d.daemon=False
 	d.start()
 
@@ -152,7 +175,7 @@ def test_vf_to_vf_tcp(capsys,add_machine):
 	
 	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf0_tap,timeout=2)
 	if len(pkt_list)==0:
-		raise AssertionError('Cannot receive icmp reply!')
+		raise AssertionError('Cannot receive tcp reply!')
 
 def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	cmd = shlex.split(cmd_str)
@@ -174,6 +197,53 @@ def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	else:
 		if err_found:
 			raise AssertionError("Receive expected unexpected string " + exp_error)
+
+def test_vf_to_vf_vip_dnat(capsys, add_machine, build_path):
+	d = multiprocessing.Process(name = "sniffer", target = vf_to_vf_tcp_vf1_responder)
+	d.daemon=False
+	d.start()
+
+	expected_str = ul_actual_src
+	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
+	eval_cmd_output(add_vip_test, expected_str)
+	time.sleep(1)
+
+	# vm1 (vf0) -> vm2 (vf2), vm2 has VIP, send packet to VIP from vm1 side, whether the packet is received 
+	# and sent back by vm2 (DNAT)
+	tcp_pkt = Ether(dst = vf1_mac, src = vf0_mac, type = 0x0800) / IP(dst = virtual_ip, src = vf0_ip) / TCP(sport=1200)
+	sendp(tcp_pkt, iface = vf0_tap)
+	
+	pkt_list = sniff(count = 1, lfilter = is_tcp_pkt, iface = vf0_tap, timeout = 2)
+	if len(pkt_list) == 0:
+		raise AssertionError('Cannot receive tcp reply via VIP (DNAT)!')
+
+	expected_str = "Delvip"
+	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
+	eval_cmd_output(del_vip_test, expected_str)
+
+
+def test_vf_to_vf_vip_snat(capsys, add_machine, build_path):
+	d = multiprocessing.Process(name = "sniffer", target = vf_to_vf_tcp_vf0_responder)
+	d.daemon=False
+	d.start()
+
+	expected_str = ul_actual_src
+	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
+	eval_cmd_output(add_vip_test, expected_str)
+	time.sleep(1)
+
+	# vm2 (vf1) -> vm1 (vf0), vm2 has VIP, check on vm1 side, whether VIP is source (SNAT)
+	tcp_pkt = Ether(dst = vf0_mac, src = vf1_mac, type = 0x0800) / IP(dst = vf0_ip, src = vf1_ip) / TCP(sport=1240)
+	sendp(tcp_pkt, iface = vf1_tap)
+	
+	pkt_list = sniff(count = 1, lfilter = is_tcp_pkt, iface = vf1_tap, timeout = 2)
+	if len(pkt_list) == 0:
+		raise AssertionError('Cannot receive tcp reply via VIP (SNAT)!')
+
+	expected_str = "Delvip"
+	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
+	eval_cmd_output(del_vip_test, expected_str)
+
 
 def test_grpc_addmachine_error_102(capsys, build_path):
 	# Try to add using an existing vm identifier
