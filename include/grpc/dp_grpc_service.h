@@ -27,6 +27,7 @@ public:
 	void run(std::string listen_address);
 	void HandleRpcs();
 	char* GetUUID();
+	void CalculateUnderlayRoute(uint32_t vni, uint8_t* route, uint32_t route_size);
 };
 
 #endif //__INCLUDE_DP_GRPC_SERVICE_H

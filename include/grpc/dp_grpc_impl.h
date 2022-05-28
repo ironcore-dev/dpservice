@@ -160,7 +160,7 @@ typedef struct dp_reply {
 		dp_vm_info	vm_info;
 		dp_route	route;
 		uint32_t	back_ip;
-
+		uint32_t	vni;
 	};
 } dp_reply;
 

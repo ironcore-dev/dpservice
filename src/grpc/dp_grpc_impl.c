@@ -131,6 +131,7 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		if (ret)
 			goto err_snat;
 	}
+	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
 err_snat:
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
@@ -208,6 +209,7 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 			goto err;
 		}
 	}
+	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;

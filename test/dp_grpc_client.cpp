@@ -304,10 +304,12 @@ public:
 			request.set_allocated_ipv6config(ipv6_config);
 			request.set_machinetype(dpdkonmetal::MachineType::VirtualMachine);
 			stub_->addMachine(&context, request, &response);
-			if (!response.status().error())
+			if (!response.status().error()) {
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());
-			else
+				printf("Received underlay route : %s \n", response.status().underlay_route().c_str());
+			} else {
 				printf("Received an error %d\n", response.status().error());
+			}
 	}
 
 	void AddRoute() {
@@ -389,7 +391,7 @@ public:
 
 	void AddLBVIP() {
 			LBMsg request;
-			Status reply;
+			ExtStatus reply;
 			ClientContext context;
 			LBIP *vip_ip = new LBIP();
 			LBIP *back_ip = new LBIP();
@@ -406,6 +408,8 @@ public:
 			stub_->addLBVIP(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
+			} else {
+				printf("Received underlay route : %s \n", reply.underlay_route().c_str());
 			}
 	}
 
@@ -454,7 +458,7 @@ public:
 
 	void AddVIP() {
 			MachineVIPMsg request;
-			Status reply;
+			ExtStatus reply;
 			ClientContext context;
 			MachineVIPIP *vip_ip = new MachineVIPIP();
 
@@ -466,12 +470,14 @@ public:
 			stub_->addMachineVIP(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
+			} else {
+				printf("Received underlay route : %s \n", reply.underlay_route().c_str());
 			}
 	}
 
 	void AddPfx() {
 			MachinePrefixMsg request;
-			Status reply;
+			ExtStatus reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 			MachineIDMsg *m_id = new MachineIDMsg();
@@ -486,6 +492,8 @@ public:
 			stub_->addMachinePrefix(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
+			} else {
+				printf("Received underlay route : %s \n", reply.underlay_route().c_str());
 			}
 	}
 

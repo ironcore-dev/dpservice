@@ -237,7 +237,7 @@ def test_grpc_list_delroutes(capsys, build_path):
 
 def test_grpc_add_list_delVIP(capsys, build_path):
 	# Try to add VIP, list, test error cases, delete vip and list again
-	expected_str = "Addvip"
+	expected_str = ul_actual_src
 	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
 	eval_cmd_output(add_vip_test, expected_str)
 
@@ -265,7 +265,7 @@ def test_grpc_add_list_delVIP(capsys, build_path):
 
 def test_grpc_add_list_delLBVIP(capsys, build_path):
 	# Try to add VIP, list, test error cases, delete vip and list again
-	expected_str = "Addlbvip"
+	expected_str = ul_actual_src
 	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip --vni " + vni + " --ipv4 " + virtual_ip + " --back_ip " + back_ip1
 	eval_cmd_output(add_lbvip_test, expected_str)
 
@@ -304,7 +304,7 @@ def test_grpc_add_list_delLBVIP(capsys, build_path):
 
 def test_grpc_add_list_delPfx(capsys, build_path):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	expected_str = "Addprefix"
+	expected_str = ul_actual_src
 	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
 	eval_cmd_output(add_pfx_test, expected_str)
 

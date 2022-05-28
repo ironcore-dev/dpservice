@@ -32,6 +32,8 @@ int AddLBVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddLBVIPCall(service_, cq_);
@@ -52,6 +54,10 @@ int AddLBVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		reply_.set_underlay_route(buf_str);
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -143,6 +149,8 @@ int AddPfxCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddPfxCall(service_, cq_);
@@ -163,6 +171,10 @@ int AddPfxCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		reply_.set_underlay_route(buf_str);
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -252,6 +264,8 @@ int AddVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddVIPCall(service_, cq_);
@@ -271,6 +285,10 @@ int AddVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		reply_.set_underlay_route(buf_str);
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -347,8 +365,10 @@ int AddMachineCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	VirtualFunction *vf = new VirtualFunction();
-	Status *err_status = new Status();
+	ExtStatus *err_status = new ExtStatus();
 	grpc::Status ret = grpc::Status::OK;
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddMachineCall(service_, cq_);
@@ -385,6 +405,10 @@ int AddMachineCall::Proceed()
 			reply_.set_allocated_vf(vf);
 			err_status->set_error(reply.com_head.err_code);
 		}
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		err_status->set_underlay_route(buf_str);
 		reply_.set_allocated_status(err_status);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);

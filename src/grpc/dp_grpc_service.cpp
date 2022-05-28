@@ -3,6 +3,7 @@
 #include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_port.h"
+#include "dpdk_layer.h"
 #include <rte_mbuf.h>
 
 
@@ -32,6 +33,15 @@ void GRPCService::run(std::string listen_address)
 char* GRPCService::GetUUID()
 {
 	return (char*)uuid;
+}
+
+void GRPCService::CalculateUnderlayRoute(uint32_t vni, uint8_t* route, uint32_t route_size)
+{
+	uint32_t l_vni = htonl(vni);
+
+	memcpy(route, get_underlay_conf()->src_ip6, route_size);
+	memcpy(route + 8, &l_vni, 4);
+	memset(route + 12, 0, 4);
 }
 
 void GRPCService::HandleRpcs()
