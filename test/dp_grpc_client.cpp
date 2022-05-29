@@ -47,6 +47,7 @@ static char machine_str[30] = {0};
 static char ip_str[30] = {0};
 static char back_ip_str[30] = {0};
 static char pxe_ip_str[30] = {0};
+static char vm_pci_str[30] = {0};
 static char pxe_path_str[30] = {0};
 static IPVersion version;
 
@@ -57,6 +58,7 @@ static int t_vni;
 static int length;
 
 #define CMD_LINE_OPT_INIT			"is_init"
+#define CMD_LINE_OPT_PCI			"vm_pci"
 #define CMD_LINE_OPT_ADD_PFX		"addpfx"
 #define CMD_LINE_OPT_LIST_PFX		"listpfx"
 #define CMD_LINE_OPT_DEL_PFX		"delpfx"
@@ -101,6 +103,7 @@ enum {
 	CMD_LINE_OPT_GET_VIP_NUM,
 	CMD_LINE_OPT_PXE_IP_NUM,
 	CMD_LINE_OPT_PXE_STR_NUM,
+	CMD_LINE_OPT_PCI_NUM,
 	CMD_LINE_OPT_BACK_IP_NUM,
 	CMD_LINE_OPT_ADD_LB_VIP_NUM,
 	CMD_LINE_OPT_DEL_LB_VIP_NUM,
@@ -129,6 +132,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_GET_VIP, 1, 0, CMD_LINE_OPT_GET_VIP_NUM},
 	{CMD_LINE_OPT_PXE_IP, 1, 0, CMD_LINE_OPT_PXE_IP_NUM},
 	{CMD_LINE_OPT_PXE_STR, 1, 0, CMD_LINE_OPT_PXE_STR_NUM},
+	{CMD_LINE_OPT_PCI, 1, 0, CMD_LINE_OPT_PCI_NUM},
 	{CMD_LINE_OPT_BACK_IP, 1, 0, CMD_LINE_OPT_BACK_IP_NUM},
 	{CMD_LINE_OPT_ADD_LB_VIP, 0, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
 	{CMD_LINE_OPT_DEL_LB_VIP, 0, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
@@ -245,6 +249,9 @@ int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_PXE_STR_NUM:
 			strncpy(pxe_path_str, optarg, 29);
 			break;
+		case CMD_LINE_OPT_PCI_NUM:
+			strncpy(vm_pci_str, optarg, 29);
+			break;
 		case CMD_LINE_OPT_BACK_IP_NUM:
 			strncpy(back_ip_str, optarg, 29);
 			break;
@@ -303,6 +310,8 @@ public:
 			request.set_allocated_ipv4config(ip_config);
 			request.set_allocated_ipv6config(ipv6_config);
 			request.set_machinetype(dpdkonmetal::MachineType::VirtualMachine);
+			if (vm_pci_str[0] != '\0')
+				request.set_devicename(vm_pci_str);
 			stub_->addMachine(&context, request, &response);
 			if (!response.status().error()) {
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());

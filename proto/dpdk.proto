@@ -125,13 +125,17 @@ message AddMachineRequest {
 	// Both instance types cannot be mixed during a session.
 	// Maximum number of instantiated bare metal machines is 1.
 	// Maximum number of Virtual Machines is not defined.
+	// If you specify device name, a device with this name will be assigned, if it exists
+	// otherwise an error code. If you dont specify any device name, next available VF 
+	// will be assigned. 
 	MachineType machineType = 1;
 
 	bytes machineID = 2;
 	uint32 vni = 3;
 	IPConfig ipv4Config = 4;
 	IPConfig ipv6Config = 5;
-	ThrottlingConfig throttlingConfig = 6;
+	string deviceName = 6;
+	ThrottlingConfig throttlingConfig = 7;
 }
 
 message Machine {

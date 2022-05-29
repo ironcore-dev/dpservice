@@ -381,6 +381,8 @@ int AddMachineCall::Proceed()
 				  (in_addr*)&request.add_machine.ip4_pxe_addr);
 		snprintf(request.add_machine.pxe_str, VM_MACHINE_PXE_STR_LEN, "%s",
 				 request_.ipv4config().pxeconfig().bootfilename().c_str());
+		snprintf(request.add_machine.name, sizeof(request.add_machine.name), "%s",
+				 request_.devicename().c_str());
 		uint8_t ret = inet_pton(AF_INET6, request_.ipv6config().primaryaddress().c_str(),
 								request.add_machine.ip6_addr6);
 		if(ret < 0)
