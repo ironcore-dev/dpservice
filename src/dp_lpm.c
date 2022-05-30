@@ -111,6 +111,18 @@ int dp_get_active_vm_ports(int* act_ports)
 	return count;
 }
 
+bool dp_arp_cycle_needed(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return  (vm_table[portid].vm_ready && 
+			(vm_table[portid].info.neigh_mac.addr_bytes[0] == 0) &&
+			(vm_table[portid].info.neigh_mac.addr_bytes[1] == 0) &&
+			(vm_table[portid].info.neigh_mac.addr_bytes[2] == 0) &&
+			(vm_table[portid].info.neigh_mac.addr_bytes[3] == 0) &&
+			(vm_table[portid].info.neigh_mac.addr_bytes[4] == 0) &&
+			(vm_table[portid].info.neigh_mac.addr_bytes[5] == 0));
+}
+
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
@@ -168,7 +180,8 @@ static struct rte_rib6* get_lpm6(int vni, const int socketid)
 	int i;
 
 	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready && (vm_table[i].vni == vni))
+		if (vm_table[i].vm_ready && (vm_table[i].vni == vni) && 
+			vm_table[i].ipv6_rib[socketid])
 			return vm_table[i].ipv6_rib[socketid];
 
 	return NULL;
