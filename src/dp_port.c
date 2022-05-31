@@ -118,12 +118,12 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 					rte_strerror(-ret), port_id);
 	}	
 
+	dp_set_mac(port_id);
+
 	if (port->dp_p_type == DP_PORT_PF) {
-		dp_get_pf_neigh_mac(dev_info.if_index, &pf_neigh_mac);
+		dp_get_pf_neigh_mac(dev_info.if_index, &pf_neigh_mac, dp_get_mac(port_id));
 		dp_set_neigh_mac(port_id, &pf_neigh_mac);
 	}
-
-	dp_set_mac(port_id);
 
 	if (port->dp_p_type == DP_PORT_VF)
 		memcpy(port->vf_name, ifname, IF_NAMESIZE);

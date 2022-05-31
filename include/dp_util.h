@@ -11,6 +11,12 @@ extern "C" {
 #define DP_OP_ENV_HARDWARE 1
 #define DP_OP_ENV_SCAPYTEST 2
 
+#define DP_MAC_EQUAL(mac1, mac2) (((mac1)->addr_bytes[0] == (mac2)->addr_bytes[0]) && \
+								((mac1)->addr_bytes[1] == (mac2)->addr_bytes[1]) && \
+								((mac1)->addr_bytes[2] == (mac2)->addr_bytes[2]) && \
+								((mac1)->addr_bytes[3] == (mac2)->addr_bytes[3]) && \
+								((mac1)->addr_bytes[4] == (mac2)->addr_bytes[4]) && \
+								((mac1)->addr_bytes[5] == (mac2)->addr_bytes[5]))
 
 int dp_parse_args(int argc, char **argv);
 char *dp_get_pf0_name();
