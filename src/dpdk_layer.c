@@ -71,9 +71,11 @@ static void signal_handler(int signum)
 
 static void timer_cb()
 {
-	trigger_nd_ra();
+	if (dp_is_ip6_overlay_enabled()) {
+		trigger_nd_ra();
+		trigger_nd_unsol_adv();
+	}
 	trigger_garp();
-	trigger_nd_unsol_adv();
 }
 
 int dp_dpdk_init(int argc, char **argv)

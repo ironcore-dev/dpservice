@@ -23,6 +23,7 @@
 
 static int debug_mode = 0;
 static int no_offload = 0;
+static int ipv6_overlay = 0;
 static int no_conntrack = 0;
 static int no_stats = 0;
 static int tunnel_opt = DP_FLOW_OVERLAY_TYPE_IPIP;
@@ -59,6 +60,7 @@ static const char op_env_opt_scapytest[] = "scapytest";
 #define CMD_LINE_OPT_OP_ENV "op_env"
 #define CMD_LINE_OPT_VNI "vni"
 #define CMD_LINE_OPT_NO_OFFLOAD "no-offload"
+#define CMD_LINE_OPT_IPV6_OVERLAY "enable-ipv6-overlay"
 #define CMD_LINE_OPT_NO_CONNTRACK "no-conntrack"
 #define CMD_LINE_OPT_NO_STATS "no-stats"
 #define CMD_LINE_OPT_WCMP_FRAC "wcmp-frac"
@@ -78,6 +80,7 @@ enum
 	CMD_LINE_OPT_NO_STATS_NUM,
 	CMD_LINE_OPT_CONF_FILE_NUM,
 	CMD_LINE_OPT_WCMP_FRAC_NUM,
+	CMD_LINE_OPT_IPV6_OVERLAY_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -90,6 +93,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_WCMP_FRAC, 1, 0, CMD_LINE_OPT_WCMP_FRAC_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
+	{CMD_LINE_OPT_IPV6_OVERLAY, 0, 0, CMD_LINE_OPT_IPV6_OVERLAY_NUM},
 	{CMD_LINE_OPT_NO_CONNTRACK, 0, 0, CMD_LINE_OPT_NO_CONNTRACK_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
 	{CMD_LINE_OPT_CONF_FILE, 1, 0, CMD_LINE_OPT_CONF_FILE_NUM},
@@ -113,6 +117,7 @@ static void dp_print_usage(const char *prgname)
 			" [--conf-file]=/file_path"
 			" [--no-stats]"
 			" [--no-conntrack]"
+			" [--enable-ipv6-overlay]"
 			" [--no-offload]\n",
 			prgname);
 }
@@ -252,7 +257,9 @@ int dp_parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_NO_OFFLOAD_NUM:
 			no_offload = 1;
 			break;
-
+		case CMD_LINE_OPT_IPV6_OVERLAY_NUM:
+			ipv6_overlay = 1;
+			break;
 		case CMD_LINE_OPT_NO_CONNTRACK_NUM:
 			no_conntrack = 1;
 			break;
@@ -292,6 +299,14 @@ int dp_is_conntrack_enabled()
 		return 0;
 	else
 		return 1;
+}
+
+int dp_is_ip6_overlay_enabled()
+{
+	if (ipv6_overlay)
+		return 1;
+	else
+		return 0;
 }
 
 int get_overlay_type()
