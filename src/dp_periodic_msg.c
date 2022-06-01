@@ -28,6 +28,8 @@ void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t et
 					arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
 					rte_memcpy(arp_hdr->arp_data.arp_sha.addr_bytes, 
 							   dp_get_mac(clone_buf->port), RTE_ETHER_ADDR_LEN);
+					if (dp_arp_cycle_needed(clone_buf->port))
+						arp_hdr->arp_data.arp_tip = htonl(dp_get_dhcp_range_ip4(clone_buf->port));
 				}
 				df_ptr = alloc_dp_flow_ptr(clone_buf);
 				if (!df_ptr) {
@@ -60,8 +62,8 @@ void trigger_garp()
 	memset(eth_hdr->dst_addr.addr_bytes, 0xff, RTE_ETHER_ADDR_LEN);
 
 	arp_hdr = (struct rte_arp_hdr*) (eth_hdr + 1);
-	arp_hdr->arp_opcode = htons(1);
-	arp_hdr->arp_hardware = htons(1);
+	arp_hdr->arp_opcode = htons(DP_ARP_REQUEST);
+	arp_hdr->arp_hardware = htons(DP_ARP_HW_ETH);
 	arp_hdr->arp_protocol = htons(RTE_ETHER_TYPE_IPV4);
 	arp_hdr->arp_hlen = 6;
 	arp_hdr->arp_plen = 4;

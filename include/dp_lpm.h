@@ -99,6 +99,7 @@ void dp_set_mac(uint16_t portid);
 struct rte_ether_addr *dp_get_mac(uint16_t portid);
 void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr* neigh);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
+bool dp_arp_cycle_needed(uint16_t portid);
 void dp_del_vm(int portid, int socketid, bool rollback);
 int dp_get_active_vm_ports(int* act_ports);
 uint8_t* dp_get_vm_machineid(uint16_t portid);

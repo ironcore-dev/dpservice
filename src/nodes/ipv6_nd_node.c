@@ -99,11 +99,15 @@ static __rte_always_inline uint16_t ipv6_nd_node_process(struct rte_graph *graph
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		init_dp_mbuf_priv1(mbuf0);
-		if (handle_nd(mbuf0))
-			rte_node_enqueue_x1(graph, node, ipv6_nd_node.next_index[mbuf0->port], mbuf0);
-		else
+		if (!dp_is_ip6_overlay_enabled()) {
 			rte_node_enqueue_x1(graph, node, IPV6_ND_NEXT_DROP, mbuf0);
+		} else {
+			init_dp_mbuf_priv1(mbuf0);
+			if (handle_nd(mbuf0))
+				rte_node_enqueue_x1(graph, node, ipv6_nd_node.next_index[mbuf0->port], mbuf0);
+			else
+				rte_node_enqueue_x1(graph, node, IPV6_ND_NEXT_DROP, mbuf0);
+		}
 	}	
 
 	return cnt;

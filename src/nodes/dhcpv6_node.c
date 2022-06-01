@@ -164,12 +164,16 @@ static __rte_always_inline uint16_t dhcpv6_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		ret = handle_dhcpv6(mbuf0);
-		if (ret > 0)
-			rte_node_enqueue_x1(graph, node, dhcpv6_node.next_index[mbuf0->port] , mbuf0);
-		else
+		if (!dp_is_ip6_overlay_enabled()) {
 			rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
-		rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
+		} else {
+			ret = handle_dhcpv6(mbuf0);
+			if (ret > 0)
+				rte_node_enqueue_x1(graph, node, dhcpv6_node.next_index[mbuf0->port] , mbuf0);
+			else
+				rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
+			rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
+		}
 	}	
 
     return cnt;

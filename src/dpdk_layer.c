@@ -71,9 +71,11 @@ static void signal_handler(int signum)
 
 static void timer_cb()
 {
-	trigger_nd_ra();
+	if (dp_is_ip6_overlay_enabled()) {
+		trigger_nd_ra();
+		trigger_nd_unsol_adv();
+	}
 	trigger_garp();
-	trigger_nd_unsol_adv();
 }
 
 int dp_dpdk_init(int argc, char **argv)
@@ -485,18 +487,18 @@ int dp_init_graph()
 	gen_conf = *u_conf;
 }
 
-void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type)
+void dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type)
 {
-	int port_id;
-	port_id = dp_port_allocate(&dp_layer, port_ext, type);
-	if (port_id < 0) {
+	int ret;
+	ret = dp_port_allocate(&dp_layer, portid, port_ext, type);
+	if (ret < 0) {
 		printf("Can not allocate port\n ");
 		return;
 	}
 	if (type == DP_PORT_PF)
-		dp_install_isolated_mode(port_id);
+		dp_install_isolated_mode(portid);
 
-	enable_rx_node(port_id);
+	enable_rx_node(portid);
 }
 
 void dp_stop_interface(int portid, dp_port_type type)
@@ -515,7 +517,7 @@ void dp_stop_interface(int portid, dp_port_type type)
 				"rte_eth_dev_stop:err=%d, port=%u\n",
 				ret, portid);
 	}
-	if(!dp_port_deallocate(&dp_layer, type))
+	if(!dp_port_deallocate(&dp_layer, portid))
 		printf("Port deallocation failed for port %d \n", portid);
 }
 

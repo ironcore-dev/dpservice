@@ -118,12 +118,12 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 					rte_strerror(-ret), port_id);
 	}	
 
+	dp_set_mac(port_id);
+
 	if (port->dp_p_type == DP_PORT_PF) {
-		dp_get_pf_neigh_mac(dev_info.if_index, &pf_neigh_mac);
+		dp_get_pf_neigh_mac(dev_info.if_index, &pf_neigh_mac, dp_get_mac(port_id));
 		dp_set_neigh_mac(port_id, &pf_neigh_mac);
 	}
-
-	dp_set_mac(port_id);
 
 	if (port->dp_p_type == DP_PORT_VF)
 		memcpy(port->vf_name, ifname, IF_NAMESIZE);
@@ -229,7 +229,7 @@ int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 	return -1;
 }
 
-static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
+static struct dp_port* dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	int i;
 
@@ -243,9 +243,31 @@ static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int
 	return NULL;
 }
 
-int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, dp_port_type type)
+static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
-	struct dp_port* vf_port = dp_get_vf_port_per_id(dp_layer, type);
+	int i;
+
+	/* Find the corresponding internal vf port structure */
+	for (i = 0; i < dp_layer->dp_port_cnt; i++)
+		if (dp_layer->ports[i]->dp_port_id == portid)
+			return dp_layer->ports[i];
+
+	return NULL;
+}
+
+bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid)
+{
+	struct dp_port* vf_port = dp_get_vf_port_per_id(dp_layer, portid);
+
+	if (!vf_port)
+		return true;
+
+	return (vf_port->dp_allocated != 0);
+}
+
+int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid)
+{
+	struct dp_port* vf_port = dp_get_alloced_vf_port_per_id(dp_layer, portid);
 
 	if (!vf_port)
 		return 0;
@@ -255,7 +277,7 @@ int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 	return 1;
 }
 
-int dp_port_allocate(struct dp_dpdk_layer *dp_layer, struct dp_port_ext *port_ext, dp_port_type type)
+int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_ext *port_ext, dp_port_type type)
 {
 	struct dp_port* vf_port;
 	int port_id = -1, ret;
@@ -263,7 +285,7 @@ int dp_port_allocate(struct dp_dpdk_layer *dp_layer, struct dp_port_ext *port_ex
 	if (type == DP_PORT_PF) {
 		port_id = dp_get_pf_port_id_with_name(dp_layer, port_ext->port_name);
 	} else {
-		vf_port = dp_get_next_avail_vf_port(dp_layer, type);
+		vf_port = dp_get_vf_port_per_id(dp_layer, portid);
 		if (vf_port) {
 			port_id = vf_port->dp_port_id;
 			vf_port->dp_allocated = 1;

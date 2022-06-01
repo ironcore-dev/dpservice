@@ -131,6 +131,7 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		if (ret)
 			goto err_snat;
 	}
+	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
 err_snat:
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
@@ -208,6 +209,7 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 			goto err;
 		}
 	}
+	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;
@@ -244,12 +246,27 @@ err:
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
 	struct dp_port_ext pf_port;
-	int port_id, err_code = EXIT_SUCCESS;
+	int port_id = 0, err_code = EXIT_SUCCESS;
+	uint16_t p_id = 0;
 
 	memset(&pf_port, 0, sizeof(pf_port));
 	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
 
-	port_id = dp_get_next_avail_vf_id(get_dpdk_layer(), DP_PORT_VF);
+	if (req->add_machine.name[0] != '\0') {
+		if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
+			if (dp_is_port_allocated(get_dpdk_layer(), p_id)) {
+				err_code = DP_ERROR_VM_ALREADY_ALLOCATED;
+				goto err;
+			}
+			port_id = p_id;
+		} else {
+			err_code = DP_ERROR_VM_CANT_GET_NAME;
+			goto err;
+		}
+	} else {
+		port_id = dp_get_next_avail_vf_id(get_dpdk_layer(), DP_PORT_VF);
+	}
+
 	if ( port_id >= 0) {
 		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
@@ -280,7 +297,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT6;
 			goto route_err;
 		}
-		dp_start_interface(&pf_port, DP_PORT_VF);
+		dp_start_interface(&pf_port, port_id, DP_PORT_VF);
 
 		/* TODO get the pci info of this port and fill it accordingly */
 		rep->vf_pci.bus = 2;

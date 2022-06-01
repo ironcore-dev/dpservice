@@ -29,7 +29,8 @@ subdir('proto')
 subdir('include')
 subdir('src')
 subdir('test')
-test('test', files('test/run_test'), args : [meson.current_build_dir()])
+test('test-ipip', files('test/run_test'), args : [meson.current_build_dir(), 'ipip'], is_parallel : false)
+test('test-geneve', files('test/run_test'), args : [meson.current_build_dir(), 'geneve'],  is_parallel : false)
 
 run_target('cppcheck', command : ['cppcheck', '--project=' + 
   join_paths(meson.build_root(), 'compile_commands.json')])

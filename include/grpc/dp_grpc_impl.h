@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <rte_mbuf.h>
+#include <rte_ethdev.h>
 #include <net/if.h>
 #include "dp_util.h"
 
@@ -86,6 +87,7 @@ typedef struct dp_addmachine {
 	uint32_t	vni;
 	uint32_t	ip4_pxe_addr;
 	char		pxe_str[VM_MACHINE_PXE_STR_LEN];
+	char		name[RTE_ETH_NAME_MAX_LEN];
 } dp_addmachine;
 
 typedef struct dp_delmachine {
@@ -138,7 +140,7 @@ typedef struct dp_request {
 } dp_request;
 
 typedef struct dp_vf_pci {
-	char		name[IFNAMSIZ];
+	char		name[RTE_ETH_NAME_MAX_LEN];
 	uint32_t	domain;
 	uint32_t	bus;
 	uint32_t	slot;
@@ -160,7 +162,7 @@ typedef struct dp_reply {
 		dp_vm_info	vm_info;
 		dp_route	route;
 		uint32_t	back_ip;
-
+		uint32_t	vni;
 	};
 } dp_reply;
 

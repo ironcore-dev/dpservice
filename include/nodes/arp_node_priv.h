@@ -7,6 +7,10 @@
 extern "C" {
 #endif
 
+#define DP_ARP_REQUEST	1
+#define DP_ARP_REPLY	2
+#define DP_ARP_HW_ETH	1
+
 enum
 {
 	ARP_NEXT_DROP,

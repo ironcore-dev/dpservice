@@ -27,13 +27,17 @@ static __rte_always_inline int handle_arp(struct rte_mbuf *m)
 	struct rte_ether_hdr *incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_arp_hdr *incoming_arp_hdr = (struct rte_arp_hdr*) (incoming_eth_hdr + 1);
 	uint32_t  requested_ip = ntohl(incoming_arp_hdr->arp_data.arp_tip);
+	uint32_t  sender_ip = ntohl(incoming_arp_hdr->arp_data.arp_sip);
 	struct rte_ether_addr  tmp_addr; 
 	uint32_t temp_ip;
 
-	if (requested_ip == dp_get_gw_ip4()) {
+	if (dp_arp_cycle_needed(m->port) && (sender_ip == dp_get_dhcp_range_ip4(m->port)))
+		dp_set_neigh_mac(m->port, &incoming_eth_hdr->src_addr);
+
+	if ((ntohs(incoming_arp_hdr->arp_opcode) == DP_ARP_REQUEST) && (requested_ip == dp_get_gw_ip4())) {
 		rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->dst_addr);
 		rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
-		incoming_arp_hdr->arp_opcode = htons(2);
+		incoming_arp_hdr->arp_opcode = htons(DP_ARP_REPLY);
 		rte_memcpy(tmp_addr.addr_bytes, incoming_arp_hdr->arp_data.arp_sha.addr_bytes, 
 					RTE_ETHER_ADDR_LEN);
 		rte_memcpy(incoming_arp_hdr->arp_data.arp_sha.addr_bytes, dp_get_mac(m->port), RTE_ETHER_ADDR_LEN);

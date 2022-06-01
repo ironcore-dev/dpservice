@@ -35,6 +35,7 @@ struct dp_port {
 	char					node_name[RTE_NODE_NAMESIZE];
 };
 
+bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid);
 struct dp_port* dp_get_next_avail_vf_port(struct dp_dpdk_layer *dp_layer, dp_port_type type);
 int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type);
 int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name);
@@ -42,9 +43,9 @@ struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer,
 							   dp_port_type type);
 int dp_port_init(struct dp_port* port, int port_id, 
 				 struct dp_port_ext *port_details);
-int dp_port_allocate(struct dp_dpdk_layer *dp_layer, struct dp_port_ext *port_ext,
+int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_ext *port_ext,
 					 dp_port_type type);
-int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, dp_port_type type);
+int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid);
 void print_link_info(int port_id, char *out, size_t out_size);
 void dp_port_exit();
 

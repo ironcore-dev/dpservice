@@ -37,6 +37,12 @@ message Status {
 	string message = 2;
 }
 
+message ExtStatus {
+	int32 error = 1;
+	string message = 2;
+	bytes underlay_route = 3;
+}
+
 message Empty {}
 
 message Prefix {
@@ -119,13 +125,17 @@ message AddMachineRequest {
 	// Both instance types cannot be mixed during a session.
 	// Maximum number of instantiated bare metal machines is 1.
 	// Maximum number of Virtual Machines is not defined.
+	// If you specify device name, a device with this name will be assigned, if it exists
+	// otherwise an error code. If you dont specify any device name, next available VF 
+	// will be assigned. 
 	MachineType machineType = 1;
 
 	bytes machineID = 2;
 	uint32 vni = 3;
 	IPConfig ipv4Config = 4;
 	IPConfig ipv6Config = 5;
-	ThrottlingConfig throttlingConfig = 6;
+	string deviceName = 6;
+	ThrottlingConfig throttlingConfig = 7;
 }
 
 message Machine {
@@ -228,7 +238,7 @@ message VirtualFunction {
 }
 
 message AddMachineResponse {
-	Status status = 1;
+	ExtStatus status = 1;
 	VirtualFunction vf = 2; // Holds VF information when a VM has been created.
 }
 
@@ -272,16 +282,16 @@ service DPDKonmetal {
 	// listMachinePrefixes returns a list of prefixes, that will be routed to the machine by the DPDK app.
 	// For example this could be a node's Kubernetes Pod CIDR.
 	rpc listMachinePrefixes(MachineIDMsg) returns (PrefixesMsg) {}
-	rpc addMachinePrefix(MachinePrefixMsg) returns (Status) {}
+	rpc addMachinePrefix(MachinePrefixMsg) returns (ExtStatus) {}
 	rpc deleteMachinePrefix(MachinePrefixMsg) returns (Status) {}
 
 	// NAT related, add/get/del Virtual IP for a given Machine
-	rpc addMachineVIP(MachineVIPMsg) returns (Status) {}
+	rpc addMachineVIP(MachineVIPMsg) returns (ExtStatus) {}
 	rpc getMachineVIP(MachineIDMsg) returns (MachineVIPIP) {}
 	rpc delMachineVIP(MachineIDMsg) returns (Status) {}
 
 	// LB related, add/list/del backend IPs for a given LB IP
-	rpc addLBVIP(LBMsg) returns (Status) {}
+	rpc addLBVIP(LBMsg) returns (ExtStatus) {}
 	rpc getLBVIPBackends(LBQueryMsg) returns (LBBackendMsg) {}
 	rpc delLBVIP(LBMsg) returns (Status) {}
 

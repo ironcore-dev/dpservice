@@ -69,7 +69,7 @@ void dp_dpdk_exit();
 
 /* Functions for the control plane */
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type);
-void dp_start_interface(struct dp_port_ext *port_ext, dp_port_type type);
+void dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type);
 void dp_stop_interface(int portid, dp_port_type type);
 
 void set_underlay_conf(struct underlay_conf *u_conf);
