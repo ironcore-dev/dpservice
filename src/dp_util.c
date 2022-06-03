@@ -20,7 +20,9 @@
 #define DP_CONF_FILE_SIZE 64
 #define DP_LINE_SIZE 128
 #define DP_WCMP_FRAC_SIZE 5
+#define DP_A_OPT_SIZE 80 /* Mellanox driver -a option */
 
+static bool conf_file_info_printed = false;
 static int debug_mode = 0;
 static int no_offload = 0;
 static int ipv6_overlay = 0;
@@ -32,6 +34,8 @@ static double wcmp_frac = 1.0;
 static int wcmp_enabled = 0;
 static char pf0name[IF_NAMESIZE] = {0};
 static char pf1name[IF_NAMESIZE] = {0};
+static char pf0_a[DP_A_OPT_SIZE] = {0};
+static char pf1_a[DP_A_OPT_SIZE] = {0};
 static char vf_pattern[IF_NAMESIZE] = {0};
 static char ip6_str[DP_MAX_IP6_CHAR] = {0};
 static char vni_str[DP_MAX_IP6_CHAR] = {0};
@@ -53,6 +57,8 @@ static const char op_env_opt_scapytest[] = "scapytest";
 
 #define CMD_LINE_OPT_PF0 "pf0"
 #define CMD_LINE_OPT_PF1 "pf1"
+#define CMD_LINE_OPT_PF0_A "a-pf0"
+#define CMD_LINE_OPT_PF1_A "a-pf1"
 #define CMD_LINE_OPT_IPV6 "ipv6"
 #define CMD_LINE_OPT_VF_PATTERN "vf-pattern"
 #define CMD_LINE_OPT_TUNNEL_OPT "tun_opt"
@@ -122,7 +128,7 @@ static void dp_print_usage(const char *prgname)
 			prgname);
 }
 
-static void dp_handle_conf_file()
+void dp_handle_conf_file()
 {
 	char s[DP_LINE_SIZE] = {0};
 	FILE * fp;
@@ -131,6 +137,7 @@ static void dp_handle_conf_file()
 	ssize_t read;
 	char* token;
 
+	strncpy(conf_file_str, DP_DEFAULT_CONF_FILE, DP_CONF_FILE_SIZE);
 	fp = fopen(conf_file_str, "r");
 	if (fp == NULL)
 		return;
@@ -147,6 +154,16 @@ static void dp_handle_conf_file()
 		if (strncmp(token, CMD_LINE_OPT_PF1, strlen(CMD_LINE_OPT_PF1)) == 0) {
 			token = strtok(NULL, " ");
 			strncpy(pf1name, token, IFNAMSIZ);
+			count++;
+		}
+		if (strncmp(token, CMD_LINE_OPT_PF0_A, strlen(CMD_LINE_OPT_PF0_A)) == 0) {
+			token = strtok(NULL, " ");
+			strncpy(pf0_a, token, DP_A_OPT_SIZE);
+			count++;
+		}
+		if (strncmp(token, CMD_LINE_OPT_PF1_A, strlen(CMD_LINE_OPT_PF1_A)) == 0) {
+			token = strtok(NULL, " ");
+			strncpy(pf1_a, token, DP_A_OPT_SIZE);
 			count++;
 		}
 		if (strncmp(token, CMD_LINE_OPT_VF_PATTERN, strlen(CMD_LINE_OPT_VF_PATTERN)) == 0) {
@@ -166,7 +183,10 @@ static void dp_handle_conf_file()
 		count = 0;
 	}
 
-	printf("Config file found at %s and will be used ! \n", conf_file_str);
+	if (!conf_file_info_printed) {
+		conf_file_info_printed = true;
+		printf("Config file found at %s and will be used ! \n", conf_file_str);
+	}
 	fclose(fp);
 	free(line);
 }
@@ -179,8 +199,6 @@ int dp_parse_args(int argc, char **argv)
 	int opt, ret, temp;
 
 	argvopt = argv;
-
-	strncpy(conf_file_str, DP_DEFAULT_CONF_FILE, DP_CONF_FILE_SIZE);
 
 	/* Error or normal output strings. */
 	while ((opt = getopt_long(argc, argvopt, short_options, lgopts,
@@ -345,6 +363,24 @@ char *dp_get_pf0_name()
 char *dp_get_pf1_name()
 {
 	return pf1name;
+}
+
+char *dp_get_pf0_opt_a()
+{
+	return pf0_a;
+}
+
+char *dp_get_pf1_opt_a()
+{
+	return pf1_a;
+}
+
+bool dp_is_mellanox_opt_set() 
+{
+	if (pf0_a[0] != '\0' && pf1_a[0] != '\0')
+		return true;
+	else
+		return false;
 }
 
 char *dp_get_vf_pattern()

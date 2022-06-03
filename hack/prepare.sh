@@ -2,6 +2,7 @@
 CONF_FILE="/tmp/dp_service.conf"
 PF0_NAME=""
 PF0_PCI_ADDR=""
+PF1_PCI_ADDR=""
 NUM_VF=6
 VF_START=2
 NUM_PAGES=4
@@ -30,6 +31,11 @@ while read l1 ;do
                if [ $count -eq 0 ]; then
                    if [[ "$k" == "0000:"* ]]; then
                        PF0_PCI_ADDR=$k
+                   fi
+               fi
+               if [ $count -eq 1 ]; then
+                   if [[ "$k" == "0000:"* ]]; then
+                       PF1_PCI_ADDR=$k
                    fi
                fi
            done
@@ -115,11 +121,20 @@ fi
 
 }
 
+function prepare_melanox_param() {
+
+PARAM=$[$NUM_VF - 1]
+echo "a-pf0 "$PF0_PCI_ADDR",class=rxq_cqe_comp_en=0,rx_vec_en=1,representor=pf[0]vf[0-"$PARAM"]" >> $CONF_FILE
+echo "a-pf1 "$PF1_PCI_ADDR",class=rxq_cqe_comp_en=0,rx_vec_en=1" >> $CONF_FILE
+
+}
+
 rm -f $CONF_FILE
 detect_pfs;
 configure_vfs;
 configure_hugepages;
 detect_vfs;
 detect_ipv6;
+prepare_melanox_param;
 
 exit 0;

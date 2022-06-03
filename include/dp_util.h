@@ -19,8 +19,12 @@ extern "C" {
 								((mac1)->addr_bytes[5] == (mac2)->addr_bytes[5]))
 
 int dp_parse_args(int argc, char **argv);
+void dp_handle_conf_file();
 char *dp_get_pf0_name();
 char *dp_get_pf1_name();
+char *dp_get_pf0_opt_a();
+char *dp_get_pf1_opt_a();
+bool dp_is_mellanox_opt_set();
 char *dp_get_vf_pattern();
 int dp_is_stats_enabled();
 int dp_is_offload_enabled();
