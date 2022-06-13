@@ -94,7 +94,7 @@ def ipv6_in_ipv6_responder():
 	time.sleep(1)
 	sendp(reply_pkt, iface=pf0_tap)
 
-
+@pytest.mark.skipif(port_redundancy == True, reason = "port reduncy not support in ipv6 path")
 def test_IPv6inIPv6(capsys, tun_opt):
 	d = None
 	if tun_opt == tun_type_geneve:

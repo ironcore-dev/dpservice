@@ -21,10 +21,15 @@ def tun_opt(request):
 
 @pytest.fixture(scope="package")
 def prepare_env(request, build_path, tun_opt):
+	
+	wcmp_opt_str = ""
+	if port_redundancy:
+		wcmp_opt_str = " --wcmp-frac=0.5"
+
 	dp_service_cmd = build_path+"/src/dp_service -l 0,1 --vdev=net_tap0,iface="+pf0_tap+",mac=\""+pf0_mac+"\" "\
 		"--vdev=net_tap1,iface="+pf1_tap+",mac=\""+pf1_mac+ "\" --vdev=net_tap2,"\
 		"iface="+vf0_tap+",mac=\""+vf0_mac + "\" --vdev=net_tap3,iface="+vf1_tap+",mac=\""+vf1_mac+ "\" --vdev=net_tap4,iface="+vf2_tap+",mac=\""+vf2_mac + "\"  -- "\
-		"--pf0="+pf0_tap+" --pf1="+pf1_tap+" --vf-pattern="+vf_patt+" --ipv6="+ul_ipv6+" --no-offload --no-stats"+" --op_env=scapytest " + "--tun_opt=" + tun_opt +\
+		"--pf0="+pf0_tap+" --pf1="+pf1_tap+" --vf-pattern="+vf_patt+" --ipv6="+ul_ipv6+" --no-offload --no-stats"+" --op_env=scapytest " + "--tun_opt=" + tun_opt + wcmp_opt_str + \
 		" --enable-ipv6-overlay"
 	cmd = shlex.split(dp_service_cmd)
 	process = subprocess.Popen(cmd, 
