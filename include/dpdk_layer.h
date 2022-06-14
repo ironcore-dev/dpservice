@@ -42,6 +42,7 @@ struct dp_dpdk_layer {
 	struct rte_ring					*grpc_tx_queue;
 	struct rte_ring					*grpc_rx_queue;
 	struct rte_ring					*periodic_msg_queue;
+	struct rte_ring					*monitoring_rx_queue;
 };
 
 struct underlay_conf {
