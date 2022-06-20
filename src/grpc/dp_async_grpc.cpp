@@ -135,6 +135,7 @@ int GetLBVIPBackendsCall::Proceed()
 			back_ip->set_address(inet_ntoa(addr));
 			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 		}
+		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -250,6 +251,7 @@ int ListPfxCall::Proceed()
 				pfx->set_prefixlength(rp_route->pfx_length);
 			}
 		}
+		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -575,6 +577,7 @@ int ListRoutesCall::Proceed()
 			inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
 			route->set_nexthopaddress(buf);
 		}
+		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
