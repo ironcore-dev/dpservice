@@ -262,15 +262,41 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	return EXIT_SUCCESS;
 }
 
-void dp_list_routes(int vni, struct dp_reply *rep, int socketid, bool ext_routes)
+static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool ext_routes, uint16_t per_buf)
 {
-	struct rte_rib_node *node = NULL;
 	struct vm_route *route;
-	struct rte_rib *root;
 	dp_route *rp_route;
-	uint64_t next_hop;
 	uint32_t ipv4 = 0;
 	uint8_t depth = 0;
+
+	rp_route = &((&rep->route)[rep->com_head.msg_count % per_buf]);
+	rep->com_head.msg_count++;
+
+	rte_rib_get_ip(node, &ipv4);
+	rte_rib_get_depth(node, &depth);
+	rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+	rp_route->pfx_ip.addr = ipv4;
+	rp_route->pfx_length = depth;
+
+	if (ext_routes) {
+		route = (struct vm_route *)rte_rib_get_ext(node);
+		rp_route->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+		rp_route->trgt_vni = route->vni;
+		rte_memcpy(rp_route->trgt_ip.addr6, route->nh_ipv6,
+					sizeof(rp_route->trgt_ip.addr6));
+	}
+}
+
+void dp_list_routes(int vni, struct rte_mbuf *m, int socketid,
+					struct rte_mbuf *rep_arr[], bool ext_routes)
+{
+	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
+	struct rte_mbuf *m_new, *m_curr = m;
+	struct rte_rib_node *node = NULL;
+	struct rte_rib *root;
+	uint16_t msg_per_buf;
+	uint64_t next_hop;
+	dp_reply *rep;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 
@@ -278,33 +304,40 @@ void dp_list_routes(int vni, struct dp_reply *rep, int socketid, bool ext_routes
 	if (!root)
 		return;
 
-	rep->com_head.msg_count = 0;
+	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+
 	do {
 		node = rte_rib_get_nxt(root, RTE_IPV4(0,0,0,0), 0, node, RTE_RIB_GET_NXT_ALL);
 		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
 			dp_is_pf_port_id(next_hop) && ext_routes) {
-			rp_route = &((&rep->route)[rep->com_head.msg_count]);
-			rep->com_head.msg_count++;
-			rte_rib_get_ip(node, &ipv4);
-			rte_rib_get_depth(node, &depth);
-			rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			rp_route->pfx_ip.addr = ipv4;
-			rp_route->pfx_length = depth;
-			route = (struct vm_route *)rte_rib_get_ext(node);
-			rp_route->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
-			rp_route->trgt_vni = route->vni;
-			rte_memcpy(rp_route->trgt_ip.addr6, route->nh_ipv6,
-						sizeof(rp_route->trgt_ip.addr6));
+			if (rep->com_head.msg_count && 
+			    (rep->com_head.msg_count % msg_per_buf == 0)) {
+				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+				if (!m_new)
+					break;
+				m_curr = m_new;
+				rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
+			}
+			dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
 		} else if (node && (rte_rib_get_nh(node, &next_hop) == 0) && !ext_routes) {
-			rp_route = &((&rep->route)[rep->com_head.msg_count]);
-			rep->com_head.msg_count++;
-			rte_rib_get_ip(node, &ipv4);
-			rte_rib_get_depth(node, &depth);
-			rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			rp_route->pfx_ip.addr = ipv4;
-			rp_route->pfx_length = depth;
+			if (rep->com_head.msg_count && 
+			    (rep->com_head.msg_count % msg_per_buf == 0)) {
+				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+				if (!m_new)
+					break;
+				m_curr = m_new;
+				rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
+			}
+			dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
 		}
 	} while (node != NULL);
+
+	if (rep_arr_size < 0) {
+		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
+		return;
+	}
+	rep_arr[--rep_arr_size] = m_curr;
 }
 
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,

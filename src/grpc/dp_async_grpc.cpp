@@ -543,6 +543,8 @@ int ListRoutesCall::Proceed()
 	Route *route;
 	grpc::Status ret = grpc::Status::OK;
 	int i;
+	uint8_t is_chained = 0;
+	uint16_t read_so_far = 0;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
@@ -553,31 +555,35 @@ int ListRoutesCall::Proceed()
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
-			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			route = reply_.add_routes();
-			rp_route = &((&reply->route)[i]);
-			
-			if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
-				route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
-			else
-				route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		do {
+			if (dp_recv_from_worker_with_mbuf(&mbuf))
+				return -1;
+			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+				route = reply_.add_routes();
+				rp_route = &((&reply->route)[i]);
 
-			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-				addr.s_addr = htonl(rp_route->pfx_ip.addr);
-				pfx = new Prefix();
-				pfx->set_address(inet_ntoa(addr));
-				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-				pfx->set_prefixlength(rp_route->pfx_length);
-				route->set_allocated_prefix(pfx);
+				if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
+					route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+				else
+					route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+
+				if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+					addr.s_addr = htonl(rp_route->pfx_ip.addr);
+					pfx = new Prefix();
+					pfx->set_address(inet_ntoa(addr));
+					pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+					pfx->set_prefixlength(rp_route->pfx_length);
+					route->set_allocated_prefix(pfx);
+				}
+				route->set_nexthopvni(rp_route->trgt_vni);
+				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
+				route->set_nexthopaddress(buf);
 			}
-			route->set_nexthopvni(rp_route->trgt_vni);
-			inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
-			route->set_nexthopaddress(buf);
-		}
-		rte_pktmbuf_free(mbuf);
+			read_so_far += (reply->com_head.msg_count - read_so_far);
+			is_chained = reply->com_head.is_chained;
+			rte_pktmbuf_free(mbuf);
+		} while (is_chained);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

@@ -172,6 +172,14 @@ int dp_recv_from_worker_with_mbuf(struct rte_mbuf **m);
 int dp_process_request(struct rte_mbuf *m);
 void dp_fill_head(dp_com_head* head, uint16_t type,
 				  uint8_t is_chained, uint8_t count);
+struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,
+										 struct rte_mbuf *rep_arr[],
+										 int8_t *size);
+uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,
+								   struct rte_mbuf *rep_arr[],
+								   int8_t *size);
+void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr,
+								struct rte_mbuf *rep_arr[]);
 
 #ifdef __cplusplus
 }
