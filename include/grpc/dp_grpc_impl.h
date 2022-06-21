@@ -34,8 +34,7 @@ typedef enum {
 typedef struct dp_com_head {
 	uint8_t com_type;
 	uint8_t is_chained;
-	uint8_t buf_count;
-	uint8_t msg_count;
+	uint16_t msg_count;
 	uint32_t err_code;
 } dp_com_head;
 
@@ -177,7 +176,7 @@ struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,
 										 int8_t *size);
 uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,
 								   struct rte_mbuf *rep_arr[],
-								   int8_t *size);
+								   int8_t *idx, uint16_t size);
 void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr,
 								struct rte_mbuf *rep_arr[]);
 

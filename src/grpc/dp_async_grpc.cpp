@@ -601,6 +601,8 @@ int ListMachinesCall::Proceed()
 	Machine *machine;
 	struct in_addr addr;
 	dp_vm_info *vm_info;
+	uint8_t is_chained = 0;
+	uint16_t read_so_far = 0;
 	int i;
 	grpc::Status ret = grpc::Status::OK;
 	char buf[INET6_ADDRSTRLEN];
@@ -612,20 +614,24 @@ int ListMachinesCall::Proceed()
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
-			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			machine = reply_.add_machines();
-			vm_info = &((&reply->vm_info)[i]);
-			addr.s_addr = htonl(vm_info->ip_addr);
-			machine->set_primaryipv4address(inet_ntoa(addr));
-			inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
-			machine->set_primaryipv6address(buf);
-			machine->set_machineid((char *)vm_info->machine_id);
-			machine->set_vni(vm_info->vni);
-		}
-		rte_pktmbuf_free(mbuf);
+		do {
+			if (dp_recv_from_worker_with_mbuf(&mbuf))
+				return -1;
+			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+				machine = reply_.add_machines();
+				vm_info = &((&reply->vm_info)[i]);
+				addr.s_addr = htonl(vm_info->ip_addr);
+				machine->set_primaryipv4address(inet_ntoa(addr));
+				inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
+				machine->set_primaryipv6address(buf);
+				machine->set_machineid((char *)vm_info->machine_id);
+				machine->set_vni(vm_info->vni);
+			}
+			read_so_far += (reply->com_head.msg_count - read_so_far);
+			is_chained = reply->com_head.is_chained;
+			rte_pktmbuf_free(mbuf);
+		} while (is_chained);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

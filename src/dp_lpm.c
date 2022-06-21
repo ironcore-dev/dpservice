@@ -304,7 +304,8 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid,
 	if (!root)
 		return;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
+										    &rep_arr_size, sizeof(dp_route));
 	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
 
 	do {

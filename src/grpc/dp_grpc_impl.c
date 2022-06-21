@@ -8,6 +8,50 @@
 #define DP_SHOW_EXT_ROUTES true
 #define DP_SHOW_INT_ROUTES false
 
+void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[])
+{
+	dp_reply *rep;
+
+	rte_pktmbuf_free(m_curr);
+	rep = rte_pktmbuf_mtod(rep_arr[0], dp_reply*);
+	rep->com_head.is_chained = 0;
+}
+
+uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[],
+								   int8_t *idx, uint16_t size)
+{
+	uint16_t buf_size, msg_per_buf;
+	dp_reply *rep;
+
+	buf_size = m_curr->buf_len - m_curr->data_off - sizeof(dp_com_head);
+	msg_per_buf = buf_size / size;
+	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	rep->com_head.msg_count = 0;
+
+	return msg_per_buf;
+}
+
+struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
+{
+	dp_reply *rep, *rep_new;
+	struct rte_mbuf* m_new;
+
+	m_new = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
+	if (!m_new) {
+		printf("grpc rte_mbuf allocation failed\n");
+		return NULL;
+	}
+	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	rep->com_head.is_chained = 1;
+	rep_new = rte_pktmbuf_mtod(m_new, dp_reply*);
+	rep_new->com_head.msg_count = rep->com_head.msg_count;
+	if (--(*size) < 0)
+		return NULL;
+	rep_arr[*size] = m_curr;
+
+	return m_new;
+}
+
 int dp_send_to_worker(dp_request *req)
 {
 	struct rte_mbuf *m = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
@@ -50,8 +94,8 @@ int dp_recv_from_worker_with_mbuf(struct rte_mbuf **mbuf)
 __rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
 									  uint8_t is_chained, uint8_t count)
 {
+	RTE_SET_USED(count);
 	head->com_type = type;
-	head->buf_count = count;
 	head->is_chained = is_chained;
 	head->msg_count = 0;
 	head->err_code = EXIT_SUCCESS;
@@ -395,27 +439,48 @@ err:
 	return ret;
 }
 
-static int dp_process_listmachine(dp_request *req, dp_reply *rep)
+static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
+	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
+	struct rte_mbuf *m_new, *m_curr = m;
 	int act_ports[DP_MAX_PORTS];
+	uint16_t msg_per_buf;
 	dp_vm_info *vm_info;
+	dp_reply *rep;
 	int i, count;
 
 	count = dp_get_active_vm_ports(act_ports);
+	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size, sizeof(dp_vm_info));
 
 	if (!count)
-		return EXIT_SUCCESS;
-	/* TODO in case the reply extends a single mbuf, we should send several mbufs and chain them */
-	rep->com_head.msg_count = count;
+		goto out;
+
+	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
 	for (i = 0; i < count; i++) {
-		vm_info = &((&rep->vm_info)[i]);
-		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]);
+		if (rep->com_head.msg_count && 
+			(rep->com_head.msg_count % msg_per_buf == 0)) {
+			m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+			if (!m_new)
+				break;
+			m_curr = m_new;
+			rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
+		}
+		rep->com_head.msg_count++;
+		vm_info = &((&rep->vm_info)[i % msg_per_buf]);
+		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]) + i;
 		rte_memcpy(vm_info->ip6_addr, dp_get_dhcp_range_ip6(act_ports[i]),
 				   sizeof(vm_info->ip6_addr));
 		vm_info->vni = dp_get_vm_vni(act_ports[i]);
 		rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(act_ports[i]),
 			sizeof(vm_info->machine_id));
 	}
+	if (rep_arr_size < 0) {
+		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
+		return EXIT_SUCCESS;
+	}
+
+out:
+	rep_arr[--rep_arr_size] = m_curr;
 	return EXIT_SUCCESS;
 }
 
@@ -428,10 +493,12 @@ static int dp_process_listroute(dp_request *req, struct rte_mbuf *req_mbuf, stru
 	return EXIT_SUCCESS;
 }
 
-static int dp_process_listbackips(dp_request *req, dp_reply *rep)
+static int dp_process_listbackips(dp_request *req, struct rte_mbuf *req_mbuf, struct rte_mbuf *rep_arr[])
 {
+	dp_reply *rep = rte_pktmbuf_mtod(req_mbuf, dp_reply*);
 
 	dp_get_lb_back_ips(ntohl(req->qry_lb_vip.vip.vip_addr), req->qry_lb_vip.vni, rep);
+	rep_arr[DP_MBUF_ARR_SIZE - 1] = req_mbuf;
 
 	return EXIT_SUCCESS;
 }
@@ -451,52 +518,6 @@ static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_m
 
 out:
 	return EXIT_SUCCESS;
-}
-
-void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[])
-{
-	dp_reply *rep;
-
-	rte_pktmbuf_free(m_curr);
-	rep = rte_pktmbuf_mtod(rep_arr[0], dp_reply*);
-	rep->com_head.is_chained = 0;
-}
-
-uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
-{
-	uint16_t buf_size, msg_per_buf;
-	dp_reply *rep;
-
-	buf_size = m_curr->buf_len - m_curr->data_off - sizeof(dp_com_head);
-	msg_per_buf = buf_size / sizeof(dp_route);
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
-	rep_arr[--(*size)] = m_curr;
-	rep->com_head.msg_count = 0;
-	rep->com_head.buf_count = 0;
-
-	return msg_per_buf;
-}
-
-struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
-{
-	dp_reply *rep, *rep_new;
-	struct rte_mbuf* m_new;
-
-	m_new = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
-	if (!m_new) {
-		printf("grpc rte_mbuf allocation failed\n");
-		return NULL;
-	}
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
-	rep->com_head.is_chained = 1;
-	rep_new = rte_pktmbuf_mtod(m_new, dp_reply*);
-	rep_new->com_head.buf_count = rep->com_head.buf_count + 1;
-	rep_new->com_head.msg_count = rep->com_head.msg_count;
-	if (--(*size) < 0)
-		return NULL;
-	rep_arr[*size] = m_curr;
-
-	return m_new;
 }
 
 int dp_process_request(struct rte_mbuf *m)
@@ -552,10 +573,10 @@ int dp_process_request(struct rte_mbuf *m)
 			ret = dp_process_listpfxs(req, m, m_arr);
 			break;
 		case DP_REQ_TYPE_LISTLBBACKENDS:
-			ret = dp_process_listbackips(req, rte_pktmbuf_mtod(m, dp_reply*));
+			ret = dp_process_listbackips(req, m, m_arr);
 			break;
 		case DP_REQ_TYPE_LISTMACHINE:
-			ret = dp_process_listmachine(NULL, rte_pktmbuf_mtod(m, dp_reply*));
+			ret = dp_process_listmachine(NULL, m, m_arr);
 			break;
 		default:
 			break;
@@ -570,11 +591,11 @@ int dp_process_request(struct rte_mbuf *m)
 		p_rep = rte_pktmbuf_mtod(m, dp_reply*);
 		*p_rep = rep;
 		rte_ring_sp_enqueue(get_dpdk_layer()->grpc_rx_queue, m);
-	}
-	if (req->com_head.com_type == DP_REQ_TYPE_LISTROUTE)
+	} else {
 		for (i = DP_MBUF_ARR_SIZE - 1; i >= 0; i--) {
 			if (m_arr[i])
 				rte_ring_sp_enqueue(get_dpdk_layer()->grpc_rx_queue, m_arr[i]);
 		}
+	}
 	return ret;
 }
