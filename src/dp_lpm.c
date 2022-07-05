@@ -553,6 +553,31 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, s
 	return DP_ROUTE_DROP;
 }
 
+
+bool lpm_ipv4_exact_route_exist(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
+{
+	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
+	struct rte_rib_node *node = NULL;
+	struct rte_rib *root;
+
+	if (t_vni)
+		root = get_lpm(t_vni, socketid);
+	else
+		root = vm_table[port_id].ipv4_rib[socketid];
+
+	if (!root)
+		return false;
+
+	
+	node = rte_rib_lookup_exact(root, dst_ip, 32);
+
+	if (node){
+		return true;
+	}else {
+		return false;
+	}
+}
+
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr, struct vm_route *r, int socketid)
 {
 	struct rte_rib6_node *node;

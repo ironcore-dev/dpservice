@@ -73,6 +73,9 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr,
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
 						 struct vm_route *r, int socketid);
 
+bool lpm_ipv4_exact_route_exist(int port_id, int t_vni, const struct dp_flow *df_ptr,
+						 struct vm_route *r, int socketid);
+
 void dp_init_vm_handle_tbl(int socket_id);
 int dp_map_vm_handle(void *key, uint16_t portid);
 int dp_get_portid_with_vm_handle(void *key);

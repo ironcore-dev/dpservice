@@ -46,6 +46,8 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	if (ret < 0)
 		return DP_ROUTE_DROP;
 
+	df_ptr->flags.public_flow= lpm_ipv4_exact_route_exist(m->port, df_ptr->tun_info.dst_vni, df_ptr, &route, rte_eth_dev_socket_id(m->port))? 0:1;
+	
 	df_ptr->nxt_hop = ret;
 
 	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
