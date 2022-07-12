@@ -43,3 +43,5 @@ ov_target_ip = "192.168.129.5"
 ov_target_pfx = "192.168.129.0"
 virtual_ip = "174.23.4.5"
 pfx_ip = "174.23.4.0"
+
+MAX_LINES_ROUTE_REPLY = 36
