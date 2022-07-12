@@ -135,6 +135,7 @@ int GetLBVIPBackendsCall::Proceed()
 			back_ip->set_address(inet_ntoa(addr));
 			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 		}
+		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -250,6 +251,7 @@ int ListPfxCall::Proceed()
 				pfx->set_prefixlength(rp_route->pfx_length);
 			}
 		}
+		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -541,6 +543,8 @@ int ListRoutesCall::Proceed()
 	Route *route;
 	grpc::Status ret = grpc::Status::OK;
 	int i;
+	uint8_t is_chained = 0;
+	uint16_t read_so_far = 0;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
@@ -551,30 +555,35 @@ int ListRoutesCall::Proceed()
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
-			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			route = reply_.add_routes();
-			rp_route = &((&reply->route)[i]);
-			
-			if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
-				route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
-			else
-				route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		do {
+			if (dp_recv_from_worker_with_mbuf(&mbuf))
+				return -1;
+			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+				route = reply_.add_routes();
+				rp_route = &((&reply->route)[i]);
 
-			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-				addr.s_addr = htonl(rp_route->pfx_ip.addr);
-				pfx = new Prefix();
-				pfx->set_address(inet_ntoa(addr));
-				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-				pfx->set_prefixlength(rp_route->pfx_length);
-				route->set_allocated_prefix(pfx);
+				if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
+					route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+				else
+					route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+
+				if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+					addr.s_addr = htonl(rp_route->pfx_ip.addr);
+					pfx = new Prefix();
+					pfx->set_address(inet_ntoa(addr));
+					pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+					pfx->set_prefixlength(rp_route->pfx_length);
+					route->set_allocated_prefix(pfx);
+				}
+				route->set_nexthopvni(rp_route->trgt_vni);
+				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
+				route->set_nexthopaddress(buf);
 			}
-			route->set_nexthopvni(rp_route->trgt_vni);
-			inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
-			route->set_nexthopaddress(buf);
-		}
+			read_so_far += (reply->com_head.msg_count - read_so_far);
+			is_chained = reply->com_head.is_chained;
+			rte_pktmbuf_free(mbuf);
+		} while (is_chained);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -592,6 +601,8 @@ int ListMachinesCall::Proceed()
 	Machine *machine;
 	struct in_addr addr;
 	dp_vm_info *vm_info;
+	uint8_t is_chained = 0;
+	uint16_t read_so_far = 0;
 	int i;
 	grpc::Status ret = grpc::Status::OK;
 	char buf[INET6_ADDRSTRLEN];
@@ -603,20 +614,24 @@ int ListMachinesCall::Proceed()
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
-			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			machine = reply_.add_machines();
-			vm_info = &((&reply->vm_info)[i]);
-			addr.s_addr = htonl(vm_info->ip_addr);
-			machine->set_primaryipv4address(inet_ntoa(addr));
-			inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
-			machine->set_primaryipv6address(buf);
-			machine->set_machineid((char *)vm_info->machine_id);
-			machine->set_vni(vm_info->vni);
-		}
-		rte_pktmbuf_free(mbuf);
+		do {
+			if (dp_recv_from_worker_with_mbuf(&mbuf))
+				return -1;
+			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+				machine = reply_.add_machines();
+				vm_info = &((&reply->vm_info)[i]);
+				addr.s_addr = htonl(vm_info->ip_addr);
+				machine->set_primaryipv4address(inet_ntoa(addr));
+				inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
+				machine->set_primaryipv6address(buf);
+				machine->set_machineid((char *)vm_info->machine_id);
+				machine->set_vni(vm_info->vni);
+			}
+			read_so_far += (reply->com_head.msg_count - read_so_far);
+			is_chained = reply->com_head.is_chained;
+			rte_pktmbuf_free(mbuf);
+		} while (is_chained);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

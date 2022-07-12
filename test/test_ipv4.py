@@ -221,11 +221,10 @@ def test_vf_to_vf_tcp(capsys,add_machine):
 
 def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	cmd = shlex.split(cmd_str)
-	process = subprocess.Popen(cmd, 
-								stdout=subprocess.PIPE,
-								universal_newlines=True)
+	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
 	count = 0
 	err_found = False
+
 	while count < maxlines:
 		output = process.stdout.readline()
 		line = output.strip()
@@ -445,3 +444,24 @@ def test_grpc_add_list_delPfx(capsys, build_path):
 	expected_str = pfx_ip
 	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
 	eval_cmd_output(list_pfx_test, expected_str, negate=True)
+
+# def test_grpc_add_list_del_routes_big_reply(capsys, build_path):
+# 	expected_str = "Listroute called"
+# 	pfx_first = "192.168."
+# 	pfx_second = 29
+# 	max_lines = MAX_LINES_ROUTE_REPLY + 2 + 1
+# 	for idx in range(MAX_LINES_ROUTE_REPLY):
+# 		pfx_second = pfx_second + 1
+# 		ov_target_pfx = pfx_first + str(pfx_second) + ".0"
+# 		add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 32 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
+# 		subprocess.run(shlex.split(add_ipv4_route_cmd), stdout=subprocess.DEVNULL)
+# 	list_route_test = build_path + "/test/dp_grpc_client --listroutes --vni " + vni
+# 	#TODO this test case is not complete and needs to handle more than 38 lines
+# 	eval_cmd_output(list_route_test, expected_str, maxlines=max_lines)
+# 	pfx_first = "192.168."
+# 	pfx_second = 29
+# 	for idx in range(MAX_LINES_ROUTE_REPLY):
+# 		pfx_second = pfx_second + 1
+# 		ov_target_pfx = pfx_first + str(pfx_second) + ".0"
+# 		del_route_test = build_path+"/test/dp_grpc_client --delroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 32"
+#		subprocess.run(shlex.split(del_route_test), stdout=subprocess.DEVNULL)

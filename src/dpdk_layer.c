@@ -101,16 +101,16 @@ int dp_dpdk_init(int argc, char **argv)
 
 	dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
 	dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
-	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.grpc_tx_queue)
 		printf("Error creating grpc tx queue\n");
-	dp_layer.grpc_rx_queue = rte_ring_create("grpc_rx_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	dp_layer.grpc_rx_queue = rte_ring_create("grpc_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.grpc_rx_queue)
 		printf("Error creating grpc rx queue\n");
-	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.periodic_msg_queue)
 		printf("Error creating periodic_msg_queue queue\n");
-	dp_layer.monitoring_rx_queue = rte_ring_create("monitoring_rx_queue", 32, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	dp_layer.monitoring_rx_queue = rte_ring_create("monitoring_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.monitoring_rx_queue)
 		printf("Error creating monitoring rx queue\n");
 
