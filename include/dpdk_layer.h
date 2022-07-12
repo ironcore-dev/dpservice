@@ -22,6 +22,8 @@ extern "C" {
 #define DP_NR_TX_QUEUES		1
 #define MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		2
+#define DP_INTERNAL_Q_SIZE	32
+#define DP_MBUF_ARR_SIZE	(DP_INTERNAL_Q_SIZE / 4) * 3
 
 #define NB_MBUF(nports)                  \
 	RTE_MAX((2 * 1 * 1024 +              \
@@ -42,6 +44,7 @@ struct dp_dpdk_layer {
 	struct rte_ring					*grpc_tx_queue;
 	struct rte_ring					*grpc_rx_queue;
 	struct rte_ring					*periodic_msg_queue;
+	struct rte_ring					*monitoring_rx_queue;
 };
 
 struct underlay_conf {

@@ -91,7 +91,8 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
 int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
-void dp_list_routes(int vni, dp_reply *rep, int socketid, bool ext_routes);
+void dp_list_routes(int vni, struct rte_mbuf *m, int socketid,
+					struct rte_mbuf *rep_arr[], bool ext_routes);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid);
 void dp_set_vm_ip6(uint16_t portid, uint8_t* ipv6);

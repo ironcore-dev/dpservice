@@ -21,6 +21,7 @@ ul_actual_dst="2a10:afc0:e01f:f408:0:64::"
 ul_actual_src="2a10:afc0:e01f:f403:0:64::"
 start_str = "DPDK main loop started"
 tun_type_geneve="geneve"
+port_redundancy=True
 
 bcast_mac = "ff:ff:ff:ff:ff:ff"
 null_ip = "0.0.0.0"
@@ -42,3 +43,5 @@ ov_target_ip = "192.168.129.5"
 ov_target_pfx = "192.168.129.0"
 virtual_ip = "174.23.4.5"
 pfx_ip = "174.23.4.0"
+
+MAX_LINES_ROUTE_REPLY = 36

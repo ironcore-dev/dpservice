@@ -83,8 +83,12 @@ def is_tcp_vip_src_pkt(pkt):
 			return True
 	return False
 
-def ipv4_in_ipv6_responder():
-	pkt_list = sniff(count=1,lfilter=is_encaped_icmp_pkt,iface=pf0_tap)
+def ipv4_in_ipv6_responder(pf_name):
+	pkt_list = sniff(count=1,lfilter=is_encaped_icmp_pkt,iface=pf_name,timeout=10)
+
+	if len(pkt_list)==0:
+		return 
+
 	pkt=pkt_list[0]
 	pkt.show()
 	if Ether in pkt:
@@ -96,10 +100,10 @@ def ipv4_in_ipv6_responder():
 
 	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst) / ICMP(type=0)
 	time.sleep(1)
-	sendp(reply_pkt, iface=pf0_tap)
+	sendp(reply_pkt, iface=pf_name)
 
-def geneve_in_ipv6_responder():
-	pkt_list = sniff(count=1,lfilter=is_geneve_encaped_icmp_pkt, iface=pf0_tap)
+def geneve_in_ipv6_responder(pf_name):
+	pkt_list = sniff(count=1,lfilter=is_geneve_encaped_icmp_pkt, iface=pf_name,timeout=8)
 	pkt=pkt_list[0]
 	pkt.show()
 
@@ -113,14 +117,15 @@ def geneve_in_ipv6_responder():
 	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=17) / UDP(sport=6081, dport=6081) \
 				/ GENEVE(vni=0x640000, proto=0x0800) / IP(dst=pktip.src, src=pktip.dst) / ICMP(type=0)
 	time.sleep(1)
-	sendp(reply_pkt, iface=pf0_tap)
+	sendp(reply_pkt, iface=pf_name)
 
+@pytest.mark.skipif(port_redundancy == True, reason = "port reduncy test already includes this one")
 def test_IPv4inIPv6(capsys, add_machine, tun_opt):
 	d = None
 	if tun_opt == tun_type_geneve:
-		d = multiprocessing.Process(name="sniffer",target = geneve_in_ipv6_responder)
+		d = multiprocessing.Process(name="sniffer",target = geneve_in_ipv6_responder,args=(pf0_tap,))
 	else:
-		d = multiprocessing.Process(name="sniffer",target = ipv4_in_ipv6_responder)
+		d = multiprocessing.Process(name="sniffer",target = ipv4_in_ipv6_responder, args=(pf0_tap,))
 	d.daemon=False
 	d.start()
 
@@ -128,10 +133,47 @@ def test_IPv4inIPv6(capsys, add_machine, tun_opt):
 	icmp_echo_pkt = Ether(dst=pf0_mac,src=vf0_mac,type=0x0800)/IP(dst="192.168.129.5",src="172.32.10.5")/ICMP(type=8)
 	sendp(icmp_echo_pkt,iface=vf0_tap)
 
-	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=2)
+	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=5)
 	if len(pkt_list)==0:
 		raise AssertionError('Cannot receive icmp reply!')
-	
+
+@pytest.mark.skipif(port_redundancy == False, reason = "no need to test port redundancy if it is disabled")
+def test_link_redundancy_handling(capsys, add_machine,tun_opt):
+	d = None
+	d2 = None
+	if tun_opt == tun_type_geneve:
+		d = multiprocessing.Process(name="sniffer",target = geneve_in_ipv6_responder, args=(pf0_tap,))
+		d2 = multiprocessing.Process(name="sniffer",target = geneve_in_ipv6_responder, args=(pf1_tap,))
+	else:
+		d = multiprocessing.Process(name="sniffer",target = ipv4_in_ipv6_responder, args=(pf0_tap,))
+		d2 = multiprocessing.Process(name="sniffer",target = ipv4_in_ipv6_responder,args=(pf1_tap,))
+	d.daemon=False
+	d.start()
+
+	d2.daemon=False
+	d2.start()
+
+	time.sleep(1)
+	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" down"))
+	time.sleep(0.5)
+	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
+
+	icmp_echo_pkt = Ether(dst=pf0_mac,src=vf0_mac,type=0x0800)/IP(dst="192.168.129.5",src="172.32.10.5")/ICMP(type=8)
+	sendp(icmp_echo_pkt,iface=vf0_tap)
+	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=2)
+
+	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" up"))
+	time.sleep(0.5)
+	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" down"))
+	time.sleep(0.5)
+
+	sendp(icmp_echo_pkt,iface=vf0_tap)
+	pkt_list2 = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=2)
+
+	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
+	if len(pkt_list)==0 and len(pkt_list2)==0:
+		raise AssertionError('Cannot receive icmp reply!')
+
 
 def vf_to_vf_tcp_vf1_responder():
 	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf1_tap)
@@ -179,11 +221,10 @@ def test_vf_to_vf_tcp(capsys,add_machine):
 
 def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	cmd = shlex.split(cmd_str)
-	process = subprocess.Popen(cmd, 
-								stdout=subprocess.PIPE,
-								universal_newlines=True)
+	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
 	count = 0
 	err_found = False
+
 	while count < maxlines:
 		output = process.stdout.readline()
 		line = output.strip()
@@ -403,3 +444,24 @@ def test_grpc_add_list_delPfx(capsys, build_path):
 	expected_str = pfx_ip
 	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
 	eval_cmd_output(list_pfx_test, expected_str, negate=True)
+
+# def test_grpc_add_list_del_routes_big_reply(capsys, build_path):
+# 	expected_str = "Listroute called"
+# 	pfx_first = "192.168."
+# 	pfx_second = 29
+# 	max_lines = MAX_LINES_ROUTE_REPLY + 2 + 1
+# 	for idx in range(MAX_LINES_ROUTE_REPLY):
+# 		pfx_second = pfx_second + 1
+# 		ov_target_pfx = pfx_first + str(pfx_second) + ".0"
+# 		add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 32 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
+# 		subprocess.run(shlex.split(add_ipv4_route_cmd), stdout=subprocess.DEVNULL)
+# 	list_route_test = build_path + "/test/dp_grpc_client --listroutes --vni " + vni
+# 	#TODO this test case is not complete and needs to handle more than 38 lines
+# 	eval_cmd_output(list_route_test, expected_str, maxlines=max_lines)
+# 	pfx_first = "192.168."
+# 	pfx_second = 29
+# 	for idx in range(MAX_LINES_ROUTE_REPLY):
+# 		pfx_second = pfx_second + 1
+# 		ov_target_pfx = pfx_first + str(pfx_second) + ".0"
+# 		del_route_test = build_path+"/test/dp_grpc_client --delroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 32"
+#		subprocess.run(shlex.split(del_route_test), stdout=subprocess.DEVNULL)
