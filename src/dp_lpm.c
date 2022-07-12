@@ -525,12 +525,13 @@ int setup_lpm6(int port_id, int vni, const int socketid)
 	return EXIT_SUCCESS;
 }
 
-int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
-{
-	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
+
+struct rte_rib_node *lpm_get_ip4_route_node(int port_id, int t_vni, int socketid, const struct dp_flow *df_ptr){
+
 	struct rte_rib_node *node;
 	struct rte_rib *root;
-	uint64_t next_hop;
+
+	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
 
 	if (t_vni)
 		root = get_lpm(t_vni, socketid);
@@ -538,9 +539,25 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, s
 		root = vm_table[port_id].ipv4_rib[socketid];
 
 	if (!root)
-		return DP_ROUTE_DROP;
+		return NULL;
 
 	node = rte_rib_lookup(root, dst_ip);
+
+	return node;
+}
+
+int lpm_get_ip4_route_key(struct rte_rib_node *node, uint32_t *ip){
+
+	if (node){
+		return rte_rib_get_ip(node, ip);
+	}
+	
+	return DP_ROUTE_DROP;
+}
+
+int lpm_get_ip4_dst_port( struct rte_rib_node *node, struct vm_route *r)
+{
+	uint64_t next_hop;
 
 	if (node) {
 		if (rte_rib_get_nh(node, &next_hop) != 0)
@@ -554,29 +571,34 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, s
 }
 
 
-bool lpm_ipv4_exact_route_exist(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
-{
-	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
-	struct rte_rib_node *node = NULL;
-	struct rte_rib *root;
+// int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
+// {
+// 	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
+// 	struct rte_rib_node *node;
+// 	struct rte_rib *root;
+// 	uint64_t next_hop;
 
-	if (t_vni)
-		root = get_lpm(t_vni, socketid);
-	else
-		root = vm_table[port_id].ipv4_rib[socketid];
+// 	if (t_vni)
+// 		root = get_lpm(t_vni, socketid);
+// 	else
+// 		root = vm_table[port_id].ipv4_rib[socketid];
 
-	if (!root)
-		return false;
+// 	if (!root)
+// 		return DP_ROUTE_DROP;
 
-	
-	node = rte_rib_lookup_exact(root, dst_ip, 32);
+// 	node = rte_rib_lookup(root, dst_ip);
 
-	if (node){
-		return true;
-	}else {
-		return false;
-	}
-}
+// 	if (node) {
+// 		if (rte_rib_get_nh(node, &next_hop) != 0)
+// 			return DP_ROUTE_DROP;
+// 		if (dp_is_pf_port_id(next_hop))
+// 			*r = *(struct vm_route *)rte_rib_get_ext(node);
+// 		return next_hop;
+// 	}
+
+// 	return DP_ROUTE_DROP;
+// }
+
 
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr, struct vm_route *r, int socketid)
 {

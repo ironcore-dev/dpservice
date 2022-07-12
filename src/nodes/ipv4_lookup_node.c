@@ -33,6 +33,8 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	struct dp_flow *df_ptr;
 	struct vm_route route;
 	int ret = 0;
+	struct rte_rib_node *route_node = NULL;
+	uint32_t route_key = 0;
 
 	df_ptr = get_dp_flow_ptr(m);
 	if (!df_ptr)
@@ -42,13 +44,16 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
 		return DP_ROUTE_DHCP;
 
-	ret = lpm_get_ip4_dst_port(m->port, df_ptr->tun_info.dst_vni, df_ptr, &route, rte_eth_dev_socket_id(m->port));
+	route_node = lpm_get_ip4_route_node(m->port, df_ptr->tun_info.dst_vni, rte_eth_dev_socket_id(m->port), df_ptr);
+
+	ret = lpm_get_ip4_dst_port(route_node, &route);
 	if (ret < 0)
 		return DP_ROUTE_DROP;
-
-	df_ptr->flags.public_flow= lpm_ipv4_exact_route_exist(m->port, df_ptr->tun_info.dst_vni, df_ptr, &route, rte_eth_dev_socket_id(m->port))? 0:1;
-	
 	df_ptr->nxt_hop = ret;
+
+	if (lpm_get_ip4_route_key(route_node, &route_key))
+		return DP_ROUTE_DROP;
+	df_ptr->flags.public_flow= route_key == 0? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 
 	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df_ptr->tun_info.dst_vni = route.vni;
