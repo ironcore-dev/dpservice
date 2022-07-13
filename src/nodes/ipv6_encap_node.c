@@ -27,8 +27,9 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	struct underlay_conf *u_conf = get_underlay_conf();
 	struct rte_ipv6_hdr *ipv6_hdr;
 
-    m->outer_l2_len = sizeof(struct rte_ether_hdr);
-    m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
+	m->outer_l2_len = sizeof(struct rte_ether_hdr);
+	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
+	m->l2_len = 0; /* We dont have inner l2, when we encapsulate */
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
 
@@ -42,7 +43,8 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
 	ipv6_hdr->proto = df->tun_info.proto_id;
 
-	m->ol_flags = RTE_MBUF_F_TX_IPV6;
+	m->ol_flags |= RTE_MBUF_F_TX_OUTER_IPV6;
+	m->ol_flags |= RTE_MBUF_F_TX_TUNNEL_IP;
 
 	return 1;
 } 

@@ -11,13 +11,10 @@ struct rte_eth_conf port_conf = {
 	},
 	.txmode = {
 			.offloads =
-				DEV_TX_OFFLOAD_GENEVE_TNL_TSO |
 				DEV_TX_OFFLOAD_IPV4_CKSUM  |
 				DEV_TX_OFFLOAD_UDP_CKSUM   |
 				DEV_TX_OFFLOAD_TCP_CKSUM   |
-				DEV_TX_OFFLOAD_SCTP_CKSUM  |
-				DEV_TX_OFFLOAD_OUTER_UDP_CKSUM| 
-				DEV_TX_OFFLOAD_TCP_TSO,
+				DEV_TX_OFFLOAD_IP_TNL_TSO
 	},
 	.rx_adv_conf = {
 			.rss_conf = {
