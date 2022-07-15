@@ -33,8 +33,8 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	struct dp_flow *df_ptr;
 	struct vm_route route;
 	int ret = 0;
-	struct rte_rib_node *route_node = NULL;
 	uint32_t route_key = 0;
+	uint64_t dst_port_id;
 
 	df_ptr = get_dp_flow_ptr(m);
 	if (!df_ptr)
@@ -44,16 +44,16 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
 		return DP_ROUTE_DHCP;
 
-	route_node = lpm_get_ip4_route_node(m->port, df_ptr->tun_info.dst_vni, rte_eth_dev_socket_id(m->port), df_ptr);
-
-	ret = lpm_get_ip4_dst_port(route_node, &route);
+	ret = lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr, rte_eth_dev_socket_id(m->port), &route, &route_key, &dst_port_id);
+	// ret = lpm_get_ip4_dst_port(route_node, &route);
 	if (ret < 0)
 		return DP_ROUTE_DROP;
-	df_ptr->nxt_hop = ret;
 
-	if (lpm_get_ip4_route_key(route_node, &route_key))
-		return DP_ROUTE_DROP;
-	df_ptr->flags.public_flow= route_key == 0? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
+	//TODO: it is not exactly correct to use next_hop to directly store next hop port id and convert here. but it is already used in 
+	// such way in the original implementation. as long as port number is limited to 256, it is ok.
+	df_ptr->nxt_hop = (uint8_t)dst_port_id;
+
+	df_ptr->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 
 	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df_ptr->tun_info.dst_vni = route.vni;
@@ -85,7 +85,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		}
 	}
 	
-	return ret;
+	return 0;
 }
 
 static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *graph,
