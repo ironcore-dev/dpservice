@@ -48,7 +48,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 			df_ptr->nat_addr = df_ptr->src.src_addr;
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
-			dp_nat_chg_ip(df_ptr, ipv4_hdr);
+			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 
 			/* Expect the new destination in this conntrack object */
 			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
@@ -67,7 +67,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 		df_ptr->nat_addr = df_ptr->src.src_addr;
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
-		dp_nat_chg_ip(df_ptr, ipv4_hdr);
+		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 	}
 
 	if (((cntrack->flow_status == DP_FLOW_STATUS_DST_NAT) || (cntrack->flow_status == DP_FLOW_STATUS_DST_LB))
@@ -77,7 +77,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 		df_ptr->nat_addr = df_ptr->src.src_addr;
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
-		dp_nat_chg_ip(df_ptr, ipv4_hdr);
+		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 	}
 	return 1;
 }

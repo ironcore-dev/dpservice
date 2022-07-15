@@ -229,25 +229,33 @@ void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
 		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 }
 
-void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr)
+void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
+				   struct rte_mbuf *m)
 {
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 
 	ipv4_hdr->hdr_checksum = 0;
-	ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
-	
+	m->ol_flags |= RTE_MBUF_F_TX_IPV4;
+	m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;
+	m->tx_offload = 0;
+	m->l2_len = sizeof(struct rte_ether_hdr);
+	m->l3_len = rte_ipv4_hdr_len(ipv4_hdr);
+	m->l4_len = 0;
+
 	switch (df_ptr->l4_type)
 	{
 		case IPPROTO_TCP:
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			tcp_hdr->cksum = 0;
-			tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+			m->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
+			m->l4_len = (tcp_hdr->data_off & 0xf0) >> 2;
 		break;
 		case IPPROTO_UDP:
 			udp_hdr =  (struct rte_udp_hdr *)(ipv4_hdr + 1);
 			udp_hdr->dgram_cksum = 0;
-			udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
+			m->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
+			m->l4_len = sizeof(struct rte_udp_hdr);
 		break;
 		case IPPROTO_ICMP:
 		break;

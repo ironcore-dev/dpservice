@@ -59,7 +59,7 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
 			df_ptr->nat_addr = df_ptr->dst.dst_addr;
 			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
-			dp_nat_chg_ip(df_ptr, ipv4_hdr);
+			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
@@ -79,7 +79,7 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 		df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
 		df_ptr->nat_addr = df_ptr->dst.dst_addr;
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
-		dp_nat_chg_ip(df_ptr, ipv4_hdr);
+		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 	}
 
 	return 1;
