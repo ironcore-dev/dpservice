@@ -66,8 +66,6 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		return 1;
 	}
 
-
-
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_NAT &&
 		cntrack->dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);

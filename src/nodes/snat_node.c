@@ -42,7 +42,6 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		src_ip = ntohl(df_ptr->src.src_addr);
 		if (dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port)) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port)));
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
