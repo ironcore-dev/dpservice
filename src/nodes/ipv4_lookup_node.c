@@ -45,7 +45,6 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 		return DP_ROUTE_DHCP;
 
 	ret = lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr, rte_eth_dev_socket_id(m->port), &route, &route_key, &dst_port_id);
-	// ret = lpm_get_ip4_dst_port(route_node, &route);
 	if (ret < 0)
 		return DP_ROUTE_DROP;
 

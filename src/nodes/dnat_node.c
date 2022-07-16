@@ -49,7 +49,6 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 		if (dp_is_ip_dnatted(dst_ip, vni)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dp_get_vm_dnat_ip(dst_ip, vni));
 			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;

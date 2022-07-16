@@ -91,8 +91,6 @@ int dp_dpdk_init(int argc, char **argv)
 	if (ret < 0)
 		rte_panic("Cannot init EAL\n");
 
-	rte_pdump_init();
-	
 	memset(&dp_layer, 0, sizeof(struct dp_dpdk_layer));
 
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS), 

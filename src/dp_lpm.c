@@ -552,15 +552,16 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, i
 
 		*dst_port_id = next_hop;
 		status = rte_rib_get_ip(node, route_key);
-		if (status < 0){
+		if (status < 0)
 			return DP_ROUTE_DROP;
-		}
+		
 		return 0;
 	}
 
 	return DP_ROUTE_DROP;
 }
 
+// TODO: delete this function after ipv6 adaptation
 // int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
 // {
 // 	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);

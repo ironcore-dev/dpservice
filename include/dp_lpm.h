@@ -69,6 +69,7 @@ struct vm_route {
 
 int setup_lpm(int port_id, int vni, const int socketid);
 int setup_lpm6(int port_id, int vni, const int socketid);
+// TODO: delete this function after ipv6 adaptation
 // int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr,
 // 						 struct vm_route *r, int socketid);
 int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, int socketid,
