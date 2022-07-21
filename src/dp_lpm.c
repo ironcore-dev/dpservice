@@ -561,36 +561,6 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, i
 	return DP_ROUTE_DROP;
 }
 
-// TODO: delete this function after ipv6 adaptation
-// int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
-// {
-// 	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
-// 	struct rte_rib_node *node;
-// 	struct rte_rib *root;
-// 	uint64_t next_hop;
-
-// 	if (t_vni)
-// 		root = get_lpm(t_vni, socketid);
-// 	else
-// 		root = vm_table[port_id].ipv4_rib[socketid];
-
-// 	if (!root)
-// 		return DP_ROUTE_DROP;
-
-// 	node = rte_rib_lookup(root, dst_ip);
-
-// 	if (node) {
-// 		if (rte_rib_get_nh(node, &next_hop) != 0)
-// 			return DP_ROUTE_DROP;
-// 		if (dp_is_pf_port_id(next_hop))
-// 			*r = *(struct vm_route *)rte_rib_get_ext(node);
-// 		return next_hop;
-// 	}
-
-// 	return DP_ROUTE_DROP;
-// }
-
-
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr, struct vm_route *r, int socketid)
 {
 	struct rte_rib6_node *node;
