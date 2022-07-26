@@ -19,6 +19,8 @@
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 
+#include "rte_pdump.h"
+
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
 static pthread_t ctrl_thread_tid;
@@ -88,7 +90,7 @@ int dp_dpdk_init(int argc, char **argv)
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0)
 		rte_panic("Cannot init EAL\n");
-	
+
 	memset(&dp_layer, 0, sizeof(struct dp_dpdk_layer));
 
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS), 

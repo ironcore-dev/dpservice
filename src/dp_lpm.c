@@ -525,12 +525,14 @@ int setup_lpm6(int port_id, int vni, const int socketid)
 	return EXIT_SUCCESS;
 }
 
-int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, struct vm_route *r, int socketid)
-{
+int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, int socketid,
+						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id){
+
 	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;
+	int status;
 
 	if (t_vni)
 		root = get_lpm(t_vni, socketid);
@@ -547,7 +549,13 @@ int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr, s
 			return DP_ROUTE_DROP;
 		if (dp_is_pf_port_id(next_hop))
 			*r = *(struct vm_route *)rte_rib_get_ext(node);
-		return next_hop;
+
+		*dst_port_id = next_hop;
+		status = rte_rib_get_ip(node, route_key);
+		if (status < 0)
+			return DP_ROUTE_DROP;
+		
+		return 0;
 	}
 
 	return DP_ROUTE_DROP;

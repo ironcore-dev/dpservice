@@ -11,7 +11,6 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/snat_node.h"
 
-
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct snat_node_ctx *ctx = (struct snat_node_ctx *)node->ctx;
@@ -41,7 +40,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		src_ip = ntohl(df_ptr->src.src_addr);
-		if (dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port))
+		if (dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port)) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port)));

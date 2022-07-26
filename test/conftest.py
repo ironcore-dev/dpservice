@@ -73,6 +73,7 @@ def add_machine(build_path, tun_opt):
 	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
 	add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
 	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv6 2002::123 --length 128 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
+	add_default_public_route = build_path+"/test/dp_grpc_client --addroute " + " --vni " + vni + " --ipv4 0.0.0.0 --length 0 --t_vni "+ vni + " --t_ipv6 " + ul_actual_dst
 	subprocess.run(shlex.split("ip link set dev "+vf0_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf2_tap+" up"))
@@ -81,5 +82,6 @@ def add_machine(build_path, tun_opt):
 	subprocess.run(shlex.split(add_machine_cmd2))
 	subprocess.run(shlex.split(add_ipv4_route_cmd))
 	subprocess.run(shlex.split(add_ipv6_route_cmd))
+	subprocess.run(shlex.split(add_default_public_route))
 	time.sleep(1)
 

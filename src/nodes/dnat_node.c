@@ -11,7 +11,6 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/dnat_node.h"
 
-
 static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct dnat_node_ctx *ctx = (struct dnat_node_ctx *)node->ctx;

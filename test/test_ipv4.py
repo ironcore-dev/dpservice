@@ -102,6 +102,27 @@ def ipv4_in_ipv6_responder(pf_name):
 	time.sleep(1)
 	sendp(reply_pkt, iface=pf_name)
 
+def encaped_tcp_in_ipv6_vip_responder(pf_name):
+	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=pf_name,timeout=10)
+
+	if len(pkt_list)==0:
+		return 
+
+	pkt=pkt_list[0]
+	pkt.show()
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if TCP in pkt:
+		pkttcp = pkt[TCP]
+
+	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst) /TCP(sport=pkttcp.dport, dport=pkttcp.sport)
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf_name)
+
 def geneve_in_ipv6_responder(pf_name):
 	pkt_list = sniff(count=1,lfilter=is_geneve_encaped_icmp_pkt, iface=pf_name,timeout=8)
 	pkt=pkt_list[0]
@@ -190,20 +211,6 @@ def vf_to_vf_tcp_vf1_responder():
 	time.sleep(1)
 	sendp(reply_pkt, iface=vf1_tap)
 
-def vf_to_vf_tcp_vf0_responder():
-	pkt_list = sniff(count=1,lfilter=is_tcp_vip_src_pkt,iface=vf0_tap)
-	pkt=pkt_list[0]
-
-	if Ether in pkt:
-		pktether=pkt[Ether]
-	if IP in pkt:
-		pktip= pkt[IP]
-	if TCP in pkt:
-		pkttcp = pkt[TCP]
-
-	reply_pkt = Ether(dst=pktether.src,src=pktether.dst,type=0x0800)/IP(dst=pktip.src,src=pktip.dst)/TCP(sport=pkttcp.dport, dport=pkttcp.sport)
-	time.sleep(1)
-	sendp(reply_pkt, iface=vf0_tap)
 
 def test_vf_to_vf_tcp(capsys,add_machine):
 	d=multiprocessing.Process(name="sniffer",target=vf_to_vf_tcp_vf1_responder)
@@ -262,29 +269,31 @@ def test_vf_to_vf_vip_dnat(capsys, add_machine, build_path):
 	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
 	eval_cmd_output(del_vip_test, expected_str)
 
-
-def test_vf_to_vf_vip_snat(capsys, add_machine, build_path):
-	d = multiprocessing.Process(name = "sniffer", target = vf_to_vf_tcp_vf0_responder)
+def test_vf_to_pf_vip_snat(capsys, add_machine, build_path):
+	d = multiprocessing.Process(name = "sniffer1", target = encaped_tcp_in_ipv6_vip_responder, args=(pf0_tap,))
 	d.daemon=False
 	d.start()
+
+	d2 = multiprocessing.Process(name = "sniffer2", target = encaped_tcp_in_ipv6_vip_responder, args=(pf1_tap,))
+	d2.daemon=False
+	d2.start()
 
 	expected_str = ul_actual_src
 	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
 	eval_cmd_output(add_vip_test, expected_str)
 	time.sleep(1)
 
-	# vm2 (vf1) -> vm1 (vf0), vm2 has VIP, check on vm1 side, whether VIP is source (SNAT)
-	tcp_pkt = Ether(dst = vf0_mac, src = vf1_mac, type = 0x0800) / IP(dst = vf0_ip, src = vf1_ip) / TCP(sport=1240)
+	# vm2 (vf1) -> PF0/PF1 (internet traffic), vm2 has VIP, check on PFs side, whether VIP is source (SNAT)
+	tcp_pkt = Ether(dst = pf0_mac, src = vf1_mac, type = 0x0800) / IP(dst = public_ip, src = vf1_ip) / TCP(sport=1240)
 	sendp(tcp_pkt, iface = vf1_tap)
 	
-	pkt_list = sniff(count = 1, lfilter = is_tcp_pkt, iface = vf1_tap, timeout = 2)
+	pkt_list = sniff(count = 1, lfilter = is_tcp_pkt, iface = vf1_tap, timeout = 5)
 	if len(pkt_list) == 0:
 		raise AssertionError('Cannot receive tcp reply via VIP (SNAT)!')
 
 	expected_str = "Delvip"
 	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
 	eval_cmd_output(del_vip_test, expected_str)
-
 
 def test_grpc_addmachine_error_102(capsys, build_path):
 	# Try to add using an existing vm identifier

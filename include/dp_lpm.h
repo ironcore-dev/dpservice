@@ -64,12 +64,14 @@ struct vm_entry {
 struct vm_route {
 	int		vni;
 	uint8_t	nh_ipv6[16];
+
 };
 
 int setup_lpm(int port_id, int vni, const int socketid);
 int setup_lpm6(int port_id, int vni, const int socketid);
-int lpm_get_ip4_dst_port(int port_id, int t_vni, const struct dp_flow *df_ptr,
-						 struct vm_route *r, int socketid);
+int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, int socketid,
+						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id);
+// TODO: adapt lpm_get_ip6_dst_port to lpm_lookup_ip4_route, to include necessary returned values.
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
 						 struct vm_route *r, int socketid);
 
