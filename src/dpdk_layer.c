@@ -19,10 +19,12 @@
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 
-#include "rte_pdump.h"
+// #include "rte_pdump.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
+// static int last_pf0_hairpin_tx_queue_index=0;
+static int last_pf1_hairpin_tx_queue_offset = 1;
 static pthread_t ctrl_thread_tid;
 static struct rte_timer timer;
 static uint64_t timer_res;
@@ -101,8 +103,17 @@ int dp_dpdk_init(int argc, char **argv)
 	if (dp_layer.rte_mempool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
-	dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
-	dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
+	dp_layer.nr_std_rx_queues = DP_NR_STD_RX_QUEUES;
+	dp_layer.nr_std_tx_queues = DP_NR_STD_TX_QUEUES;
+
+	dp_layer.nr_vf_hairpin_rx_queues = DP_NR_VF_HAIRPIN_RX_QUEUES;
+	dp_layer.nr_pf_hairpin_tx_queues = DP_NR_VF_HAIRPIN_RX_QUEUES * dp_get_num_of_vfs();
+
+	dp_layer.nr_pf_hairpin_rx_queues = 0;
+	dp_layer.nr_vf_hairpin_tx_queues = 0;
+
+	// dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
+	// dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
 	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.grpc_tx_queue)
 		printf("Error creating grpc tx queue\n");
@@ -231,8 +242,8 @@ static int dp_cfg_ethdev(int port_id)
 	struct rte_node_ethdev_config *ethdev_conf;
 
 	ethdev_conf = &dp_layer.ethdev_conf[dp_layer.dp_port_cnt - 1];
-	ethdev_conf->num_rx_queues = dp_layer.nr_rx_queues;
-	ethdev_conf->num_tx_queues = dp_layer.nr_tx_queues;
+	// ethdev_conf->num_rx_queues = dp_layer.nr_rx_queues;
+	// ethdev_conf->num_tx_queues = dp_layer.nr_tx_queues;
 	ethdev_conf->port_id = port_id;
 	ethdev_conf->mp_count = 1;
 	ethdev_conf->mp = &dp_layer.rte_mempool;
@@ -286,10 +297,20 @@ static void dp_install_isolated_mode(int port_id)
 
 }
 
+static void allocate_pf_hairpin_tx_queue (uint16_t port_id, uint16_t peer_pf_port_id, uint16_t hairpin_queue_offset){
+	
+	struct dp_port* vf_port;
+
+	vf_port = dp_get_vf_port_per_id(&dp_layer, port_id);
+
+	vf_port->peer_pf_port_id = peer_pf_port_id;
+	vf_port->peer_pf_hairpin_tx_queue_offset = hairpin_queue_offset;
+}
+
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 {
 	uint32_t ret, cnt = 0;
-	uint16_t nr_ports, port_id;;
+	uint16_t nr_ports, port_id;
 	struct dp_port_ext dp_port_ext;
 	char ifname[IF_NAMESIZE] = {0};
 
@@ -328,6 +349,10 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 			if (cnt == last_assigned_vf_idx) {
 				dp_port_prepare(type, port_id, &dp_port_ext);
 				last_assigned_vf_idx++;
+
+				//if it belongs to pf0, assign a tx queue from pf1 for it
+				allocate_pf_hairpin_tx_queue(port_id,dp_get_pf1_port_id(),last_pf1_hairpin_tx_queue_offset);
+				last_pf1_hairpin_tx_queue_offset++;
 				return port_id;
 			}
 			cnt++;
@@ -335,6 +360,105 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 	}
 
 	return -1;
+}
+
+static int setup_hairpin_rx_tx_queues (uint16_t port_id,uint16_t peer_port_id, uint8_t port_hairpin_rx_q_offset, uint8_t peer_port_hairpin_tx_q_offset){
+
+	uint32_t hairpin_queue, peer_hairpin_queue = 0;
+	int ret = 0;
+	struct rte_eth_hairpin_conf hairpin_conf = {
+		.peer_count = 1,
+		.manual_bind = 1,
+		.tx_explicit = 1,
+	};
+
+	struct rte_eth_rxq_info rxq_info = { 0 };
+	struct rte_eth_txq_info txq_info = { 0 };
+
+	hairpin_conf.peers[0].port = peer_port_id;
+	peer_hairpin_queue =  dp_layer.nr_std_tx_queues - 1 + peer_port_hairpin_tx_q_offset;
+	hairpin_conf.peers[0].queue = peer_hairpin_queue;
+	rte_eth_rx_queue_info_get(port_id, 0, &rxq_info);
+
+	hairpin_queue =  dp_layer.nr_std_rx_queues - 1 + port_hairpin_rx_q_offset;
+	printf("setup from port %d to port %d, rxq %d to txq %d \n",port_id,peer_port_id,hairpin_queue,peer_hairpin_queue);
+	ret = rte_eth_rx_hairpin_queue_setup(
+				port_id, hairpin_queue,
+				rxq_info.nb_desc, &hairpin_conf);
+
+	if (ret != 0){
+		printf("Error: configure hairpin rx->tx queue from %d to %d \n ",port_id, peer_port_id);
+		return -1;
+	}
+
+	hairpin_conf.peers[0].port = port_id;
+	hairpin_conf.peers[0].queue = hairpin_queue;
+	rte_eth_tx_queue_info_get(peer_port_id, 0, &txq_info);
+	printf("setup from port %d to port %d, txq %d to rxq %d \n",peer_port_id,port_id,peer_hairpin_queue,hairpin_queue);
+	ret = rte_eth_tx_hairpin_queue_setup(
+				peer_port_id, peer_hairpin_queue,
+				txq_info.nb_desc, &hairpin_conf);
+	if (ret != 0){
+		printf("Error: configure hairpin tx->rx queue from %d to %d \n ",peer_port_id, port_id);
+		return -1;
+	}
+	return ret;
+}
+
+int hairpin_vfs_to_pf() {
+
+	int ret = 0;
+	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++){
+		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF) {
+			ret = setup_hairpin_rx_tx_queues(dp_layer.ports[i]->dp_port_id, dp_layer.ports[i]->peer_pf_port_id,
+											1,dp_layer.ports[i]->peer_pf_hairpin_tx_queue_offset);
+			if (ret < 0) {
+				printf("Failed to setup hairpin rx queue for vf %d \n",dp_layer.ports[i]->dp_port_id);
+				return ret;
+			}
+		}
+	}
+
+	return ret;
+}
+
+
+static int
+hairpin_port_bind(uint16_t port_id, int direction)
+{
+	int i, ret = 0;
+	uint16_t peer_ports[RTE_MAX_ETHPORTS];
+	int peer_ports_num = 0;
+
+	peer_ports_num = rte_eth_hairpin_get_peer_ports(port_id,
+			peer_ports, RTE_MAX_ETHPORTS, direction);
+	if (peer_ports_num < 0 )
+		return peer_ports_num; /* errno. */
+	for (i = 0; i < peer_ports_num; i++) {
+		// if (!rte_eth_devices[i].data->dev_started)
+		// 	continue;
+		ret = rte_eth_hairpin_bind(port_id, peer_ports[i]);
+		if (ret)
+			return ret;
+	}
+	return ret;
+}
+
+int hairpin_ports_bind(uint16_t port_id)
+{
+	int ret = 0;
+	uint16_t port_id;
+
+	/* Bind with our peer RX ports, TXQ -> RXQ. */
+	ret = hairpin_port_bind(port_id, 1);
+	if (ret)
+		return ret;
+	/* Bind with our peer TX ports, RXQ -> TXQ. */
+	ret = hairpin_port_bind(port_id, 0);
+	if (ret)
+		return ret;
+	
+	return ret;
 }
 
 int dp_init_graph()

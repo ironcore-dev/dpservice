@@ -65,9 +65,19 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	printf(":: initializing port: %d (%s)\n", port_id, ifname);
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
-	ret = rte_eth_dev_configure(port_id,
-								port->dp_layer->nr_rx_queues, 
-								port->dp_layer->nr_tx_queues, &port_conf);
+
+	if (port->dp_p_type == DP_PORT_VF)
+		ret = rte_eth_dev_configure(port_id,
+								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_vf_hairpin_rx_queues, 
+								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_vf_hairpin_tx_queues, &port_conf);
+	else 
+		ret = rte_eth_dev_configure(port_id,
+								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_pf_hairpin_rx_queues, 
+								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_pf_hairpin_tx_queues, &port_conf);
+
+	// ret = rte_eth_dev_configure(port_id,
+	// 							port->dp_layer->nr_rx_queues, 
+	// 							port->dp_layer->nr_tx_queues, &port_conf);
 	if (ret < 0) {
 		rte_exit(EXIT_FAILURE,
 				":: cannot configure device: err=%d, port=%u\n",
@@ -79,7 +89,7 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	/* >8 End of ethernet port configured with default settings. */
 
 	/* Configuring number of RX and TX queues connected to single port. 8< */
-	for (i = 0; i < port->dp_layer->nr_rx_queues; i++) {
+	for (i = 0; i < port->dp_layer->nr_std_rx_queues; i++) {
 		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
 									rte_eth_dev_socket_id(port_id),
 									&rxq_conf,
@@ -97,7 +107,7 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	txq_conf = dev_info.default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
-	for (i = 0; i < port->dp_layer->nr_tx_queues; i++) {
+	for (i = 0; i < port->dp_layer->nr_std_tx_queues; i++) {
 		ret = rte_eth_tx_queue_setup(port_id, i, 2048,
 									rte_eth_dev_socket_id(port_id),
 									&txq_conf);
@@ -243,7 +253,7 @@ static struct dp_port* dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_la
 	return NULL;
 }
 
-static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
+struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	int i;
 

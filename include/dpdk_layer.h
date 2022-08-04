@@ -18,8 +18,9 @@ extern "C" {
 #define DP_MAX_VF_PRO_PORT	32
 #define DP_ACTIVE_VF_PORT	4
 #define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
-#define DP_NR_RX_QUEUES		1
-#define DP_NR_TX_QUEUES		1
+#define DP_NR_STD_RX_QUEUES		1
+#define DP_NR_STD_TX_QUEUES		1
+#define DP_NR_VF_HAIRPIN_RX_QUEUES	1
 #define MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		2
 #define DP_INTERNAL_Q_SIZE	32
@@ -36,8 +37,14 @@ struct dp_dpdk_layer {
 	struct dp_port					*ports[DP_MAX_PORTS];
 	struct rte_node_ethdev_config 	ethdev_conf[DP_MAX_PORTS];
 	int								dp_port_cnt;
-	uint16_t						nr_rx_queues;
-	uint16_t						nr_tx_queues;
+	// uint16_t						nr_rx_queues;
+	// uint16_t						nr_tx_queues;
+	uint16_t						nr_std_rx_queues;
+	uint16_t						nr_std_tx_queues;
+	uint16_t						nr_pf_hairpin_tx_queues;
+	uint16_t						nr_pf_hairpin_rx_queues;
+	uint16_t						nr_vf_hairpin_tx_queues;
+	uint16_t						nr_vf_hairpin_rx_queues;
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
 	rte_graph_t 					graph_id;
@@ -79,6 +86,9 @@ void set_underlay_conf(struct underlay_conf *u_conf);
 struct underlay_conf *get_underlay_conf();
 struct dp_dpdk_layer *get_dpdk_layer();
 pthread_t *dp_get_ctrl_thread_id();
+
+int hairpin_vfs_to_pf();
+int hairpin_two_ports_bind();
 
 #ifdef __cplusplus
 }

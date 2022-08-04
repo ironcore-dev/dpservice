@@ -34,6 +34,8 @@ struct dp_port {
 	struct dp_port_ext		dp_port_ext;
 	char					node_name[RTE_NODE_NAMESIZE];
 	uint8_t					link_status;
+	uint8_t					peer_pf_hairpin_tx_queue_offset;
+	uint8_t					peer_pf_port_id;
 };
 
 bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid);
@@ -49,6 +51,7 @@ int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_
 int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid);
 void print_link_info(int port_id, char *out, size_t out_size);
 void dp_port_exit();
+struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid);
 
 void dp_port_set_link_status(struct dp_dpdk_layer *dp_layer,int port_id, uint8_t status);
 uint8_t dp_port_get_link_status(struct dp_dpdk_layer *dp_layer,int port_id);
