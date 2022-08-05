@@ -89,7 +89,6 @@ static void dp_init_interfaces()
 		dp_init_interface(&vf_port, DP_PORT_VF);
 
 	hairpin_vfs_to_pf();
-	hairpin_two_ports_bind();
 
 	dp_init_graph();
 	dp_start_interface(&pf0_port, dp_get_pf0_port_id(), DP_PORT_PF);
