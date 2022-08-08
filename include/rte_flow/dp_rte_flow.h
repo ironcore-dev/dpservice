@@ -87,6 +87,11 @@ int insert_geneve_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_geneve *geneve_mask,
 								uint16_t type, uint32_t *vni);
 
+int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_mark *mark_spec,
+									struct rte_flow_item_mark *mark_mask,
+									uint32_t marked_id);
+
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt);
 
 
@@ -126,6 +131,10 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 int create_redirect_queue_action (struct rte_flow_action *action, int action_cnt,
 									struct rte_flow_action_queue *queue_action,
 									uint16_t queue_index);
+
+int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_mark *mark_action,
+							uint32_t marked_value);
 
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 

@@ -425,6 +425,26 @@ int insert_geneve_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	return ++pattern_cnt;
 }
 
+int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_mark *mark_spec,
+									struct rte_flow_item_mark *mark_mask,
+									uint32_t marked_id)
+{
+
+	memset(mark_spec, 0, sizeof(struct rte_flow_item_mark));
+	memset(mark_mask, 0, sizeof(struct rte_flow_item_mark));
+
+	mark_spec -> id = marked_id;
+	mark_mask -> id = rte_flow_item_mark_mask.id;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_MARK;
+	pattern[pattern_cnt].spec = mark_spec;
+	pattern[pattern_cnt].mask = mark_mask;
+
+	return ++pattern_cnt;
+}
+
+
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt)
 {
 
@@ -539,6 +559,19 @@ int create_redirect_queue_action(struct rte_flow_action *action, int action_cnt,
 
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_QUEUE;
 	action[action_cnt].conf = queue_action;
+
+	return ++action_cnt;
+}
+
+int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_mark *mark_action,
+							uint32_t marked_value)
+{
+
+	mark_action->id =  marked_value;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_MARK;
+	action[action_cnt].conf = mark_action;
 
 	return ++action_cnt;
 }
