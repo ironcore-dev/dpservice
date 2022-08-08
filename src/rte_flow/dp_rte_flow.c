@@ -589,7 +589,7 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 	}
 	else
 	{
-		printf("Flow validated on port %d targeting port %d \n ", port_id, df->nxt_hop);
+		printf("Flow validated on port %d \n", port_id);
 		flow = rte_flow_create(port_id, attr, pattern, action, &error);
 		if (!flow)
 		{

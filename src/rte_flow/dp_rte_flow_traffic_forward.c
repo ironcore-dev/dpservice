@@ -277,7 +277,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_hairpin_offload(struct rte
 
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
-	hairpin_action_cnt = create_raw_decap_action(hairpin_action, hairpin_action_cnt,
+	action_cnt = create_raw_decap_action(action, action_cnt,
 										 &raw_decap, NULL, sizeof(struct rte_ether_hdr));
 
 
@@ -339,9 +339,9 @@ static __rte_always_inline int dp_handle_tunnel_encap_hairpin_offload(struct rte
 										&flow_age, 60, agectx);
 
 	// create flow action -- send to port
-	struct rte_flow_action_port_id send_to_port;
-	action_cnt = create_send_to_port_action(action, action_cnt,
-											&send_to_port, df->nxt_hop);
+	// struct rte_flow_action_port_id send_to_port;
+	// action_cnt = create_send_to_port_action(action, action_cnt,
+	// 										&send_to_port, df->nxt_hop);
 
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
