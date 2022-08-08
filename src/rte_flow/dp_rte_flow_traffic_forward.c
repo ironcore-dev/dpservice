@@ -192,11 +192,31 @@ static __rte_always_inline int dp_handle_tunnel_encap_hairpin_offload(struct rte
 	memset(hairpin_action, 0, sizeof(hairpin_action));
 
 	// create flow match pattern -- mark
-	struct rte_flow_item_mark mark_spec;
-	struct rte_flow_item_mark mark_mask;
-	pattern_cnt = insert_packet_mark_match_pattern(pattern, pattern_cnt,
-												&mark_spec, &mark_mask,
-												df->tun_info.dst_vni);
+	// struct rte_flow_item_mark mark_spec;
+	// struct rte_flow_item_mark mark_mask;
+	// pattern_cnt = insert_packet_mark_match_pattern(pattern, pattern_cnt,
+	// 											&mark_spec, &mark_mask,
+	// 											0x64);
+	// pattern_cnt = insert_packet_mark_match_pattern(pattern, pattern_cnt,
+	// 											&mark_spec, &mark_mask,
+	// 											df->tun_info.dst_vni);
+
+	// struct rte_flow_item_tag tag_spec;
+	// struct rte_flow_item_tag tag_mask;
+	// pattern_cnt = insert_tag_match_pattern(pattern, pattern_cnt,
+	// 											&tag_spec, &tag_mask,
+	// 											df->tun_info.dst_vni,0);
+
+	// struct rte_flow_item_meta meta_spec;
+	// struct rte_flow_item_meta meta_mask;
+	// pattern_cnt = insert_meta_match_pattern(pattern, pattern_cnt,
+	// 										&meta_spec, &meta_mask,
+	// 										df->tun_info.dst_vni);
+	
+	uint8_t vni_in_mac_addr[RTE_ETHER_ADDR_LEN];
+	memset(vni_in_mac_addr,0,sizeof(vni_in_mac_addr));
+	memcpy(vni_in_mac_addr, &df->tun_info.dst_vni, 4);
+
 
 	// create flow match patterns -- eth
 	struct rte_flow_item_eth eth_spec;
@@ -297,8 +317,20 @@ static __rte_always_inline int dp_handle_tunnel_encap_hairpin_offload(struct rte
 
 
 	/*Firstly install a flow rule to move packet to hairpin rxq*/
-	struct rte_flow_action_mark mark_action;
-	hairpin_action_cnt = create_packet_mark_action(hairpin_action, hairpin_action_cnt, &mark_action, df->tun_info.dst_vni);
+	// struct rte_flow_action_mark mark_action;
+	// hairpin_action_cnt = create_packet_mark_action(hairpin_action, hairpin_action_cnt, &mark_action, df->tun_info.dst_vni);
+	// hairpin_action_cnt = create_packet_mark_action(hairpin_action, hairpin_action_cnt, &mark_action, 0x64);
+	
+	// struct rte_flow_action_set_tag tag_action;
+	// hairpin_action_cnt = create_set_tag_action(hairpin_action, hairpin_action_cnt, &tag_action, df->tun_info.dst_vni,0);
+
+	// struct rte_flow_action_set_meta meta_action;
+	// hairpin_action_cnt = create_set_meta_action(hairpin_action, hairpin_action_cnt, &meta_action, df->tun_info.dst_vni);
+
+	struct rte_flow_action_set_mac set_mac_action;
+	struct rte_ether_addr	e_addr;
+	memcpy(e_addr.addr_bytes, vni_in_mac_addr, sizeof(RTE_ETHER_ADDR_LEN));
+	hairpin_action_cnt = create_dst_mac_set_action(hairpin_action, hairpin_action_cnt, &set_mac_action, &e_addr);
 
 	struct rte_flow_action_queue queue_action;
 	uint16_t sample_queue_id = DP_NR_STD_RX_QUEUES;

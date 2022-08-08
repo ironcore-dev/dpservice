@@ -444,6 +444,48 @@ int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_
 	return ++pattern_cnt;
 }
 
+int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_tag *tag_spec,
+									struct rte_flow_item_tag *tag_mask,
+									uint32_t tag_value, uint8_t tag_index)
+{
+
+	memset(tag_spec, 0, sizeof(struct rte_flow_item_tag));
+	memset(tag_mask, 0, sizeof(struct rte_flow_item_tag));
+
+	tag_spec -> data = tag_value;
+	tag_spec -> index = tag_index;
+
+	tag_mask -> data = rte_flow_item_tag_mask.data;
+	tag_mask -> index = rte_flow_item_tag_mask.index;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TAG;
+	pattern[pattern_cnt].spec = tag_spec;
+	pattern[pattern_cnt].mask = tag_mask;
+
+	return ++pattern_cnt;
+}
+
+int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+							struct rte_flow_item_meta *meta_spec,
+							struct rte_flow_item_meta *meta_mask,
+							uint32_t meta_value)
+{
+
+	memset(meta_spec, 0, sizeof(struct rte_flow_item_meta));
+	memset(meta_mask, 0, sizeof(struct rte_flow_item_meta));
+
+	meta_spec -> data = meta_value;
+	
+	meta_mask -> data = 0xffffffff;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_META;
+	pattern[pattern_cnt].spec = meta_spec;
+	pattern[pattern_cnt].mask = meta_mask;
+
+	return ++pattern_cnt;
+}
+
 
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt)
 {
@@ -572,6 +614,36 @@ int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
 
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_MARK;
 	action[action_cnt].conf = mark_action;
+
+	return ++action_cnt;
+}
+
+int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_set_tag *set_tag_action,
+							uint32_t tag_value, uint8_t index)
+{
+
+	set_tag_action->data =  tag_value;
+	set_tag_action->mask =  0xffffffff;
+	set_tag_action->index = 0;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TAG;
+	action[action_cnt].conf = set_tag_action;
+
+	return ++action_cnt;
+}
+
+
+int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_set_meta *meta_action,
+							uint32_t meta_value)
+{
+
+	meta_action->data =  meta_value;
+	meta_action->mask= 0xffffffff;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_META;
+	action[action_cnt].conf = meta_action;
 
 	return ++action_cnt;
 }

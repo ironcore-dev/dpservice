@@ -92,6 +92,16 @@ int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_
 									struct rte_flow_item_mark *mark_mask,
 									uint32_t marked_id);
 
+int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_tag *tag_spec,
+									struct rte_flow_item_tag *tag_mask,
+									uint32_t tag_value, uint8_t tag_index);
+
+int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+							struct rte_flow_item_meta *meta_spec,
+							struct rte_flow_item_meta *meta_mask,
+							uint32_t meta_value);
+
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt);
 
 
@@ -135,6 +145,14 @@ int create_redirect_queue_action (struct rte_flow_action *action, int action_cnt
 int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_mark *mark_action,
 							uint32_t marked_value);
+
+int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_set_tag *set_tag_action,
+							uint32_t tag_value, uint8_t index);
+
+int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_set_meta *meta_action,
+							uint32_t meta_value);
 
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 
