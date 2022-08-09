@@ -227,8 +227,8 @@ int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 
 	if (dst)
 	{
-		memcpy(&(eth_spec->src), src, nr_dst_mask_len);
-		memcpy(&(eth_mask->src), ether_addr_mask, nr_dst_mask_len);
+		memcpy(&(eth_spec->dst), dst, nr_dst_mask_len);
+		memcpy(&(eth_mask->dst), ether_addr_mask, nr_dst_mask_len);
 	}
 
 	eth_spec->type = type;
@@ -698,7 +698,7 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 		flow = rte_flow_create(port_id, attr, pattern, action, &error);
 		if (!flow)
 		{
-			printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+			printf("Flow can't be created on port %d message: %s\n", port_id, error.message ? error.message : "(no stated reason)");
 			return NULL;
 		}
 		return flow;

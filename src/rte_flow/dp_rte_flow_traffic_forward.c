@@ -218,17 +218,24 @@ static __rte_always_inline int dp_handle_tunnel_encap_hairpin_offload(struct rte
 	memcpy(vni_in_mac_addr, &df->tun_info.dst_vni, 4);
 
 
-	// create flow match patterns -- eth
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
+	// create flow match patterns -- eth, for maching vf packets
+	struct rte_flow_item_eth ol_eth_spec;
+	struct rte_flow_item_eth ol_eth_mask;
 	hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-												&eth_spec, &eth_mask,
+												&ol_eth_spec, &ol_eth_mask,
 												NULL, 0, NULL, 0,
 												htons(df->l3_type));
 	
+	
+	// create flow match patterns -- eth, for maching modified vf packets embedded with vni info
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+	struct rte_ether_addr modified_eth_dst_addr;
+	memcpy(modified_eth_dst_addr.addr_bytes, vni_in_mac_addr, sizeof(struct rte_ether_addr));
+	
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
+												NULL, 0, &modified_eth_dst_addr, sizeof(struct rte_ether_addr),
 												htons(df->l3_type));
 
 	// create flow match patterns -- inner packet, ipv6 or ipv4
