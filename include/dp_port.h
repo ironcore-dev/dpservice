@@ -34,7 +34,7 @@ struct dp_port {
 	struct dp_port_ext		dp_port_ext;
 	char					node_name[RTE_NODE_NAMESIZE];
 	uint8_t					link_status;
-	uint8_t					peer_pf_hairpin_tx_queue_offset;
+	uint8_t					peer_pf_hairpin_tx_rx_queue_offset;
 	uint8_t					peer_pf_port_id;
 };
 

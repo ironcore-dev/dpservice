@@ -20,7 +20,7 @@ extern "C" {
 #define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
 #define DP_NR_STD_RX_QUEUES		1
 #define DP_NR_STD_TX_QUEUES		1
-#define DP_NR_VF_HAIRPIN_RX_QUEUES	1
+#define DP_NR_VF_HAIRPIN_RX_TX_QUEUES	1
 #define MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		2
 #define DP_INTERNAL_Q_SIZE	32
@@ -41,10 +41,10 @@ struct dp_dpdk_layer {
 	// uint16_t						nr_tx_queues;
 	uint16_t						nr_std_rx_queues;
 	uint16_t						nr_std_tx_queues;
-	uint16_t						nr_pf_hairpin_tx_queues;
-	uint16_t						nr_pf_hairpin_rx_queues;
-	uint16_t						nr_vf_hairpin_tx_queues;
-	uint16_t						nr_vf_hairpin_rx_queues;
+	uint16_t						nr_pf_hairpin_rx_tx_queues;
+	// uint16_t						nr_pf_hairpin_rx_queues;
+	uint16_t						nr_vf_hairpin_rx_tx_queues;
+	// uint16_t						nr_vf_hairpin_rx_queues;
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
 	rte_graph_t 					graph_id;
@@ -91,6 +91,7 @@ int hairpin_vfs_to_pf();
 int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id);
 int hairpin_ports_bind_all(uint16_t port_id);
 int bind_vf_with_peer_pf_port(uint16_t port_id);
+uint16_t get_pf_hairpin_rx_queue(uint16_t port_id);
 
 #ifdef __cplusplus
 }

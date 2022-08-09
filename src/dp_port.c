@@ -68,12 +68,12 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 
 	if (port->dp_p_type == DP_PORT_VF)
 		ret = rte_eth_dev_configure(port_id,
-								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_vf_hairpin_rx_queues, 
-								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_vf_hairpin_tx_queues, &port_conf);
+								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_vf_hairpin_rx_tx_queues, 
+								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_vf_hairpin_rx_tx_queues, &port_conf);
 	else 
 		ret = rte_eth_dev_configure(port_id,
-								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_pf_hairpin_rx_queues, 
-								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_pf_hairpin_tx_queues, &port_conf);
+								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues, 
+								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues, &port_conf);
 
 	// ret = rte_eth_dev_configure(port_id,
 	// 							port->dp_layer->nr_rx_queues, 

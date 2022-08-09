@@ -24,7 +24,7 @@
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
 // static int last_pf0_hairpin_tx_queue_index=0;
-static int last_pf1_hairpin_tx_queue_offset = 1;
+static int last_pf1_hairpin_tx_rx_queue_offset = 1;
 static pthread_t ctrl_thread_tid;
 static struct rte_timer timer;
 static uint64_t timer_res;
@@ -106,11 +106,11 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.nr_std_rx_queues = DP_NR_STD_RX_QUEUES;
 	dp_layer.nr_std_tx_queues = DP_NR_STD_TX_QUEUES;
 
-	dp_layer.nr_vf_hairpin_rx_queues = DP_NR_VF_HAIRPIN_RX_QUEUES;
-	dp_layer.nr_pf_hairpin_tx_queues = DP_NR_VF_HAIRPIN_RX_QUEUES * dp_get_num_of_vfs();
+	dp_layer.nr_vf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
+	dp_layer.nr_pf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_get_num_of_vfs();
 
-	dp_layer.nr_pf_hairpin_rx_queues = 0;
-	dp_layer.nr_vf_hairpin_tx_queues = 0;
+	// dp_layer.nr_vf_hairpin_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
+	// dp_layer.nr_pf_hairpin_rx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_get_num_of_vfs();
 
 	// dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
 	// dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
@@ -304,7 +304,7 @@ static void allocate_pf_hairpin_tx_queue (uint16_t port_id, uint16_t peer_pf_por
 	vf_port = dp_get_vf_port_per_id(&dp_layer, port_id);
 
 	vf_port->peer_pf_port_id = peer_pf_port_id;
-	vf_port->peer_pf_hairpin_tx_queue_offset = hairpin_queue_offset;
+	vf_port->peer_pf_hairpin_tx_rx_queue_offset = hairpin_queue_offset;
 }
 
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
@@ -351,8 +351,8 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 				last_assigned_vf_idx++;
 
 				//if it belongs to pf0, assign a tx queue from pf1 for it
-				allocate_pf_hairpin_tx_queue(port_id,dp_get_pf1_port_id(),last_pf1_hairpin_tx_queue_offset);
-				last_pf1_hairpin_tx_queue_offset++;
+				allocate_pf_hairpin_tx_queue(port_id,dp_get_pf1_port_id(),last_pf1_hairpin_tx_rx_queue_offset);
+				last_pf1_hairpin_tx_rx_queue_offset++;
 				return port_id;
 			}
 			cnt++;
@@ -411,9 +411,16 @@ int hairpin_vfs_to_pf() {
 	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++){
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF) {
 			ret = setup_hairpin_rx_tx_queues(dp_layer.ports[i]->dp_port_id, dp_layer.ports[i]->peer_pf_port_id,
-											1,dp_layer.ports[i]->peer_pf_hairpin_tx_queue_offset);
+											1,dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset);
 			if (ret < 0) {
 				printf("Failed to setup hairpin rx queue for vf %d \n",dp_layer.ports[i]->dp_port_id);
+				return ret;
+			}
+
+			ret = setup_hairpin_rx_tx_queues(dp_layer.ports[i]->peer_pf_port_id, dp_layer.ports[i]->dp_port_id,
+											dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset, 1);
+			if (ret < 0) {
+				printf("Failed to setup hairpin tx queue for vf %d \n",dp_layer.ports[i]->dp_port_id);
 				return ret;
 			}
 		}
@@ -468,6 +475,12 @@ int bind_vf_with_peer_pf_port (uint16_t port_id)
 			ret = rte_eth_hairpin_bind(peer_pf_port, port_id);
 			if (ret < 0) {
 				printf("Failed to bind %d to %d, due to error: %d \n", peer_pf_port, port_id, ret);
+				return ret;
+			}
+			printf("Try to bind %d to %d \n", port_id, peer_pf_port);
+			ret = rte_eth_hairpin_bind(port_id, peer_pf_port);
+			if (ret < 0) {
+				printf("Failed to bind %d to %d, due to error: %d \n", port_id, peer_pf_port, ret);
 				return ret;
 			}
 			break;
