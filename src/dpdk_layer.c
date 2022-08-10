@@ -307,6 +307,20 @@ static void allocate_pf_hairpin_tx_queue (uint16_t port_id, uint16_t peer_pf_por
 	vf_port->peer_pf_hairpin_tx_rx_queue_offset = hairpin_queue_offset;
 }
 
+uint16_t get_pf_hairpin_rx_queue(uint16_t port_id)
+{
+	uint16_t pf_rx_q_index;
+
+	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++){
+		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF && dp_layer.ports[i]->dp_port_id == port_id) {
+			pf_rx_q_index =  dp_layer.nr_std_rx_queues - 1 + dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset;
+			break;
+		}
+	}
+
+	return pf_rx_q_index;
+}
+
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 {
 	uint32_t ret, cnt = 0;

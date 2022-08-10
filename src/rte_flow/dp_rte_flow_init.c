@@ -6,7 +6,7 @@ void dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 
 	// create flow attributes
 	struct rte_flow_attr attr;
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
+	create_rte_flow_rule_attr(&attr, 0, 1, 1, 0, 0);
 
 	struct rte_flow_item pattern[3];
 	int pattern_cnt = 0;
