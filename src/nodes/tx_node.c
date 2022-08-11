@@ -81,12 +81,6 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);
 		}
 
-		// cannot offload traffic forwarding from pf1 to vf of pf0
-		// if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		// 	if (mbuf0->port != dp_get_pf0_port_id())
-		// 		df->flags.valid = 0;
-		// }
-
 		if (df && df->flags.valid && df->conntrack)
 			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}

@@ -518,8 +518,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	struct rte_flow_action_set_mac set_dst_mac;
 	struct rte_flow_action_age hairpin_flow_age;
 
-	// config the content of agectx
-	// config_allocated_agectx(agectx, m->port, df, flow);
 	if (cross_pf_port) {
 		hairpin_action_cnt = create_dst_mac_set_action(hairpin_action, hairpin_action_cnt,
 											&set_dst_mac,&new_eth_hdr->dst_addr);

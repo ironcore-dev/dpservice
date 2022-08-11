@@ -37,14 +37,10 @@ struct dp_dpdk_layer {
 	struct dp_port					*ports[DP_MAX_PORTS];
 	struct rte_node_ethdev_config 	ethdev_conf[DP_MAX_PORTS];
 	int								dp_port_cnt;
-	// uint16_t						nr_rx_queues;
-	// uint16_t						nr_tx_queues;
 	uint16_t						nr_std_rx_queues;
 	uint16_t						nr_std_tx_queues;
 	uint16_t						nr_pf_hairpin_rx_tx_queues;
-	// uint16_t						nr_pf_hairpin_rx_queues;
 	uint16_t						nr_vf_hairpin_rx_tx_queues;
-	// uint16_t						nr_vf_hairpin_rx_queues;
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
 	rte_graph_t 					graph_id;

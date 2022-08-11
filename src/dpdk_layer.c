@@ -19,11 +19,8 @@
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 
-// #include "rte_pdump.h"
-
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
-// static int last_pf0_hairpin_tx_queue_index=0;
 static int last_pf1_hairpin_tx_rx_queue_offset = 1;
 static pthread_t ctrl_thread_tid;
 static struct rte_timer timer;
@@ -109,11 +106,6 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.nr_vf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
 	dp_layer.nr_pf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_get_num_of_vfs();
 
-	// dp_layer.nr_vf_hairpin_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
-	// dp_layer.nr_pf_hairpin_rx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_get_num_of_vfs();
-
-	// dp_layer.nr_rx_queues = DP_NR_RX_QUEUES;
-	// dp_layer.nr_tx_queues = DP_NR_TX_QUEUES;
 	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.grpc_tx_queue)
 		printf("Error creating grpc tx queue\n");
@@ -242,8 +234,6 @@ static int dp_cfg_ethdev(int port_id)
 	struct rte_node_ethdev_config *ethdev_conf;
 
 	ethdev_conf = &dp_layer.ethdev_conf[dp_layer.dp_port_cnt - 1];
-	// ethdev_conf->num_rx_queues = dp_layer.nr_rx_queues;
-	// ethdev_conf->num_tx_queues = dp_layer.nr_tx_queues;
 	ethdev_conf->port_id = port_id;
 	ethdev_conf->mp_count = 1;
 	ethdev_conf->mp = &dp_layer.rte_mempool;

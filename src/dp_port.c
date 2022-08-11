@@ -75,9 +75,6 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues, 
 								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues, &port_conf);
 
-	// ret = rte_eth_dev_configure(port_id,
-	// 							port->dp_layer->nr_rx_queues, 
-	// 							port->dp_layer->nr_tx_queues, &port_conf);
 	if (ret < 0) {
 		rte_exit(EXIT_FAILURE,
 				":: cannot configure device: err=%d, port=%u\n",
