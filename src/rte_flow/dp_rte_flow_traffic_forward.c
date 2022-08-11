@@ -284,19 +284,42 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
 
-	printf("dp_handle_tunnel_decap_offload called \n");
+	printf("dp_handle_tunnel_decap_hairpin_offload called \n");
 	struct underlay_conf *u_conf = get_underlay_conf();
+	bool cross_pf_port = m->port == dp_get_pf0_port_id()? false : true;
 
 	struct rte_flow_attr attr;
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
+	// create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 
 	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
 	int pattern_cnt = 0;
+	struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
+	int hairpin_pattern_cnt = 0;
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
+	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
+	int hairpin_action_cnt = 0;
 	memset(pattern, 0, sizeof(pattern));
+	// memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
 	memset(action, 0, sizeof(action));
+	memset(hairpin_action, 0, sizeof(hairpin_action));
 
+
+	uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
+	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)eth_hdr;
+	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
+	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
+	new_eth_hdr->ether_type = htons(df->l3_type);
+
+	struct rte_flow_item_eth ol_eth_spec;
+	struct rte_flow_item_eth ol_eth_mask;
+	if (cross_pf_port)
+		hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+														&ol_eth_spec, &ol_eth_mask,
+														&new_eth_hdr->src_addr, sizeof(struct rte_ether_addr), &new_eth_hdr->dst_addr, sizeof(struct rte_ether_addr),
+														new_eth_hdr->ether_type);
+
+	
 	// create flow match patterns -- eth
 	struct rte_flow_item_eth eth_spec;
 	struct rte_flow_item_eth eth_mask;
@@ -346,12 +369,22 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 												NULL, 0,
 												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 												df->l4_type);
+		if (cross_pf_port)
+			hairpin_pattern_cnt = insert_ipv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+													&ol_ipv6_spec, &ol_ipv6_mask,
+													NULL, 0,
+													df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
+													df->l4_type);
 	}
 	else
 	{
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
 												df, DP_IS_DST);
+		if (cross_pf_port)
+			hairpin_pattern_cnt = insert_ipv4_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+													&ol_ipv4_spec, &ol_ipv4_mask,
+													df, DP_IS_DST);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -362,6 +395,11 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
 											   df->src_port, df->dst_port);
+		if (cross_pf_port)
+			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+												&tcp_spec, &tcp_mask,
+												df->src_port, df->dst_port);
+
 	}
 
 	struct rte_flow_item_udp udp_spec;
@@ -371,6 +409,10 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
 											   df->src_port, df->dst_port);
+		if (cross_pf_port)
+			hairpin_pattern_cnt = insert_udp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+												&udp_spec, &udp_mask,
+												df->src_port, df->dst_port);
 	}
 
 	struct rte_flow_item_icmp icmp_spec;
@@ -380,6 +422,10 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
 												&icmp_spec, &icmp_mask,
 												df->icmp_type);
+		if (cross_pf_port)
+			hairpin_pattern_cnt = insert_icmp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+													&icmp_spec, &icmp_mask,
+													df->icmp_type);
 	}
 
 	struct rte_flow_item_icmp6 icmp6_spec;
@@ -389,10 +435,16 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
 												  &icmp6_spec, &icmp6_mask,
 												  df->icmp_type);
+		if (cross_pf_port)
+			hairpin_pattern_cnt = insert_icmpv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+													&icmp6_spec, &icmp6_mask,
+													df->icmp_type);
 	}
 
 	// create flow match patterns -- end
 	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
+	if (cross_pf_port)
+		hairpin_pattern_cnt = insert_end_match_pattern(hairpin_pattern, hairpin_pattern_cnt);
 
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
@@ -408,14 +460,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	}
 
 	// create flow action -- raw encap
-	uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
 	struct rte_flow_action_raw_encap raw_encap;
-
-	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)eth_hdr;
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
-	new_eth_hdr->ether_type = htons(df->l3_type);
-
 	action_cnt = create_raw_encap_action(action, action_cnt,
 										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
 
@@ -428,252 +473,81 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	action_cnt = create_flow_age_action(action, action_cnt,
 											&flow_age, 60, agectx);
 
-	// create flow action -- send to port
+	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
+	struct rte_flow_action_queue queue_action;
 	struct rte_flow_action_port_id send_to_port;
-	action_cnt = create_send_to_port_action(action, action_cnt,
+	if (cross_pf_port) {
+		uint16_t hairpin_rx_queue_id = get_pf_hairpin_rx_queue((uint16_t)df->nxt_hop);
+ 		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
+	} else {
+		// create flow action -- send to port
+		action_cnt = create_send_to_port_action(action, action_cnt,
 											&send_to_port, df->nxt_hop);
+	}
+
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
 	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
-	if (!flow)
-	{
-		free_allocated_agectx(agectx);
-		return 0;
+	if (cross_pf_port) {
+		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
+		struct rte_flow *hairpin_flow = NULL;
+		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+		if (!hairpin_flow)
+		{
+			free_allocated_agectx(agectx);
+			printf("failed to install hairpin queue flow rule P1 \n");
+			return 0;
+		}
+		// config the content of agectx
+		printf("install decap hairpin p1 \n");		
+		config_allocated_agectx(agectx, m->port, df, hairpin_flow);
+	} else {
+		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
+		struct rte_flow *flow = NULL;
+		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+		if (!flow) {
+			free_allocated_agectx(agectx);
+			return 0;
+		}
+		printf("install decap normal \n");	
+		// config the content of agectx
+		config_allocated_agectx(agectx, m->port, df, flow);
 	}
-
-	// config the content of agectx
-	config_allocated_agectx(agectx, m->port, df, flow);
-	return 1;
-}
-
-static __rte_always_inline int dp_handle_tunnel_decap_hairpin_offload(struct rte_mbuf *m, struct dp_flow *df)
-{
-
-	printf("dp_handle_tunnel_decap_hairpin_offload called \n");
-	struct underlay_conf *u_conf = get_underlay_conf();
-
-	struct rte_flow_attr attr;
-	// create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
-
-	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
-	int pattern_cnt = 0;
-	// struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
-	// int hairpin_pattern_cnt = 0;
-	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
-	int action_cnt = 0;
-	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
-	int hairpin_action_cnt = 0;
-	memset(pattern, 0, sizeof(pattern));
-	// memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
-	memset(action, 0, sizeof(action));
-	memset(hairpin_action, 0, sizeof(hairpin_action));
-	
-	// create flow match patterns -- eth
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
-	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
-												htons(df->tun_info.l3_type));
-
-	// create flow match patterns -- ipv6
-	struct rte_flow_item_ipv6 ipv6_spec;
-	struct rte_flow_item_ipv6 ipv6_mask;
-	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-											&ipv6_spec, &ipv6_mask,
-											NULL, 0,
-											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
-											df->tun_info.proto_id);
-
-	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
-	{
-
-		// create flow match patterns -- udp
-		struct rte_flow_item_udp udp_spec;
-		struct rte_flow_item_udp udp_mask;
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   0, htons(u_conf->dst_port));
-
-		// create flow match patterns -- geneve
-		struct rte_flow_item_geneve gen_spec;
-		struct rte_flow_item_geneve gen_mask;
-		pattern_cnt = insert_geneve_match_pattern(pattern, pattern_cnt,
-												  &gen_spec, &gen_mask,
-												  df->l3_type, &df->tun_info.dst_vni);
-	}
-
-	// create flow match patterns -- inner packet, ipv6 or ipv4
-	struct rte_flow_item_ipv6 ol_ipv6_spec;
-	struct rte_flow_item_ipv6 ol_ipv6_mask;
-
-	struct rte_flow_item_ipv4 ol_ipv4_spec;
-	struct rte_flow_item_ipv4 ol_ipv4_mask;
-
-	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-	{
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-												df->l4_type);
-	}
-	else
-	{
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
-												&ol_ipv4_spec, &ol_ipv4_mask,
-												df, DP_IS_DST);
-	}
-
-	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
-	struct rte_flow_item_tcp tcp_spec;
-	struct rte_flow_item_tcp tcp_mask;
-	if (df->l4_type == DP_IP_PROTO_TCP)
-	{
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
-											   &tcp_spec, &tcp_mask,
-											   df->src_port, df->dst_port);
-	}
-
-	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
-	if (df->l4_type == DP_IP_PROTO_UDP)
-	{
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   df->src_port, df->dst_port);
-	}
-
-	struct rte_flow_item_icmp icmp_spec;
-	struct rte_flow_item_icmp icmp_mask;
-	if (df->l4_type == DP_IP_PROTO_ICMP)
-	{
-		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
-												&icmp_spec, &icmp_mask,
-												df->icmp_type);
-	}
-
-	struct rte_flow_item_icmp6 icmp6_spec;
-	struct rte_flow_item_icmp6 icmp6_mask;
-	if (df->l4_type == DP_IP_PROTO_ICMPV6)
-	{
-		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
-												  &icmp6_spec, &icmp6_mask,
-												  df->icmp_type);
-	}
-
-	// create flow match patterns -- end
-	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
-
-	/*Firstly, move this packets to the right hairpin rx queue of pf, so as to be moved to vf*/
-	struct rte_flow_action_raw_decap raw_decap;
-	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
-	{
-		hairpin_action_cnt = create_raw_decap_action(hairpin_action, hairpin_action_cnt,
-											 &raw_decap, NULL, DP_TUNN_GENEVE_ENCAP_SIZE);
-	}
-	else
-	{
-		hairpin_action_cnt = create_raw_decap_action(hairpin_action, hairpin_action_cnt,
-											 &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
-	}
-
-	uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
-	struct rte_flow_action_raw_encap raw_encap;
-
-	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)eth_hdr;
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
-	new_eth_hdr->ether_type = htons(df->l3_type);
-
-	hairpin_action_cnt = create_raw_encap_action(hairpin_action, hairpin_action_cnt,
-										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
-
-
-	struct rte_flow_action_queue queue_action;
-	uint16_t hairpin_rx_queue_id = get_pf_hairpin_rx_queue((uint16_t)df->nxt_hop);
-	printf("hairpin_rx_queue_id is %d \n",hairpin_rx_queue_id);
- 	hairpin_action_cnt = create_redirect_queue_action(hairpin_action, hairpin_action_cnt, &queue_action, hairpin_rx_queue_id);
-
-	// create flow action -- end
-	hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
-
-	// validate and install rte flow
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
-	struct rte_flow *hairpin_flow = NULL;
-	hairpin_flow = validate_and_install_rte_flow(m->port, &attr, pattern, hairpin_action, df);
-	if (!hairpin_flow)
-	{
-		// free_allocated_agectx(agectx);
-		printf("failed to install hairpin queue flow rule \n");
-		return 0;
-	}
-
-	// create flow action -- raw decap
-	// struct rte_flow_action_raw_decap raw_decap;
-	// if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
-	// {
-	// 	action_cnt = create_raw_decap_action(action, action_cnt,
-	// 										 &raw_decap, NULL, DP_TUNN_GENEVE_ENCAP_SIZE);
-	// }
-	// else
-	// {
-	// 	action_cnt = create_raw_decap_action(action, action_cnt,
-	// 										 &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
-	// }
 
 	// create flow action -- set dst mac
 	/* This redundant action is needed to make hairpin work*/
 	struct rte_flow_action_set_mac set_dst_mac;
-	// struct rte_ether_addr mac_addr_b={
-	// 	.addr_bytes="\xff\xff\xff\xff\xff\xff",
-	// };
-	action_cnt = create_dst_mac_set_action(action, action_cnt,
-										   &set_dst_mac,&new_eth_hdr->dst_addr);
-	
-	// create flow action -- raw encap
-	// uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
-	// struct rte_flow_action_raw_encap raw_encap;
-
-	// struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)eth_hdr;
-	// rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
-	// rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
-	// new_eth_hdr->ether_type = htons(df->l3_type);
-
-	// action_cnt = create_raw_encap_action(action, action_cnt,
-	// 									 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
-
-	// create flow action -- age
-	// struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-	// struct rte_flow_action_age flow_age;
-	// if (!agectx)
-	// 	return 0;
-
-	// action_cnt = create_flow_age_action(action, action_cnt,
-	// 										&flow_age, 60, agectx);
-
-	// create flow action -- send to port
-	// struct rte_flow_action_port_id send_to_port;
-	// action_cnt = create_send_to_port_action(action, action_cnt,
-	// 										&send_to_port, df->nxt_hop);
-	// create flow action -- end
-	action_cnt = create_end_action(action, action_cnt);
-
-	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-	create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
-	flow = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, action, df);
-	if (!flow)
-	{
-		// free_allocated_agectx(agectx);
-		return 0;
-	}
+	struct rte_flow_action_age hairpin_flow_age;
 
 	// config the content of agectx
 	// config_allocated_agectx(agectx, m->port, df, flow);
+	if (cross_pf_port) {
+		hairpin_action_cnt = create_dst_mac_set_action(hairpin_action, hairpin_action_cnt,
+											&set_dst_mac,&new_eth_hdr->dst_addr);
+		// create flow action -- age
+		struct flow_age_ctx *hairpin_agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
+		if (!hairpin_agectx)
+			return 0;
+		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
+											&hairpin_flow_age, 60, hairpin_agectx);
+		// create flow action -- end
+		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
+		// validate and install rte flow
+		struct rte_flow *hairpin_flow_P2 = NULL;
+		create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
+		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action, df);
+		if (!hairpin_flow_P2)
+		{
+			free_allocated_agectx(hairpin_agectx);
+			printf("failed to install hairpin queue flow rule P2 \n");
+			return 0;
+		}
+		printf("install decap hairpin p2 \n");	
+		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
+	}
+		
+
 	return 1;
 }
 
@@ -813,14 +687,11 @@ int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
 		return dp_handle_local_traffic_forward(m, df);
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING){
-		printf("offload incoming traffic \n");
-		// return dp_handle_tunnel_decap_offload(m, df);
-		return dp_handle_tunnel_decap_hairpin_offload(m, df);
-	}
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		return dp_handle_tunnel_decap_offload(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-			return dp_handle_tunnel_encap_offload(m,df);
+		return dp_handle_tunnel_encap_offload(m,df);
 
 	return 0;
 }
