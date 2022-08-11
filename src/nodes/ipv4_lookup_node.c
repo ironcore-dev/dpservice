@@ -67,23 +67,29 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 
 	if (dp_is_offload_enabled())
 		df_ptr->flags.valid = 1;
-
+	
+	// printf("port id %d \n",df_ptr->nxt_hop);
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		// rewrite outgoing port if WCMP algorithm decides to do so
 		if (dp_is_wcmp_enabled()) {
-			// egress_pf_port selected_port = calculate_port_by_hash(df_ptr->dp_flow_hash);
-			// struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-			// uint16_t owner_port_id = dp_get_pf0_port_id();
+			egress_pf_port selected_port = calculate_port_by_hash(df_ptr->dp_flow_hash);
+			struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
+			uint16_t owner_port_id = dp_get_pf0_port_id();
 			uint16_t peer_port_id = dp_get_pf1_port_id();
-
-			df_ptr->nxt_hop = peer_port_id; // test code, must be removed later
+			// printf("select port %d \n", selected_port);
+			// df_ptr->nxt_hop = peer_port_id; // test code, must be removed later
 
 			// basic logic of port redundancy if one of ports are down
-			// if ((selected_port == PEER_PORT && dp_port_get_link_status(dp_layer,peer_port_id) == RTE_ETH_LINK_UP) 
-			// 	|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer,owner_port_id) == RTE_ETH_LINK_DOWN)) {
-			// 	df_ptr->nxt_hop = peer_port_id;
-			// 	// df_ptr->flags.valid = 0;
-			// }
+			if ((selected_port == PEER_PORT && dp_port_get_link_status(dp_layer,peer_port_id) == RTE_ETH_LINK_UP) 
+				|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer,owner_port_id) == RTE_ETH_LINK_DOWN)) {
+				// if ( dp_port_get_link_status(dp_layer,owner_port_id) == RTE_ETH_LINK_DOWN)
+				// 	printf("owner port is down \n");
+				// else
+				// 	printf("owner port is up \n");
+				df_ptr->nxt_hop = peer_port_id;
+				// printf("changed port id %d \n",df_ptr->nxt_hop);
+				// df_ptr->flags.valid = 0;
+			}
 		}
 	}
 	

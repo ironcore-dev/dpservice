@@ -87,9 +87,6 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 		// 		df->flags.valid = 0;
 		// }
 
-		if (!df->conntrack)
-			printf("conntrack is null \n");
-
 		if (df && df->flags.valid && df->conntrack)
 			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}

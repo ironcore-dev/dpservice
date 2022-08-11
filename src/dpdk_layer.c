@@ -443,28 +443,6 @@ int hairpin_vfs_to_pf() {
 	return ret;
 }
 
-
-// static int
-// hairpin_port_bind(uint16_t port_id, int direction)
-// {
-// 	int i, ret = 0;
-// 	uint16_t peer_ports[RTE_MAX_ETHPORTS];
-// 	int peer_ports_num = 0;
-
-// 	peer_ports_num = rte_eth_hairpin_get_peer_ports(port_id,
-// 			peer_ports, RTE_MAX_ETHPORTS, direction);
-// 	if (peer_ports_num < 0 )
-// 		return peer_ports_num; /* errno. */
-// 	for (i = 0; i < peer_ports_num; i++) {
-// 		// if (!rte_eth_devices[i].data->dev_started)
-// 		// 	continue;
-// 		ret = rte_eth_hairpin_bind(port_id, peer_ports[i]);
-// 		if (ret)
-// 			return ret;
-// 	}
-// 	return ret;
-// }
-
 int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id)
 {
 	int ret = 0;
@@ -700,6 +678,7 @@ void dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type t
 		dp_install_isolated_mode(portid);
 
 	enable_rx_node(portid);
+	dp_port_set_link_status(&dp_layer, portid, RTE_ETH_LINK_UP);
 }
 
 void dp_stop_interface(int portid, dp_port_type type)
