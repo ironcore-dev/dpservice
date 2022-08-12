@@ -54,11 +54,11 @@ struct flow_value {
 	uint16_t		port;
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
-	struct rte_flow	*rteflow[DP_FLOW_DIR_MAX];
 };
 
 struct flow_age_ctx {
 	struct flow_value	*cntrack;
+	struct rte_flow		*rte_flow;
 	uint16_t			dir;
 };
 

@@ -54,7 +54,7 @@ void dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	}
 	else
 	{
-		printf("Isolate flow validated on port %d \n ", port_id);
+		// printf("Isolate flow validated on port %d \n ", port_id);
 		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
 		if (!flow)
 			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
@@ -123,7 +123,7 @@ void dp_install_isolated_mode_geneve(int port_id)
 	}
 	else
 	{
-		printf("Isolate flow validated on port %d \n ", port_id);
+		// printf("Isolate flow validated on port %d \n ", port_id);
 		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
 		if (!flow)
 			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");

@@ -162,9 +162,9 @@ void dp_process_aged_flows(int port_id)
 		agectx = (struct flow_age_ctx*)contexts[idx];
 		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, agectx->cntrack->rteflow[agectx->dir], &error);
+		rte_flow_destroy(port_id, agectx->rte_flow, &error);
 		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  rte_flow inserted on port %d\n", 
-			 agectx->cntrack->rteflow[agectx->dir], rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
+			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
 		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
 			dp_free_flow(agectx->cntrack);
 		rte_free(agectx);

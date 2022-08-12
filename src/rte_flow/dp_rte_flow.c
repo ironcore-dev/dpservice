@@ -669,8 +669,8 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 
 	agectx->cntrack = df->conntrack;
 	agectx->dir = agectx->cntrack->dir;
-	agectx->cntrack->rteflow[agectx->dir] = flow;
-	agectx->cntrack->port = port_id;
+	agectx->rte_flow = flow;
+	// agectx->cntrack->port = port_id; // it is not actually used, considering to remove this field
 	rte_atomic32_inc(&agectx->cntrack->flow_cnt);
 }
 
@@ -694,7 +694,7 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 	}
 	else
 	{
-		printf("Flow validated on port %d \n", port_id);
+		// printf("Flow validated on port %d \n", port_id);
 		flow = rte_flow_create(port_id, attr, pattern, action, &error);
 		if (!flow)
 		{

@@ -179,10 +179,9 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		if (!hairpin_flow)
 		{
 			free_allocated_agectx(hairpin_agectx);
-			printf("failed to install hairpin queue flow rule \n");
+			printf("failed to install hairpin queue flow rule on vf\n");
 			return 0;
 		}
-
 		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
 	}
 
@@ -273,6 +272,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	if (!flow)
 	{
 		free_allocated_agectx(agectx);
+		printf("failed to install encap rule on pf \n");
 		return 0;
 	}
 
@@ -281,11 +281,11 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	return 1;
 }
 
-static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m, struct dp_flow *df, uint16_t incoming_pf)
+static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
 
 	struct underlay_conf *u_conf = get_underlay_conf();
-	bool cross_pf_port = incoming_pf == dp_get_pf0_port_id()? false : true;
+	bool cross_pf_port = m->port == dp_get_pf0_port_id()? false : true;
 
 	struct rte_flow_attr attr;
 
@@ -490,27 +490,24 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	if (cross_pf_port) {
 		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 		struct rte_flow *hairpin_flow = NULL;
-		hairpin_flow = validate_and_install_rte_flow(incoming_pf, &attr, pattern, action, df);
+		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 		if (!hairpin_flow)
 		{
 			free_allocated_agectx(agectx);
-			printf("failed to install hairpin queue flow rule P1 \n");
 			return 0;
 		}
 		// config the content of agectx
-		printf("install decap hairpin p1 \n");		
-		config_allocated_agectx(agectx, incoming_pf, df, hairpin_flow);
+		config_allocated_agectx(agectx, m->port, df, hairpin_flow);
 	} else {
 		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
 		struct rte_flow *flow = NULL;
-		flow = validate_and_install_rte_flow(incoming_pf, &attr, pattern, action, df);
+		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 		if (!flow) {
 			free_allocated_agectx(agectx);
 			return 0;
 		}
-		printf("install decap normal \n");	
 		// config the content of agectx
-		config_allocated_agectx(agectx, incoming_pf, df, flow);
+		config_allocated_agectx(agectx, m->port, df, flow);
 	}
 
 	// create flow action -- set dst mac
@@ -536,10 +533,9 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		if (!hairpin_flow_P2)
 		{
 			free_allocated_agectx(hairpin_agectx);
-			printf("failed to install hairpin queue flow rule P2 \n");
+			printf("failed to install hairpin queue flow rule on pf\n");
 			return 0;
 		}
-		printf("install decap hairpin p2 \n");	
 		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
 	}
 
@@ -683,8 +679,7 @@ int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
 		return dp_handle_local_traffic_forward(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		// install decap rule on both pfs since it is not known which pf is going to be used for incoming traffic
-		return dp_handle_tunnel_decap_offload(m, df, dp_get_pf0_port_id()) && dp_handle_tunnel_decap_offload(m, df, dp_get_pf1_port_id());
+		return dp_handle_tunnel_decap_offload(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
 		return dp_handle_tunnel_encap_offload(m,df);
