@@ -64,7 +64,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			dp_add_flow_data(&key, flow_val);
 
 			// Only the original flow (outgoing)'s hash value is recorded
-			df_ptr->dp_flow_hash=(uint32_t)dp_get_flow_hash_value(&key);
+			df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(&key);
 
 			/* Add reply direction to the conntrack table */
 			dp_invert_flow_key(&key);
@@ -72,7 +72,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			dp_add_flow(&key);
 			dp_add_flow_data(&key, flow_val);
 		} else {
-			dp_get_flow_data(&key, (void**)&flow_val);
+			dp_get_flow_data(&key, (void **)&flow_val);
 			if (dp_are_flows_identical(&key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
 				if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 					flow_val->flow_state = DP_FLOW_STATE_REPLY;
@@ -83,11 +83,11 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 					flow_val->flow_state = DP_FLOW_STATE_ESTAB;
 				flow_val->dir = DP_FLOW_DIR_ORG;
 			}
-			df_ptr->dp_flow_hash=(uint32_t)dp_get_flow_hash_value(&key);
+			df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(&key);
 		}
 		flow_val->timestamp = rte_rdtsc();
 		if (flow_val == NULL)
-			printf("flow_val is null \n");
+			printf("flow_val is null\n");
 		df_ptr->conntrack = flow_val;
 	}
 	return ret;
@@ -107,12 +107,12 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 		mbuf0 = pkts[i];
 		route = handle_conntrack(mbuf0);
 
-		if (route >= 0) 
-			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_LB, 
+		if (route >= 0)
+			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_LB,
 								mbuf0);
 		else
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DROP, mbuf0);
-	}	
+	}
 
 	return cnt;
 }
@@ -123,8 +123,8 @@ static struct rte_node_register conntrack_node_base = {
 	.process = conntrack_node_process,
 
 	.nb_edges = CONNTRACK_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+
 			[CONNTRACK_NEXT_LB] = "lb",
 			[CONNTRACK_NEXT_DROP] = "drop",
 		},

@@ -72,7 +72,7 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 void dp_invert_flow_key(struct flow_key *key /* in / out */);
 void dp_init_flowtable(int socket_id);
 void dp_process_aged_flows(int port_id);
-void dp_process_aged_flows_non_offload();
+void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct flow_value *cntrack);
 
 hash_sig_t dp_get_flow_hash_value(struct flow_key *key);

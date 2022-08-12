@@ -48,7 +48,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	if (ret < 0)
 		return DP_ROUTE_DROP;
 
-	//TODO: it is not exactly correct to use next_hop to directly store next hop port id and convert here. but it is already used in 
+	//TODO: it is not exactly correct to use next_hop to directly store next hop port id and convert here. but it is already used in
 	// such way in the original implementation. as long as port number is limited to 256, it is ok.
 	df_ptr->nxt_hop = (uint8_t)dst_port_id;
 
@@ -67,7 +67,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 
 	if (dp_is_offload_enabled())
 		df_ptr->flags.valid = 1;
-	
+
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		// rewrite outgoing port if WCMP algorithm decides to do so
 		if (dp_is_wcmp_enabled()) {
@@ -77,14 +77,14 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 			uint16_t peer_port_id = dp_get_pf1_port_id();
 
 			// basic logic of port redundancy if one of ports are down
-			if ((selected_port == PEER_PORT && dp_port_get_link_status(dp_layer,peer_port_id) == RTE_ETH_LINK_UP) 
-				|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer,owner_port_id) == RTE_ETH_LINK_DOWN)) {
+			if ((selected_port == PEER_PORT && dp_port_get_link_status(dp_layer, peer_port_id) == RTE_ETH_LINK_UP)
+				|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer, owner_port_id) == RTE_ETH_LINK_DOWN)) {
 
 				df_ptr->nxt_hop = peer_port_id;
 			}
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -99,8 +99,7 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 
 	pkts = (struct rte_mbuf **)objs;
 
-	for (i = 0; i < cnt; i++)
-	{
+	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		route = handle_ipv4_lookup(mbuf0);
 		if (route >= 0)
@@ -129,8 +128,8 @@ static struct rte_node_register ipv4_lookup_node_base = {
 	.process = ipv4_lookup_node_process,
 
 	.nb_edges = IPV4_LOOKUP_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+
 			[IPV4_LOOKUP_NEXT_DROP] = "drop",
 			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
 			[IPV4_LOOKUP_NEXT_NAT] = "snat",

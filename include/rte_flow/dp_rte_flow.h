@@ -72,12 +72,12 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_mask,
 								uint16_t src_port, uint16_t dst_port);
 
-int insert_icmp_match_pattern (struct rte_flow_item *pattern, int pattern_cnt,
+int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp *icmp_spec,
 								struct rte_flow_item_icmp *icmp_mask,
 								uint8_t type);
 
-int insert_icmpv6_match_pattern (struct rte_flow_item *pattern, int pattern_cnt,
+int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp6 *icmp6_spec,
 								struct rte_flow_item_icmp6 *icmp6_mask,
 								uint8_t type);
@@ -135,10 +135,10 @@ int create_flow_age_action(struct rte_flow_action *action, int action_cnt,
 
 void free_allocated_agectx(struct flow_age_ctx *agectx);
 
-void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id, 
+void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 								struct dp_flow *df, struct rte_flow *flow);
 
-int create_redirect_queue_action (struct rte_flow_action *action, int action_cnt,
+int create_redirect_queue_action(struct rte_flow_action *action, int action_cnt,
 									struct rte_flow_action_queue *queue_action,
 									uint16_t queue_index);
 
@@ -156,7 +156,7 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 
-struct rte_flow* validate_and_install_rte_flow(uint16_t port_id,
+struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
 												const struct rte_flow_item pattern[],
 												const struct rte_flow_action action[],

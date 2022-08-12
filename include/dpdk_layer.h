@@ -35,7 +35,7 @@ extern "C" {
 struct dp_dpdk_layer {
 	struct rte_mempool				*rte_mempool;
 	struct dp_port					*ports[DP_MAX_PORTS];
-	struct rte_node_ethdev_config 	ethdev_conf[DP_MAX_PORTS];
+	struct rte_node_ethdev_config	ethdev_conf[DP_MAX_PORTS];
 	int								dp_port_cnt;
 	uint16_t						nr_std_rx_queues;
 	uint16_t						nr_std_tx_queues;
@@ -43,7 +43,7 @@ struct dp_dpdk_layer {
 	uint16_t						nr_vf_hairpin_rx_tx_queues;
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
-	rte_graph_t 					graph_id;
+	rte_graph_t					graph_id;
 	struct rte_ring					*grpc_tx_queue;
 	struct rte_ring					*grpc_rx_queue;
 	struct rte_ring					*periodic_msg_queue;
@@ -69,9 +69,9 @@ struct underlay_conf {
 
 /* Functions for internal processing */
 int dp_dpdk_init(int argc, char **argv);
-int dp_init_graph();
-int dp_dpdk_main_loop();
-void dp_dpdk_exit();
+int dp_init_graph(void);
+int dp_dpdk_main_loop(void);
+void dp_dpdk_exit(void);
 
 /* Functions for the control plane */
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type);
@@ -83,7 +83,7 @@ struct underlay_conf *get_underlay_conf();
 struct dp_dpdk_layer *get_dpdk_layer();
 pthread_t *dp_get_ctrl_thread_id();
 
-int hairpin_vfs_to_pf();
+int hairpin_vfs_to_pf(void);
 int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id);
 int hairpin_ports_bind_all(uint16_t port_id);
 int bind_vf_with_peer_pf_port(uint16_t port_id);

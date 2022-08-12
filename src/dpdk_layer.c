@@ -92,7 +92,7 @@ int dp_dpdk_init(int argc, char **argv)
 
 	memset(&dp_layer, 0, sizeof(struct dp_dpdk_layer));
 
-	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS), 
+	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS),
 												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE + 32,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
@@ -123,7 +123,7 @@ int dp_dpdk_init(int argc, char **argv)
 	rte_timer_subsystem_init();
 	//init the timer
 	rte_timer_init(&timer);
-	
+
 
 	hz = rte_get_timer_hz();
 	timer_res = hz * 10; // 10 seconds
@@ -140,14 +140,14 @@ int dp_dpdk_init(int argc, char **argv)
 
 
 static int graph_main_loop()
-{	
+{
 	struct rte_graph *graph;
-	
+
 	while (!force_quit) {
 		graph = dp_layer.graph;
-		rte_graph_walk(graph);	
+		rte_graph_walk(graph);
 	}
-	
+
 	return 0;
 }
 
@@ -176,14 +176,15 @@ static void print_stats(char *msg_out, size_t msg_len)
 	print_link_info(0, msg_out, msg_len);
 	//if (strlen(msg_out))
 	//bb	printf("%s", msg_out);
-	
+
 	sleep(1);
 
 	rte_graph_cluster_stats_destroy(stats);
 }
 
-static int main_core_loop() {
-	uint64_t prev_tsc=0, cur_tsc;
+static int main_core_loop(void)
+{
+	uint64_t prev_tsc = 0, cur_tsc;
 	char *msg_out = NULL;
 	size_t msg_out_len_max = 400;
 
@@ -195,17 +196,17 @@ static int main_core_loop() {
 			print_stats(msg_out, msg_out_len_max);
 		}
 		cur_tsc = rte_get_timer_cycles();
-		if((cur_tsc - prev_tsc) > timer_res) {
+		if ((cur_tsc - prev_tsc) > timer_res) {
 			rte_timer_manage();
 			prev_tsc = cur_tsc;
 		}
 	}
-	
+
 	free(msg_out);
 	return 0;
 }
 
-int dp_dpdk_main_loop()
+int dp_dpdk_main_loop(void)
 {
 
 	printf("DPDK main loop started\n ");
@@ -219,12 +220,12 @@ int dp_dpdk_main_loop()
 	return 0;
 }
 
-void dp_dpdk_exit()
+void dp_dpdk_exit(void)
 {
 	uint32_t i;
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++)
-		free(dp_layer.ports[i]); 
+		free(dp_layer.ports[i]);
 
 	rte_eal_cleanup();
 }
@@ -240,7 +241,7 @@ static int dp_cfg_ethdev(int port_id)
 	return 0;
 }
 
-static int dp_port_prepare(dp_port_type type, int port_id, 
+static int dp_port_prepare(dp_port_type type, int port_id,
 						   struct dp_port_ext *port_ext)
 {
 	struct dp_port *dp_port;
@@ -251,7 +252,7 @@ static int dp_port_prepare(dp_port_type type, int port_id,
 		dp_layer.ports[dp_layer.dp_port_cnt++] = dp_port;
 		dp_cfg_ethdev(port_id);
 	}
-	return 0;	
+	return 0;
 }
 
 
@@ -273,23 +274,24 @@ static int dp_port_flow_isolate(int port_id)
 
 static void dp_install_isolated_mode(int port_id)
 {
-	
-	if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_IPIP){
-		printf("Init isolation flow rule for IPinIP tunnels \n");
-		dp_install_isolated_mode_ipip(port_id,DP_IP_PROTO_IPv4_ENCAP);
-		dp_install_isolated_mode_ipip(port_id,DP_IP_PROTO_IPv6_ENCAP);
+
+	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP) {
+		printf("Init isolation flow rule for IPinIP tunnels\n");
+		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP);
+		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP);
 	}
-	
-	if (get_overlay_type()==DP_FLOW_OVERLAY_TYPE_GENEVE){
-		printf("Init isolation flow rule for GENEVE tunnels \n");
+
+	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE) {
+		printf("Init isolation flow rule for GENEVE tunnels\n");
 		dp_install_isolated_mode_geneve(port_id);
 	}
 
 }
 
-static void allocate_pf_hairpin_tx_queue (uint16_t port_id, uint16_t peer_pf_port_id, uint16_t hairpin_queue_offset){
-	
-	struct dp_port* vf_port;
+static void allocate_pf_hairpin_tx_queue(uint16_t port_id, uint16_t peer_pf_port_id, uint16_t hairpin_queue_offset)
+{
+
+	struct dp_port *vf_port;
 
 	vf_port = dp_get_vf_port_per_id(&dp_layer, port_id);
 
@@ -301,7 +303,7 @@ uint16_t get_pf_hairpin_rx_queue(uint16_t port_id)
 {
 	uint16_t pf_rx_q_index;
 
-	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++){
+	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++) {
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF && dp_layer.ports[i]->dp_port_id == port_id) {
 			pf_rx_q_index =  dp_layer.nr_std_rx_queues - 1 + dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset;
 			break;
@@ -323,7 +325,7 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 		rte_exit(EXIT_FAILURE, ":: no Ethernet ports found\n");
 
 	dp_port_ext = *port;
-	printf("Looking for VFs of PF %s \n", dp_port_ext.port_name);
+	printf("Looking for VFs of PF %s\n", dp_port_ext.port_name);
 
 	RTE_ETH_FOREACH_DEV(port_id) {
 		struct rte_eth_dev_info dev_info;
@@ -336,37 +338,38 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 
 		if_indextoname(dev_info.if_index, ifname);
 		if ((type == DP_PORT_PF) && (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0)) {
-			
-			if (get_op_env()!=DP_OP_ENV_SCAPYTEST)
+
+			if (get_op_env() != DP_OP_ENV_SCAPYTEST)
 				dp_port_flow_isolate(port_id);
-			
+
 			dp_port_prepare(type, port_id, &dp_port_ext);
 			dp_add_pf_port_id(port_id);
 
 			// Only PF's status is handled for now since it is critical for cross-hypervisor communication
-			rte_eth_dev_callback_register(port_id,RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
+			rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
 			return port_id;
 		}
 
-		if ((type == DP_PORT_VF) && 
+		if ((type == DP_PORT_VF) &&
 			(strstr(ifname, dp_port_ext.port_name) != NULL)) {
 			if (cnt == last_assigned_vf_idx) {
 				dp_port_prepare(type, port_id, &dp_port_ext);
 				last_assigned_vf_idx++;
 
 				//if it belongs to pf0, assign a tx queue from pf1 for it
-				allocate_pf_hairpin_tx_queue(port_id,dp_get_pf1_port_id(),last_pf1_hairpin_tx_rx_queue_offset);
+				allocate_pf_hairpin_tx_queue(port_id, dp_get_pf1_port_id(), last_pf1_hairpin_tx_rx_queue_offset);
 				last_pf1_hairpin_tx_rx_queue_offset++;
 				return port_id;
 			}
 			cnt++;
-		}	
+		}
 	}
 
 	return -1;
 }
 
-static int setup_hairpin_rx_tx_queues (uint16_t port_id,uint16_t peer_port_id, uint8_t port_hairpin_rx_q_offset, uint8_t peer_port_hairpin_tx_q_offset){
+static int setup_hairpin_rx_tx_queues (uint16_t port_id, uint16_t peer_port_id, uint8_t port_hairpin_rx_q_offset, uint8_t peer_port_hairpin_tx_q_offset)
+{
 
 	uint32_t hairpin_queue, peer_hairpin_queue = 0;
 	int ret = 0;
@@ -385,46 +388,48 @@ static int setup_hairpin_rx_tx_queues (uint16_t port_id,uint16_t peer_port_id, u
 	rte_eth_rx_queue_info_get(port_id, 0, &rxq_info);
 
 	hairpin_queue =  dp_layer.nr_std_rx_queues - 1 + port_hairpin_rx_q_offset;
-	printf("setup from port %d to port %d, rxq %d to txq %d \n",port_id,peer_port_id,hairpin_queue,peer_hairpin_queue);
+	printf("setup from port %d to port %d, rxq %d to txq %d\n", port_id, peer_port_id, hairpin_queue, peer_hairpin_queue);
 	ret = rte_eth_rx_hairpin_queue_setup(
 				port_id, hairpin_queue,
 				rxq_info.nb_desc, &hairpin_conf);
 
-	if (ret != 0){
-		printf("Error: configure hairpin rx->tx queue from %d to %d \n ",port_id, peer_port_id);
+	if (ret != 0) {
+		printf("Error: configure hairpin rx->tx queue from %d to %d\n ", port_id, peer_port_id);
 		return -1;
 	}
 
 	hairpin_conf.peers[0].port = port_id;
 	hairpin_conf.peers[0].queue = hairpin_queue;
 	rte_eth_tx_queue_info_get(peer_port_id, 0, &txq_info);
-	printf("setup from port %d to port %d, txq %d to rxq %d \n",peer_port_id,port_id,peer_hairpin_queue,hairpin_queue);
+	printf("setup from port %d to port %d, txq %d to rxq %d\n", peer_port_id, port_id, peer_hairpin_queue, hairpin_queue);
 	ret = rte_eth_tx_hairpin_queue_setup(
 				peer_port_id, peer_hairpin_queue,
 				txq_info.nb_desc, &hairpin_conf);
-	if (ret != 0){
-		printf("Error: configure hairpin tx->rx queue from %d to %d \n ",peer_port_id, port_id);
+	if (ret != 0) {
+		printf("Error: configure hairpin tx->rx queue from %d to %d\n ", peer_port_id, port_id);
 		return -1;
 	}
 	return ret;
 }
 
-int hairpin_vfs_to_pf() {
+int hairpin_vfs_to_pf(void)
+{
 
 	int ret = 0;
-	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++){
+
+	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++) {
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF) {
 			ret = setup_hairpin_rx_tx_queues(dp_layer.ports[i]->dp_port_id, dp_layer.ports[i]->peer_pf_port_id,
-											1,dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset);
+											1, dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset);
 			if (ret < 0) {
-				printf("Failed to setup hairpin rx queue for vf %d \n",dp_layer.ports[i]->dp_port_id);
+				printf("Failed to setup hairpin rx queue for vf %d\n", dp_layer.ports[i]->dp_port_id);
 				return ret;
 			}
 
 			ret = setup_hairpin_rx_tx_queues(dp_layer.ports[i]->peer_pf_port_id, dp_layer.ports[i]->dp_port_id,
 											dp_layer.ports[i]->peer_pf_hairpin_tx_rx_queue_offset, 1);
 			if (ret < 0) {
-				printf("Failed to setup hairpin tx queue for vf %d \n",dp_layer.ports[i]->dp_port_id);
+				printf("Failed to setup hairpin tx queue for vf %d\n", dp_layer.ports[i]->dp_port_id);
 				return ret;
 			}
 		}
@@ -436,33 +441,34 @@ int hairpin_vfs_to_pf() {
 int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id)
 {
 	int ret = 0;
+
 	ret = rte_eth_hairpin_bind(tx_port_id, rx_port_id);
 	if (ret < 0) {
-		printf("Failed to bind %d to %d, due to error: %d \n",tx_port_id,rx_port_id,ret);
+		printf("Failed to bind %d to %d, due to error: %d\n", tx_port_id, rx_port_id, ret);
 		return ret;
 	}
 	return ret;
 }
 
-int bind_vf_with_peer_pf_port (uint16_t port_id)
+int bind_vf_with_peer_pf_port(uint16_t port_id)
 {
 	int ret = 0;
 	uint16_t peer_pf_port;
 
-	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++){
+	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++) {
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF && dp_layer.ports[i]->dp_port_id == port_id) {
 			peer_pf_port = dp_layer.ports[i]->peer_pf_port_id;
 			// bind txq of peer_pf_port to rxq of port_id
-			printf("Try to bind %d to %d \n", peer_pf_port, port_id);
+			printf("Try to bind %d to %d\n", peer_pf_port, port_id);
 			ret = rte_eth_hairpin_bind(peer_pf_port, port_id);
 			if (ret < 0) {
-				printf("Failed to bind %d to %d, due to error: %d \n", peer_pf_port, port_id, ret);
+				printf("Failed to bind %d to %d, due to error: %d\n", peer_pf_port, port_id, ret);
 				return ret;
 			}
-			printf("Try to bind %d to %d \n", port_id, peer_pf_port);
+			printf("Try to bind %d to %d\n", port_id, peer_pf_port);
 			ret = rte_eth_hairpin_bind(port_id, peer_pf_port);
 			if (ret < 0) {
-				printf("Failed to bind %d to %d, due to error: %d \n", port_id, peer_pf_port, ret);
+				printf("Failed to bind %d to %d, due to error: %d\n", port_id, peer_pf_port, ret);
 				return ret;
 			}
 			break;
@@ -482,12 +488,12 @@ int hairpin_ports_bind_all(uint16_t port_id)
 	peer_ports_num = rte_eth_hairpin_get_peer_ports(port_id,
 			peer_ports, RTE_MAX_ETHPORTS, 1);
 
-	if (peer_ports_num < 0 )
+	if (peer_ports_num < 0)
 		return -1;
 
 	for (i = 0; i < peer_ports_num; i++) {
 		ret = hairpin_ports_bind(port_id, peer_ports[i]);
-		if (ret < 0){
+		if (ret < 0) {
 			return ret;
 		}
 	}
@@ -495,11 +501,11 @@ int hairpin_ports_bind_all(uint16_t port_id)
 	return ret;
 }
 
-int dp_init_graph()
+int dp_init_graph(void)
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
-	struct rte_node_register *dhcpv6_node, *rx_periodic_node;;
+	struct rte_node_register *dhcpv6_node, *rx_periodic_node;
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
@@ -567,11 +573,11 @@ int dp_init_graph()
 			if (ret < 0)
 				return ret;
 			rte_node_edge_update(rx_periodic_node->id, RTE_EDGE_ID_INVALID,
- 						&next_nodes, 1);
- 			ret = rx_periodic_set_next(
- 				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(rx_periodic_node->id) - 1);
- 			if (ret < 0)
- 				return ret;
+						&next_nodes, 1);
+			ret = rx_periodic_set_next(
+				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(rx_periodic_node->id) - 1);
+			if (ret < 0)
+				return ret;
 			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID,
 						&next_nodes, 1);
 			ret = ipv6_nd_set_next(
@@ -606,7 +612,7 @@ int dp_init_graph()
 			if (ret < 0)
 				return ret;
 		}
-	}	
+	}
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {
 		FILE *f;
 		rte_graph_t graph_id;
@@ -615,7 +621,7 @@ int dp_init_graph()
 
 		if (rte_lcore_is_enabled(lcore_id) == 0)
 			continue;
-		
+
 		graph_conf.nb_node_patterns = nb_patterns;
 		graph_conf.socket_id = rte_lcore_to_socket_id(lcore_id);
 
@@ -625,8 +631,8 @@ int dp_init_graph()
 		graph_id = rte_graph_create(dp_layer.graph_name, &graph_conf);
 		if (graph_id == RTE_GRAPH_ID_INVALID)
 			rte_exit(EXIT_FAILURE,
-					"rte_graph_create(): graph_id invalid"
-					" for lcore %u\n", lcore_id);
+					"rte_graph_create(): graph_id invalid for lcore %u\n",
+					lcore_id);
 		sprintf(fname, "%s.dot", dp_layer.graph_name);
 		f = fopen(fname, "w");
 		ret = rte_graph_export(dp_layer.graph_name, f);
@@ -659,6 +665,7 @@ int dp_init_graph()
 void dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type)
 {
 	int ret;
+
 	ret = dp_port_allocate(&dp_layer, portid, port_ext, type);
 	if (ret < 0) {
 		printf("Can not allocate port\n ");
@@ -687,8 +694,8 @@ void dp_stop_interface(int portid, dp_port_type type)
 				"rte_eth_dev_stop:err=%d, port=%u\n",
 				ret, portid);
 	}
-	if(!dp_port_deallocate(&dp_layer, portid))
-		printf("Port deallocation failed for port %d \n", portid);
+	if (!dp_port_deallocate(&dp_layer, portid))
+		printf("Port deallocation failed for port %d\n", portid);
 }
 
 struct dp_dpdk_layer *get_dpdk_layer()
