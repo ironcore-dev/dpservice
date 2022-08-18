@@ -192,9 +192,9 @@ static int main_core_loop(void)
 
 	while (!force_quit) {
 		/* Accumulate and print stats on main until exit */
-		if (dp_is_stats_enabled() && rte_graph_has_stats_feature()) {
+		if (dp_is_stats_enabled() && rte_graph_has_stats_feature())
 			print_stats(msg_out, msg_out_len_max);
-		}
+
 		cur_tsc = rte_get_timer_cycles();
 		if ((cur_tsc - prev_tsc) > timer_res) {
 			rte_timer_manage();
@@ -368,7 +368,7 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 	return -1;
 }
 
-static int setup_hairpin_rx_tx_queues (uint16_t port_id, uint16_t peer_port_id, uint8_t port_hairpin_rx_q_offset, uint8_t peer_port_hairpin_tx_q_offset)
+static int setup_hairpin_rx_tx_queues(uint16_t port_id, uint16_t peer_port_id, uint8_t port_hairpin_rx_q_offset, uint8_t peer_port_hairpin_tx_q_offset)
 {
 
 	uint32_t hairpin_queue, peer_hairpin_queue = 0;
@@ -493,9 +493,8 @@ int hairpin_ports_bind_all(uint16_t port_id)
 
 	for (i = 0; i < peer_ports_num; i++) {
 		ret = hairpin_ports_bind(port_id, peer_ports[i]);
-		if (ret < 0) {
+		if (ret < 0)
 			return ret;
-		}
 	}
 
 	return ret;
@@ -652,13 +651,13 @@ int dp_init_graph(void)
 	return 0;
 }
 
- __rte_always_inline struct underlay_conf *get_underlay_conf()
- {
+__rte_always_inline struct underlay_conf *get_underlay_conf()
+{
 	return &gen_conf;
 }
 
- __rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
- {
+__rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
+{
 	gen_conf = *u_conf;
 }
 

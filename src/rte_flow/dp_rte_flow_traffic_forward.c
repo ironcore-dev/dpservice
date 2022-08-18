@@ -326,7 +326,8 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	if (cross_pf_port)
 		hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 														&ol_eth_spec, &ol_eth_mask,
-														&new_eth_hdr->src_addr, sizeof(struct rte_ether_addr), &new_eth_hdr->dst_addr, sizeof(struct rte_ether_addr),
+														&new_eth_hdr->src_addr, sizeof(struct rte_ether_addr),
+														&new_eth_hdr->dst_addr, sizeof(struct rte_ether_addr),
 														new_eth_hdr->ether_type);
 
 
