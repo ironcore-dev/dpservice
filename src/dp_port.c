@@ -309,7 +309,20 @@ int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_
 	return port_id;
 }
 
-void dp_port_exit(void)
+void set_vf_attach_status (struct dp_dpdk_layer *dp_layer, int portid, uint8_t attach_status)
+{
+	
+	for (uint i = 0; i < dp_layer->dp_port_cnt; i++) {
+		if ((dp_layer->ports[i]->dp_p_type == DP_PORT_VF) &&
+			dp_layer->ports[i]->dp_port_id == portid) {
+				dp_layer->ports[i]->attached =  attach_status;
+				printf("port %d 's attach is set to %d \n",portid,attach_status);
+				break;
+		}
+	} 
+}
+
+void dp_port_exit()
 {
 
 }

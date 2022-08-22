@@ -71,6 +71,14 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	queue = ctx->queue_id;
 	pkts = (struct rte_mbuf **)objs;
 
+	if (!dp_is_pf_port_id(port) && get_dp_port_attach_status(port) == 0){
+		printf("port %d 's attach status is %d \n",port,get_dp_port_attach_status(port));
+		sent_count = 0;
+		rte_node_enqueue(graph, node, TX_NEXT_DROP,
+						&objs[sent_count], cnt - sent_count);
+		return sent_count;
+	}
+
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);

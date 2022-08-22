@@ -36,6 +36,7 @@ struct dp_port {
 	uint8_t					link_status;
 	uint8_t					peer_pf_hairpin_tx_rx_queue_offset;
 	uint8_t					peer_pf_port_id;
+	uint8_t					attached;
 };
 
 bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid);
@@ -55,6 +56,8 @@ struct dp_port *dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid
 
 void dp_port_set_link_status(struct dp_dpdk_layer *dp_layer, int port_id, uint8_t status);
 uint8_t dp_port_get_link_status(struct dp_dpdk_layer *dp_layer, int port_id);
+
+void set_vf_attach_status (struct dp_dpdk_layer *dp_layer, int portid, uint8_t attach_status);
 
 #ifdef __cplusplus
 }

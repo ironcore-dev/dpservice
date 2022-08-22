@@ -7,6 +7,7 @@
 #include "nodes/dhcp_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dpdk_layer.h"
 
 #define IS_PXE_TFTP(p_mode) (p_mode == DP_PXE_MODE_TFTP)
 #define IS_PXE_HTTP(p_mode) (p_mode == DP_PXE_MODE_HTTP)
@@ -206,8 +207,10 @@ static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (handle_dhcp(mbuf0))
+		if (handle_dhcp(mbuf0)) {
 			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port] , mbuf0);
+			set_dp_port_attach_status(mbuf0->port);
+		}
 		else
 			rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);
 		rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);

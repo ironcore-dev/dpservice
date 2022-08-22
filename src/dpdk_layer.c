@@ -272,6 +272,24 @@ static int dp_port_flow_isolate(int port_id)
 }
 
 
+void set_dp_port_attach_status(int port_id)
+{
+	set_vf_attach_status(&dp_layer, port_id, 1);
+}
+
+int get_dp_port_attach_status(int port_id)
+{
+	int status = 1;
+	for (uint i = 0; i < dp_layer.dp_port_cnt; i++) {
+		if ((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) && dp_layer.ports[i]->dp_port_id == port_id) {
+			status = dp_layer.ports[i]->attached;
+			break;
+		}
+	}
+
+	return status; 
+}
+
 static void dp_install_isolated_mode(int port_id)
 {
 
