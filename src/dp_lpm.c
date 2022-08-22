@@ -10,6 +10,16 @@ static struct rte_hash *vm_handle_tbl = NULL;
 static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static uint8_t dp_router_gw_ip6[16] = {0xfe,0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
 
+static void init_vm_table(void) 
+{
+	for(uint8_t i =0; i<DP_MAX_PORTS; i++){
+		for (uint8_t rib_index = 0; rib_index < DP_NB_SOCKETS; rib_index ++) {
+			vm_table[i].ipv4_rib[rib_index] = NULL;
+			vm_table[i].ipv6_rib[rib_index] = NULL;
+		}
+	}
+}
+
 void dp_init_vm_handle_tbl(int socket_id)
 {
 	struct rte_hash_parameters handle_table_params = {
@@ -26,6 +36,7 @@ void dp_init_vm_handle_tbl(int socket_id)
 	handle_table_params.name = s;
 	handle_table_params.socket_id = socket_id;
 	vm_handle_tbl = rte_hash_create(&handle_table_params);
+	init_vm_table();
 	if(!vm_handle_tbl)
 		rte_exit(EXIT_FAILURE, "create vm handle table failed\n");
 }
@@ -604,9 +615,9 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	} else {
 		vm_table[portid].vm_ready = 0;
-		if (vm_table[portid].ipv6_rib)
+		if (vm_table[portid].ipv6_rib[socketid])
 			rte_rib6_free(vm_table[portid].ipv6_rib[socketid]);
-		if (vm_table[portid].ipv4_rib)
+		if (vm_table[portid].ipv4_rib[socketid])
 			rte_rib_free(vm_table[portid].ipv4_rib[socketid]);
 		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 		// own mac address in the vm_entry needs to be refilled due to the above cleaning process
