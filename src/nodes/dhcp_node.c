@@ -207,7 +207,7 @@ static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
 		mbuf0 = pkts[i];
 		if (handle_dhcp(mbuf0)) {
 			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port] , mbuf0);
-			set_dp_port_attach_status(mbuf0->port);
+			set_vf_port_status_as_attached(mbuf0->port);
 		}
 		else
 			rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);

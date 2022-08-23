@@ -17,6 +17,11 @@ typedef enum {
 	DP_PORT_VF,
 } dp_port_type;
 
+typedef enum {
+	DP_VF_PORT_DISATTACH,
+	DP_VF_PORT_ATTACH,
+} dp_vf_port_attach_status;
+
 struct dp_port_ext {
 	char					port_name[IFNAMSIZ];
 	struct rte_ether_addr	port_mac;
@@ -25,18 +30,18 @@ struct dp_port_ext {
 };
 
 struct dp_port {
-	struct dp_dpdk_layer	*dp_layer;
-	dp_port_type			dp_p_type;
-	int						dp_p_port_id;
-	int						dp_port_id;
-	int						dp_allocated;
-	uint8_t				vf_name[IFNAMSIZ];
-	struct dp_port_ext		dp_port_ext;
-	char					node_name[RTE_NODE_NAMESIZE];
-	uint8_t					link_status;
-	uint8_t					peer_pf_hairpin_tx_rx_queue_offset;
-	uint8_t					peer_pf_port_id;
-	uint8_t					attached;
+	struct dp_dpdk_layer		*dp_layer;
+	dp_port_type				dp_p_type;
+	int							dp_p_port_id;
+	int							dp_port_id;
+	int							dp_allocated;
+	uint8_t						vf_name[IFNAMSIZ];
+	struct dp_port_ext			dp_port_ext;
+	char						node_name[RTE_NODE_NAMESIZE];
+	uint8_t						link_status;
+	uint8_t						peer_pf_hairpin_tx_rx_queue_offset;
+	uint8_t						peer_pf_port_id;
+	dp_vf_port_attach_status	attached;
 };
 
 bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid);
@@ -57,7 +62,8 @@ struct dp_port *dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid
 void dp_port_set_link_status(struct dp_dpdk_layer *dp_layer, int port_id, uint8_t status);
 uint8_t dp_port_get_link_status(struct dp_dpdk_layer *dp_layer, int port_id);
 
-void set_vf_attach_status (struct dp_dpdk_layer *dp_layer, int portid, uint8_t attach_status);
+void dp_set_vf_attach_status(struct dp_dpdk_layer *dp_layer, int portid, dp_vf_port_attach_status attach_status);
+dp_vf_port_attach_status get_vf_attach_status(struct dp_dpdk_layer *dp_layer, int portid);
 
 #ifdef __cplusplus
 }

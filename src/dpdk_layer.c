@@ -18,6 +18,7 @@
 #include "nodes/ipv6_lookup_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
+#include "dp_port.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
@@ -272,21 +273,14 @@ static int dp_port_flow_isolate(int port_id)
 }
 
 
-void set_dp_port_attach_status(int port_id)
+void set_vf_port_status_as_attached(int port_id)
 {
-	set_vf_attach_status(&dp_layer, port_id, 1);
+	dp_set_vf_attach_status(&dp_layer, port_id, DP_VF_PORT_ATTACH);
 }
 
-int get_dp_port_attach_status(int port_id)
+dp_vf_port_attach_status get_vf_port_attach_status(int port_id)
 {
-	int status = 1;
-	for (uint i = 0; i < dp_layer.dp_port_cnt; i++) {
-		if ((dp_layer.ports[i]->dp_p_type == DP_PORT_VF) && dp_layer.ports[i]->dp_port_id == port_id) {
-			status = dp_layer.ports[i]->attached;
-			break;
-		}
-	}
-
+	dp_vf_port_attach_status status = get_vf_attach_status(&dp_layer, port_id);
 	return status; 
 }
 

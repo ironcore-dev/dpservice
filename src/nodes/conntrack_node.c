@@ -86,8 +86,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(&key);
 		}
 		flow_val->timestamp = rte_rdtsc();
-		if (flow_val == NULL)
-			printf("flow_val is null\n");
+
 		df_ptr->conntrack = flow_val;
 	}
 	return ret;
