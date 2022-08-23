@@ -46,6 +46,7 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 {
 	struct rte_ether_hdr *eth_hdr;
+
 	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
 	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->dst_addr);
 	eth_hdr->ether_type = htons(eth_type);
@@ -76,15 +77,8 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 		if (mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) {
 			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-			}
-			else
+			} else
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);
-		}
-
-		// cannot offload traffic forwarding from pf1 to vf of pf0
-		if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-			if (mbuf0->port != dp_get_pf0_port_id())
-				df->flags.valid = 0;
 		}
 
 		if (df && df->flags.valid && df->conntrack)
@@ -114,8 +108,8 @@ static struct rte_node_register tx_node_base = {
 	.process = tx_node_process,
 
 	.nb_edges = TX_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+
 			[TX_NEXT_DROP] = "drop",
 		},
 };

@@ -25,9 +25,9 @@ void dp_init_flowtable(int socket_id)
 	ipv4_table_params.name = s;
 	ipv4_table_params.socket_id = socket_id;
 	ipv4_flow_tbl = rte_hash_create(&ipv4_table_params);
-	if(!ipv4_flow_tbl)
+	if (!ipv4_flow_tbl)
 		rte_exit(EXIT_FAILURE, "create ipv4 flow table failed\n");
-	timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT ;
+	timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT;
 }
 
 void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
@@ -40,22 +40,22 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 	key->proto = df_ptr->l4_type;
 
 	switch (df_ptr->l4_type) {
-		case IPPROTO_TCP:
-			key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
-			key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
-			break;
-		case IPPROTO_UDP:
-			key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
-			key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
-			break;
-		case IPPROTO_ICMP:
-			key->port_dst = 0;
-			key->src.type_src = df_ptr->icmp_type;
-			break;
-		default:
-			key->port_dst = 0;
-			key->src.port_src = 0;
-			break;
+	case IPPROTO_TCP:
+		key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
+		key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
+		break;
+	case IPPROTO_UDP:
+		key->port_dst = rte_be_to_cpu_16(df_ptr->dst_port);
+		key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
+		break;
+	case IPPROTO_ICMP:
+		key->port_dst = 0;
+		key->src.type_src = df_ptr->icmp_type;
+		break;
+	default:
+		key->port_dst = 0;
+		key->src.port_src = 0;
+		break;
 	}
 }
 
@@ -101,12 +101,12 @@ void dp_delete_flow(struct flow_key *key)
 
 	pos = rte_hash_del_key(ipv4_flow_tbl, key);
 	if (pos < 0)
-		printf("Hash key already deleted \n");
+		printf("Hash key already deleted\n");
 	else
 		rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
 }
 
-void dp_add_flow_data(struct flow_key *key, void* data)
+void dp_add_flow_data(struct flow_key *key, void *data)
 {
 	if (rte_hash_add_key_data(ipv4_flow_tbl, key, data) < 0)
 		rte_exit(EXIT_FAILURE, "flow table for port add data failed\n");
@@ -159,12 +159,12 @@ void dp_process_aged_flows(int port_id)
 		goto free;
 
 	for (idx = 0; idx < nb_context; idx++) {
-		agectx = (struct flow_age_ctx*)contexts[idx];
+		agectx = (struct flow_age_ctx *)contexts[idx];
 		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, agectx->cntrack->rteflow[agectx->dir], &error);
-		printf("Aged flow to sw table agectx: rteflow %p \n flowval: flowcnt %d  rte_flow inserted on port %d\n", 
-			 agectx->cntrack->rteflow[agectx->dir], rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
+		rte_flow_destroy(port_id, agectx->rte_flow, &error);
+		printf("Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
+			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
 		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
 			dp_free_flow(agectx->cntrack);
 		rte_free(agectx);
@@ -173,7 +173,7 @@ free:
 	rte_free(contexts);
 }
 
-void dp_process_aged_flows_non_offload()
+void dp_process_aged_flows_non_offload(void)
 {
 	struct flow_value *flow_val = NULL;
 	const void *next_key;
@@ -183,16 +183,17 @@ void dp_process_aged_flows_non_offload()
 	cur = rte_rdtsc();
 	/* iterate through the hash table */
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
-						    (void**)&flow_val, &iter) >= 0) {
+						    (void **)&flow_val, &iter) >= 0) {
 		if (unlikely((cur - flow_val->timestamp) > timeout))
 			dp_free_flow(flow_val);
 	}
 }
 
-hash_sig_t dp_get_flow_hash_value(struct flow_key *key){
+hash_sig_t dp_get_flow_hash_value(struct flow_key *key)
+{
 
 	//It is not necessary to first test if this key exists, since for now, this function
 	// is always called after either a flow is checked or added in the firewall node.
-	return rte_hash_hash(ipv4_flow_tbl,key);
+	return rte_hash_hash(ipv4_flow_tbl, key);
 
 }

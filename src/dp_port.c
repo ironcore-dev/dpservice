@@ -27,14 +27,14 @@ struct rte_eth_conf port_conf = {
 	},
 };
 
-struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
+struct dp_port *dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
-	struct dp_port* port;
+	struct dp_port *port;
 
 	port = malloc(sizeof(struct dp_port));
 	if (!port)
 		return NULL;
-	
+
 	memset(port, 0, sizeof(struct dp_port));
 	port->dp_layer = dp_layer;
 	port->dp_allocated = 0;
@@ -44,14 +44,14 @@ struct dp_port* dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type
 }
 
 
-int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_details)
+int dp_port_init(struct dp_port *port, int port_id, struct dp_port_ext *port_details)
 {
 	struct rte_ether_addr pf_neigh_mac;
 	char ifname[IF_NAMESIZE] = {0};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
 	struct rte_eth_dev_info dev_info;
-	
+
 	int ret;
 	uint16_t i;
 
@@ -65,9 +65,16 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	printf(":: initializing port: %d (%s)\n", port_id, ifname);
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
-	ret = rte_eth_dev_configure(port_id,
-								port->dp_layer->nr_rx_queues, 
-								port->dp_layer->nr_tx_queues, &port_conf);
+
+	if (port->dp_p_type == DP_PORT_VF)
+		ret = rte_eth_dev_configure(port_id,
+								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_vf_hairpin_rx_tx_queues,
+								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_vf_hairpin_rx_tx_queues, &port_conf);
+	else
+		ret = rte_eth_dev_configure(port_id,
+								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues,
+								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues, &port_conf);
+
 	if (ret < 0) {
 		rte_exit(EXIT_FAILURE,
 				":: cannot configure device: err=%d, port=%u\n",
@@ -79,7 +86,7 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	/* >8 End of ethernet port configured with default settings. */
 
 	/* Configuring number of RX and TX queues connected to single port. 8< */
-	for (i = 0; i < port->dp_layer->nr_rx_queues; i++) {
+	for (i = 0; i < port->dp_layer->nr_std_rx_queues; i++) {
 		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
 									rte_eth_dev_socket_id(port_id),
 									&rxq_conf,
@@ -97,7 +104,7 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 	txq_conf = dev_info.default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
-	for (i = 0; i < port->dp_layer->nr_tx_queues; i++) {
+	for (i = 0; i < port->dp_layer->nr_std_tx_queues; i++) {
 		ret = rte_eth_tx_queue_setup(port_id, i, 2048,
 									rte_eth_dev_socket_id(port_id),
 									&txq_conf);
@@ -111,12 +118,12 @@ int dp_port_init(struct dp_port* port, int port_id, struct dp_port_ext *port_det
 
 	if (port->dp_p_type == DP_PORT_VF) {
 		ret = rte_eth_promiscuous_enable(port_id);
-		printf("Setting interface number %d in promiscuous mode \n", port_id);
+		printf("Setting interface number %d in promiscuous mode\n", port_id);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
 					":: promiscuous mode enable failed: err=%s, port=%u\n",
 					rte_strerror(-ret), port_id);
-	}	
+	}
 
 	dp_set_mac(port_id);
 
@@ -188,12 +195,12 @@ void print_link_info(int port_id, char *out, size_t out_size)
 		stats.oerrors);
 }
 
-int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name)
+int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char *pf_name)
 {
 	int i;
 
 	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((strncmp(dp_layer->ports[i]->dp_port_ext.port_name, pf_name, IF_NAMESIZE) == 0) && 
+		if ((strncmp(dp_layer->ports[i]->dp_port_ext.port_name, pf_name, IF_NAMESIZE) == 0) &&
 			dp_layer->ports[i]->dp_p_type == DP_PORT_PF)
 			return dp_layer->ports[i]->dp_port_id;
 	}
@@ -201,7 +208,7 @@ int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char* pf_name)
 }
 
 
-struct dp_port* dp_get_next_avail_vf_port(struct dp_dpdk_layer *dp_layer, dp_port_type type)
+struct dp_port *dp_get_next_avail_vf_port(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 {
 	int i;
 
@@ -210,7 +217,7 @@ struct dp_port* dp_get_next_avail_vf_port(struct dp_dpdk_layer *dp_layer, dp_por
 		if ((dp_layer->ports[i]->dp_p_type == type) &&
 			!dp_layer->ports[i]->dp_allocated)
 			return dp_layer->ports[i];
-	} 
+	}
 
 	return NULL;
 }
@@ -224,26 +231,26 @@ int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 		if ((dp_layer->ports[i]->dp_p_type == type) &&
 			!dp_layer->ports[i]->dp_allocated)
 			return dp_layer->ports[i]->dp_port_id;
-	} 
+	}
 
 	return -1;
 }
 
-static struct dp_port* dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
+static struct dp_port *dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	int i;
 
 	/* Find the corresponding internal vf port structure */
 	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if (dp_layer->ports[i]->dp_allocated && 
+		if (dp_layer->ports[i]->dp_allocated &&
 			 (dp_layer->ports[i]->dp_port_id == portid))
 			return dp_layer->ports[i];
-	} 
+	}
 
 	return NULL;
 }
 
-static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
+struct dp_port *dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	int i;
 
@@ -257,7 +264,7 @@ static struct dp_port* dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int
 
 bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid)
 {
-	struct dp_port* vf_port = dp_get_vf_port_per_id(dp_layer, portid);
+	struct dp_port *vf_port = dp_get_vf_port_per_id(dp_layer, portid);
 
 	if (!vf_port)
 		return true;
@@ -267,7 +274,7 @@ bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid)
 
 int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid)
 {
-	struct dp_port* vf_port = dp_get_alloced_vf_port_per_id(dp_layer, portid);
+	struct dp_port *vf_port = dp_get_alloced_vf_port_per_id(dp_layer, portid);
 
 	if (!vf_port)
 		return 0;
@@ -279,7 +286,7 @@ int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid)
 
 int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_ext *port_ext, dp_port_type type)
 {
-	struct dp_port* vf_port;
+	struct dp_port *vf_port;
 	int port_id = -1, ret;
 
 	if (type == DP_PORT_PF) {
@@ -302,7 +309,7 @@ int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_
 	return port_id;
 }
 
-void dp_port_exit()
+void dp_port_exit(void)
 {
 
 }

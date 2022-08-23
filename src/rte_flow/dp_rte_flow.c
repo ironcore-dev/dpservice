@@ -6,10 +6,10 @@
 #include "node_api.h"
 #include "nodes/ipv6_nd_node.h"
 
-const static uint8_t ether_addr_mask[RTE_ETHER_ADDR_LEN] = "\xff\xff\xff\xff\xff\xff";
-const static uint8_t ipv6_addr_mask[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
+static const uint8_t ether_addr_mask[RTE_ETHER_ADDR_LEN] = "\xff\xff\xff\xff\xff\xff";
+static const uint8_t ipv6_addr_mask[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
 										  "\xff\xff\xff\xff\xff\xff\xff\xff";
-const static uint8_t ipv4_addr_mask[4] = "\xff\xff\xff\xff";
+static const uint8_t ipv4_addr_mask[4] = "\xff\xff\xff\xff";
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 {
@@ -49,8 +49,7 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	struct rte_ipv6_hdr *ipv6_hdr;
 
 	df = get_dp_flow_ptr(pkt);
-	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
-	{
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		if (hdr)
 			ipv4_hdr = (struct rte_ipv4_hdr *)hdr;
 		else
@@ -59,11 +58,9 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		df->src.src_addr = ipv4_hdr->src_addr;
 		df->dst.dst_addr = ipv4_hdr->dst_addr;
 		df->l4_type = ipv4_hdr->next_proto_id;
-		// printf("extract for ipv4 header, protoid is %#x \n",ipv4_hdr->next_proto_id);
+		// printf("extract for ipv4 header, protoid is %#x\n",ipv4_hdr->next_proto_id);
 		return df->l4_type;
-	}
-	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-	{
+	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		if (hdr)
 			ipv6_hdr = (struct rte_ipv6_hdr *)hdr;
 		else
@@ -89,57 +86,39 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	struct icmp6hdr *icmp6_hdr;
 
 	df = get_dp_flow_ptr(pkt);
-	if (df->l4_type == DP_IP_PROTO_TCP)
-	{
+	if (df->l4_type == DP_IP_PROTO_TCP) {
 		if (hdr != NULL)
-		{
 			tcp_hdr = (struct rte_tcp_hdr *)hdr;
-		}
 		else
-		{
 			tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, offset);
-		}
+
 		df->dst_port = tcp_hdr->dst_port;
 		df->src_port = tcp_hdr->src_port;
 		return 0;
-	}
-	else if (df->l4_type == DP_IP_PROTO_UDP)
-	{
+	} else if (df->l4_type == DP_IP_PROTO_UDP) {
 		if (hdr != NULL)
-		{
 			udp_hdr = (struct rte_udp_hdr *)hdr;
-		}
 		else
-		{
 			udp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_udp_hdr *, offset);
-		}
+
 		df->dst_port = udp_hdr->dst_port;
 		df->src_port = udp_hdr->src_port;
 		return 0;
-	}
-	else if (df->l4_type == DP_IP_PROTO_ICMP)
-	{
+	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
 		if (hdr != NULL)
-		{
 			icmp_hdr = (struct rte_icmp_hdr *)hdr;
-		}
 		else
-		{
+
 			icmp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_icmp_hdr *, offset);
-		}
+
 		df->icmp_type = icmp_hdr->icmp_type;
 		return 0;
-	}
-	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
-	{
+	} else if (df->l4_type == DP_IP_PROTO_ICMPV6) {
 		if (hdr != NULL)
-		{
 			icmp6_hdr = (struct icmp6hdr *)hdr;
-		}
 		else
-		{
 			icmp6_hdr = rte_pktmbuf_mtod_offset(pkt, struct icmp6hdr *, offset);
-		}
+
 		df->icmp_type = icmp6_hdr->icmp6_type;
 		return 0;
 	}
@@ -158,22 +137,18 @@ int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	df = get_dp_flow_ptr(pkt);
 
 	if (hdr != NULL)
-	{
 		ipv6_hdr = (struct rte_ipv6_hdr *)hdr;
-	}
 	else
-	{
 		ipv6_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv6_hdr *, offset);
-	}
 
-	if (ipv6_hdr != NULL)
-	{
+
+	if (ipv6_hdr != NULL) {
 		rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
 		rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
 		df->tun_info.proto_id = ipv6_hdr->proto;
-		// printf("ipv6->proto %#x \n",ipv6_hdr->proto);
-		// printf("ipv6->hop_limits %#x \n",ipv6_hdr->hop_limits);
-		// printf("payload length in arriving ipv6 hdr %#x \n",ipv6_hdr->payload_len);
+		// printf("ipv6->proto %#x\n",ipv6_hdr->proto);
+		// printf("ipv6->hop_limits %#x\n",ipv6_hdr->hop_limits);
+		// printf("payload length in arriving ipv6 hdr %#x\n",ipv6_hdr->payload_len);
 		return ipv6_hdr->proto;
 	}
 
@@ -219,16 +194,14 @@ int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 	memset(eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
 
-	if (src)
-	{
+	if (src) {
 		memcpy(&(eth_spec->src), src, nr_src_mask_len);
 		memcpy(&(eth_mask->src), ether_addr_mask, nr_src_mask_len);
 	}
 
-	if (dst)
-	{
-		memcpy(&(eth_spec->src), src, nr_dst_mask_len);
-		memcpy(&(eth_mask->src), ether_addr_mask, nr_dst_mask_len);
+	if (dst) {
+		memcpy(&(eth_spec->dst), dst, nr_dst_mask_len);
+		memcpy(&(eth_mask->dst), ether_addr_mask, nr_dst_mask_len);
 	}
 
 	eth_spec->type = type;
@@ -252,14 +225,12 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	memset(ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
 	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
 
-	if (src)
-	{
+	if (src) {
 		memcpy(ipv6_spec->hdr.src_addr, src, nr_src_mask_len);
 		memcpy(ipv6_mask->hdr.src_addr, ipv6_addr_mask, nr_src_mask_len);
 	}
 
-	if (dst)
-	{
+	if (dst) {
 		memcpy(ipv6_spec->hdr.dst_addr, dst, nr_dst_mask_len);
 		memcpy(ipv6_mask->hdr.dst_addr, ipv6_addr_mask, nr_dst_mask_len);
 	}
@@ -316,14 +287,12 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	memset(udp_mask, 0, sizeof(struct rte_flow_item_udp));
 
 	// Who is going to match a port that is 0? Let's assume that port>0 is a valid one.
-	if (src_port)
-	{
+	if (src_port) {
 		udp_spec->hdr.src_port = src_port;
 		udp_mask->hdr.src_port = 0xffff;
 	}
 
-	if (dst_port)
-	{
+	if (dst_port) {
 		udp_spec->hdr.dst_port = dst_port;
 		udp_mask->hdr.dst_port = 0xffff;
 	}
@@ -345,14 +314,12 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	memset(tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
 
 	// Who is going to match a port that is 0? Let's assume that port>0 is a valid one.
-	if (src_port)
-	{
+	if (src_port) {
 		tcp_spec->hdr.src_port = src_port;
 		tcp_mask->hdr.src_port = 0xffff;
 	}
 
-	if (dst_port)
-	{
+	if (dst_port) {
 		tcp_spec->hdr.dst_port = dst_port;
 		tcp_mask->hdr.dst_port = 0xffff;
 	}
@@ -415,6 +382,7 @@ int insert_geneve_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	geneve_mask->protocol = 0xFFFF;
 
 	uint8_t vni_mask[3] = {0xFF, 0xFF, 0xFF};
+
 	rte_memcpy(geneve_spec->vni, vni, sizeof(geneve_spec->vni));
 	rte_memcpy(geneve_mask->vni, vni_mask, sizeof(geneve_spec->vni));
 
@@ -424,6 +392,68 @@ int insert_geneve_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 
 	return ++pattern_cnt;
 }
+
+int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_mark *mark_spec,
+									struct rte_flow_item_mark *mark_mask,
+									uint32_t marked_id)
+{
+
+	memset(mark_spec, 0, sizeof(struct rte_flow_item_mark));
+	memset(mark_mask, 0, sizeof(struct rte_flow_item_mark));
+
+	mark_spec->id = marked_id;
+	mark_mask->id = rte_flow_item_mark_mask.id;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_MARK;
+	pattern[pattern_cnt].spec = mark_spec;
+	pattern[pattern_cnt].mask = mark_mask;
+
+	return ++pattern_cnt;
+}
+
+int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_tag *tag_spec,
+									struct rte_flow_item_tag *tag_mask,
+									uint32_t tag_value, uint8_t tag_index)
+{
+
+	memset(tag_spec, 0, sizeof(struct rte_flow_item_tag));
+	memset(tag_mask, 0, sizeof(struct rte_flow_item_tag));
+
+	tag_spec->data = tag_value;
+	tag_spec->index = tag_index;
+
+	tag_mask->data = rte_flow_item_tag_mask.data;
+	tag_mask->index = rte_flow_item_tag_mask.index;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TAG;
+	pattern[pattern_cnt].spec = tag_spec;
+	pattern[pattern_cnt].mask = tag_mask;
+
+	return ++pattern_cnt;
+}
+
+int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+							struct rte_flow_item_meta *meta_spec,
+							struct rte_flow_item_meta *meta_mask,
+							uint32_t meta_value)
+{
+
+	memset(meta_spec, 0, sizeof(struct rte_flow_item_meta));
+	memset(meta_mask, 0, sizeof(struct rte_flow_item_meta));
+
+	meta_spec->data = meta_value;
+
+	meta_mask->data = 0xffffffff;
+
+	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_META;
+	pattern[pattern_cnt].spec = meta_spec;
+	pattern[pattern_cnt].mask = meta_mask;
+
+	return ++pattern_cnt;
+}
+
 
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt)
 {
@@ -543,6 +573,49 @@ int create_redirect_queue_action(struct rte_flow_action *action, int action_cnt,
 	return ++action_cnt;
 }
 
+int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_mark *mark_action,
+							uint32_t marked_value)
+{
+
+	mark_action->id =  marked_value;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_MARK;
+	action[action_cnt].conf = mark_action;
+
+	return ++action_cnt;
+}
+
+int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_set_tag *set_tag_action,
+							uint32_t tag_value, uint8_t index)
+{
+
+	set_tag_action->data =  tag_value;
+	set_tag_action->mask =  0xffffffff;
+	set_tag_action->index = 0;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TAG;
+	action[action_cnt].conf = set_tag_action;
+
+	return ++action_cnt;
+}
+
+
+int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
+							struct rte_flow_action_set_meta *meta_action,
+							uint32_t meta_value)
+{
+
+	meta_action->data =  meta_value;
+	meta_action->mask = 0xffffffff;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_META;
+	action[action_cnt].conf = meta_action;
+
+	return ++action_cnt;
+}
+
 int create_end_action(struct rte_flow_action *action, int action_cnt)
 {
 
@@ -564,8 +637,8 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 
 	agectx->cntrack = df->conntrack;
 	agectx->dir = agectx->cntrack->dir;
-	agectx->cntrack->rteflow[agectx->dir] = flow;
-	agectx->cntrack->port = port_id;
+	agectx->rte_flow = flow;
+	// agectx->cntrack->port = port_id; // it is not actually used, considering to remove this field
 	rte_atomic32_inc(&agectx->cntrack->flow_cnt);
 }
 
@@ -580,20 +653,17 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 	struct rte_flow *flow = NULL;
 
 	struct rte_flow_error error;
+
 	res = rte_flow_validate(port_id, attr, pattern, action, &error);
 
-	if (res)
-	{
+	if (res) {
 		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
 		return NULL;
-	}
-	else
-	{
-		printf("Flow validated on port %d targeting port %d \n ", port_id, df->nxt_hop);
+	} else {
+		// printf("Flow validated on port %d\n", port_id);
 		flow = rte_flow_create(port_id, attr, pattern, action, &error);
-		if (!flow)
-		{
-			printf("Flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+		if (!flow) {
+			printf("Flow can't be created on port %d message: %s\n", port_id, error.message ? error.message : "(no stated reason)");
 			return NULL;
 		}
 		return flow;

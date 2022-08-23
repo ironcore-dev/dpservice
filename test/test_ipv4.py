@@ -174,25 +174,20 @@ def test_link_redundancy_handling(capsys, add_machine,tun_opt):
 	d2.daemon=False
 	d2.start()
 
-	time.sleep(1)
-	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" down"))
 	time.sleep(0.5)
-	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
 
 	icmp_echo_pkt = Ether(dst=pf0_mac,src=vf0_mac,type=0x0800)/IP(dst="192.168.129.5",src="172.32.10.5")/ICMP(type=8)
 	sendp(icmp_echo_pkt,iface=vf0_tap)
 	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=2)
 
-	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" up"))
-	time.sleep(0.5)
-	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" down"))
 	time.sleep(0.5)
 
+	icmp_echo_pkt = Ether(dst=pf0_mac,src=vf0_mac,type=0x0800)/IP(dst="192.168.129.6",src="172.32.10.5")/ICMP(type=8)
 	sendp(icmp_echo_pkt,iface=vf0_tap)
 	pkt_list2 = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=2)
 
 	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
-	if len(pkt_list)==0 and len(pkt_list2)==0:
+	if len(pkt_list)!=1 and len(pkt_list2) !=1:
 		raise AssertionError('Cannot receive icmp reply!')
 
 

@@ -8,7 +8,7 @@
 #define DP_SHOW_EXT_ROUTES true
 #define DP_SHOW_INT_ROUTES false
 
-void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[])
+void dp_last_mbuf_from_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[])
 {
 	dp_reply *rep;
 
@@ -17,7 +17,7 @@ void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_ar
 	rep->com_head.is_chained = 0;
 }
 
-uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[],
+uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[],
 								   int8_t *idx, uint16_t size)
 {
 	uint16_t buf_size, msg_per_buf;
@@ -31,10 +31,10 @@ uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep
 	return msg_per_buf;
 }
 
-struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
+struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
 {
 	dp_reply *rep, *rep_new;
-	struct rte_mbuf* m_new;
+	struct rte_mbuf *m_new;
 
 	m_new = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
 	if (!m_new) {
@@ -70,7 +70,7 @@ int dp_recv_from_worker(dp_reply *rep)
 	struct rte_mbuf *m;
 	dp_reply *head;
 
-	if (!rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void**)&m)) {
+	if (!rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void **)&m)) {
 		head = rte_pktmbuf_mtod(m, dp_reply*);
 		*rep = *head;
 		rte_pktmbuf_free(m);
@@ -83,7 +83,7 @@ int dp_recv_from_worker_with_mbuf(struct rte_mbuf **mbuf)
 {
 	struct rte_mbuf *m;
 
-	if (!rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void**)&m)) {
+	if (!rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void **)&m)) {
 		*mbuf = m;
 		return EXIT_SUCCESS;
 	}
@@ -91,7 +91,7 @@ int dp_recv_from_worker_with_mbuf(struct rte_mbuf **mbuf)
 	return EXIT_FAILURE;
 }
 
-__rte_always_inline void dp_fill_head(dp_com_head* head, uint16_t type,
+__rte_always_inline void dp_fill_head(dp_com_head *head, uint16_t type,
 									  uint8_t is_chained, uint8_t count)
 {
 	RTE_SET_USED(count);
@@ -210,7 +210,7 @@ err:
 
 static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
-	int port_id, ret = EXIT_SUCCESS;;
+	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
@@ -247,7 +247,7 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr), 
+		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
 					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
 			ret = DP_ERROR_VM_ADD_PFX_ROUTE;
 			goto err;
@@ -272,7 +272,7 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	if(req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_del_route(dp_get_pf0_port_id(), dp_get_vm_vni(port_id), 0,
 					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
 					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
@@ -311,7 +311,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		port_id = dp_get_next_avail_vf_id(get_dpdk_layer(), DP_PORT_VF);
 	}
 
-	if ( port_id >= 0) {
+	if (port_id >= 0) {
 		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
 			goto err;
@@ -324,14 +324,14 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_LPM6;
 			goto lpm_err;
 		}
-		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), 32, 
+		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), 32,
 							  rte_eth_dev_socket_id(port_id));
 		dp_set_vm_pxe_ip4(port_id, ntohl(req->add_machine.ip4_pxe_addr),
 							  rte_eth_dev_socket_id(port_id));
 		dp_set_vm_pxe_str(port_id, req->add_machine.pxe_str);
 		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, 128,
 							  rte_eth_dev_socket_id(port_id));
-		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr), 
+		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
 					 NULL, 32, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT4;
 			goto lpm_err;
@@ -342,7 +342,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			goto route_err;
 		}
 		dp_start_interface(&pf_port, port_id, DP_PORT_VF);
-
+		bind_vf_with_peer_pf_port((uint16_t)port_id);
 		/* TODO get the pci info of this port and fill it accordingly */
 		rep->vf_pci.bus = 2;
 		rep->vf_pci.domain = 2;
@@ -392,7 +392,7 @@ static int dp_process_addroute(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
-	if(req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_add_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
 					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
 					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
@@ -417,7 +417,7 @@ static int dp_process_delroute(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
-	if(req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_del_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
 					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
 					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
@@ -457,13 +457,13 @@ static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rt
 
 	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
 	for (i = 0; i < count; i++) {
-		if (rep->com_head.msg_count && 
+		if (rep->com_head.msg_count &&
 			(rep->com_head.msg_count % msg_per_buf == 0)) {
 			m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
 			if (!m_new)
 				break;
 			m_curr = m_new;
-			rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
+			rep = rte_pktmbuf_mtod(m_new, dp_reply*);
 		}
 		rep->com_head.msg_count++;
 		vm_info = &((&rep->vm_info)[i % msg_per_buf]);
@@ -513,7 +513,7 @@ static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_m
 	if (port_id < 0)
 		goto out;
 
-	dp_list_routes(dp_get_vm_vni(port_id), m, 
+	dp_list_routes(dp_get_vm_vni(port_id), m,
 								rte_eth_dev_socket_id(dp_get_pf0_port_id()), rep_arr, DP_SHOW_INT_ROUTES);
 
 out:
@@ -522,70 +522,69 @@ out:
 
 int dp_process_request(struct rte_mbuf *m)
 {
-	struct rte_mbuf* m_arr[DP_MBUF_ARR_SIZE];
-	dp_request* req;
+	struct rte_mbuf *m_arr[DP_MBUF_ARR_SIZE];
+	dp_request *req;
 	dp_reply rep, *p_rep;
 	int ret = EXIT_SUCCESS, i;
 
 	req = rte_pktmbuf_mtod(m, dp_request*);
 	memset(&rep, 0, sizeof(dp_reply));
-	memset(m_arr, 0, DP_MBUF_ARR_SIZE * sizeof(struct rte_mbuf*));
+	memset(m_arr, 0, DP_MBUF_ARR_SIZE * sizeof(struct rte_mbuf *));
 
-	switch (req->com_head.com_type)
-	{
-		case DP_REQ_TYPE_ADDLBVIP:
-			ret = dp_process_add_lb_vip(req, &rep);
-			break;
-		case DP_REQ_TYPE_DELLBVIP:
-			ret = dp_process_del_lb_vip(req, &rep);
-			break;
-		case DP_REQ_TYPE_ADDVIP:
-			ret = dp_process_addvip(req, &rep);
-			break;
-		case DP_REQ_TYPE_DELVIP:
-			ret = dp_process_delvip(req, &rep);
-			break;
-		case DP_REQ_TYPE_GETVIP:
-			ret = dp_process_getvip(req, &rep);
-			break;
-		case DP_REQ_TYPE_ADDPREFIX:
-			ret = dp_process_addprefix(req, &rep);
-			break;
-		case DP_REQ_TYPE_DELPREFIX:
-			ret = dp_process_delprefix(req, &rep);
-			break;
-		case DP_REQ_TYPE_ADDMACHINE:
-			ret = dp_process_addmachine(req, &rep);
-			break;
-		case DP_REQ_TYPE_DELMACHINE:
-			ret = dp_process_delmachine(req, &rep);
-			break;
-		case DP_REQ_TYPE_ADDROUTE:
-			ret = dp_process_addroute(req, &rep);
-			break;
-		case DP_REQ_TYPE_DELROUTE:
-			ret = dp_process_delroute(req, &rep);
-			break;
-		case DP_REQ_TYPE_LISTROUTE:
-			ret = dp_process_listroute(req, m, m_arr);
-			break;
-		case DP_REQ_TYPE_LISTPREFIX:
-			ret = dp_process_listpfxs(req, m, m_arr);
-			break;
-		case DP_REQ_TYPE_LISTLBBACKENDS:
-			ret = dp_process_listbackips(req, m, m_arr);
-			break;
-		case DP_REQ_TYPE_LISTMACHINE:
-			ret = dp_process_listmachine(NULL, m, m_arr);
-			break;
-		default:
-			break;
+	switch (req->com_head.com_type) {
+	case DP_REQ_TYPE_ADDLBVIP:
+		ret = dp_process_add_lb_vip(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELLBVIP:
+		ret = dp_process_del_lb_vip(req, &rep);
+		break;
+	case DP_REQ_TYPE_ADDVIP:
+		ret = dp_process_addvip(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELVIP:
+		ret = dp_process_delvip(req, &rep);
+		break;
+	case DP_REQ_TYPE_GETVIP:
+		ret = dp_process_getvip(req, &rep);
+		break;
+	case DP_REQ_TYPE_ADDPREFIX:
+		ret = dp_process_addprefix(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELPREFIX:
+		ret = dp_process_delprefix(req, &rep);
+		break;
+	case DP_REQ_TYPE_ADDMACHINE:
+		ret = dp_process_addmachine(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELMACHINE:
+		ret = dp_process_delmachine(req, &rep);
+		break;
+	case DP_REQ_TYPE_ADDROUTE:
+		ret = dp_process_addroute(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELROUTE:
+		ret = dp_process_delroute(req, &rep);
+		break;
+	case DP_REQ_TYPE_LISTROUTE:
+		ret = dp_process_listroute(req, m, m_arr);
+		break;
+	case DP_REQ_TYPE_LISTPREFIX:
+		ret = dp_process_listpfxs(req, m, m_arr);
+		break;
+	case DP_REQ_TYPE_LISTLBBACKENDS:
+		ret = dp_process_listbackips(req, m, m_arr);
+		break;
+	case DP_REQ_TYPE_LISTMACHINE:
+		ret = dp_process_listmachine(NULL, m, m_arr);
+		break;
+	default:
+		break;
 	}
 	/* For requests without any parameter (like listmachine), the reply */
 	/* is directly written into the mbuf in the process function */
 	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE &&
-		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE && 
-		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX && 
+		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE &&
+		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS) {
 		rep.com_head.com_type = req->com_head.com_type;
 		p_rep = rte_pktmbuf_mtod(m, dp_reply*);
