@@ -281,7 +281,7 @@ void set_vf_port_status_as_attached(int port_id)
 dp_vf_port_attach_status get_vf_port_attach_status(int port_id)
 {
 	dp_vf_port_attach_status status = get_vf_attach_status(&dp_layer, port_id);
-	return status; 
+	return status;
 }
 
 static void dp_install_isolated_mode(int port_id)
