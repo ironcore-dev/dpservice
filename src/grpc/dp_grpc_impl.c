@@ -467,7 +467,7 @@ static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rt
 		}
 		rep->com_head.msg_count++;
 		vm_info = &((&rep->vm_info)[i % msg_per_buf]);
-		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]) + i;
+		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]);
 		rte_memcpy(vm_info->ip6_addr, dp_get_dhcp_range_ip6(act_ports[i]),
 				   sizeof(vm_info->ip6_addr));
 		vm_info->vni = dp_get_vm_vni(act_ports[i]);
