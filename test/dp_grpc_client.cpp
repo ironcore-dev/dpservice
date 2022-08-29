@@ -285,16 +285,9 @@ class GRPCClient {
 public:
 	GRPCClient(std::shared_ptr<Channel> channel)
 		: stub_(DPDKonmetal::NewStub(channel)) {}
-		void SayHello() {
-			Empty request;
-			Status reply;
-			ClientContext context;
-
-			stub_->QueryHelloWorld(&context, request, &reply);
-	}
-	void AddMachine() {
-			AddMachineRequest request;
-			AddMachineResponse response;
+	void AddInterface() {
+			AddInterfaceRequest request;
+			AddInterfaceResponse response;
 			ClientContext context;
 			IPConfig *ip_config = new IPConfig();
 			PXEConfig *pxe_config = new PXEConfig();
@@ -305,14 +298,14 @@ public:
 			pxe_config->set_nextserver(pxe_ip_str);
 			ip_config->set_allocated_pxeconfig(pxe_config);
 			ipv6_config->set_primaryaddress(ip6_str);
-			request.set_machineid(machine_str);
+			request.set_interfaceid(machine_str);
 			request.set_vni(vni);
 			request.set_allocated_ipv4config(ip_config);
 			request.set_allocated_ipv6config(ipv6_config);
-			request.set_machinetype(dpdkonmetal::MachineType::VirtualMachine);
+			request.set_interfacetype(dpdkonmetal::InterfaceType::VirtualInterface);
 			if (vm_pci_str[0] != '\0')
 				request.set_devicename(vm_pci_str);
-			stub_->addMachine(&context, request, &response);
+			stub_->addInterface(&context, request, &response);
 			if (!response.status().error()) {
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());
 				printf("Received underlay route : %s \n", response.status().underlay_route().c_str());
@@ -466,17 +459,17 @@ public:
 	}
 
 	void AddVIP() {
-			MachineVIPMsg request;
+			InterfaceVIPMsg request;
 			ExtStatus reply;
 			ClientContext context;
-			MachineVIPIP *vip_ip = new MachineVIPIP();
+			InterfaceVIPIP *vip_ip = new InterfaceVIPIP();
 
-			request.set_machineid(machine_str);
+			request.set_interfaceid(machine_str);
 			vip_ip->set_ipversion(version);
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				vip_ip->set_address(ip_str);
-			request.set_allocated_machinevipip(vip_ip);
-			stub_->addMachineVIP(&context, request, &reply);
+			request.set_allocated_interfacevipip(vip_ip);
+			stub_->addInterfaceVIP(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			} else {
@@ -485,20 +478,20 @@ public:
 	}
 
 	void AddPfx() {
-			MachinePrefixMsg request;
+			InterfacePrefixMsg request;
 			ExtStatus reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
-			MachineIDMsg *m_id = new MachineIDMsg();
+			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
-			m_id->set_machineid(machine_str);
-			request.set_allocated_machine_id(m_id);
+			m_id->set_interfaceid(machine_str);
+			request.set_allocated_interface_id(m_id);
 			pfx_ip->set_ipversion(version);
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->addMachinePrefix(&context, request, &reply);
+			stub_->addInterfacePrefix(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			} else {
@@ -516,33 +509,33 @@ public:
 	}
 
 	void DelPfx() {
-			MachinePrefixMsg request;
+			InterfacePrefixMsg request;
 			Status reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
-			MachineIDMsg *m_id = new MachineIDMsg();
+			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
-			m_id->set_machineid(machine_str);
-			request.set_allocated_machine_id(m_id);
+			m_id->set_interfaceid(machine_str);
+			request.set_allocated_interface_id(m_id);
 			pfx_ip->set_ipversion(version);
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->deleteMachinePrefix(&context, request, &reply);
+			stub_->deleteInterfacePrefix(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			}
 	}
 
 	void ListPfx() {
-			MachineIDMsg request;
+			InterfaceIDMsg request;
 			PrefixesMsg reply;
 			ClientContext context;
 			int i;
 
-			request.set_machineid(machine_str);
-			stub_->listMachinePrefixes(&context, request, &reply);
+			request.set_interfaceid(machine_str);
+			stub_->listInterfacePrefixes(&context, request, &reply);
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("Route prefix %s len %d \n",
 					reply.prefixes(i).address().c_str(),
@@ -551,24 +544,24 @@ public:
 	}
 
 	void DelVIP() {
-			MachineIDMsg request;
+			InterfaceIDMsg request;
 			Status reply;
 			ClientContext context;
 
-			request.set_machineid(machine_str);
-			stub_->delMachineVIP(&context, request, &reply);
+			request.set_interfaceid(machine_str);
+			stub_->delInterfaceVIP(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			}
 	}
 
 	void GetVIP() {
-			MachineIDMsg request;
-			MachineVIPIP reply;
+			InterfaceIDMsg request;
+			InterfaceVIPIP reply;
 			ClientContext context;
 
-			request.set_machineid(machine_str);
-			stub_->getMachineVIP(&context, request, &reply);
+			request.set_interfaceid(machine_str);
+			stub_->getInterfaceVIP(&context, request, &reply);
 			if (!reply.status().error())
 				printf("Received VIP %s \n", reply.address().c_str());
 			else
@@ -576,31 +569,31 @@ public:
 			
 	}
 
-	void DelMachine() {
-			MachineIDMsg request;
+	void DelInterface() {
+			InterfaceIDMsg request;
 			Status reply;
 			ClientContext context;
 
-			request.set_machineid(machine_str);
-			stub_->deleteMachine(&context, request, &reply);
+			request.set_interfaceid(machine_str);
+			stub_->deleteInterface(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			}
 	}
 
-	void GetMachines() {
+	void GetInterfaces() {
 			Empty request;
-			MachinesMsg reply;
+			InterfacesMsg reply;
 			ClientContext context;
 			int i;
 
-			stub_->listMachines(&context, request, &reply);
-			for (i = 0; i < reply.machines_size(); i++)
+			stub_->listInterfaces(&context, request, &reply);
+			for (i = 0; i < reply.interfaces_size(); i++)
 			{
-				printf("Machine %s ipv4 %s ipv6 %s vni %d\n", reply.machines(i).machineid().c_str(),
-					reply.machines(i).primaryipv4address().c_str(), 
-					reply.machines(i).primaryipv6address().c_str(),
-					reply.machines(i).vni());
+				printf("Interface %s ipv4 %s ipv6 %s vni %d\n", reply.interfaces(i).interfaceid().c_str(),
+					reply.interfaces(i).primaryipv4address().c_str(), 
+					reply.interfaces(i).primaryipv6address().c_str(),
+					reply.interfaces(i).vni());
 			}
 	}
 
@@ -617,17 +610,17 @@ int main(int argc, char** argv)
 	switch (command)
 	{
 	case DP_CMD_ADD_MACHINE:
-		dpdk_client.AddMachine();
+		dpdk_client.AddInterface();
 		std::cout << "Addmachine called " << std::endl;
 		printf("IP %s, IPv6 %s PXE Server IP %s PXE Path %s\n", ip_str, ip6_str, pxe_ip_str, pxe_path_str);
 		break;
 	case DP_CMD_DEL_MACHINE:
-		dpdk_client.DelMachine();
+		dpdk_client.DelInterface();
 		std::cout << "Delmachine called " << std::endl;
 		break;
 	case DP_CMD_GET_MACHINE:
 		std::cout << "Getmachine called " << std::endl;
-		dpdk_client.GetMachines();
+		dpdk_client.GetInterfaces();
 		break;
 	case DP_CMD_ADD_ROUTE:
 		dpdk_client.AddRoute();

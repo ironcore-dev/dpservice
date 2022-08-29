@@ -157,7 +157,7 @@ int AddPfxCall::Proceed()
 		new AddPfxCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machine_id().machineid().c_str());
+				 "%s", request_.interface_id().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.prefix().address().c_str(),
@@ -195,7 +195,7 @@ int DelPfxCall::Proceed()
 		new DelPfxCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machine_id().machineid().c_str());
+				 "%s", request_.interface_id().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.prefix().address().c_str(),
@@ -233,7 +233,7 @@ int ListPfxCall::Proceed()
 		new ListPfxCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machineid().c_str());
+				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -273,10 +273,10 @@ int AddVIPCall::Proceed()
 		new AddVIPCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machineid().c_str());
-		if (request_.machinevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+				 "%s", request_.interfaceid().c_str());
+		if (request_.interfacevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.machinevipip().address().c_str(),
+			inet_aton(request_.interfacevipip().address().c_str(),
 					  (in_addr*)&request.add_vip.vip.vip_addr);
 		}
 		dp_send_to_worker(&request);
@@ -310,7 +310,7 @@ int DelVIPCall::Proceed()
 		new DelVIPCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machineid().c_str());
+				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -340,7 +340,7 @@ int GetVIPCall::Proceed()
 		new GetVIPCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machineid().c_str());
+				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -362,7 +362,7 @@ int GetVIPCall::Proceed()
 	return 0;
 }
 
-int AddMachineCall::Proceed()
+int AddInterfaceCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
@@ -373,7 +373,7 @@ int AddMachineCall::Proceed()
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new AddMachineCall(service_, cq_);
+		new AddInterfaceCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		err_status->set_error(EXIT_SUCCESS);
 		request.add_machine.vni = request_.vni();
@@ -391,7 +391,7 @@ int AddMachineCall::Proceed()
 			err_status->set_error(DP_ERROR_VM_ADD_IPV6_FORMAT);
 
 		snprintf(request.add_machine.machine_id, VM_MACHINE_ID_STR_LEN, "%s",
-				 request_.machineid().c_str());
+				 request_.interfaceid().c_str());
 		if (!err_status->error())
 			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -423,17 +423,17 @@ int AddMachineCall::Proceed()
 	return 0;
 }
 
-int DelMachineCall::Proceed()
+int DelInterfaceCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
-		new DelMachineCall(service_, cq_);
+		new DelInterfaceCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_machine.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.machineid().c_str());
+				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -593,12 +593,12 @@ int ListRoutesCall::Proceed()
 	return 0;
 }
 
-int ListMachinesCall::Proceed()
+int ListInterfacesCall::Proceed()
 {
 	dp_request request = {0};
 	struct rte_mbuf *mbuf = NULL;
 	struct dp_reply *reply;
-	Machine *machine;
+	Interface *machine;
 	struct in_addr addr;
 	dp_vm_info *vm_info;
 	uint8_t is_chained = 0;
@@ -608,7 +608,7 @@ int ListMachinesCall::Proceed()
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new ListMachinesCall(service_, cq_);
+		new ListInterfacesCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -619,13 +619,13 @@ int ListMachinesCall::Proceed()
 				return -1;
 			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
 			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
-				machine = reply_.add_machines();
+				machine = reply_.add_interfaces();
 				vm_info = &((&reply->vm_info)[i]);
 				addr.s_addr = htonl(vm_info->ip_addr);
 				machine->set_primaryipv4address(inet_ntoa(addr));
 				inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
 				machine->set_primaryipv6address(buf);
-				machine->set_machineid((char *)vm_info->machine_id);
+				machine->set_interfaceid((char *)vm_info->machine_id);
 				machine->set_vni(vm_info->vni);
 			}
 			read_so_far += (reply->com_head.msg_count - read_so_far);
