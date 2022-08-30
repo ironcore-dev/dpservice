@@ -153,7 +153,7 @@ class DelVIPCall final : BaseCall {
 public:
 	DelVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DELVIP), responder_(&ctx_) {
-		service_->RequestdelInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdeleteInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -176,14 +176,14 @@ public:
 
 class AddInterfaceCall final : BaseCall {
 	ServerContext ctx_;
-	AddInterfaceRequest request_;
-	AddInterfaceResponse reply_;
-	ServerAsyncResponseWriter<AddInterfaceResponse> responder_;
+	CreateInterfaceRequest request_;
+	CreateInterfaceResponse reply_;
+	ServerAsyncResponseWriter<CreateInterfaceResponse> responder_;
 
 public:
 	AddInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_ADDMACHINE), responder_(&ctx_) {
-		service_->RequestaddInterface(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestcreateInterface(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;

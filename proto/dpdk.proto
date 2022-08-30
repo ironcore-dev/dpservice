@@ -120,7 +120,7 @@ message ThrottlingConfig {
 	uint32 maxOpenFlows = 5;
 }
 
-message AddInterfaceRequest {
+message CreateInterfaceRequest {
 	// interfaceType defines whether a Bare Metal Interface or a Virtual Interface is created.
 	// Both instance types cannot be mixed during a session.
 	// Maximum number of instantiated bare metal interfaces is 1.
@@ -237,7 +237,7 @@ message VirtualFunction {
 	uint32 function = 5;  // PCIe Function
 }
 
-message AddInterfaceResponse {
+message CreateInterfaceResponse {
 	ExtStatus status = 1;
 	VirtualFunction vf = 2; // Holds VF information when a VM has been created.
 }
@@ -266,10 +266,10 @@ service DPDKonmetal {
 	//// INTERFACES
 	rpc listInterfaces(Empty) returns (InterfacesMsg) {}
 
-	// addInterface creates and configures a VF (hypervisor case) or PF (bare metal) for the new interface.
+	// createInterface creates and configures a VF (hypervisor case) or PF (bare metal) for the new interface.
 	// If the interface's VNet is not known to the DPDK app yet, the VNet and its routing table will be intialized.
-	// After calling addInterface() the Client has to make sure that the routing table of the corresponding VNet is filled (use listRoutes and addRoute as required).
-	rpc addInterface(AddInterfaceRequest) returns (AddInterfaceResponse) {}
+	// After calling createInterface() the Client has to make sure that the routing table of the corresponding VNet is filled (use listRoutes and addRoute as required).
+	rpc createInterface(CreateInterfaceRequest) returns (CreateInterfaceResponse) {}
 
 	// deleteInterface removes all networking configuration of a interface from the DPDK app.
 	// The VF will be released and can be reused for other VMs.
@@ -288,7 +288,7 @@ service DPDKonmetal {
 	// NAT related, add/get/del Virtual IP for a given Interface
 	rpc addInterfaceVIP(InterfaceVIPMsg) returns (ExtStatus) {}
 	rpc getInterfaceVIP(InterfaceIDMsg) returns (InterfaceVIPIP) {}
-	rpc delInterfaceVIP(InterfaceIDMsg) returns (Status) {}
+	rpc deleteInterfaceVIP(InterfaceIDMsg) returns (Status) {}
 
 	// LB related, add/list/del backend IPs for a given LB IP
 	rpc addLBVIP(LBMsg) returns (ExtStatus) {}

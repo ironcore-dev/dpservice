@@ -286,8 +286,8 @@ public:
 	GRPCClient(std::shared_ptr<Channel> channel)
 		: stub_(DPDKonmetal::NewStub(channel)) {}
 	void AddInterface() {
-			AddInterfaceRequest request;
-			AddInterfaceResponse response;
+			CreateInterfaceRequest request;
+			CreateInterfaceResponse response;
 			ClientContext context;
 			IPConfig *ip_config = new IPConfig();
 			PXEConfig *pxe_config = new PXEConfig();
@@ -305,7 +305,7 @@ public:
 			request.set_interfacetype(dpdkonmetal::InterfaceType::VirtualInterface);
 			if (vm_pci_str[0] != '\0')
 				request.set_devicename(vm_pci_str);
-			stub_->addInterface(&context, request, &response);
+			stub_->createInterface(&context, request, &response);
 			if (!response.status().error()) {
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());
 				printf("Received underlay route : %s \n", response.status().underlay_route().c_str());
@@ -549,7 +549,7 @@ public:
 			ClientContext context;
 
 			request.set_interfaceid(machine_str);
-			stub_->delInterfaceVIP(&context, request, &reply);
+			stub_->deleteInterfaceVIP(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			}
