@@ -42,8 +42,8 @@ public:
 class AddPfxCall final : BaseCall {
 	ServerContext ctx_;
 	InterfacePrefixMsg request_;
-	ExtStatus reply_;
-	ServerAsyncResponseWriter<ExtStatus> responder_;
+	IpAdditionResponse reply_;
+	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
 
 public:
 	AddPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
@@ -87,8 +87,8 @@ public:
 class AddVIPCall final : BaseCall {
 	ServerContext ctx_;
 	InterfaceVIPMsg request_;
-	ExtStatus reply_;
-	ServerAsyncResponseWriter<ExtStatus> responder_;
+	IpAdditionResponse reply_;
+	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
 
 public:
 	AddVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
@@ -102,8 +102,8 @@ public:
 class AddLBVIPCall final : BaseCall {
 	ServerContext ctx_;
 	LBMsg request_;
-	ExtStatus reply_;
-	ServerAsyncResponseWriter<ExtStatus> responder_;
+	IpAdditionResponse reply_;
+	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
 
 public:
 	AddLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)

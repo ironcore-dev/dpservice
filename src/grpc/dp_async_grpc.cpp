@@ -32,6 +32,7 @@ int AddLBVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -57,8 +58,9 @@ int AddLBVIPCall::Proceed()
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
 		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_error(reply.com_head.err_code);
+		reply_.set_underlayroute(buf_str);
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -150,6 +152,7 @@ int AddPfxCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -157,7 +160,7 @@ int AddPfxCall::Proceed()
 		new AddPfxCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.interface_id().interfaceid().c_str());
+				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.prefix().address().c_str(),
@@ -175,8 +178,9 @@ int AddPfxCall::Proceed()
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_error(reply.com_head.err_code);
+		reply_.set_underlayroute(buf_str);
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -195,7 +199,7 @@ int DelPfxCall::Proceed()
 		new DelPfxCall(service_, cq_);
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
-				 "%s", request_.interface_id().interfaceid().c_str());
+				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.prefix().address().c_str(),
@@ -266,6 +270,7 @@ int AddVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -290,8 +295,9 @@ int AddVIPCall::Proceed()
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_error(reply.com_head.err_code);
+		reply_.set_underlayroute(buf_str);
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -367,7 +373,8 @@ int AddInterfaceCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	VirtualFunction *vf = new VirtualFunction();
-	ExtStatus *err_status = new ExtStatus();
+	Status *err_status = new Status();
+	IpAdditionResponse *ip_resp = new IpAdditionResponse();
 	grpc::Status ret = grpc::Status::OK;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
@@ -412,8 +419,9 @@ int AddInterfaceCall::Proceed()
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
 		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
-		err_status->set_underlay_route(buf_str);
-		reply_.set_allocated_status(err_status);
+		ip_resp->set_underlayroute(buf_str);
+		ip_resp->set_allocated_status(err_status);
+		reply_.set_allocated_response(ip_resp);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

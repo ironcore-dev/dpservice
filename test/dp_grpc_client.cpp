@@ -306,11 +306,11 @@ public:
 			if (vm_pci_str[0] != '\0')
 				request.set_devicename(vm_pci_str);
 			stub_->createInterface(&context, request, &response);
-			if (!response.status().error()) {
+			if (!response.response().status().error()) {
 				printf("Allocated VF for you %s \n", response.vf().name().c_str());
-				printf("Received underlay route : %s \n", response.status().underlay_route().c_str());
+				printf("Received underlay route : %s \n", response.response().underlayroute().c_str());
 			} else {
-				printf("Received an error %d\n", response.status().error());
+				printf("Received an error %d\n", response.response().status().error());
 			}
 	}
 
@@ -393,7 +393,7 @@ public:
 
 	void AddLBVIP() {
 			LBMsg request;
-			ExtStatus reply;
+			IpAdditionResponse reply;
 			ClientContext context;
 			LBIP *vip_ip = new LBIP();
 			LBIP *back_ip = new LBIP();
@@ -408,10 +408,10 @@ public:
 				back_ip->set_address(back_ip_str);
 			request.set_allocated_lbbackendip(back_ip);
 			stub_->addLBVIP(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
 			} else {
-				printf("Received underlay route : %s \n", reply.underlay_route().c_str());
+				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
 			}
 	}
 
@@ -460,7 +460,7 @@ public:
 
 	void AddVIP() {
 			InterfaceVIPMsg request;
-			ExtStatus reply;
+			IpAdditionResponse reply;
 			ClientContext context;
 			InterfaceVIPIP *vip_ip = new InterfaceVIPIP();
 
@@ -470,32 +470,32 @@ public:
 				vip_ip->set_address(ip_str);
 			request.set_allocated_interfacevipip(vip_ip);
 			stub_->addInterfaceVIP(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
 			} else {
-				printf("Received underlay route : %s \n", reply.underlay_route().c_str());
+				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
 			}
 	}
 
 	void AddPfx() {
 			InterfacePrefixMsg request;
-			ExtStatus reply;
+			IpAdditionResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
 			m_id->set_interfaceid(machine_str);
-			request.set_allocated_interface_id(m_id);
+			request.set_allocated_interfaceid(m_id);
 			pfx_ip->set_ipversion(version);
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->addInterfacePrefix(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
 			} else {
-				printf("Received underlay route : %s \n", reply.underlay_route().c_str());
+				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
 			}
 	}
 
@@ -516,7 +516,7 @@ public:
 			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
 			m_id->set_interfaceid(machine_str);
-			request.set_allocated_interface_id(m_id);
+			request.set_allocated_interfaceid(m_id);
 			pfx_ip->set_ipversion(version);
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);

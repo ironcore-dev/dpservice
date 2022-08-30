@@ -37,10 +37,9 @@ message Status {
 	string message = 2;
 }
 
-message ExtStatus {
-	int32 error = 1;
-	string message = 2;
-	bytes underlay_route = 3;
+message IpAdditionResponse {
+	Status status = 1;
+	bytes underlayRoute = 2;
 }
 
 message Empty {}
@@ -190,12 +189,12 @@ message RuleIDMsg {
 }
 
 message ThrottlingConfigMsg {
-	InterfaceIDMsg interface_id = 1;
+	InterfaceIDMsg interfaceID = 1;
 	ThrottlingConfig throttlingConfig = 2;
 }
 
 message InterfacePrefixMsg {
-	InterfaceIDMsg interface_id = 1;
+	InterfaceIDMsg interfaceID = 1;
 	Prefix prefix = 2;
 }
 
@@ -238,7 +237,7 @@ message VirtualFunction {
 }
 
 message CreateInterfaceResponse {
-	ExtStatus status = 1;
+	IpAdditionResponse response = 1;
 	VirtualFunction vf = 2; // Holds VF information when a VM has been created.
 }
 
@@ -282,16 +281,16 @@ service DPDKonmetal {
 	// listInterfacePrefixes returns a list of prefixes, that will be routed to the interface by the DPDK app.
 	// For example this could be a node's Kubernetes Pod CIDR.
 	rpc listInterfacePrefixes(InterfaceIDMsg) returns (PrefixesMsg) {}
-	rpc addInterfacePrefix(InterfacePrefixMsg) returns (ExtStatus) {}
+	rpc addInterfacePrefix(InterfacePrefixMsg) returns (IpAdditionResponse) {}
 	rpc deleteInterfacePrefix(InterfacePrefixMsg) returns (Status) {}
 
 	// NAT related, add/get/del Virtual IP for a given Interface
-	rpc addInterfaceVIP(InterfaceVIPMsg) returns (ExtStatus) {}
+	rpc addInterfaceVIP(InterfaceVIPMsg) returns (IpAdditionResponse) {}
 	rpc getInterfaceVIP(InterfaceIDMsg) returns (InterfaceVIPIP) {}
 	rpc deleteInterfaceVIP(InterfaceIDMsg) returns (Status) {}
 
 	// LB related, add/list/del backend IPs for a given LB IP
-	rpc addLBVIP(LBMsg) returns (ExtStatus) {}
+	rpc addLBVIP(LBMsg) returns (IpAdditionResponse) {}
 	rpc getLBVIPBackends(LBQueryMsg) returns (LBBackendMsg) {}
 	rpc delLBVIP(LBMsg) returns (Status) {}
 
