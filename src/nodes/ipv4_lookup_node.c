@@ -68,6 +68,11 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 	if (dp_is_offload_enabled())
 		df_ptr->flags.valid = 1;
 
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_LOCAL || df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+		if (!dp_is_pf_port_id(df_ptr->nxt_hop) && get_vf_port_attach_status(df_ptr->nxt_hop) == DP_VF_PORT_DISATTACH)
+			return DP_ROUTE_DROP;
+	}
+
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		// rewrite outgoing port if WCMP algorithm decides to do so
 		if (dp_is_wcmp_enabled()) {

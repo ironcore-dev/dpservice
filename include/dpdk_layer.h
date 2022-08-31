@@ -88,6 +88,8 @@ int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id);
 int hairpin_ports_bind_all(uint16_t port_id);
 int bind_vf_with_peer_pf_port(uint16_t port_id);
 uint16_t get_pf_hairpin_rx_queue(uint16_t port_id);
+void set_vf_port_status_as_attached(int port_id);
+dp_vf_port_attach_status get_vf_port_attach_status(int port_id);
 
 #ifdef __cplusplus
 }

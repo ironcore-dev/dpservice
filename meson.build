@@ -1,5 +1,5 @@
 project('dp_service', 'c', 'cpp',
-  default_options : ['c_args=-Wno-deprecated-declarations -Werror', 'cpp_args=-fpermissive'],
+  default_options : ['c_args=-Wno-deprecated-declarations -Werror -Wno-format-truncation', 'cpp_args=-fpermissive'],
   version: run_command('cat', 'include/dp_version.h').stdout().strip().split(' ').get(2).split('"').get(1),
   license : 'MIT')
 add_global_arguments('-DDEBUG=true', language : 'c')

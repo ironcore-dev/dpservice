@@ -7,6 +7,7 @@
 #include "nodes/dhcp_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dpdk_layer.h"
 
 #define IS_PXE_TFTP(p_mode) (p_mode == DP_PXE_MODE_TFTP)
 #define IS_PXE_HTTP(p_mode) (p_mode == DP_PXE_MODE_HTTP)
@@ -63,12 +64,12 @@ static void parse_options(struct dp_dhcp_header *dhcp_pkt, uint16_t tot_op_len)
 	uint8_t op_len;
 	uint8_t op;
 
-	for(int i = 0; i < tot_op_len; i+= op_len) {
+	for (int i = 0; i < tot_op_len; i += op_len) {
 		op = dhcp_pkt->options[i];
 		i++;
 		op_len = dhcp_pkt->options[i];
 		i++;
-		switch(op) {
+		switch (op) {
 			case DP_DHCP_MSG_TYPE:
 				msg_type = dhcp_pkt->options[i];
 			break;
@@ -108,22 +109,22 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	char pxe_srv_ip_str[INET_ADDRSTRLEN];
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	incoming_ipv4_hdr = (struct rte_ipv4_hdr*) (incoming_eth_hdr + 1);
-	incoming_udp_hdr = (struct rte_udp_hdr*) (incoming_ipv4_hdr + 1);
+	incoming_ipv4_hdr = (struct rte_ipv4_hdr *) (incoming_eth_hdr + 1);
+	incoming_udp_hdr = (struct rte_udp_hdr *) (incoming_ipv4_hdr + 1);
 	dhcp_hdr = rte_pktmbuf_mtod_offset(m, struct dp_dhcp_header *,
 									   sizeof(struct rte_ether_hdr)
 									   + sizeof(struct rte_ipv4_hdr)
 									   + sizeof(struct rte_udp_hdr));
 
-	
+
 	options_len = rte_pktmbuf_data_len(m) - DHCP_FIXED_LEN - sizeof(struct rte_ether_hdr);
 	parse_options(dhcp_hdr, options_len);
-	
+
 	m->ol_flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = sizeof(struct rte_ipv4_hdr);
 	m->pkt_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr) + sizeof(struct dp_dhcp_header);
-	m->data_len = m->pkt_len; 
+	m->data_len = m->pkt_len;
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
 	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
 	incoming_ipv4_hdr->src_addr = htonl(dp_get_gw_ip4());
@@ -134,15 +135,15 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 		incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port));
 	}
 	incoming_ipv4_hdr->hdr_checksum = 0;
-	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) + 
+	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) +
 										    sizeof(struct rte_udp_hdr) + sizeof(struct rte_ipv4_hdr));
-	
+
 	incoming_udp_hdr->dgram_len = htons(sizeof(struct dp_dhcp_header) + sizeof(struct rte_udp_hdr));
 	incoming_udp_hdr->dst_port =  htons(DP_BOOTP_CLNT_PORT);
 	incoming_udp_hdr->src_port =  htons(DP_BOOTP_SRV_PORT);
 	incoming_udp_hdr->dgram_cksum = rte_ipv4_phdr_cksum(incoming_ipv4_hdr, m->ol_flags);
 
-	switch(msg_type) {
+	switch (msg_type) {
 		case DHCPDISCOVER:
 			dhcp_type = DP_DHCP_OFFER;
 			break;
@@ -179,19 +180,19 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	net_mask = htonl(DP_DHCP_MASK);
 	mtu = htons(DP_DHCP_MTU_VALUE);
 
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_type, DP_DHCP_MSG_TYPE, 1);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &net_mask, DP_DHCP_SUBNET_MASK, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &mtu, DP_DHCP_MTU, 2);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_type, DP_DHCP_MSG_TYPE, 1);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &net_mask, DP_DHCP_SUBNET_MASK, 4);
+	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &mtu, DP_DHCP_MTU, 2);
 	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode))
-		vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos] , &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
+		vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
 
 	dhcp_hdr->options[vend_pos] = DP_DHCP_END;
 
 	return 1;
-} 
+}
 
 static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
 													 struct rte_node *node,
@@ -206,12 +207,13 @@ static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (handle_dhcp(mbuf0))
-			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port] , mbuf0);
-		else
+		if (handle_dhcp(mbuf0)) {
+			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port], mbuf0);
+			set_vf_port_status_as_attached(mbuf0->port);
+		} else
 			rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);
 		rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);
-	}	
+	}
 
     return cnt;
 }
@@ -229,8 +231,8 @@ static struct rte_node_register dhcp_node_base = {
 	.process = dhcp_node_process,
 
 	.nb_edges = DHCP_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+
 			[DHCP_NEXT_DROP] = "drop",
 		},
 };
