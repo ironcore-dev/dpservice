@@ -388,6 +388,34 @@ err:
 	return ret;
 }
 
+static int dp_process_getmachine(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	dp_vm_info *vm_info;
+
+	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_VM_NOT_FND;
+		goto err;
+	}
+
+	vm_info = &((&rep->vm_info)[0]);
+	vm_info->ip_addr = dp_get_dhcp_range_ip4(port_id);
+	rte_memcpy(vm_info->ip6_addr, dp_get_dhcp_range_ip6(port_id),
+				sizeof(vm_info->ip6_addr));
+	vm_info->vni = dp_get_vm_vni(port_id);
+	rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(port_id),
+		sizeof(vm_info->machine_id));
+	rte_eth_dev_get_name_by_port(port_id, rep->vm_info.pci_name);
+
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
 static int dp_process_addroute(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
@@ -467,12 +495,13 @@ static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rt
 		}
 		rep->com_head.msg_count++;
 		vm_info = &((&rep->vm_info)[i % msg_per_buf]);
-		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]) + i;
+		vm_info->ip_addr = dp_get_dhcp_range_ip4(act_ports[i]);
 		rte_memcpy(vm_info->ip6_addr, dp_get_dhcp_range_ip6(act_ports[i]),
 				   sizeof(vm_info->ip6_addr));
 		vm_info->vni = dp_get_vm_vni(act_ports[i]);
 		rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(act_ports[i]),
 			sizeof(vm_info->machine_id));
+		rte_eth_dev_get_name_by_port(act_ports[i], vm_info->pci_name);
 	}
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
@@ -558,6 +587,9 @@ int dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_DELMACHINE:
 		ret = dp_process_delmachine(req, &rep);
+		break;
+	case DP_REQ_TYPE_GETMACHINE:
+		ret = dp_process_getmachine(req, &rep);
 		break;
 	case DP_REQ_TYPE_ADDROUTE:
 		ret = dp_process_addroute(req, &rep);

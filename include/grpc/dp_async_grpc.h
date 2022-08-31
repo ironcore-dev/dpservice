@@ -41,14 +41,14 @@ public:
 
 class AddPfxCall final : BaseCall {
 	ServerContext ctx_;
-	MachinePrefixMsg request_;
-	ExtStatus reply_;
-	ServerAsyncResponseWriter<ExtStatus> responder_;
+	InterfacePrefixMsg request_;
+	IpAdditionResponse reply_;
+	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
 
 public:
 	AddPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_ADDPREFIX), responder_(&ctx_) {
-		service_->RequestaddMachinePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestaddInterfacePrefix(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -56,14 +56,14 @@ public:
 
 class DelPfxCall final : BaseCall {
 	ServerContext ctx_;
-	MachinePrefixMsg request_;
+	InterfacePrefixMsg request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
 	DelPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DELPREFIX), responder_(&ctx_) {
-		service_->RequestdeleteMachinePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdeleteInterfacePrefix(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -71,14 +71,14 @@ public:
 
 class ListPfxCall final : BaseCall {
 	ServerContext ctx_;
-	MachineIDMsg request_;
+	InterfaceIDMsg request_;
 	PrefixesMsg reply_;
 	ServerAsyncResponseWriter<PrefixesMsg> responder_;
 
 public:
 	ListPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTPREFIX), responder_(&ctx_) {
-		service_->RequestlistMachinePrefixes(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestlistInterfacePrefixes(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -86,14 +86,14 @@ public:
 
 class AddVIPCall final : BaseCall {
 	ServerContext ctx_;
-	MachineVIPMsg request_;
-	ExtStatus reply_;
-	ServerAsyncResponseWriter<ExtStatus> responder_;
+	InterfaceVIPMsg request_;
+	IpAdditionResponse reply_;
+	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
 
 public:
 	AddVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_ADDVIP), responder_(&ctx_) {
-		service_->RequestaddMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestaddInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -102,8 +102,8 @@ public:
 class AddLBVIPCall final : BaseCall {
 	ServerContext ctx_;
 	LBMsg request_;
-	ExtStatus reply_;
-	ServerAsyncResponseWriter<ExtStatus> responder_;
+	IpAdditionResponse reply_;
+	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
 
 public:
 	AddLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
@@ -146,14 +146,14 @@ public:
 
 class DelVIPCall final : BaseCall {
 	ServerContext ctx_;
-	MachineIDMsg request_;
+	InterfaceIDMsg request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
 	DelVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DELVIP), responder_(&ctx_) {
-		service_->RequestdelMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdeleteInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -161,44 +161,44 @@ public:
 
 class GetVIPCall final : BaseCall {
 	ServerContext ctx_;
-	MachineIDMsg request_;
-	MachineVIPIP reply_;
-	ServerAsyncResponseWriter<MachineVIPIP> responder_;
+	InterfaceIDMsg request_;
+	InterfaceVIPIP reply_;
+	ServerAsyncResponseWriter<InterfaceVIPIP> responder_;
 
 public:
 	GetVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_GETVIP), responder_(&ctx_) {
-		service_->RequestgetMachineVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestgetInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
 };
 
-class AddMachineCall final : BaseCall {
+class AddInterfaceCall final : BaseCall {
 	ServerContext ctx_;
-	AddMachineRequest request_;
-	AddMachineResponse reply_;
-	ServerAsyncResponseWriter<AddMachineResponse> responder_;
+	CreateInterfaceRequest request_;
+	CreateInterfaceResponse reply_;
+	ServerAsyncResponseWriter<CreateInterfaceResponse> responder_;
 
 public:
-	AddMachineCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	AddInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_ADDMACHINE), responder_(&ctx_) {
-		service_->RequestaddMachine(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestcreateInterface(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
 };
 
-class DelMachineCall final : BaseCall {
+class DelInterfaceCall final : BaseCall {
 	ServerContext ctx_;
-	MachineIDMsg request_;
+	InterfaceIDMsg request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
-	DelMachineCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	DelInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DELMACHINE), responder_(&ctx_) {
-		service_->RequestdeleteMachine(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdeleteInterface(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -234,6 +234,21 @@ public:
 	int Proceed() override;
 };
 
+class GetInterfaceCall final : BaseCall {
+	ServerContext ctx_;
+	InterfaceIDMsg request_;
+	GetInterfaceResponse reply_;
+	ServerAsyncResponseWriter<GetInterfaceResponse> responder_;
+
+public:
+	GetInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_GETMACHINE), responder_(&ctx_) {
+		service_->RequestgetInterface(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class ListRoutesCall final : BaseCall {
 	ServerContext ctx_;
 	VNIMsg request_;
@@ -249,16 +264,16 @@ public:
 	int Proceed() override;
 };
 
-class ListMachinesCall final : BaseCall {
+class ListInterfacesCall final : BaseCall {
 	ServerContext ctx_;
 	Empty request_;
-	MachinesMsg reply_;
-	ServerAsyncResponseWriter<MachinesMsg> responder_;
+	InterfacesMsg reply_;
+	ServerAsyncResponseWriter<InterfacesMsg> responder_;
 
 public:
-	ListMachinesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	ListInterfacesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTMACHINE), responder_(&ctx_) {
-		service_->RequestlistMachines(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestlistInterfaces(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;

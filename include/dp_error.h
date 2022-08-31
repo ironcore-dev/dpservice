@@ -17,6 +17,7 @@ extern "C" {
 #define DP_ERROR_VM_CANT_GET_NAME		110
 #define DP_ERROR_VM_DEL					150
 #define DP_ERROR_VM_DEL_VM_NOT_FND		151
+#define DP_ERROR_VM_GET_VM_NOT_FND		171
 #define DP_ERROR_VM_LIST				200
 #define DP_ERROR_VM_ADD_RT				250
 #define DP_ERROR_VM_ADD_RT_FAIL4		251

@@ -296,6 +296,12 @@ def test_grpc_addmachine_error_102(capsys, build_path):
 	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
 	eval_cmd_output(add_machine_test, expected_error_str)
 
+def test_grpc_getmachine_single(capsys, build_path):
+	# Try to get a single existing interface(machine)
+	expected_str = vf1_ip
+	add_machine_test = build_path+"/test/dp_grpc_client --getmachine " + vm2_name
+	eval_cmd_output(add_machine_test, expected_str)
+
 def test_grpc_addmachine_error_106(capsys, build_path):
 	# Try to add with new machine identifer but already given IPv4
 	expected_error_str = "error 106"

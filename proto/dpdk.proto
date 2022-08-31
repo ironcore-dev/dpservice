@@ -3,9 +3,9 @@ syntax = "proto3";
 package dpdkonmetal;
 option go_package = "./dpdkproto";
 
-enum MachineType {
-	VirtualMachine = 0;
-	BareMetalMachine = 1;
+enum InterfaceType {
+	VirtualInterface = 0;
+	BareMetalInterface = 1;
 }
 
 enum IPVersion {
@@ -37,10 +37,9 @@ message Status {
 	string message = 2;
 }
 
-message ExtStatus {
-	int32 error = 1;
-	string message = 2;
-	bytes underlay_route = 3;
+message IpAdditionResponse {
+	Status status = 1;
+	bytes underlayRoute = 2;
 }
 
 message Empty {}
@@ -62,7 +61,7 @@ message PXEConfig {
 	string bootFileName = 2;
 }
 
-// Firewall Rules can be inserted and removed while the machine is running. In the C code probably it makes sense to use linked lists.
+// Firewall Rules can be inserted and removed while the interface is running. In the C code probably it makes sense to use linked lists.
 // Firewall rules have an order and may result in accepting or dropping a packet.
 // When a packet matches a firewall rule, the defined action is taken. No further firewall rules will be evaluated thereafter.
 message FirewallRule {
@@ -107,7 +106,7 @@ message IPConfig {
 	repeated bytes dns = 8;
 
 	repeated FirewallRule firewallRules = 9;
-	repeated Prefix machinePrefixes = 10;
+	repeated Prefix interfacePrefixes = 10;
 }
 
 message ThrottlingConfig {
@@ -120,17 +119,17 @@ message ThrottlingConfig {
 	uint32 maxOpenFlows = 5;
 }
 
-message AddMachineRequest {
-	// machineType defines whether a Bare Metal Machine or a Virtual Machine is created.
+message CreateInterfaceRequest {
+	// interfaceType defines whether a Bare Metal Interface or a Virtual Interface is created.
 	// Both instance types cannot be mixed during a session.
-	// Maximum number of instantiated bare metal machines is 1.
-	// Maximum number of Virtual Machines is not defined.
+	// Maximum number of instantiated bare metal interfaces is 1.
+	// Maximum number of Virtual Interfaces is not defined.
 	// If you specify device name, a device with this name will be assigned, if it exists
 	// otherwise an error code. If you dont specify any device name, next available VF 
 	// will be assigned. 
-	MachineType machineType = 1;
+	InterfaceType interfaceType = 1;
 
-	bytes machineID = 2;
+	bytes interfaceID = 2;
 	uint32 vni = 3;
 	IPConfig ipv4Config = 4;
 	IPConfig ipv6Config = 5;
@@ -138,19 +137,26 @@ message AddMachineRequest {
 	ThrottlingConfig throttlingConfig = 7;
 }
 
-message Machine {
-	bytes machineID = 1;
+message Interface {
+	bytes interfaceID = 1;
 	uint32 vni = 2;
 	bytes primaryIPv4Address = 3;
 	bytes primaryIPv6Address = 4;
 	ThrottlingConfig throttlingConfig = 5;
+	bytes underlayRoute = 6;
+	string pciDpName = 7;
 }
 
-message MachineIDMsg {
-	bytes machineID = 1;
+message InterfaceIDMsg {
+	bytes interfaceID = 1;
 }
 
-message MachineVIPIP {
+message GetInterfaceResponse {
+	Status status = 1;
+	Interface interface = 2;
+}
+
+message InterfaceVIPIP {
 	Status status = 1;
 	IPVersion ipVersion = 2;
 	bytes address = 3;	// Can be both ipv4 and ipv6
@@ -161,9 +167,9 @@ message LBIP {
 	bytes address = 2;	// Can be both ipv4 and ipv6
 }
 
-message MachineVIPMsg {
-	bytes machineID = 1;
-	MachineVIPIP machineVIPIP = 2;
+message InterfaceVIPMsg {
+	bytes interfaceID = 1;
+	InterfaceVIPIP interfaceVIPIP = 2;
 }
 
 message LBMsg {
@@ -181,8 +187,8 @@ message LBBackendMsg {
 	repeated LBIP backends = 1;
 }
 
-message MachinesMsg {
-	repeated Machine machines = 1;
+message InterfacesMsg {
+	repeated Interface interfaces = 1;
 }
 
 message RuleIDMsg {
@@ -190,12 +196,12 @@ message RuleIDMsg {
 }
 
 message ThrottlingConfigMsg {
-	MachineIDMsg machine_id = 1;
+	InterfaceIDMsg interfaceID = 1;
 	ThrottlingConfig throttlingConfig = 2;
 }
 
-message MachinePrefixMsg {
-	MachineIDMsg machine_id = 1;
+message InterfacePrefixMsg {
+	InterfaceIDMsg interfaceID = 1;
 	Prefix prefix = 2;
 }
 
@@ -217,7 +223,7 @@ message RoutesMsg {
 }
 
 message FirewallRuleMsg {
-	bytes machineID = 1;
+	bytes interfaceID = 1;
 	FirewallRule rule = 2;
 }
 
@@ -237,8 +243,8 @@ message VirtualFunction {
 	uint32 function = 5;  // PCIe Function
 }
 
-message AddMachineResponse {
-	ExtStatus status = 1;
+message CreateInterfaceResponse {
+	IpAdditionResponse response = 1;
 	VirtualFunction vf = 2; // Holds VF information when a VM has been created.
 }
 
@@ -263,35 +269,37 @@ service DPDKonmetal {
 
 
 
-	//// MACHINES
-	rpc listMachines(Empty) returns (MachinesMsg) {}
+	//// INTERFACES
+	rpc listInterfaces(Empty) returns (InterfacesMsg) {}
 
-	// addMachine creates and configures a VF (hypervisor case) or PF (bare metal) for the new machine.
-	// If the machine's VNet is not known to the DPDK app yet, the VNet and its routing table will be intialized.
-	// After calling addMachine() the Client has to make sure that the routing table of the corresponding VNet is filled (use listRoutes and addRoute as required).
-	rpc addMachine(AddMachineRequest) returns (AddMachineResponse) {}
+	rpc getInterface(InterfaceIDMsg) returns (GetInterfaceResponse) {}
 
-	// deleteMachine removes all networking configuration of a machine from the DPDK app.
+	// createInterface creates and configures a VF (hypervisor case) or PF (bare metal) for the new interface.
+	// If the interface's VNet is not known to the DPDK app yet, the VNet and its routing table will be intialized.
+	// After calling createInterface() the Client has to make sure that the routing table of the corresponding VNet is filled (use listRoutes and addRoute as required).
+	rpc createInterface(CreateInterfaceRequest) returns (CreateInterfaceResponse) {}
+
+	// deleteInterface removes all networking configuration of a interface from the DPDK app.
 	// The VF will be released and can be reused for other VMs.
-	// If the machine was the last machine of a VNet on this hypervisor, the VNet and its routes will be freed from the DPDK app.
-	rpc deleteMachine(MachineIDMsg) returns (Status) {}
+	// If the interface was the last interface of a VNet on this hypervisor, the VNet and its routes will be freed from the DPDK app.
+	rpc deleteInterface(InterfaceIDMsg) returns (Status) {}
 
-	// updateThrottlingConfig changes a machine's throttling configuration during runtime.
+	// updateThrottlingConfig changes a interface's throttling configuration during runtime.
 	rpc updateThrottlingConfig(ThrottlingConfigMsg) returns (Status) {}
 
-	// listMachinePrefixes returns a list of prefixes, that will be routed to the machine by the DPDK app.
+	// listInterfacePrefixes returns a list of prefixes, that will be routed to the interface by the DPDK app.
 	// For example this could be a node's Kubernetes Pod CIDR.
-	rpc listMachinePrefixes(MachineIDMsg) returns (PrefixesMsg) {}
-	rpc addMachinePrefix(MachinePrefixMsg) returns (ExtStatus) {}
-	rpc deleteMachinePrefix(MachinePrefixMsg) returns (Status) {}
+	rpc listInterfacePrefixes(InterfaceIDMsg) returns (PrefixesMsg) {}
+	rpc addInterfacePrefix(InterfacePrefixMsg) returns (IpAdditionResponse) {}
+	rpc deleteInterfacePrefix(InterfacePrefixMsg) returns (Status) {}
 
-	// NAT related, add/get/del Virtual IP for a given Machine
-	rpc addMachineVIP(MachineVIPMsg) returns (ExtStatus) {}
-	rpc getMachineVIP(MachineIDMsg) returns (MachineVIPIP) {}
-	rpc delMachineVIP(MachineIDMsg) returns (Status) {}
+	// NAT related, add/get/del Virtual IP for a given Interface
+	rpc addInterfaceVIP(InterfaceVIPMsg) returns (IpAdditionResponse) {}
+	rpc getInterfaceVIP(InterfaceIDMsg) returns (InterfaceVIPIP) {}
+	rpc deleteInterfaceVIP(InterfaceIDMsg) returns (Status) {}
 
 	// LB related, add/list/del backend IPs for a given LB IP
-	rpc addLBVIP(LBMsg) returns (ExtStatus) {}
+	rpc addLBVIP(LBMsg) returns (IpAdditionResponse) {}
 	rpc getLBVIPBackends(LBQueryMsg) returns (LBBackendMsg) {}
 	rpc delLBVIP(LBMsg) returns (Status) {}
 
@@ -299,7 +307,7 @@ service DPDKonmetal {
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}
 
 	// addRoutes adds a new route to a VNet's routing table (identified by VNI).
-	// If the DPDK application does not hold any machine in the specified VNet, an error will be returned.
+	// If the DPDK application does not hold any interface in the specified VNet, an error will be returned.
 	rpc addRoute(VNIRouteMsg) returns (Status) {}
 
 	// deleteRoute removes a route from a VNet.
@@ -309,8 +317,7 @@ service DPDKonmetal {
 
 
 	//// FIREWALL
-	rpc listFirewallRules(MachineIDMsg) returns (FirewallRulesMsg) {}
+	rpc listFirewallRules(InterfaceIDMsg) returns (FirewallRulesMsg) {}
 	rpc addFirewallRule(FirewallRuleMsg) returns (Status) {}
 	rpc deleteFirewallRule(RuleIDMsg) returns (Status) {}
-	rpc QueryHelloWorld(Empty) returns (Status) {};
 }
