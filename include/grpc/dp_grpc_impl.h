@@ -21,6 +21,7 @@ typedef enum {
 	DP_REQ_TYPE_GETVIP,
 	DP_REQ_TYPE_ADDMACHINE,
 	DP_REQ_TYPE_DELMACHINE,
+	DP_REQ_TYPE_GETMACHINE,
 	DP_REQ_TYPE_ADDROUTE,
 	DP_REQ_TYPE_DELROUTE,
 	DP_REQ_TYPE_LISTROUTE,
@@ -93,6 +94,10 @@ typedef struct dp_delmachine {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_delmachine;
 
+typedef struct dp_getmachine {
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+} dp_getmachine;
+
 typedef struct dp_delvip {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_delvip;
@@ -131,6 +136,7 @@ typedef struct dp_request {
 		dp_lp_qry_lb	qry_lb_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
+		dp_getmachine	get_machine;
 		dp_delvip		del_vip;
 		dp_getvip		get_vip;
 		dp_route		route;
@@ -151,6 +157,7 @@ typedef struct dp_vm_info {
 	uint8_t		ip6_addr[16];
 	uint8_t		machine_id[VM_MACHINE_ID_STR_LEN];
 	uint32_t	vni;
+	char		pci_name[RTE_ETH_NAME_MAX_LEN];
 } dp_vm_info;
 
 typedef struct dp_reply {

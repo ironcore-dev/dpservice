@@ -234,6 +234,21 @@ public:
 	int Proceed() override;
 };
 
+class GetInterfaceCall final : BaseCall {
+	ServerContext ctx_;
+	InterfaceIDMsg request_;
+	GetInterfaceResponse reply_;
+	ServerAsyncResponseWriter<GetInterfaceResponse> responder_;
+
+public:
+	GetInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_GETMACHINE), responder_(&ctx_) {
+		service_->RequestgetInterface(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
 class ListRoutesCall final : BaseCall {
 	ServerContext ctx_;
 	VNIMsg request_;

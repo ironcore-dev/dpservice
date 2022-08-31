@@ -143,10 +143,17 @@ message Interface {
 	bytes primaryIPv4Address = 3;
 	bytes primaryIPv6Address = 4;
 	ThrottlingConfig throttlingConfig = 5;
+	bytes underlayRoute = 6;
+	string pciDpName = 7;
 }
 
 message InterfaceIDMsg {
 	bytes interfaceID = 1;
+}
+
+message GetInterfaceResponse {
+	Status status = 1;
+	Interface interface = 2;
 }
 
 message InterfaceVIPIP {
@@ -264,6 +271,8 @@ service DPDKonmetal {
 
 	//// INTERFACES
 	rpc listInterfaces(Empty) returns (InterfacesMsg) {}
+
+	rpc getInterface(InterfaceIDMsg) returns (GetInterfaceResponse) {}
 
 	// createInterface creates and configures a VF (hypervisor case) or PF (bare metal) for the new interface.
 	// If the interface's VNet is not known to the DPDK app yet, the VNet and its routing table will be intialized.

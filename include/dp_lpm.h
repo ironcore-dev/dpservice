@@ -47,7 +47,6 @@ struct macip_entry {
 	uint8_t		depth;
 	uint8_t		dhcp_ipv6[16];
 	uint8_t		vm_ipv6[16];
-	uint8_t		virt_ipv6[16];
 	uint32_t	pxe_ip;
 	uint8_t		pxe_str[VM_MACHINE_PXE_STR_LEN];
 };

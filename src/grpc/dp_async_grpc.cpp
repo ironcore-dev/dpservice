@@ -459,6 +459,56 @@ int DelInterfaceCall::Proceed()
 	return 0;
 }
 
+int GetInterfaceCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	dp_vm_info *vm_info;
+	Status *err_status = new Status();
+	Interface *machine = new Interface();
+	grpc::Status ret = grpc::Status::OK;
+	struct in_addr addr;
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
+
+	if (status_ == REQUEST) {
+		new GetInterfaceCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.get_machine.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+
+		vm_info = &reply.vm_info;
+		addr.s_addr = htonl(vm_info->ip_addr);
+		machine->set_primaryipv4address(inet_ntoa(addr));
+		inet_ntop(AF_INET6, vm_info->ip6_addr, buf_str, INET6_ADDRSTRLEN);
+		machine->set_primaryipv6address(buf_str);
+		machine->set_interfaceid((char *)vm_info->machine_id);
+		machine->set_vni(vm_info->vni);
+		machine->set_pcidpname(vm_info->pci_name);
+
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		grpc_service->CalculateUnderlayRoute(vm_info->vni, buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		machine->set_underlayroute(buf_str);
+		reply_.set_allocated_interface(machine);
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 int AddRouteCall::Proceed()
 {
 	dp_request request = {0};
@@ -613,7 +663,8 @@ int ListInterfacesCall::Proceed()
 	uint16_t read_so_far = 0;
 	int i;
 	grpc::Status ret = grpc::Status::OK;
-	char buf[INET6_ADDRSTRLEN];
+	char buf_str[INET6_ADDRSTRLEN];
+	uint8_t buf_bin[16];
 
 	if (status_ == REQUEST) {
 		new ListInterfacesCall(service_, cq_);
@@ -622,6 +673,7 @@ int ListInterfacesCall::Proceed()
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
 		do {
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
@@ -631,10 +683,14 @@ int ListInterfacesCall::Proceed()
 				vm_info = &((&reply->vm_info)[i]);
 				addr.s_addr = htonl(vm_info->ip_addr);
 				machine->set_primaryipv4address(inet_ntoa(addr));
-				inet_ntop(AF_INET6, vm_info->ip6_addr, buf, INET6_ADDRSTRLEN);
-				machine->set_primaryipv6address(buf);
+				inet_ntop(AF_INET6, vm_info->ip6_addr, buf_str, INET6_ADDRSTRLEN);
+				machine->set_primaryipv6address(buf_str);
 				machine->set_interfaceid((char *)vm_info->machine_id);
 				machine->set_vni(vm_info->vni);
+				machine->set_pcidpname(vm_info->pci_name);
+				grpc_service->CalculateUnderlayRoute(vm_info->vni, buf_bin, sizeof(buf_bin));
+				inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+				machine->set_underlayroute(buf_str);
 			}
 			read_so_far += (reply->com_head.msg_count - read_so_far);
 			is_chained = reply->com_head.is_chained;

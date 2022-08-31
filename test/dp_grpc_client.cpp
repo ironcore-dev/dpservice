@@ -23,6 +23,7 @@ typedef enum {
 	DP_CMD_ADD_MACHINE,
 	DP_CMD_DEL_MACHINE,
 	DP_CMD_GET_MACHINE,
+	DP_CMD_LIST_MACHINES,
 	DP_CMD_ADD_ROUTE,
 	DP_CMD_DEL_ROUTE,
 	DP_CMD_GET_ROUTE,
@@ -64,7 +65,8 @@ static int length;
 #define CMD_LINE_OPT_DEL_PFX		"delpfx"
 #define CMD_LINE_OPT_ADD_MACHINE	"addmachine"
 #define CMD_LINE_OPT_DEL_MACHINE	"delmachine"
-#define CMD_LINE_OPT_GET_MACHINE	"getmachines"
+#define CMD_LINE_OPT_GET_MACHINE	"getmachine"
+#define CMD_LINE_OPT_LIST_MACHINES	"getmachines"
 #define CMD_LINE_OPT_VNI			"vni"
 #define CMD_LINE_OPT_T_VNI			"t_vni"
 #define CMD_LINE_OPT_PRIMARY_IPV4	"ipv4"
@@ -89,6 +91,7 @@ enum {
 	CMD_LINE_OPT_ADD_MACHINE_NUM,
 	CMD_LINE_OPT_DEL_MACHINE_NUM,
 	CMD_LINE_OPT_GET_MACHINE_NUM,
+	CMD_LINE_OPT_LIST_MACHINES_NUM,
 	CMD_LINE_OPT_ADD_ROUTE_NUM,
 	CMD_LINE_OPT_DEL_ROUTE_NUM,
 	CMD_LINE_OPT_GET_ROUTE_NUM,
@@ -117,7 +120,8 @@ enum {
 static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_MACHINE, 1, 0, CMD_LINE_OPT_ADD_MACHINE_NUM},
 	{CMD_LINE_OPT_DEL_MACHINE, 1, 0, CMD_LINE_OPT_DEL_MACHINE_NUM},
-	{CMD_LINE_OPT_GET_MACHINE, 0, 0, CMD_LINE_OPT_GET_MACHINE_NUM},
+	{CMD_LINE_OPT_GET_MACHINE, 1, 0, CMD_LINE_OPT_GET_MACHINE_NUM},
+	{CMD_LINE_OPT_LIST_MACHINES, 0, 0, CMD_LINE_OPT_LIST_MACHINES_NUM},
 	{CMD_LINE_OPT_ADD_ROUTE, 0, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
 	{CMD_LINE_OPT_DEL_ROUTE, 0, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
 	{CMD_LINE_OPT_GET_ROUTE, 0, 0, CMD_LINE_OPT_GET_ROUTE_NUM},
@@ -186,6 +190,10 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_GET_MACHINE_NUM:
 			command = DP_CMD_GET_MACHINE;
+			strncpy(machine_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_LIST_MACHINES_NUM:
+			command = DP_CMD_LIST_MACHINES;
 			break;
 		case CMD_LINE_OPT_ADD_ROUTE_NUM:
 			command = DP_CMD_ADD_ROUTE;
@@ -581,6 +589,25 @@ public:
 			}
 	}
 
+	void GetInterface() {
+			InterfaceIDMsg request;
+			GetInterfaceResponse reply;
+			ClientContext context;
+
+			request.set_interfaceid(machine_str);
+			stub_->getInterface(&context, request, &reply);
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
+			} else {
+				printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
+				reply.interface().primaryipv4address().c_str(), 
+				reply.interface().primaryipv6address().c_str(),
+				reply.interface().vni(),
+				reply.interface().pcidpname().c_str(),
+				reply.interface().underlayroute().c_str());
+			}
+	}
+
 	void GetInterfaces() {
 			Empty request;
 			InterfacesMsg reply;
@@ -590,10 +617,12 @@ public:
 			stub_->listInterfaces(&context, request, &reply);
 			for (i = 0; i < reply.interfaces_size(); i++)
 			{
-				printf("Interface %s ipv4 %s ipv6 %s vni %d\n", reply.interfaces(i).interfaceid().c_str(),
+				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).interfaceid().c_str(),
 					reply.interfaces(i).primaryipv4address().c_str(), 
 					reply.interfaces(i).primaryipv6address().c_str(),
-					reply.interfaces(i).vni());
+					reply.interfaces(i).vni(),
+					reply.interfaces(i).pcidpname().c_str(),
+					reply.interfaces(i).underlayroute().c_str());
 			}
 	}
 
@@ -619,6 +648,10 @@ int main(int argc, char** argv)
 		std::cout << "Delmachine called " << std::endl;
 		break;
 	case DP_CMD_GET_MACHINE:
+		std::cout << "Getmachine (single) called " << std::endl;
+		dpdk_client.GetInterface();
+		break;
+	case DP_CMD_LIST_MACHINES:
 		std::cout << "Getmachine called " << std::endl;
 		dpdk_client.GetInterfaces();
 		break;
