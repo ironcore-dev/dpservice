@@ -74,14 +74,16 @@ static void parse_options(struct dp_dhcp_header *dhcp_pkt, uint16_t tot_op_len)
 				msg_type = dhcp_pkt->options[i];
 			break;
 			case DP_DHCP_USR_CLS_INF:
-				memcpy(user_class_inf, &dhcp_pkt->options[i],
-						 op_len <= (DP_USER_CLASS_INF_SIZE - 1) ? op_len + 1 : (DP_USER_CLASS_INF_SIZE - 1));
+				snprintf(user_class_inf,
+						 op_len <= (DP_USER_CLASS_INF_SIZE - 1) ? op_len + 1 : (DP_USER_CLASS_INF_SIZE - 1),
+						 "%s", &dhcp_pkt->options[i]);
 				if (strncmp(user_class_inf, DP_USER_CLASS_INF_COMP_STR, DP_USER_CLASS_INF_SIZE - 1) == 0)
 					pxe_mode = DP_PXE_MODE_HTTP;
 			break;
 			case DP_DHCP_VND_CLS_IDT:
-				memcpy(vnd_cls_ident, &dhcp_pkt->options[i],
-						 op_len <= (DP_VND_CLASS_IDENT - 1) ? op_len : (DP_VND_CLASS_IDENT - 1));
+				snprintf(vnd_cls_ident,
+						 op_len <= (DP_VND_CLASS_IDENT - 1) ? op_len : (DP_VND_CLASS_IDENT - 1),
+						 "%s", &dhcp_pkt->options[i]);
 				if (strstr(vnd_cls_ident, DP_VND_CLS_IDT_COMP_STR))
 					pxe_mode = DP_PXE_MODE_TFTP;
 			break;
@@ -230,7 +232,7 @@ static struct rte_node_register dhcp_node_base = {
 
 	.nb_edges = DHCP_NEXT_MAX,
 	.next_nodes = {
-		
+
 			[DHCP_NEXT_DROP] = "drop",
 		},
 };
