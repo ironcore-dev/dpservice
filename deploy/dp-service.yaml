@@ -54,6 +54,13 @@ spec:
           name: hugepages
         - mountPath: /tmp
           name: temp
+        livenessProbe:
+          exec:
+            command:
+            - /dp_grpc_client
+            - --is_init
+          initialDelaySeconds: 10
+          periodSeconds: 10
       dnsPolicy: ClusterFirst
       hostNetwork: true
       restartPolicy: Always

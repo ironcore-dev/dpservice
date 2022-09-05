@@ -14,6 +14,7 @@
 using grpc::Channel;
 using grpc::ClientContext;
 using namespace dpdkonmetal;
+using namespace std::chrono;
 
 static const char short_options[] = "d" /* debug */
 				    "D"	 /* promiscuous */;
@@ -511,8 +512,14 @@ public:
 			Empty request;
 			UUIDMsg reply;
 			ClientContext context;
+			system_clock::time_point deadline = system_clock::now() + seconds(5);
+
+			context.set_deadline(deadline);
+			reply.set_uuid("");
 
 			stub_->initialized(&context, request, &reply);
+			if (reply.uuid().c_str()[0] == '\0')
+				exit(1);
 			printf("Received UUID %s \n", reply.uuid().c_str());
 	}
 
