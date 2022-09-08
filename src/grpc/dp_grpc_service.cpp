@@ -26,13 +26,23 @@ void GRPCService::run(std::string listen_address)
 	builder.RegisterService(this);
 	this->cq_ = builder.AddCompletionQueue();
 	this->server_= builder.BuildAndStart();
-	std::cout << "Server listening on " << listen_address << std::endl;
+	std::cout << "Server initialized and listening on " << listen_address << std::endl;
 	HandleRpcs();
 }
 
 char* GRPCService::GetUUID()
 {
 	return (char*)uuid;
+}
+
+void GRPCService::SetInitStatus(bool status)
+{
+	initialized = status;
+}
+
+bool GRPCService::IsInitialized()
+{
+	return initialized;
 }
 
 void GRPCService::CalculateUnderlayRoute(uint32_t vni, uint8_t* route, uint32_t route_size)
@@ -48,6 +58,8 @@ void GRPCService::HandleRpcs()
 {
 	void* tag;
 	bool ok;
+
+	new InitCall(this, cq_.get());
 	new InitializedCall(this, cq_.get());
 	new DelPfxCall(this, cq_.get());
 	new ListPfxCall(this, cq_.get());

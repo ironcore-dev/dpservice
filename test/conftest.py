@@ -69,6 +69,7 @@ def add_machine(build_path, tun_opt):
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
+	init_cmd = build_path+"/test/dp_grpc_client --init"
 	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine " + vm1_name + " --vni "+ vni + " --ipv4 " + vf0_ip + " --ipv6 " + vf0_ipv6
 	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
 	add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
@@ -78,6 +79,7 @@ def add_machine(build_path, tun_opt):
 	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf2_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" up"))
+	subprocess.run(shlex.split(init_cmd))
 	subprocess.run(shlex.split(add_machine_cmd))
 	subprocess.run(shlex.split(add_machine_cmd2))
 	subprocess.run(shlex.split(add_ipv4_route_cmd))
