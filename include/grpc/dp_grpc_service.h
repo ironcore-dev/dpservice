@@ -20,6 +20,7 @@ private:
 	std::unique_ptr<Server> server_;
 	uuid_t binuuid;
 	void *uuid;
+	bool initialized = false;
 	
 public:
 	GRPCService();
@@ -27,6 +28,8 @@ public:
 	void run(std::string listen_address);
 	void HandleRpcs();
 	char* GetUUID();
+	void SetInitStatus(bool status);
+	bool IsInitialized();
 	void CalculateUnderlayRoute(uint32_t vni, uint8_t* route, uint32_t route_size);
 };
 

@@ -37,6 +37,7 @@ typedef enum {
 	DP_CMD_ADD_PFX,
 	DP_CMD_LIST_PFX,
 	DP_CMD_DEL_PFX,
+	DP_CMD_INITIALIZED,
 	DP_CMD_INIT,
 } cmd_type;
 
@@ -59,7 +60,8 @@ static int vni;
 static int t_vni;
 static int length;
 
-#define CMD_LINE_OPT_INIT			"is_init"
+#define CMD_LINE_OPT_INIT			"init"
+#define CMD_LINE_OPT_INITIALIZED	"is_initialized"
 #define CMD_LINE_OPT_PCI			"vm_pci"
 #define CMD_LINE_OPT_ADD_PFX		"addpfx"
 #define CMD_LINE_OPT_LIST_PFX		"listpfx"
@@ -115,6 +117,7 @@ enum {
 	CMD_LINE_OPT_ADD_PFX_NUM,
 	CMD_LINE_OPT_LIST_PFX_NUM,
 	CMD_LINE_OPT_DEL_PFX_NUM,
+	CMD_LINE_OPT_INITIALIZED_NUM,
 	CMD_LINE_OPT_INIT_NUM,
 };
 
@@ -145,6 +148,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
 	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
 	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
+	{CMD_LINE_OPT_INITIALIZED, 0, 0, CMD_LINE_OPT_INITIALIZED_NUM},
 	{CMD_LINE_OPT_INIT, 0, 0, CMD_LINE_OPT_INIT_NUM},
 	{NULL, 0, 0, 0},
 };
@@ -272,6 +276,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_LIST_LB_VIP_NUM:
 			command = DP_CMD_LIST_LB_VIP;
+			break;
+		case CMD_LINE_OPT_INITIALIZED_NUM:
+			command = DP_CMD_INITIALIZED;
 			break;
 		case CMD_LINE_OPT_INIT_NUM:
 			command = DP_CMD_INIT;
@@ -517,10 +524,23 @@ public:
 			context.set_deadline(deadline);
 			reply.set_uuid("");
 
-			stub_->initialized(&context, request, &reply);
-			if (reply.uuid().c_str()[0] == '\0')
+			grpc::Status ret = stub_->initialized(&context, request, &reply);
+			/* Aborted answers mean that dp-service is not initialized with init() call yet */
+			/* So do not exit with error in that case */
+			if ((reply.uuid().c_str()[0] == '\0') && (ret.error_code() != grpc::StatusCode::ABORTED))
 				exit(1);
 			printf("Received UUID %s \n", reply.uuid().c_str());
+	}
+
+	void Init() {
+			InitConfig request;
+			Status reply;
+			ClientContext context;
+			system_clock::time_point deadline = system_clock::now() + seconds(5);
+
+			context.set_deadline(deadline);
+
+			stub_->init(&context, request, &reply);
 	}
 
 	void DelPfx() {
@@ -711,9 +731,13 @@ int main(int argc, char** argv)
 		std::cout << "Listprefix called " << std::endl;
 		dpdk_client.ListPfx();
 		break;
-	case DP_CMD_INIT:
+	case DP_CMD_INITIALIZED:
 		std::cout << "Initialized called " << std::endl;
 		dpdk_client.Initialized();
+		break;
+	case DP_CMD_INIT:
+		std::cout << "Init called " << std::endl;
+		dpdk_client.Init();
 		break;
 	default:
 		break;

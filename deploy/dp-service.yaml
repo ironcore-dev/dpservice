@@ -14,7 +14,7 @@ spec:
     matchLabels:
       name: dp-service
   template:
-    metadata:
+    metadata:b
       labels:
         name: dp-service
     spec:
@@ -58,7 +58,7 @@ spec:
           exec:
             command:
             - /dp_grpc_client
-            - --is_init
+            - --is_initialized
           initialDelaySeconds: 10
           periodSeconds: 10
       dnsPolicy: ClusterFirst

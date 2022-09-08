@@ -23,10 +23,11 @@ using grpc::ServerCompletionQueue;
 
 using namespace dpdkonmetal;
 
-enum CallStatus { REQUEST, AWAIT_MSG, FINISH };
+enum CallStatus { REQUEST, INITCHECK, AWAIT_MSG, FINISH };
 
 class BaseCall {
 protected:
+	grpc::Status ret = grpc::Status::OK;
 	DPDKonmetal::AsyncService* service_;
 	ServerCompletionQueue* cq_;
 	CallStatus status_;
@@ -35,6 +36,7 @@ public:
 	BaseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq, uint16_t call_type)
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
 		}
+	int InitCheck();
 	virtual int Proceed() = 0;
 	virtual ~BaseCall() = default;
 };
@@ -287,8 +289,23 @@ class InitializedCall final : BaseCall {
 
 public:
 	InitializedCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_INIT), responder_(&ctx_) {
+	:BaseCall(service, cq, DP_REQ_TYPE_INITIALIZED), responder_(&ctx_) {
 		service_->Requestinitialized(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
+class InitCall final : BaseCall {
+	ServerContext ctx_;
+	InitConfig request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	InitCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_INIT), responder_(&ctx_) {
+		service_->Requestinit(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;

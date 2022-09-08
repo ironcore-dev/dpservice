@@ -6,18 +6,50 @@
 #include <dp_error.h>
 #include <rte_ether.h>
 
+int BaseCall::InitCheck()
+{
+	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+
+	if (!grpc_service->IsInitialized()) {
+		status_ = INITCHECK;
+		ret = grpc::Status(grpc::StatusCode::ABORTED, "not initialized");
+	} else {
+		status_ = AWAIT_MSG;
+	}
+
+	return status_;
+}
+
 int InitializedCall::Proceed()
 {
-	grpc::Status ret = grpc::Status::OK;
-
 	if (status_ == REQUEST) {
 		new InitializedCall(service_, cq_);
+		InitCheck();
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+		reply_.set_uuid(grpc_service->GetUUID());
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
 
+int InitCall::Proceed()
+{
+	if (status_ == REQUEST) {
+		new InitCall(service_, cq_);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
-		reply_.set_uuid(grpc_service->GetUUID());
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+		grpc_service->SetInitStatus(true);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -31,13 +63,14 @@ int AddLBVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	grpc::Status ret = grpc::Status::OK;
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddLBVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
@@ -50,6 +83,9 @@ int AddLBVIPCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -73,10 +109,11 @@ int DelLBVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new DelLBVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
@@ -89,6 +126,9 @@ int DelLBVIPCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -111,11 +151,12 @@ int GetLBVIPBackendsCall::Proceed()
 	struct in_addr addr;
 	uint32_t *rp_back_ip;
 	LBIP *back_ip;
-	grpc::Status ret = grpc::Status::OK;
 	int i;
 
 	if (status_ == REQUEST) {
 		new GetLBVIPBackendsCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
@@ -126,6 +167,9 @@ int GetLBVIPBackendsCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker_with_mbuf(&mbuf))
 			return -1;
@@ -151,13 +195,14 @@ int AddPfxCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	grpc::Status ret = grpc::Status::OK;
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddPfxCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -170,6 +215,9 @@ int AddPfxCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -193,10 +241,11 @@ int DelPfxCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new DelPfxCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -209,6 +258,9 @@ int DelPfxCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker(&reply))
 			return -1;
@@ -230,17 +282,21 @@ int ListPfxCall::Proceed()
 	struct in_addr addr;
 	dp_route *rp_route;
 	Prefix *pfx;
-	grpc::Status ret = grpc::Status::OK;
 	int i;
 
 	if (status_ == REQUEST) {
 		new ListPfxCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker_with_mbuf(&mbuf))
 			return -1;
@@ -269,13 +325,14 @@ int AddVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	grpc::Status ret = grpc::Status::OK;
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -287,6 +344,9 @@ int AddVIPCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -310,16 +370,20 @@ int DelVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new DelVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -340,16 +404,20 @@ int GetVIPCall::Proceed()
 	dp_reply reply = {0};
 	Status *err_status = new Status();
 	struct in_addr addr;
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new GetVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -375,12 +443,13 @@ int AddInterfaceCall::Proceed()
 	VirtualFunction *vf = new VirtualFunction();
 	Status *err_status = new Status();
 	IpAdditionResponse *ip_resp = new IpAdditionResponse();
-	grpc::Status ret = grpc::Status::OK;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new AddInterfaceCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		err_status->set_error(EXIT_SUCCESS);
 		request.add_machine.vni = request_.vni();
@@ -403,6 +472,9 @@ int AddInterfaceCall::Proceed()
 			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		if (!err_status->error()) {
 			dp_fill_head(&reply.com_head, call_type_, 0, 1);
@@ -435,16 +507,20 @@ int DelInterfaceCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new DelInterfaceCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -466,19 +542,23 @@ int GetInterfaceCall::Proceed()
 	dp_vm_info *vm_info;
 	Status *err_status = new Status();
 	Interface *machine = new Interface();
-	grpc::Status ret = grpc::Status::OK;
 	struct in_addr addr;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new GetInterfaceCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -513,10 +593,11 @@ int AddRouteCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new AddRouteCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
@@ -536,6 +617,9 @@ int AddRouteCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
@@ -554,10 +638,11 @@ int DelRouteCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new DelRouteCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
@@ -577,6 +662,9 @@ int DelRouteCall::Proceed()
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker(&reply))
 			return -1;
@@ -599,7 +687,6 @@ int ListRoutesCall::Proceed()
 	dp_route *rp_route;
 	Prefix *pfx;
 	Route *route;
-	grpc::Status ret = grpc::Status::OK;
 	int i;
 	uint8_t is_chained = 0;
 	uint16_t read_so_far = 0;
@@ -607,11 +694,16 @@ int ListRoutesCall::Proceed()
 
 	if (status_ == REQUEST) {
 		new ListRoutesCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni();
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		do {
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
@@ -662,16 +754,20 @@ int ListInterfacesCall::Proceed()
 	uint8_t is_chained = 0;
 	uint16_t read_so_far = 0;
 	int i;
-	grpc::Status ret = grpc::Status::OK;
 	char buf_str[INET6_ADDRSTRLEN];
 	uint8_t buf_bin[16];
 
 	if (status_ == REQUEST) {
 		new ListInterfacesCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
 		do {
