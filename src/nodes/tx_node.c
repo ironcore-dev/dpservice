@@ -76,7 +76,7 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
 		if ((mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) ||
-			(df->flags.nat >= DP_LB_CHG_UL_DST_IP)) {
+			(df->flags.nat >= DP_LB_CHG_UL_DST_IP) || df->flags.flow_type == DP_FLOW_TYPE_OUTGOING ) {
 			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
 				if (df->flags.nat == DP_LB_RECIRC)
@@ -90,11 +90,13 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}
 
+	printf("send to port %d\n",port);
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,
 								cnt);
 
 	/* Redirect unsent pkts to drop node */
 	if (sent_count != cnt) {
+		printf("drop pkt in tx\n");
 		rte_node_enqueue(graph, node, TX_NEXT_DROP,
 						&objs[sent_count], cnt - sent_count);
 	}

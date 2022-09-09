@@ -275,6 +275,7 @@ def test_vf_to_pf_vip_snat(capsys, add_machine, build_path):
 
 	expected_str = ul_actual_src
 	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
+	print(add_vip_test)
 	eval_cmd_output(add_vip_test, expected_str)
 	time.sleep(1)
 

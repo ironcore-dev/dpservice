@@ -32,6 +32,7 @@ def prepare_env(request, build_path, tun_opt):
 		"--pf0="+pf0_tap+" --pf1="+pf1_tap+" --vf-pattern="+vf_patt+" --ipv6="+ul_ipv6+" --no-offload --no-stats"+" --op_env=scapytest " + "--tun_opt=" + tun_opt + wcmp_opt_str + \
 		" --enable-ipv6-overlay"
 	cmd = shlex.split(dp_service_cmd)
+	print(dp_service_cmd)
 	process = subprocess.Popen(cmd, 
 								stdout=subprocess.PIPE,
 								universal_newlines=True)
@@ -72,9 +73,12 @@ def add_machine(build_path, tun_opt):
 	init_cmd = build_path+"/test/dp_grpc_client --init"
 	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine " + vm1_name + " --vni "+ vni + " --ipv4 " + vf0_ip + " --ipv6 " + vf0_ipv6
 	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
+	print(add_machine_cmd2)
 	add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
 	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv6 2002::123 --length 128 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
 	add_default_public_route = build_path+"/test/dp_grpc_client --addroute " + " --vni " + vni + " --ipv4 0.0.0.0 --length 0 --t_vni "+ vni + " --t_ipv6 " + ul_actual_dst
+	print(add_default_public_route)
+	
 	subprocess.run(shlex.split("ip link set dev "+vf0_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf2_tap+" up"))

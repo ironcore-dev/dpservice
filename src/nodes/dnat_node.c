@@ -31,6 +31,9 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 	struct flow_value *cntrack = NULL;
 	uint32_t dst_ip, vni;
 
+	struct rte_udp_hdr	*udp_hdr;
+	struct rte_tcp_hdr	*tcp_hdr;
+
 	memset(&key, 0, sizeof(struct flow_key));
 	df_ptr = get_dp_flow_ptr(m);
 
@@ -81,6 +84,15 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		cntrack->dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
+		if (cntrack->nat_info.nat_type==DP_FLOW_NAT_TYPE_NETWORK){
+			if (df_ptr->l4_type == DP_IP_PROTO_TCP){
+				tcp_hdr = (struct rte_tcp_hdr*)(ipv4_hdr+1);
+				tcp_hdr->dst_port = htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
+			}else if (df_ptr->l4_type == DP_IP_PROTO_UDP) {
+				udp_hdr = (struct rte_udp_hdr*)(ipv4_hdr+1);
+				udp_hdr->dst_port = htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
+			}
+		}
 		df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
 		df_ptr->nat_addr = df_ptr->dst.dst_addr;
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;

@@ -171,6 +171,34 @@ struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m)
 	return ipv4_hdr;
 }
 
+struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset)
+{
+	struct dp_flow *df;
+	struct rte_tcp_hdr *tcp_hdr;
+
+	df = get_dp_flow_ptr(m);
+	if (df->l4_type == DP_IP_PROTO_TCP)
+		tcp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *, offset);
+	else
+		return NULL;
+
+	return tcp_hdr;
+}
+
+struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset)
+{
+	struct dp_flow *df;
+	struct rte_udp_hdr *udp_hdr;
+
+	df = get_dp_flow_ptr(m);
+	if (df->l4_type == DP_IP_PROTO_UDP)
+		udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *, offset);
+	else
+		return NULL;
+
+	return udp_hdr;
+}
+
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer)
 {
 
