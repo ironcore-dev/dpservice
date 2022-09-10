@@ -298,7 +298,7 @@ static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool
 	}
 }
 
-void dp_list_routes(int vni, struct rte_mbuf *m, int socketid,
+void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 					struct rte_mbuf *rep_arr[], bool ext_routes)
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
@@ -341,7 +341,8 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid,
 				m_curr = m_new;
 				rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
 			}
-			dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
+			if (next_hop == portid)
+				dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
 		}
 	} while (node != NULL);
 
