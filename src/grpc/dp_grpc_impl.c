@@ -300,6 +300,10 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
 			if (dp_is_port_allocated(get_dpdk_layer(), p_id)) {
 				err_code = DP_ERROR_VM_ALREADY_ALLOCATED;
+				rep->vf_pci.bus = 2;
+				rep->vf_pci.domain = 2;
+				rep->vf_pci.function = 2;
+				rte_eth_dev_get_name_by_port(p_id, rep->vf_pci.name);
 				goto err;
 			}
 			port_id = p_id;
