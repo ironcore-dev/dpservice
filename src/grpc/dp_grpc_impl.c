@@ -300,6 +300,10 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
 			if (dp_is_port_allocated(get_dpdk_layer(), p_id)) {
 				err_code = DP_ERROR_VM_ALREADY_ALLOCATED;
+				rep->vf_pci.bus = 2;
+				rep->vf_pci.domain = 2;
+				rep->vf_pci.function = 2;
+				rte_eth_dev_get_name_by_port(p_id, rep->vf_pci.name);
 				goto err;
 			}
 			port_id = p_id;
@@ -517,7 +521,7 @@ static int dp_process_listroute(dp_request *req, struct rte_mbuf *req_mbuf, stru
 {
 	uint32_t vni = req->route.vni;
 
-	dp_list_routes(vni, req_mbuf, rte_eth_dev_socket_id(dp_get_pf0_port_id()), rep_arr, DP_SHOW_EXT_ROUTES);
+	dp_list_routes(vni, req_mbuf, rte_eth_dev_socket_id(dp_get_pf0_port_id()), 0, rep_arr, DP_SHOW_EXT_ROUTES);
 
 	return EXIT_SUCCESS;
 }
@@ -539,11 +543,13 @@ static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_m
 	port_id = dp_get_portid_with_vm_handle(req->get_pfx.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0)
+	if (port_id < 0) {
+		rep_arr[DP_MBUF_ARR_SIZE - 1] = m;
 		goto out;
+	}
 
 	dp_list_routes(dp_get_vm_vni(port_id), m,
-								rte_eth_dev_socket_id(dp_get_pf0_port_id()), rep_arr, DP_SHOW_INT_ROUTES);
+					rte_eth_dev_socket_id(dp_get_pf0_port_id()), port_id, rep_arr, DP_SHOW_INT_ROUTES);
 
 out:
 	return EXIT_SUCCESS;
