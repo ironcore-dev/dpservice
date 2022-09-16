@@ -523,6 +523,124 @@ err:
 	return ret;
 }
 
+static int dp_process_addnat(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	uint32_t vm_vni;
+
+	if (req->add_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL){
+		ret = DP_ERROR_VM_ADD_NETNAT_NONLOCAL;
+		goto err;
+	}
+
+	port_id = dp_get_portid_with_vm_handle(req->add_nat_vip.machine_id);
+	vm_vni = dp_get_vm_vni(port_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_ADD_NETNAT_INVALID_PORT;
+		goto err;
+	}
+
+	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+
+		ret = dp_set_vm_hrztl_snat_ip(dp_get_dhcp_range_ip4(port_id),ntohl(req->add_nat_vip.vip.vip_addr),
+									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
+	
+		if (ret)
+			goto err;
+	}
+	rep->vni = vm_vni;
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
+static int dp_process_delnat(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	uint32_t vm_vni;
+
+	printf("dp_process_delnat is called \n");
+	if (req->del_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL){
+		ret = DP_ERROR_VM_DEL_NETNAT_NONLOCAL;
+		goto err;
+	}
+
+
+	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
+	vm_vni = dp_get_vm_vni(port_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_DEL_NETNAT_INVALID_PORT;
+		goto err;
+	}
+
+	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_del_vm_hrztl_snat_ip(dp_get_dhcp_range_ip4(port_id),vm_vni);
+		if (ret) 
+			goto err;
+	}
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
+static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
+{
+	int ret = EXIT_SUCCESS;
+
+	if (req->add_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR){
+		ret = DP_ERROR_VM_ADD_NEIGHNAT_WRONGTYPE;
+		goto err;
+	}
+	printf("dp_process_add_neigh_nat is called \n");
+	if (req->add_nat_neigh.ip_type == RTE_ETHER_TYPE_IPV4 ){
+		printf("try to add horizontal_nat_entry");
+		ret = dp_add_horizontal_nat_entry(ntohl(req->add_nat_neigh.vip.vip_addr), NULL, 
+								req->add_nat_neigh.vni, 
+								(uint16_t)req->add_nat_neigh.port_range[0],(uint16_t)req->add_nat_neigh.port_range[1],
+								req->add_nat_neigh.route);
+		printf("Add hrzt nat extern entry result is %d\n",ret);
+		if (ret)
+			goto err;
+	}
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
+static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
+{
+	int ret = EXIT_SUCCESS;
+
+	if (req->del_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR){
+		ret = DP_ERROR_VM_DEL_NEIGHNAT_WRONGTYPE;
+		goto err;
+	}
+
+	if (req->del_nat_vip.ip_type== RTE_ETHER_TYPE_IPV4 ){
+		ret = dp_del_horizontal_nat_entry(ntohl(req->del_nat_vip.vip.vip_addr), NULL, 
+								req->del_nat_vip.vni, 
+								(uint16_t)req->del_nat_vip.port_range[0],(uint16_t)req->del_nat_vip.port_range[1]);
+		printf("Del hrzt nat extern entry result is %d\n",ret);
+		if (ret)
+			goto err;
+	}
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
 static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
@@ -666,6 +784,18 @@ int dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_LISTROUTE:
 		ret = dp_process_listroute(req, m, m_arr);
+		break;
+	case DP_REQ_TYPE_ADD_NATVIP:
+		ret = dp_process_addnat(req, &rep);
+		break;
+	case DP_REQ_TYPE_DEL_NATVIP:
+		ret = dp_process_delnat(req, &rep);
+		break;
+	case DP_REQ_TYPE_ADD_NEIGH_NAT:
+		ret = dp_process_add_neigh_nat(req, &rep);
+		break;
+	case DP_REQ_TYPE_DEL_NEIGH_NAT:
+		ret = dp_process_del_neigh_nat(req, &rep);
 		break;
 	case DP_REQ_TYPE_LISTPREFIX:
 		ret = dp_process_listpfxs(req, m, m_arr);

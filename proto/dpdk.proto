@@ -173,6 +173,11 @@ message LBIP {
 	bytes address = 2;	// Can be both ipv4 and ipv6
 }
 
+message NATIP {
+	IPVersion ipVersion = 1;
+	bytes address = 2;	// Can be both ipv4 and ipv6
+}
+
 message InterfaceVIPMsg {
 	bytes interfaceID = 1;
 	InterfaceVIPIP interfaceVIPIP = 2;
@@ -227,6 +232,21 @@ message DeleteLoadBalancerTargetRequest {
 
 message InterfacesMsg {
 	repeated Interface interfaces = 1;
+}
+
+message NATMsg {
+	bytes interfaceID =1;
+	NATIP natVIPIP = 2;
+	uint32 minPort = 3; // port should be uint16 (less than 65536)
+	uint32 maxPort = 4;
+}
+
+message NeighborNATMsg {
+	NATIP natVIPIP = 1;
+	uint32 vni = 2;
+	uint32 minPort = 3; // port should be uint16 (less than 65536)
+	uint32 maxPort = 4;
+	bytes underlayRoute = 5;
 }
 
 message RuleIDMsg {
@@ -345,6 +365,14 @@ service DPDKonmetal {
 	rpc addLoadBalancerTarget(AddLoadBalancerTargetRequest) returns (Status) {}
 	rpc getLoadBalancerTargets(GetLoadBalancerTargetsRequest) returns (GetLoadBalancerTargetsResponse) {}
 	rpc deleteLoadBalancerTarget(DeleteLoadBalancerTargetRequest) returns (Status) {}
+
+	// Network-NAT related, add/del a NAT for an interface
+	rpc addNAT(NATMsg) returns (IpAdditionResponse) {}
+	rpc delNAT(NATMsg) returns (Status) {}
+
+	rpc addNeighborNAT(NeighborNATMsg) returns (Status) {}
+	rpc delNeighborNAT(NeighborNATMsg) returns (Status) {}
+	
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}

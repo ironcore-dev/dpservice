@@ -924,6 +924,180 @@ int ListRoutesCall::Proceed()
 	return 0;
 }
 
+int AddNATVIPCall::Proceed()
+{
+	dp_request request = {0};
+	struct dp_reply reply = {0};
+
+	grpc::Status ret = grpc::Status::OK;
+	Status *err_status = new Status();
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
+
+	if (status_ == REQUEST) {
+		new AddNATVIPCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		request.add_nat_vip.type = DP_NETNAT_INFO_TYPE_LOCAL;
+		snprintf(request.add_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_nat_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.natvipip().address().c_str(),
+					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
+		}
+
+		// maybe add a validity check here to ensure minport is not greater than 2^30
+		request.add_nat_vip.port_range[0] = request_.minport();
+		printf("min_port is %d\n", request.add_nat_vip.port_range[0]);
+		request.add_nat_vip.port_range[1] = request_.maxport();
+
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		reply_.set_underlayroute(buf_str);
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+
+}
+
+int DelNATVIPCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelNATVIPCall(service_, cq_);
+		printf("delnatvipcall is called \n");
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.del_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		request.del_nat_vip.type = DP_NETNAT_INFO_TYPE_LOCAL;
+		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_nat_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.natvipip().address().c_str(),
+					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
+		}
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int AddNeighborNATCall::Proceed()
+{
+	dp_request request = {0};
+	struct dp_reply reply = {0};
+
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new AddNeighborNATCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		request.add_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+		// snprintf(request.add_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+		// 		 "%s", request_.interfaceid().c_str());
+		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			printf("setrequest.add_nat_neigh.ip_type to RTE_ETHER_TYPE_IPV4 \n");
+			request.add_nat_neigh.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.natvipip().address().c_str(),
+					  (in_addr*)&request.add_nat_neigh.vip.vip_addr);
+		}
+
+		// maybe add a validity check here to ensure minport is not greater than 2^30
+		request.add_nat_neigh.vni = request_.vni();
+		request.add_nat_neigh.port_range[0] = request_.minport();
+		request.add_nat_neigh.port_range[1] = request_.maxport();
+		inet_pton(AF_INET6, request_.underlayroute().c_str(),
+				  request.add_nat_neigh.route);
+
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+
+}
+
+int DelNeighborNATCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	grpc::Status ret = grpc::Status::OK;
+
+	if (status_ == REQUEST) {
+		new DelNeighborNATCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		// snprintf(request.del_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+		// 		 "%s", request_.interfaceid().c_str());
+		request.del_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+
+		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			printf("setrequest.add_nat_neigh.ip_type to RTE_ETHER_TYPE_IPV4 \n");
+			request.del_nat_neigh.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.natvipip().address().c_str(),
+					  (in_addr*)&request.del_nat_neigh.vip.vip_addr);
+		}
+
+		// maybe add a validity check here to ensure minport is not greater than 2^30
+		request.del_nat_neigh.vni = request_.vni();
+		request.del_nat_neigh.port_range[0] = request_.minport();
+		request.del_nat_neigh.port_range[1] = request_.maxport();
+		// inet_pton(AF_INET6, request_.underlayroute().c_str(),
+		// 		  request.add_nat_neigh.route);
+
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 int ListInterfacesCall::Proceed()
 {
 	dp_request request = {0};

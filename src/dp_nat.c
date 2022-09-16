@@ -18,24 +18,24 @@ static struct rte_hash *ipv4_network_dnat_tbl = NULL;
 static struct horizontal_nat_entry *network_nat_db = NULL;
 
 // test code
-static uint32_t dp_vm_ip4 = RTE_IPV4(176, 44, 33, 12);
-static uint32_t dp_vm_hrzt_ip4 = RTE_IPV4(45, 66, 77, 88);
-static uint32_t dp_vm_hrzt_extern_ip4 = RTE_IPV4(45, 88, 77, 66);
-static uint8_t dp_underlay_ip6[16] = {0x2a, 0x10, 0xaf, 0xc0, 0xe0, 0x1f, 0xf4, 0x04, 0, 0, 0, 0x64, 0, 0, 0, 0};
+// static uint32_t dp_vm_ip4 = RTE_IPV4(176, 44, 33, 12);
+// static uint32_t dp_vm_hrzt_ip4 = RTE_IPV4(45, 66, 77, 88);
+// static uint32_t dp_vm_hrzt_extern_ip4 = RTE_IPV4(45, 88, 77, 66);
+// static uint8_t dp_underlay_ip6[16] = {0x2a, 0x10, 0xaf, 0xc0, 0xe0, 0x1f, 0xf4, 0x04, 0, 0, 0, 0x64, 0, 0, 0, 0};
 
-static void hrzt_nat_init()
-{
-	int ret;
-	ret = dp_set_vm_hrztl_snat_ip(dp_vm_ip4,dp_vm_hrzt_ip4,100,1000,1200);
-	printf("Add hrzt nat svip result is %d\n",ret);
+// static void hrzt_nat_init()
+// {
+// 	int ret;
+// 	ret = dp_set_vm_hrztl_snat_ip(dp_vm_ip4,dp_vm_hrzt_ip4,100,1000,1200);
+// 	printf("Add hrzt nat svip result is %d\n",ret);
 
-	ret = dp_add_horizontal_nat_entry(dp_vm_hrzt_extern_ip4, NULL, 
-								100, 2000,2500,
-								dp_underlay_ip6);
+// 	ret = dp_add_horizontal_nat_entry(dp_vm_hrzt_extern_ip4, NULL, 
+// 								100, 2000,2500,
+// 								dp_underlay_ip6);
 	
-	printf("Add hrzt nat extern entry result is %d\n",ret);
+// 	printf("Add hrzt nat extern entry result is %d\n",ret);
 
-}
+// }
 
 
 void dp_init_nat_tables(int socket_id)
@@ -81,7 +81,7 @@ void dp_init_nat_tables(int socket_id)
 	if(!ipv4_network_dnat_tbl)
 		rte_exit(EXIT_FAILURE, "create ipv4 network dnat table failed\n");	
 
-	 hrzt_nat_init();
+	//  hrzt_nat_init();
 }
 
 bool dp_is_ip_snatted(uint32_t vm_ip, uint32_t vni)
@@ -182,7 +182,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
 
 	if (rte_hash_lookup(ipv4_snat_tbl, &nkey) >= 0) {
 		if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0){
-			ret = DP_ERROR_VM_ADD_NAT_ADD_DATA;
+			ret = DP_REQ_TYPE_ADD_NATVIP;
 			goto err;
 		}
 
@@ -209,7 +209,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
 	data->vip_ip=s_ip;
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
-		ret = DP_ERROR_VM_ADD_NAT_ADD_DATA;
+		ret = DP_ERROR_VM_ADD_NET_NAT_DATA;
 		goto out;
 	}
 
@@ -250,9 +250,11 @@ int dp_set_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
 
+	printf("add to nat vip table: %d, %d, %d, %d, %d \n", vm_ip, s_ip, vni, min_port, max_port);
+
 	if (rte_hash_lookup(ipv4_snat_tbl, &nkey) >= 0) {
 		if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0){
-			ret = DP_ERROR_VM_ADD_NAT_ADD_DATA;
+			ret = DP_ERROR_VM_ADD_NETNAT_DATA_NOT_FOUND;
 			goto err;
 		}
 
@@ -260,7 +262,6 @@ int dp_set_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_
 			ret = DP_ERROR_VM_ADD_NAT_IP_EXISTS;
 			goto err;
 		}else{
-			
 			data->horizontal_nat_ip=s_ip;
 			data->horizontal_nat_port_range[0]=min_port;
 			data->horizontal_nat_port_range[1]=max_port;
@@ -285,7 +286,7 @@ int dp_set_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_
 	data->horizontal_nat_port_range[1]=max_port;
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
-		ret = DP_ERROR_VM_ADD_NAT_ADD_DATA;
+		ret = DP_ERROR_VM_ADD_NET_NAT_DATA;
 		goto out;
 	}
 
@@ -343,18 +344,21 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 
 }
 
-void dp_del_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
+int dp_del_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
 {
 	struct nat_key nkey;
 	// uint32_t *snat_ip;
 	struct snat_data *data;
 	int pos;
+	
 
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
 
+	printf("del from nat vip table: %d, %d\n", vm_ip, vni);
+
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0)
-		return;
+		return DP_ERROR_VM_DEL_NETNAT_ENTRY_NOT_FOUND;
 
 	if (data->horizontal_nat_ip){
 		data->horizontal_nat_ip = 0;
@@ -366,11 +370,15 @@ void dp_del_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
 		rte_free(data);
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
-		if (pos < 0)
+		if (pos < 0){
 			printf("SNAT hash key already deleted \n");
+			return EXIT_FAILURE;
+		}
 		else
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 	}
+
+	return EXIT_SUCCESS;
 
 }
 
@@ -538,6 +546,8 @@ int dp_add_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 {
 
 	struct horizontal_nat_entry *last;
+
+	printf("try to add neigh nat: %d, %d, %d, %d,%x, %x \n",nat_ipv4, vni, min_port,max_port,underlay_ipv6[0],underlay_ipv6[1]);
 	if (network_nat_db!=NULL){
 		last = network_nat_db;
 		while (last->next != NULL){
@@ -583,13 +593,17 @@ int dp_del_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	struct horizontal_nat_entry *tmp = network_nat_db, *prev;
 	int is_nat_entry_found=0;
 
+	printf("try to del neigh nat: %d, %d, %d, %d, \n",nat_ipv4, vni, min_port,max_port);
 	is_nat_entry_found=dp_cmp_horizontal_nat_entry(tmp,nat_ipv4,nat_ipv6,vni,min_port,max_port);
 	if (tmp!=NULL && is_nat_entry_found) {
 		network_nat_db=tmp->next;
-		free(tmp);
+		printf("free the first element\n");
+		if (tmp == NULL)
+			printf("tmp is null here\n");
+		rte_free(tmp);
 		return EXIT_SUCCESS;
 	}
-
+	printf("continue to find ...\n");
 	while (tmp!=NULL && !is_nat_entry_found){
 		prev = tmp;
 		tmp=tmp->next;
@@ -600,7 +614,7 @@ int dp_del_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 		return EXIT_FAILURE;
 
 	prev->next=tmp->next;
-	free(tmp);
+	rte_free(tmp);
 	return EXIT_SUCCESS;
 
 }
