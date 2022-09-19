@@ -14,7 +14,7 @@ spec:
     matchLabels:
       name: dp-service
   template:
-    metadata:b
+    metadata:
       labels:
         name: dp-service
     spec:

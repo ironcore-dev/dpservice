@@ -1,4 +1,0 @@
-namespace: dp-service-system
-
-resources:
-  - dp-service.yaml
