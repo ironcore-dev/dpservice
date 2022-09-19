@@ -291,6 +291,117 @@ def test_vf_to_pf_vip_snat(capsys, add_machine, build_path):
 	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
 	eval_cmd_output(del_vip_test, expected_str)
 
+def send_tcp_pkt_from_vm1():
+
+	# sys.stdout = open(str(os.getpid()) + ".out", "w")
+	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=pf0_tap,timeout=10)
+
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive network-natted tcp pkt on pf')
+
+	pkt=pkt_list[0]
+	pkt.show()
+
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if TCP in pkt:
+		pkttcp= pkt[TCP]
+
+	if pktip.src == nat_vip and pkttcp.sport == nat_local_min_port:
+		reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst) /TCP(sport=pkttcp.dport, dport=pkttcp.sport)
+		time.sleep(1)
+		sendp(reply_pkt, iface=pf0_tap)
+
+
+def test_vf_to_pf_network_nat(capsys, add_machine, build_path):
+
+	expected_str = "Addnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+	d = multiprocessing.Process(name = "send_tcp_pkt", target = send_tcp_pkt_from_vm1, args=())
+	d.daemon=False
+	d.start()
+
+	tcp_pkt = Ether(dst = pf0_mac, src = vf0_mac, type = 0x0800) / IP(dst = public_ip, src = vf0_ip) / TCP(sport=1240)
+	time.sleep(2)
+	sendp(tcp_pkt, iface = vf0_tap)
+
+	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf0_tap,timeout=10)
+
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive network-natted tcp pkt on pf')
+
+	pkt=pkt_list[0]
+	# pkt.show()
+	
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if TCP in pkt:
+		pkttcp= pkt[TCP]
+
+	if pktip.dst !=vf0_ip  or pkttcp.dport != 1240:
+		raise AssertionError('Received wrong packet with ip:'+pktip.dst+" dport:"+ str(pkttcp.dport))
+
+	expected_str = "Delnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+def send_bounce_pkt_to_pf():
+	bouce_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=nat_vip, src=public_ip) /TCP(sport=8989, dport=510)
+	time.sleep(3)
+	sendp(bouce_pkt, iface=pf0_tap)
+
+def test_network_nat_pkt_relay(capsys, add_machine, build_path):
+	expected_str = "Addnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+	expected_str = "AddNeighNat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addneighnat " + " --ipv4 " + nat_vip + " --vni " + vni + " --min_port " + str(nat_neigh_min_port) + " --max_port "+ str(nat_neigh_max_port) + " --t_ipv6 "+nat_neigh_ul_dst
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+	d = multiprocessing.Process(name = "send_bounce_pkt", target = send_bounce_pkt_to_pf, args=())
+	d.daemon=False
+	d.start()
+
+	# answer, unanswered = srp(bouce_pkt, iface=pf0_tap, timeout=10)
+	pkt_list = sniff(count=2,lfilter=is_tcp_pkt,iface=pf0_tap,timeout=10)
+
+	if len(pkt_list)<2:
+		raise AssertionError('Cannot receive network-natted relay pkt on pf')
+	# it seems that pkt_list[0] is the injected pkt
+	pkt=pkt_list[1]
+
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if TCP in pkt:
+		pkttcp= pkt[TCP]
+	if pktipv6.dst != nat_neigh_ul_dst  or pkttcp.dport != 510:
+		raise AssertionError('Received wrong network-nat relayed packet with outer dst ipv6 addr:'+pktipv6.dst+" dport:"+ pkttcp.dport)
+
+
+	expected_str = "DelNeighNat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delneighnat " + " --ipv4 " + nat_vip + " --vni " + vni + " --min_port " + str(nat_neigh_min_port) + " --max_port "+ str(nat_neigh_max_port)
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+	expected_str = "Delnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+
 def test_grpc_addmachine_error_102(capsys, build_path):
 	# Try to add using an existing vm identifier
 	expected_error_str = "error 102"

@@ -44,6 +44,12 @@ public_ip = "45.86.6.6"
 ov_target_ip = "192.168.129.5"
 ov_target_pfx = "192.168.129.0"
 virtual_ip = "174.23.4.5"
+nat_vip = "176.22.22.22"
+nat_local_min_port = 100
+nat_local_max_port = 120
+nat_neigh_min_port = 500
+nat_neigh_max_port = 520
+nat_neigh_ul_dst="2a10:afc0:e01f:f406:0:64::"
 pfx_ip = "174.23.4.0"
 mylb = "my_lb"
 

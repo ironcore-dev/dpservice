@@ -162,7 +162,7 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 		}
 		else if (route == DP_ROUTE_PKT_RELAY){
 			printf("send to relay node \n");
-			sleep(3);
+			// sleep(3);
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_PACKET_RELAY, mbuf0);
 		}
 		else

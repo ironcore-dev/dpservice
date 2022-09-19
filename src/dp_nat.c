@@ -547,7 +547,7 @@ int dp_add_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 	struct horizontal_nat_entry *last;
 
-	printf("try to add neigh nat: %d, %d, %d, %d,%x, %x \n",nat_ipv4, vni, min_port,max_port,underlay_ipv6[0],underlay_ipv6[1]);
+	printf("try to add neigh nat: %d, %d, %d, %d,%x, %x \n",nat_ipv4, vni, min_port,max_port,underlay_ipv6[14],underlay_ipv6[15]);
 	if (network_nat_db!=NULL){
 		last = network_nat_db;
 		while (last->next != NULL){
