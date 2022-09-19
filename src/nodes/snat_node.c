@@ -47,7 +47,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		uint16_t nat_port;
 		src_ip = ntohl(df_ptr->src.src_addr);
 		is_ip_snatted = dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port));
-		is_ip_network_snatted = dp_is_ip_hrztl_snatted(src_ip, dp_get_vm_vni(m->port));
+		is_ip_network_snatted = dp_is_ip_network_snatted(src_ip, dp_get_vm_vni(m->port));
 		if ((is_ip_snatted || is_ip_network_snatted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -65,9 +65,9 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 					udp_hdr = (struct rte_udp_hdr*)(ipv4_hdr+1);
 					src_port = udp_hdr->src_port;
 				}
-				nat_port = htons(dp_allocate_hrztl_snat_port(src_ip, src_port, dp_get_vm_vni(m->port)));
+				nat_port = htons(dp_allocate_network_snat_port(src_ip, src_port, dp_get_vm_vni(m->port)));
 				printf("nat_port is %d \n",nat_port);
-				ipv4_hdr->src_addr = htonl(dp_get_vm_hrztl_snat_ip(src_ip, dp_get_vm_vni(m->port)));
+				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, dp_get_vm_vni(m->port)));
 				
 				if (df_ptr->l4_type == DP_IP_PROTO_TCP)
 					tcp_hdr->src_port = nat_port;

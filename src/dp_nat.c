@@ -15,7 +15,7 @@ static struct rte_hash *ipv4_dnat_tbl = NULL;
 static struct rte_hash *ipv4_snat_tbl = NULL;
 
 static struct rte_hash *ipv4_network_dnat_tbl = NULL;
-static struct horizontal_nat_entry *network_nat_db = NULL;
+static struct network_nat_entry *network_nat_db = NULL;
 
 // test code
 // static uint32_t dp_vm_ip4 = RTE_IPV4(176, 44, 33, 12);
@@ -26,10 +26,10 @@ static struct horizontal_nat_entry *network_nat_db = NULL;
 // static void hrzt_nat_init()
 // {
 // 	int ret;
-// 	ret = dp_set_vm_hrztl_snat_ip(dp_vm_ip4,dp_vm_hrzt_ip4,100,1000,1200);
+// 	ret = dp_set_vm_network_snat_ip(dp_vm_ip4,dp_vm_hrzt_ip4,100,1000,1200);
 // 	printf("Add hrzt nat svip result is %d\n",ret);
 
-// 	ret = dp_add_horizontal_nat_entry(dp_vm_hrzt_extern_ip4, NULL, 
+// 	ret = dp_add_network_nat_entry(dp_vm_hrzt_extern_ip4, NULL, 
 // 								100, 2000,2500,
 // 								dp_underlay_ip6);
 	
@@ -106,7 +106,7 @@ bool dp_is_ip_snatted(uint32_t vm_ip, uint32_t vni)
 	return true;
 }
 
-bool dp_is_ip_hrztl_snatted(uint32_t vm_ip, uint32_t vni)
+bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni)
 {
 	struct nat_key nkey;
 	int ret;
@@ -115,17 +115,15 @@ bool dp_is_ip_hrztl_snatted(uint32_t vm_ip, uint32_t vni)
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
 
-	printf("not 0\n");
 	ret = rte_hash_lookup(ipv4_snat_tbl, &nkey);
 	if (ret < 0){
 		printf("not found the key\n");
 		return false;
 	}
-	printf("not 1\n");
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0)
 		return false;
-	printf("not 2\n");
-	if (data->horizontal_nat_ip == 0)
+
+	if (data->network_nat_ip == 0)
 		return false;
 
 	return true;
@@ -150,7 +148,7 @@ uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 	return data->vip_ip;
 }
 
-uint32_t dp_get_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
+uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 {
 	struct nat_key nkey;
 	// uint32_t *snat_ip;
@@ -163,10 +161,10 @@ uint32_t dp_get_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0)
 		return 0;
 
-	// *snat_ip=data->horizontal_nat_ip;
+	// *snat_ip=data->network_nat_ip;
 
 	// return *snat_ip;
-	return data->horizontal_nat_ip;
+	return data->network_nat_ip;
 }
 
 int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
@@ -239,7 +237,7 @@ err:
 	return ret;
 }
 
-int dp_set_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
+int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	int ret = EXIT_SUCCESS;
 	struct nat_key nkey;
@@ -258,49 +256,37 @@ int dp_set_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_
 			goto err;
 		}
 
-		if (data->horizontal_nat_ip != 0){
-			ret = DP_ERROR_VM_ADD_NAT_IP_EXISTS;
+		if (data->network_nat_ip != 0){
+			ret = DP_ERROR_VM_ADD_NETNAT_IP_EXISTS;
 			goto err;
 		}else{
-			data->horizontal_nat_ip=s_ip;
-			data->horizontal_nat_port_range[0]=min_port;
-			data->horizontal_nat_port_range[1]=max_port;
+			data->network_nat_ip=s_ip;
+			data->network_nat_port_range[0]=min_port;
+			data->network_nat_port_range[1]=max_port;
 			return ret;
 		}
 	}
 	
 
 	if (rte_hash_add_key(ipv4_snat_tbl, &nkey) < 0) {
-		ret = DP_ERROR_VM_ADD_NAT_ALLOC;
+		ret = DP_ERROR_VM_ADD_NETNAT_KEY;
 		goto err;
 	}
 
 	data = rte_zmalloc("snat_val", sizeof(struct snat_data), RTE_CACHE_LINE_SIZE);
 	if (!data) {
-		ret = DP_ERROR_VM_ADD_NAT_ADD_KEY;
+		ret = DP_ERROR_VM_ADD_NETNAT_ALLO_DATA;
 		goto err_key;
 	}
 	printf("add hrzl nat \n");
-	data->horizontal_nat_ip=s_ip;
-	data->horizontal_nat_port_range[0]=min_port;
-	data->horizontal_nat_port_range[1]=max_port;
+	data->network_nat_ip=s_ip;
+	data->network_nat_port_range[0]=min_port;
+	data->network_nat_port_range[1]=max_port;
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
-		ret = DP_ERROR_VM_ADD_NET_NAT_DATA;
+		ret = DP_ERROR_VM_ADD_NETNAT_ADD_DATA;
 		goto out;
 	}
-
-	// snat_ip = rte_zmalloc("snat_val", sizeof(uint32_t), RTE_CACHE_LINE_SIZE);
-	// if (!snat_ip) {
-	// 	ret = DP_ERROR_VM_ADD_NAT_ADD_KEY;
-	// 	goto err_key;
-	// }
-
-	// snat_ip = s_ip;
-	// if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, snat_ip) < 0) {
-	// 	ret = DP_ERROR_VM_ADD_NAT_ADD_DATA;
-	// 	goto out;
-	// }
 
 	return ret;
 out:
@@ -332,7 +318,7 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 	if (data->vip_ip)
 		data->vip_ip = 0;
 
-	if (data->vip_ip == 0 && data->horizontal_nat_ip ==0){
+	if (data->vip_ip == 0 && data->network_nat_ip ==0){
 		rte_free(data);
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
@@ -344,7 +330,7 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 
 }
 
-int dp_del_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
+int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 {
 	struct nat_key nkey;
 	// uint32_t *snat_ip;
@@ -360,22 +346,24 @@ int dp_del_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni)
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0)
 		return DP_ERROR_VM_DEL_NETNAT_ENTRY_NOT_FOUND;
 
-	if (data->horizontal_nat_ip){
-		data->horizontal_nat_ip = 0;
-		data->horizontal_nat_port_range[0]=0;
-		data->horizontal_nat_port_range[1]=0;
+	if (data->network_nat_ip){
+		data->network_nat_ip = 0;
+		data->network_nat_port_range[0]=0;
+		data->network_nat_port_range[1]=0;
 	}
 
-	if (data->vip_ip == 0 && data->horizontal_nat_ip ==0){
+	if (data->vip_ip == 0 && data->network_nat_ip ==0){
 		rte_free(data);
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
 		if (pos < 0){
 			printf("SNAT hash key already deleted \n");
-			return EXIT_FAILURE;
+			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
 		}
-		else
+		else{
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
+			return DP_ERROR_VM_DEL_NETNAT_DELETE_FAIL;
+		}
 	}
 
 	return EXIT_SUCCESS;
@@ -513,7 +501,7 @@ void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 }
 
 
-static int dp_cmp_horizontal_nat_entry(struct horizontal_nat_entry *entry, uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+static int dp_cmp_network_nat_entry(struct network_nat_entry *entry, uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 
@@ -527,7 +515,7 @@ static int dp_cmp_horizontal_nat_entry(struct horizontal_nat_entry *entry, uint3
 }
 
 // check if a port falls into the range of external nat's port range
-static int dp_check_port_network_nat_entry(struct horizontal_nat_entry *entry, uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+static int dp_check_port_network_nat_entry(struct network_nat_entry *entry, uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni, uint16_t port)
 {
 	if(((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
@@ -540,29 +528,29 @@ static int dp_check_port_network_nat_entry(struct horizontal_nat_entry *entry, u
 
 }
 
-int dp_add_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
 								uint8_t *underlay_ipv6)
 {
 
-	struct horizontal_nat_entry *last;
+	struct network_nat_entry *last;
 
 	printf("try to add neigh nat: %d, %d, %d, %d,%x, %x \n",nat_ipv4, vni, min_port,max_port,underlay_ipv6[14],underlay_ipv6[15]);
 	if (network_nat_db!=NULL){
 		last = network_nat_db;
 		while (last->next != NULL){
-			int is_entry_found = dp_cmp_horizontal_nat_entry(last,nat_ipv4,nat_ipv6,vni,min_port,max_port);
+			int is_entry_found = dp_cmp_network_nat_entry(last,nat_ipv4,nat_ipv6,vni,min_port,max_port);
 			if (!is_entry_found){
-					printf("cannot add a redundant horizontal nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
-					return EXIT_FAILURE;
+					printf("cannot add a redundant network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
+					return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
 				}
 		}
 	}
 
-	struct horizontal_nat_entry *new_entry = (struct horizontal_nat_entry *)rte_zmalloc("horizontal_nat_array",sizeof(struct horizontal_nat_entry),RTE_CACHE_LINE_SIZE);
+	struct network_nat_entry *new_entry = (struct network_nat_entry *)rte_zmalloc("network_nat_array",sizeof(struct network_nat_entry),RTE_CACHE_LINE_SIZE);
 	if (!new_entry){
-		printf("failed to allocate horizontal nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
-		return EXIT_FAILURE;
+		printf("failed to allocate network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
+		return DP_ERROR_VM_ADD_NEIGHNAT_ALLOC;
 	}
 
 	if (nat_ipv4 != 0)
@@ -587,14 +575,14 @@ int dp_add_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 }
 
-int dp_del_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni,uint16_t min_port, uint16_t max_port)
 {
-	struct horizontal_nat_entry *tmp = network_nat_db, *prev;
+	struct network_nat_entry *tmp = network_nat_db, *prev;
 	int is_nat_entry_found=0;
 
 	printf("try to del neigh nat: %d, %d, %d, %d, \n",nat_ipv4, vni, min_port,max_port);
-	is_nat_entry_found=dp_cmp_horizontal_nat_entry(tmp,nat_ipv4,nat_ipv6,vni,min_port,max_port);
+	is_nat_entry_found=dp_cmp_network_nat_entry(tmp,nat_ipv4,nat_ipv6,vni,min_port,max_port);
 	if (tmp!=NULL && is_nat_entry_found) {
 		network_nat_db=tmp->next;
 		printf("free the first element\n");
@@ -607,11 +595,11 @@ int dp_del_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	while (tmp!=NULL && !is_nat_entry_found){
 		prev = tmp;
 		tmp=tmp->next;
-		is_nat_entry_found = dp_cmp_horizontal_nat_entry(tmp,nat_ipv4,nat_ipv6,vni,min_port,max_port);
+		is_nat_entry_found = dp_cmp_network_nat_entry(tmp,nat_ipv4,nat_ipv6,vni,min_port,max_port);
 	}
 
 	if (tmp==NULL)
-		return EXIT_FAILURE;
+		return DP_ERROR_VM_DEL_NEIGHNAT_ENTRY_NOFOUND;
 
 	prev->next=tmp->next;
 	rte_free(tmp);
@@ -619,14 +607,14 @@ int dp_del_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 }
 
-int dp_get_horizontal_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni,uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6)
 {
 
-	struct horizontal_nat_entry *current = network_nat_db;
+	struct network_nat_entry *current = network_nat_db;
 
 	while (current!=NULL){
-		int is_nat_entry_found = dp_cmp_horizontal_nat_entry(current,nat_ipv4,nat_ipv6,vni,min_port,max_port);
+		int is_nat_entry_found = dp_cmp_network_nat_entry(current,nat_ipv4,nat_ipv6,vni,min_port,max_port);
 		if (is_nat_entry_found){
 			memcpy(underlay_ipv6,current->dst_ipv6,sizeof(current->dst_ipv6));
 			return EXIT_SUCCESS;
@@ -634,10 +622,10 @@ int dp_get_horizontal_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 		current = current->next;
 	}
 
-	return EXIT_FAILURE;
+	return DP_ERROR_VM_GET_NEIGHNAT_UNDER_IPV6;
 }
 
-int dp_lookup_horizontal_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6)
+int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6)
 {
 	struct dp_flow *df_ptr;
 	
@@ -647,24 +635,12 @@ int dp_lookup_horizontal_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay
 
 	df_ptr = get_dp_flow_ptr(pkt);
 
-	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING){
-		printf("cannot looup underlay ip of neighboring horizontal nat for non-incoming traffic \n");
-		return -1;
-	}
-
-	if (df_ptr->l4_type == IPPROTO_ICMP){
-		printf("cannot looup underlay ip of neighboring horizontal nat for icmp traffic \n");
-		return -1;
-	}
-
 	dst_ip=ntohl(df_ptr->dst.dst_addr);
 	dst_port=ntohs(df_ptr->dst_port);
-	printf("dst port is %d in searching range \n",df_ptr->dst_port);
-	printf("dst port is %d in searching range \n",rte_be_to_cpu_16(df_ptr->dst_port));
 	dst_vni=df_ptr->tun_info.dst_vni;
 	printf("dst port is %d in searching range \n",ntohs(df_ptr->dst_port));
 
-	struct horizontal_nat_entry *current = network_nat_db;
+	struct network_nat_entry *current = network_nat_db;
 
 	while (current!=NULL){
 		int is_nat_entry_found = dp_check_port_network_nat_entry(current, dst_ip, NULL,dst_vni,dst_port);
@@ -679,7 +655,7 @@ int dp_lookup_horizontal_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay
 	return 0;
 }
 
-uint16_t dp_allocate_hrztl_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni)
+uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni)
 {
 	struct nat_key nkey;
 	struct network_dnat_key network_key;
@@ -692,13 +668,13 @@ uint16_t dp_allocate_hrztl_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t 
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void**)&data) < 0)
 		return 0;
 
-	if (data->horizontal_nat_ip == 0)
+	if (data->network_nat_ip == 0)
 		return 0;
 
-	min_port = data->horizontal_nat_port_range[0];
-	max_port = data->horizontal_nat_port_range[1];
+	min_port = data->network_nat_port_range[0];
+	max_port = data->network_nat_port_range[1];
 
-	network_key.nat_ip= data->horizontal_nat_ip;
+	network_key.nat_ip= data->network_nat_ip;
 	network_key.vni=vni;
 	
 	for (uint16_t p = min_port; p <= max_port; p++){

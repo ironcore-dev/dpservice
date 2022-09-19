@@ -8,7 +8,7 @@ extern "C" {
 #define DP_NAT_TABLE_MAX	100
 
 // TODO: change this to a configurable value
-#define DP_HORIZONTAL_NAT_MAX_ENTRY 256
+#define DP_NETWORK_NAT_MAX_ENTRY 256
 
 enum {
 	DP_NAT_CHG_NONE,
@@ -23,7 +23,7 @@ struct nat_key {
 	uint32_t	vni;
 };
 
-struct horizontal_nat_entry {
+struct network_nat_entry {
 	union 
 	{
 		uint32_t	nat_ip4;
@@ -35,13 +35,13 @@ struct horizontal_nat_entry {
 	uint32_t	vni;
 	uint8_t		dst_ipv6[16];
 
-	struct horizontal_nat_entry	*next;
+	struct network_nat_entry	*next;
 };
 
 struct snat_data {
 	uint32_t	vip_ip;
-	uint32_t	horizontal_nat_ip;
-	uint16_t	horizontal_nat_port_range[2];
+	uint32_t	network_nat_ip;
+	uint16_t	network_nat_port_range[2];
 };
 
 struct network_dnat_key{
@@ -68,22 +68,22 @@ int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni);
 void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
-int dp_add_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
 								uint8_t *underlay_ipv6);
 
-int dp_del_horizontal_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-int dp_get_horizontal_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
 								uint32_t vni, uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6);
 
-bool dp_is_ip_hrztl_snatted(uint32_t vm_ip, uint32_t vni);
-uint32_t dp_get_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni);
-int dp_set_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
-int dp_del_vm_hrztl_snat_ip(uint32_t vm_ip, uint32_t vni);
-uint16_t dp_allocate_hrztl_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni);
-int dp_lookup_horizontal_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6);
+bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni);
+uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
+int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
+int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
+uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni);
+int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6);
 
 #ifdef __cplusplus
 }

@@ -1,6 +1,7 @@
 import pytest
 import pytest, shlex, subprocess, time
 from config import *
+import time
 
 
 def pytest_addoption(parser):
@@ -70,6 +71,7 @@ def add_machine(build_path, tun_opt):
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
+	time.sleep(5)
 	init_cmd = build_path+"/test/dp_grpc_client --init"
 	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine " + vm1_name + " --vni "+ vni + " --ipv4 " + vf0_ip + " --ipv6 " + vf0_ipv6
 	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6

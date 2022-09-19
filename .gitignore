@@ -12,3 +12,4 @@ __*
 *.pcap
 .idea/
 *.pl
+scapy-script/*

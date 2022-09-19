@@ -544,7 +544,7 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
 
-		ret = dp_set_vm_hrztl_snat_ip(dp_get_dhcp_range_ip4(port_id),ntohl(req->add_nat_vip.vip.vip_addr),
+		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id),ntohl(req->add_nat_vip.vip.vip_addr),
 									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
 	
 		if (ret)
@@ -580,7 +580,7 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_del_vm_hrztl_snat_ip(dp_get_dhcp_range_ip4(port_id),vm_vni);
+		ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id),vm_vni);
 		if (ret) 
 			goto err;
 	}
@@ -601,8 +601,8 @@ static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
 	}
 	printf("dp_process_add_neigh_nat is called \n");
 	if (req->add_nat_neigh.ip_type == RTE_ETHER_TYPE_IPV4 ){
-		printf("try to add horizontal_nat_entry");
-		ret = dp_add_horizontal_nat_entry(ntohl(req->add_nat_neigh.vip.vip_addr), NULL, 
+		printf("try to add network_nat_entry");
+		ret = dp_add_network_nat_entry(ntohl(req->add_nat_neigh.vip.vip_addr), NULL, 
 								req->add_nat_neigh.vni, 
 								(uint16_t)req->add_nat_neigh.port_range[0],(uint16_t)req->add_nat_neigh.port_range[1],
 								req->add_nat_neigh.route);
@@ -627,7 +627,7 @@ static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->del_nat_vip.ip_type== RTE_ETHER_TYPE_IPV4 ){
-		ret = dp_del_horizontal_nat_entry(ntohl(req->del_nat_vip.vip.vip_addr), NULL, 
+		ret = dp_del_network_nat_entry(ntohl(req->del_nat_vip.vip.vip_addr), NULL, 
 								req->del_nat_vip.vni, 
 								(uint16_t)req->del_nat_vip.port_range[0],(uint16_t)req->del_nat_vip.port_range[1]);
 		printf("Del hrzt nat extern entry result is %d\n",ret);
