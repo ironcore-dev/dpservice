@@ -39,6 +39,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_state = DP_FLOW_STATE_NEW;
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
+	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_ZERO; // init this flag
 	dp_add_flow_data(key, flow_val);
 
 	// Only the original flow (outgoing)'s hash value is recorded
@@ -126,6 +127,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			if (!flow_val)
 				printf("failed to add a flow table entry due to NULL flow_val pointer \n");
 			flow_val->nat_info.nat_type=DP_FLOW_NAT_TYPE_NETWORK;
+			flow_val->nat_info.l4_type=df_ptr->l4_type;
 			memcpy(flow_val->nat_info.underlay_dst,underlay_dst,sizeof(flow_val->nat_info.underlay_dst));
 		} else {
 			dp_get_flow_data(&key, (void **)&flow_val);
@@ -182,11 +184,8 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 			rte_node_enqueue_x1(graph, node, route,
 								mbuf0);
 		}
-		else if (route == DP_ROUTE_PKT_RELAY){
-			printf("send to relay node \n");
-			// sleep(3);
+		else if (route == DP_ROUTE_PKT_RELAY)
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_PACKET_RELAY, mbuf0);
-		}
 		else
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DROP, mbuf0);
 	}

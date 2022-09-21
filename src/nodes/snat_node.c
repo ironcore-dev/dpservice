@@ -45,18 +45,18 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		printf("new flow in snat \n");
 		uint16_t nat_port;
+		uint32_t vni =  dp_get_vm_vni(m->port);
 		src_ip = ntohl(df_ptr->src.src_addr);
-		is_ip_snatted = dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port));
-		is_ip_network_snatted = dp_is_ip_network_snatted(src_ip, dp_get_vm_vni(m->port));
+		is_ip_snatted = dp_is_ip_snatted(src_ip,vni);
+		is_ip_network_snatted = dp_is_ip_network_snatted(src_ip,vni);
 		if ((is_ip_snatted || is_ip_network_snatted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			if(is_ip_snatted){
-				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port)));
+				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));
 				cntrack->nat_info.nat_type=DP_FLOW_NAT_TYPE_VIP;
 			}
 			if(is_ip_network_snatted && df_ptr->l4_type != DP_IP_PROTO_ICMP){
-				printf(" it is network natted \n");
 				uint16_t src_port;
 				if (df_ptr->l4_type == DP_IP_PROTO_TCP){
 					tcp_hdr = (struct rte_tcp_hdr*)(ipv4_hdr+1);
@@ -65,9 +65,13 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 					udp_hdr = (struct rte_udp_hdr*)(ipv4_hdr+1);
 					src_port = udp_hdr->src_port;
 				}
-				nat_port = htons(dp_allocate_network_snat_port(src_ip, src_port, dp_get_vm_vni(m->port)));
-				printf("nat_port is %d \n",nat_port);
-				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, dp_get_vm_vni(m->port)));
+				nat_port = htons(dp_allocate_network_snat_port(src_ip, src_port, vni, df_ptr->l4_type));
+				printf("allocate port %d \n",nat_port);
+				if (nat_port == 0){
+					printf("an invalid network nat port is allocated \n");
+					return 0;
+				}
+				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 				
 				if (df_ptr->l4_type == DP_IP_PROTO_TCP)
 					tcp_hdr->src_port = nat_port;
@@ -75,6 +79,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 					udp_hdr->src_port = nat_port;
 
 				cntrack->nat_info.nat_type=DP_FLOW_NAT_TYPE_NETWORK;
+				cntrack->nat_info.vni=vni;
 			}
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 			df_ptr->nat_addr = df_ptr->src.src_addr;
@@ -87,11 +92,9 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
-			if (is_ip_network_snatted && df_ptr->l4_type != DP_IP_PROTO_ICMP){
+			if (is_ip_network_snatted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = ntohs(nat_port);
-				printf("nat_port is %d \n",nat_port);
-				printf("change dst port in key %d \n",cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
-			}
+			
 			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 		}

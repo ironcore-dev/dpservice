@@ -134,7 +134,7 @@ int dp_dpdk_init(int argc, char **argv)
 	hz = rte_get_timer_hz();
 	timer_res = hz * 10; // 10 seconds
 	lcore_id = rte_lcore_id();
-	rte_timer_reset(&timer, hz*30, PERIODICAL, lcore_id, timer_cb, NULL);
+	rte_timer_reset(&timer, hz*10, PERIODICAL, lcore_id, timer_cb, NULL);
 
 	force_quit = false;
 

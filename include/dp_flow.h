@@ -35,6 +35,7 @@ enum {
 };
 
 enum {
+	DP_FLOW_NAT_TYPE_ZERO,
 	DP_FLOW_NAT_TYPE_VIP,
 	DP_FLOW_NAT_TYPE_NETWORK,
 };
@@ -53,9 +54,11 @@ struct flow_key {
 
 struct flow_nat_info {
 	uint8_t nat_type;
-	uint8_t nat_addr4;
-	uint8_t nat_port;
+	// uint8_t nat_addr4;
+	// uint8_t nat_port;
+	uint32_t vni;
 	uint8_t underlay_dst[16];
+	uint8_t l4_type;
 };
 
 
@@ -89,6 +92,7 @@ void dp_init_flowtable(int socket_id);
 void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct flow_value *cntrack);
+void dp_free_network_nat_port(struct flow_value *cntrack);
 
 hash_sig_t dp_get_flow_hash_value(struct flow_key *key);
 

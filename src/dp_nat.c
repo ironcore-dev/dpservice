@@ -655,10 +655,10 @@ int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ip
 	return 0;
 }
 
-uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni)
+uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni, uint8_t l4_type)
 {
-	struct nat_key nkey;
-	struct network_dnat_key network_key;
+	struct nat_key nkey={0};
+	struct network_dnat_key network_key={0};
 	struct snat_data *data;
 	uint16_t min_port,max_port, allocated_port=0;
 
@@ -676,14 +676,46 @@ uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_
 
 	network_key.nat_ip= data->network_nat_ip;
 	network_key.vni=vni;
+	network_key.l4_type=l4_type;
 	
 	for (uint16_t p = min_port; p <= max_port; p++){
 		network_key.nat_port=p;
+		int ret = rte_hash_lookup(ipv4_network_dnat_tbl, &network_key);
+		printf("new port %d, ret %d \n",p,ret);
 		if (rte_hash_lookup(ipv4_network_dnat_tbl, &network_key)==-ENOENT){
 			allocated_port=p;
 			break;
 		}
 	}
-	
+
+	printf("add network key %d, %d, %d \n",network_key.nat_ip,network_key.vni,network_key.nat_port);
+	if (rte_hash_add_key(ipv4_network_dnat_tbl, (const void*)&network_key) < 0) {
+		printf("failed to add to ipv4 network dnat table \n");
+		return 0;
+	}
+
+	// No data is needed for now, since the mapped port info has been writen into conntrack table
+	// only key existence is important here
+
 	return allocated_port;
+}
+
+int dp_remove_network_snat_port(uint32_t nat_ip, uint16_t nat_port, uint32_t vni, uint8_t l4_type)
+{
+	struct network_dnat_key network_key={0};
+	int ret;
+
+	network_key.nat_ip = nat_ip;
+	network_key.nat_port = nat_port;
+	network_key.vni = vni;
+	network_key.l4_type = l4_type;
+	ret = rte_hash_lookup(ipv4_network_dnat_tbl, &network_key);
+	if (ret == -ENOENT)
+		return -1;
+
+	ret = rte_hash_del_key(ipv4_network_dnat_tbl, &network_key);
+	if (ret == -ENOENT)
+		return -2;
+
+	return 0;
 }

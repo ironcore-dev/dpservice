@@ -48,6 +48,7 @@ struct network_dnat_key{
 	uint32_t	nat_ip;
 	uint32_t	vni;
 	uint16_t	nat_port;
+	uint8_t	l4_type;
 };
 
 struct network_dnat_value{
@@ -82,8 +83,9 @@ bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
 int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
-uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni);
+uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni, uint8_t l4_type);
 int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6);
+int dp_remove_network_snat_port(uint32_t nat_ip, uint16_t nat_port, uint32_t vni, uint8_t l4_type);
 
 #ifdef __cplusplus
 }

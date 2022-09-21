@@ -5,6 +5,7 @@
 #include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
 #include <rte_icmp.h>
+#include "dp_nat.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static uint64_t timeout = 0;
@@ -131,9 +132,27 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 
 void dp_free_flow(struct flow_value *cntrack)
 {
+	printf("dp_free_flow \n");
+	dp_free_network_nat_port(cntrack);
 	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
 	rte_free(cntrack);
+}
+
+void dp_free_network_nat_port(struct flow_value *cntrack)
+{
+	uint32_t nat_ip;
+	uint32_t vni;
+	uint16_t nat_port;
+
+	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK){
+		nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst;
+		vni = cntrack->nat_info.vni;
+		nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
+		printf("try to free network_nat_port \n");
+		int ret = dp_remove_network_snat_port(nat_ip, nat_port, vni, cntrack->nat_info.l4_type);
+		printf("ret is %d \n",ret);
+	}
 }
 
 void dp_process_aged_flows(int port_id)
