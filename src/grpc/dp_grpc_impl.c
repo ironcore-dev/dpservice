@@ -328,12 +328,12 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_LPM6;
 			goto lpm_err;
 		}
-		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), 32,
+		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), DP_LPM_DHCP_IP_DEPTH,
 							  rte_eth_dev_socket_id(port_id));
 		dp_set_vm_pxe_ip4(port_id, ntohl(req->add_machine.ip4_pxe_addr),
 							  rte_eth_dev_socket_id(port_id));
 		dp_set_vm_pxe_str(port_id, req->add_machine.pxe_str);
-		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, 128,
+		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, DP_LPM_DHCP_IP6_DEPTH,
 							  rte_eth_dev_socket_id(port_id));
 		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
 					 NULL, 32, rte_eth_dev_socket_id(port_id))) {

@@ -306,6 +306,8 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 	struct rte_rib_node *node = NULL;
 	struct rte_rib *root;
 	uint16_t msg_per_buf;
+	uint32_t ipv4 = 0;
+	uint8_t depth = 0;
 	uint64_t next_hop;
 	dp_reply *rep;
 
@@ -341,8 +343,13 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 				m_curr = m_new;
 				rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
 			}
-			if (next_hop == portid)
+			if (next_hop == portid) {
+				rte_rib_get_ip(node, &ipv4);
+				rte_rib_get_depth(node, &depth);
+				if ((dp_get_dhcp_range_ip4(portid) == ipv4) && (depth == DP_LPM_DHCP_IP_DEPTH))
+					continue;
 				dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
+			}
 		}
 	} while (node != NULL);
 

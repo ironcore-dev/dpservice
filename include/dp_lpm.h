@@ -38,6 +38,8 @@ extern "C" {
 #define DP_ENCAP_TYPE_GENEVE 1
 
 #define DP_LPM_ROLLBACK	true
+#define DP_LPM_DHCP_IP_DEPTH	32
+#define DP_LPM_DHCP_IP6_DEPTH	128
 
 struct macip_entry {
 	struct rte_ether_addr	own_mac;
