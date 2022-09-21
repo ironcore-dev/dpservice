@@ -187,15 +187,15 @@ int parse_args(int argc, char **argv)
 		/* Long options */
 		case CMD_LINE_OPT_ADD_MACHINE_NUM:
 			command = DP_CMD_ADD_MACHINE;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_DEL_MACHINE_NUM:
 			command = DP_CMD_DEL_MACHINE;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_GET_MACHINE_NUM:
 			command = DP_CMD_GET_MACHINE;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_LIST_MACHINES_NUM:
 			command = DP_CMD_LIST_MACHINES;
@@ -234,27 +234,27 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_VIP_NUM:
 			command = DP_CMD_ADD_VIP;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_ADD_PFX_NUM:
 			command = DP_CMD_ADD_PFX;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_DEL_PFX_NUM:
 			command = DP_CMD_DEL_PFX;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_LIST_PFX_NUM:
 			command = DP_CMD_LIST_PFX;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_DEL_VIP_NUM:
 			command = DP_CMD_DEL_VIP;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_GET_VIP_NUM:
 			command = DP_CMD_GET_VIP;
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_PXE_IP_NUM:
 			strncpy(pxe_ip_str, optarg, 29);
