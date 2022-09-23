@@ -528,12 +528,18 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
-	if (req->add_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL){
+	if (req->add_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL) {
 		ret = DP_ERROR_VM_ADD_NETNAT_NONLOCAL;
 		goto err;
 	}
 
 	port_id = dp_get_portid_with_vm_handle(req->add_nat_vip.machine_id);
+
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_VM_NOT_FND;
+		goto err;
+	}
+
 	vm_vni = dp_get_vm_vni(port_id);
 
 	/* This machine ID doesnt exist */
@@ -544,9 +550,9 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
 
-		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id),ntohl(req->add_nat_vip.vip.vip_addr),
+		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
 									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
-	
+
 		if (ret)
 			goto err;
 	}
@@ -563,14 +569,17 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
-	printf("dp_process_delnat is called \n");
-	if (req->del_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL){
+	if (req->del_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL) {
 		ret = DP_ERROR_VM_DEL_NETNAT_NONLOCAL;
 		goto err;
 	}
 
 
 	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_VM_NOT_FND;
+		goto err;
+	}
 	vm_vni = dp_get_vm_vni(port_id);
 
 	/* This machine ID doesnt exist */
@@ -580,8 +589,8 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id),vm_vni);
-		if (ret) 
+		ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), vm_vni);
+		if (ret)
 			goto err;
 	}
 	return EXIT_SUCCESS;
@@ -595,18 +604,15 @@ static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
-	if (req->add_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR){
+	if (req->add_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR) {
 		ret = DP_ERROR_VM_ADD_NEIGHNAT_WRONGTYPE;
 		goto err;
 	}
-	printf("dp_process_add_neigh_nat is called \n");
-	if (req->add_nat_neigh.ip_type == RTE_ETHER_TYPE_IPV4 ){
-		printf("try to add network_nat_entry");
-		ret = dp_add_network_nat_entry(ntohl(req->add_nat_neigh.vip.vip_addr), NULL, 
-								req->add_nat_neigh.vni, 
-								(uint16_t)req->add_nat_neigh.port_range[0],(uint16_t)req->add_nat_neigh.port_range[1],
+	if (req->add_nat_neigh.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_add_network_nat_entry(ntohl(req->add_nat_neigh.vip.vip_addr), NULL,
+								req->add_nat_neigh.vni,
+								(uint16_t)req->add_nat_neigh.port_range[0], (uint16_t)req->add_nat_neigh.port_range[1],
 								req->add_nat_neigh.route);
-		printf("Add hrzt nat extern entry result is %d\n",ret);
 		if (ret)
 			goto err;
 	}
@@ -621,16 +627,15 @@ static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
-	if (req->del_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR){
+	if (req->del_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR) {
 		ret = DP_ERROR_VM_DEL_NEIGHNAT_WRONGTYPE;
 		goto err;
 	}
 
-	if (req->del_nat_vip.ip_type== RTE_ETHER_TYPE_IPV4 ){
-		ret = dp_del_network_nat_entry(ntohl(req->del_nat_vip.vip.vip_addr), NULL, 
-								req->del_nat_vip.vni, 
-								(uint16_t)req->del_nat_vip.port_range[0],(uint16_t)req->del_nat_vip.port_range[1]);
-		printf("Del hrzt nat extern entry result is %d\n",ret);
+	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_del_network_nat_entry(ntohl(req->del_nat_vip.vip.vip_addr), NULL,
+								req->del_nat_vip.vni,
+								(uint16_t)req->del_nat_vip.port_range[0], (uint16_t)req->del_nat_vip.port_range[1]);
 		if (ret)
 			goto err;
 	}

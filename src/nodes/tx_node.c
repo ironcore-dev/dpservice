@@ -90,16 +90,13 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}
 
-	printf("send to port %d\n",port);
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,
 								cnt);
 
 	/* Redirect unsent pkts to drop node */
-	if (sent_count != cnt) {
-		printf("drop pkt in tx\n");
+	if (sent_count != cnt)
 		rte_node_enqueue(graph, node, TX_NEXT_DROP,
 						&objs[sent_count], cnt - sent_count);
-	}
 
 	return sent_count;
 }

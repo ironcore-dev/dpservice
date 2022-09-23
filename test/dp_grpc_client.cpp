@@ -503,7 +503,7 @@ public:
 			{
 				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
 					reply.routes(i).prefix().address().c_str(),
-					reply.routes(i).prefix().prefixlength(), 
+					reply.routes(i).prefix().prefixlength(),
 					reply.routes(i).nexthopvni(),
 					reply.routes(i).nexthopaddress().c_str());
 			}
@@ -778,7 +778,7 @@ public:
 				printf("Received VIP %s \n", reply.address().c_str());
 			else
 				printf("Error detected with code %d\n", reply.status().error());
-			
+
 	}
 
 	void DelInterface() {
@@ -804,7 +804,7 @@ public:
 				printf("Received an error %d \n", reply.status().error());
 			} else {
 				printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
-				reply.interface().primaryipv4address().c_str(), 
+				reply.interface().primaryipv4address().c_str(),
 				reply.interface().primaryipv6address().c_str(),
 				reply.interface().vni(),
 				reply.interface().pcidpname().c_str(),
@@ -822,7 +822,7 @@ public:
 			for (i = 0; i < reply.interfaces_size(); i++)
 			{
 				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).interfaceid().c_str(),
-					reply.interfaces(i).primaryipv4address().c_str(), 
+					reply.interfaces(i).primaryipv4address().c_str(),
 					reply.interfaces(i).primaryipv6address().c_str(),
 					reply.interfaces(i).vni(),
 					reply.interfaces(i).pcidpname().c_str(),

@@ -28,7 +28,6 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	struct dp_flow *df_ptr;
 	uint16_t ret = PACKET_RELAY_NEXT_DROP;
 	struct flow_value *cntrack = NULL;
-	// uint8_t z_ipv6_addr[16]={0};
 
 	df_ptr = get_dp_flow_ptr(m);
 
@@ -38,16 +37,15 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	if (!cntrack)
 		return ret;
 
-	if (cntrack->nat_info.nat_type==DP_FLOW_NAT_TYPE_NETWORK){
+	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK) {
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+		// TODO: add flexibility to allow relay packet from a different port
 		// df_ptr->nxt_hop = dp_get_pf1_port_id();
 		df_ptr->nxt_hop = m->port;
-		memcpy(df_ptr->tun_info.ul_dst_addr6,cntrack->nat_info.underlay_dst,sizeof(df_ptr->tun_info.ul_dst_addr6));
+		memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->nat_info.underlay_dst, sizeof(df_ptr->tun_info.ul_dst_addr6));
 		return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
 	}
 
-	if (ret ==PACKET_RELAY_NEXT_DROP )
-		printf("drop a pkt in relay node\n");
 	return ret;
 }
 
@@ -58,8 +56,6 @@ static __rte_always_inline uint16_t packet_relay_node_process(struct rte_graph *
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	int i, ret;
-
-	// struct dp_flow *df;
 
 	pkts = (struct rte_mbuf **)objs;
 
@@ -87,8 +83,8 @@ static struct rte_node_register packet_relay_node_base = {
 	.process = packet_relay_node_process,
 
 	.nb_edges = PACKET_RELAY_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+
 			[PACKET_RELAY_NEXT_DROP] = "drop",
 			[PACKET_RELAY_NEXT_OVERLAY_SWITCH] = "overlay_switch",
 		},
@@ -100,3 +96,4 @@ struct rte_node_register *packet_relay_node_get(void)
 }
 
 RTE_NODE_REGISTER(packet_relay_node_base);
+

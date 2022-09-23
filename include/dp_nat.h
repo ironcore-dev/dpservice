@@ -24,14 +24,13 @@ struct nat_key {
 };
 
 struct network_nat_entry {
-	union 
-	{
+	union {
 		uint32_t	nat_ip4;
 		uint8_t		nat_ip6[16];
 	} nat_ip;
 
 	uint16_t	port_range[2];
-	
+
 	uint32_t	vni;
 	uint8_t		dst_ipv6[16];
 
@@ -44,14 +43,14 @@ struct snat_data {
 	uint16_t	network_nat_port_range[2];
 };
 
-struct network_dnat_key{
+struct network_dnat_key {
 	uint32_t	nat_ip;
 	uint32_t	vni;
 	uint16_t	nat_port;
 	uint8_t	l4_type;
 };
 
-struct network_dnat_value{
+struct network_dnat_value {
 	uint32_t	vm_ip;
 	uint16_t	vm_port;
 };
@@ -69,14 +68,14 @@ int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni);
 void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
 								uint8_t *underlay_ipv6);
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6, 
+int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6);
 
 bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni);
@@ -91,3 +90,4 @@ int dp_remove_network_snat_port(uint32_t nat_ip, uint16_t nat_port, uint32_t vni
 }
 #endif
 #endif
+

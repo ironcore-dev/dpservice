@@ -84,12 +84,12 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		cntrack->dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
-		if (cntrack->nat_info.nat_type==DP_FLOW_NAT_TYPE_NETWORK){
-			if (df_ptr->l4_type == DP_IP_PROTO_TCP){
-				tcp_hdr = (struct rte_tcp_hdr*)(ipv4_hdr+1);
+		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK) {
+			if (df_ptr->l4_type == DP_IP_PROTO_TCP) {
+				tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr+1);
 				tcp_hdr->dst_port = htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
-			}else if (df_ptr->l4_type == DP_IP_PROTO_UDP) {
-				udp_hdr = (struct rte_udp_hdr*)(ipv4_hdr+1);
+			} else if (df_ptr->l4_type == DP_IP_PROTO_UDP) {
+				udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr+1);
 				udp_hdr->dst_port = htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 			}
 		}
@@ -119,7 +119,7 @@ static __rte_always_inline uint16_t dnat_node_process(struct rte_graph *graph,
 		if (handle_dnat(mbuf0))
 			next_index = DNAT_NEXT_IPV4_LOOKUP;
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}	
+	}
 
 	return cnt;
 }
@@ -130,8 +130,8 @@ static struct rte_node_register dnat_node_base = {
 	.process = dnat_node_process,
 
 	.nb_edges = DNAT_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+		
 			[DNAT_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
 			[DNAT_NEXT_DROP] = "drop",
 		},

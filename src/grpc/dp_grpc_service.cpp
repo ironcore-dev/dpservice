@@ -19,7 +19,7 @@ GRPCService::~GRPCService()
 	free(uuid);
 }
 
-void GRPCService::run(std::string listen_address) 
+void GRPCService::run(std::string listen_address)
 {
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
@@ -97,3 +97,4 @@ void GRPCService::HandleRpcs()
 		while (static_cast<BaseCall*>(tag)->Proceed() < 0) {};
 	}
 }
+

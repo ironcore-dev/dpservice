@@ -29,6 +29,7 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df_ptr, struct rte_mbuf *m, int flow_typ)
 {
 	struct flow_value *flow_val = NULL;
+
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val)
 		return flow_val;
@@ -46,7 +47,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
 
 	/* Add reply direction to the conntrack table, but only for passthrough traffic flows */
-	if (flow_typ == CONNTRACK_FLOW_PASSTHROUGH){
+	if (flow_typ == CONNTRACK_FLOW_PASSTHROUGH) {
 		dp_invert_flow_key(key);
 		flow_val->flow_key[DP_FLOW_DIR_REPLY] = *key;
 		dp_add_flow(key);
@@ -55,10 +56,10 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	return flow_val;
 }
 
-static __rte_always_inline void change_flow_state_dir(struct flow_key *key,struct flow_value *flow_val, struct dp_flow *df_ptr, int flow_typ)
+static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df_ptr, int flow_typ)
 {
-	
-	if (flow_typ == CONNTRACK_FLOW_RELAY){
+
+	if (flow_typ == CONNTRACK_FLOW_RELAY) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
@@ -66,18 +67,16 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key,struc
 		}
 	}
 
-	if (flow_typ == CONNTRACK_FLOW_PASSTHROUGH){
-		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) { 
-			if (flow_val->flow_state == DP_FLOW_STATE_NEW){
-				printf("DP_FLOW_STATE_NEW -> DP_FLOW_STATE_REPLY \n");
+	if (flow_typ == CONNTRACK_FLOW_PASSTHROUGH) {
+		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
+			if (flow_val->flow_state == DP_FLOW_STATE_NEW) {
 				flow_val->flow_state = DP_FLOW_STATE_REPLY;
 			}
 			flow_val->dir = DP_FLOW_DIR_REPLY;
 		}
-		
+
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-			if (flow_val->flow_state == DP_FLOW_STATE_REPLY){
-				printf("DP_FLOW_STATE_REPLY -> DP_FLOW_STATE_ESTAB \n");
+			if (flow_val->flow_state == DP_FLOW_STATE_REPLY) {
 				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
 			}
 			flow_val->dir = DP_FLOW_DIR_ORG;
@@ -111,27 +110,22 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if (!dp_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
-	printf("flow type is %d \n",df_ptr->flags.flow_type);
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING 
-		&& ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)) 
-		&& dp_lookup_network_nat_underlay_ip(m,underlay_dst)){
-		
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING
+		&& ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP))
+		&& dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
 		flow_typ = CONNTRACK_FLOW_RELAY;
-		printf("need to relay a pkt \n");
 		memset(&key, 0, sizeof(struct flow_key));
 		dp_build_flow_key(&key, m);
 		if (!dp_flow_exists(&key)) {
-			
-			printf("add a new network nat new flow entry \n");
-			flow_val = flow_table_insert_entry(&key,df_ptr,m,flow_typ);
+			flow_val = flow_table_insert_entry(&key, df_ptr, m, flow_typ);
 			if (!flow_val)
 				printf("failed to add a flow table entry due to NULL flow_val pointer \n");
-			flow_val->nat_info.nat_type=DP_FLOW_NAT_TYPE_NETWORK;
-			flow_val->nat_info.l4_type=df_ptr->l4_type;
-			memcpy(flow_val->nat_info.underlay_dst,underlay_dst,sizeof(flow_val->nat_info.underlay_dst));
+			flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK;
+			flow_val->nat_info.l4_type = df_ptr->l4_type;
+			memcpy(flow_val->nat_info.underlay_dst, underlay_dst, sizeof(flow_val->nat_info.underlay_dst));
 		} else {
 			dp_get_flow_data(&key, (void **)&flow_val);
-			change_flow_state_dir(&key,flow_val,df_ptr,flow_typ);
+			change_flow_state_dir(&key, flow_val, df_ptr, flow_typ);
 		}
 		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;
@@ -143,19 +137,16 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
 
 		flow_typ = CONNTRACK_FLOW_PASSTHROUGH;
-		
+
 		memset(&key, 0, sizeof(struct flow_key));
 		dp_build_flow_key(&key, m);
-		printf("dst port in key %d \n", key.port_dst);
 		if (!dp_flow_exists(&key)) {
-			printf("new flow in conntrack \n");
-			flow_val = flow_table_insert_entry(&key,df_ptr,m,flow_typ);
+			flow_val = flow_table_insert_entry(&key, df_ptr, m, flow_typ);
 			if (!flow_val)
 				printf("failed to add a flow table entry due to NULL flow_val pointer \n");
 		} else {
-			printf("existing flow in conntrack \n");
 			dp_get_flow_data(&key, (void **)&flow_val);
-			change_flow_state_dir(&key,flow_val,df_ptr,flow_typ);
+			change_flow_state_dir(&key, flow_val, df_ptr, flow_typ);
 		}
 		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;
@@ -180,10 +171,9 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 		mbuf0 = pkts[i];
 		route = handle_conntrack(mbuf0);
 
-		if (route >= 0) {
-			rte_node_enqueue_x1(graph, node, route,
+		if (route >= 0)
+			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_LB,
 								mbuf0);
-		}
 		else if (route == DP_ROUTE_PKT_RELAY)
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_PACKET_RELAY, mbuf0);
 		else
