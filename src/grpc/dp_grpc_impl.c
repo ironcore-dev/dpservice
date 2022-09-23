@@ -105,14 +105,10 @@ static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
-	if (!dp_is_vni_available(req->add_lb_vip.vni,
-							 rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
-		ret = DP_ERROR_VM_ADD_LB_NO_VNI_EXIST;
-		goto err;
-	}
-	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV6) {
 		if (dp_set_lb_back_ip(ntohl(req->add_lb_vip.vip.vip_addr),
-						  ntohl(req->add_lb_vip.back.back_addr), req->add_lb_vip.vni)) {
+							  (uint8_t *)req->add_lb_vip.back.back_addr6, req->add_lb_vip.vni,
+							  sizeof(req->add_lb_vip.back.back_addr6))) {
 			ret = DP_ERROR_VM_ADD_LB_VIP;
 			goto err;
 		}
@@ -130,14 +126,9 @@ static int dp_process_del_lb_vip(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
-	if (!dp_is_vni_available(req->add_lb_vip.vni,
-							 rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
-		ret = DP_ERROR_VM_DEL_LB_NO_VNI_EXIST;
-		goto err;
-	}
-	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV6) {
 		if (dp_del_lb_back_ip(ntohl(req->add_lb_vip.vip.vip_addr),
-						  ntohl(req->add_lb_vip.back.back_addr), req->add_lb_vip.vni)) {
+							  (uint8_t *)req->add_lb_vip.back.back_addr6, req->add_lb_vip.vni)) {
 			ret = DP_ERROR_VM_DEL_LB_VIP;
 			goto err;
 		}

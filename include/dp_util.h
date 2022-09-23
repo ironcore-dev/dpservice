@@ -4,6 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <stdbool.h>
 
 #define VM_MACHINE_ID_STR_LEN 64
 #define VM_MACHINE_PXE_STR_LEN 32

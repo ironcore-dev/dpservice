@@ -76,6 +76,12 @@ int AddLBVIPCall::Proceed()
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.lbvipip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
+		}
+		if (request_.lbbackendip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
+			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV6;
+			inet_pton(AF_INET6, request_.lbbackendip().address().c_str(),
+					  request.add_lb_vip.back.back_addr6);
+		} else {
 			inet_aton(request_.lbbackendip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.back.back_addr);
 		}
@@ -119,6 +125,12 @@ int DelLBVIPCall::Proceed()
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.lbvipip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
+		}
+		if (request_.lbbackendip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
+			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV6;
+			inet_pton(AF_INET6, request_.lbbackendip().address().c_str(),
+					  request.add_lb_vip.back.back_addr6);
+		} else {
 			inet_aton(request_.lbbackendip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.back.back_addr);
 		}
@@ -148,9 +160,9 @@ int GetLBVIPBackendsCall::Proceed()
 	dp_request request = {0};
 	struct rte_mbuf *mbuf = NULL;
 	struct dp_reply *reply;
-	struct in_addr addr;
-	uint32_t *rp_back_ip;
+	uint8_t *rp_back_ip;
 	LBIP *back_ip;
+	char buf_str[INET6_ADDRSTRLEN];
 	int i;
 
 	if (status_ == REQUEST) {
@@ -174,12 +186,13 @@ int GetLBVIPBackendsCall::Proceed()
 		if (dp_recv_from_worker_with_mbuf(&mbuf))
 			return -1;
 		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		rp_back_ip = &reply->back_ip.b_ip.addr6[0];
 		for (i = 0; i < reply->com_head.msg_count; i++) {
 			back_ip = reply_.add_backends();
-			rp_back_ip = &((&reply->back_ip)[i]);
-			addr.s_addr = htonl(*rp_back_ip);
-			back_ip->set_address(inet_ntoa(addr));
-			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+			inet_ntop(AF_INET6, rp_back_ip, buf_str, INET6_ADDRSTRLEN);
+			back_ip->set_address(buf_str);
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			rp_back_ip += sizeof(reply->back_ip.b_ip.addr6);
 		}
 		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;

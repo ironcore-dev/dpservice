@@ -416,12 +416,14 @@ public:
 
 			request.set_vni(vni);
 			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == dpdkonmetal::IPVersion::IPv4) {
+				vip_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 				vip_ip->set_address(ip_str);
+			}
 			request.set_allocated_lbvipip(vip_ip);
 
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				back_ip->set_address(back_ip_str);
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			back_ip->set_address(t_ip6_str);
 			request.set_allocated_lbbackendip(back_ip);
 			stub_->addLBVIP(&context, request, &reply);
 			if (reply.status().error()) {
@@ -440,12 +442,14 @@ public:
 
 			request.set_vni(vni);
 			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == dpdkonmetal::IPVersion::IPv4) {
+				vip_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 				vip_ip->set_address(ip_str);
+			}
 			request.set_allocated_lbvipip(vip_ip);
 
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				back_ip->set_address(back_ip_str);
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			back_ip->set_address(t_ip6_str);
 			request.set_allocated_lbbackendip(back_ip);
 			stub_->delLBVIP(&context, request, &reply);
 			if (reply.error()) {

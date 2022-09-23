@@ -53,6 +53,7 @@ struct flow_value {
 	uint16_t		dir;
 	uint16_t		port;
 	uint64_t		timestamp;
+	uint8_t			lb_dst_addr6[16];
 	rte_atomic32_t	flow_cnt;
 };
 

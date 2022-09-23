@@ -7,14 +7,12 @@
 extern "C" {
 #endif
 
-enum
-{
-	LB_NEXT_IPV4_LOOKUP,
+enum {
+	LB_NEXT_OVERLAY_SWITCH,
 	LB_NEXT_DNAT,
 	LB_NEXT_DROP,
 	LB_NEXT_MAX
 };
-
 
 struct lb_node_ctx
 {

@@ -161,15 +161,22 @@ typedef struct dp_vm_info {
 	char		pci_name[RTE_ETH_NAME_MAX_LEN];
 } dp_vm_info;
 
+typedef struct dp_lb_backip {
+	union {
+		uint32_t	addr;
+		uint8_t		addr6[16];
+	} b_ip;
+} dp_lb_backip;
+
 typedef struct dp_reply {
 	dp_com_head com_head;
 	union {
-		dp_vip		get_vip;
-		dp_vf_pci	vf_pci;
-		dp_vm_info	vm_info;
-		dp_route	route;
-		uint32_t	back_ip;
-		uint32_t	vni;
+		dp_vip			get_vip;
+		dp_vf_pci		vf_pci;
+		dp_vm_info		vm_info;
+		dp_route		route;
+		dp_lb_backip	back_ip;
+		uint32_t		vni;
 	};
 } dp_reply;
 

@@ -25,16 +25,15 @@ static int lb_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline int handle_lb(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 {
-	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key key;
 	struct flow_value *cntrack = NULL;
 	uint32_t dst_ip, vni;
 
 	if (!dp_is_lb_enabled())
-		return 0;
+		return LB_NEXT_DNAT;
 
 	memset(&key, 0, sizeof(struct flow_key));
 	df_ptr = get_dp_flow_ptr(m);
@@ -43,46 +42,39 @@ static __rte_always_inline int handle_lb(struct rte_mbuf *m)
 		cntrack = df_ptr->conntrack;
 
 	if (!cntrack)
-		return 1;
+		return LB_NEXT_DNAT;
+
+	dst_ip = ntohl(df_ptr->dst.dst_addr);
+	if (df_ptr->tun_info.dst_vni == 0)
+		vni = dp_get_vm_vni(m->port);
+	else
+		vni = df_ptr->tun_info.dst_vni;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
-		dst_ip = ntohl(df_ptr->dst.dst_addr);
-		if (df_ptr->tun_info.dst_vni == 0)
-			vni = dp_get_vm_vni(m->port);
-		else
-			vni = df_ptr->tun_info.dst_vni;
-
 		if (dp_is_ip_lb(dst_ip, vni)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-			ipv4_hdr = dp_get_ipv4_hdr(m);
-			ipv4_hdr->dst_addr = htonl(dp_lb_get_backend_ip(dst_ip, vni, NULL));
-			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
-			df_ptr->nat_addr = df_ptr->dst.dst_addr;
-			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
-			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
-
-			/* Expect the new source in this conntrack object */
+			if (df_ptr->l4_type == IPPROTO_ICMP)
+				return LB_NEXT_DROP;
+			memcpy(df_ptr->tun_info.ul_dst_addr6, dp_lb_get_backend_ip(dst_ip, vni), sizeof(df_ptr->tun_info.ul_dst_addr6));
+			memcpy(cntrack->lb_dst_addr6, df_ptr->tun_info.ul_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 			cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
-			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src = ntohl(ipv4_hdr->dst_addr);
-			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
-			return 1;
+			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+			df_ptr->nxt_hop = m->port;
+			df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+			return LB_NEXT_OVERLAY_SWITCH;
 		}
-		return 0;
 	}
 
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB &&
 		cntrack->dir == DP_FLOW_DIR_ORG) {
-		ipv4_hdr = dp_get_ipv4_hdr(m);
-		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src);
-		df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
-		df_ptr->nat_addr = df_ptr->dst.dst_addr;
-		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
-		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
+		memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+		df_ptr->nxt_hop = m->port;
+		df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+		return LB_NEXT_OVERLAY_SWITCH;
 	}
 
-	return 1;
+	return LB_NEXT_DNAT;
 }
 
 static __rte_always_inline uint16_t lb_node_process(struct rte_graph *graph,
@@ -100,10 +92,7 @@ static __rte_always_inline uint16_t lb_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		if (handle_lb(mbuf0))
-			next_index = LB_NEXT_IPV4_LOOKUP;
-		else
-			next_index = LB_NEXT_DNAT;
+		next_index = handle_lb(mbuf0);
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
 
@@ -118,7 +107,7 @@ static struct rte_node_register lb_node_base = {
 	.nb_edges = LB_NEXT_MAX,
 	.next_nodes =
 		{
-			[LB_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
+			[LB_NEXT_OVERLAY_SWITCH] = "overlay_switch",
 			[LB_NEXT_DNAT] = "dnat",
 			[LB_NEXT_DROP] = "drop",
 		},

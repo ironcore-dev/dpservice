@@ -39,30 +39,24 @@ static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node 
 
 static __rte_always_inline void check_aged_flows(uint16_t portid)
 {
-	if (dp_is_offload_enabled()) { 
-		dp_process_aged_flows(dp_get_pf0_port_id());
-		dp_process_aged_flows(dp_get_pf1_port_id());
+	if (dp_is_offload_enabled())
 		dp_process_aged_flows(portid);
-	} else {
-		dp_process_aged_flows_non_offload();
-	}
 }
 
 static __rte_always_inline uint16_t handle_monitoring_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx){
 	struct rte_mbuf *mbufs[32];
 	struct rte_mbuf *mbuf0;
-	int count=0, i;
+	int count = 0, i;
 
 	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.monitoring_rx, (void **)mbufs, 32, NULL);
 
 	if (count == 0) {
 		return 0;
 	}
-	// pkts = (struct rte_mbuf **)node->objs;
 
 	for (i = 0; i < count; i++) {
 		mbuf0 = mbufs[i];
-		dp_process_status_msg(mbuf0);
+		dp_process_event_msg(mbuf0);
 	}
 
 	RTE_SET_USED(ctx);

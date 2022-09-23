@@ -5,6 +5,7 @@
 #include <rte_common.h>
 #include <rte_errno.h>
 #include <rte_malloc.h>
+#include <rte_rib6.h>
 #include "dp_flow.h"
 #include "dp_lb.h"
 
@@ -49,26 +50,12 @@ bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni)
 	return true;
 }
 
-uint32_t dp_get_lb_ip(uint32_t vm_ip, uint32_t vni)
-{
-	//struct lb_key nkey;
-	uint32_t *lb_ip = NULL;
-/*
-	nkey.ip = vm_ip;
-	nkey.vni = vni;
-
-	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_ip) < 0)
-		return 0;*/
-
-	return *lb_ip;
-}
-
 static int dp_lb_last_free_pos(struct lb_value *val)
 {
 	int ret = -1, k;
 
 	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
-		if (val->back_end_ips[k] == 0)
+		if (val->back_end_ips[k][0] == 0)
 			break;
 	}
 	if (k != DP_LB_MAX_IPS_PER_VIP)
@@ -77,13 +64,14 @@ static int dp_lb_last_free_pos(struct lb_value *val)
 	return ret;
 }
 
-static void dp_lb_delete_back_ip(struct lb_value *val, uint32_t b_ip)
+static void dp_lb_delete_back_ip(struct lb_value *val, uint8_t *b_ip)
 {
 	int k;
 
 	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
-		if (val->back_end_ips[k] == b_ip) {
-			val->back_end_ips[k] = 0;
+		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[k][0], b_ip)) {
+			memset(&val->back_end_ips[k][0], 0, 16);
+			val->back_end_cnt--;
 			break;
 		}
 	}
@@ -94,7 +82,7 @@ static bool dp_lb_back_ips_exist(struct lb_value *val)
 	int k;
 
 	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
-		if (val->back_end_ips[k] != 0)
+		if (val->back_end_ips[k][0] != 0)
 			break;
 	}
 	if (k != DP_LB_MAX_IPS_PER_VIP)
@@ -109,13 +97,13 @@ static int dp_lb_rr_backend(struct lb_value *val)
 
 	if (val->back_end_cnt == 1) {
 		for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++)
-			if (val->back_end_ips[k] != 0)
+			if (val->back_end_ips[k][0] != 0)
 				break;
 		if (k != DP_LB_MAX_IPS_PER_VIP)
 			ret = k;
 	} else {
 		for (k = val->last_sel_pos; k < DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos; k++)
-			if ((val->back_end_ips[k % DP_LB_MAX_IPS_PER_VIP] != 0) && (k != val->last_sel_pos))
+			if ((val->back_end_ips[k % DP_LB_MAX_IPS_PER_VIP][0] != 0) && (k != val->last_sel_pos))
 				break;
 
 		if (k != (DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos))
@@ -125,11 +113,12 @@ static int dp_lb_rr_backend(struct lb_value *val)
 	return ret;
 }
 
-uint32_t dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, struct flow_key *fkey)
+uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
+	uint8_t *ret = NULL;
 	struct lb_key nkey;
-	int pos, ret = 0;
+	int pos;
 
 	nkey.ip = v_ip;
 	nkey.vni = vni;
@@ -147,7 +136,7 @@ uint32_t dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, struct flow_key *fkey
 		goto out;
 
 	lb_val->last_sel_pos = pos;
-	ret = lb_val->back_end_ips[pos];
+	ret = (uint8_t *)&lb_val->back_end_ips[pos][0];
 
 out:
 	return ret;
@@ -157,7 +146,7 @@ void dp_get_lb_back_ips(uint32_t v_ip, uint32_t vni, struct dp_reply *rep)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey;
-	uint32_t *rp_b_ip;
+	uint8_t *rp_b_ip6;
 	int k;
 
 	if (!dp_is_ip_lb(v_ip, vni))
@@ -170,16 +159,17 @@ void dp_get_lb_back_ips(uint32_t v_ip, uint32_t vni, struct dp_reply *rep)
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
 		return;
 
+	rp_b_ip6 = &rep->back_ip.b_ip.addr6[0];
 	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
-		if (lb_val->back_end_ips[k] != 0) {
-			rp_b_ip = &((&rep->back_ip)[rep->com_head.msg_count]);
+		if (lb_val->back_end_ips[k][0] != 0) {
 			rep->com_head.msg_count++;
-			*rp_b_ip = lb_val->back_end_ips[k];
+			rte_memcpy(rp_b_ip6, &lb_val->back_end_ips[k][0], sizeof(rep->back_ip.b_ip.addr6));
+			rp_b_ip6 += sizeof(rep->back_ip.b_ip.addr6);
 		}
 	}
 }
 
-int dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
+int dp_set_lb_back_ip(uint32_t v_ip, uint8_t *back_ip, uint32_t vni, uint8_t ip_size)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey;
@@ -195,20 +185,19 @@ int dp_set_lb_back_ip(uint32_t v_ip, uint32_t back_ip, uint32_t vni)
 		lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 		if (!lb_val)
 			goto err_key;
-		lb_val->vip_maglev_tbl = NULL;
 		pos = dp_lb_last_free_pos(lb_val);
 		if (pos < 0)
 			goto out;
 		if (rte_hash_add_key_data(ipv4_lb_tbl, &nkey, lb_val) < 0)
 			goto out;
-		lb_val->back_end_ips[pos] = back_ip;
+		rte_memcpy(&lb_val->back_end_ips[pos][0], back_ip, ip_size);
 	} else {
 		if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
 			goto err;
 		pos = dp_lb_last_free_pos(lb_val);
 		if (pos < 0)
 			goto err;
-		lb_val->back_end_ips[pos] = back_ip;
+		rte_memcpy(&lb_val->back_end_ips[pos][0], back_ip, ip_size);
 	}
 	lb_val->back_end_cnt++;
 	return EXIT_SUCCESS;
@@ -225,7 +214,7 @@ err:
 	return EXIT_FAILURE;
 }
 
-int dp_del_lb_back_ip(uint32_t vm_ip, uint32_t back_ip, uint32_t vni)
+int dp_del_lb_back_ip(uint32_t vm_ip, uint8_t *back_ip, uint32_t vni)
 {
 	int ret = EXIT_SUCCESS;
 	struct lb_value *lb_val;
