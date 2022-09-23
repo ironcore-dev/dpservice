@@ -369,8 +369,10 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 				last_assigned_vf_idx++;
 
 				//if it belongs to pf0, assign a tx queue from pf1 for it
-				allocate_pf_hairpin_tx_queue(port_id, dp_get_pf1_port_id(), last_pf1_hairpin_tx_rx_queue_offset);
-				last_pf1_hairpin_tx_rx_queue_offset++;
+				if (dp_is_offload_enabled()) {
+					allocate_pf_hairpin_tx_queue(port_id, dp_get_pf1_port_id(), last_pf1_hairpin_tx_rx_queue_offset);
+					last_pf1_hairpin_tx_rx_queue_offset++;
+				}
 				return port_id;
 			}
 			cnt++;
