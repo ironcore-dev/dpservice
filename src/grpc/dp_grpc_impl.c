@@ -346,7 +346,8 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			goto route_err;
 		}
 		dp_start_interface(&pf_port, port_id, DP_PORT_VF);
-		bind_vf_with_peer_pf_port((uint16_t)port_id);
+		if (dp_is_offload_enabled())
+			bind_vf_with_peer_pf_port((uint16_t)port_id);
 		/* TODO get the pci info of this port and fill it accordingly */
 		rep->vf_pci.bus = 2;
 		rep->vf_pci.domain = 2;
