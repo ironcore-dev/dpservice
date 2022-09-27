@@ -199,6 +199,43 @@ struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset)
 	return udp_hdr;
 }
 
+uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val) 
+{
+
+	struct dp_flow *df;
+	struct rte_tcp_hdr *tcp_hdr;
+	struct rte_udp_hdr *udp_hdr;
+	struct rte_ipv4_hdr *ipv4_hdr;
+	uint16_t old_val = 0;
+
+	df = get_dp_flow_ptr(m);
+
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+		ipv4_hdr = dp_get_ipv4_hdr(m);
+		if (df->l4_type == DP_IP_PROTO_TCP) {
+			tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr+1);
+			if (port_type == DP_L4_PORT_DIR_SRC) {
+				old_val = tcp_hdr->src_port;
+				tcp_hdr->src_port = new_val;
+			} else {
+				old_val = tcp_hdr->dst_port;
+				tcp_hdr->dst_port = new_val;
+			}
+		} else {
+			udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr+1);
+			if (port_type == DP_L4_PORT_DIR_SRC) {
+				old_val = udp_hdr->src_port;
+				udp_hdr->src_port = new_val;
+			} else {
+				old_val = udp_hdr->dst_port;
+				udp_hdr->dst_port = new_val;
+			}
+		}
+
+	}
+	return old_val;
+}
+
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer)
 {
 

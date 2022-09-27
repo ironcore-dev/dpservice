@@ -62,29 +62,7 @@ void dp_init_nat_tables(int socket_id)
 
 }
 
-bool dp_is_ip_snatted(uint32_t vm_ip, uint32_t vni)
-{
-	struct nat_key nkey;
-	int ret;
-	struct snat_data *data;
-
-	nkey.ip = vm_ip;
-	nkey.vni = vni;
-
-	ret = rte_hash_lookup(ipv4_snat_tbl, &nkey);
-	if (ret < 0)
-		return false;
-
-	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
-		return false;
-
-	if (data->vip_ip == 0)
-		return false;
-
-	return true;
-}
-
-bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni)
+void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result)
 {
 	struct nat_key nkey;
 	int ret;
@@ -95,23 +73,28 @@ bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni)
 
 	ret = rte_hash_lookup(ipv4_snat_tbl, &nkey);
 	if (ret < 0) {
-		printf("not found the key\n");
-		return false;
+		result->is_vip_natted = false;
+		result->is_network_natted = false;
 	}
-	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
-		return false;
+	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
+		result->is_vip_natted = false;
+		result->is_network_natted = false;
+	}
+
+	if (data->vip_ip == 0)
+		result->is_vip_natted = false;
+	else
+		result->is_vip_natted = true;
 
 	if (data->network_nat_ip == 0)
-		return false;
-
-	return true;
+		result->is_network_natted = false;
+	else
+		result->is_network_natted = true;
 }
 
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 {
 	struct nat_key nkey;
-	// uint32_t snat_ip;
-
 	struct snat_data *data;
 
 	nkey.ip = vm_ip;
@@ -197,7 +180,6 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 {
 	int ret = EXIT_SUCCESS;
 	struct nat_key nkey;
-	// uint32_t *snat_ip;
 	int pos;
 	struct snat_data *data;
 
@@ -258,7 +240,6 @@ err:
 void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 {
 	struct nat_key nkey;
-	// uint32_t *snat_ip;
 	struct snat_data *data;
 	int pos;
 

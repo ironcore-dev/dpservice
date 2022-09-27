@@ -22,16 +22,14 @@ static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
+
 static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 {
 	struct rte_ipv4_hdr *ipv4_hdr;
-	struct rte_udp_hdr	*udp_hdr;
-	struct rte_tcp_hdr	*tcp_hdr;
-
 	struct dp_flow *df_ptr;
 	struct flow_value *cntrack = NULL;
 	uint32_t src_ip;
-	uint8_t is_ip_snatted = 0, is_ip_network_snatted = 0;
+	struct nat_check_result nat_check;
 
 	df_ptr = get_dp_flow_ptr(m);
 
@@ -44,46 +42,38 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		uint16_t nat_port;
 		uint32_t vni =  dp_get_vm_vni(m->port);
-
+		
 		src_ip = ntohl(df_ptr->src.src_addr);
-		is_ip_snatted = dp_is_ip_snatted(src_ip, vni);
-		is_ip_network_snatted = dp_is_ip_network_snatted(src_ip, vni);
-		if ((is_ip_snatted || is_ip_network_snatted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
+		dp_check_if_ip_natted(src_ip, vni, &nat_check);
+		if ((nat_check.is_vip_natted || nat_check.is_network_natted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
+			
 			ipv4_hdr = dp_get_ipv4_hdr(m);
-			if (is_ip_snatted) {
+			if (nat_check.is_vip_natted) {
 				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));
 				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 			}
-			if (is_ip_network_snatted && df_ptr->l4_type != DP_IP_PROTO_ICMP) {
-				uint16_t src_port;
+			if (nat_check.is_network_natted && df_ptr->l4_type != DP_IP_PROTO_ICMP) {
 
-				if (df_ptr->l4_type == DP_IP_PROTO_TCP) {
-					tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr+1);
-					src_port = tcp_hdr->src_port;
-				} else if (df_ptr->l4_type == DP_IP_PROTO_UDP) {
-					udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr+1);
-					src_port = udp_hdr->src_port;
-				}
-				nat_port = htons(dp_allocate_network_snat_port(src_ip, src_port, vni, df_ptr->l4_type));
+				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->src_port, vni, df_ptr->l4_type));
 				if (nat_port == 0) {
 					printf("an invalid network nat port is allocated \n");
 					return 0;
 				}
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
-				if (df_ptr->l4_type == DP_IP_PROTO_TCP)
-					tcp_hdr->src_port = nat_port;
-				else if (df_ptr->l4_type == DP_IP_PROTO_UDP)
-					udp_hdr->src_port = nat_port;
+				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
+					printf("Error to replace l4 hdr's src port with value %d \n", nat_port);
+					return 0;
+				}
 
-				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK;
+				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
 				cntrack->nat_info.vni = vni;
 				cntrack->nat_info.l4_type = df_ptr->l4_type;
 			}
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 			df_ptr->nat_addr = df_ptr->src.src_addr;
-			if (is_ip_network_snatted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
+			if (nat_check.is_network_natted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
 				df_ptr->nat_port = nat_port;
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
@@ -92,7 +82,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
-			if (is_ip_network_snatted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
+			if (nat_check.is_network_natted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = ntohs(nat_port);
 
 			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
@@ -106,14 +96,13 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 
-		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK) {
-			if (df_ptr->l4_type == DP_IP_PROTO_TCP) {
-					tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr+1);
-					tcp_hdr->src_port = htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
-				} else if (df_ptr->l4_type == DP_IP_PROTO_UDP) {
-					udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr+1);
-					udp_hdr->src_port = htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
-				}
+		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+
+			if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
+				printf("Error to replace l4 hdr's src port with value %d \n", htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
+				return 0;
+			}
+
 			df_ptr->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
 		}
 
@@ -167,7 +156,7 @@ static struct rte_node_register snat_node_base = {
 
 	.nb_edges = SNAT_NEXT_MAX,
 	.next_nodes = {
-		
+
 			[SNAT_NEXT_FIREWALL] = "firewall",
 			[SNAT_NEXT_DROP] = "drop",
 		},

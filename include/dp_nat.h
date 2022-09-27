@@ -55,9 +55,13 @@ struct network_dnat_value {
 	uint16_t	vm_port;
 };
 
+struct nat_check_result {
+	bool	is_vip_natted;
+	bool	is_network_natted;
+};
+
 void dp_init_nat_tables(int socket_id);
 void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
-bool dp_is_ip_snatted(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni);
 
@@ -78,7 +82,7 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6);
 
-bool dp_is_ip_network_snatted(uint32_t vm_ip, uint32_t vni);
+void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result);
 uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
 int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);

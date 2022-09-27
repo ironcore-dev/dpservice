@@ -110,31 +110,55 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if (!dp_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
+	// This code routine deals with traffic that arrives at PFs (incoming traffic)
+	// The incoming traffic is first searched against conntracktable
+	// if a new entry is needed to construct, it gets checked if it needs to be relayed
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING
-		&& ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP))
-		&& dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
-		flow_typ = CONNTRACK_FLOW_RELAY;
-		memset(&key, 0, sizeof(struct flow_key));
-		dp_build_flow_key(&key, m);
-		if (!dp_flow_exists(&key)) {
-			flow_val = flow_table_insert_entry(&key, df_ptr, m, flow_typ);
-			if (!flow_val)
-				printf("failed to add a flow table entry due to NULL flow_val pointer \n");
-			flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK;
-			flow_val->nat_info.l4_type = df_ptr->l4_type;
-			memcpy(flow_val->nat_info.underlay_dst, underlay_dst, sizeof(flow_val->nat_info.underlay_dst));
-		} else {
-			dp_get_flow_data(&key, (void **)&flow_val);
-			change_flow_state_dir(&key, flow_val, df_ptr, flow_typ);
-		}
-		flow_val->timestamp = rte_rdtsc();
-		df_ptr->conntrack = flow_val;
-		ret = DP_ROUTE_PKT_RELAY;
-		return ret;
-	}
+		&&  ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP))) {
+			memset(&key, 0, sizeof(struct flow_key));
+			dp_build_flow_key(&key, m);
+			if (dp_flow_exists(&key)) {
+				dp_get_flow_data(&key, (void **)&flow_val);
+				if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
+					flow_typ = CONNTRACK_FLOW_RELAY;
+					ret = DP_ROUTE_PKT_RELAY;
+				} else {
+					flow_typ = CONNTRACK_FLOW_PASSTHROUGH;
+					ret = 0; // to be more explicite
+				}
+				change_flow_state_dir(&key, flow_val, df_ptr, flow_typ);
+			} else {
+				// only perform this lookup on unknown traffic flows
+				if (dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
+					flow_typ = CONNTRACK_FLOW_RELAY;
+					ret = DP_ROUTE_PKT_RELAY;
+				} else {
+					flow_typ = CONNTRACK_FLOW_PASSTHROUGH;
+					ret = 0;
+				}
 
-	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
-		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
+				flow_val = flow_table_insert_entry(&key, df_ptr, m, flow_typ);
+				if (!flow_val)
+					printf("failed to add a flow table entry due to NULL flow_val pointer \n");
+
+				if (flow_typ == CONNTRACK_FLOW_RELAY) {
+					flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
+					flow_val->nat_info.l4_type = df_ptr->l4_type;
+					memcpy(flow_val->nat_info.underlay_dst, underlay_dst, sizeof(flow_val->nat_info.underlay_dst));
+				}
+
+			}
+			flow_val->timestamp = rte_rdtsc();
+			df_ptr->conntrack = flow_val;
+			return ret;
+		}
+
+
+	// ICMP incoming traffic is/is going to be handled seperately since icmp echo msgs need to be
+	// generated for LB and NAT
+	if ((df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING
+		&& (df_ptr->l4_type == IPPROTO_TCP || df_ptr->l4_type == IPPROTO_UDP || df_ptr->l4_type == IPPROTO_ICMP))
+		|| (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING && df_ptr->l4_type == IPPROTO_ICMP)) {
 
 		flow_typ = CONNTRACK_FLOW_PASSTHROUGH;
 
