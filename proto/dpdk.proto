@@ -42,6 +42,11 @@ message IpAdditionResponse {
 	bytes underlayRoute = 2;
 }
 
+message CreateLoadBalancerResponse {
+	Status status = 1;
+	bytes underlayRoute = 2;
+}
+
 message Empty {}
 
 message Prefix {
@@ -172,19 +177,50 @@ message InterfaceVIPMsg {
 	InterfaceVIPIP interfaceVIPIP = 2;
 }
 
-message LBMsg {
-	LBIP lbVipIP = 1;
-	uint32 vni = 2;
-	LBIP lbBackendIP = 3;
+message GetLoadBalancerRequest {
+	bytes loadBalancerID = 1;
 }
 
-message LBQueryMsg {
-	LBIP lbVipIP = 1;
-	uint32 vni = 2;
+message GetLoadBalancerTargetsRequest {
+	bytes loadBalancerID = 1;
 }
 
-message LBBackendMsg {
-	repeated LBIP backends = 1;
+message DeleteLoadBalancerRequest {
+	bytes loadBalancerID = 1;
+}
+
+message LBPort {
+	uint32 port = 1;
+	Protocol protocol = 2;
+}
+
+message GetLoadBalancerTargetsResponse {
+	Status status = 1;
+	repeated LBIP targetIPs = 2;
+}
+
+message GetLoadBalancerResponse {
+	Status status = 1;
+	LBIP lbVipIP = 2;
+	uint32 vni = 3;
+	repeated LBPort lbports = 4;
+}
+
+message CreateLoadBalancerRequest {
+	bytes loadBalancerID = 1;
+	LBIP lbVipIP = 2;
+	uint32 vni = 3;
+	repeated LBPort lbports = 4;
+}
+
+message AddLoadBalancerTargetRequest {
+	bytes loadBalancerID = 1;
+	LBIP targetIP = 2;
+}
+
+message DeleteLoadBalancerTargetRequest {
+	bytes loadBalancerID = 1;
+	LBIP targetIP = 2;
 }
 
 message InterfacesMsg {
@@ -298,10 +334,15 @@ service DPDKonmetal {
 	rpc getInterfaceVIP(InterfaceIDMsg) returns (InterfaceVIPIP) {}
 	rpc deleteInterfaceVIP(InterfaceIDMsg) returns (Status) {}
 
-	// LB related, add/list/del backend IPs for a given LB IP
-	rpc addLBVIP(LBMsg) returns (IpAdditionResponse) {}
-	rpc getLBVIPBackends(LBQueryMsg) returns (LBBackendMsg) {}
-	rpc delLBVIP(LBMsg) returns (Status) {}
+	// create/list/del Loadbalancer for a given IP to be loadbalanced
+	rpc createLoadBalancer(CreateLoadBalancerRequest) returns (CreateLoadBalancerResponse) {}
+	rpc getLoadBalancer(GetLoadBalancerRequest) returns (GetLoadBalancerResponse) {}
+	rpc deleteLoadBalancer(DeleteLoadBalancerRequest) returns (Status) {}
+
+	// create/list/del Loadbalancer Targets for a given Loadbalancer ID
+	rpc addLoadBalancerTarget(AddLoadBalancerTargetRequest) returns (Status) {}
+	rpc getLoadBalancerTargets(GetLoadBalancerTargetsRequest) returns (GetLoadBalancerTargetsResponse) {}
+	rpc deleteLoadBalancerTarget(DeleteLoadBalancerTargetRequest) returns (Status) {}
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}
