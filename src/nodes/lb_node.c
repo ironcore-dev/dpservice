@@ -31,6 +31,7 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 	struct flow_key key;
 	struct flow_value *cntrack = NULL;
 	uint32_t dst_ip, vni;
+	uint8_t *target_ip6;
 
 	if (!dp_is_lb_enabled())
 		return LB_NEXT_DNAT;
@@ -55,7 +56,12 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			if (df_ptr->l4_type == IPPROTO_ICMP)
 				return LB_NEXT_DROP;
-			memcpy(df_ptr->tun_info.ul_dst_addr6, dp_lb_get_backend_ip(dst_ip, vni), sizeof(df_ptr->tun_info.ul_dst_addr6));
+
+			target_ip6 = dp_lb_get_backend_ip(dst_ip, vni, df_ptr->dst_port, df_ptr->l4_type);
+			if (!target_ip6)
+				return LB_NEXT_DROP;
+
+			memcpy(df_ptr->tun_info.ul_dst_addr6, target_ip6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 			memcpy(cntrack->lb_dst_addr6, df_ptr->tun_info.ul_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 			cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
 			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;

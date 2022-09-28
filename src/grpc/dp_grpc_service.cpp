@@ -77,6 +77,9 @@ void GRPCService::HandleRpcs()
 	new DelInterfaceCall(this, cq_.get());
 	new ListInterfacesCall(this, cq_.get());
 	new GetInterfaceCall(this, cq_.get());
+	new CreateLBCall(this, cq_.get());
+	new GetLBCall(this, cq_.get());
+	new DelLBCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

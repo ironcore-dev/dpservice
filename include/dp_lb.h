@@ -21,19 +21,24 @@ struct lb_key {
 };
 
 struct lb_value {
-	uint32_t back_end_ips[DP_LB_MAX_IPS_PER_VIP][4];
-	uint16_t last_sel_pos;
-	uint16_t back_end_cnt;
+	uint8_t		lb_id[DP_LB_ID_SIZE];
+	dp_lb_port	ports[DP_LB_PORT_SIZE];
+	uint32_t	back_end_ips[DP_LB_MAX_IPS_PER_VIP][4];
+	uint16_t	last_sel_pos;
+	uint16_t	back_end_cnt;
 };
 
 void dp_init_lb_tables(int socket_id);
-int dp_del_lb_back_ip(uint32_t vm_ip, uint8_t *back_ip, uint32_t vni);
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_lb_ip(uint32_t vm_ip, uint32_t vni);
-int dp_set_lb_back_ip(uint32_t v_ip, uint8_t *back_ip, uint32_t vni, uint8_t ip_size);
-uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni);
+uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16_t proto);
 bool dp_is_lb_enabled();
-void dp_get_lb_back_ips(uint32_t v_ip, uint32_t vni, struct dp_reply *rep);
+int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip);
+int dp_set_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size);
+void dp_get_lb_back_ips(void *id_key, struct dp_reply *rep);
+int dp_create_lb(void *id_key, uint32_t v_ip, uint32_t vni, struct dp_lb_port ports[]);
+int dp_delete_lb(void *id_key);
+int dp_get_lb(void *id_key, dp_lb *list_lb /* out */);
 
 
 #ifdef __cplusplus

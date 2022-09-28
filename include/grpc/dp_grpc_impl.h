@@ -31,6 +31,9 @@ typedef enum {
 	DP_REQ_TYPE_LISTPREFIX,
 	DP_REQ_TYPE_INITIALIZED,
 	DP_REQ_TYPE_INIT,
+	DP_REQ_TYPE_CREATELB,
+	DP_REQ_TYPE_GETLB,
+	DP_REQ_TYPE_DELLB,
 } dp_req_type;
 
 typedef struct dp_com_head {
@@ -40,6 +43,11 @@ typedef struct dp_com_head {
 	uint32_t err_code;
 } dp_com_head;
 
+typedef struct dp_lb_port {
+	uint16_t protocol;
+	uint16_t port;
+} dp_lb_port;
+
 typedef struct dp_vip {
 	uint32_t ip_type;
 	union {
@@ -48,6 +56,16 @@ typedef struct dp_vip {
 	} vip;
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_vip;
+
+typedef struct dp_lb {
+	uint32_t	ip_type;
+	union {
+		uint32_t	vip_addr;
+		uint8_t		vip_addr6[16];
+	} vip;
+	uint32_t	vni;
+	struct dp_lb_port lbports[DP_LB_PORT_SIZE];
+} dp_lb;
 
 typedef struct dp_pfx {
 	uint32_t pfx_ip_type;
@@ -60,21 +78,12 @@ typedef struct dp_pfx {
 } dp_pfx;
 
 typedef struct dp_lp_qry_lb {
-	uint32_t ip_type;
-	union {
-		uint32_t	vip_addr;
-		uint8_t		vip_addr6[16];
-	} vip;
-	uint32_t	vni;
+	char	lb_id[DP_LB_ID_SIZE];
 } dp_lp_qry_lb;
 
 typedef struct dp_lb_vip {
-	uint32_t ip_type;
-	union {
-		uint32_t	vip_addr;
-		uint8_t		vip_addr6[16];
-	} vip;
-	uint32_t	vni;
+	char		lb_id[DP_LB_ID_SIZE];
+	uint32_t	ip_type;
 	union {
 		uint32_t	back_addr;
 		uint8_t		back_addr6[16];
@@ -111,6 +120,25 @@ typedef struct dp_getpfx {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_getpfx;
 
+typedef struct dp_add_lb {
+	char		lb_id[DP_LB_ID_SIZE];
+	uint32_t	ip_type;
+	union {
+		uint32_t	vip_addr;
+		uint8_t		vip_addr6[16];
+	} vip;
+	uint32_t	vni;
+	struct dp_lb_port lbports[DP_LB_PORT_SIZE];
+} dp_add_lb;
+
+typedef struct dp_list_lb {
+	char	lb_id[DP_LB_ID_SIZE];
+} dp_list_lb;
+
+typedef struct dp_del_lb {
+	char	lb_id[DP_LB_ID_SIZE];
+} dp_del_lb;
+
 typedef struct dp_addroute {
 	uint32_t	pfx_ip_type;
 	union {
@@ -133,7 +161,11 @@ typedef struct dp_request {
 	union {
 		dp_pfx			add_pfx;
 		dp_vip			add_vip;
+		dp_add_lb		add_lb;
+		dp_list_lb		get_lb;
+		dp_del_lb		del_lb;
 		dp_lb_vip		add_lb_vip;
+		dp_lb_vip		del_lb_vip;
 		dp_lp_qry_lb	qry_lb_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
@@ -172,6 +204,7 @@ typedef struct dp_reply {
 	dp_com_head com_head;
 	union {
 		dp_vip			get_vip;
+		dp_lb			get_lb;
 		dp_vf_pci		vf_pci;
 		dp_vm_info		vm_info;
 		dp_route		route;

@@ -101,13 +101,61 @@ __rte_always_inline void dp_fill_head(dp_com_head *head, uint16_t type,
 	head->err_code = EXIT_SUCCESS;
 }
 
+static int dp_process_add_lb(dp_request *req, dp_reply *rep)
+{
+	int ret = EXIT_SUCCESS;
+	int vni = req->add_lb.vni;
+
+	if (req->add_lb.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (dp_create_lb((void *)req->add_lb.lb_id, ntohl(req->add_lb.vip.vip_addr), req->add_lb.vni,
+					 	 req->add_lb.lbports)) {
+			ret = DP_ERROR_CREATE_LB_ERR;
+			goto err;
+		}
+	}  else {
+		ret = DP_ERROR_CREATE_LB_UNSUPP_IP;
+		goto err;
+	}
+	rep->vni = vni;
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
+static int dp_process_del_lb(dp_request *req, dp_reply *rep)
+{
+	int ret;
+
+	ret = dp_delete_lb((void *)req->del_lb.lb_id);
+	if (ret) {
+		rep->com_head.err_code = ret;
+		return ret;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_get_lb(dp_request *req, dp_reply *rep)
+{
+	int ret;
+
+	ret = dp_get_lb((void *)req->del_lb.lb_id, &rep->get_lb);
+	if (ret) {
+		rep->com_head.err_code = ret;
+		return ret;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 {
 	int ret = EXIT_SUCCESS;
 
 	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV6) {
-		if (dp_set_lb_back_ip(ntohl(req->add_lb_vip.vip.vip_addr),
-							  (uint8_t *)req->add_lb_vip.back.back_addr6, req->add_lb_vip.vni,
+		if (dp_set_lb_back_ip((void *)req->add_lb_vip.lb_id,
+							  (uint8_t *)req->add_lb_vip.back.back_addr6,
 							  sizeof(req->add_lb_vip.back.back_addr6))) {
 			ret = DP_ERROR_VM_ADD_LB_VIP;
 			goto err;
@@ -127,8 +175,8 @@ static int dp_process_del_lb_vip(dp_request *req, dp_reply *rep)
 	int ret = EXIT_SUCCESS;
 
 	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV6) {
-		if (dp_del_lb_back_ip(ntohl(req->add_lb_vip.vip.vip_addr),
-							  (uint8_t *)req->add_lb_vip.back.back_addr6, req->add_lb_vip.vni)) {
+		if (dp_del_lb_back_ip((void *)req->del_lb_vip.lb_id,
+							  (uint8_t *)req->del_lb_vip.back.back_addr6)) {
 			ret = DP_ERROR_VM_DEL_LB_VIP;
 			goto err;
 		}
@@ -522,7 +570,7 @@ static int dp_process_listbackips(dp_request *req, struct rte_mbuf *req_mbuf, st
 {
 	dp_reply *rep = rte_pktmbuf_mtod(req_mbuf, dp_reply*);
 
-	dp_get_lb_back_ips(ntohl(req->qry_lb_vip.vip.vip_addr), req->qry_lb_vip.vni, rep);
+	dp_get_lb_back_ips((void *)req->qry_lb_vip.lb_id, rep);
 	rep_arr[DP_MBUF_ARR_SIZE - 1] = req_mbuf;
 
 	return EXIT_SUCCESS;
@@ -559,6 +607,15 @@ int dp_process_request(struct rte_mbuf *m)
 	memset(m_arr, 0, DP_MBUF_ARR_SIZE * sizeof(struct rte_mbuf *));
 
 	switch (req->com_head.com_type) {
+	case DP_REQ_TYPE_CREATELB:
+		ret = dp_process_add_lb(req, &rep);
+		break;
+	case DP_REQ_TYPE_GETLB:
+		ret = dp_process_get_lb(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELLB:
+		ret = dp_process_del_lb(req, &rep);
+		break;
 	case DP_REQ_TYPE_ADDLBVIP:
 		ret = dp_process_add_lb_vip(req, &rep);
 		break;
