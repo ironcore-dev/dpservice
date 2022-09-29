@@ -37,6 +37,11 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	if (!cntrack)
 		return ret;
 
+	if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
+		printf("received a icmp pkt in relay node \n");
+		return ret;
+	}
+
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		// TODO: add flexibility to allow relay packet from a different port

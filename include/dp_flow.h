@@ -41,6 +41,11 @@ enum {
 	DP_FLOW_NAT_TYPE_NETWORK_NEIGH,
 };
 
+enum {
+	DP_FLOW_ACTION_UNSPECIFIC,
+	DP_FLOW_ACTION_DROP,
+};
+
 struct flow_key {
 	uint32_t ip_dst;
 	uint32_t ip_src;
@@ -73,6 +78,7 @@ struct flow_value {
 	uint8_t			lb_dst_addr6[16];
 	rte_atomic32_t	flow_cnt;
 	struct flow_nat_info	nat_info;
+	uint8_t			action[DP_FLOW_DIR_MAX];
 };
 
 struct flow_age_ctx {

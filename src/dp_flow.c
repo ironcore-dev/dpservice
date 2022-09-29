@@ -99,12 +99,15 @@ void dp_add_flow(struct flow_key *key)
 void dp_delete_flow(struct flow_key *key)
 {
 	int pos;
+	
+	if (dp_flow_exists(key)) {
+		pos = rte_hash_del_key(ipv4_flow_tbl, key);
+		if (pos < 0)
+			printf("Hash key already deleted\n");
+		else
+			rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
+	}
 
-	pos = rte_hash_del_key(ipv4_flow_tbl, key);
-	if (pos < 0)
-		printf("Hash key already deleted\n");
-	else
-		rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
 }
 
 void dp_add_flow_data(struct flow_key *key, void *data)

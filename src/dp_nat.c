@@ -75,10 +75,12 @@ void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result
 	if (ret < 0) {
 		result->is_vip_natted = false;
 		result->is_network_natted = false;
+		return;
 	}
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
 		result->is_vip_natted = false;
 		result->is_network_natted = false;
+		return;
 	}
 
 	if (data->vip_ip == 0)
@@ -90,6 +92,7 @@ void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result
 		result->is_network_natted = false;
 	else
 		result->is_network_natted = true;
+
 }
 
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
@@ -157,6 +160,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
 		goto err_key;
 	}
 	data->vip_ip = s_ip;
+	data->network_nat_ip = 0;
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
 		ret = DP_ERROR_VM_ADD_NET_NAT_DATA;
@@ -215,6 +219,7 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 		goto err_key;
 	}
 	data->network_nat_ip = s_ip;
+	data->vip_ip = 0;
 	data->network_nat_port_range[0] = min_port;
 	data->network_nat_port_range[1] = max_port;
 
@@ -359,7 +364,7 @@ int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni)
 		ret = DP_ERROR_VM_ADD_DNAT_ADD_KEY;
 		goto out;
 	}
-
+	
 	return ret;
 out:
 	rte_free(v_ip);
@@ -370,7 +375,7 @@ err_key:
 	else
 		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 err:
-	printf("dnat table add ip failed\n");
+	printf("dnat table add entry failed\n");
 	return ret;
 }
 
@@ -592,10 +597,10 @@ uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_
 	nkey.vni = vni;
 
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
-		return 0;
+		return 1;
 
 	if (data->network_nat_ip == 0)
-		return 0;
+		return 1;
 
 	min_port = data->network_nat_port_range[0];
 	max_port = data->network_nat_port_range[1];

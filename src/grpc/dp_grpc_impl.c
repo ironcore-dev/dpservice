@@ -555,6 +555,11 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 
 		if (ret)
 			goto err;
+
+		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr),
+								0, vm_vni);
+		if (ret)
+			goto err;
 	}
 	rep->vni = vm_vni;
 	return EXIT_SUCCESS;
@@ -613,6 +618,11 @@ static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
 								req->add_nat_neigh.vni,
 								(uint16_t)req->add_nat_neigh.port_range[0], (uint16_t)req->add_nat_neigh.port_range[1],
 								req->add_nat_neigh.route);
+		if (ret)
+			goto err;
+
+		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_neigh.vip.vip_addr),
+								0, req->add_nat_neigh.vni);
 		if (ret)
 			goto err;
 	}

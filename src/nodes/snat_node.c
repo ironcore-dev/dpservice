@@ -22,7 +22,6 @@ static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-
 static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 {
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -53,8 +52,14 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));
 				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 			}
-			if (nat_check.is_network_natted && df_ptr->l4_type != DP_IP_PROTO_ICMP) {
 
+			if (!nat_check.is_vip_natted && nat_check.is_network_natted && df_ptr->l4_type == DP_IP_PROTO_ICMP) {
+				if (dp_flow_exists(&cntrack->flow_key[DP_FLOW_DIR_REPLY]))
+					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
+				return 0; // drop icmp pkt if a vm is only network-natted
+			}
+
+			if (nat_check.is_network_natted) {
 				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->src_port, vni, df_ptr->l4_type));
 				if (nat_port == 0) {
 					printf("an invalid network nat port is allocated \n");
@@ -73,7 +78,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			}
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 			df_ptr->nat_addr = df_ptr->src.src_addr;
-			if (nat_check.is_network_natted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
+			if (nat_check.is_network_natted)
 				df_ptr->nat_port = nat_port;
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
@@ -82,7 +87,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
-			if (nat_check.is_network_natted && df_ptr->l4_type != DP_IP_PROTO_ICMP)
+			if (nat_check.is_network_natted)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = ntohs(nat_port);
 
 			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
