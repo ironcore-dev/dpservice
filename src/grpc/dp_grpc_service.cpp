@@ -51,7 +51,9 @@ void GRPCService::CalculateUnderlayRoute(uint32_t vni, uint8_t* route, uint32_t 
 
 	memcpy(route, get_underlay_conf()->src_ip6, route_size);
 	memcpy(route + 8, &l_vni, 4);
-	memset(route + 12, 0, 4);
+	memcpy(route + 12, &pfx_counter, 2);
+	memset(route + 14, 0, 2);
+	pfx_counter++;
 }
 
 void GRPCService::HandleRpcs()

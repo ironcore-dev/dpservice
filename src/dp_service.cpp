@@ -12,6 +12,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_lb.h"
+#include "dp_alias.h"
 #include "grpc/dp_grpc_service.h"
 #include "dp_multi_path.h"
 
@@ -98,6 +99,7 @@ static void dp_init_interfaces()
 	dp_init_nat_tables(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_lb_tables(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_vm_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+	dp_init_alias_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	if (dp_is_wcmp_enabled())
 		fill_port_select_table(dp_get_wcmp_frac());
 }

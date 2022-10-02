@@ -6,6 +6,7 @@
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_alias.h"
 #include "dpdk_layer.h"
 
 #include "nodes/ipip_tunnel_node.h"
@@ -42,6 +43,7 @@ static __rte_always_inline int handle_ipip_tunnel_decap(struct rte_mbuf *m, stru
 {
 	uint8_t route = IPIP_TUNNEL_NEXT_DROP;
 	uint32_t vni_ns;
+	int nxt_hop;
 
 	memcpy(&vni_ns, (df->tun_info.ul_dst_addr6) + 8, 4);
 	df->tun_info.dst_vni = ntohl(vni_ns);
@@ -51,6 +53,14 @@ static __rte_always_inline int handle_ipip_tunnel_decap(struct rte_mbuf *m, stru
 
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP)
 		route = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
+
+	nxt_hop = dp_get_portid_with_alias_handle((void *)df->tun_info.ul_dst_addr6);
+	if (nxt_hop != -1) {
+		/* TODO We jump over the conntrack node, do we need to conntrack alias prefix 
+		routes ? For example if they have statefull firewall rules ? */
+		route = IPIP_TUNNEL_NEXT_FIREWALL;
+		df->nxt_hop = nxt_hop;
+	}
 
 	if (route != IPIP_TUNNEL_NEXT_DROP)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
@@ -105,6 +115,7 @@ static struct rte_node_register ipip_tunnel_node_base = {
 			[IPIP_TUNNEL_NEXT_IPV6_ENCAP] = "ipv6_encap",
 			[IPIP_TUNNEL_NEXT_IPV4_LOOKUP] = "conntrack",
 			[IPIP_TUNNEL_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
+			[IPIP_TUNNEL_NEXT_FIREWALL] = "firewall",
 		},
 };
 

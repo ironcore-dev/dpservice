@@ -1,6 +1,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_lb.h"
+#include "dp_alias.h"
 #include <dp_error.h>
 #include "grpc/dp_grpc_impl.h"
 #include "dpdk_layer.h"
@@ -285,11 +286,16 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
+	if (req->add_pfx.pfx_lb_enabled)
+		dp_map_alias_handle((void *)req->add_pfx.pfx_ul_addr6, port_id);
+
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
 					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
-			ret = DP_ERROR_VM_ADD_PFX_ROUTE;
-			goto err;
+			if (!req->add_pfx.pfx_lb_enabled) {
+				ret = DP_ERROR_VM_ADD_PFX_ROUTE;
+				goto err;
+			}
 		}
 	}
 	rep->vni = dp_get_vm_vni(port_id);

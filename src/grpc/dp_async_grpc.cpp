@@ -352,6 +352,11 @@ int AddPfxCall::Proceed()
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
+		if (request_.prefix().loadbalancerenabled())
+			request.add_pfx.pfx_lb_enabled = 1;
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+		grpc_service->CalculateUnderlayRoute(0, buf_bin, sizeof(buf_bin));
+		memcpy(request.add_pfx.pfx_ul_addr6, buf_bin, sizeof(request.add_pfx.pfx_ul_addr6));
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -363,8 +368,6 @@ int AddPfxCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
-		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);

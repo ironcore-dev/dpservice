@@ -67,6 +67,7 @@ static int debug_mode;
 static int vni;
 static int t_vni;
 static int length;
+static bool pfx_lb_enabled = false;
 
 #define CMD_LINE_OPT_INIT			"init"
 #define CMD_LINE_OPT_INITIALIZED	"is_initialized"
@@ -101,6 +102,7 @@ static int length;
 #define CMD_LINE_OPT_CREATE_LB		"createlb"
 #define CMD_LINE_OPT_DEL_LB			"dellb"
 #define CMD_LINE_OPT_GET_LB			"getlb"
+#define CMD_LINE_OPT_PFX_LB			"lb_pfx"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -137,6 +139,7 @@ enum {
 	CMD_LINE_OPT_CREATE_LB_NUM,
 	CMD_LINE_OPT_DEL_LB_NUM,
 	CMD_LINE_OPT_GET_LB_NUM,
+	CMD_LINE_OPT_PFX_LB_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -173,6 +176,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_CREATE_LB, 1, 0, CMD_LINE_OPT_CREATE_LB_NUM},
 	{CMD_LINE_OPT_DEL_LB, 1, 0, CMD_LINE_OPT_DEL_LB_NUM},
 	{CMD_LINE_OPT_GET_LB, 1, 0, CMD_LINE_OPT_GET_LB_NUM},
+	{CMD_LINE_OPT_PFX_LB, 0, 0, CMD_LINE_OPT_PFX_LB_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -326,6 +330,9 @@ int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_GET_LB_NUM:
 			command = DP_CMD_GET_LB;
 			strncpy(lb_id_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_PFX_LB_NUM:
+			pfx_lb_enabled = true;
 			break;
 		default:
 			dp_print_usage(prgname);
@@ -534,6 +541,7 @@ public:
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
+			pfx_ip->set_loadbalancerenabled(pfx_lb_enabled);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->addInterfacePrefix(&context, request, &reply);
 			if (reply.status().error()) {

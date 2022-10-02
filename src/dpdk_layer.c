@@ -16,6 +16,7 @@
 #include "nodes/ipv6_encap_node.h"
 #include "nodes/rx_periodic_node.h"
 #include "nodes/ipv6_lookup_node.h"
+#include "nodes/ipip_tunnel_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
