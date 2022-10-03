@@ -258,6 +258,7 @@ void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 			m->l4_len = sizeof(struct rte_udp_hdr);
 		break;
 		case IPPROTO_ICMP:
+			m->l4_len = sizeof(struct rte_icmp_hdr);
 		break;
 		default:
 		break;

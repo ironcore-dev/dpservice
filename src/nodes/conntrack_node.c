@@ -30,7 +30,6 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key key;
-	int ret = 0;
 
 	df_ptr = get_dp_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -42,10 +41,10 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 		return DP_ROUTE_DROP;
 
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
-		return ret;
+		return CONNTRACK_NEXT_DNAT;
 
 	if (!dp_is_conntrack_enabled())
-		return ret;
+		return CONNTRACK_NEXT_DNAT;
 
 	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
 		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
@@ -89,7 +88,10 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 
 		df_ptr->conntrack = flow_val;
 	}
-	return ret;
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		return CONNTRACK_NEXT_LB;
+
+	return CONNTRACK_NEXT_DNAT;
 }
 
 static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *graph,
@@ -107,7 +109,7 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 		route = handle_conntrack(mbuf0);
 
 		if (route >= 0)
-			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_LB,
+			rte_node_enqueue_x1(graph, node, route,
 								mbuf0);
 		else
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DROP, mbuf0);
@@ -123,8 +125,8 @@ static struct rte_node_register conntrack_node_base = {
 
 	.nb_edges = CONNTRACK_NEXT_MAX,
 	.next_nodes = {
-
 			[CONNTRACK_NEXT_LB] = "lb",
+			[CONNTRACK_NEXT_DNAT] = "dnat",
 			[CONNTRACK_NEXT_DROP] = "drop",
 		},
 };

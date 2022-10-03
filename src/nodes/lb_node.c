@@ -26,6 +26,50 @@ static int lb_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
+static __rte_always_inline int lb_ping_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
+{
+	struct rte_icmp_hdr *icmp_hdr;
+	struct rte_ipv4_hdr *ipv4_hdr;
+	uint32_t temp_ip;
+	uint32_t cksum;
+
+	ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
+
+	if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
+		icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
+	else
+		return LB_NEXT_DROP;
+
+	cksum = ~icmp_hdr->icmp_cksum & 0xffff;
+	cksum += ~RTE_BE16(RTE_IP_ICMP_ECHO_REQUEST << 8) & 0xffff;
+	cksum += RTE_BE16(RTE_IP_ICMP_ECHO_REPLY << 8);
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+	icmp_hdr->icmp_cksum = ~cksum;
+
+	temp_ip = ipv4_hdr->dst_addr;
+	ipv4_hdr->dst_addr = ipv4_hdr->src_addr;
+	ipv4_hdr->src_addr = temp_ip;
+	df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+	df_ptr->nxt_hop = m->port;
+	df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+	dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
+	memcpy(df_ptr->tun_info.ul_dst_addr6, df_ptr->tun_info.ul_src_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+
+	return LB_NEXT_OVERLAY_SWITCH;
+}
+
+static __rte_always_inline void lb_alias_check(struct dp_flow *df_ptr, uint16_t port)
+{
+	df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+	df_ptr->nxt_hop = port;
+	if (dp_get_portid_with_alias_handle(df_ptr->tun_info.ul_dst_addr6) == -1)
+		df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+	else
+		df_ptr->flags.nat = DP_LB_RECIRC;
+}
+
 static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr;
@@ -56,7 +100,7 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 		if (dp_is_ip_lb(dst_ip, vni)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			if (df_ptr->l4_type == IPPROTO_ICMP)
-				return LB_NEXT_DROP;
+				return lb_ping_reply(df_ptr, m);
 
 			target_ip6 = dp_lb_get_backend_ip(dst_ip, vni, df_ptr->dst_port, df_ptr->l4_type);
 			if (!target_ip6)
@@ -65,12 +109,7 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 			memcpy(df_ptr->tun_info.ul_dst_addr6, target_ip6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 			memcpy(cntrack->lb_dst_addr6, df_ptr->tun_info.ul_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 			cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
-			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
-			df_ptr->nxt_hop = m->port;
-			if (dp_get_portid_with_alias_handle(df_ptr->tun_info.ul_dst_addr6) == -1)
-				df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
-			else
-				df_ptr->flags.nat = DP_LB_RECIRC;
+			lb_alias_check(df_ptr, m->port);
 			return LB_NEXT_OVERLAY_SWITCH;
 		}
 	}
@@ -78,12 +117,7 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB &&
 		cntrack->dir == DP_FLOW_DIR_ORG) {
 		memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
-		df_ptr->nxt_hop = m->port;
-		if (dp_get_portid_with_alias_handle(df_ptr->tun_info.ul_dst_addr6) == -1)
-			df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
-		else
-			df_ptr->flags.nat = DP_LB_RECIRC;
+		lb_alias_check(df_ptr, m->port);
 		return LB_NEXT_OVERLAY_SWITCH;
 	}
 
