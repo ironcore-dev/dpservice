@@ -12,6 +12,7 @@ enum {
 	DP_NAT_CHG_SRC_IP,
 	DP_NAT_CHG_DST_IP,
 	DP_LB_CHG_UL_DST_IP,
+	DP_LB_RECIRC,
 };
 
 struct nat_key {

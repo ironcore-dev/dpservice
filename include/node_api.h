@@ -13,9 +13,9 @@ struct dp_flow {
 	struct {
 		uint8_t	flow_type : 2;		// local,outgoing,incoming
 		uint8_t public_flow : 1;    
-		uint8_t	overlay_type: 2;	// supported overlay type
+		uint8_t	overlay_type: 1;	// supported overlay type
 		uint8_t	valid : 1;			// maybe change to offload to indicate if this flow needs to offloaded
-		uint8_t	nat : 2;
+		uint8_t	nat : 3;
 	} flags;
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	union {

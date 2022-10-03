@@ -9,6 +9,7 @@
 #include "dp_flow.h"
 #include "dp_util.h"
 #include "dp_lb.h"
+#include "dp_alias.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/lb_node.h"
 
@@ -66,7 +67,10 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 			cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
 			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 			df_ptr->nxt_hop = m->port;
-			df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+			if (dp_get_portid_with_alias_handle(df_ptr->tun_info.ul_dst_addr6) == -1)
+				df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+			else
+				df_ptr->flags.nat = DP_LB_RECIRC;
 			return LB_NEXT_OVERLAY_SWITCH;
 		}
 	}
@@ -76,7 +80,10 @@ static __rte_always_inline rte_edge_t handle_lb(struct rte_mbuf *m)
 		memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		df_ptr->nxt_hop = m->port;
-		df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+		if (dp_get_portid_with_alias_handle(df_ptr->tun_info.ul_dst_addr6) == -1)
+			df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
+		else
+			df_ptr->flags.nat = DP_LB_RECIRC;
 		return LB_NEXT_OVERLAY_SWITCH;
 	}
 
