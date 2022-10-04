@@ -109,7 +109,7 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 
 	if (req->add_lb.ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_create_lb((void *)req->add_lb.lb_id, ntohl(req->add_lb.vip.vip_addr), req->add_lb.vni,
-					 	 req->add_lb.lbports)) {
+						 req->add_lb.lbports)) {
 			ret = DP_ERROR_CREATE_LB_ERR;
 			goto err;
 		}

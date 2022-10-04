@@ -46,7 +46,7 @@ void dp_init_lb_tables(int socket_id)
 	lb_id_map_table_params.name = s;
 	lb_id_map_table_params.socket_id = socket_id;
 	id_map_lb_tbl = rte_hash_create(&lb_id_map_table_params);
-	if(!id_map_lb_tbl)
+	if (!id_map_lb_tbl)
 		rte_exit(EXIT_FAILURE, "create id map lb table failed\n");
 }
 
@@ -113,7 +113,7 @@ int dp_get_lb(void *id_key, dp_lb *list_lb)
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
 		return DP_ERROR_GET_LB_ID_ERR;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void**)&lb_val) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
 		return DP_ERROR_GET_LB_BACK_IP_ERR;
 
 	list_lb->ip_type = RTE_ETHER_TYPE_IPV4;
@@ -137,7 +137,7 @@ int dp_delete_lb(void *id_key)
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
 		return DP_ERROR_DEL_LB_ID_ERR;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void**)&lb_val) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
 		return DP_ERROR_DEL_LB_BACK_IP_ERR;
 
 	rte_free(lb_val);
@@ -243,7 +243,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 	nkey.ip = v_ip;
 	nkey.vni = vni;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void**)&lb_val) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
 		goto out;
 
 	/* TODO This is just temporary. Round robin.
@@ -274,7 +274,7 @@ void dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
 		return;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void**)&lb_val) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
 		return;
 
 	rep->com_head.msg_count = 0;
@@ -298,7 +298,7 @@ int dp_set_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size)
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
 		goto err;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void**)&lb_val) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
 		goto err;
 
 	pos = dp_lb_last_free_pos(lb_val);
@@ -322,7 +322,7 @@ int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip)
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
 		goto out;
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void**)&lb_val) < 0)
+	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
 		goto out;
 
 	dp_lb_delete_back_ip(lb_val, back_ip);

@@ -56,8 +56,8 @@ static __rte_always_inline int handle_ipip_tunnel_decap(struct rte_mbuf *m, stru
 
 	nxt_hop = dp_get_portid_with_alias_handle((void *)df->tun_info.ul_dst_addr6);
 	if (nxt_hop != -1) {
-		/* TODO We jump over the conntrack node, do we need to conntrack alias prefix 
-		routes ? For example if they have statefull firewall rules ? */
+		/* TODO We jump over the conntrack node, do we need to conntrack alias prefix */
+		/* routes ? For example if they have statefull firewall rules ? */
 		route = IPIP_TUNNEL_NEXT_FIREWALL;
 		df->nxt_hop = nxt_hop;
 	}
