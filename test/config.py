@@ -19,6 +19,7 @@ ul_ipv6 = "2a10:afc0:e01f:f403::1"
 # vni 100 (0x64) is encoded in these addresses
 ul_actual_dst="2a10:afc0:e01f:f408:0:64::"
 ul_actual_src="2a10:afc0:e01f:f403:0:64::"
+ul_actual_src_pfx="2a10:afc0:e01f:f403::"
 start_str = "DPDK main loop started"
 tun_type_geneve="geneve"
 port_redundancy=True
@@ -44,5 +45,6 @@ ov_target_ip = "192.168.129.5"
 ov_target_pfx = "192.168.129.0"
 virtual_ip = "174.23.4.5"
 pfx_ip = "174.23.4.0"
+mylb = "my_lb"
 
 MAX_LINES_ROUTE_REPLY = 36
