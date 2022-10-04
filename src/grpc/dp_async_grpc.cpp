@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
 #include <dp_error.h>
+#include <dp_lpm.h>
 #include <rte_ether.h>
 
 int BaseCall::InitCheck()
@@ -59,27 +60,38 @@ int InitCall::Proceed()
 	return 0;
 }
 
-int AddLBVIPCall::Proceed()
+int CreateLBCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	uint16_t i, size;
+	Status *err_status;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new AddLBVIPCall(service_, cq_);
+		new CreateLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
+				 request_.loadbalancerid().c_str());
+		request.add_lb.vni = request_.vni();
 		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.lbvipip().address().c_str(),
-					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
-			inet_aton(request_.lbbackendip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.back.back_addr);
+			size = (request_.lbports_size() >= DP_LB_PORT_SIZE) ? DP_LB_PORT_SIZE : request_.lbports_size();
+			for (i = 0; i < size; i++) {
+				request.add_lb.lbports[i].port = request_.lbports(i).port();
+				if (request_.lbports(i).protocol() == TCP)
+					request.add_lb.lbports[i].protocol = DP_IP_PROTO_TCP;
+				if (request_.lbports(i).protocol() == UDP)
+					request.add_lb.lbports[i].protocol = DP_IP_PROTO_UDP;
+			}
+		} else {
+			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		request.add_lb_vip.vni = request_.vni();
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -92,11 +104,141 @@ int AddLBVIPCall::Proceed()
 			return -1;
 		status_ = FINISH;
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
-		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
+		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int DelLBCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+
+	if (status_ == REQUEST) {
+		new DelLBCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.del_lb.lb_id, DP_LB_ID_SIZE, "%s",
+				 request_.loadbalancerid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int GetLBCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	struct in_addr addr;
+	Status *err_status;
+	LBPort *lb_port;
+	LBIP *lb_ip;
+	int i;
+
+	if (status_ == REQUEST) {
+		new GetLBCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
+				 request_.loadbalancerid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_vni(reply.get_lb.vni);
+		lb_ip = new LBIP();
+		addr.s_addr = reply.get_lb.vip.vip_addr;
+		lb_ip->set_address(inet_ntoa(addr));
+		if (reply.get_lb.ip_type == RTE_ETHER_TYPE_IPV4)
+			lb_ip->set_ipversion(IPv4);
+		else
+			lb_ip->set_ipversion(IPv6);
+		reply_.set_allocated_lbvipip(lb_ip);
+		for (i = 0; i < DP_LB_PORT_SIZE; i++) {
+			if (reply.get_lb.lbports[i].port == 0)
+				continue;
+			lb_port = reply_.add_lbports();
+			lb_port->set_port(reply.get_lb.lbports[i].port);
+			if (reply.get_lb.lbports[i].protocol == DP_IP_PROTO_TCP)
+				lb_port->set_protocol(TCP);
+			if (reply.get_lb.lbports[i].protocol == DP_IP_PROTO_UDP)
+				lb_port->set_protocol(UDP);
+		}
+		err_status = new Status();
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int AddLBVIPCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+
+	if (status_ == REQUEST) {
+		new AddLBVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.add_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
+				 request_.loadbalancerid().c_str());
+		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
+			request.add_lb_vip.ip_type = RTE_ETHER_TYPE_IPV6;
+			inet_pton(AF_INET6, request_.targetip().address().c_str(),
+					  request.add_lb_vip.back.back_addr6);
+		} else {
+			request.add_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+		}
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -115,14 +257,15 @@ int DelLBVIPCall::Proceed()
 		if (InitCheck() == INITCHECK)
 			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.lbvipip().address().c_str(),
-					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
-			inet_aton(request_.lbbackendip().address().c_str(),
-					  (in_addr*)&request.add_lb_vip.back.back_addr);
+		snprintf(request.del_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
+				 request_.loadbalancerid().c_str());
+		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
+			request.del_lb_vip.ip_type = RTE_ETHER_TYPE_IPV6;
+			inet_pton(AF_INET6, request_.targetip().address().c_str(),
+					  request.del_lb_vip.back.back_addr6);
+		} else {
+			request.del_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		request.add_lb_vip.vni = request_.vni();
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -148,9 +291,9 @@ int GetLBVIPBackendsCall::Proceed()
 	dp_request request = {0};
 	struct rte_mbuf *mbuf = NULL;
 	struct dp_reply *reply;
-	struct in_addr addr;
-	uint32_t *rp_back_ip;
+	uint8_t *rp_back_ip;
 	LBIP *back_ip;
+	char buf_str[INET6_ADDRSTRLEN];
 	int i;
 
 	if (status_ == REQUEST) {
@@ -158,12 +301,8 @@ int GetLBVIPBackendsCall::Proceed()
 		if (InitCheck() == INITCHECK)
 			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.lbvipip().address().c_str(),
-					  (in_addr*)&request.add_lb_vip.vip.vip_addr);
-		}
-		request.add_lb_vip.vni = request_.vni();
+		snprintf(request.qry_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
+				 request_.loadbalancerid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -174,12 +313,13 @@ int GetLBVIPBackendsCall::Proceed()
 		if (dp_recv_from_worker_with_mbuf(&mbuf))
 			return -1;
 		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		rp_back_ip = &reply->back_ip.b_ip.addr6[0];
 		for (i = 0; i < reply->com_head.msg_count; i++) {
-			back_ip = reply_.add_backends();
-			rp_back_ip = &((&reply->back_ip)[i]);
-			addr.s_addr = htonl(*rp_back_ip);
-			back_ip->set_address(inet_ntoa(addr));
-			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+			back_ip = reply_.add_targetips();
+			inet_ntop(AF_INET6, rp_back_ip, buf_str, INET6_ADDRSTRLEN);
+			back_ip->set_address(buf_str);
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			rp_back_ip += sizeof(reply->back_ip.b_ip.addr6);
 		}
 		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
@@ -212,6 +352,11 @@ int AddPfxCall::Proceed()
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
+		if (request_.prefix().loadbalancerenabled())
+			request.add_pfx.pfx_lb_enabled = 1;
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+		grpc_service->CalculateUnderlayRoute(0, buf_bin, sizeof(buf_bin));
+		memcpy(request.add_pfx.pfx_ul_addr6, buf_bin, sizeof(request.add_pfx.pfx_ul_addr6));
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -223,8 +368,6 @@ int AddPfxCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
-		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);

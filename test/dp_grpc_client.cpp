@@ -19,6 +19,8 @@ using namespace std::chrono;
 static const char short_options[] = "d" /* debug */
 				    "D"	 /* promiscuous */;
 
+#define DP_MAX_LB_PORTS 16
+
 typedef enum {
 	DP_CMD_NONE,
 	DP_CMD_ADD_MACHINE,
@@ -39,6 +41,9 @@ typedef enum {
 	DP_CMD_DEL_PFX,
 	DP_CMD_INITIALIZED,
 	DP_CMD_INIT,
+	DP_CMD_CREATE_LB,
+	DP_CMD_DEL_LB,
+	DP_CMD_GET_LB,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -47,11 +52,14 @@ static char vni_str[30] = {0};
 static char len_str[30] = {0};
 static char t_vni_str[30] = {0};
 static char machine_str[64] = {0};
+static char lb_id_str[64] = {0};
 static char ip_str[30] = {0};
 static char back_ip_str[30] = {0};
 static char pxe_ip_str[30] = {0};
 static char vm_pci_str[30] = {0};
 static char pxe_path_str[30] = {0};
+static char port_str[30] = {0};
+static char proto_str[30] = {0};
 static IPVersion version;
 
 static int command;
@@ -59,6 +67,7 @@ static int debug_mode;
 static int vni;
 static int t_vni;
 static int length;
+static bool pfx_lb_enabled = false;
 
 #define CMD_LINE_OPT_INIT			"init"
 #define CMD_LINE_OPT_INITIALIZED	"is_initialized"
@@ -85,9 +94,15 @@ static int length;
 #define CMD_LINE_OPT_PXE_IP			"pxe_ip"
 #define CMD_LINE_OPT_BACK_IP		"back_ip"
 #define CMD_LINE_OPT_PXE_STR		"pxe_str"
+#define CMD_LINE_OPT_PORT_STR		"port"
+#define CMD_LINE_OPT_PROTO_STR		"protocol"
 #define CMD_LINE_OPT_ADD_LB_VIP		"addlbvip"
 #define CMD_LINE_OPT_DEL_LB_VIP		"dellbvip"
 #define CMD_LINE_OPT_LIST_LB_VIP	"listbackips"
+#define CMD_LINE_OPT_CREATE_LB		"createlb"
+#define CMD_LINE_OPT_DEL_LB			"dellb"
+#define CMD_LINE_OPT_GET_LB			"getlb"
+#define CMD_LINE_OPT_PFX_LB			"lb_pfx"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -108,6 +123,8 @@ enum {
 	CMD_LINE_OPT_DEL_VIP_NUM,
 	CMD_LINE_OPT_GET_VIP_NUM,
 	CMD_LINE_OPT_PXE_IP_NUM,
+	CMD_LINE_OPT_PORT_NUM,
+	CMD_LINE_OPT_PROTO_NUM,
 	CMD_LINE_OPT_PXE_STR_NUM,
 	CMD_LINE_OPT_PCI_NUM,
 	CMD_LINE_OPT_BACK_IP_NUM,
@@ -119,6 +136,10 @@ enum {
 	CMD_LINE_OPT_DEL_PFX_NUM,
 	CMD_LINE_OPT_INITIALIZED_NUM,
 	CMD_LINE_OPT_INIT_NUM,
+	CMD_LINE_OPT_CREATE_LB_NUM,
+	CMD_LINE_OPT_DEL_LB_NUM,
+	CMD_LINE_OPT_GET_LB_NUM,
+	CMD_LINE_OPT_PFX_LB_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -139,17 +160,23 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_DEL_VIP, 1, 0, CMD_LINE_OPT_DEL_VIP_NUM},
 	{CMD_LINE_OPT_GET_VIP, 1, 0, CMD_LINE_OPT_GET_VIP_NUM},
 	{CMD_LINE_OPT_PXE_IP, 1, 0, CMD_LINE_OPT_PXE_IP_NUM},
+	{CMD_LINE_OPT_PORT_STR, 1, 0, CMD_LINE_OPT_PORT_NUM},
+	{CMD_LINE_OPT_PROTO_STR, 1, 0, CMD_LINE_OPT_PROTO_NUM},
 	{CMD_LINE_OPT_PXE_STR, 1, 0, CMD_LINE_OPT_PXE_STR_NUM},
 	{CMD_LINE_OPT_PCI, 1, 0, CMD_LINE_OPT_PCI_NUM},
 	{CMD_LINE_OPT_BACK_IP, 1, 0, CMD_LINE_OPT_BACK_IP_NUM},
-	{CMD_LINE_OPT_ADD_LB_VIP, 0, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
-	{CMD_LINE_OPT_DEL_LB_VIP, 0, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
-	{CMD_LINE_OPT_LIST_LB_VIP, 0, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
+	{CMD_LINE_OPT_ADD_LB_VIP, 1, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
+	{CMD_LINE_OPT_DEL_LB_VIP, 1, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
+	{CMD_LINE_OPT_LIST_LB_VIP, 1, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
 	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
 	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
 	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
 	{CMD_LINE_OPT_INITIALIZED, 0, 0, CMD_LINE_OPT_INITIALIZED_NUM},
 	{CMD_LINE_OPT_INIT, 0, 0, CMD_LINE_OPT_INIT_NUM},
+	{CMD_LINE_OPT_CREATE_LB, 1, 0, CMD_LINE_OPT_CREATE_LB_NUM},
+	{CMD_LINE_OPT_DEL_LB, 1, 0, CMD_LINE_OPT_DEL_LB_NUM},
+	{CMD_LINE_OPT_GET_LB, 1, 0, CMD_LINE_OPT_GET_LB_NUM},
+	{CMD_LINE_OPT_PFX_LB, 0, 0, CMD_LINE_OPT_PFX_LB_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -262,6 +289,12 @@ int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_PXE_STR_NUM:
 			strncpy(pxe_path_str, optarg, 29);
 			break;
+		case CMD_LINE_OPT_PORT_NUM:
+			strncpy(port_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_PROTO_NUM:
+			strncpy(proto_str, optarg, 29);
+			break;
 		case CMD_LINE_OPT_PCI_NUM:
 			strncpy(vm_pci_str, optarg, 29);
 			break;
@@ -270,18 +303,36 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_LB_VIP_NUM:
 			command = DP_CMD_ADD_LB_VIP;
+			strncpy(lb_id_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_DEL_LB_VIP_NUM:
 			command = DP_CMD_DEL_LB_VIP;
+			strncpy(lb_id_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_LIST_LB_VIP_NUM:
 			command = DP_CMD_LIST_LB_VIP;
+			strncpy(lb_id_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_INITIALIZED_NUM:
 			command = DP_CMD_INITIALIZED;
 			break;
 		case CMD_LINE_OPT_INIT_NUM:
 			command = DP_CMD_INIT;
+			break;
+		case CMD_LINE_OPT_CREATE_LB_NUM:
+			command = DP_CMD_CREATE_LB;
+			strncpy(lb_id_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_DEL_LB_NUM:
+			command = DP_CMD_DEL_LB;
+			strncpy(lb_id_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_GET_LB_NUM:
+			command = DP_CMD_GET_LB;
+			strncpy(lb_id_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_PFX_LB_NUM:
+			pfx_lb_enabled = true;
 			break;
 		default:
 			dp_print_usage(prgname);
@@ -408,69 +459,53 @@ public:
 	}
 
 	void AddLBVIP() {
-			LBMsg request;
-			IpAdditionResponse reply;
+			AddLoadBalancerTargetRequest request;
+			Status reply;
 			ClientContext context;
-			LBIP *vip_ip = new LBIP();
 			LBIP *back_ip = new LBIP();
 
-			request.set_vni(vni);
-			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				vip_ip->set_address(ip_str);
-			request.set_allocated_lbvipip(vip_ip);
 
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				back_ip->set_address(back_ip_str);
-			request.set_allocated_lbbackendip(back_ip);
-			stub_->addLBVIP(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
+			request.set_loadbalancerid(lb_id_str);
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			back_ip->set_address(t_ip6_str);
+			request.set_allocated_targetip(back_ip);
+			stub_->addLoadBalancerTarget(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
 			} else {
-				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
+				printf("LB target added \n");
 			}
 	}
 
 	void DelLBVIP() {
-			LBMsg request;
+			DeleteLoadBalancerTargetRequest request;
 			Status reply;
 			ClientContext context;
-			LBIP *vip_ip = new LBIP();
 			LBIP *back_ip = new LBIP();
 
-			request.set_vni(vni);
-			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				vip_ip->set_address(ip_str);
-			request.set_allocated_lbvipip(vip_ip);
-
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				back_ip->set_address(back_ip_str);
-			request.set_allocated_lbbackendip(back_ip);
-			stub_->delLBVIP(&context, request, &reply);
+			request.set_loadbalancerid(lb_id_str);
+			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			back_ip->set_address(t_ip6_str);
+			request.set_allocated_targetip(back_ip);
+			stub_->deleteLoadBalancerTarget(&context, request, &reply);
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			}
 	}
 
 	void ListBackIPs() {
-			LBQueryMsg request;
-			LBBackendMsg reply;
+			GetLoadBalancerTargetsRequest request;
+			GetLoadBalancerTargetsResponse reply;
 			ClientContext context;
-			LBIP *vip_ip = new LBIP();
 			int i;
 
-			request.set_vni(vni);
-			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
-				vip_ip->set_address(ip_str);
-			request.set_allocated_lbvipip(vip_ip);
+			request.set_loadbalancerid(lb_id_str);
 
-			stub_->getLBVIPBackends(&context, request, &reply);
-			for (i = 0; i < reply.backends_size(); i++)
+			stub_->getLoadBalancerTargets(&context, request, &reply);
+			for (i = 0; i < reply.targetips_size(); i++)
 			{
 				printf("Backend ip %s \n",
-					reply.backends(i).address().c_str());
+					reply.targetips(i).address().c_str());
 			}
 	}
 
@@ -506,12 +541,102 @@ public:
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
+			pfx_ip->set_loadbalancerenabled(pfx_lb_enabled);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->addInterfacePrefix(&context, request, &reply);
 			if (reply.status().error()) {
 				printf("Received an error %d \n", reply.status().error());
 			} else {
 				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
+			}
+	}
+
+	void CreateLB() {
+			CreateLoadBalancerRequest request;
+			CreateLoadBalancerResponse reply;
+			ClientContext context;
+			LBIP *lb_ip = new LBIP(); 
+			LBPort *lb_port;
+			uint16_t ports[DP_MAX_LB_PORTS];
+			uint16_t countpro = 0, countp = 0, i;
+			uint16_t final_count = 0;
+			char protos[DP_MAX_LB_PORTS][4];
+			char *pt;
+
+			request.set_loadbalancerid(lb_id_str);
+			request.set_vni(vni);
+			lb_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+			lb_ip->set_address(ip_str);
+			request.set_allocated_lbvipip(lb_ip);
+
+			pt = strtok(port_str,",");
+			while (pt != NULL) {
+				if (countp == DP_MAX_LB_PORTS)
+					break;
+				ports[countp++] = atoi(pt);
+				pt = strtok(NULL, ",");
+			}
+
+			pt = strtok(proto_str,",");
+			while (pt != NULL) {
+				if (countpro == DP_MAX_LB_PORTS)
+					break;
+				snprintf(&protos[countpro++][0], 4, "%s", pt);
+				pt = strtok (NULL, ",");
+			}
+			final_count = countpro > countp ? countp : countpro;
+			for (i = 0; i < final_count; i++) {
+				lb_port = request.add_lbports();
+				lb_port->set_port(ports[i]);
+				if (strncasecmp("tcp", &protos[i][0], 29) == 0)
+					lb_port->set_protocol(dpdkonmetal::Protocol::TCP);
+				if (strncasecmp("udp", &protos[i][0], 29) == 0)
+					lb_port->set_protocol(dpdkonmetal::Protocol::UDP);
+			}
+
+			stub_->createLoadBalancer(&context, request, &reply);
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
+			} else {
+				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
+			}
+	}
+
+	void GetLB() {
+			GetLoadBalancerRequest request;
+			GetLoadBalancerResponse reply;
+			ClientContext context;
+			int i;
+
+			request.set_loadbalancerid(lb_id_str);
+
+			stub_->getLoadBalancer(&context, request, &reply);
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
+			} else {
+				printf("Received LB with vni: %d LB ip: %s with ports: ", reply.vni(), reply.lbvipip().address().c_str());
+				for (i = 0; i < reply.lbports_size(); i++) {
+					if (reply.lbports(i).protocol() == TCP)
+						printf("%d,%s ", reply.lbports(i).port(), "tcp");
+					if (reply.lbports(i).protocol() == UDP)
+						printf("%d,%s ", reply.lbports(i).port(), "udp");
+				}
+				printf("\n");
+			}
+	}
+
+	void DelLB() {
+			DeleteLoadBalancerRequest request;
+			ClientContext context;
+			Status reply;
+
+			request.set_loadbalancerid(lb_id_str);
+
+			stub_->deleteLoadBalancer(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			} else {
+				printf("Delete LB Success");
 			}
 	}
 
@@ -738,6 +863,19 @@ int main(int argc, char** argv)
 	case DP_CMD_INIT:
 		std::cout << "Init called " << std::endl;
 		dpdk_client.Init();
+		break;
+	case DP_CMD_CREATE_LB:
+		std::cout << "Create Loadbalancer called " << std::endl;
+		dpdk_client.CreateLB();
+		printf("VIP %s, vni %s\n", ip_str, vni_str);
+		break;
+	case DP_CMD_GET_LB:
+		std::cout << "Get Loadbalancer called " << std::endl;
+		dpdk_client.GetLB();
+		break;
+	case DP_CMD_DEL_LB:
+		std::cout << "Delete Loadbalancer called " << std::endl;
+		dpdk_client.DelLB();
 		break;
 	default:
 		break;

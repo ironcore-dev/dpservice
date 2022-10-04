@@ -23,9 +23,8 @@ extern "C"
 #define DP_FLOW_WEST_EAST		0
 #define DP_FLOW_SOUTH_NORTH		1
 
+#define DP_FLOW_OVERLAY_TYPE_IPIP	0
 #define DP_FLOW_OVERLAY_TYPE_GENEVE	1
-#define DP_FLOW_OVERLAY_TYPE_IPIP	2
-#define DP_FLOW_OVERLAY_TYPE_SRV6	3
 
 #define DP_IS_SRC false
 #define DP_IS_DST true

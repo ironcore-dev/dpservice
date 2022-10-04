@@ -101,47 +101,92 @@ public:
 	int Proceed() override;
 };
 
+class CreateLBCall final : BaseCall {
+	ServerContext ctx_;
+	CreateLoadBalancerRequest request_;
+	CreateLoadBalancerResponse reply_;
+	ServerAsyncResponseWriter<CreateLoadBalancerResponse> responder_;
+
+public:
+	CreateLBCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_CREATELB), responder_(&ctx_) {
+		service_->RequestcreateLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
+											this);
+	}
+	int Proceed() override;
+};
+
+class GetLBCall final : BaseCall {
+	ServerContext ctx_;
+	GetLoadBalancerRequest request_;
+	GetLoadBalancerResponse reply_;
+	ServerAsyncResponseWriter<GetLoadBalancerResponse> responder_;
+
+public:
+	GetLBCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_GETLB), responder_(&ctx_) {
+		service_->RequestgetLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
+											this);
+	}
+	int Proceed() override;
+};
+
+class DelLBCall final : BaseCall {
+	ServerContext ctx_;
+	DeleteLoadBalancerRequest request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelLBCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELLB), responder_(&ctx_) {
+		service_->RequestdeleteLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
+											this);
+	}
+	int Proceed() override;
+};
+
 class AddLBVIPCall final : BaseCall {
 	ServerContext ctx_;
-	LBMsg request_;
-	IpAdditionResponse reply_;
-	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
+	AddLoadBalancerTargetRequest request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
 
 public:
 	AddLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_ADDLBVIP), responder_(&ctx_) {
-		service_->RequestaddLBVIP(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
+		service_->RequestaddLoadBalancerTarget(&ctx_, &request_, &responder_, cq_, cq_,
+											   this);
 	}
 	int Proceed() override;
 };
 
 class DelLBVIPCall final : BaseCall {
 	ServerContext ctx_;
-	LBMsg request_;
+	DeleteLoadBalancerTargetRequest request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
 	DelLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DELLBVIP), responder_(&ctx_) {
-		service_->RequestdelLBVIP(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
+		service_->RequestdeleteLoadBalancerTarget(&ctx_, &request_, &responder_, cq_, cq_,
+												  this);
 	}
 	int Proceed() override;
 };
 
 class GetLBVIPBackendsCall final : BaseCall {
 	ServerContext ctx_;
-	LBQueryMsg request_;
-	LBBackendMsg reply_;
-	ServerAsyncResponseWriter<LBBackendMsg> responder_;
+	GetLoadBalancerTargetsRequest request_;
+	GetLoadBalancerTargetsResponse reply_;
+	ServerAsyncResponseWriter<GetLoadBalancerTargetsResponse> responder_;
 
 public:
 	GetLBVIPBackendsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBBACKENDS), responder_(&ctx_) {
-		service_->RequestgetLBVIPBackends(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
+		service_->RequestgetLoadBalancerTargets(&ctx_, &request_, &responder_, cq_, cq_,
+												this);
 	}
 	int Proceed() override;
 };

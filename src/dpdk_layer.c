@@ -16,6 +16,7 @@
 #include "nodes/ipv6_encap_node.h"
 #include "nodes/rx_periodic_node.h"
 #include "nodes/ipv6_lookup_node.h"
+#include "nodes/ipip_tunnel_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
@@ -79,6 +80,7 @@ static void timer_cb()
 		trigger_nd_unsol_adv();
 	}
 	trigger_garp();
+	dp_send_event_timer_msg();
 }
 
 int dp_dpdk_init(int argc, char **argv)
@@ -116,6 +118,7 @@ int dp_dpdk_init(int argc, char **argv)
 	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.periodic_msg_queue)
 		printf("Error creating periodic_msg_queue queue\n");
+	/* TODO Monitoring queue needs to be multiproducer, single consumer */
 	dp_layer.monitoring_rx_queue = rte_ring_create("monitoring_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.monitoring_rx_queue)
 		printf("Error creating monitoring rx queue\n");

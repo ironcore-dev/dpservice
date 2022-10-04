@@ -6,7 +6,7 @@
 #include <net/if.h>
 #include "dp_util.h"
 
-#include "dp_link_status.h"
+#include "dp_event.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,6 +16,7 @@ extern "C" {
 typedef enum {
 	DP_STATUS_TYPE_UNKNOWN,
 	DP_STATUS_TYPE_LINK,
+	DP_STATUS_TYPE_TIMER,
 } dp_status_type;
 
 typedef enum {
@@ -26,7 +27,7 @@ typedef enum {
 typedef struct {
 	dp_status_type type;
 	dp_status_scope scope; 
-} dp_status_msg_head;
+} dp_event_msg_head;
 
 typedef struct {
 	uint16_t port_id;
@@ -34,15 +35,15 @@ typedef struct {
 } dp_link_status;
 
 typedef struct {
-	dp_status_msg_head msg_head;
+	dp_event_msg_head msg_head;
 	
 	union {
 		dp_link_status link_status;
-	} status_entry;
+	} event_entry;
 
-} dp_status_msg;
+} dp_event_msg;
 
-void dp_process_status_msg(struct rte_mbuf *m);
+void dp_process_event_msg(struct rte_mbuf *m);
 
 #ifdef __cplusplus
 }

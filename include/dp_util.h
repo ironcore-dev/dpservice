@@ -4,9 +4,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <stdbool.h>
 
-#define VM_MACHINE_ID_STR_LEN 64
-#define VM_MACHINE_PXE_STR_LEN 32
+#define VM_MACHINE_ID_STR_LEN	64
+#define VM_MACHINE_PXE_STR_LEN	32
+#define DP_LB_ID_SIZE			64
+#define DP_LB_PORT_SIZE			16
 
 #define DP_OP_ENV_HARDWARE 1
 #define DP_OP_ENV_SCAPYTEST 2

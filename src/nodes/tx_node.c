@@ -10,6 +10,7 @@
 #include "dp_flow.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
+#include "dp_nat.h"
 #include "dp_mbuf_dyn.h"
 
 #include "rte_flow/dp_rte_flow.h"
@@ -74,11 +75,15 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
-		if (mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) {
-			if (dp_is_pf_port_id(port))
+		if ((mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) ||
+			(df->flags.nat >= DP_LB_CHG_UL_DST_IP)) {
+			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-			else
+				if (df->flags.nat == DP_LB_RECIRC)
+					rte_node_enqueue_x1(graph, node, TX_NEXT_CLS, mbuf0);
+			} else {
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);
+			}
 		}
 
 		if (df && df->flags.valid && df->conntrack)
@@ -109,8 +114,8 @@ static struct rte_node_register tx_node_base = {
 
 	.nb_edges = TX_NEXT_MAX,
 	.next_nodes = {
-
 			[TX_NEXT_DROP] = "drop",
+			[TX_NEXT_CLS] = "cls",
 		},
 };
 
