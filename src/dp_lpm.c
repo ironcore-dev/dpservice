@@ -1,5 +1,6 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
+#include "dp_error.h"
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
@@ -221,18 +222,24 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = get_lpm(vni, socketid);
-	if (!root)
+	if (!root) {
+		ret = DP_ERROR_VM_ADD_RT_NO_VM;
 		goto err;
+	}
 
 	node = rte_rib_lookup_exact(root, ip, depth);
-	if (node)
+	if (node) {
+		ret = DP_ERROR_VM_ADD_RT_FAIL4;
 		goto err;
+	}
 
 	node = rte_rib_insert(root, ip, depth);
 	if (node) {
 		ret = rte_rib_set_nh(node, portid);
-		if (ret < 0)
+		if (ret < 0) {
+			ret = DP_ERROR_VM_ADD_RT_FAIL4;
 			goto err;
+		}
 		/* This is an external route */
 		if (dp_is_pf_port_id(portid)) {
 			route = rte_rib_get_ext(node);
@@ -240,12 +247,12 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
 		}
 	} else {
+		ret = DP_ERROR_VM_ADD_RT_FAIL4;
 		goto err;
 	}
 
 	return ret;
 err:
-	ret = EXIT_FAILURE;
 	printf("Unable to add entry %u to the DP RIB table on socket %d\n",
 		portid, socketid);
 	return ret;
