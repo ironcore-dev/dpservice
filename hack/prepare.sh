@@ -3,9 +3,13 @@ CONF_FILE="/tmp/dp_service.conf"
 PF0_NAME=""
 PF0_PCI_ADDR=""
 PF1_PCI_ADDR=""
-NUM_VF=6
+NUM_VF=30
 VF_START=2
 NUM_PAGES=4
+
+timestamp() {
+  date +"%Y-%m-%d_%H-%M-%S-%3N"
+}
 
 function detect_pfs() {
 count=0
@@ -31,11 +35,13 @@ while read l1 ;do
                if [ $count -eq 0 ]; then
                    if [[ "$k" == "0000:"* ]]; then
                        PF0_PCI_ADDR=$k
+                       echo "$(timestamp): detected PF0 "$PF0_PCI_ADDR
                    fi
                fi
                if [ $count -eq 1 ]; then
                    if [[ "$k" == "0000:"* ]]; then
                        PF1_PCI_ADDR=$k
+                       echo "$(timestamp): detected PF1 "$PF1_PCI_ADDR
                    fi
                fi
            done
@@ -65,6 +71,7 @@ while read l1 ;do
             read_next=0
             modified=${i::-1} 
             echo "vf-pattern "$modified >> $CONF_FILE
+            echo "$(timestamp): detected vf pattern "$modified
             count=$[$count + 1]
         fi
         if [ "$i" = "netdev" ]; then
@@ -93,18 +100,28 @@ function configure_vfs() {
 
 maxvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_totalvfs)
 numvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_numvfs)
+mod_vf_count=0
+prefix_count=0
 
 if [ $numvfs -eq 0 ]; then
     allowedvfs=$((maxvfs - VF_START))
     if [ "$allowedvfs" -lt "$NUM_VF" ]; then
        NUM_VF=$allowedvfs
     fi
-    
+    echo "$(timestamp): will create "$NUM_VF" VFs"
     echo $NUM_VF | tee /sys/class/net/$PF0_NAME/device/sriov_numvfs
-    modified_pci=${PF0_PCI_ADDR::-2}
+    modified_pci=${PF0_PCI_ADDR::-3}
     sleep 1
-    for ((i=$VF_START;i<=1+$NUM_VF;i+=1)); do echo $modified_pci"."$i > /sys/bus/pci/drivers/mlx5_core/unbind; done
+
+    for ((i=$VF_START;i<=1+$NUM_VF;i+=1)); do
+       mod_vf_count=$(($i%8))
+       if [ $mod_vf_count -eq 0 ]; then
+          prefix_count=$[$prefix_count + 1]
+       fi
+       echo $modified_pci$prefix_count"."$mod_vf_count > /sys/bus/pci/drivers/mlx5_core/unbind
+    done
     sleep 2
+    echo "$(timestamp): changing eswitch mode for "$PF0_PCI_ADDR" to switchdev"
     devlink dev eswitch set pci/$PF0_PCI_ADDR mode switchdev
 fi
 
@@ -130,11 +147,19 @@ echo "a-pf1 "$PF1_PCI_ADDR",class=rxq_cqe_comp_en=0,rx_vec_en=1" >> $CONF_FILE
 }
 
 rm -f $CONF_FILE
+
+echo "$(timestamp): detecting PFs"
 detect_pfs;
+echo "$(timestamp): configuring VFs"
 configure_vfs;
+echo "$(timestamp): configuring hugepages"
 configure_hugepages;
+echo "$(timestamp): detecting VFs"
 detect_vfs;
+echo "$(timestamp): detecting underlay ipv6 address"
 detect_ipv6;
+echo "$(timestamp): calculating mellanox parameters"
 prepare_melanox_param;
+echo "$(timestamp): all results written to "$CONF_FILE
 
 exit 0;
