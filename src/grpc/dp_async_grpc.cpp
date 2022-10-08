@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
 #include <dp_error.h>
+#include <dp_util.h>
 #include <dp_lpm.h>
 #include <rte_ether.h>
 
@@ -47,6 +48,7 @@ int InitCall::Proceed()
 	if (status_ == REQUEST) {
 		new InitCall(service_, cq_);
 		status_ = AWAIT_MSG;
+		DPS_LOG(INFO, DPSERVICE, "GRPC init called \n");
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
@@ -73,6 +75,7 @@ int CreateLBCall::Proceed()
 		new CreateLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC create LoadBalancer called for id: %s\n", request_.loadbalancerid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -127,6 +130,7 @@ int DelLBCall::Proceed()
 		new DelLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC delete LoadBalancer called for id: %s\n", request_.loadbalancerid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -164,6 +168,7 @@ int GetLBCall::Proceed()
 		new GetLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC get LoadBalancer called for id: %s\n", request_.loadbalancerid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -217,6 +222,7 @@ int AddLBVIPCall::Proceed()
 		new AddLBVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC add LoadBalancer target called for id: %s\n", request_.loadbalancerid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -256,6 +262,7 @@ int DelLBVIPCall::Proceed()
 		new DelLBVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC delete LoadBalancer target called for id: %s\n", request_.loadbalancerid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -300,6 +307,7 @@ int GetLBVIPBackendsCall::Proceed()
 		new GetLBVIPBackendsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC list LoadBalancer targets called for id: %s\n", request_.loadbalancerid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.qry_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -343,6 +351,7 @@ int AddPfxCall::Proceed()
 		new AddPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC add AliasPrefix called for id: %s\n", request_.interfaceid().interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -389,6 +398,7 @@ int DelPfxCall::Proceed()
 		new DelPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC delete AliasPrefix called for id: %s\n", request_.interfaceid().interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -431,6 +441,7 @@ int ListPfxCall::Proceed()
 		new ListPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC list AliasPrefix(es) called for id: %s\n", request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -476,6 +487,7 @@ int AddVIPCall::Proceed()
 		new AddVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC add VIP called for id: %s\n", request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -518,6 +530,7 @@ int DelVIPCall::Proceed()
 		new DelVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC delete VIP called for id: %s\n", request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -552,6 +565,7 @@ int GetVIPCall::Proceed()
 		new GetVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC get VIP called for id: %s\n", request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -593,6 +607,9 @@ int AddInterfaceCall::Proceed()
 		new AddInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC add Interface called for id: %s IP: %s dpdk pci: %s\n",
+				request_.interfaceid().c_str(), request_.ipv4config().primaryaddress().c_str(),
+				request_.devicename().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		err_status->set_error(EXIT_SUCCESS);
 		request.add_machine.vni = request_.vni();
@@ -655,6 +672,8 @@ int DelInterfaceCall::Proceed()
 		new DelInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC delete Interface called for id: %s\n",
+				request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -693,6 +712,8 @@ int GetInterfaceCall::Proceed()
 		new GetInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC get Interface called for id: %s\n",
+				request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -741,6 +762,7 @@ int AddRouteCall::Proceed()
 		new AddRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC add Route called\n");
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
@@ -786,6 +808,7 @@ int DelRouteCall::Proceed()
 		new DelRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC delete Route called\n");
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
@@ -839,6 +862,7 @@ int ListRoutesCall::Proceed()
 		new ListRoutesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC list Routes called\n");
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni();
 		dp_send_to_worker(&request);
@@ -904,6 +928,7 @@ int ListInterfacesCall::Proceed()
 		new ListInterfacesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC list Interfaces called\n");
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;

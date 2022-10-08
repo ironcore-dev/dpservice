@@ -3,6 +3,7 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_util.h"
 #include "nodes/rx_node_priv.h"
 #include "node_api.h"
 
@@ -51,7 +52,7 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	ctx->queue_id = ethdev_rx_main.node_ctx[port_id].queue_id;
 	ctx->next = RX_NEXT_CLS;
 
-	printf("rx_node: init, port_id: %u, queue_id: %u\n", ctx->port_id,
+	DPS_LOG(INFO, DPSERVICE, "rx_node: init, port_id: %u, queue_id: %u\n", ctx->port_id,
 			ctx->queue_id);
 
 	RTE_SET_USED(graph);

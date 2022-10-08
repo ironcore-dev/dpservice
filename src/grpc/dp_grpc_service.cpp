@@ -26,7 +26,7 @@ void GRPCService::run(std::string listen_address)
 	builder.RegisterService(this);
 	this->cq_ = builder.AddCompletionQueue();
 	this->server_= builder.BuildAndStart();
-	std::cout << "Server initialized and listening on " << listen_address << std::endl;
+	DPS_LOG(INFO, DPSERVICE, "Server initialized and listening on %s\n", listen_address.c_str());
 	HandleRpcs();
 }
 

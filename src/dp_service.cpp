@@ -108,7 +108,6 @@ int main(int argc, char **argv)
 {
 	int ret;
 
-	printf("Starting DP Service version %s\n", DP_SERVICE_VERSION);
 	dp_handle_conf_file();
 	if (dp_is_mellanox_opt_set()) {
 		if (dp_add_args(argc, argv) < 0)
@@ -120,6 +119,8 @@ int main(int argc, char **argv)
 	argc -= ret;
 	argv += ret;
 
+	rte_openlog_stream(stdout);
+	DPS_LOG(INFO, DPSERVICE, "Starting DP Service version %s\n", DP_SERVICE_VERSION);
 	ret = dp_parse_args(argc, argv);
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid dp_service parameters\n");
