@@ -212,8 +212,7 @@ static int main_core_loop(void)
 
 int dp_dpdk_main_loop(void)
 {
-
-	printf("DPDK main loop started\n ");
+	DPS_LOG(INFO, DPSERVICE, "DPDK main loop started\n");
 
 	/* Launch per-lcore init on every worker lcore */
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
@@ -268,8 +267,8 @@ static int dp_port_flow_isolate(int port_id)
 	/* Poisoning to make sure PMDs update it in case of error. */
 	memset(&error, 0x66, sizeof(error));
 	if (rte_flow_isolate(port_id, set, &error))
-		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
-	printf("Ingress traffic on port %u is %s to the defined flow rules\n",
+		DPS_LOG(ERR, DPSERVICE, "Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	DPS_LOG(INFO, DPSERVICE, "Ingress traffic on port %u is %s to the defined flow rules\n",
 			port_id,
 			set ? "now restricted" : "not restricted anymore");
 	return 0;
@@ -291,13 +290,13 @@ static void dp_install_isolated_mode(int port_id)
 {
 
 	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP) {
-		printf("Init isolation flow rule for IPinIP tunnels\n");
+		DPS_LOG(INFO, DPSERVICE, "Init isolation flow rule for IPinIP tunnels\n");
 		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP);
 		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP);
 	}
 
 	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE) {
-		printf("Init isolation flow rule for GENEVE tunnels\n");
+		DPS_LOG(INFO, DPSERVICE, "Init isolation flow rule for GENEVE tunnels\n");
 		dp_install_isolated_mode_geneve(port_id);
 	}
 
@@ -337,10 +336,9 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 
 	nr_ports = rte_eth_dev_count_avail();
 	if (nr_ports == 0)
-		rte_exit(EXIT_FAILURE, ":: no Ethernet ports found\n");
+		rte_exit(EXIT_FAILURE, "no Ethernet ports found\n");
 
 	dp_port_ext = *port;
-	printf("Looking for VFs of PF %s\n", dp_port_ext.port_name);
 
 	RTE_ETH_FOREACH_DEV(port_id) {
 		struct rte_eth_dev_info dev_info;

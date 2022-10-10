@@ -5,6 +5,20 @@
 extern "C" {
 #endif
 #include <stdbool.h>
+#include <rte_log.h>
+
+#define DP_TIMESTAMP_BUF_SIZE 26
+
+#define RTE_LOGTYPE_DPSERVICE RTE_LOGTYPE_USER1
+#define DPS_LOG(l, t, ...)						\
+	do {										\
+	char buf[DP_TIMESTAMP_BUF_SIZE] = {0};		\
+	time_t now = time(NULL);					\
+	strftime(buf, DP_TIMESTAMP_BUF_SIZE - 1, "%Y-%m-%d %H:%M:%S", gmtime(&now));\
+	fprintf(rte_log_get_stream(), "%s ", buf);	\
+	rte_log(RTE_LOG_ ## l,						\
+		 RTE_LOGTYPE_ ## t, # t ": " __VA_ARGS__);\
+	} while (0)
 
 #define VM_MACHINE_ID_STR_LEN	64
 #define VM_MACHINE_PXE_STR_LEN	32
