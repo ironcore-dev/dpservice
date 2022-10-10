@@ -471,12 +471,11 @@ static int dp_process_addroute(dp_request *req, dp_reply *rep)
 	int ret = EXIT_SUCCESS;
 
 	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_add_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
-					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
-					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
-			ret = DP_ERROR_VM_ADD_RT_FAIL4;
+		ret = dp_add_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+						   ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
+						    req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+		if (ret)
 			goto err;
-		}
 	} else {
 		if (dp_add_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
 					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
