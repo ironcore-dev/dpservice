@@ -42,6 +42,7 @@ typedef enum {
 	DP_CMD_INITIALIZED,
 	DP_CMD_ADD_NAT_VIP,
 	DP_CMD_DEL_NAT_VIP,
+	DP_CMD_GET_NAT_INFO,
 	DP_CMD_ADD_NEIGH_NAT,
 	DP_CMD_DEL_NEIGH_NAT,
 	DP_CMD_INIT,
@@ -67,6 +68,7 @@ static char proto_str[30] = {0};
 static char min_port_str[30]={0};
 static char max_port_str[30]={0};
 static IPVersion version;
+static char get_nat_info_type_str[10]={0};
 
 static int command;
 static int debug_mode;
@@ -115,6 +117,7 @@ static uint32_t max_port;
 #define CMD_LINE_OPT_DEL_NAT_VIP	"delnat"
 #define CMD_LINE_OPT_ADD_NEIGH_NAT 	"addneighnat"
 #define CMD_LINE_OPT_DEL_NEIGH_NAT 	"delneighnat"
+#define CMD_LINE_OPT_GET_NAT_INFO	"getnatinfo"
 #define CMD_LINE_OPT_NAT_MIN_PORT	"min_port"
 #define CMD_LINE_OPT_NAT_MAX_PORT	"max_port"
 
@@ -156,6 +159,7 @@ enum {
 	CMD_LINE_OPT_NAT_MAX_PORT_NUM,
 	CMD_LINE_OPT_ADD_NEIGH_NAT_NUM,
 	CMD_LINE_OPT_DEL_NEIGH_NAT_NUM,
+	CMD_LINE_OPT_GET_NAT_INFO_NUM,
 	CMD_LINE_OPT_INIT_NUM,
 	CMD_LINE_OPT_CREATE_LB_NUM,
 	CMD_LINE_OPT_DEL_LB_NUM,
@@ -194,10 +198,11 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_LIST_LB_VIP, 0, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
 	{CMD_LINE_OPT_ADD_NAT_VIP, 1, 0, CMD_LINE_OPT_ADD_NAT_VIP_NUM},
 	{CMD_LINE_OPT_DEL_NAT_VIP, 1, 0, CMD_LINE_OPT_DEL_NAT_VIP_NUM},
-	{CMD_LINE_OPT_NAT_MIN_PORT,1,0,CMD_LINE_OPT_NAT_MIN_PORT_NUM},
-	{CMD_LINE_OPT_NAT_MAX_PORT,1,0,CMD_LINE_OPT_NAT_MAX_PORT_NUM},
-	{CMD_LINE_OPT_ADD_NEIGH_NAT,0,0,CMD_LINE_OPT_ADD_NEIGH_NAT_NUM},
-	{CMD_LINE_OPT_DEL_NEIGH_NAT,0,0,CMD_LINE_OPT_DEL_NEIGH_NAT_NUM},
+	{CMD_LINE_OPT_NAT_MIN_PORT, 1, 0, CMD_LINE_OPT_NAT_MIN_PORT_NUM},
+	{CMD_LINE_OPT_NAT_MAX_PORT, 1, 0, CMD_LINE_OPT_NAT_MAX_PORT_NUM},
+	{CMD_LINE_OPT_GET_NAT_INFO, 1, 0, CMD_LINE_OPT_GET_NAT_INFO_NUM},
+	{CMD_LINE_OPT_ADD_NEIGH_NAT, 0, 0, CMD_LINE_OPT_ADD_NEIGH_NAT_NUM},
+	{CMD_LINE_OPT_DEL_NEIGH_NAT, 0, 0, CMD_LINE_OPT_DEL_NEIGH_NAT_NUM},
 	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
 	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
 	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
@@ -384,6 +389,10 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_DEL_NEIGH_NAT_NUM:
 			command = DP_CMD_DEL_NEIGH_NAT;
+			break;
+		case CMD_LINE_OPT_GET_NAT_INFO_NUM:
+			command = DP_CMD_GET_NAT_INFO;
+			strncpy(get_nat_info_type_str, optarg, 9);
 			break;
 		default:
 			dp_print_usage(prgname);
@@ -831,8 +840,8 @@ public:
 	}
 
 	void AddNAT() {
-		NATMsg request;
-		IpAdditionResponse reply;
+		AddNATRequest request;
+		AddNATResponse reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
@@ -852,7 +861,7 @@ public:
 	}
 
 	void DelNAT() {
-		NATMsg request;
+		DeleteNATRequest request;
 		Status reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
@@ -862,7 +871,7 @@ public:
 		if(version == dpdkonmetal::IPVersion::IPv4)
 				nat_vip->set_address(ip_str);
 		request.set_allocated_natvipip(nat_vip);
-		stub_->delNAT(&context, request, &reply);
+		stub_->deleteNAT(&context, request, &reply);
 		if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 		} else {
@@ -871,7 +880,7 @@ public:
 	}
 
 	void AddNeighNAT() {
-		NeighborNATMsg request;
+		AddNeighborNATRequest request;
 		Status reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
@@ -896,8 +905,58 @@ public:
 			printf("called addneighnat with code %d\n",reply.error());
 		}
 	}
+
+	void GetNATInfo() {
+		GetNATInfoRequest request;
+		GetNATInfoReply reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+		int i;
+
+		nat_vip->set_ipversion(version);
+		if(version == dpdkonmetal::IPVersion::IPv4) {
+			nat_vip->set_address(ip_str);
+		} else {
+			nat_vip->set_address(ip6_str);
+		}
+
+		printf("query nat info %s \n", ip_str);
+		request.set_allocated_natvipip(nat_vip);
+		printf("query nat info %s \n", request.natvipip().address().c_str());
+
+		if (!strcmp(get_nat_info_type_str,"local"))
+			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoLocal);
+		else if (!strcmp(get_nat_info_type_str,"neigh"))
+			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoNeigh);
+		else
+			printf("Wrong query nat info type parameter, either local or neigh \n");
+
+		stub_->getNATInfo(&context, request, &reply);
+
+		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
+			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
+			for (i = 0; i < reply.natinfoentries_size(); i++) {
+				printf("  %d: IP %s, min_port %d, max_port %d \n", i+1,
+				reply.natinfoentries(i).address().c_str(),
+				reply.natinfoentries(i).minport(),
+				reply.natinfoentries(i).maxport());
+			}
+		}
+
+		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
+			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
+			for (i = 0; i < reply.natinfoentries_size(); i++) {
+				printf("  %d: min_port %d, max_port %d --> Underlay IPv6 %s \n", i+1,
+				reply.natinfoentries(i).minport(),
+				reply.natinfoentries(i).maxport(),
+				reply.natinfoentries(i).underlayroute().c_str());
+			}
+		}
+
+	}
+
 	void DelNeighNAT() {
-		NeighborNATMsg request;
+		DeleteNeighborNATRequest request;
 		Status reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
@@ -913,9 +972,8 @@ public:
 		request.set_vni(vni);
 		request.set_minport(min_port);
 		request.set_maxport(max_port);
-		request.set_underlayroute(t_ip6_str);
 
-		stub_->delNeighborNAT(&context, request, &reply);
+		stub_->deleteNeighborNAT(&context, request, &reply);
 		if (reply.error()) {
 			printf("Received an error %d \n", reply.error());
 		}else{
@@ -1004,6 +1062,10 @@ int main(int argc, char** argv)
 	case DP_CMD_ADD_NAT_VIP:
 		std::cout << "Addnat called " << std::endl;
 		dpdk_client.AddNAT();
+		break;
+	case DP_CMD_GET_NAT_INFO:
+		std::cout << "getNATEntry called " << std::endl;
+		dpdk_client.GetNATInfo();
 		break;
 	case DP_CMD_DEL_NAT_VIP:
 		std::cout << "Delnat called " << std::endl;

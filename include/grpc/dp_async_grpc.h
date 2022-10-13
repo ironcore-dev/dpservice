@@ -328,9 +328,9 @@ public:
 
 class AddNATVIPCall final: BaseCall {
 	ServerContext ctx_;
-	NATMsg request_;
-	IpAdditionResponse reply_;
-	ServerAsyncResponseWriter<IpAdditionResponse> responder_;
+	AddNATRequest request_;
+	AddNATResponse reply_;
+	ServerAsyncResponseWriter<AddNATResponse> responder_;
 
 public:
 	AddNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
@@ -341,16 +341,31 @@ public:
 	int	Proceed() override;
 };
 
-class DelNATVIPCall final: BaseCall {
+class GetNATInfoCall final: BaseCall {
 	ServerContext ctx_;
-	NATMsg request_;
+	GetNATInfoRequest request_;
+	GetNATInfoReply reply_;
+	ServerAsyncResponseWriter<GetNATInfoReply> responder_;
+
+public:
+	GetNATInfoCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_GET_NATENTRY), responder_(&ctx_) {
+		service_->RequestgetNATInfo(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int	Proceed() override;
+};
+
+class DeleteNATVIPCall final: BaseCall {
+	ServerContext ctx_;
+	DeleteNATRequest request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
-	DelNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	DeleteNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DEL_NATVIP), responder_(&ctx_) {
-		service_->RequestdelNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdeleteNAT(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;
@@ -358,7 +373,7 @@ public:
 
 class AddNeighborNATCall final: BaseCall {
 	ServerContext ctx_;
-	NeighborNATMsg request_;
+	AddNeighborNATRequest request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
@@ -371,16 +386,16 @@ public:
 	int	Proceed() override;
 };
 
-class DelNeighborNATCall final: BaseCall {
+class DeleteNeighborNATCall final: BaseCall {
 	ServerContext ctx_;
-	NeighborNATMsg request_;
+	DeleteNeighborNATRequest request_;
 	Status reply_;
 	ServerAsyncResponseWriter<Status> responder_;
 
 public:
-	DelNeighborNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	DeleteNeighborNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_DEL_NEIGH_NAT), responder_(&ctx_) {
-		service_->RequestdelNeighborNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestdeleteNeighborNAT(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;

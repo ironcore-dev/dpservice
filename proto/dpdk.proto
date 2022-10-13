@@ -32,12 +32,23 @@ enum FirewallAction {
 	Accept = 1;
 }
 
+enum NATInfoType {
+	NATInfoTypeZero = 0;
+	NATInfoLocal = 1;
+	NATInfoNeigh = 2;
+}
+
 message Status {
 	int32 error = 1;
 	string message = 2;
 }
 
 message IpAdditionResponse {
+	Status status = 1;
+	bytes underlayRoute = 2;
+}
+
+message AddNATResponse {
 	Status status = 1;
 	bytes underlayRoute = 2;
 }
@@ -234,19 +245,50 @@ message InterfacesMsg {
 	repeated Interface interfaces = 1;
 }
 
-message NATMsg {
+message AddNATRequest {
 	bytes interfaceID =1;
 	NATIP natVIPIP = 2;
 	uint32 minPort = 3; // port should be uint16 (less than 65536)
 	uint32 maxPort = 4;
 }
 
-message NeighborNATMsg {
+message GetNATInfoRequest {
+	NATIP natVIPIP = 1; // list all local machines that are behind this IP
+	NATInfoType natInfoType = 2; 
+}
+
+message NATInfoEntry {
+	IPVersion ipVersion = 1;
+	bytes address = 2;	// Can be both ipv4 and ipv6
+	uint32 minPort = 3; 
+	uint32 maxPort = 4;
+	bytes underlayRoute = 5;
+}
+
+message GetNATInfoReply {
+	NATIP natVIPIP = 1;
+	NATInfoType natInfoType = 2; 
+	repeated NATInfoEntry natInfoEntries = 3;
+} 
+
+message DeleteNATRequest {
+	bytes interfaceID =1;
+	NATIP natVIPIP = 2;
+}
+
+message AddNeighborNATRequest {
 	NATIP natVIPIP = 1;
 	uint32 vni = 2;
 	uint32 minPort = 3; // port should be uint16 (less than 65536)
 	uint32 maxPort = 4;
 	bytes underlayRoute = 5;
+}
+
+message DeleteNeighborNATRequest {
+	NATIP natVIPIP = 1;
+	uint32 vni = 2;
+	uint32 minPort = 3; // port should be uint16 (less than 65536)
+	uint32 maxPort = 4;
 }
 
 message RuleIDMsg {
@@ -367,12 +409,13 @@ service DPDKonmetal {
 	rpc deleteLoadBalancerTarget(DeleteLoadBalancerTargetRequest) returns (Status) {}
 
 	// Network-NAT related, add/del a NAT for an interface
-	rpc addNAT(NATMsg) returns (IpAdditionResponse) {}
-	rpc delNAT(NATMsg) returns (Status) {}
+	rpc addNAT(AddNATRequest) returns (AddNATResponse) {}
+	rpc deleteNAT(DeleteNATRequest) returns (Status) {}
 
-	rpc addNeighborNAT(NeighborNATMsg) returns (Status) {}
-	rpc delNeighborNAT(NeighborNATMsg) returns (Status) {}
+	rpc addNeighborNAT(AddNeighborNATRequest) returns (Status) {}
+	rpc deleteNeighborNAT(DeleteNeighborNATRequest) returns (Status) {}
 	
+	rpc getNATInfo(GetNATInfoRequest) returns (GetNATInfoReply) {}
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}

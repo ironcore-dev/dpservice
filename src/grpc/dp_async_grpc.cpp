@@ -952,6 +952,7 @@ int AddNATVIPCall::Proceed()
 		request.add_nat_vip.port_range[0] = request_.minport();
 		request.add_nat_vip.port_range[1] = request_.maxport();
 
+		DPS_LOG(INFO, DPSERVICE, "GRPC AddNATVIP called \n");
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -978,14 +979,14 @@ int AddNATVIPCall::Proceed()
 
 }
 
-int DelNATVIPCall::Proceed()
+int DeleteNATVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
-		new DelNATVIPCall(service_, cq_);
+		new DeleteNATVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
@@ -993,10 +994,12 @@ int DelNATVIPCall::Proceed()
 				 "%s", request_.interfaceid().c_str());
 		request.del_nat_vip.type = DP_NETNAT_INFO_TYPE_LOCAL;
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.add_nat_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			request.del_nat_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
 		}
+
+		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNATVIP called \n");
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1044,6 +1047,7 @@ int AddNeighborNATCall::Proceed()
 		inet_pton(AF_INET6, request_.underlayroute().c_str(),
 				  request.add_nat_neigh.route);
 
+		DPS_LOG(INFO, DPSERVICE, "GRPC AddNeighborNAT called \n");
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1065,14 +1069,14 @@ int AddNeighborNATCall::Proceed()
 
 }
 
-int DelNeighborNATCall::Proceed()
+int DeleteNeighborNATCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
-		new DelNeighborNATCall(service_, cq_);
+		new DeleteNeighborNATCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
@@ -1088,7 +1092,8 @@ int DelNeighborNATCall::Proceed()
 		request.del_nat_neigh.vni = request_.vni();
 		request.del_nat_neigh.port_range[0] = request_.minport();
 		request.del_nat_neigh.port_range[1] = request_.maxport();
-
+		
+		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNeighborNAT called \n");
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1154,6 +1159,92 @@ int ListInterfacesCall::Proceed()
 				grpc_service->CalculateUnderlayRoute(vm_info->vni, buf_bin, sizeof(buf_bin));
 				inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 				machine->set_underlayroute(buf_str);
+			}
+			read_so_far += (reply->com_head.msg_count - read_so_far);
+			is_chained = reply->com_head.is_chained;
+			rte_pktmbuf_free(mbuf);
+		} while (is_chained);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int GetNATInfoCall::Proceed()
+{
+	dp_request request = {0};
+	grpc::Status ret = grpc::Status::OK;
+	struct rte_mbuf *mbuf = NULL;
+	struct dp_reply *reply;
+	uint8_t is_chained = 0;
+	uint16_t read_so_far = 0;
+	int i;
+	NATInfoEntry *rep_nat_entry;
+	dp_nat_entry *dp_nat_item;
+	struct in_addr addr;
+	NATIP *nat_ip = new NATIP();
+	char buf[INET6_ADDRSTRLEN];
+
+	if (status_ == REQUEST) {
+		new GetNATInfoCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+
+		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
+			request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_LOCAL;
+		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
+			request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+
+		// request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_LOCAL;
+		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.get_nat_entry.ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.natvipip().address().c_str(),
+					  (in_addr*)&request.get_nat_entry.vip.vip_addr);
+		}
+		
+		DPS_LOG(INFO, DPSERVICE, "GRPC get NAT info called\n");
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.get_nat_entry.ip_type = RTE_ETHER_TYPE_IPV4;
+			nat_ip->set_address(request_.natvipip().address().c_str());
+			nat_ip->set_ipversion(request_.natvipip().ipversion());
+			reply_.set_allocated_natvipip(nat_ip);
+		}
+
+		reply_.set_natinfotype(request_.natinfotype());
+		
+		do {
+			if (dp_recv_from_worker_with_mbuf(&mbuf))
+				return -1;
+			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+
+			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+				rep_nat_entry = reply_.add_natinfoentries();
+				dp_nat_item = &((&reply->nat_entry)[i]);
+				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
+					addr.s_addr = htonl(dp_nat_item->m_ip.addr);
+					rep_nat_entry->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+					rep_nat_entry->set_address(inet_ntoa(addr));
+				}
+			
+				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
+					inet_ntop(AF_INET6, dp_nat_item->underlay_route, buf, INET6_ADDRSTRLEN);
+					rep_nat_entry->set_underlayroute(buf);
+				}
+
+				rep_nat_entry->set_minport(dp_nat_item->min_port);
+				rep_nat_entry->set_maxport(dp_nat_item->max_port);
 			}
 			read_so_far += (reply->com_head.msg_count - read_so_far);
 			is_chained = reply->com_head.is_chained;

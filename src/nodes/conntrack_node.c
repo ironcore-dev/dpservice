@@ -135,28 +135,6 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			return ret;
 		}
 
-
-	// ICMP incoming traffic is/is going to be handled seperately since icmp echo msgs need to be
-	// generated for LB and NAT
-	if ((df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING
-		&& (df_ptr->l4_type == IPPROTO_TCP || df_ptr->l4_type == IPPROTO_UDP || df_ptr->l4_type == IPPROTO_ICMP))
-		|| (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING && df_ptr->l4_type == IPPROTO_ICMP)) {
-
-		flow_typ = CONNTRACK_FLOW_PASSTHROUGH;
-
-		memset(&key, 0, sizeof(struct flow_key));
-		dp_build_flow_key(&key, m);
-		if (!dp_flow_exists(&key)) {
-			flow_val = flow_table_insert_entry(&key, df_ptr, m);
-			if (!flow_val)
-				printf("failed to add a flow table entry due to NULL flow_val pointer \n");
-		} else {
-			dp_get_flow_data(&key, (void **)&flow_val);
-			change_flow_state_dir(&key, flow_val, df_ptr, flow_typ);
-		}
-		flow_val->timestamp = rte_rdtsc();
-		df_ptr->conntrack = flow_val;
-	}
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		return CONNTRACK_NEXT_LB;
 

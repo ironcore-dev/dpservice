@@ -352,7 +352,7 @@ def test_vf_to_pf_network_nat(capsys, add_machine, build_path):
 		raise AssertionError('Received wrong packet with ip:'+pktip.dst+" dport:"+ str(pkttcp.dport))
 
 	expected_str = "Delnat"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip 
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 def send_bounce_pkt_to_pf():
@@ -398,7 +398,7 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 	expected_str = "Delnat"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 

@@ -375,7 +375,7 @@ err_key:
 	else
 		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 err:
-	printf("dnat table add entry failed\n");
+	// printf("dnat table add entry failed\n");
 	return ret;
 }
 
@@ -455,7 +455,7 @@ static int dp_check_port_network_nat_entry(struct network_nat_entry *entry, uint
 {
 	if (((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
 				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0))
-				&& entry->vni == vni && entry->port_range[0] <= port && entry->port_range[1] >= port)
+				&& entry->vni == vni && entry->port_range[0] <= port && entry->port_range[1] > port)
 		return 1;
 
 	else
@@ -469,16 +469,15 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 {
 
 	struct network_nat_entry *last;
-
 	if (network_nat_db != NULL) {
 		last = network_nat_db;
 		while (last->next != NULL) {
 			int is_entry_found = dp_cmp_network_nat_entry(last, nat_ipv4, nat_ipv6, vni, min_port, max_port);
-
-			if (!is_entry_found) {
-					printf("cannot add a redundant network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
+			if (is_entry_found) {
+					printf("cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n", nat_ipv4, vni, min_port, max_port);
 					return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
-				}
+			}
+			last = last->next;
 		}
 	}
 
@@ -507,6 +506,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	}
 
 	last->next = new_entry;
+
 	return EXIT_SUCCESS;
 
 }
@@ -609,7 +609,7 @@ uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_
 	network_key.vni = vni;
 	network_key.l4_type = l4_type;
 
-	for (uint16_t p = min_port; p <= max_port; p++) {
+	for (uint16_t p = min_port; p < max_port; p++) {
 		network_key.nat_port = p;
 		int ret = rte_hash_lookup(ipv4_network_dnat_tbl, &network_key);
 
@@ -649,4 +649,106 @@ int dp_remove_network_snat_port(uint32_t nat_ip, uint16_t nat_port, uint32_t vni
 		return -2;
 
 	return 0;
+}
+
+int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
+{
+	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
+	struct rte_mbuf *m_new, *m_curr = m;
+	uint16_t msg_per_buf;
+	struct nat_key *nkey;
+	struct snat_data *data;
+	dp_reply *rep;
+	uint32_t index = 0;
+	int32_t ret;
+	struct dp_nat_entry *rp_nat_entry;
+
+	if (rte_hash_count(ipv4_snat_tbl) == 0)
+		return EXIT_SUCCESS;
+
+	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
+										    &rep_arr_size, sizeof(struct dp_nat_entry));
+	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+
+	while (true) {
+		ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index);
+		if (ret == -EINVAL)
+			return DP_ERROR_VM_GET_NETNAT_ITER_ERROR;
+		
+		if (ret == -ENOENT)
+			break; // no more key-data item, thus break / return
+		
+		if (data->network_nat_ip == nat_ip) {
+			if (rep->com_head.msg_count &&
+				(rep->com_head.msg_count % msg_per_buf == 0)) {
+
+				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+				if (!m_new)
+					break;
+				m_curr = m_new;
+				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
+			}
+			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
+			// rp_nat_entry = (&rep->nat_entry) + (rep->com_head.msg_count % msg_per_buf) * sizeof(struct dp_nat_entry);
+			rep->com_head.msg_count++;
+			
+			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_LOCAL;
+			rp_nat_entry->min_port = data->network_nat_port_range[0];
+			rp_nat_entry->max_port = data->network_nat_port_range[1];
+			rp_nat_entry->m_ip.addr = nkey->ip;
+		}
+	}
+
+	if (rep_arr_size < 0) {
+		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
+		return EXIT_SUCCESS;
+	}
+
+	rep_arr[--rep_arr_size] = m_curr;
+
+	return EXIT_SUCCESS;
+}
+
+int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
+{
+	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
+	struct rte_mbuf *m_new, *m_curr = m;
+	uint16_t msg_per_buf;
+	dp_reply *rep;
+	struct dp_nat_entry *rp_nat_entry;
+	struct network_nat_entry *current = network_nat_db;
+
+	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
+										    &rep_arr_size, sizeof(struct dp_nat_entry));
+	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+
+	while (current != NULL) {
+		if (current->nat_ip.nat_ip4 == nat_ip) {
+			if (rep->com_head.msg_count &&
+				(rep->com_head.msg_count % msg_per_buf == 0)) {
+					m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
+					if (!m_new)
+						break;
+					m_curr = m_new;
+					rep = rte_pktmbuf_mtod(m_new, dp_reply*);
+			}
+			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
+			// rp_nat_entry = (&rep->nat_entry) + (rep->com_head.msg_count % msg_per_buf) * sizeof(struct dp_nat_entry);
+			rep->com_head.msg_count++;
+			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+			rp_nat_entry->min_port = current->port_range[0];
+			rp_nat_entry->max_port = current->port_range[1];
+			rte_memcpy(rp_nat_entry->underlay_route, current->dst_ipv6, sizeof(current->dst_ipv6));
+		}
+		current = current->next;
+	}
+
+	if (rep_arr_size < 0) {
+		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
+		return EXIT_SUCCESS;
+	}
+
+	rep_arr[--rep_arr_size] = m_curr;
+
+	return EXIT_SUCCESS;
 }
