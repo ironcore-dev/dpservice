@@ -322,7 +322,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 
 	root = get_lpm(vni, socketid);
 	if (!root)
-		return;
+		goto out;
 
 	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
 										    &rep_arr_size, sizeof(dp_route));
@@ -364,6 +364,8 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
 		return;
 	}
+
+out:
 	rep_arr[--rep_arr_size] = m_curr;
 }
 

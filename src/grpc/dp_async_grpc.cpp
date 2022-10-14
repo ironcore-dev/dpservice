@@ -762,7 +762,9 @@ int AddRouteCall::Proceed()
 		new AddRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPS_LOG(INFO, DPSERVICE, "GRPC add Route called\n");
+		DPS_LOG(INFO, DPSERVICE, "GRPC add Route called with parameters vni: %d prefix: %s length %d target hop %s\n", 
+				request_.vni().vni(), request_.route().prefix().address().c_str(), request_.route().prefix().prefixlength(),
+				request_.route().nexthopaddress().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
