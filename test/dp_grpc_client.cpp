@@ -614,7 +614,8 @@ public:
 			if (reply.status().error()) {
 				printf("Received an error %d \n", reply.status().error());
 			} else {
-				printf("Received LB with vni: %d LB ip: %s with ports: ", reply.vni(), reply.lbvipip().address().c_str());
+				printf("Received LB with vni: %d UL: %s LB ip: %s with ports: ", reply.vni(),
+					   reply.underlayroute().c_str(), reply.lbvipip().address().c_str());
 				for (i = 0; i < reply.lbports_size(); i++) {
 					if (reply.lbports(i).protocol() == TCP)
 						printf("%d,%s ", reply.lbports(i).port(), "tcp");
