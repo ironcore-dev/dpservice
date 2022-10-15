@@ -228,7 +228,8 @@ int AddLBVIPCall::Proceed()
 		new AddLBVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPS_LOG(INFO, DPSERVICE, "GRPC add LoadBalancer target called for id: %s\n", request_.loadbalancerid().c_str());
+		DPS_LOG(INFO, DPSERVICE, "GRPC add LoadBalancer target called for id: %s adding target %s\n",
+				request_.loadbalancerid().c_str(), request_.targetip().address().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());

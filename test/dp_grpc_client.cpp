@@ -698,7 +698,7 @@ public:
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			} else {
-				printf("Delete LB Success");
+				printf("Delete LB Success\n");
 			}
 	}
 
