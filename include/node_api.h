@@ -34,6 +34,7 @@ struct dp_flow {
 	uint16_t				src_port;
 	
 	uint8_t					icmp_type;
+	uint16_t				icmp_identifier;
 	uint32_t                dp_flow_hash;
 
 	struct {

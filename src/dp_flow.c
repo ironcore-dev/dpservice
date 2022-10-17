@@ -50,7 +50,7 @@ void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in 
 		key->src.port_src = rte_be_to_cpu_16(df_ptr->src_port);
 		break;
 	case IPPROTO_ICMP:
-		key->port_dst = 0;
+		key->port_dst = rte_be_to_cpu_16(df_ptr->icmp_identifier);
 		key->src.type_src = df_ptr->icmp_type;
 		break;
 	default:

@@ -60,8 +60,6 @@ struct flow_key {
 
 struct flow_nat_info {
 	uint8_t nat_type;
-	// uint8_t nat_addr4;
-	// uint8_t nat_port;
 	uint32_t vni;
 	uint8_t underlay_dst[16];
 	uint8_t l4_type;
