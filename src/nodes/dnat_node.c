@@ -65,7 +65,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 				dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
 				return DP_ROUTE_PKT_RELAY;
-			} 
+			}
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dnat_ip);
 			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
@@ -101,7 +101,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 
 			if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src)) == 0) {
-				printf("Error to replace l4 hdr's dst port with value %d \n", htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
+				DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's dst port with value %d \n", htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
 				return 0;
 			}
 		}

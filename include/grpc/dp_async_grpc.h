@@ -344,8 +344,8 @@ public:
 class GetNATInfoCall final: BaseCall {
 	ServerContext ctx_;
 	GetNATInfoRequest request_;
-	GetNATInfoReply reply_;
-	ServerAsyncResponseWriter<GetNATInfoReply> responder_;
+	GetNATInfoResponse reply_;
+	ServerAsyncResponseWriter<GetNATInfoResponse> responder_;
 
 public:
 	GetNATInfoCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)

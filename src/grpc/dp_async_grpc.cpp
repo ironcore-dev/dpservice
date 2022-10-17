@@ -106,7 +106,7 @@ int CreateLBCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_); 
+		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
@@ -774,7 +774,7 @@ int AddRouteCall::Proceed()
 		new AddRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPS_LOG(INFO, DPSERVICE, "GRPC add Route called with parameters vni: %d prefix: %s length %d target hop %s\n", 
+		DPS_LOG(INFO, DPSERVICE, "GRPC add Route called with parameters vni: %d prefix: %s length %d target hop %s\n",
 				request_.vni().vni(), request_.route().prefix().address().c_str(), request_.route().prefix().prefixlength(),
 				request_.route().nexthopaddress().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
@@ -1092,7 +1092,7 @@ int DeleteNeighborNATCall::Proceed()
 		request.del_nat_neigh.vni = request_.vni();
 		request.del_nat_neigh.port_range[0] = request_.minport();
 		request.del_nat_neigh.port_range[1] = request_.maxport();
-		
+
 		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNeighborNAT called \n");
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -1200,13 +1200,12 @@ int GetNATInfoCall::Proceed()
 		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
 			request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 
-		// request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_LOCAL;
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.get_nat_entry.ip_type = RTE_ETHER_TYPE_IPV4;
 			inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.get_nat_entry.vip.vip_addr);
 		}
-		
+
 		DPS_LOG(INFO, DPSERVICE, "GRPC get NAT info called\n");
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -1223,7 +1222,7 @@ int GetNATInfoCall::Proceed()
 		}
 
 		reply_.set_natinfotype(request_.natinfotype());
-		
+
 		do {
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
@@ -1237,7 +1236,7 @@ int GetNATInfoCall::Proceed()
 					rep_nat_entry->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 					rep_nat_entry->set_address(inet_ntoa(addr));
 				}
-			
+
 				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
 					inet_ntop(AF_INET6, dp_nat_item->underlay_route, buf, INET6_ADDRSTRLEN);
 					rep_nat_entry->set_underlayroute(buf);

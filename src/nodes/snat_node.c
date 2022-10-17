@@ -10,6 +10,7 @@
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/snat_node.h"
+#include "dp_util.h"
 
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -41,12 +42,11 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		uint16_t nat_port;
 		uint32_t vni =  dp_get_vm_vni(m->port);
-		
+
 		src_ip = ntohl(df_ptr->src.src_addr);
 		dp_check_if_ip_natted(src_ip, vni, &nat_check);
 		if ((nat_check.is_vip_natted || nat_check.is_network_natted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-			
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			if (nat_check.is_vip_natted) {
 				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));
@@ -62,13 +62,13 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			if (nat_check.is_network_natted) {
 				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->src_port, vni, df_ptr->l4_type));
 				if (nat_port == 0) {
-					printf("an invalid network nat port is allocated \n");
+					DPS_LOG(ERR, DPSERVICE, "an invalid network nat port is allocated \n");
 					return 0;
 				}
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
-					printf("Error to replace l4 hdr's src port with value %d \n", nat_port);
+					DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", nat_port);
 					return 0;
 				}
 
@@ -102,9 +102,8 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-
 			if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
-				printf("Error to replace l4 hdr's src port with value %d \n", htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
+				DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
 				return 0;
 			}
 

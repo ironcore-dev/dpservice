@@ -295,7 +295,7 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 		if (pos < 0) {
 			printf("SNAT hash key already deleted \n");
 			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
-		} else{
+		} else {
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 			return DP_ERROR_VM_DEL_NETNAT_DELETE_FAIL;
 		}
@@ -364,7 +364,7 @@ int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni)
 		ret = DP_ERROR_VM_ADD_DNAT_ADD_KEY;
 		goto out;
 	}
-	
+
 	return ret;
 out:
 	rte_free(v_ip);
@@ -469,13 +469,15 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 {
 
 	struct network_nat_entry *last;
+
 	if (network_nat_db != NULL) {
 		last = network_nat_db;
 		while (last->next != NULL) {
 			int is_entry_found = dp_cmp_network_nat_entry(last, nat_ipv4, nat_ipv6, vni, min_port, max_port);
+
 			if (is_entry_found) {
-					printf("cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n", nat_ipv4, vni, min_port, max_port);
-					return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
+				DPS_LOG(ERR, DPSERVICE, "cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n", nat_ipv4, vni, min_port, max_port);
+				return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
 			}
 			last = last->next;
 		}
@@ -484,7 +486,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	struct network_nat_entry *new_entry = (struct network_nat_entry *)rte_zmalloc("network_nat_array", sizeof(struct network_nat_entry), RTE_CACHE_LINE_SIZE);
 
 	if (!new_entry) {
-		printf("failed to allocate network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
+		DPS_LOG(ERR, DPSERVICE, "failed to allocate network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
 		return DP_ERROR_VM_ADD_NEIGHNAT_ALLOC;
 	}
 
@@ -620,7 +622,7 @@ uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_
 	}
 
 	if (rte_hash_add_key(ipv4_network_dnat_tbl, (const void *)&network_key) < 0) {
-		printf("failed to add to ipv4 network dnat table \n");
+		DPS_LOG(ERR, DPSERVICE, "failed to add to ipv4 network dnat table \n");
 		return 0;
 	}
 
@@ -674,10 +676,10 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 		ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index);
 		if (ret == -EINVAL)
 			return DP_ERROR_VM_GET_NETNAT_ITER_ERROR;
-		
+
 		if (ret == -ENOENT)
 			break; // no more key-data item, thus break / return
-		
+
 		if (data->network_nat_ip == nat_ip) {
 			if (rep->com_head.msg_count &&
 				(rep->com_head.msg_count % msg_per_buf == 0)) {
@@ -689,9 +691,8 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
 			}
 			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
-			// rp_nat_entry = (&rep->nat_entry) + (rep->com_head.msg_count % msg_per_buf) * sizeof(struct dp_nat_entry);
 			rep->com_head.msg_count++;
-			
+
 			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_LOCAL;
 			rp_nat_entry->min_port = data->network_nat_port_range[0];
 			rp_nat_entry->max_port = data->network_nat_port_range[1];
@@ -733,7 +734,6 @@ int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 					rep = rte_pktmbuf_mtod(m_new, dp_reply*);
 			}
 			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
-			// rp_nat_entry = (&rep->nat_entry) + (rep->com_head.msg_count % msg_per_buf) * sizeof(struct dp_nat_entry);
 			rep->com_head.msg_count++;
 			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 			rp_nat_entry->min_port = current->port_range[0];

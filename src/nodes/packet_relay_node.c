@@ -9,6 +9,7 @@
 #include "dp_lpm.h"
 #include "dpdk_layer.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_util.h"
 
 struct packet_relay_node_main packet_relay_node;
 
@@ -38,7 +39,7 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 		return ret;
 
 	if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-		printf("received a icmp pkt in relay node \n");
+		DPS_LOG(INFO, DPSERVICE, "received a icmp pkt in relay node \n");
 		return ret;
 	}
 

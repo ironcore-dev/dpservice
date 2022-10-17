@@ -265,7 +265,7 @@ message NATInfoEntry {
 	bytes underlayRoute = 5;
 }
 
-message GetNATInfoReply {
+message GetNATInfoResponse {
 	NATIP natVIPIP = 1;
 	NATInfoType natInfoType = 2; 
 	repeated NATInfoEntry natInfoEntries = 3;
@@ -415,7 +415,7 @@ service DPDKonmetal {
 	rpc addNeighborNAT(AddNeighborNATRequest) returns (Status) {}
 	rpc deleteNeighborNAT(DeleteNeighborNATRequest) returns (Status) {}
 	
-	rpc getNATInfo(GetNATInfoRequest) returns (GetNATInfoReply) {}
+	rpc getNATInfo(GetNATInfoRequest) returns (GetNATInfoResponse) {}
 
 	//// ROUTES
 	rpc listRoutes(VNIMsg) returns (RoutesMsg) {}

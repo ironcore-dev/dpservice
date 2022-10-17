@@ -16,7 +16,6 @@ void dp_last_mbuf_from_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_ar
 	rte_pktmbuf_free(m_curr);
 	rep = rte_pktmbuf_mtod(rep_arr[0], dp_reply*);
 	rep->com_head.is_chained = 0;
-	// rep->com_head.is_chained = 1;
 }
 
 uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[],
@@ -29,8 +28,6 @@ uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep
 	msg_per_buf = buf_size / size;
 	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
 	rep->com_head.msg_count = 0;
-	// new
-	// rep->com_head.is_chained = 0;
 
 	return msg_per_buf;
 }
@@ -746,7 +743,7 @@ out:
 
 static int dp_process_getnatentry(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
-	if (req->get_nat_entry.ip_type == RTE_ETHER_TYPE_IPV4){
+	if (req->get_nat_entry.ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (req->get_nat_entry.type == DP_NETNAT_INFO_TYPE_LOCAL)
 			return dp_list_nat_local_entry(m, rep_arr, ntohl(req->get_nat_entry.vip.vip_addr));
 		else if (req->get_nat_entry.type == DP_NETNAT_INFO_TYPE_NEIGHBOR)
@@ -861,10 +858,6 @@ int dp_process_request(struct rte_mbuf *m)
 			if (m_arr[i])
 				rte_ring_sp_enqueue(get_dpdk_layer()->grpc_rx_queue, m_arr[i]);
 		}
-		// for (i = 0; i < DP_MBUF_ARR_SIZE; i++) {
-		// 	if (m_arr[i])
-		// 		rte_ring_sp_enqueue(get_dpdk_layer()->grpc_rx_queue, m_arr[i]);
-		// }
 	}
 	return ret;
 }

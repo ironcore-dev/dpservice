@@ -908,7 +908,7 @@ public:
 
 	void GetNATInfo() {
 		GetNATInfoRequest request;
-		GetNATInfoReply reply;
+		GetNATInfoResponse reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 		int i;
@@ -920,9 +920,7 @@ public:
 			nat_vip->set_address(ip6_str);
 		}
 
-		printf("query nat info %s \n", ip_str);
 		request.set_allocated_natvipip(nat_vip);
-		printf("query nat info %s \n", request.natvipip().address().c_str());
 
 		if (!strcmp(get_nat_info_type_str,"local"))
 			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoLocal);

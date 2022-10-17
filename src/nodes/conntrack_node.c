@@ -107,8 +107,6 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if (!dp_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
-	// The incoming traffic is first searched against conntracktable
-	// if a new entry is needed to relayed due to neighboring NAT requirement, it is redirected to the relay node
 	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
 		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
 			memset(&key, 0, sizeof(struct flow_key));
@@ -116,6 +114,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			if (dp_flow_exists(&key)) {
 				dp_get_flow_data(&key, (void **)&flow_val);
 
+				// for existing incoming flow containing a flag indicating it needs to be redirected to network, do it here to short-cut.
 				if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 					flow_typ = CONNTRACK_FLOW_RELAY;
 					ret = DP_ROUTE_PKT_RELAY;
@@ -127,7 +126,7 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			} else {
 				flow_val = flow_table_insert_entry(&key, df_ptr, m);
 				if (!flow_val)
-					printf("failed to add a flow table entry due to NULL flow_val pointer \n");
+					DPS_LOG(ERR, DPSERVICE, "failed to add a flow table entry due to NULL flow_val pointer \n");
 				ret = 0;
 			}
 			flow_val->timestamp = rte_rdtsc();
