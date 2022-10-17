@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+#define DP_UNDEFINED_VNI 0
+
 typedef enum {
 	DP_REQ_TYPE_NONE,
 	DP_REQ_TYPE_ADDLBVIP,
