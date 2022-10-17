@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-	enum
+	enum 
 	{
 		PACKET_RELAY_NEXT_DROP,
 		PACKET_RELAY_NEXT_OVERLAY_SWITCH,

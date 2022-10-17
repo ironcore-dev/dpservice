@@ -368,12 +368,13 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_PFX_LB_NUM:
 			pfx_lb_enabled = true;
+			break;
 		case CMD_LINE_OPT_ADD_NAT_VIP_NUM:
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			command = DP_CMD_ADD_NAT_VIP;
 			break;
 		case CMD_LINE_OPT_DEL_NAT_VIP_NUM:
-			strncpy(machine_str, optarg, 29);
+			strncpy(machine_str, optarg, 63);
 			command = DP_CMD_DEL_NAT_VIP;
 			break;
 		case CMD_LINE_OPT_NAT_MIN_PORT_NUM:

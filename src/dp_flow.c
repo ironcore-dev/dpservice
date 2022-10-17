@@ -99,11 +99,10 @@ void dp_add_flow(struct flow_key *key)
 void dp_delete_flow(struct flow_key *key)
 {
 	int pos;
-	
 	if (dp_flow_exists(key)) {
 		pos = rte_hash_del_key(ipv4_flow_tbl, key);
 		if (pos < 0)
-			printf("Hash key already deleted\n");
+			DPS_LOG(WARNING, DPSERVICE, "Hash key already deleted \n");
 		else
 			rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
 	}
@@ -153,9 +152,8 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 		nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
 		int ret = dp_remove_network_snat_port(nat_ip, nat_port, vni, cntrack->nat_info.l4_type);
 
-		if (ret < 0) {
-			printf("failed to remove an allocated network NAT port: %d, vni %d , with error code %d \n", nat_port, vni, ret);
-		}
+		if (ret < 0)
+			DPS_LOG(ERR, DPSERVICE, "failed to remove an allocated network NAT port: %d, vni %d , with error code %d \n", nat_port, vni, ret);
 	}
 }
 
@@ -186,7 +184,7 @@ void dp_process_aged_flows(int port_id)
 		if (!agectx)
 			continue;
 		rte_flow_destroy(port_id, agectx->rte_flow, &error);
-		printf("Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
+		DPS_LOG(INFO, DPSERVICE, "Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
 			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
 		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
 			dp_free_flow(agectx->cntrack);

@@ -952,7 +952,8 @@ int AddNATVIPCall::Proceed()
 		request.add_nat_vip.port_range[0] = request_.minport();
 		request.add_nat_vip.port_range[1] = request_.maxport();
 
-		DPS_LOG(INFO, DPSERVICE, "GRPC AddNATVIP called \n");
+		DPS_LOG(INFO, DPSERVICE, "GRPC AddNATVIP is called to add a local NAT entry: interface %s -> NAT IP %s, with port range [%d, %d) \n",
+				 request_.interfaceid().c_str(), request_.natvipip().address().c_str(), request_.minport(), request_.maxport());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -999,7 +1000,8 @@ int DeleteNATVIPCall::Proceed()
 					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
 		}
 
-		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNATVIP called \n");
+		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNATVIP is called to delete a local NAT entry: interface %s -> NAT IP %s \n",
+				 request_.interfaceid().c_str(), request_.natvipip().address().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1047,7 +1049,8 @@ int AddNeighborNATCall::Proceed()
 		inet_pton(AF_INET6, request_.underlayroute().c_str(),
 				  request.add_nat_neigh.route);
 
-		DPS_LOG(INFO, DPSERVICE, "GRPC AddNeighborNAT called \n");
+		DPS_LOG(INFO, DPSERVICE, "GRPC AddNeighborNAT is called to add a neigh NAT entry: NAT IP %s, port range [%d, %d) for vni %d, with route %s \n",
+				request_.natvipip().address().c_str(), request_.minport(), request_.maxport(), request_.vni(), request_.underlayroute().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1093,7 +1096,8 @@ int DeleteNeighborNATCall::Proceed()
 		request.del_nat_neigh.port_range[0] = request_.minport();
 		request.del_nat_neigh.port_range[1] = request_.maxport();
 
-		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNeighborNAT called \n");
+		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNeighborNAT is called to delete a neigh NAT entry: NAT IP %s, port range [%d, %d) for vni %d \n", 
+				request_.natvipip().address().c_str(), request_.minport(), request_.maxport(), request_.vni());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1206,7 +1210,7 @@ int GetNATInfoCall::Proceed()
 					  (in_addr*)&request.get_nat_entry.vip.vip_addr);
 		}
 
-		DPS_LOG(INFO, DPSERVICE, "GRPC get NAT info called\n");
+		DPS_LOG(INFO, DPSERVICE, "GRPC getNATInfo is called to get entries for NAT IP %s \n", request_.natvipip().address().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;

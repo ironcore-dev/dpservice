@@ -65,8 +65,7 @@ static __rte_always_inline uint16_t packet_relay_node_process(struct rte_graph *
 
 	pkts = (struct rte_mbuf **)objs;
 
-	for (i = 0; i < cnt; i++)
-	{
+	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		ret = handle_packet_relay(mbuf0);
 

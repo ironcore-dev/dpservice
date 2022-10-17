@@ -172,11 +172,11 @@ out:
 err_key:
 	pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 	if (pos < 0)
-		printf("SNAT hash key already deleted \n");
+		DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 err:
-	printf("snat table add ip failed\n");
+	DPS_LOG(ERR, DPSERVICE, "snat table add ip failed\n");
 	return ret;
 }
 
@@ -234,11 +234,11 @@ out:
 err_key:
 	pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 	if (pos < 0)
-		printf("SNAT hash key already deleted \n");
+		DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 err:
-	printf("snat table add ip failed\n");
+	DPS_LOG(ERR, DPSERVICE, "snat table add ip failed\n");
 	return ret;
 }
 
@@ -262,7 +262,7 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
 		if (pos < 0)
-			printf("SNAT hash key already deleted \n");
+			DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
 		else
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 	}
@@ -293,7 +293,7 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
 		if (pos < 0) {
-			printf("SNAT hash key already deleted \n");
+			DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");;
 			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
 		} else {
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
@@ -371,11 +371,10 @@ out:
 err_key:
 	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
 	if (pos < 0)
-		printf("DNAT hash key already deleted \n");
+		DPS_LOG(WARNING, DPSERVICE, "DNAT hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 err:
-	// printf("dnat table add entry failed\n");
 	return ret;
 }
 
@@ -394,7 +393,7 @@ void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
 
 	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
 	if (pos < 0)
-		printf("DNAT hash key already deleted \n");
+		DPS_LOG(WARNING, DPSERVICE, "DNAT hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 }
@@ -476,7 +475,8 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 			int is_entry_found = dp_cmp_network_nat_entry(last, nat_ipv4, nat_ipv6, vni, min_port, max_port);
 
 			if (is_entry_found) {
-				DPS_LOG(ERR, DPSERVICE, "cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n", nat_ipv4, vni, min_port, max_port);
+				DPS_LOG(ERR, DPSERVICE, "cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n", 
+						nat_ipv4, vni, min_port, max_port);
 				return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
 			}
 			last = last->next;

@@ -53,35 +53,31 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	return flow_val;
 }
 
-static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df_ptr, 
-													int flow_typ)
+static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df_ptr)
 {
 
-	if (flow_typ == CONNTRACK_FLOW_RELAY) {
+	if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
-	}
-
-	if (flow_typ == CONNTRACK_FLOW_PASSTHROUGH) {
+	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
-			if (flow_val->flow_state == DP_FLOW_STATE_NEW) {
+			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_REPLY;
-			}
+			
 			flow_val->dir = DP_FLOW_DIR_REPLY;
 		}
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-			if (flow_val->flow_state == DP_FLOW_STATE_REPLY) {
+			if (flow_val->flow_state == DP_FLOW_STATE_REPLY)
 				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
-			}
+			
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	}
 	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
-
 }
 
 static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
@@ -90,7 +86,6 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key key;
-	int ret = 0, flow_typ;
 
 	df_ptr = get_dp_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -113,25 +108,14 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 			dp_build_flow_key(&key, m);
 			if (dp_flow_exists(&key)) {
 				dp_get_flow_data(&key, (void **)&flow_val);
-
-				// for existing incoming flow containing a flag indicating it needs to be redirected to network, do it here to short-cut.
-				if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
-					flow_typ = CONNTRACK_FLOW_RELAY;
-					ret = DP_ROUTE_PKT_RELAY;
-				} else {
-					flow_typ = CONNTRACK_FLOW_PASSTHROUGH;
-					ret = 0; // to be more explicite
-				}
-				change_flow_state_dir(&key, flow_val, df_ptr, flow_typ);
+				change_flow_state_dir(&key, flow_val, df_ptr);
 			} else {
 				flow_val = flow_table_insert_entry(&key, df_ptr, m);
 				if (!flow_val)
 					DPS_LOG(ERR, DPSERVICE, "failed to add a flow table entry due to NULL flow_val pointer \n");
-				ret = 0;
 			}
 			flow_val->timestamp = rte_rdtsc();
 			df_ptr->conntrack = flow_val;
-			return ret;
 		}
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
@@ -157,8 +141,6 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 		if (route >= 0)
 			rte_node_enqueue_x1(graph, node, route,
 								mbuf0);
-		else if (route == DP_ROUTE_PKT_RELAY)
-			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_PACKET_RELAY, mbuf0);
 		else
 			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DROP, mbuf0);
 	}
@@ -175,7 +157,6 @@ static struct rte_node_register conntrack_node_base = {
 	.next_nodes = {
 			[CONNTRACK_NEXT_LB] = "lb",
 			[CONNTRACK_NEXT_DNAT] = "dnat",
-			[CONNTRACK_NEXT_PACKET_RELAY] = "packet_relay",
 			[CONNTRACK_NEXT_DROP] = "drop",
 		},
 };
