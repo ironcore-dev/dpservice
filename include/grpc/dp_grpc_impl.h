@@ -49,6 +49,11 @@ typedef enum {
 	DP_NETNAT_INFO_TYPE_NEIGHBOR,
 } dp_netnat_info_type;
 
+typedef enum {
+	DP_ROUTE_TYPE_STANDARD,
+	DP_ROUTE_TYPE_LOADBALANCED,
+} dp_route_type;
+
 typedef struct dp_com_head {
 	uint8_t com_type;
 	uint8_t is_chained;
@@ -168,7 +173,11 @@ typedef struct dp_addroute {
 	} trgt_ip;
 	uint32_t	vni;
 	uint32_t	trgt_vni;
-	uint32_t	weight;
+	uint16_t	weight;
+	struct {
+		uint8_t route_type;
+		uint8_t reserved;
+	} flags;
 } dp_route;
 
 typedef struct dp_nat_vip {

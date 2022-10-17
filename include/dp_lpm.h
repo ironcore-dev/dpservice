@@ -15,6 +15,11 @@
 extern "C" {
 #endif
 
+#define DP_ROUTE_WRITE_MASK_N_HOP	0xFFFFFFFFFFFF0000
+#define DP_ROUTE_READ_MASK_N_HOP	0x000000000000FFFF
+#define DP_ROUTE_READ_MASK_TYPE		0x00000000FFFF0000
+#define DP_ROUTE_WRITE_MASK_TYPE	0xFFFFFFFF0000FFFF
+
 #define DP_ROUTE_DHCP		-2
 #define DP_ROUTE_DROP		-3
 #define DP_ROUTE_FIREWALL	-4
@@ -88,7 +93,7 @@ uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_dhcp_range_ip6(uint16_t portid);
 uint8_t* dp_get_vm_ip6(uint16_t portid);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 uint8_t* ip6, uint8_t depth, int socketid);
+				 uint8_t* ip6, uint8_t depth, dp_route_type rt, int socketid);
 int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
 				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid);
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
