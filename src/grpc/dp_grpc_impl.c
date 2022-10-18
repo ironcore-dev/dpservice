@@ -298,6 +298,13 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 			}
 		}
 	}
+	if (req->add_pfx.pfx_lb_enabled){
+		rep->route.vni = DP_UNDEFINED_VNI;
+		memcpy(rep->route.trgt_ip.addr6, req->add_pfx.pfx_ul_addr6, sizeof(rep->route.trgt_ip.addr6));
+	} else {
+		rep->route.vni = dp_get_vm_vni(port_id);
+	}
+
 	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
 err:
