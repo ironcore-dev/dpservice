@@ -10,13 +10,13 @@
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/snat_node.h"
+#include "dp_util.h"
 
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct snat_node_ctx *ctx = (struct snat_node_ctx *)node->ctx;
 
 	ctx->next = SNAT_NEXT_DROP;
-
 
 	RTE_SET_USED(graph);
 
@@ -29,6 +29,7 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 	struct dp_flow *df_ptr;
 	struct flow_value *cntrack = NULL;
 	uint32_t src_ip;
+	struct nat_check_result nat_check;
 
 	df_ptr = get_dp_flow_ptr(m);
 
@@ -39,13 +40,46 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		return 1;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
+		uint16_t nat_port;
+		uint32_t vni =  dp_get_vm_vni(m->port);
+
 		src_ip = ntohl(df_ptr->src.src_addr);
-		if (dp_is_ip_snatted(src_ip, dp_get_vm_vni(m->port)) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
+		dp_check_if_ip_natted(src_ip, vni, &nat_check);
+		if ((nat_check.is_vip_natted || nat_check.is_network_natted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
-			ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, dp_get_vm_vni(m->port)));
+			if (nat_check.is_vip_natted) {
+				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));
+				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
+			}
+
+			if (!nat_check.is_vip_natted && nat_check.is_network_natted && df_ptr->l4_type == DP_IP_PROTO_ICMP) {
+				if (dp_flow_exists(&cntrack->flow_key[DP_FLOW_DIR_REPLY]))
+					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
+				return 0; // drop icmp pkt if a vm is only network-natted
+			}
+
+			if (nat_check.is_network_natted) {
+				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->src_port, vni, df_ptr->l4_type));
+				if (nat_port == 0) {
+					DPS_LOG(ERR, DPSERVICE, "an invalid network nat port is allocated \n");
+					return 0;
+				}
+				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
+
+				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
+					DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", nat_port);
+					return 0;
+				}
+
+				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
+				cntrack->nat_info.vni = vni;
+				cntrack->nat_info.l4_type = df_ptr->l4_type;
+			}
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 			df_ptr->nat_addr = df_ptr->src.src_addr;
+			if (nat_check.is_network_natted)
+				df_ptr->nat_port = nat_port;
 			df_ptr->src.src_addr = ipv4_hdr->src_addr;
 			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 
@@ -53,6 +87,9 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
+			if (nat_check.is_network_natted)
+				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = ntohs(nat_port);
+
 			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 		}
@@ -63,6 +100,16 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		cntrack->dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
+
+		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+			if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
+				DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
+				return 0;
+			}
+
+			df_ptr->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
+		}
+
 		df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 		df_ptr->nat_addr = df_ptr->src.src_addr;
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
@@ -101,7 +148,7 @@ static __rte_always_inline uint16_t snat_node_process(struct rte_graph *graph,
 			next_index = SNAT_NEXT_FIREWALL;
 
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}	
+	}
 
 	return cnt;
 }
@@ -112,8 +159,8 @@ static struct rte_node_register snat_node_base = {
 	.process = snat_node_process,
 
 	.nb_edges = SNAT_NEXT_MAX,
-	.next_nodes =
-		{
+	.next_nodes = {
+
 			[SNAT_NEXT_FIREWALL] = "firewall",
 			[SNAT_NEXT_DROP] = "drop",
 		},

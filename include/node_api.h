@@ -27,6 +27,7 @@ struct dp_flow {
 		uint8_t		src_addr6[16];
 	} src;
 	uint32_t	nat_addr;
+	uint16_t	nat_port;
 	
 	uint8_t					l4_type;
 	uint16_t				dst_port;
@@ -54,6 +55,7 @@ struct dp_mbuf_priv1 {
 };
 
 typedef enum {
+	DP_PER_TYPE_ZERO,
  	DP_PER_TYPE_ND_RA,
  	DP_PER_TYPE_DIRECT_TX,
  } dp_periodic_type;

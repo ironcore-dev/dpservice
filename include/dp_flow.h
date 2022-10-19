@@ -34,6 +34,18 @@ enum {
 	DP_FLOW_STATUS_DST_LB,
 };
 
+enum {
+	DP_FLOW_NAT_TYPE_ZERO,
+	DP_FLOW_NAT_TYPE_VIP,
+	DP_FLOW_NAT_TYPE_NETWORK_LOCAL,
+	DP_FLOW_NAT_TYPE_NETWORK_NEIGH,
+};
+
+enum {
+	DP_FLOW_ACTION_UNSPECIFIC,
+	DP_FLOW_ACTION_DROP,
+};
+
 struct flow_key {
 	uint32_t ip_dst;
 	uint32_t ip_src;
@@ -46,6 +58,16 @@ struct flow_key {
 	uint8_t  proto;
 } __rte_packed;
 
+struct flow_nat_info {
+	uint8_t nat_type;
+	// uint8_t nat_addr4;
+	// uint8_t nat_port;
+	uint32_t vni;
+	uint8_t underlay_dst[16];
+	uint8_t l4_type;
+};
+
+
 struct flow_value {
 	uint16_t		flow_status;
 	uint16_t		flow_state;
@@ -55,6 +77,8 @@ struct flow_value {
 	uint64_t		timestamp;
 	uint8_t			lb_dst_addr6[16];
 	rte_atomic32_t	flow_cnt;
+	struct flow_nat_info	nat_info;
+	uint8_t			action[DP_FLOW_DIR_MAX];
 };
 
 struct flow_age_ctx {
@@ -75,6 +99,7 @@ void dp_init_flowtable(int socket_id);
 void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct flow_value *cntrack);
+void dp_free_network_nat_port(struct flow_value *cntrack);
 
 hash_sig_t dp_get_flow_hash_value(struct flow_key *key);
 

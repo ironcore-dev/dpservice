@@ -29,6 +29,10 @@ extern "C"
 #define DP_IS_SRC false
 #define DP_IS_DST true
 
+#define DP_L4_PORT_DIR_SRC 1
+#define DP_L4_PORT_DIR_DST 2
+
+
 // #define DP_RTE_FLOW_DEFAULT_GROUP	0
 // #define DP_RTE_FLOW_VNET_GROUP		1
 
@@ -38,6 +42,10 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); /
 int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset,  tcp/udp/icmp header
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m);
+struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
+struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset);
+
+uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val);
 
 // functions to craft actions/patterns are added later
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer);

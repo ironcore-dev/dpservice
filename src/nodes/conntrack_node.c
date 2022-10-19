@@ -10,6 +10,9 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/conntrack_node.h"
 #include "nodes/dhcp_node.h"
+#include "dp_nat.h"
+#include <stdio.h>
+#include <unistd.h>
 
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -18,10 +21,63 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 
 	ctx->next = CONNTRACK_NEXT_DROP;
 
-
 	RTE_SET_USED(graph);
 
 	return 0;
+}
+
+static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df_ptr, struct rte_mbuf *m)
+{
+	struct flow_value *flow_val = NULL;
+
+	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
+	if (!flow_val)
+		return flow_val;
+	/* Add original direction to conntrack table */
+	dp_add_flow(key);
+	rte_atomic32_clear(&flow_val->flow_cnt);
+	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
+	flow_val->flow_state = DP_FLOW_STATE_NEW;
+	flow_val->flow_status = DP_FLOW_STATUS_NONE;
+	flow_val->dir = DP_FLOW_DIR_ORG;
+	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_ZERO; // init this flag
+	dp_add_flow_data(key, flow_val);
+
+	// Only the original flow (outgoing)'s hash value is recorded
+	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
+
+	dp_invert_flow_key(key);
+	flow_val->flow_key[DP_FLOW_DIR_REPLY] = *key;
+	dp_add_flow(key);
+	dp_add_flow_data(key, flow_val);
+	return flow_val;
+}
+
+static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df_ptr)
+{
+
+	if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
+		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
+			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
+				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
+			flow_val->dir = DP_FLOW_DIR_ORG;
+		}
+	} else {
+		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
+			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
+				flow_val->flow_state = DP_FLOW_STATE_REPLY;
+			
+			flow_val->dir = DP_FLOW_DIR_REPLY;
+		}
+
+		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
+			if (flow_val->flow_state == DP_FLOW_STATE_REPLY)
+				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
+			
+			flow_val->dir = DP_FLOW_DIR_ORG;
+		}
+	}
+	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
 }
 
 static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
@@ -48,46 +104,20 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 
 	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
 		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
-		memset(&key, 0, sizeof(struct flow_key));
-
-		dp_build_flow_key(&key, m);
-		if (!dp_flow_exists(&key)) {
-			/* Add original direction to conntrack table */
-			dp_add_flow(&key);
-			flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
-			rte_atomic32_clear(&flow_val->flow_cnt);
-			flow_val->flow_key[DP_FLOW_DIR_ORG] = key;
-			flow_val->flow_state = DP_FLOW_STATE_NEW;
-			flow_val->flow_status = DP_FLOW_STATUS_NONE;
-			flow_val->dir = DP_FLOW_DIR_ORG;
-			dp_add_flow_data(&key, flow_val);
-
-			// Only the original flow (outgoing)'s hash value is recorded
-			df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(&key);
-
-			/* Add reply direction to the conntrack table */
-			dp_invert_flow_key(&key);
-			flow_val->flow_key[DP_FLOW_DIR_REPLY] = key;
-			dp_add_flow(&key);
-			dp_add_flow_data(&key, flow_val);
-		} else {
-			dp_get_flow_data(&key, (void **)&flow_val);
-			if (dp_are_flows_identical(&key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
-				if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-					flow_val->flow_state = DP_FLOW_STATE_REPLY;
-				flow_val->dir = DP_FLOW_DIR_REPLY;
+			memset(&key, 0, sizeof(struct flow_key));
+			dp_build_flow_key(&key, m);
+			if (dp_flow_exists(&key)) {
+				dp_get_flow_data(&key, (void **)&flow_val);
+				change_flow_state_dir(&key, flow_val, df_ptr);
+			} else {
+				flow_val = flow_table_insert_entry(&key, df_ptr, m);
+				if (!flow_val)
+					DPS_LOG(ERR, DPSERVICE, "failed to add a flow table entry due to NULL flow_val pointer \n");
 			}
-			if (dp_are_flows_identical(&key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-				if (flow_val->flow_state == DP_FLOW_STATE_REPLY)
-					flow_val->flow_state = DP_FLOW_STATE_ESTAB;
-				flow_val->dir = DP_FLOW_DIR_ORG;
-			}
-			df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(&key);
+			flow_val->timestamp = rte_rdtsc();
+			df_ptr->conntrack = flow_val;
 		}
-		flow_val->timestamp = rte_rdtsc();
 
-		df_ptr->conntrack = flow_val;
-	}
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		return CONNTRACK_NEXT_LB;
 

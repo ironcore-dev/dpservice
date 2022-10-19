@@ -46,6 +46,7 @@ struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbu
 	rep->com_head.is_chained = 1;
 	rep_new = rte_pktmbuf_mtod(m_new, dp_reply*);
 	rep_new->com_head.msg_count = rep->com_head.msg_count;
+	rep_new->com_head.is_chained = 0;
 	if (--(*size) < 0)
 		return NULL;
 	rep_arr[*size] = m_curr;
@@ -523,6 +524,139 @@ err:
 	return ret;
 }
 
+static int dp_process_addnat(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	uint32_t vm_vni;
+
+	if (req->add_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL) {
+		ret = DP_ERROR_VM_ADD_NETNAT_NONLOCAL;
+		goto err;
+	}
+
+	port_id = dp_get_portid_with_vm_handle(req->add_nat_vip.machine_id);
+
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_VM_NOT_FND;
+		goto err;
+	}
+
+	vm_vni = dp_get_vm_vni(port_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_ADD_NETNAT_INVALID_PORT;
+		goto err;
+	}
+
+	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+
+		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
+									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
+
+		if (ret)
+			goto err;
+
+		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr),
+								0, vm_vni);
+		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
+			goto err;
+	}
+	rep->vni = vm_vni;
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
+static int dp_process_delnat(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	uint32_t vm_vni;
+
+	if (req->del_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL) {
+		ret = DP_ERROR_VM_DEL_NETNAT_NONLOCAL;
+		goto err;
+	}
+
+
+	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_VM_NOT_FND;
+		goto err;
+	}
+	vm_vni = dp_get_vm_vni(port_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_DEL_NETNAT_INVALID_PORT;
+		goto err;
+	}
+
+	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), vm_vni);
+		if (ret)
+			goto err;
+	}
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
+static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
+{
+	int ret = EXIT_SUCCESS;
+
+	if (req->add_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR) {
+		ret = DP_ERROR_VM_ADD_NEIGHNAT_WRONGTYPE;
+		goto err;
+	}
+	if (req->add_nat_neigh.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_add_network_nat_entry(ntohl(req->add_nat_neigh.vip.vip_addr), NULL,
+								req->add_nat_neigh.vni,
+								(uint16_t)req->add_nat_neigh.port_range[0], (uint16_t)req->add_nat_neigh.port_range[1],
+								req->add_nat_neigh.route);
+		if (ret)
+			goto err;
+
+		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_neigh.vip.vip_addr),
+								0, req->add_nat_neigh.vni);
+		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
+			goto err;
+	}
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
+static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
+{
+	int ret = EXIT_SUCCESS;
+
+	if (req->del_nat_neigh.type != DP_NETNAT_INFO_TYPE_NEIGHBOR) {
+		ret = DP_ERROR_VM_DEL_NEIGHNAT_WRONGTYPE;
+		goto err;
+	}
+
+	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ret = dp_del_network_nat_entry(ntohl(req->del_nat_vip.vip.vip_addr), NULL,
+								req->del_nat_vip.vni,
+								(uint16_t)req->del_nat_vip.port_range[0], (uint16_t)req->del_nat_vip.port_range[1]);
+		if (ret)
+			goto err;
+	}
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+
+}
+
 static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
@@ -607,6 +741,20 @@ out:
 	return EXIT_SUCCESS;
 }
 
+static int dp_process_getnatentry(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
+{
+	if (req->get_nat_entry.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (req->get_nat_entry.type == DP_NETNAT_INFO_TYPE_LOCAL)
+			return dp_list_nat_local_entry(m, rep_arr, ntohl(req->get_nat_entry.vip.vip_addr));
+		else if (req->get_nat_entry.type == DP_NETNAT_INFO_TYPE_NEIGHBOR)
+			return dp_list_nat_neigh_entry(m, rep_arr, ntohl(req->get_nat_entry.vip.vip_addr));
+		else
+			return DP_ERROR_VM_GET_NETNAT_INFO_TYPE_UNKNOWN;
+	} else {
+		return DP_ERROR_VM_GET_NETNAT_IPV6_UNSUPPORTED;
+	}
+}
+
 int dp_process_request(struct rte_mbuf *m)
 {
 	struct rte_mbuf *m_arr[DP_MBUF_ARR_SIZE];
@@ -667,6 +815,21 @@ int dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_LISTROUTE:
 		ret = dp_process_listroute(req, m, m_arr);
 		break;
+	case DP_REQ_TYPE_ADD_NATVIP:
+		ret = dp_process_addnat(req, &rep);
+		break;
+	case DP_REQ_TYPE_GET_NATENTRY:
+		ret = dp_process_getnatentry(req, m, m_arr);
+		break;
+	case DP_REQ_TYPE_DEL_NATVIP:
+		ret = dp_process_delnat(req, &rep);
+		break;
+	case DP_REQ_TYPE_ADD_NEIGH_NAT:
+		ret = dp_process_add_neigh_nat(req, &rep);
+		break;
+	case DP_REQ_TYPE_DEL_NEIGH_NAT:
+		ret = dp_process_del_neigh_nat(req, &rep);
+		break;
 	case DP_REQ_TYPE_LISTPREFIX:
 		ret = dp_process_listpfxs(req, m, m_arr);
 		break;
@@ -684,7 +847,8 @@ int dp_process_request(struct rte_mbuf *m)
 	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX &&
-		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS) {
+		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS &&
+		req->com_head.com_type != DP_REQ_TYPE_GET_NATENTRY) {
 		rep.com_head.com_type = req->com_head.com_type;
 		p_rep = rte_pktmbuf_mtod(m, dp_reply*);
 		*p_rep = rep;

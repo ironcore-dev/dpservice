@@ -36,7 +36,18 @@ typedef enum {
 	DP_REQ_TYPE_CREATELB,
 	DP_REQ_TYPE_GETLB,
 	DP_REQ_TYPE_DELLB,
+	DP_REQ_TYPE_ADD_NATVIP,
+	DP_REQ_TYPE_GET_NATENTRY,
+	DP_REQ_TYPE_DEL_NATVIP,
+	DP_REQ_TYPE_ADD_NEIGH_NAT,
+	DP_REQ_TYPE_DEL_NEIGH_NAT,
 } dp_req_type;
+
+typedef enum {
+	DP_NETNAT_INFO_ZERO,
+	DP_NETNAT_INFO_TYPE_LOCAL,
+	DP_NETNAT_INFO_TYPE_NEIGHBOR,
+} dp_netnat_info_type;
 
 typedef struct dp_com_head {
 	uint8_t com_type;
@@ -160,6 +171,19 @@ typedef struct dp_addroute {
 	uint32_t	weight;
 } dp_route;
 
+typedef struct dp_nat_vip {
+	dp_netnat_info_type	type;
+	uint32_t ip_type;
+	union {
+		uint32_t	vip_addr;
+		uint8_t		vip_addr6[16];
+	} vip;
+	char machine_id[VM_MACHINE_ID_STR_LEN];
+	uint32_t port_range[2];
+	uint8_t		route[16];
+	uint32_t	vni;
+} dp_net_nat;
+
 typedef struct dp_request {
 	dp_com_head com_head;
 	union {
@@ -170,6 +194,11 @@ typedef struct dp_request {
 		dp_del_lb		del_lb;
 		dp_lb_vip		add_lb_vip;
 		dp_lb_vip		del_lb_vip;
+		dp_net_nat		add_nat_vip;
+		dp_net_nat		get_nat_entry;
+		dp_net_nat		del_nat_vip;
+		dp_net_nat		add_nat_neigh;
+		dp_net_nat		del_nat_neigh;
 		dp_lp_qry_lb	qry_lb_vip;
 		dp_addmachine	add_machine;
 		dp_delmachine	del_machine;
@@ -204,6 +233,17 @@ typedef struct dp_lb_backip {
 	} b_ip;
 } dp_lb_backip;
 
+typedef struct dp_nat_entry {
+	union {
+		uint32_t	addr;
+		uint8_t		addr6[16];
+	} m_ip;
+	uint32_t	min_port;
+	uint32_t	max_port;
+	uint8_t		entry_type; // DP_NETNAT_INFO_TYPE_LOCAL or DP_NETNAT_INFO_TYPE_NEIGHBOR
+	uint8_t		underlay_route[16];
+} dp_nat_entry;
+
 typedef struct dp_reply {
 	dp_com_head com_head;
 	union {
@@ -213,6 +253,7 @@ typedef struct dp_reply {
 		dp_vm_info		vm_info;
 		dp_route		route;
 		dp_lb_backip	back_ip;
+		dp_nat_entry	nat_entry;
 		uint32_t		vni;
 	};
 } dp_reply;

@@ -40,6 +40,11 @@ typedef enum {
 	DP_CMD_LIST_PFX,
 	DP_CMD_DEL_PFX,
 	DP_CMD_INITIALIZED,
+	DP_CMD_ADD_NAT_VIP,
+	DP_CMD_DEL_NAT_VIP,
+	DP_CMD_GET_NAT_INFO,
+	DP_CMD_ADD_NEIGH_NAT,
+	DP_CMD_DEL_NEIGH_NAT,
 	DP_CMD_INIT,
 	DP_CMD_CREATE_LB,
 	DP_CMD_DEL_LB,
@@ -60,7 +65,10 @@ static char vm_pci_str[30] = {0};
 static char pxe_path_str[30] = {0};
 static char port_str[30] = {0};
 static char proto_str[30] = {0};
+static char min_port_str[30]={0};
+static char max_port_str[30]={0};
 static IPVersion version;
+static char get_nat_info_type_str[10]={0};
 
 static int command;
 static int debug_mode;
@@ -68,6 +76,8 @@ static int vni;
 static int t_vni;
 static int length;
 static bool pfx_lb_enabled = false;
+static uint32_t min_port;
+static uint32_t max_port;
 
 #define CMD_LINE_OPT_INIT			"init"
 #define CMD_LINE_OPT_INITIALIZED	"is_initialized"
@@ -103,6 +113,14 @@ static bool pfx_lb_enabled = false;
 #define CMD_LINE_OPT_DEL_LB			"dellb"
 #define CMD_LINE_OPT_GET_LB			"getlb"
 #define CMD_LINE_OPT_PFX_LB			"lb_pfx"
+#define CMD_LINE_OPT_ADD_NAT_VIP	"addnat"
+#define CMD_LINE_OPT_DEL_NAT_VIP	"delnat"
+#define CMD_LINE_OPT_ADD_NEIGH_NAT 	"addneighnat"
+#define CMD_LINE_OPT_DEL_NEIGH_NAT 	"delneighnat"
+#define CMD_LINE_OPT_GET_NAT_INFO	"getnatinfo"
+#define CMD_LINE_OPT_NAT_MIN_PORT	"min_port"
+#define CMD_LINE_OPT_NAT_MAX_PORT	"max_port"
+
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -135,6 +153,13 @@ enum {
 	CMD_LINE_OPT_LIST_PFX_NUM,
 	CMD_LINE_OPT_DEL_PFX_NUM,
 	CMD_LINE_OPT_INITIALIZED_NUM,
+	CMD_LINE_OPT_ADD_NAT_VIP_NUM,
+	CMD_LINE_OPT_DEL_NAT_VIP_NUM,
+	CMD_LINE_OPT_NAT_MIN_PORT_NUM,
+	CMD_LINE_OPT_NAT_MAX_PORT_NUM,
+	CMD_LINE_OPT_ADD_NEIGH_NAT_NUM,
+	CMD_LINE_OPT_DEL_NEIGH_NAT_NUM,
+	CMD_LINE_OPT_GET_NAT_INFO_NUM,
 	CMD_LINE_OPT_INIT_NUM,
 	CMD_LINE_OPT_CREATE_LB_NUM,
 	CMD_LINE_OPT_DEL_LB_NUM,
@@ -168,6 +193,16 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_LB_VIP, 1, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
 	{CMD_LINE_OPT_DEL_LB_VIP, 1, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
 	{CMD_LINE_OPT_LIST_LB_VIP, 1, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
+	{CMD_LINE_OPT_ADD_LB_VIP, 0, 0, CMD_LINE_OPT_ADD_LB_VIP_NUM},
+	{CMD_LINE_OPT_DEL_LB_VIP, 0, 0, CMD_LINE_OPT_DEL_LB_VIP_NUM},
+	{CMD_LINE_OPT_LIST_LB_VIP, 0, 0, CMD_LINE_OPT_LIST_LB_VIP_NUM},
+	{CMD_LINE_OPT_ADD_NAT_VIP, 1, 0, CMD_LINE_OPT_ADD_NAT_VIP_NUM},
+	{CMD_LINE_OPT_DEL_NAT_VIP, 1, 0, CMD_LINE_OPT_DEL_NAT_VIP_NUM},
+	{CMD_LINE_OPT_NAT_MIN_PORT, 1, 0, CMD_LINE_OPT_NAT_MIN_PORT_NUM},
+	{CMD_LINE_OPT_NAT_MAX_PORT, 1, 0, CMD_LINE_OPT_NAT_MAX_PORT_NUM},
+	{CMD_LINE_OPT_GET_NAT_INFO, 1, 0, CMD_LINE_OPT_GET_NAT_INFO_NUM},
+	{CMD_LINE_OPT_ADD_NEIGH_NAT, 0, 0, CMD_LINE_OPT_ADD_NEIGH_NAT_NUM},
+	{CMD_LINE_OPT_DEL_NEIGH_NAT, 0, 0, CMD_LINE_OPT_DEL_NEIGH_NAT_NUM},
 	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
 	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
 	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
@@ -334,6 +369,32 @@ int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_PFX_LB_NUM:
 			pfx_lb_enabled = true;
 			break;
+		case CMD_LINE_OPT_ADD_NAT_VIP_NUM:
+			strncpy(machine_str, optarg, 63);
+			command = DP_CMD_ADD_NAT_VIP;
+			break;
+		case CMD_LINE_OPT_DEL_NAT_VIP_NUM:
+			strncpy(machine_str, optarg, 63);
+			command = DP_CMD_DEL_NAT_VIP;
+			break;
+		case CMD_LINE_OPT_NAT_MIN_PORT_NUM:
+			strncpy(min_port_str, optarg, 29);
+			min_port = (uint32_t)atoi(min_port_str);
+			break;
+		case CMD_LINE_OPT_NAT_MAX_PORT_NUM:
+			strncpy(max_port_str, optarg, 29);
+			max_port = (uint32_t)atoi(max_port_str);
+			break;
+		case CMD_LINE_OPT_ADD_NEIGH_NAT_NUM:
+			command = DP_CMD_ADD_NEIGH_NAT;
+			break;
+		case CMD_LINE_OPT_DEL_NEIGH_NAT_NUM:
+			command = DP_CMD_DEL_NEIGH_NAT;
+			break;
+		case CMD_LINE_OPT_GET_NAT_INFO_NUM:
+			command = DP_CMD_GET_NAT_INFO;
+			strncpy(get_nat_info_type_str, optarg, 9);
+			break;
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -452,7 +513,7 @@ public:
 			{
 				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
 					reply.routes(i).prefix().address().c_str(),
-					reply.routes(i).prefix().prefixlength(), 
+					reply.routes(i).prefix().prefixlength(),
 					reply.routes(i).nexthopvni(),
 					reply.routes(i).nexthopaddress().c_str());
 			}
@@ -727,7 +788,7 @@ public:
 				printf("Received VIP %s \n", reply.address().c_str());
 			else
 				printf("Error detected with code %d\n", reply.status().error());
-			
+
 	}
 
 	void DelInterface() {
@@ -753,7 +814,7 @@ public:
 				printf("Received an error %d \n", reply.status().error());
 			} else {
 				printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
-				reply.interface().primaryipv4address().c_str(), 
+				reply.interface().primaryipv4address().c_str(),
 				reply.interface().primaryipv6address().c_str(),
 				reply.interface().vni(),
 				reply.interface().pcidpname().c_str(),
@@ -771,12 +832,152 @@ public:
 			for (i = 0; i < reply.interfaces_size(); i++)
 			{
 				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).interfaceid().c_str(),
-					reply.interfaces(i).primaryipv4address().c_str(), 
+					reply.interfaces(i).primaryipv4address().c_str(),
 					reply.interfaces(i).primaryipv6address().c_str(),
 					reply.interfaces(i).vni(),
 					reply.interfaces(i).pcidpname().c_str(),
 					reply.interfaces(i).underlayroute().c_str());
 			}
+	}
+
+	void AddNAT() {
+		AddNATRequest request;
+		AddNATResponse reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+
+		request.set_interfaceid(machine_str);
+		nat_vip->set_ipversion(version);
+		if(version == dpdkonmetal::IPVersion::IPv4)
+			nat_vip->set_address(ip_str);
+		request.set_allocated_natvipip(nat_vip);
+		request.set_minport(min_port);
+		request.set_maxport(max_port);
+		stub_->addNAT(&context, request, &reply);
+		if (reply.status().error()) {
+			printf("Received an error %d \n", reply.status().error());
+		} else {
+			printf("Received underlay route : %s \n", reply.underlayroute().c_str());
+		}
+	}
+
+	void DelNAT() {
+		DeleteNATRequest request;
+		Status reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+
+		request.set_interfaceid(machine_str);
+		nat_vip->set_ipversion(version);
+		if(version == dpdkonmetal::IPVersion::IPv4)
+				nat_vip->set_address(ip_str);
+		request.set_allocated_natvipip(nat_vip);
+		stub_->deleteNAT(&context, request, &reply);
+		if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+		} else {
+				printf("deleted a nat info with code %d \n",reply.error());
+		}
+	}
+
+	void AddNeighNAT() {
+		AddNeighborNATRequest request;
+		Status reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+
+		nat_vip->set_ipversion(version);
+		if(version == dpdkonmetal::IPVersion::IPv4) {
+			nat_vip->set_address(ip_str);
+		} else {
+			nat_vip->set_address(ip6_str);
+		}
+
+		request.set_allocated_natvipip(nat_vip);
+		request.set_vni(vni);
+		request.set_minport(min_port);
+		request.set_maxport(max_port);
+		request.set_underlayroute(t_ip6_str);
+
+		stub_->addNeighborNAT(&context, request, &reply);
+		if (reply.error()) {
+			printf("Received an error %d \n", reply.error());
+		}else{
+			printf("called addneighnat with code %d\n",reply.error());
+		}
+	}
+
+	void GetNATInfo() {
+		GetNATInfoRequest request;
+		GetNATInfoResponse reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+		int i;
+
+		nat_vip->set_ipversion(version);
+		if(version == dpdkonmetal::IPVersion::IPv4) {
+			nat_vip->set_address(ip_str);
+		} else {
+			nat_vip->set_address(ip6_str);
+		}
+
+		request.set_allocated_natvipip(nat_vip);
+
+		if (!strcmp(get_nat_info_type_str,"local"))
+			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoLocal);
+		else if (!strcmp(get_nat_info_type_str,"neigh"))
+			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoNeigh);
+		else
+			printf("Wrong query nat info type parameter, either local or neigh \n");
+
+		stub_->getNATInfo(&context, request, &reply);
+
+		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
+			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
+			for (i = 0; i < reply.natinfoentries_size(); i++) {
+				printf("  %d: IP %s, min_port %d, max_port %d \n", i+1,
+				reply.natinfoentries(i).address().c_str(),
+				reply.natinfoentries(i).minport(),
+				reply.natinfoentries(i).maxport());
+			}
+		}
+
+		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
+			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
+			for (i = 0; i < reply.natinfoentries_size(); i++) {
+				printf("  %d: min_port %d, max_port %d --> Underlay IPv6 %s \n", i+1,
+				reply.natinfoentries(i).minport(),
+				reply.natinfoentries(i).maxport(),
+				reply.natinfoentries(i).underlayroute().c_str());
+			}
+		}
+
+	}
+
+	void DelNeighNAT() {
+		DeleteNeighborNATRequest request;
+		Status reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+
+		nat_vip->set_ipversion(version);
+		if(version == dpdkonmetal::IPVersion::IPv4) {
+			nat_vip->set_address(ip_str);
+		} else {
+			nat_vip->set_address(ip6_str);
+		}
+
+		request.set_allocated_natvipip(nat_vip);
+		request.set_vni(vni);
+		request.set_minport(min_port);
+		request.set_maxport(max_port);
+
+		stub_->deleteNeighborNAT(&context, request, &reply);
+		if (reply.error()) {
+			printf("Received an error %d \n", reply.error());
+		}else{
+			printf("called delneighnat with code %d\n",reply.error());
+		}
 	}
 
 private:
@@ -856,6 +1057,26 @@ int main(int argc, char** argv)
 	case DP_CMD_LIST_PFX:
 		std::cout << "Listprefix called " << std::endl;
 		dpdk_client.ListPfx();
+		break;
+	case DP_CMD_ADD_NAT_VIP:
+		std::cout << "Addnat called " << std::endl;
+		dpdk_client.AddNAT();
+		break;
+	case DP_CMD_GET_NAT_INFO:
+		std::cout << "getNATEntry called " << std::endl;
+		dpdk_client.GetNATInfo();
+		break;
+	case DP_CMD_DEL_NAT_VIP:
+		std::cout << "Delnat called " << std::endl;
+		dpdk_client.DelNAT();
+		break;
+	case DP_CMD_ADD_NEIGH_NAT:
+		std::cout << "AddNeighNat called " << std::endl;
+		dpdk_client.AddNeighNAT();
+		break;
+	case DP_CMD_DEL_NEIGH_NAT:
+		std::cout << "DelNeighNat called " << std::endl;
+		dpdk_client.DelNeighNAT();
 		break;
 	case DP_CMD_INITIALIZED:
 		std::cout << "Initialized called " << std::endl;

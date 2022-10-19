@@ -17,6 +17,7 @@
 #include "nodes/rx_periodic_node.h"
 #include "nodes/ipv6_lookup_node.h"
 #include "nodes/ipip_tunnel_node.h"
+#include "nodes/packet_relay_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
@@ -47,6 +48,7 @@ static const char * const default_patterns[] = {
 	"geneve_tunnel",
 	"ipip_tunnel",
 	"overlay_switch",
+	"packet_relay",
 	"tx-*",
 	"drop",
 };

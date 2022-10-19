@@ -19,7 +19,7 @@ GRPCService::~GRPCService()
 	free(uuid);
 }
 
-void GRPCService::run(std::string listen_address) 
+void GRPCService::run(std::string listen_address)
 {
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
@@ -86,6 +86,11 @@ void GRPCService::HandleRpcs()
 	new CreateLBCall(this, cq_.get());
 	new GetLBCall(this, cq_.get());
 	new DelLBCall(this, cq_.get());
+	new AddNATVIPCall(this, cq_.get());
+	new DeleteNATVIPCall(this, cq_.get());
+	new AddNeighborNATCall(this, cq_.get());
+	new DeleteNeighborNATCall(this, cq_.get());
+	new GetNATInfoCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));
@@ -93,3 +98,4 @@ void GRPCService::HandleRpcs()
 		while (static_cast<BaseCall*>(tag)->Proceed() < 0) {};
 	}
 }
+

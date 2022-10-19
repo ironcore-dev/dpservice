@@ -19,6 +19,7 @@ extern "C" {
 #define DP_ROUTE_DROP		-3
 #define DP_ROUTE_FIREWALL	-4
 #define DP_ROUTE_NAT		-5
+#define DP_ROUTE_PKT_RELAY	-6
 
 #define DP_IP_PROTO_UDP		0x11
 #define DP_IP_PROTO_TCP		0x06

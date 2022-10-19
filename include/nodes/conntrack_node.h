@@ -7,14 +7,18 @@
 extern "C" {
 #endif
 
-enum
-{
+enum {
 	CONNTRACK_NEXT_LB,
 	CONNTRACK_NEXT_DNAT,
 	CONNTRACK_NEXT_DROP,
 	CONNTRACK_NEXT_MAX
 };
 
+enum
+{
+	CONNTRACK_FLOW_PASSTHROUGH,
+	CONNTRACK_FLOW_RELAY,
+};
 
 struct conntrack_node_ctx
 {

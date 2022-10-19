@@ -338,7 +338,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 				if (!m_new)
 					break;
 				m_curr = m_new;
-				rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
+				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
 			}
 			dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
 		} else if (node && (rte_rib_get_nh(node, &next_hop) == 0) && !ext_routes) {
@@ -348,7 +348,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 				if (!m_new)
 					break;
 				m_curr = m_new;
-				rep = rte_pktmbuf_mtod(m_new, dp_reply*);;
+				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
 			}
 			if (next_hop == portid) {
 				rte_rib_get_ip(node, &ipv4);
