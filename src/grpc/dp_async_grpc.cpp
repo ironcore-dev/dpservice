@@ -476,8 +476,6 @@ int ListPfxCall::Proceed()
 				pfx->set_address(inet_ntoa(addr));
 				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 				pfx->set_prefixlength(rp_route->pfx_length);
-				if (rp_route->flags.route_type == DP_ROUTE_TYPE_LOADBALANCED)
-					pfx->set_loadbalancerenabled(true);
 			}
 		}
 		rte_pktmbuf_free(mbuf);

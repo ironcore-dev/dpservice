@@ -210,51 +210,13 @@ static bool dp_is_more_vm_in_vni_avail(int portid)
 	return false;
 }
 
-static __rte_always_inline void dp_encode_route_type(uint64_t *nh, dp_route_type r_type)
-{
-	uint64_t temp = r_type;
-	*nh = (*nh & DP_ROUTE_WRITE_MASK_TYPE) | (temp << 16);
-}
-
-static __rte_always_inline dp_route_type dp_decode_route_type(uint64_t *nh)
-{
-	u_int32_t r_type =  ((*nh) & DP_ROUTE_READ_MASK_TYPE) >> 16;
-
-	if (r_type == DP_ROUTE_TYPE_LOADBALANCED)
-		return DP_ROUTE_TYPE_LOADBALANCED;
-
-	return DP_ROUTE_TYPE_STANDARD;
-}
-
-static __rte_always_inline void dp_encode_next_hop(uint64_t *nh, uint16_t next_hop)
-{
-	*nh = (*nh & DP_ROUTE_WRITE_MASK_N_HOP) | next_hop;
-}
-
-static __rte_always_inline uint16_t dp_decode_next_hop(uint64_t *nh) 
-{
-	return *nh & DP_ROUTE_READ_MASK_N_HOP;
-}
-
-static __rte_always_inline int dp_rte_rib_get_nh(const struct rte_rib_node *node, uint64_t *nh)
-{
-	int ret;
-
-	ret = rte_rib_get_nh(node, nh);
-	*nh = dp_decode_next_hop(nh);
-
-	return ret;
-}
-
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
-				 uint32_t ip, uint8_t *ip6, uint8_t depth, dp_route_type rt, 
-				 int socketid)
+				 uint32_t ip, uint8_t *ip6, uint8_t depth, int socketid)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
-	int ret = EXIT_SUCCESS;
 	struct rte_rib *root;
-	uint64_t nh = 0;
+	int ret = EXIT_SUCCESS;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
@@ -273,9 +235,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 
 	node = rte_rib_insert(root, ip, depth);
 	if (node) {
-		dp_encode_next_hop(&nh, portid);
-		dp_encode_route_type(&nh, rt);
-		ret = rte_rib_set_nh(node, nh);
+		ret = rte_rib_set_nh(node, portid);
 		if (ret < 0) {
 			ret = DP_ERROR_VM_ADD_RT_FAIL4;
 			goto err;
@@ -323,7 +283,6 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool ext_routes, uint16_t per_buf)
 {
 	struct vm_route *route;
-	uint64_t next_hop = 0;
 	dp_route *rp_route;
 	uint32_t ipv4 = 0;
 	uint8_t depth = 0;
@@ -333,8 +292,6 @@ static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool
 
 	rte_rib_get_ip(node, &ipv4);
 	rte_rib_get_depth(node, &depth);
-	rte_rib_get_nh(node, &next_hop);
-	rp_route->flags.route_type = dp_decode_route_type(&next_hop);
 	rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 	rp_route->pfx_ip.addr = ipv4;
 	rp_route->pfx_length = depth;
@@ -354,11 +311,11 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
 	struct rte_rib_node *node = NULL;
-	uint64_t next_hop = 0;
 	struct rte_rib *root;
 	uint16_t msg_per_buf;
 	uint32_t ipv4 = 0;
 	uint8_t depth = 0;
+	uint64_t next_hop;
 	dp_reply *rep;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
@@ -373,7 +330,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 
 	do {
 		node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL);
-		if (node && (dp_rte_rib_get_nh(node, &next_hop) == 0) &&
+		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
 			dp_is_pf_port_id(next_hop) && ext_routes) {
 			if (rep->com_head.msg_count &&
 			    (rep->com_head.msg_count % msg_per_buf == 0)) {
@@ -384,7 +341,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
 			}
 			dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
-		} else if (node && (dp_rte_rib_get_nh(node, &next_hop) == 0) && !ext_routes) {
+		} else if (node && (rte_rib_get_nh(node, &next_hop) == 0) && !ext_routes) {
 			if (rep->com_head.msg_count &&
 			    (rep->com_head.msg_count % msg_per_buf == 0)) {
 				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
@@ -616,7 +573,7 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, i
 	node = rte_rib_lookup(root, dst_ip);
 
 	if (node) {
-		if (dp_rte_rib_get_nh(node, &next_hop) != 0)
+		if (rte_rib_get_nh(node, &next_hop) != 0)
 			return DP_ROUTE_DROP;
 		if (dp_is_pf_port_id(next_hop))
 			*r = *(struct vm_route *)rte_rib_get_ext(node);

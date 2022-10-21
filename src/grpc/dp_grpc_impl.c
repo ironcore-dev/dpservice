@@ -277,7 +277,6 @@ err:
 
 static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 {
-	dp_route_type rt = DP_ROUTE_TYPE_STANDARD;
 	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
@@ -288,14 +287,12 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	if (req->add_pfx.pfx_lb_enabled) {
+	if (req->add_pfx.pfx_lb_enabled)
 		dp_map_alias_handle((void *)req->add_pfx.pfx_ul_addr6, port_id);
-		rt = DP_ROUTE_TYPE_LOADBALANCED;
-	}
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
-					 NULL, req->add_pfx.pfx_length, rt, rte_eth_dev_socket_id(port_id))) {
+					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
 			if (!req->add_pfx.pfx_lb_enabled) {
 				ret = DP_ERROR_VM_ADD_PFX_ROUTE;
 				goto err;
@@ -392,7 +389,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, DP_LPM_DHCP_IP6_DEPTH,
 							  rte_eth_dev_socket_id(port_id));
 		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
-					 NULL, 32, DP_ROUTE_TYPE_STANDARD, rte_eth_dev_socket_id(port_id))) {
+					 NULL, 32, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT4;
 			goto lpm_err;
 		}
@@ -484,8 +481,7 @@ static int dp_process_addroute(dp_request *req, dp_reply *rep)
 	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		ret = dp_add_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
 						   ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
-						    req->route.pfx_length, DP_ROUTE_TYPE_STANDARD,
-							rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+						    req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 		if (ret)
 			goto err;
 	} else {
