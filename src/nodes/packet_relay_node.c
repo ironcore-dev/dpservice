@@ -38,10 +38,6 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	if (!cntrack)
 		return ret;
 
-	if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-		DPS_LOG(INFO, DPSERVICE, "received a icmp pkt in relay node \n");
-		return ret;
-	}
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
@@ -50,6 +46,11 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 		df_ptr->nxt_hop = m->port;
 		memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->nat_info.underlay_dst, sizeof(df_ptr->tun_info.ul_dst_addr6));
 		return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
+	}
+
+	if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
+		DPS_LOG(INFO, DPSERVICE, "received a icmp pkt in relay node \n");
+		return ret;
 	}
 
 	return ret;

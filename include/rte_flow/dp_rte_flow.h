@@ -46,6 +46,7 @@ struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
 struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset);
 
 uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val);
+uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier);
 
 // functions to craft actions/patterns are added later
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer);

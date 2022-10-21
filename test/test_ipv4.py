@@ -317,7 +317,7 @@ def send_tcp_pkt_from_vm1():
 		sendp(reply_pkt, iface=pf0_tap)
 
 
-def test_vf_to_pf_network_nat(capsys, add_machine, build_path):
+def test_vf_to_pf_network_nat_tcp(capsys, add_machine, build_path):
 
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
@@ -350,6 +350,64 @@ def test_vf_to_pf_network_nat(capsys, add_machine, build_path):
 
 	if pktip.dst !=vf0_ip  or pkttcp.dport != 1240:
 		raise AssertionError('Received wrong packet with ip:'+pktip.dst+" dport:"+ str(pkttcp.dport))
+
+	expected_str = "Delnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+def send_icmp_pkt_from_vm1():
+
+	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=pf0_tap,timeout=10)
+
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive network-natted tcp pkt on pf')
+
+	pkt=pkt_list[0]
+
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if ICMP in pkt:
+		pkticmp= pkt[ICMP]
+
+	if pktip.src == nat_vip:
+		reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst) / ICMP(type=0, id=pkticmp.id)
+		sendp(reply_pkt, iface=pf0_tap)
+
+def test_vf_to_pf_network_nat_icmp(capsys, add_machine, build_path):
+
+	expected_str = "Addnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+	d = multiprocessing.Process(name = "send_icmp_pkt", target = send_icmp_pkt_from_vm1, args=())
+	d.daemon=False
+	d.start()
+	time.sleep(1)
+	icmp_pkt = Ether(dst = pf0_mac, src = vf0_mac, type = 0x0800) / IP(dst = public_ip, src = vf0_ip) / ICMP(type=8, id=0x0040)
+	sendp(icmp_pkt, iface = vf0_tap)
+
+	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=3)
+
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive network-natted icmp pkt on pf')
+
+	pkt=pkt_list[0]
+	
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if ICMP in pkt:
+		pkticmp= pkt[ICMP]
+
+	if pktip.dst !=vf0_ip:
+		raise AssertionError('Received wrong icmp packet with ip:'+pktip.dst)
 
 	expected_str = "Delnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip 
@@ -391,7 +449,6 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 		pkttcp= pkt[TCP]
 	if pktipv6.dst != nat_neigh_ul_dst  or pkttcp.dport != 510:
 		raise AssertionError('Received wrong network-nat relayed packet with outer dst ipv6 addr:'+pktipv6.dst+" dport:"+ pkttcp.dport)
-
 
 	expected_str = "DelNeighNat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delneighnat " + " --ipv4 " + nat_vip + " --vni " + vni + " --min_port " + str(nat_neigh_min_port) + " --max_port "+ str(nat_neigh_max_port)

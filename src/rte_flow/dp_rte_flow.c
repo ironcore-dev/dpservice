@@ -108,10 +108,10 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		if (hdr != NULL)
 			icmp_hdr = (struct rte_icmp_hdr *)hdr;
 		else
-
 			icmp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_icmp_hdr *, offset);
 
 		df->icmp_type = icmp_hdr->icmp_type;
+		df->icmp_identifier = icmp_hdr->icmp_ident;
 		return 0;
 	} else if (df->l4_type == DP_IP_PROTO_ICMPV6) {
 		if (hdr != NULL)
@@ -199,6 +199,20 @@ struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset)
 	return udp_hdr;
 }
 
+struct rte_icmp_hdr *dp_get_icmp_hdr(struct rte_mbuf *m, uint16_t offset)
+{
+	struct dp_flow *df;
+	struct rte_icmp_hdr *icmp_hdr;
+
+	df = get_dp_flow_ptr(m);
+	if (df->l4_type == DP_IP_PROTO_ICMP)
+		icmp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_icmp_hdr *, offset);
+	else
+		return NULL;
+
+	return icmp_hdr;
+}
+
 uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val)
 {
 
@@ -234,6 +248,37 @@ uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t n
 
 	}
 	return old_val;
+}
+
+uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
+{
+	struct dp_flow *df;
+
+	struct rte_icmp_hdr *icmp_hdr;
+	struct rte_ipv4_hdr *ipv4_hdr;
+	uint16_t old_identifier = 65535;
+	uint32_t cksum;
+
+	df = get_dp_flow_ptr(m);
+	ipv4_hdr = dp_get_ipv4_hdr(m);
+	
+	if (df->l4_type == DP_IP_PROTO_ICMP) {
+		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
+		old_identifier = icmp_hdr->icmp_ident;
+		icmp_hdr->icmp_ident = RTE_BE16(new_identifier);
+		
+		// the approach of adding up vectors from icmp_hdr one by one is not durable since data field is not
+		// provided in struct rte_icmp_hdr
+		cksum = (~(icmp_hdr->icmp_cksum)) & 0xffff;
+		cksum += (~old_identifier) & 0xffff;
+		cksum += icmp_hdr->icmp_ident & 0xffff;
+		cksum = (cksum & 0xffff) + (cksum >> 16);
+		cksum = (cksum & 0xffff) + (cksum >> 16);
+		
+		icmp_hdr->icmp_cksum = (~cksum) & 0xffff;
+	}
+
+	return ntohs(old_identifier);
 }
 
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer)
