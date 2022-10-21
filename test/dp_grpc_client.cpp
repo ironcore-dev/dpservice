@@ -39,6 +39,9 @@ typedef enum {
 	DP_CMD_ADD_PFX,
 	DP_CMD_LIST_PFX,
 	DP_CMD_DEL_PFX,
+	DP_CMD_ADD_LBPFX,
+	DP_CMD_LIST_LBPFX,
+	DP_CMD_DEL_LBPFX,
 	DP_CMD_INITIALIZED,
 	DP_CMD_ADD_NAT_VIP,
 	DP_CMD_DEL_NAT_VIP,
@@ -85,6 +88,9 @@ static uint32_t max_port;
 #define CMD_LINE_OPT_ADD_PFX		"addpfx"
 #define CMD_LINE_OPT_LIST_PFX		"listpfx"
 #define CMD_LINE_OPT_DEL_PFX		"delpfx"
+#define CMD_LINE_OPT_ADD_LBPFX		"addlbpfx"
+#define CMD_LINE_OPT_LIST_LBPFX		"listlbpfx"
+#define CMD_LINE_OPT_DEL_LBPFX		"dellbpfx"
 #define CMD_LINE_OPT_ADD_MACHINE	"addmachine"
 #define CMD_LINE_OPT_DEL_MACHINE	"delmachine"
 #define CMD_LINE_OPT_GET_MACHINE	"getmachine"
@@ -152,6 +158,9 @@ enum {
 	CMD_LINE_OPT_ADD_PFX_NUM,
 	CMD_LINE_OPT_LIST_PFX_NUM,
 	CMD_LINE_OPT_DEL_PFX_NUM,
+	CMD_LINE_OPT_ADD_LBPFX_NUM,
+	CMD_LINE_OPT_LIST_LBPFX_NUM,
+	CMD_LINE_OPT_DEL_LBPFX_NUM,
 	CMD_LINE_OPT_INITIALIZED_NUM,
 	CMD_LINE_OPT_ADD_NAT_VIP_NUM,
 	CMD_LINE_OPT_DEL_NAT_VIP_NUM,
@@ -206,6 +215,9 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_PFX, 1, 0, CMD_LINE_OPT_ADD_PFX_NUM},
 	{CMD_LINE_OPT_LIST_PFX, 1, 0, CMD_LINE_OPT_LIST_PFX_NUM},
 	{CMD_LINE_OPT_DEL_PFX, 1, 0, CMD_LINE_OPT_DEL_PFX_NUM},
+	{CMD_LINE_OPT_ADD_LBPFX, 1, 0, CMD_LINE_OPT_ADD_LBPFX_NUM},
+	{CMD_LINE_OPT_LIST_LBPFX, 1, 0, CMD_LINE_OPT_LIST_LBPFX_NUM},
+	{CMD_LINE_OPT_DEL_LBPFX, 1, 0, CMD_LINE_OPT_DEL_LBPFX_NUM},
 	{CMD_LINE_OPT_INITIALIZED, 0, 0, CMD_LINE_OPT_INITIALIZED_NUM},
 	{CMD_LINE_OPT_INIT, 0, 0, CMD_LINE_OPT_INIT_NUM},
 	{CMD_LINE_OPT_CREATE_LB, 1, 0, CMD_LINE_OPT_CREATE_LB_NUM},
@@ -308,6 +320,18 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_LIST_PFX_NUM:
 			command = DP_CMD_LIST_PFX;
+			strncpy(machine_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_ADD_LBPFX_NUM:
+			command = DP_CMD_ADD_LBPFX;
+			strncpy(machine_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_DEL_LBPFX_NUM:
+			command = DP_CMD_DEL_LBPFX;
+			strncpy(machine_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_LIST_LBPFX_NUM:
+			command = DP_CMD_LIST_LBPFX;
 			strncpy(machine_str, optarg, 63);
 			break;
 		case CMD_LINE_OPT_DEL_VIP_NUM:
@@ -602,9 +626,30 @@ public:
 			if(version == dpdkonmetal::IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
-			pfx_ip->set_loadbalancerenabled(pfx_lb_enabled);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->addInterfacePrefix(&context, request, &reply);
+			if (reply.status().error()) {
+				printf("Received an error %d \n", reply.status().error());
+			} else {
+				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
+			}
+	}
+
+	void AddLBPfx() {
+			CreateInterfaceLoadBalancerPrefixRequest request;
+			CreateInterfaceLoadBalancerPrefixResponse reply;
+			ClientContext context;
+			Prefix *pfx_ip = new Prefix();
+			InterfaceIDMsg *m_id = new InterfaceIDMsg();
+
+			m_id->set_interfaceid(machine_str);
+			request.set_allocated_interfaceid(m_id);
+			pfx_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				pfx_ip->set_address(ip_str);
+			pfx_ip->set_prefixlength(length);
+			request.set_allocated_prefix(pfx_ip);
+			stub_->createInterfaceLoadBalancerPrefix(&context, request, &reply);
 			if (reply.status().error()) {
 				printf("Received an error %d \n", reply.status().error());
 			} else {
@@ -698,7 +743,7 @@ public:
 			if (reply.error()) {
 				printf("Received an error %d \n", reply.error());
 			} else {
-				printf("Delete LB Success");
+				printf("Delete LB Success\n");
 			}
 	}
 
@@ -758,6 +803,41 @@ public:
 
 			request.set_interfaceid(machine_str);
 			stub_->listInterfacePrefixes(&context, request, &reply);
+			for (i = 0; i < reply.prefixes_size(); i++) {
+				printf("Route prefix %s len %d \n",
+					reply.prefixes(i).address().c_str(),
+					reply.prefixes(i).prefixlength());
+			}
+	}
+
+	void DelLBPfx() {
+			DeleteInterfaceLoadBalancerPrefixRequest request;
+			Status reply;
+			ClientContext context;
+			Prefix *pfx_ip = new Prefix();
+			InterfaceIDMsg *m_id = new InterfaceIDMsg();
+
+			m_id->set_interfaceid(machine_str);
+			request.set_allocated_interfaceid(m_id);
+			pfx_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				pfx_ip->set_address(ip_str);
+			pfx_ip->set_prefixlength(length);
+			request.set_allocated_prefix(pfx_ip);
+			stub_->deleteInterfaceLoadBalancerPrefix(&context, request, &reply);
+			if (reply.error()) {
+				printf("Received an error %d \n", reply.error());
+			}
+	}
+
+	void ListLBPfx() {
+			ListInterfaceLoadBalancerPrefixesRequest request;
+			ListInterfaceLoadBalancerPrefixesResponse reply;
+			ClientContext context;
+			int i;
+
+			request.set_interfaceid(machine_str);
+			stub_->listInterfaceLoadBalancerPrefixes(&context, request, &reply);
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("Route prefix %s len %d \n",
 					reply.prefixes(i).address().c_str(),
@@ -1057,6 +1137,18 @@ int main(int argc, char** argv)
 	case DP_CMD_LIST_PFX:
 		std::cout << "Listprefix called " << std::endl;
 		dpdk_client.ListPfx();
+		break;
+	case DP_CMD_ADD_LBPFX:
+		dpdk_client.AddLBPfx();
+		std::cout << "AddLBprefix called " << std::endl;
+		break;
+	case DP_CMD_DEL_LBPFX:
+		dpdk_client.DelLBPfx();
+		std::cout << "DelLBprefix called " << std::endl;
+		break;
+	case DP_CMD_LIST_LBPFX:
+		std::cout << "ListLBprefix called " << std::endl;
+		dpdk_client.ListLBPfx();
 		break;
 	case DP_CMD_ADD_NAT_VIP:
 		std::cout << "Addnat called " << std::endl;

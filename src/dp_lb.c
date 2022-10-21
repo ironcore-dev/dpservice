@@ -8,6 +8,7 @@
 #include <rte_rib6.h>
 #include "dp_error.h"
 #include "dp_flow.h"
+#include "dp_util.h"
 #include "dp_lb.h"
 
 struct rte_hash_parameters ipv4_lb_table_params = {
@@ -131,30 +132,40 @@ int dp_get_lb(void *id_key, dp_lb *list_lb)
 int dp_delete_lb(void *id_key)
 {
 	struct lb_value *lb_val = NULL;
+	int res = EXIT_SUCCESS;
 	struct lb_key *lb_k;
 	int32_t pos;
 
-	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
-		return DP_ERROR_DEL_LB_ID_ERR;
+	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0) {
+		res = DP_ERROR_DEL_LB_ID_ERR;
+		goto err_id;
+	}
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
-		return DP_ERROR_DEL_LB_BACK_IP_ERR;
+	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0) {
+		res = DP_ERROR_DEL_LB_BACK_IP_ERR;
+		goto err_back_ip;
+	}
 
 	rte_free(lb_val);
-	pos = rte_hash_del_key(ipv4_lb_tbl, &lb_k);
+	pos = rte_hash_del_key(ipv4_lb_tbl, lb_k);
 	if (pos < 0)
-		printf("LB hash key already deleted \n");
+		DPS_LOG(WARNING, DPSERVICE, "LB hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(ipv4_lb_tbl, pos);
 
 	rte_free(lb_k);
 	pos = rte_hash_del_key(id_map_lb_tbl, id_key);
 	if (pos < 0)
-		printf("LB id map hash key already deleted \n");
+		DPS_LOG(WARNING, DPSERVICE, "LB id map hash key already deleted \n");
 	else
 		rte_hash_free_key_with_position(id_map_lb_tbl, pos);
 
 	return EXIT_SUCCESS;
+
+err_back_ip:
+	rte_free(lb_val);
+err_id:
+	return res;
 }
 
 bool dp_is_lb_enabled()

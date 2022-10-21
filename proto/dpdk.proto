@@ -43,6 +43,11 @@ message Status {
 	string message = 2;
 }
 
+message CreateInterfaceLoadBalancerPrefixResponse {
+	Status status = 1;
+	bytes underlayRoute = 2;
+}
+
 message IpAdditionResponse {
 	Status status = 1;
 	bytes underlayRoute = 2;
@@ -64,7 +69,6 @@ message Prefix {
 	IPVersion ipVersion = 1;
 	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
 	uint32 prefixLength = 3;  // max length is 32 for IPv4 and 128 for IPv6
-	bool loadBalancerEnabled = 4;
 }
 
 message InitConfig {
@@ -171,6 +175,14 @@ message InterfaceIDMsg {
 message GetInterfaceResponse {
 	Status status = 1;
 	Interface interface = 2;
+}
+
+message ListInterfaceLoadBalancerPrefixesRequest {
+	bytes interfaceID = 1;
+}
+
+message ListInterfaceLoadBalancerPrefixesResponse {
+	repeated Prefix prefixes = 1;
 }
 
 message InterfaceVIPIP {
@@ -300,6 +312,16 @@ message ThrottlingConfigMsg {
 	ThrottlingConfig throttlingConfig = 2;
 }
 
+message CreateInterfaceLoadBalancerPrefixRequest {
+	InterfaceIDMsg interfaceID = 1;
+	Prefix prefix = 2;
+}
+
+message DeleteInterfaceLoadBalancerPrefixRequest {
+	InterfaceIDMsg interfaceID = 1;
+	Prefix prefix = 2;
+}
+
 message InterfacePrefixMsg {
 	InterfaceIDMsg interfaceID = 1;
 	Prefix prefix = 2;
@@ -392,6 +414,11 @@ service DPDKonmetal {
 	rpc listInterfacePrefixes(InterfaceIDMsg) returns (PrefixesMsg) {}
 	rpc addInterfacePrefix(InterfacePrefixMsg) returns (IpAdditionResponse) {}
 	rpc deleteInterfacePrefix(InterfacePrefixMsg) returns (Status) {}
+
+	// LoadBalancerTargetPrefix(es) are similar to Prefixes but used for LoadBalancing purposes
+	rpc listInterfaceLoadBalancerPrefixes(ListInterfaceLoadBalancerPrefixesRequest) returns (ListInterfaceLoadBalancerPrefixesResponse) {}
+	rpc createInterfaceLoadBalancerPrefix(CreateInterfaceLoadBalancerPrefixRequest) returns (CreateInterfaceLoadBalancerPrefixResponse) {}
+	rpc deleteInterfaceLoadBalancerPrefix(DeleteInterfaceLoadBalancerPrefixRequest) returns (Status) {}
 
 	// NAT related, add/get/del Virtual IP for a given Interface
 	rpc addInterfaceVIP(InterfaceVIPMsg) returns (IpAdditionResponse) {}
