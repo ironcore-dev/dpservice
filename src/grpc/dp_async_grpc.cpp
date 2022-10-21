@@ -369,11 +369,6 @@ int AddPfxCall::Proceed()
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		if (request_.prefix().loadbalancerenabled()) {
-			request.add_pfx.pfx_lb_enabled = 1;
-			grpc_service->CalculateUnderlayRoute(DP_UNDEFINED_VNI, buf_bin, sizeof(buf_bin));
-			memcpy(request.add_pfx.pfx_ul_addr6, buf_bin, sizeof(request.add_pfx.pfx_ul_addr6));
-		}
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -385,12 +380,8 @@ int AddPfxCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		if (reply.route.vni == DP_UNDEFINED_VNI) {
-			inet_ntop(AF_INET6, reply.route.trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
-		} else {
-			grpc_service->CalculateUnderlayRoute(reply.route.vni, buf_bin, sizeof(buf_bin));
-			inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
-		}
+		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
+		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
@@ -455,6 +446,141 @@ int ListPfxCall::Proceed()
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPS_LOG(INFO, DPSERVICE, "GRPC list AliasPrefix(es) called for id: %s\n", request_.interfaceid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker_with_mbuf(&mbuf))
+			return -1;
+		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		for (i = 0; i < reply->com_head.msg_count; i++) {
+			pfx = reply_.add_prefixes();
+			rp_route = &((&reply->route)[i]);
+			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+				addr.s_addr = htonl(rp_route->pfx_ip.addr);
+				pfx->set_address(inet_ntoa(addr));
+				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+				pfx->set_prefixlength(rp_route->pfx_length);
+			}
+		}
+		rte_pktmbuf_free(mbuf);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int CreateLBTargetPfxCall::Proceed()
+{
+	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+	dp_request request = {0};
+	dp_reply reply = {0};
+	Status *err_status = new Status();
+	uint8_t buf_bin[16];
+	char buf_str[INET6_ADDRSTRLEN];
+
+	if (status_ == REQUEST) {
+		new CreateLBTargetPfxCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC CreateLBTargetPfx called for id: %s\n", request_.interfaceid().interfaceid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().interfaceid().c_str());
+		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.prefix().address().c_str(),
+					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+		}
+		request.add_pfx.pfx_length = request_.prefix().prefixlength();
+		request.add_pfx.pfx_lb_enabled = 1;
+		grpc_service->CalculateUnderlayRoute(DP_UNDEFINED_VNI, buf_bin, sizeof(buf_bin));
+		memcpy(request.add_pfx.pfx_ul_addr6, buf_bin, sizeof(request.add_pfx.pfx_ul_addr6));
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		inet_ntop(AF_INET6, reply.route.trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
+		reply_.set_underlayroute(buf_str);
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int DelLBTargetPfxCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply= {0};
+
+	if (status_ == REQUEST) {
+		new DelLBTargetPfxCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC DelLBTargetPfx called for id: %s\n", request_.interfaceid().interfaceid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().interfaceid().c_str());
+		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+			inet_aton(request_.prefix().address().c_str(),
+					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+		}
+		request.add_pfx.pfx_length = request_.prefix().prefixlength();
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		reply_.set_error(reply.com_head.err_code);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int ListLBTargetPfxCall::Proceed()
+{
+	dp_request request = {0};
+	struct rte_mbuf *mbuf = NULL;
+	struct dp_reply *reply;
+	struct in_addr addr;
+	dp_route *rp_route;
+	Prefix *pfx;
+	int i;
+
+	if (status_ == REQUEST) {
+		new ListLBTargetPfxCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC ListLBTargetPfxCall called for id: %s\n", request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());

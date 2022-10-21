@@ -91,6 +91,9 @@ void GRPCService::HandleRpcs()
 	new AddNeighborNATCall(this, cq_.get());
 	new DeleteNeighborNATCall(this, cq_.get());
 	new GetNATInfoCall(this, cq_.get());
+	new ListLBTargetPfxCall(this, cq_.get());
+	new DelLBTargetPfxCall(this, cq_.get());
+	new CreateLBTargetPfxCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

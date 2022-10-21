@@ -275,6 +275,56 @@ err:
 	return ret;
 }
 
+static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	dp_alias_value alias_val;
+
+	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_ADD_PFX_NO_VM;
+		goto err;
+	}
+
+	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	alias_val.portid = port_id;
+	alias_val.length = req->add_pfx.pfx_length;
+	dp_map_alias_handle((void *)req->add_pfx.pfx_ul_addr6, &alias_val);
+
+	memcpy(rep->route.trgt_ip.addr6, req->add_pfx.pfx_ul_addr6, sizeof(rep->route.trgt_ip.addr6));
+
+	return EXIT_SUCCESS;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
+static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	dp_alias_value alias_val;
+
+	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_DEL_PFX_NO_VM;
+		goto err;
+	}
+
+	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	alias_val.portid = port_id;
+	alias_val.length = req->add_pfx.pfx_length;
+	dp_del_portid_with_alias_handle(&alias_val);
+
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
 static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
@@ -287,9 +337,6 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	if (req->add_pfx.pfx_lb_enabled)
-		dp_map_alias_handle((void *)req->add_pfx.pfx_ul_addr6, port_id);
-
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
 					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
@@ -298,12 +345,6 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 				goto err;
 			}
 		}
-	}
-	if (req->add_pfx.pfx_lb_enabled){
-		rep->route.vni = DP_UNDEFINED_VNI;
-		memcpy(rep->route.trgt_ip.addr6, req->add_pfx.pfx_ul_addr6, sizeof(rep->route.trgt_ip.addr6));
-	} else {
-		rep->route.vni = dp_get_vm_vni(port_id);
 	}
 
 	rep->vni = dp_get_vm_vni(port_id);
@@ -722,6 +763,24 @@ static int dp_process_listbackips(dp_request *req, struct rte_mbuf *req_mbuf, st
 	return EXIT_SUCCESS;
 }
 
+static int dp_process_listlb_pfxs(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->get_pfx.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		rep_arr[DP_MBUF_ARR_SIZE - 1] = m;
+		goto out;
+	}
+
+	dp_list_alias_routes(m, port_id, rep_arr);
+
+out:
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
 	int port_id;
@@ -797,6 +856,12 @@ int dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_DELPREFIX:
 		ret = dp_process_delprefix(req, &rep);
 		break;
+	case DP_REQ_TYPE_ADDLBPREFIX:
+		ret = dp_process_addlb_prefix(req, &rep);
+		break;
+	case DP_REQ_TYPE_DELLBPREFIX:
+		ret = dp_process_dellb_prefix(req, &rep);
+		break;
 	case DP_REQ_TYPE_ADDMACHINE:
 		ret = dp_process_addmachine(req, &rep);
 		break;
@@ -833,6 +898,9 @@ int dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_LISTPREFIX:
 		ret = dp_process_listpfxs(req, m, m_arr);
 		break;
+	case DP_REQ_TYPE_LISTLBPREFIX:
+		ret = dp_process_listlb_pfxs(req, m, m_arr);
+		break;
 	case DP_REQ_TYPE_LISTLBBACKENDS:
 		ret = dp_process_listbackips(req, m, m_arr);
 		break;
@@ -847,6 +915,7 @@ int dp_process_request(struct rte_mbuf *m)
 	if (req->com_head.com_type != DP_REQ_TYPE_LISTMACHINE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX &&
+		req->com_head.com_type != DP_REQ_TYPE_LISTLBPREFIX &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS &&
 		req->com_head.com_type != DP_REQ_TYPE_GET_NATENTRY) {
 		rep.com_head.com_type = req->com_head.com_type;

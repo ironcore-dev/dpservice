@@ -41,6 +41,51 @@ public:
 	virtual ~BaseCall() = default;
 };
 
+class CreateLBTargetPfxCall final : BaseCall {
+	ServerContext ctx_;
+	CreateInterfaceLoadBalancerPrefixRequest request_;
+	CreateInterfaceLoadBalancerPrefixResponse reply_;
+	ServerAsyncResponseWriter<CreateInterfaceLoadBalancerPrefixResponse> responder_;
+
+public:
+	CreateLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADDLBPREFIX), responder_(&ctx_) {
+		service_->RequestcreateInterfaceLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
+														   this);
+	}
+	int Proceed() override;
+};
+
+class DelLBTargetPfxCall final : BaseCall {
+	ServerContext ctx_;
+	DeleteInterfaceLoadBalancerPrefixRequest request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DELLBPREFIX), responder_(&ctx_) {
+		service_->RequestdeleteInterfaceLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
+														   this);
+	}
+	int Proceed() override;
+};
+
+class ListLBTargetPfxCall final : BaseCall {
+	ServerContext ctx_;
+	ListInterfaceLoadBalancerPrefixesRequest request_;
+	ListInterfaceLoadBalancerPrefixesResponse reply_;
+	ServerAsyncResponseWriter<ListInterfaceLoadBalancerPrefixesResponse> responder_;
+
+public:
+	ListLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBPREFIX), responder_(&ctx_) {
+		service_->RequestlistInterfaceLoadBalancerPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
+														   this);
+	}
+	int Proceed() override;
+};
+
 class AddPfxCall final : BaseCall {
 	ServerContext ctx_;
 	InterfacePrefixMsg request_;
