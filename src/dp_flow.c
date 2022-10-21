@@ -94,17 +94,28 @@ void dp_add_flow(struct flow_key *key)
 {
 	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
 		rte_exit(EXIT_FAILURE, "flow table for port add key failed\n");
+	else {
+		DPS_LOG(DEBUG, DPSERVICE, "Successfully added a hash key \n");
+		dp_output_flow_key_info(key);
+	}
 }
 
 void dp_delete_flow(struct flow_key *key)
 {
 	int pos;
+	
 	if (dp_flow_exists(key)) {
 		pos = rte_hash_del_key(ipv4_flow_tbl, key);
 		if (pos < 0)
 			DPS_LOG(WARNING, DPSERVICE, "Hash key already deleted \n");
-		else
+		else {
+			DPS_LOG(DEBUG, DPSERVICE, "Successfully deleted an existing hash key \n");
+			dp_output_flow_key_info(key);
 			rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
+		}
+	} else {
+		DPS_LOG(WARNING, DPSERVICE, "Attempt to delete a non-existing hash key \n");
+		dp_output_flow_key_info(key);
 	}
 
 }
@@ -184,7 +195,7 @@ void dp_process_aged_flows(int port_id)
 		if (!agectx)
 			continue;
 		rte_flow_destroy(port_id, agectx->rte_flow, &error);
-		DPS_LOG(INFO, DPSERVICE, "Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
+		DPS_LOG(DEBUG, DPSERVICE, "Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
 			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
 		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
 			dp_free_flow(agectx->cntrack);
@@ -205,8 +216,10 @@ void dp_process_aged_flows_non_offload(void)
 	/* iterate through the hash table */
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
 						    (void **)&flow_val, &iter) >= 0) {
-		if (unlikely((cur - flow_val->timestamp) > timeout))
+		if (unlikely((cur - flow_val->timestamp) > timeout)) {
+			DPS_LOG(DEBUG, DPSERVICE, "Attempt to free aged non-offloading flow \n");
 			dp_free_flow(flow_val);
+		}
 	}
 }
 
@@ -217,4 +230,26 @@ hash_sig_t dp_get_flow_hash_value(struct flow_key *key)
 	// is always called after either a flow is checked or added in the firewall node.
 	return rte_hash_hash(ipv4_flow_tbl, key);
 
+}
+
+void dp_output_flow_key_info(struct flow_key *key)
+{
+
+	char ip_src_buf[18]={0};
+	char ip_dst_buf[18]={0};
+
+	print_ip(key->ip_src, ip_src_buf);
+	print_ip(key->ip_dst, ip_dst_buf);
+
+	if (key->proto == IPPROTO_TCP)
+		DPS_LOG(DEBUG, DPSERVICE, "tcp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d \n", 
+				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
+	
+	if (key->proto == IPPROTO_UDP)
+		DPS_LOG(DEBUG, DPSERVICE, "udp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d \n", 
+				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
+
+	if (key->proto == IPPROTO_ICMP)
+		DPS_LOG(DEBUG, DPSERVICE, "icmp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d \n", 
+				ip_src_buf, ip_dst_buf, key->src.type_src, key->port_dst);
 }

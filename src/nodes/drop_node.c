@@ -4,6 +4,7 @@
 #include <rte_malloc.h>
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_util.h"
 
 
 static __rte_always_inline void prepare_drop(struct rte_mbuf *m)
@@ -22,6 +23,7 @@ static __rte_always_inline void prepare_drop(struct rte_mbuf *m)
 	if (cntrack->flow_state != DP_FLOW_STATE_NEW)
 		return;
 
+	DPS_LOG(INFO, DPSERVICE, "Attempt to free flow due to packet drop \n");
 	dp_free_flow(cntrack);
 }
 

@@ -61,6 +61,8 @@ int dp_is_wcmp_enabled();
 
 double dp_get_wcmp_frac();
 
+void print_ip(unsigned int ip, char *buf);
+
 
 #ifdef __cplusplus
 }
