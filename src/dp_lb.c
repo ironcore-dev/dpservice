@@ -214,6 +214,16 @@ static void dp_lb_delete_back_ip(struct lb_value *val, uint8_t *b_ip)
 	}
 }
 
+static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
+{
+	int k;
+
+	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++)
+		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[k][0], b_ip))
+			return true;
+	return false;
+}
+
 static int dp_lb_rr_backend(struct lb_value *val, dp_lb_port *lb_port)
 {
 	int ret = -1, k;
@@ -311,6 +321,9 @@ int dp_set_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size)
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
 		goto err;
+
+	if (dp_lb_is_back_ip_inserted(lb_val, back_ip))
+		return EXIT_SUCCESS;
 
 	pos = dp_lb_last_free_pos(lb_val);
 	if (pos < 0)
