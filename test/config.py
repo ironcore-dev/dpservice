@@ -53,4 +53,6 @@ nat_neigh_ul_dst="2a10:afc0:e01f:f406:0:64::"
 pfx_ip = "174.23.4.0"
 mylb = "my_lb"
 
+config_file_path = "/tmp/dp_service.conf"
+
 MAX_LINES_ROUTE_REPLY = 36
