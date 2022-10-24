@@ -77,7 +77,6 @@ def is_tcp_pkt(pkt):
 	return False
 
 def is_tcp_vip_src_pkt(pkt):
-	print("I am in check")
 	if TCP in pkt:
 		if pkt[IP].src == virtual_ip:
 			return True
@@ -225,11 +224,14 @@ def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	cmd = shlex.split(cmd_str)
 	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
 	count = 0
+	first_line = ""
 	err_found = False
 
 	while count < maxlines:
 		output = process.stdout.readline()
 		line = output.strip()
+		if count == 0:
+			first_line = line
 		if exp_error in line:
 			err_found = True
 		count = count + 1
@@ -240,6 +242,7 @@ def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	else:
 		if err_found:
 			raise AssertionError("Receive expected unexpected string " + exp_error)
+	return first_line
 
 def test_vf_to_vf_vip_dnat(capsys, add_machine, build_path):
 	d = multiprocessing.Process(name = "sniffer", target = vf_to_vf_tcp_vf1_responder)
@@ -275,7 +278,6 @@ def test_vf_to_pf_vip_snat(capsys, add_machine, build_path):
 
 	expected_str = ul_actual_src
 	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
-	print(add_vip_test)
 	eval_cmd_output(add_vip_test, expected_str)
 	time.sleep(1)
 
@@ -418,6 +420,11 @@ def send_bounce_pkt_to_pf():
 	time.sleep(3)
 	sendp(bouce_pkt, iface=pf0_tap)
 
+def send_lb_pkt_to_pf():
+	lb_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_src, src=ul_actual_dst, nh=4)/IP(dst=virtual_ip, src=public_ip) /TCP(sport=1234, dport=80)
+	time.sleep(3)
+	sendp(lb_pkt, iface=pf0_tap)
+
 def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
@@ -457,6 +464,51 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	expected_str = "Delnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+
+def test_pf_to_vf_network_lb_tcp(capsys, add_machine, build_path):
+	expected_str = ul_actual_src
+	add_lbvip_test = build_path+"/test/dp_grpc_client --createlb "+ mylb + " --vni " + vni + " --ipv4 " + virtual_ip + " --port 80 --protocol tcp" 
+	eval_cmd_output(add_lbvip_test, expected_str)
+
+	expected_str = ul_short_src
+	add_pfx_test = build_path+"/test/dp_grpc_client --addlbpfx " + vm1_name + " --ipv4 " + virtual_ip + " --length 32"
+	first_line = eval_cmd_output(add_pfx_test, expected_str)
+	vm1_target_lb_pfx_underlay = first_line[26:]
+
+	expected_str = "LB target added"
+	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip " + mylb + " --t_ipv6 " + vm1_target_lb_pfx_underlay
+	eval_cmd_output(add_lbvip_test, expected_str)
+
+	d = multiprocessing.Process(name = "send_lb_pkt", target = send_lb_pkt_to_pf, args=())
+	d.daemon=False
+	d.start()
+
+	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf0_tap,timeout=7)
+
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive loadbalanced tcp pkt on vf')
+
+	pkt=pkt_list[0]
+	# pkt.show()
+	
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if TCP in pkt:
+		pkttcp= pkt[TCP]
+
+	if pktip.dst != virtual_ip  or pkttcp.dport != 80:
+		raise AssertionError('Received wrong packet with ip:'+pktip.dst+" dport:"+ str(pkttcp.dport))
+
+	expected_str = "DelLBprefix"
+	del_pfx_test = build_path+"/test/dp_grpc_client --dellbpfx " + vm1_name + " --ipv4 " + virtual_ip + " --length 32"
+	eval_cmd_output(del_pfx_test, expected_str)
+
+	expected_str = "Delete LB Success"
+	del_lbvip_test = build_path+"/test/dp_grpc_client --dellb " + mylb
+	eval_cmd_output(del_lbvip_test, expected_str)
 
 
 def test_grpc_addmachine_error_102(capsys, build_path):
@@ -554,7 +606,7 @@ def test_grpc_add_list_delVIP(capsys, build_path):
 	eval_cmd_output(get_vip_test, expected_str, negate=True)
 
 def test_grpc_add_list_delLBVIP(capsys, build_path):
-	# Try to add VIP, list, test error cases, delete vip and list again
+	# Try to add LB VIP, list, test error cases, delete vip and list again
 	expected_str = ul_actual_src
 	add_lbvip_test = build_path+"/test/dp_grpc_client --createlb "+ mylb + " --vni " + vni + " --ipv4 " + virtual_ip + " --port 80 --protocol tcp" 
 	eval_cmd_output(add_lbvip_test, expected_str)
@@ -590,6 +642,14 @@ def test_grpc_add_list_delLBVIP(capsys, build_path):
 	expected_str = back_ip2
 	list_backips_test = build_path+"/test/dp_grpc_client --listbackips " + mylb
 	eval_cmd_output(list_backips_test, expected_str, negate=True)
+
+	expected_str = ul_actual_src
+	del_lbvip_test = build_path+"/test/dp_grpc_client --getlb " + mylb
+	eval_cmd_output(del_lbvip_test, expected_str)
+
+	expected_str = "Delete LB Success"
+	del_lbvip_test = build_path+"/test/dp_grpc_client --dellb " + mylb
+	eval_cmd_output(del_lbvip_test, expected_str)
 
 def test_grpc_add_list_delPfx(capsys, build_path):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
