@@ -568,12 +568,13 @@ int DelLBTargetPfxCall::Proceed()
 
 int ListLBTargetPfxCall::Proceed()
 {
-	dp_request request = {0};
+	char buf_str[INET6_ADDRSTRLEN];
 	struct rte_mbuf *mbuf = NULL;
+	dp_request request = {0};
 	struct dp_reply *reply;
 	struct in_addr addr;
 	dp_route *rp_route;
-	Prefix *pfx;
+	LBPrefix *pfx;
 	int i;
 
 	if (status_ == REQUEST) {
@@ -602,6 +603,8 @@ int ListLBTargetPfxCall::Proceed()
 				pfx->set_address(inet_ntoa(addr));
 				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 				pfx->set_prefixlength(rp_route->pfx_length);
+				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
+				pfx->set_underlayroute(buf_str);
 			}
 		}
 		rte_pktmbuf_free(mbuf);

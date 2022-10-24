@@ -2,6 +2,7 @@ import pytest
 import pytest, shlex, subprocess, time
 from config import *
 import time
+import os
 
 
 def pytest_addoption(parser):
@@ -26,6 +27,9 @@ def prepare_env(request, build_path, tun_opt):
 	wcmp_opt_str = ""
 	if port_redundancy:
 		wcmp_opt_str = " --wcmp-frac=0.5"
+
+	if os.path.exists(config_file_path) :
+		os.rename(config_file_path, config_file_path + ".backup")
 
 	dp_service_cmd = build_path+"/src/dp_service -l 0,1 --vdev=net_tap0,iface="+pf0_tap+",mac=\""+pf0_mac+"\" "\
 		"--vdev=net_tap1,iface="+pf1_tap+",mac=\""+pf1_mac+ "\" --vdev=net_tap2,"\
@@ -54,6 +58,8 @@ def prepare_env(request, build_path, tun_opt):
 	def tear_down():
 		process.terminate()
 		time.sleep(1)
+		if os.path.exists(config_file_path + ".backup") :
+			os.rename(config_file_path + ".backup", config_file_path)
 	request.addfinalizer(tear_down)
 	return process
 

@@ -124,6 +124,7 @@ int dp_list_alias_routes(struct rte_mbuf *m, uint16_t portid, struct rte_mbuf *r
 		rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 		rp_route->pfx_ip.addr = temp_val->ip;
 		rp_route->pfx_length = temp_val->length;
+		memcpy(rp_route->trgt_ip.addr6, key, sizeof(rp_route->trgt_ip.addr6));
 	}
 
 	if (rep_arr_size < 0) {

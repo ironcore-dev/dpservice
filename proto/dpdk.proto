@@ -71,6 +71,13 @@ message Prefix {
 	uint32 prefixLength = 3;  // max length is 32 for IPv4 and 128 for IPv6
 }
 
+message LBPrefix {
+	IPVersion ipVersion = 1;
+	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
+	uint32 prefixLength = 3;  // max length is 32 for IPv4 and 128 for IPv6
+	bytes underlayRoute = 4;
+}
+
 message InitConfig {
 	Prefix underlayIPv6Prefix = 1;   // prefix in the underlay network that is routed to the DPDK app
 	repeated string uplinkPorts = 2; // Linux name of the NICs that are connected to the Leaf Switches
@@ -182,7 +189,7 @@ message ListInterfaceLoadBalancerPrefixesRequest {
 }
 
 message ListInterfaceLoadBalancerPrefixesResponse {
-	repeated Prefix prefixes = 1;
+	repeated LBPrefix prefixes = 1;
 }
 
 message InterfaceVIPIP {
