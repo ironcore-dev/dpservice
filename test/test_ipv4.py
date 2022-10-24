@@ -623,6 +623,33 @@ def test_grpc_add_list_delPfx(capsys, build_path):
 	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
 	eval_cmd_output(list_pfx_test, expected_str, negate=True)
 
+def test_grpc_add_list_delLoadBalancerTargets(capsys, build_path):
+	# Try to add Prefix, list, test error cases, delete prefix and list again
+	expected_str = ul_short_src
+	add_pfx_test = build_path+"/test/dp_grpc_client --addlbpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 32"
+	eval_cmd_output(add_pfx_test, expected_str)
+
+	expected_str = pfx_ip
+	list_pfx_test = build_path+"/test/dp_grpc_client --listlbpfx " + vm2_name
+	eval_cmd_output(list_pfx_test, expected_str)
+
+	# Try to add/delete to/from a machine which doesnt exist
+	expected_str = "651"
+	add_pfx_test = build_path+"/test/dp_grpc_client --addlbpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 32"
+	eval_cmd_output(add_pfx_test, expected_str)
+
+	expected_str = "701"
+	del_pfx_test = build_path+"/test/dp_grpc_client --dellbpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 32"
+	eval_cmd_output(del_pfx_test, expected_str)
+
+	expected_str = "DelLBprefix"
+	del_pfx_test = build_path+"/test/dp_grpc_client --dellbpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 32"
+	eval_cmd_output(del_pfx_test, expected_str)
+
+	expected_str = pfx_ip
+	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
+	eval_cmd_output(list_pfx_test, expected_str, negate=True)
+
 # def test_grpc_add_list_del_routes_big_reply(capsys, build_path):
 # 	expected_str = "Listroute called"
 # 	pfx_first = "192.168."
