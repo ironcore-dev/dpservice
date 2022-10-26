@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <sys/queue.h>
+
 #define DP_NAT_TABLE_MAX	100
 
 // TODO: change this to a configurable value
@@ -23,19 +25,16 @@ struct nat_key {
 	uint32_t	vni;
 };
 
-struct network_nat_entry {
+typedef struct network_nat_entry {
 	union {
 		uint32_t	nat_ip4;
 		uint8_t		nat_ip6[16];
 	} nat_ip;
-
 	uint16_t	port_range[2];
-
 	uint32_t	vni;
 	uint8_t		dst_ipv6[16];
-
-	struct network_nat_entry	*next;
-};
+	TAILQ_ENTRY(network_nat_entry) entries;
+} network_nat_entry;
 
 struct snat_data {
 	uint32_t	vip_ip;
