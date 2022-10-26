@@ -666,7 +666,7 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 	struct dp_nat_entry *rp_nat_entry;
 
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
-		return EXIT_SUCCESS;
+		goto err;
 
 	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
 										    &rep_arr_size, sizeof(struct dp_nat_entry));
@@ -705,6 +705,7 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 		return EXIT_SUCCESS;
 	}
 
+err:
 	rep_arr[--rep_arr_size] = m_curr;
 
 	return EXIT_SUCCESS;
