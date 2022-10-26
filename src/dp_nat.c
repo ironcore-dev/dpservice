@@ -300,7 +300,6 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
 		} else {
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
-			return DP_ERROR_VM_DEL_NETNAT_DELETE_FAIL;
 		}
 	}
 
