@@ -87,6 +87,7 @@ void GRPCService::HandleRpcs()
 	new GetLBCall(this, cq_.get());
 	new DelLBCall(this, cq_.get());
 	new AddNATVIPCall(this, cq_.get());
+	new GetNATVIPCall(this, cq_.get());
 	new DeleteNATVIPCall(this, cq_.get());
 	new AddNeighborNATCall(this, cq_.get());
 	new DeleteNeighborNATCall(this, cq_.get());

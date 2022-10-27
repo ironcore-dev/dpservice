@@ -354,7 +354,7 @@ def test_vf_to_pf_network_nat_tcp(capsys, add_machine, build_path):
 		raise AssertionError('Received wrong packet with ip:'+pktip.dst+" dport:"+ str(pkttcp.dport))
 
 	expected_str = "Delnat"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip 
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 def send_icmp_pkt_from_vm1():
@@ -412,7 +412,7 @@ def test_vf_to_pf_network_nat_icmp(capsys, add_machine, build_path):
 		raise AssertionError('Received wrong icmp packet with ip:'+pktip.dst)
 
 	expected_str = "Delnat"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip 
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 def send_bounce_pkt_to_pf():
@@ -457,8 +457,8 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	if pktipv6.dst != nat_neigh_ul_dst  or pkttcp.dport != 510:
 		raise AssertionError('Received wrong network-nat relayed packet with outer dst ipv6 addr:'+pktipv6.dst+" dport:"+ pkttcp.dport)
 
-	expected_str = vf0_ip
-	get_net_nat_local_vm1_test = build_path+"/test/dp_grpc_client --getnatinfo local "  + " --ipv4 " + nat_vip
+	expected_str = nat_vip
+	get_net_nat_local_vm1_test = build_path+"/test/dp_grpc_client --getnat " + vm1_name
 	eval_cmd_output(get_net_nat_local_vm1_test, expected_str)
 
 	expected_str = nat_neigh_ul_dst
@@ -470,11 +470,11 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 	expected_str = "Delnat"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
-	expected_str = vf0_ip
-	get_net_nat_local_vm1_test = build_path+"/test/dp_grpc_client --getnatinfo local "  + " --ipv4 " + nat_vip
+	expected_str = nat_vip
+	get_net_nat_local_vm1_test =  build_path+"/test/dp_grpc_client --getnat " + vm1_name
 	eval_cmd_output(get_net_nat_local_vm1_test, expected_str, negate=True)
 
 	expected_str = nat_neigh_ul_dst
@@ -486,7 +486,7 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 	expected_str = "362"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name + " --ipv4 " + nat_vip
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 

@@ -401,6 +401,21 @@ public:
 	int	Proceed() override;
 };
 
+class GetNATVIPCall final: BaseCall {
+	ServerContext ctx_;
+	GetNATRequest request_;
+	GetNATResponse reply_;
+	ServerAsyncResponseWriter<GetNATResponse> responder_;
+
+public:
+	GetNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_GET_NATVIP), responder_(&ctx_) {
+		service_->RequestgetNAT(&ctx_, &request_, &responder_, cq_, cq_,
+								this);
+	}
+	int	Proceed() override;
+};
+
 class DeleteNATVIPCall final: BaseCall {
 	ServerContext ctx_;
 	DeleteNATRequest request_;

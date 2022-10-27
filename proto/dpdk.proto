@@ -58,6 +58,13 @@ message AddNATResponse {
 	bytes underlayRoute = 2;
 }
 
+message GetNATResponse {
+	Status status = 1;
+	NATIP natVIPIP = 2;
+	uint32 minPort = 3; // port should be uint16 (less than 65536)
+	uint32 maxPort = 4;
+}
+
 message CreateLoadBalancerResponse {
 	Status status = 1;
 	bytes underlayRoute = 2;
@@ -271,6 +278,10 @@ message AddNATRequest {
 	uint32 maxPort = 4;
 }
 
+message GetNATRequest {
+	bytes interfaceID =1;
+}
+
 message GetNATInfoRequest {
 	NATIP natVIPIP = 1; // list all local machines that are behind this IP
 	NATInfoType natInfoType = 2; 
@@ -292,7 +303,6 @@ message GetNATInfoResponse {
 
 message DeleteNATRequest {
 	bytes interfaceID =1;
-	NATIP natVIPIP = 2;
 }
 
 message AddNeighborNATRequest {
@@ -442,8 +452,9 @@ service DPDKonmetal {
 	rpc getLoadBalancerTargets(GetLoadBalancerTargetsRequest) returns (GetLoadBalancerTargetsResponse) {}
 	rpc deleteLoadBalancerTarget(DeleteLoadBalancerTargetRequest) returns (Status) {}
 
-	// Network-NAT related, add/del a NAT for an interface
+	// Network-NAT related, add/del/get a NAT for an interface
 	rpc addNAT(AddNATRequest) returns (AddNATResponse) {}
+	rpc getNAT(GetNATRequest) returns (GetNATResponse) {}
 	rpc deleteNAT(DeleteNATRequest) returns (Status) {}
 
 	rpc addNeighborNAT(AddNeighborNATRequest) returns (Status) {}
