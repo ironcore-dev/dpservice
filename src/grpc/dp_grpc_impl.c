@@ -570,11 +570,6 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
-	if (req->add_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL) {
-		ret = DP_ERROR_VM_ADD_NETNAT_NONLOCAL;
-		goto err;
-	}
-
 	port_id = dp_get_portid_with_vm_handle(req->add_nat_vip.machine_id);
 
 	if (port_id < 0) {
@@ -584,14 +579,7 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 
 	vm_vni = dp_get_vm_vni(port_id);
 
-	/* This machine ID doesnt exist */
-	if (port_id < 0) {
-		ret = DP_ERROR_VM_ADD_NETNAT_INVALID_PORT;
-		goto err;
-	}
-
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-
 		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
 									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
 
@@ -616,12 +604,6 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
-	if (req->del_nat_vip.type != DP_NETNAT_INFO_TYPE_LOCAL) {
-		ret = DP_ERROR_VM_DEL_NETNAT_NONLOCAL;
-		goto err;
-	}
-
-
 	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
 	if (port_id < 0) {
 		ret = DP_ERROR_VM_GET_VM_NOT_FND;
@@ -629,22 +611,44 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	}
 	vm_vni = dp_get_vm_vni(port_id);
 
-	/* This machine ID doesnt exist */
-	if (port_id < 0) {
-		ret = DP_ERROR_VM_DEL_NETNAT_INVALID_PORT;
+	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), vm_vni);
+	if (ret)
 		goto err;
-	}
 
-	if (req->del_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), vm_vni);
-		if (ret)
-			goto err;
-	}
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;
 	return ret;
+}
 
+static int dp_process_getnat(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	struct snat_data *s_data;
+
+	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (port_id < 0) {
+		ret = DP_ERROR_VM_GET_NAT;
+		goto err;
+	}
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+
+	if (!s_data || (s_data && !s_data->network_nat_ip)) {
+		ret = DP_ERROR_VM_GET_NAT_NO_IP_SET;
+		goto err;
+	}
+
+	rep->nat_entry.m_ip.addr = htonl(s_data->network_nat_ip);
+
+	rep->nat_entry.min_port = s_data->network_nat_port_range[0];
+	rep->nat_entry.max_port = s_data->network_nat_port_range[1];
+
+	return ret;
+err:
+	rep->com_head.err_code = ret;
+	return ret;
 }
 
 static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
@@ -672,7 +676,6 @@ static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
 err:
 	rep->com_head.err_code = ret;
 	return ret;
-
 }
 
 static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
@@ -888,6 +891,9 @@ int dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_DEL_NATVIP:
 		ret = dp_process_delnat(req, &rep);
+		break;
+	case DP_REQ_TYPE_GET_NATVIP:
+		ret = dp_process_getnat(req, &rep);
 		break;
 	case DP_REQ_TYPE_ADD_NEIGH_NAT:
 		ret = dp_process_add_neigh_nat(req, &rep);

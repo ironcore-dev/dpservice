@@ -11,11 +11,13 @@
 #include "dp_nat.h"
 #include "rte_flow/dp_rte_flow.h"
 
+TAILQ_HEAD(network_nat_head, network_nat_entry);
+
 static struct rte_hash *ipv4_dnat_tbl = NULL;
 static struct rte_hash *ipv4_snat_tbl = NULL;
 
 static struct rte_hash *ipv4_network_dnat_tbl = NULL;
-static struct network_nat_entry *network_nat_db = NULL;
+static struct network_nat_head nat_headp;
 
 void dp_init_nat_tables(int socket_id)
 {
@@ -60,6 +62,7 @@ void dp_init_nat_tables(int socket_id)
 	if (!ipv4_network_dnat_tbl)
 		rte_exit(EXIT_FAILURE, "create ipv4 network dnat table failed\n");
 
+	TAILQ_INIT(&nat_headp);
 }
 
 void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result)
@@ -107,6 +110,20 @@ uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 		return 0;
 
 	return data->vip_ip;
+}
+
+struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni)
+{
+	struct snat_data *data;
+	struct nat_key nkey;
+
+	nkey.ip = vm_ip;
+	nkey.vni = vni;
+
+	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
+		return NULL;
+
+	return data;
 }
 
 uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
@@ -297,7 +314,6 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
 		} else {
 			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
-			return DP_ERROR_VM_DEL_NETNAT_DELETE_FAIL;
 		}
 	}
 
@@ -443,7 +459,6 @@ static int dp_cmp_network_nat_entry(struct network_nat_entry *entry, uint32_t na
 				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0))
 				&& entry->vni == vni && entry->port_range[0] == min_port && entry->port_range[1] == max_port)
 		return 1;
-
 	else
 		return 0;
 }
@@ -467,47 +482,35 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint8_t *underlay_ipv6)
 {
 
-	struct network_nat_entry *last;
+	network_nat_entry *next, *new_entry;
 
-	if (network_nat_db != NULL) {
-		last = network_nat_db;
-		while (last->next != NULL) {
-			int is_entry_found = dp_cmp_network_nat_entry(last, nat_ipv4, nat_ipv6, vni, min_port, max_port);
-
-			if (is_entry_found) {
-				DPS_LOG(ERR, DPSERVICE, "cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n", 
-						nat_ipv4, vni, min_port, max_port);
-				return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
-			}
-			last = last->next;
+	TAILQ_FOREACH(next, &nat_headp, entries) {
+		if (dp_cmp_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
+			DPS_LOG(ERR, DPSERVICE, "cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n",
+					nat_ipv4, vni, min_port, max_port);
+			return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
 		}
 	}
 
-	struct network_nat_entry *new_entry = (struct network_nat_entry *)rte_zmalloc("network_nat_array", sizeof(struct network_nat_entry), RTE_CACHE_LINE_SIZE);
+	new_entry = (network_nat_entry *)rte_zmalloc("network_nat_array", sizeof(network_nat_entry), RTE_CACHE_LINE_SIZE);
 
 	if (!new_entry) {
 		DPS_LOG(ERR, DPSERVICE, "failed to allocate network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
 		return DP_ERROR_VM_ADD_NEIGHNAT_ALLOC;
 	}
 
-	if (nat_ipv4 != 0)
+	if (nat_ipv4)
 		new_entry->nat_ip.nat_ip4 = nat_ipv4;
 
-	if (nat_ipv6 != NULL)
+	if (nat_ipv6)
 		memcpy(new_entry->nat_ip.nat_ip6, nat_ipv6, sizeof(new_entry->nat_ip.nat_ip6));
 
 	new_entry->vni = vni;
 	new_entry->port_range[0] = min_port;
 	new_entry->port_range[1] = max_port;
 	memcpy(new_entry->dst_ipv6, underlay_ipv6, sizeof(new_entry->dst_ipv6));
-	new_entry->next = NULL;
 
-	if (network_nat_db == NULL) {
-		network_nat_db = new_entry;
-		return EXIT_SUCCESS;
-	}
-
-	last->next = new_entry;
+	TAILQ_INSERT_TAIL(&nat_headp, new_entry, entries);
 
 	return EXIT_SUCCESS;
 
@@ -516,75 +519,53 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
-	struct network_nat_entry *tmp = network_nat_db, *prev;
-	int is_nat_entry_found = 0;
+	network_nat_entry *item, *tmp_item;
 
-	is_nat_entry_found = dp_cmp_network_nat_entry(tmp, nat_ipv4, nat_ipv6, vni, min_port, max_port);
-	if (tmp != NULL && is_nat_entry_found) {
-		network_nat_db = tmp->next;
-		rte_free(tmp);
-		return EXIT_SUCCESS;
-	}
-	while (tmp != NULL && !is_nat_entry_found) {
-		prev = tmp;
-		tmp = tmp->next;
-		is_nat_entry_found = dp_cmp_network_nat_entry(tmp, nat_ipv4, nat_ipv6, vni, min_port, max_port);
+	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
+		tmp_item = TAILQ_NEXT(item, entries);
+		if (dp_cmp_network_nat_entry(item, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
+			TAILQ_REMOVE(&nat_headp, item, entries);
+			rte_free(item);
+			return EXIT_SUCCESS;
+		}
 	}
 
-	if (tmp == NULL)
-		return DP_ERROR_VM_DEL_NEIGHNAT_ENTRY_NOFOUND;
-
-	prev->next = tmp->next;
-	rte_free(tmp);
-	return EXIT_SUCCESS;
-
+	return DP_ERROR_VM_DEL_NEIGHNAT_ENTRY_NOFOUND;
 }
 
 int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6)
 {
+	network_nat_entry *current;
 
-	struct network_nat_entry *current = network_nat_db;
-
-	while (current != NULL) {
-		int is_nat_entry_found = dp_cmp_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port);
-
-		if (is_nat_entry_found) {
+	TAILQ_FOREACH(current, &nat_headp, entries) {
+		if (dp_cmp_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
 			memcpy(underlay_ipv6, current->dst_ipv6, sizeof(current->dst_ipv6));
 			return EXIT_SUCCESS;
 		}
-		current = current->next;
 	}
-
 	return DP_ERROR_VM_GET_NEIGHNAT_UNDER_IPV6;
 }
 
 int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6)
 {
+	struct network_nat_entry *current;
 	struct dp_flow *df_ptr;
-
-	uint32_t dst_ip;
 	uint16_t dst_port;
 	uint32_t dst_vni;
+	uint32_t dst_ip;
 
 	df_ptr = get_dp_flow_ptr(pkt);
-
 	dst_ip = ntohl(df_ptr->dst.dst_addr);
 	dst_port = ntohs(df_ptr->dst_port);
 	dst_vni = df_ptr->tun_info.dst_vni;
 
-	struct network_nat_entry *current = network_nat_db;
-
-	while (current != NULL) {
-		int is_nat_entry_found = dp_check_port_network_nat_entry(current, dst_ip, NULL, dst_vni, dst_port);
-
-		if (is_nat_entry_found) {
+	TAILQ_FOREACH(current, &nat_headp, entries) {
+		if (dp_check_port_network_nat_entry(current, dst_ip, NULL, dst_vni, dst_port)) {
 			memcpy(underlay_ipv6, current->dst_ipv6, sizeof(current->dst_ipv6));
 			return 1;
 		}
-		current = current->next;
 	}
-
 	return 0;
 }
 
@@ -666,7 +647,7 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 	struct dp_nat_entry *rp_nat_entry;
 
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
-		return EXIT_SUCCESS;
+		goto err;
 
 	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
 										    &rep_arr_size, sizeof(struct dp_nat_entry));
@@ -705,6 +686,7 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 		return EXIT_SUCCESS;
 	}
 
+err:
 	rep_arr[--rep_arr_size] = m_curr;
 
 	return EXIT_SUCCESS;
@@ -714,16 +696,16 @@ int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
+	struct dp_nat_entry *rp_nat_entry;
+	struct network_nat_entry *current ;
 	uint16_t msg_per_buf;
 	dp_reply *rep;
-	struct dp_nat_entry *rp_nat_entry;
-	struct network_nat_entry *current = network_nat_db;
 
 	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
 										    &rep_arr_size, sizeof(struct dp_nat_entry));
 	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
 
-	while (current != NULL) {
+	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (current->nat_ip.nat_ip4 == nat_ip) {
 			if (rep->com_head.msg_count &&
 				(rep->com_head.msg_count % msg_per_buf == 0)) {
@@ -740,7 +722,6 @@ int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 			rp_nat_entry->max_port = current->port_range[1];
 			rte_memcpy(rp_nat_entry->underlay_route, current->dst_ipv6, sizeof(current->dst_ipv6));
 		}
-		current = current->next;
 	}
 
 	if (rep_arr_size < 0) {

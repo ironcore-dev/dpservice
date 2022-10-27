@@ -40,7 +40,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_state = DP_FLOW_STATE_NEW;
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
-	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_ZERO; // init this flag
+	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	dp_add_flow_data(key, flow_val);
 
 	// Only the original flow (outgoing)'s hash value is recorded

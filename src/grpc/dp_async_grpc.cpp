@@ -1069,7 +1069,6 @@ int AddNATVIPCall::Proceed()
 		if (InitCheck() == INITCHECK)
 			return -1;
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		request.add_nat_vip.type = DP_NETNAT_INFO_TYPE_LOCAL;
 		snprintf(request.add_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -1107,7 +1106,50 @@ int AddNATVIPCall::Proceed()
 		delete this;
 	}
 	return 0;
+}
 
+int GetNATVIPCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	Status *err_status = new Status();
+	struct in_addr addr;
+	NATIP *nat_ip;
+
+	if (status_ == REQUEST) {
+		new GetNATVIPCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPS_LOG(INFO, DPSERVICE, "GRPC get NAT VIP called for id: %s\n", request_.interfaceid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		nat_ip = new NATIP();
+		addr.s_addr = reply.nat_entry.m_ip.addr;
+		nat_ip->set_address(inet_ntoa(addr));
+		nat_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		reply_.set_allocated_natvipip(nat_ip);
+		reply_.set_maxport(reply.nat_entry.max_port);
+		reply_.set_minport(reply.nat_entry.min_port);
+		status_ = FINISH;
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
 }
 
 int DeleteNATVIPCall::Proceed()
@@ -1123,15 +1165,9 @@ int DeleteNATVIPCall::Proceed()
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		request.del_nat_vip.type = DP_NETNAT_INFO_TYPE_LOCAL;
-		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
-			request.del_nat_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natvipip().address().c_str(),
-					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
-		}
 
-		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNATVIP is called to delete a local NAT entry: interface %s -> NAT IP %s \n",
-				 request_.interfaceid().c_str(), request_.natvipip().address().c_str());
+		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNATVIP is called to delete a local NAT entry: interface %s\n",
+				 request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
