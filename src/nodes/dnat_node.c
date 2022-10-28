@@ -53,20 +53,29 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			uint32_t dnat_ip = dp_get_vm_dnat_ip(dst_ip, vni);
 
-			if (dnat_ip == 0 && df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-				dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
-				df_ptr->dst_port = df_ptr->icmp_identifier;
+			// if it is a network nat pkt
+			if (dnat_ip == 0) {
+				// extrack identifier field from icmp pkt
+				if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
+					df_ptr->dst_port = df_ptr->icmp_identifier;
+				
+				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
+				if (dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
+					cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
+					cntrack->nat_info.l4_type = df_ptr->l4_type;
+					memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
+
+					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
+					return DP_ROUTE_PKT_RELAY;
+				}
+				
+				// if it is not a nat pkt destinated for its neighboring nat, 
+				// then it is a premature dnat pkt for network nat (sent before any outgoing traffic from VM, 
+				// and it cannot be a standalone new incoming flow for network NAT),
+				// silently drop it now.
+				return 0;
 			}
 
-			// only perform this lookup on unknown dnat (VIP dnat. Distributed NAted) traffic flows
-			if (dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
-				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
-				cntrack->nat_info.l4_type = df_ptr->l4_type;
-				memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
-
-				dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
-				return DP_ROUTE_PKT_RELAY;
-			}
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dnat_ip);
 			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
