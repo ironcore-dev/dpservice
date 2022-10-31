@@ -11,6 +11,11 @@ timestamp() {
   date +"%Y-%m-%d_%H-%M-%S-%3N"
 }
 
+exit_msg() {
+    echo "$(timestamp): ERROR: $1" >&2
+    exit 1
+}
+
 function detect_pfs() {
 count=0
 read_next=0
@@ -54,9 +59,8 @@ while read l1 ;do
    fi
 done < <(devlink port)
 
-# Return an error, if we find less pfs then 2
 if [ $count -ne 2 ]; then
-     exit 1
+     exit_msg "Need at least 2 PFs"
 fi
 }
 
@@ -98,6 +102,10 @@ done < <(ip -6 -o addr show lo | awk '{print $4}')
 
 function configure_vfs() {
 
+if [ ! -f /sys/class/net/$PF0_NAME/device/sriov_totalvfs ] || [ ! -d /sys/bus/pci/drivers/mlx5_core ]; then
+   exit_msg "Mellanox card with SR-IOV enabled is required"
+fi
+
 maxvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_totalvfs)
 numvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_numvfs)
 mod_vf_count=0
@@ -123,17 +131,34 @@ if [ $numvfs -eq 0 ]; then
     sleep 2
     echo "$(timestamp): changing eswitch mode for "$PF0_PCI_ADDR" to switchdev"
     devlink dev eswitch set pci/$PF0_PCI_ADDR mode switchdev
+    if [ $? -ne 0 ]; then
+        echo "$(timestamp): reverting to 0 VFs"
+        echo "0" > $numvfs_file
+        exit_msg "Unable to set eswitch mode"
+    fi
 fi
 
 }
 
 function configure_hugepages() {
 
-numpages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages)
-if [ $numpages -eq 0 ]; then
-    echo $NUM_PAGES > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
-    mkdir /dev/hugepages1G
-    mount -t hugetlbfs -o pagesize=1G none /dev/hugepages1G
+if [ -d /sys/kernel/mm/hugepages/hugepages-1048576kB ]; then
+   numpages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages)
+   if [ $numpages -eq 0 ]; then
+      echo $NUM_PAGES > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+      mkdir -p /dev/hugepages1G
+      mount -t hugetlbfs -o pagesize=1G none /dev/hugepages1G
+   fi
+elif [ -d /sys/kernel/mm/hugepages/hugepages-2048kB ]; then
+   echo "$(timestamp): WARNING: Using 2MB hugepages only" >&2
+   numpages=$(cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages)
+   if [ $numpages -eq 0 ]; then
+      echo $(($NUM_PAGES*512)) > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+      mkdir -p /dev/hugepages
+      mount -t hugetlbfs -o pagesize=2M none /dev/hugepages
+   fi
+else
+   exit_msg "No hugepage support"
 fi
 
 }
