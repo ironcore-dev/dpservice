@@ -92,10 +92,13 @@ bool dp_flow_exists(struct flow_key *key)
 
 void dp_add_flow(struct flow_key *key)
 {
+	uint32_t hash_v;
+
 	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
 		rte_exit(EXIT_FAILURE, "flow table for port add key failed\n");
 	else {
-		DPS_LOG(DEBUG, DPSERVICE, "Successfully added a hash key \n");
+		hash_v = (uint32_t)dp_get_flow_hash_value(key);
+		DPS_LOG(DEBUG, DPSERVICE, "Successfully added a hash key: %d \n", hash_v);
 		dp_output_flow_key_info(key);
 	}
 }
@@ -103,13 +106,16 @@ void dp_add_flow(struct flow_key *key)
 void dp_delete_flow(struct flow_key *key)
 {
 	int pos;
+	uint32_t hash_v;
 	
 	if (dp_flow_exists(key)) {
+		hash_v = (uint32_t)dp_get_flow_hash_value(key);
 		pos = rte_hash_del_key(ipv4_flow_tbl, key);
 		if (pos < 0)
-			DPS_LOG(WARNING, DPSERVICE, "Hash key already deleted \n");
+			// Negative return value of rte_hash_del_key only appears when its parameters are invalid under this if condition
+			DPS_LOG(WARNING, DPSERVICE, "Hash key deleting function's parameters are invalid \n");
 		else {
-			DPS_LOG(DEBUG, DPSERVICE, "Successfully deleted an existing hash key \n");
+			DPS_LOG(DEBUG, DPSERVICE, "Successfully deleted an existing hash key: %d \n", hash_v);
 			dp_output_flow_key_info(key);
 			rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
 		}
