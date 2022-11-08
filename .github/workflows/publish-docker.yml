@@ -22,7 +22,6 @@ on:
 
 jobs:
   buildAndPush:
-    runs-on: dpdk
     steps:
       - uses: actions/checkout@v3
       - uses: docker/metadata-action@v4
