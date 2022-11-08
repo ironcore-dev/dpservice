@@ -33,7 +33,7 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 static inline char *safe_strdup(const char *str)
 {
 	char *dup = strdup(str);
-	if (dup == NULL)
+	if (!dup)
 		rte_exit(EXIT_FAILURE, "Cannot duplicate argument\n");
 	return dup;
 }
@@ -47,7 +47,7 @@ static void dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 
 	// will be adding two devices (4 args) + terminator
 	dp_argv = (char **)calloc(argc + 5, sizeof(*dp_argv));
-	if (dp_argv == NULL)
+	if (!dp_argv)
 		rte_exit(EXIT_FAILURE, "Cannot allocate argument array\n");
 
 	// copy EAL args
@@ -78,7 +78,7 @@ static void dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 
 static void dp_args_free_mellanox()
 {
-	if (dp_argv == NULL)
+	if (!dp_argv)
 		return;
 	for (int i = 0; i < dp_argc; ++i)
 		free(dp_argv[i]);
