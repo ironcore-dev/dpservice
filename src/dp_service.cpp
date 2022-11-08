@@ -30,37 +30,59 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 	return NULL;
 }
 
-static int dp_add_args(int argc, char **argv)
+static inline char *safe_strdup(const char *str)
 {
-	int i, j, pos = 0;
+	char *dup = strdup(str);
+	if (!dup)
+		rte_exit(EXIT_FAILURE, "Cannot duplicate argument\n");
+	return dup;
+}
 
-	dp_argv = (char**)calloc(argc + 4, sizeof(*dp_argv));
-	if (dp_argv == NULL)
-		return -1;
+static void dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
+{
+	int i;
+	int argend = -1;
+	int argc = *orig_argc;
+	char **argv = *orig_argv;
 
+	// will be adding two devices (4 args) + terminator
+	dp_argv = (char **)calloc(argc + 5, sizeof(*dp_argv));
+	if (!dp_argv)
+		rte_exit(EXIT_FAILURE, "Cannot allocate argument array\n");
+
+	// copy EAL args
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "--") == 0) {
-			pos = i;
+			argend = i;
 			break;
 		} else {
-			dp_argv[i] = strdup(argv[i]);
+			dp_argv[i] = safe_strdup(argv[i]);
 		}
 	}
-	if (pos == 0)
-		return -1;
-	dp_argv[i] = strdup("-a");
-	dp_argv[++i] = dp_get_pf0_opt_a();
-	dp_argv[++i] = strdup("-a");
-	dp_argv[++i] = dp_get_pf1_opt_a();
-	dp_argv[++i] = strdup("--");
-
-	for (j = pos + 1; j < argc; j++)
-		dp_argv[++i] = strdup(argv[j]);
-
-	dp_argv[++i] = NULL;
+	// add mellanox args
+	dp_argv[i++] = safe_strdup("-a");
+	dp_argv[i++] = safe_strdup(dp_get_pf0_opt_a());
+	dp_argv[i++] = safe_strdup("-a");
+	dp_argv[i++] = safe_strdup(dp_get_pf1_opt_a());
+	// add original dp_service args
+	if (argend >= 0) {
+		for (int j = argend; j < argc; ++j)
+			dp_argv[i++] = safe_strdup(argv[j]);
+	}
+	dp_argv[i] = NULL;
 	dp_argc = i;
 
-	return 0;
+	*orig_argc = dp_argc;
+	*orig_argv = dp_argv;
+}
+
+static void dp_args_free_mellanox()
+{
+	if (!dp_argv)
+		return;
+	for (int i = 0; i < dp_argc; ++i)
+		free(dp_argv[i]);
+	free(dp_argv);
 }
 
 static void dp_init_interfaces()
@@ -109,12 +131,9 @@ int main(int argc, char **argv)
 	int ret;
 
 	dp_handle_conf_file();
-	if (dp_is_mellanox_opt_set()) {
-		if (dp_add_args(argc, argv) < 0)
-			rte_exit(EXIT_FAILURE, "Invalid dp_service parameters in config file\n");
-		argc = dp_argc;
-		argv = dp_argv;
-	}
+	if (dp_is_mellanox_opt_set())
+		dp_args_add_mellanox(&argc, &argv);
+
 	ret = dp_dpdk_init(argc, argv);
 	argc -= ret;
 	argv += ret;
@@ -133,14 +152,15 @@ int main(int argc, char **argv)
 	ret = rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL,
 							dp_handle_grpc, NULL);
 	if (ret < 0)
-		rte_exit(EXIT_FAILURE,
-				"Cannot create grpc thread\n");
+		rte_exit(EXIT_FAILURE, "Cannot create grpc thread\n");
 
 	dp_dpdk_main_loop();
 
 	pthread_join(*dp_get_ctrl_thread_id(), NULL);
 
 	dp_dpdk_exit();
+
+	dp_args_free_mellanox();
 
 	return 0;
 }
