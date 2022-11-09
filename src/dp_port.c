@@ -6,20 +6,19 @@
 /* Ethernet port configured with default settings. 8< */
 struct rte_eth_conf port_conf = {
 	.rxmode = {
-			.mq_mode = ETH_MQ_RX_NONE,
-		.split_hdr_size = 0,
+			.mq_mode = RTE_ETH_MQ_RX_NONE,
 	},
 	.txmode = {
 			.offloads =
-				DEV_TX_OFFLOAD_IPV4_CKSUM  |
-				DEV_TX_OFFLOAD_UDP_CKSUM   |
-				DEV_TX_OFFLOAD_TCP_CKSUM   |
-				DEV_TX_OFFLOAD_IP_TNL_TSO
+				RTE_ETH_TX_OFFLOAD_IPV4_CKSUM  |
+				RTE_ETH_TX_OFFLOAD_UDP_CKSUM   |
+				RTE_ETH_TX_OFFLOAD_TCP_CKSUM   |
+				RTE_ETH_TX_OFFLOAD_IP_TNL_TSO
 	},
 	.rx_adv_conf = {
 			.rss_conf = {
 					.rss_key = NULL,
-					.rss_hf = ETH_RSS_IP,
+					.rss_hf = RTE_ETH_RSS_IP,
 					},
 					},
 	.intr_conf = {

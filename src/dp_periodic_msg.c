@@ -1,3 +1,4 @@
+#include <rte_arp.h>
 #include "dp_periodic_msg.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
