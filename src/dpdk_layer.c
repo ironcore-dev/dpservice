@@ -317,7 +317,7 @@ static void allocate_pf_hairpin_tx_queue(uint16_t port_id, uint16_t peer_pf_port
 
 uint16_t get_pf_hairpin_rx_queue(uint16_t port_id)
 {
-	uint16_t pf_rx_q_index;
+	uint16_t pf_rx_q_index = 0;
 
 	for (uint8_t i = 0; i < dp_layer.dp_port_cnt; i++) {
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF && dp_layer.ports[i]->dp_port_id == port_id) {
