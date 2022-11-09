@@ -55,10 +55,16 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 			// if it is a network nat pkt
 			if (dnat_ip == 0) {
-				// extrack identifier field from icmp pkt
-				if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
+				// extrack identifier field from icmp reply pkt, which is a reply to VM's icmp request
+				if (df_ptr->l4_type == DP_IP_PROTO_ICMP && df_ptr->icmp_type == RTE_IP_ICMP_ECHO_REPLY)
 					df_ptr->dst_port = df_ptr->icmp_identifier;
 				
+				// it is icmp request targeting scalable nat
+				if (df_ptr->l4_type == DP_IP_PROTO_ICMP && df_ptr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+					df_ptr->flags.nat = DP_NAT_CHG_UL_DST_IP;
+					return DP_ROUTE_PKT_RELAY;
+				}
+
 				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
 				if (dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
 					cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
@@ -94,6 +100,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 	}
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
+		df_ptr->flags.nat = DP_NAT_CHG_UL_DST_IP;
 		return DP_ROUTE_PKT_RELAY;
 	}
 
