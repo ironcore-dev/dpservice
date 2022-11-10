@@ -517,6 +517,27 @@ int hairpin_ports_bind_all(uint16_t port_id)
 	return ret;
 }
 
+static inline int dp_graph_export(const char graph_name[RTE_GRAPH_NAMESIZE]) {
+	int ret;
+	FILE *f;
+	char fname[RTE_GRAPH_NAMESIZE + 5];
+	if (snprintf(fname, sizeof(fname), "%s.dot", graph_name) >= sizeof(fname)) {
+		DPS_LOG(ERR, DPSERVICE, "Cannot export graph, name too long\n");
+		return -ENOMEM;
+	}
+	f = fopen(fname, "w");
+	if (!f) {
+		ret = -errno;
+		DPS_LOG(ERR, DPSERVICE, "Cannot open graph export file for writing (%s)\n", rte_strerror(errno));
+		return ret;
+	}
+	ret = rte_graph_export(dp_layer.graph_name, f);
+	if (ret)
+		DPS_LOG(ERR, DPSERVICE, "rte_graph_export() failed (%d)\n", ret);
+	fclose(f);
+	return ret;
+}
+
 int dp_init_graph(void)
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
@@ -630,10 +651,7 @@ int dp_init_graph(void)
 		}
 	}
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {
-		FILE *f;
 		rte_graph_t graph_id;
-		int ret;
-		char fname[RTE_GRAPH_NAMESIZE + 4];
 
 		if (rte_lcore_is_enabled(lcore_id) == 0)
 			continue;
@@ -649,16 +667,13 @@ int dp_init_graph(void)
 			rte_exit(EXIT_FAILURE,
 					"rte_graph_create(): graph_id invalid for lcore %u\n",
 					lcore_id);
-		sprintf(fname, "%s.dot", dp_layer.graph_name);
-		f = fopen(fname, "w");
-		ret = rte_graph_export(dp_layer.graph_name, f);
-		if (ret != 0)
-			return -1;
-		fclose(f);
+		ret = dp_graph_export(dp_layer.graph_name);
+		if (ret < 0)
+			return ret;
 
 		dp_layer.graph_id = graph_id;
 		dp_layer.graph = rte_graph_lookup(dp_layer.graph_name);
-		/* >8 End of graph initialization. */
+
 		if (!dp_layer.graph)
 			rte_exit(EXIT_FAILURE,
 					"rte_graph_lookup(): graph %s not found\n",
