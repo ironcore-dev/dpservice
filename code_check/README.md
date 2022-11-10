@@ -1,14 +1,21 @@
-A script is provided to simplify the usage of checkpatch.pl to perform code polishing. It is useful, especially when a subset of checking types shall be considered during the checking process. In order to use this script, firstly download checkpatch.pl by following this [link](https://github.com/torvalds/linux/blob/master/scripts/checkpatch.pl), and put it into this directory. This script currently supports three functions:
+A script is provided to simplify the usage of checkpatch.pl to perform code polishing. It is useful, especially when a subset of checking types shall be considered during the checking process.
 
-1) check last n commit:
+In order to use this script, download checkpatch.pl by calling `./check.sh -d`. You can also download one yourself from [this link](https://github.com/torvalds/linux/blob/master/scripts/checkpatch.pl), and put it into this directory as `_checkpatch.pl`.
 
-	`./check.sh -t check  -i n`
+Currently supported functions:
+1) Check all commits since merge-base:
 
-2) check single file PATH_TO_ILE:
+	`./check.sh`
+
+2) Check last n commits:
+
+	`./check.sh -i n`
+
+3) Check a single file:
  	
-	`./check.sh -t check -f PATH_TO_ILE`
+	`./check.sh -f PATH_TO_FILE`
 
-3) auto fix single file PATH_TO_ILE:
+4) Auto-fix a single file:
 	
-	`./check.sh -t fix  -f PATH_TO_ILE`
+	`./check.sh -t fix -f PATH_TO_FILE`
 
