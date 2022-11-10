@@ -517,10 +517,12 @@ int hairpin_ports_bind_all(uint16_t port_id)
 	return ret;
 }
 
-static inline int dp_graph_export(const char graph_name[RTE_GRAPH_NAMESIZE]) {
+static inline int dp_graph_export(const char graph_name[RTE_GRAPH_NAMESIZE])
+{
 	int ret;
 	FILE *f;
 	char fname[RTE_GRAPH_NAMESIZE + 5];
+
 	if (snprintf(fname, sizeof(fname), "%s.dot", graph_name) >= sizeof(fname)) {
 		DPS_LOG(ERR, DPSERVICE, "Cannot export graph, name too long\n");
 		return -ENOMEM;
