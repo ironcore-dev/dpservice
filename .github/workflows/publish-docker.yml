@@ -22,6 +22,7 @@ on:
 
 jobs:
   buildAndPush:
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
       - uses: docker/metadata-action@v4
