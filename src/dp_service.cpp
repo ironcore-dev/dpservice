@@ -114,7 +114,9 @@ static void dp_init_interfaces()
 	if (dp_is_offload_enabled())
 		hairpin_vfs_to_pf();
 
-	dp_init_graph();
+	// TODO(plague): proper refactoring in a follow-up PR
+	if (dp_init_graph() != 0)
+		rte_exit(EXIT_FAILURE, "Cannot initialize graph subsystem\n");
 	dp_start_interface(&pf0_port, dp_get_pf0_port_id(), DP_PORT_PF);
 	dp_start_interface(&pf1_port, dp_get_pf1_port_id(), DP_PORT_PF);
 	dp_init_flowtable(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
