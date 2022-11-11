@@ -10,6 +10,7 @@
 #include "dpdk_layer.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_util.h"
+#include "dp_nat.h"
 
 struct packet_relay_node_main packet_relay_node;
 
@@ -23,6 +24,40 @@ static int packet_relay_node_init(const struct rte_graph *graph, struct rte_node
 
 	return 0;
 }
+
+static __rte_always_inline int lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
+{
+	struct rte_icmp_hdr *icmp_hdr;
+	struct rte_ipv4_hdr *ipv4_hdr;
+	uint32_t temp_ip;
+	uint32_t cksum;
+
+	ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
+
+	if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
+		icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
+	else
+		return PACKET_RELAY_NEXT_DROP;
+
+	cksum = ~icmp_hdr->icmp_cksum & 0xffff;
+	cksum += ~RTE_BE16(RTE_IP_ICMP_ECHO_REQUEST << 8) & 0xffff;
+	cksum += RTE_BE16(RTE_IP_ICMP_ECHO_REPLY << 8);
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+	icmp_hdr->icmp_cksum = ~cksum;
+
+	temp_ip = ipv4_hdr->dst_addr;
+	ipv4_hdr->dst_addr = ipv4_hdr->src_addr;
+	ipv4_hdr->src_addr = temp_ip;
+	df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+	df_ptr->nxt_hop = m->port;
+	dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
+	memcpy(df_ptr->tun_info.ul_dst_addr6, df_ptr->tun_info.ul_src_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+
+	return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
+}
+
 
 static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 {
@@ -38,7 +73,6 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	if (!cntrack)
 		return ret;
 
-
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		// TODO: add flexibility to allow relay packet from a different port
@@ -48,10 +82,8 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 		return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
 	}
 
-	if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-		DPS_LOG(INFO, DPSERVICE, "received a icmp pkt in relay node \n");
-		return ret;
-	}
+	if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
+		return lb_nnat_icmp_reply(df_ptr, m);
 
 	return ret;
 }
