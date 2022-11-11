@@ -13,3 +13,4 @@ __*
 .idea/
 *.pl
 scapy-script/*
+code_check/_checkpatch.pl
