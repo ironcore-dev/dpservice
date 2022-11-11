@@ -29,7 +29,7 @@ subdir('proto')
 subdir('include')
 subdir('src')
 subdir('test')
-test('test-ipip', files('test/run_test'), args : [meson.current_build_dir(), 'ipip'], is_parallel : false, timeout : 35)
+test('test-ipip', files('test/run_test'), args : [meson.current_build_dir(), 'ipip'], is_parallel : false, timeout : 60)
 test('test-geneve', files('test/run_test'), args : [meson.current_build_dir(), 'geneve'],  is_parallel : false)
 
 run_target('cppcheck', command : ['cppcheck', '--project=' + 

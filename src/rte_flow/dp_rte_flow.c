@@ -58,7 +58,6 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		df->src.src_addr = ipv4_hdr->src_addr;
 		df->dst.dst_addr = ipv4_hdr->dst_addr;
 		df->l4_type = ipv4_hdr->next_proto_id;
-		// printf("extract for ipv4 header, protoid is %#x\n",ipv4_hdr->next_proto_id);
 		return df->l4_type;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		if (hdr)
@@ -111,6 +110,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 			icmp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_icmp_hdr *, offset);
 
 		df->icmp_type = icmp_hdr->icmp_type;
+		df->icmp_code = icmp_hdr->icmp_code;
 		df->icmp_identifier = icmp_hdr->icmp_ident;
 		return 0;
 	} else if (df->l4_type == DP_IP_PROTO_ICMPV6) {
@@ -125,8 +125,6 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 
 	return -1;
 }
-
-// int extract_inner_l3_l4_header(struct rte_mbuf* pkt,uint16_t offset); //call the above two functions
 
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 {
@@ -211,6 +209,56 @@ struct rte_icmp_hdr *dp_get_icmp_hdr(struct rte_mbuf *m, uint16_t offset)
 		return NULL;
 
 	return icmp_hdr;
+}
+
+void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info)
+{
+	struct dp_flow *df;
+	struct rte_ipv4_hdr *ipv4_hdr;
+	struct rte_icmp_hdr *icmp_hdr;
+
+	ipv4_hdr = dp_get_ipv4_hdr(m);
+
+	df = get_dp_flow_ptr(m);
+
+	if (df->l4_type == DP_IP_PROTO_ICMP) {
+		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
+
+		if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+			err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr+1);
+			if (err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP
+				|| err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
+
+				rte_memcpy(&(err_ip_info->l4_src_port), (void *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, 2);
+				rte_memcpy(&(err_ip_info->l4_dst_port), (void *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4 + 2, 2);
+			}
+		}
+	}
+}
+
+void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t src_port_v)
+{
+	struct dp_flow *df;
+	struct rte_ipv4_hdr *ipv4_hdr;
+	struct rte_icmp_hdr *icmp_hdr;
+	uint16_t src_port = src_port_v;
+
+	ipv4_hdr = dp_get_ipv4_hdr(m);
+
+	df = get_dp_flow_ptr(m);
+
+	if (df->l4_type == DP_IP_PROTO_ICMP) {
+		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
+
+		if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+			err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr+1);
+			if (err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP
+				|| err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
+
+				rte_memcpy((void *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, &src_port, 2);
+			}
+		}
+	}
 }
 
 uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val)

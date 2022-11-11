@@ -105,7 +105,10 @@ static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
 	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
 		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
 			memset(&key, 0, sizeof(struct flow_key));
-			dp_build_flow_key(&key, m);
+			if (dp_build_flow_key(&key, m) < 0) {
+				DPS_LOG(WARNING, DPSERVICE, "failed to build a flow key \n");
+				return DP_ROUTE_DROP;
+			}
 			if (dp_flow_exists(&key)) {
 				dp_get_flow_data(&key, (void **)&flow_val);
 				change_flow_state_dir(&key, flow_val, df_ptr);
