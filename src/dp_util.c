@@ -137,7 +137,7 @@ void dp_handle_conf_file()
 	ssize_t read;
 	char* token;
 
-	strncpy(conf_file_str, DP_DEFAULT_CONF_FILE, DP_CONF_FILE_SIZE);
+	strncpy(conf_file_str, DP_DEFAULT_CONF_FILE, DP_CONF_FILE_SIZE - 1);
 	fp = fopen(conf_file_str, "r");
 	if (fp == NULL)
 		return;
@@ -148,27 +148,27 @@ void dp_handle_conf_file()
 		token = strtok(s, " ");
 		if (strncmp(token, CMD_LINE_OPT_PF0, strlen(CMD_LINE_OPT_PF0)) == 0) {
 			token = strtok(NULL, " ");
-			strncpy(pf0name, token, IFNAMSIZ);
+			strncpy(pf0name, token, IFNAMSIZ - 1);
 			count++;
 		}
 		if (strncmp(token, CMD_LINE_OPT_PF1, strlen(CMD_LINE_OPT_PF1)) == 0) {
 			token = strtok(NULL, " ");
-			strncpy(pf1name, token, IFNAMSIZ);
+			strncpy(pf1name, token, IFNAMSIZ - 1);
 			count++;
 		}
 		if (strncmp(token, CMD_LINE_OPT_PF0_A, strlen(CMD_LINE_OPT_PF0_A)) == 0) {
 			token = strtok(NULL, " ");
-			strncpy(pf0_a, token, DP_A_OPT_SIZE);
+			strncpy(pf0_a, token, DP_A_OPT_SIZE - 1);
 			count++;
 		}
 		if (strncmp(token, CMD_LINE_OPT_PF1_A, strlen(CMD_LINE_OPT_PF1_A)) == 0) {
 			token = strtok(NULL, " ");
-			strncpy(pf1_a, token, DP_A_OPT_SIZE);
+			strncpy(pf1_a, token, DP_A_OPT_SIZE - 1);
 			count++;
 		}
 		if (strncmp(token, CMD_LINE_OPT_VF_PATTERN, strlen(CMD_LINE_OPT_VF_PATTERN)) == 0) {
 			token = strtok(NULL, " ");
-			strncpy(vf_pattern, token, IFNAMSIZ);
+			strncpy(vf_pattern, token, IFNAMSIZ - 1);
 			count++;
 		}
 		if (strncmp(token, CMD_LINE_OPT_IPV6, strlen(CMD_LINE_OPT_IPV6)) == 0) {
@@ -215,11 +215,11 @@ int dp_parse_args(int argc, char **argv)
 
 		/* Long options */
 		case CMD_LINE_OPT_PF0_NUM:
-			strncpy(pf0name, optarg, IFNAMSIZ);
+			strncpy(pf0name, optarg, IFNAMSIZ - 1);
 			break;
 
 		case CMD_LINE_OPT_PF1_NUM:
-			strncpy(pf1name, optarg, IFNAMSIZ);
+			strncpy(pf1name, optarg, IFNAMSIZ - 1);
 			break;
 
 		case CMD_LINE_OPT_IPV6_NUM:
@@ -228,10 +228,10 @@ int dp_parse_args(int argc, char **argv)
 			break;
 
 		case CMD_LINE_OPT_VF_PATTERN_NUM:
-			strncpy(vf_pattern, optarg, IFNAMSIZ);
+			strncpy(vf_pattern, optarg, IFNAMSIZ - 1);
 			break;
 		case CMD_LINE_OPT_TUNNEL_OPT_NUM:
-			strncpy(tunnel_opt_str, optarg, DP_TUNNEL_OPT_SIZE);
+			strncpy(tunnel_opt_str, optarg, DP_TUNNEL_OPT_SIZE - 1);
 			if (!strcmp(tunnel_opt_str, tunnel_opt_geneve))
 			{
 				tunnel_opt = DP_FLOW_OVERLAY_TYPE_GENEVE;
@@ -243,12 +243,12 @@ int dp_parse_args(int argc, char **argv)
 
 			break;
 		case CMD_LINE_OPT_CONF_FILE_NUM:
-			strncpy(conf_file_str, optarg, DP_CONF_FILE_SIZE);
+			strncpy(conf_file_str, optarg, DP_CONF_FILE_SIZE- 1);
 			break;
 		
 
 		case CMD_LINE_OPT_OP_ENV_NUM:
-			strncpy(op_env_opt_str, optarg, DP_OP_ENV_OPT_SIZE);
+			strncpy(op_env_opt_str, optarg, DP_OP_ENV_OPT_SIZE - 1);
 			if (!strcmp(op_env_opt_str, op_env_opt_scapytest))
 			{
 				op_env = DP_OP_ENV_SCAPYTEST;
