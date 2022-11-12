@@ -557,7 +557,7 @@ def test_network_nat_external_icmp_echo(capsys, add_machine, build_path):
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port)
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
-	icmp_pkt = Ether(dst=pf0_mac, src=mc_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=nat_vip, src=public_ip) / ICMP(type=8, id=0x0040)
+	icmp_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=nat_vip, src=public_ip) / ICMP(type=8, id=0x0040)
 	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=2)
 
 	if not answer or not is_icmp_pkt(answer):
