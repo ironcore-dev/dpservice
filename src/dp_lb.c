@@ -150,15 +150,11 @@ int dp_delete_lb(void *id_key)
 	pos = rte_hash_del_key(ipv4_lb_tbl, lb_k);
 	if (pos < 0)
 		DPS_LOG(WARNING, DPSERVICE, "LB hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(ipv4_lb_tbl, pos);
 
 	rte_free(lb_k);
 	pos = rte_hash_del_key(id_map_lb_tbl, id_key);
 	if (pos < 0)
 		DPS_LOG(WARNING, DPSERVICE, "LB id map hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(id_map_lb_tbl, pos);
 
 	return EXIT_SUCCESS;
 
