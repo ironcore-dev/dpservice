@@ -1,0 +1,25 @@
+name: checkpatch
+
+on: 
+  pull_request_target:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'test/**'
+      - 'hack/**'
+      - 'config/**'
+      - 'code_check/**'
+
+jobs:
+  checkpatch:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Run checkpatch download
+        continue-on-error: true
+        run: |
+          ./code_check/check.sh -d >/dev/null 2>&1
+      - name: Run checkpatch
+        run: ./code_check/check.sh -t check
