@@ -44,7 +44,7 @@ function download_checkpatch() {
 
 
 TYPE="check"
-DIFF="$(git -C "${SCRIPT_DIR}/.." merge-base main HEAD)"
+DIFF="$(git -C "${SCRIPT_DIR}/.." merge-base origin/main HEAD)"
 while getopts 't:i:f:d' OPT; do
 	case $OPT in
 		t) TYPE="$OPTARG";;
