@@ -4,7 +4,7 @@ CONF_FILE="/tmp/dp_service.conf"
 PF0_NAME=""
 PF0_PCI_ADDR=""
 PF1_PCI_ADDR=""
-NUM_VF=30
+NUM_VF=61
 VF_START=2
 NUM_PAGES=4
 
