@@ -18,6 +18,7 @@
 
 static char **dp_argv;
 static int dp_argc;
+static char *dp_mlx_args[4];
 
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
@@ -56,18 +57,18 @@ static void dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 			argend = i;
 			break;
 		} else {
-			dp_argv[i] = safe_strdup(argv[i]);
+			dp_argv[i] = argv[i];
 		}
 	}
-	// add mellanox args
-	dp_argv[i++] = safe_strdup("-a");
-	dp_argv[i++] = safe_strdup(dp_get_pf0_opt_a());
-	dp_argv[i++] = safe_strdup("-a");
-	dp_argv[i++] = safe_strdup(dp_get_pf1_opt_a());
+	// add mellanox args (remember that they can be written to, so strdup())
+	dp_mlx_args[0] = dp_argv[i++] = safe_strdup("-a");
+	dp_mlx_args[1] = dp_argv[i++] = safe_strdup(dp_get_pf0_opt_a());
+	dp_mlx_args[2] = dp_argv[i++] = safe_strdup("-a");
+	dp_mlx_args[3] = dp_argv[i++] = safe_strdup(dp_get_pf1_opt_a());
 	// add original dp_service args
 	if (argend >= 0) {
 		for (int j = argend; j < argc; ++j)
-			dp_argv[i++] = safe_strdup(argv[j]);
+			dp_argv[i++] = argv[j];
 	}
 	dp_argv[i] = NULL;
 	dp_argc = i;
@@ -78,10 +79,8 @@ static void dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 
 static void dp_args_free_mellanox()
 {
-	if (!dp_argv)
-		return;
-	for (int i = 0; i < dp_argc; ++i)
-		free(dp_argv[i]);
+	for (int i = 0; i < 4; ++i)
+		free(dp_mlx_args[i]);
 	free(dp_argv);
 }
 
@@ -162,7 +161,8 @@ int main(int argc, char **argv)
 
 	dp_dpdk_exit();
 
-	dp_args_free_mellanox();
+	if (dp_is_mellanox_opt_set())
+		dp_args_free_mellanox();
 
 	return 0;
 }
