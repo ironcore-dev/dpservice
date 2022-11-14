@@ -423,7 +423,7 @@ def send_bounce_pkt_to_pf():
 	sendp(bouce_pkt, iface=pf0_tap)
 
 def send_lb_pkt_to_pf():
-	lb_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_src, src=ul_actual_dst, nh=4)/IP(dst=virtual_ip, src=public_ip) /TCP(sport=1234, dport=80)
+	lb_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=virtual_ip, src=public_ip) /TCP(sport=1234, dport=80)
 	time.sleep(3)
 	sendp(lb_pkt, iface=pf0_tap)
 
@@ -536,14 +536,28 @@ def test_pf_to_vf_network_lb_tcp(capsys, add_machine, build_path):
 	del_lbvip_test = build_path+"/test/dp_grpc_client --dellb " + mylb
 	eval_cmd_output(del_lbvip_test, expected_str)
 
+def test_network_lb_external_icmp_echo(capsys, add_machine, build_path):
+	expected_str = ul_actual_src
+	add_lbvip_test = build_path+"/test/dp_grpc_client --createlb "+ mylb + " --vni " + vni + " --ipv4 " + virtual_ip + " --port 80 --protocol tcp" 
+	eval_cmd_output(add_lbvip_test, expected_str)
+
+	icmp_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=virtual_ip, src=public_ip) / ICMP(type=8, id=0x0040)
+	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=2)
+
+	if not answer or not is_icmp_pkt(answer):
+		raise AssertionError('Failed to perform external icmp request to lb')
+
+	expected_str = "Delete LB Success"
+	del_lbvip_test = build_path+"/test/dp_grpc_client --dellb " + mylb
+	eval_cmd_output(del_lbvip_test, expected_str)
+
 def test_network_nat_external_icmp_echo(capsys, add_machine, build_path):
 
 	expected_str = "Addnat"
-	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
-	print(add_net_nat_vm1_test)
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port)
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
-	icmp_pkt = Ether(dst=pf0_mac, src=mc_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=nat_vip, src=public_ip) / ICMP(type=8, id=0x0040)
+	icmp_pkt = Ether(dst=mc_mac, src=pf0_mac, type=0x86DD)/IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4)/IP(dst=nat_vip, src=public_ip) / ICMP(type=8, id=0x0040)
 	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=2)
 
 	if not answer or not is_icmp_pkt(answer):
