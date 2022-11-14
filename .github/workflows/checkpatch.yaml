@@ -20,6 +20,7 @@ jobs:
       - name: Run checkpatch download
         continue-on-error: true
         run: |
+          git fetch origin main
           ./code_check/check.sh -d >/dev/null 2>&1
       - name: Run checkpatch
         run: ./code_check/check.sh -t check
