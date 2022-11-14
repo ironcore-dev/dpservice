@@ -14,6 +14,10 @@ protoc = find_program('protoc')
 grpc_cpp = find_program('grpc_cpp_plugin')
 pytest = find_program('pytest', required : false)
 scapy = find_program('scapy', required : false)
+if get_option('enable_usermode')
+  sudo = find_program('sudo')
+  setcap = find_program('setcap')
+endif
 
 if not pytest.found()
   message('Without pytest, the tests can not be run')
@@ -34,4 +38,3 @@ test('test-geneve', files('test/run_test'), args : [meson.current_build_dir(), '
 
 run_target('cppcheck', command : ['cppcheck', '--project=' + 
   join_paths(meson.build_root(), 'compile_commands.json')])
-
