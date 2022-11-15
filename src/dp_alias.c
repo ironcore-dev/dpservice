@@ -23,8 +23,7 @@ void dp_init_alias_handle_tbl(int socket_id)
 		rte_exit(EXIT_FAILURE, "create alias handle table failed\n");
 }
 
-int dp_map_alias_handle(void *key, dp_alias_value *val)
-{
+int dp_map_alias_handle(void *key, dp_alias_value *val) {
 	dp_alias_value *temp_val;
 
 	temp_val = rte_zmalloc("alias_handle_mapping", sizeof(dp_alias_value), RTE_CACHE_LINE_SIZE);
