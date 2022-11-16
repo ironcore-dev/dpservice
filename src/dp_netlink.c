@@ -24,7 +24,7 @@ static void dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr* nei
 		ndm_family = rt_msg->ndm_family;
 		if ((ndm_family != AF_INET6) || (rt_msg->ndm_state == NUD_NOARP))
 			continue;
-		if (rt_msg->ndm_flags == NTF_ROUTER) {
+        if (rt_msg->ndm_flags & NTF_ROUTER) {
 			rtl = RTM_PAYLOAD(nh);
 			for (; RTA_OK(rt_attr, rtl); rt_attr = RTA_NEXT(rt_attr, rtl))
 				if (rt_attr->rta_type == NDA_LLADDR) {
