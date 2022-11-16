@@ -1,0 +1,3 @@
+option('enable_usermode', type: 'boolean', value: false, description:
+       'Make the resulting binary runnable without root (requires sudo during build)')
+
