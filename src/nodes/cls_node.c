@@ -1,6 +1,7 @@
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
+#include <rte_arp.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
