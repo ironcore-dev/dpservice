@@ -12,9 +12,9 @@ static uint8_t dp_mc_mac[6] = {0x33,0x33,0x00,0x00,0x00,0x01};
 
 void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t eth_type)
 {
+	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	struct dp_flow *df_ptr;
 	struct rte_ether_hdr *eth_hdr;
-	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 
 	// send pkt to all allocated VFs
 	for (int i = 0; i < dp_layer->dp_port_cnt; i++) {
