@@ -9,6 +9,7 @@ on:
       - 'hack/**'
       - 'config/**'
       - 'code_check/**'
+  workflow_dispatch:
 
 jobs:
   checkpatch:
@@ -17,10 +18,10 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
       - name: Run checkpatch download
         continue-on-error: true
         run: |
-          git fetch origin main
           ./code_check/check.sh -d >/dev/null 2>&1
       - name: Run checkpatch
         run: ./code_check/check.sh -t check
