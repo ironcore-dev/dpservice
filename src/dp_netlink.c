@@ -9,8 +9,8 @@
 #include <dp_util.h>
 #include "dp_netlink.h"
 
-static void dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr* neigh,
-						struct rte_ether_addr* own_mac)
+static int dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neigh,
+						struct rte_ether_addr *own_mac)
 {
 	struct rtattr *rt_attr;
 	char mac[24];
@@ -24,7 +24,7 @@ static void dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr* nei
 		ndm_family = rt_msg->ndm_family;
 		if ((ndm_family != AF_INET6) || (rt_msg->ndm_state == NUD_NOARP))
 			continue;
-		if (rt_msg->ndm_flags == NTF_ROUTER) {
+		if (rt_msg->ndm_flags & NTF_ROUTER) {
 			rtl = RTM_PAYLOAD(nh);
 			for (; RTA_OK(rt_attr, rtl); rt_attr = RTA_NEXT(rt_attr, rtl))
 				if (rt_attr->rta_type == NDA_LLADDR) {
@@ -34,9 +34,10 @@ static void dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr* nei
 					memset(&mac_num, 0, sizeof(mac_num));
 				}
 			if (!DP_MAC_EQUAL(own_mac, neigh))
-				break;
+				return 0;
 		}
 	}
+	return -1;
 }
 
 static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char* buf_ptr)
@@ -127,7 +128,9 @@ int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr* neigh, struct rte_eth
 		goto err2;
 	}
 	nh = (struct nlmsghdr *)dp_nlink_reply;
-	dp_read_ngh(nh, nll, neigh, own_mac);
+	// TODO this should be an error in production
+	if (dp_read_ngh(nh, nll, neigh, own_mac) < 0)
+		DPS_LOG(WARNING, DPSERVICE, "WARNING: No neighboring router found\n");
 
 err2:
 	free(dp_nlink_reply);

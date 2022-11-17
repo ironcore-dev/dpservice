@@ -64,13 +64,6 @@ RUN meson build
 RUN cd ./build && ninja
 
 FROM debian:11-slim
-WORKDIR /
-COPY --from=builder /workspace/build/src/dp_service .
-COPY --from=builder /workspace/build/test/dp_grpc_client .
-COPY --from=builder /workspace/hack/prepare.sh .
-COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /lib/* /lib/
-RUN ldconfig
 
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
@@ -82,5 +75,13 @@ libuuid1 \
 libgrpc++1 \
 iproute2 \
 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /
+COPY --from=builder /workspace/build/src/dp_service .
+COPY --from=builder /workspace/build/test/dp_grpc_client .
+COPY --from=builder /workspace/hack/prepare.sh .
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /lib/* /lib/
+RUN ldconfig
 
 ENTRYPOINT ["/dp_service"]
