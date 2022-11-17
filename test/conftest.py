@@ -7,22 +7,29 @@ import os
 
 def pytest_addoption(parser):
 	parser.addoption(
-		"--build_path", action="store", default="../build", help="Provide absolute path of the build directory"
+		"--build-path", action="store", default="../build", help="Path to the root build directory"
 	)
 	parser.addoption(
-		"--tun_opt", action="store", default="ipip", help="Provide absolute path of the build directory"
+		"--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Tunnel type"
+	)
+	parser.addoption(
+		"--port-redundancy", action="store_true", help="Test with port redundancy"
 	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
-	return request.config.getoption("--build_path")
+	return request.config.getoption("--build-path")
 
 @pytest.fixture(scope="package")
 def tun_opt(request):
-	return request.config.getoption("--tun_opt")
+	return request.config.getoption("--tun-opt")
 
 @pytest.fixture(scope="package")
-def prepare_env(request, build_path, tun_opt):
+def port_redundancy(request):
+	return request.config.getoption("--port-redundancy")
+
+@pytest.fixture(scope="package")
+def prepare_env(request, build_path, tun_opt, port_redundancy):
 	
 	wcmp_opt_str = ""
 	if port_redundancy:
