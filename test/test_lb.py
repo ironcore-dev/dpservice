@@ -2,7 +2,7 @@ from config import *
 from helpers import *
 
 
-def test_network_lb_external_icmp_echo(capsys, add_machine, request_ip_vf0, build_path):
+def test_network_lb_external_icmp_echo(add_machine, request_ip_vf0, build_path):
 
 	expected_str = ul_actual_src
 	add_lbvip_test = build_path+"/test/dp_grpc_client --createlb " + mylb + " --vni " + vni + " --ipv4 " + virtual_ip + " --port 80 --protocol tcp"

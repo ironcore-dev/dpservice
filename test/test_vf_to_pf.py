@@ -29,7 +29,7 @@ def send_icmp_pkt_from_vm1():
 					 ICMP(type=0, id=pkticmp.id))
 		sendp(reply_pkt, iface=pf0_tap)
 
-def test_vf_to_pf_network_nat_icmp(capsys, add_machine, request_ip_vf0, build_path):
+def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, build_path):
 
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port)
@@ -89,7 +89,7 @@ def send_tcp_pkt_from_vm1():
 		time.sleep(1)
 		sendp(reply_pkt, iface=pf0_tap)
 
-def test_vf_to_pf_network_nat_tcp(capsys, add_machine, request_ip_vf0, build_path):
+def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, build_path):
 
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port " + str(nat_local_max_port)
@@ -125,7 +125,7 @@ def test_vf_to_pf_network_nat_tcp(capsys, add_machine, request_ip_vf0, build_pat
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 
-def test_vf_to_pf_vip_snat(capsys, add_machine, request_ip_vf0, request_ip_vf1, build_path):
+def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, build_path):
 
 	multiprocessing.Process(name="sniffer1", target=encaped_tcp_in_ipv6_vip_responder, args=(pf0_tap,), daemon=False).start()
 	multiprocessing.Process(name="sniffer2", target=encaped_tcp_in_ipv6_vip_responder, args=(pf1_tap,), daemon=False).start()

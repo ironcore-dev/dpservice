@@ -9,7 +9,7 @@ from helpers import *
 from responders import *
 
 
-def test_ipv4_in_ipv6(capsys, add_machine, request_ip_vf0, tun_opt, port_redundancy):
+def test_ipv4_in_ipv6(add_machine, request_ip_vf0, tun_opt, port_redundancy):
 
 	responder = geneve_in_ipv6_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_responder
 	multiprocessing.Process(name="sniffer1", target=responder, args=(pf0_tap,), daemon=False).start()

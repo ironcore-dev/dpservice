@@ -19,13 +19,13 @@ def test_grpc_addmachine_error_106(add_machine, build_path):
 	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm3_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
 	eval_cmd_output(add_machine_test, expected_error_str)
 
-def test_grpc_delmachine_error_151(capsys, add_machine, build_path):
+def test_grpc_delmachine_error_151(add_machine, build_path):
 	# Try to delete with machine identifer which doesnt exist
 	expected_str = "error 151"
 	del_machine_test = build_path+"/test/dp_grpc_client --delmachine " + vm3_name
 	eval_cmd_output(del_machine_test, expected_str)
 
-def test_grpc_add_list_delmachine(capsys, add_machine, build_path):
+def test_grpc_add_list_delmachine(add_machine, build_path):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
 	expected_str = "net_tap4"
 	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm3_name+ " --vni "+ vni + " --ipv4 " + vf2_ip + " --ipv6 " + vf2_ipv6
@@ -43,13 +43,13 @@ def test_grpc_add_list_delmachine(capsys, add_machine, build_path):
 	list_machine_test = build_path+"/test/dp_grpc_client --getmachines "
 	eval_cmd_output(list_machine_test, expected_str, negate=True)
 
-def test_grpc_addroute_error_251(capsys, add_machine, build_path):
+def test_grpc_addroute_error_251(add_machine, build_path):
 	# Try to add a route which is already added
 	expected_str = "error 251"
 	add_route_test = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
 	eval_cmd_output(add_route_test, expected_str)
 
-def test_grpc_list_delroutes(capsys, add_machine, build_path):
+def test_grpc_list_delroutes(add_machine, build_path):
 	# Try to list routes, delete one of them, list and add again
 	expected_str = ov_target_pfx
 	list_route_test = build_path+"/test/dp_grpc_client --listroutes --vni " + vni
@@ -67,7 +67,7 @@ def test_grpc_list_delroutes(capsys, add_machine, build_path):
 	add_route_test = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
 	eval_cmd_output(add_route_test, expected_str, negate=True)
 
-def test_grpc_add_list_delVIP(capsys, add_machine, build_path):
+def test_grpc_add_list_delVIP(add_machine, build_path):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	expected_str = ul_actual_src
 	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
@@ -95,7 +95,7 @@ def test_grpc_add_list_delVIP(capsys, add_machine, build_path):
 	get_vip_test = build_path+"/test/dp_grpc_client --getvip " + vm2_name
 	eval_cmd_output(get_vip_test, expected_str, negate=True)
 
-def test_grpc_add_list_delLBVIP(capsys, add_machine, build_path):
+def test_grpc_add_list_delLBVIP(add_machine, build_path):
 	# Try to add LB VIP, list, test error cases, delete vip and list again
 	expected_str = ul_actual_src
 	add_lbvip_test = build_path+"/test/dp_grpc_client --createlb "+ mylb + " --vni " + vni + " --ipv4 " + virtual_ip + " --port 80 --protocol tcp"
@@ -141,7 +141,7 @@ def test_grpc_add_list_delLBVIP(capsys, add_machine, build_path):
 	del_lbvip_test = build_path+"/test/dp_grpc_client --dellb " + mylb
 	eval_cmd_output(del_lbvip_test, expected_str)
 
-def test_grpc_add_list_delPfx(capsys, add_machine, build_path):
+def test_grpc_add_list_delPfx(add_machine, build_path):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	expected_str = ul_actual_src
 	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
@@ -173,7 +173,7 @@ def test_grpc_add_list_delPfx(capsys, add_machine, build_path):
 	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
 	eval_cmd_output(list_pfx_test, expected_str, negate=True)
 
-def test_grpc_add_list_delLoadBalancerTargets(capsys, add_machine, build_path):
+def test_grpc_add_list_delLoadBalancerTargets(add_machine, build_path):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	expected_str = ul_short_src
 	add_pfx_test = build_path+"/test/dp_grpc_client --addlbpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 32"
@@ -200,7 +200,7 @@ def test_grpc_add_list_delLoadBalancerTargets(capsys, add_machine, build_path):
 	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
 	eval_cmd_output(list_pfx_test, expected_str, negate=True)
 
-# def test_grpc_add_list_del_routes_big_reply(capsys, add_machine, build_path):
+# def test_grpc_add_list_del_routes_big_reply(add_machine, build_path):
 # 	expected_str = "Listroute called"
 # 	pfx_first = "192.168."
 # 	pfx_second = 29

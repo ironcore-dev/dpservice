@@ -4,7 +4,7 @@ from config import *
 from helpers import *
 
 
-def test_network_nat_external_icmp_echo(capsys, add_machine, request_ip_vf0, build_path):
+def test_network_nat_external_icmp_echo(add_machine, request_ip_vf0, build_path):
 
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port)
@@ -30,7 +30,7 @@ def send_bounce_pkt_to_pf():
 	time.sleep(3)
 	sendp(bouce_pkt, iface=pf0_tap)
 
-def test_network_nat_pkt_relay(capsys, add_machine, build_path):
+def test_network_nat_pkt_relay(add_machine, build_path):
 
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port)
