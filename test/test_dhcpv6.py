@@ -5,7 +5,7 @@ from scapy.layers.dhcp6 import *
 
 from config import *
 
-def test_dhcp6(add_machine):
+def test_dhcpv6(add_machine):
 	eth = Ether(dst=mc_mac)
 	ip6 = IPv6(dst=gw_ip6)
 	udp = UDP(sport=546,dport=547)
@@ -29,11 +29,11 @@ def test_dhcp6(add_machine):
 	pkt = eth/ip6/udp/sol/iana_op/rc_op/et_op/cid_op/opreq
 	answer = srp1(pkt, iface=vf0_tap, type=ETH_P_IPV6, timeout=2)
 	print(str(answer[DHCP6OptIAAddress].addr))
-	assert (str(cid_op.duid) == str(answer[DHCP6OptClientId].duid))
+	assert str(cid_op.duid) == str(answer[DHCP6OptClientId].duid)
 
 	iana_op = answer[DHCP6OptIAAddress]
 	pkt = eth/ip6/udp/req/iana_op/rc_op/et_op/cid_op/opreq
 	answer = srp1(pkt, iface=vf0_tap, type=ETH_P_IPV6, timeout=2)
-	assert (str(cid_op.duid) == str(answer[DHCP6OptClientId].duid))
+	assert str(cid_op.duid) == str(answer[DHCP6OptClientId].duid)
 	print(str(answer[DHCP6OptIAAddress].addr))
-	assert(str(answer[DHCP6OptIAAddress].addr) == vf0_ipv6)
+	assert str(answer[DHCP6OptIAAddress].addr) == vf0_ipv6

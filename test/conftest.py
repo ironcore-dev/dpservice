@@ -1,6 +1,7 @@
 import pytest
 import pytest, shlex, subprocess, time
 from config import *
+from helpers import request_ip
 import time
 import os
 
@@ -57,7 +58,6 @@ def prepare_env(request, build_path, tun_opt, port_redundancy):
 			break
 		return_code = process.poll()
 		if return_code is not None:
-			print('RETURN CODE', return_code)
 			# Process has finished, read rest of the output 
 			for output in process.stdout.readlines():
 				print(output.strip())
@@ -80,11 +80,12 @@ def check_dpservice(prepare_env,build_path):
 	return
 
 @pytest.fixture(scope="package")
-def add_machine(build_path, tun_opt):
+def add_machine(build_path, tun_opt): # TODO rename to 'add_machines'
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
-	time.sleep(5)
+	# TODO this needs explanation, or better yet fixing service startup
+	#time.sleep(5)
 	init_cmd = build_path+"/test/dp_grpc_client --init"
 	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine " + vm1_name + " --vni "+ vni + " --ipv4 " + vf0_ip + " --ipv6 " + vf0_ipv6
 	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
@@ -93,6 +94,7 @@ def add_machine(build_path, tun_opt):
 	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv6 2002::123 --length 128 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
 	add_default_public_route = build_path+"/test/dp_grpc_client --addroute " + " --vni " + vni + " --ipv4 0.0.0.0 --length 0 --t_vni "+ vni + " --t_ipv6 " + ul_actual_dst
 	print(add_default_public_route)
+	# TODO why are we only printing some of the commands here?
 	
 	subprocess.run(shlex.split("ip link set dev "+vf0_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
@@ -105,5 +107,29 @@ def add_machine(build_path, tun_opt):
 	subprocess.run(shlex.split(add_ipv4_route_cmd))
 	subprocess.run(shlex.split(add_ipv6_route_cmd))
 	subprocess.run(shlex.split(add_default_public_route))
-	time.sleep(1)
+	# TODO this needs explanation, or better yet fixing service startup
+	# (plague): my guess is that it takes some time to apply the GRPC command in service, the client is asynchronous
+	# so maybe do a --list* loop here!
+	time.sleep(2)
+	# TODO add timeout=2 to all sniff calls missign it (3 cases I think)
+	# TODO all the prints are wrong, either print context too or stay quiet?
+	# (actually not needed, when run via scapy it is verbose enough and colored)
+	# TODO assert is a keyword, not a function
+	# TODO sleeps in test, so at least comment them if not doable?
+	# TODO multiprocessing or threading?
+	# TODO AssertionError instead of assert
 
+# Many tests require IPs already assigned on VFs
+@pytest.fixture
+def request_ip_vf0(add_machine):
+	request_ip(vf0_tap)
+@pytest.fixture
+def request_ip_vf1(add_machine):
+	request_ip(vf1_tap)
+
+# TODO rework includes?
+
+# TODO remove capsys
+
+# TODO create helper to call sniffers
+# TODO scapy '/' endline
