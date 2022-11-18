@@ -117,7 +117,6 @@ void dp_delete_flow(struct flow_key *key)
 		else {
 			DPS_LOG(DEBUG, DPSERVICE, "Successfully deleted an existing hash key: %d \n", hash_v);
 			dp_output_flow_key_info(key);
-			rte_hash_free_key_with_position(ipv4_flow_tbl, pos);
 		}
 	} else {
 		DPS_LOG(WARNING, DPSERVICE, "Attempt to delete a non-existing hash key \n");
