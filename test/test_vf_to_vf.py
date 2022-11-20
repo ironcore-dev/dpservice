@@ -1,4 +1,4 @@
-import multiprocessing
+import threading
 import time
 
 from config import *
@@ -8,7 +8,7 @@ from responders import *
 
 def test_vf_to_vf_tcp(add_machine, request_ip_vf0, request_ip_vf1):
 
-	multiprocessing.Process(name="sniffer", target=vf_to_vf_tcp_vf1_responder, daemon=False).start()
+	threading.Thread(target=vf_to_vf_tcp_vf1_responder).start()
 
 	time.sleep(1)
 
@@ -23,7 +23,7 @@ def test_vf_to_vf_tcp(add_machine, request_ip_vf0, request_ip_vf1):
 
 def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client):
 
-	multiprocessing.Process(name="sniffer", target=vf_to_vf_tcp_vf1_responder, daemon=False).start()
+	threading.Thread(target=vf_to_vf_tcp_vf1_responder).start()
 
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
 		ul_actual_src)

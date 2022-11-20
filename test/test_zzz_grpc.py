@@ -1,7 +1,7 @@
 from config import *
 from helpers import *
 
-"""
+
 def test_grpc_addmachine_error_102(add_machine, grpc_client):
 	# Try to add using an existing vm identifier
 	grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
@@ -29,10 +29,10 @@ def test_grpc_add_list_delmachine(add_machine, grpc_client):
 	grpc_client.assert_output(f"--getmachines",
 		vm3_name)
 	grpc_client.assert_output(f"--delmachine {vm3_name}",
-		"deleted an interface with code 0")
+		"Interface deleted")
 	grpc_client.assert_output(f"--getmachines",
 		vm3_name, negate=True)
-"""
+
 def test_grpc_addroute_error_251(add_machine, grpc_client):
 	# Try to add a route which is already added
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {vni} --t_ipv6 2a10:afc0:e01f:f408::1",

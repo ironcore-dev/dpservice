@@ -1,4 +1,4 @@
-import multiprocessing
+import threading
 
 from config import *
 from helpers import *
@@ -27,7 +27,6 @@ def send_bounce_pkt_to_pf():
 				 TCP(sport=8989, dport=510))
 	time.sleep(3)
 	sendp(bouce_pkt, iface=pf0_tap)
-	raise AssertionError("Undetected assert in parallel process!")
 
 def test_network_nat_pkt_relay(add_machine, grpc_client):
 
@@ -37,7 +36,7 @@ def test_network_nat_pkt_relay(add_machine, grpc_client):
 	grpc_client.assert_output(f"--addneighnat --ipv4 {nat_vip} --vni {vni} --min_port {nat_neigh_min_port} --max_port {nat_neigh_max_port} --t_ipv6 {nat_neigh_ul_dst}",
 		"Neighbor NAT added")
 
-	multiprocessing.Process(name="send_bounce_pkt", target=send_bounce_pkt_to_pf, daemon=False).start()
+	threading.Thread(target=send_bounce_pkt_to_pf).start();
 
 	# answer, unanswered = srp(bouce_pkt, iface=pf0_tap, timeout=10)
 	pkt_list = sniff(count=2, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=10)

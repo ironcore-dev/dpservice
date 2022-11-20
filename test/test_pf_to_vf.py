@@ -1,4 +1,4 @@
-import multiprocessing
+import threading
 
 from config import *
 from helpers import *
@@ -24,7 +24,7 @@ def test_pf_to_vf_lb_tcp(add_machine, grpc_client):
 	grpc_client.assert_output(f"--addlbvip {mylb} --t_ipv6 {vm1_target_lb_pfx_underlay}",
 		"LB VIP added")
 
-	multiprocessing.Process(name="send_lb_pkt", target=send_lb_pkt_to_pf, daemon=False).start()
+	threading.Thread(target=send_lb_pkt_to_pf).start()
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=7)
 	assert len(pkt_list) == 1

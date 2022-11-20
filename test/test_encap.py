@@ -1,4 +1,4 @@
-import multiprocessing
+import threading
 import pytest
 import time
 import shlex
@@ -12,9 +12,9 @@ from responders import *
 def test_ipv4_in_ipv6(add_machine, request_ip_vf0, tun_opt, port_redundancy):
 
 	responder = geneve_in_ipv6_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_responder
-	multiprocessing.Process(name="sniffer1", target=responder, args=(pf0_tap,), daemon=False).start()
+	threading.Thread(target=responder, args=(pf0_tap,)).start()
 	if port_redundancy:
-		multiprocessing.Process(name="sniffer2", target=responder, args=(pf1_tap,), daemon=False).start()
+		threading.Thread(target=responder, args=(pf1_tap,)).start()
 
 	time.sleep(0.5)
 	icmp_echo_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
@@ -40,7 +40,7 @@ def test_ipv6_in_ipv6(add_machine, tun_opt, port_redundancy):
 		pytest.skip("port redundancy not supported in ipv6 path")
 
 	responder = geneve_in_ipv6_responder if tun_opt == tun_type_geneve else ipv6_in_ipv6_responder
-	multiprocessing.Process(name="sniffer", target=responder, daemon=False).start()
+	threading.Thread(target=responder).start()
 
 	time.sleep(1)
 
