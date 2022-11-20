@@ -5,6 +5,8 @@ from helpers import request_ip
 import time
 import os
 
+from grpc_client import GrpcClient
+
 
 def pytest_addoption(parser):
 	parser.addoption(
@@ -70,47 +72,46 @@ def prepare_env(request, build_path, tun_opt, port_redundancy):
 	request.addfinalizer(tear_down)
 	return process
 
+# TODO look into how this actually works
 @pytest.fixture(autouse=True,scope="package")
-def check_dpservice(prepare_env,build_path):
+def check_dpservice(prepare_env):
 	return_code = prepare_env.poll()
-	if return_code is not None:
-		print("dp_service is not running")
-		assert False
-	
-	return
+	assert return_code is None, "dp_service is not running"
 
 @pytest.fixture(scope="package")
-def add_machine(build_path, tun_opt): # TODO rename to 'add_machines'
+def grpc_client(build_path):
+	return GrpcClient(build_path)
+
+@pytest.fixture(scope="package")
+def add_machine(tun_opt, grpc_client): # TODO rename to 'add_machines'
+	# TODO look into this when doing Geneve, is this the right way?
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
-	# TODO this needs explanation, or better yet fixing service startup
+
+	# TODO is this still needed?
 	#time.sleep(5)
-	init_cmd = build_path+"/test/dp_grpc_client --init"
-	add_machine_cmd = build_path+"/test/dp_grpc_client --addmachine " + vm1_name + " --vni "+ vni + " --ipv4 " + vf0_ip + " --ipv6 " + vf0_ipv6
-	add_machine_cmd2 = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
-	print(add_machine_cmd2)
-	add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
-	add_ipv6_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv6 2002::123 --length 128 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
-	add_default_public_route = build_path+"/test/dp_grpc_client --addroute " + " --vni " + vni + " --ipv4 0.0.0.0 --length 0 --t_vni "+ vni + " --t_ipv6 " + ul_actual_dst
-	print(add_default_public_route)
-	# TODO why are we only printing some of the commands here?
-	
-	subprocess.run(shlex.split("ip link set dev "+vf0_tap+" up"))
-	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
-	subprocess.run(shlex.split("ip link set dev "+vf2_tap+" up"))
-	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" up"))
-	# subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
-	subprocess.run(shlex.split(init_cmd))
-	subprocess.run(shlex.split(add_machine_cmd))
-	subprocess.run(shlex.split(add_machine_cmd2))
-	subprocess.run(shlex.split(add_ipv4_route_cmd))
-	subprocess.run(shlex.split(add_ipv6_route_cmd))
-	subprocess.run(shlex.split(add_default_public_route))
+
+
+	print("---------- Init ----------")
+	subprocess.check_output(shlex.split(f"ip link set dev {vf0_tap} up"))
+	subprocess.check_output(shlex.split(f"ip link set dev {vf1_tap} up"))
+	subprocess.check_output(shlex.split(f"ip link set dev {vf2_tap} up"))
+	subprocess.check_output(shlex.split(f"ip link set dev {pf0_tap} up"))
+	grpc_client.assert_output("--init", "Init called")
+	grpc_client.assert_output(f"--addmachine {vm1_name} --vni {vni} --ipv4 {vf0_ip} --ipv6 {vf0_ipv6}", "Allocated VF for you")
+	grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}", "Allocated VF for you")
+	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", f"Route ip {ov_target_pfx}")
+	grpc_client.assert_output(f"--addroute --vni {vni} --ipv6 2002::123 --length 128 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", "target ipv6 2002::123")
+	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 0.0.0.0 --length 0 --t_vni {vni} --t_ipv6 {ul_actual_dst}", "Route ip 0.0.0.0")
+	print("--------------------------")
+
+
 	# TODO this needs explanation, or better yet fixing service startup
 	# (plague): my guess is that it takes some time to apply the GRPC command in service, the client is asynchronous
 	# so maybe do a --list* loop here!
 	time.sleep(2)
+
 	# TODO add timeout=2 to all sniff calls missign it (3 cases I think)
 	# TODO all the prints are wrong, either print context too or stay quiet?
 	# (actually not needed, when run via scapy it is verbose enough and colored)
@@ -120,10 +121,11 @@ def add_machine(build_path, tun_opt): # TODO rename to 'add_machines'
 	# TODO AssertionError instead of assert
 
 # Many tests require IPs already assigned on VFs
-@pytest.fixture
+# TODO is this called before arp test?
+@pytest.fixture(scope="package")
 def request_ip_vf0(add_machine):
 	request_ip(vf0_tap)
-@pytest.fixture
+@pytest.fixture(scope="package")
 def request_ip_vf1(add_machine):
 	request_ip(vf1_tap)
 
@@ -133,3 +135,9 @@ def request_ip_vf1(add_machine):
 
 # TODO create helper to call sniffers
 # TODO scapy '/' endline
+
+
+# TODO grpc client needs work - no return code and some command are missing outputs for testing
+# (don't forget to rewrite tests then!)
+
+# TODO move responders back into respective scripts

@@ -21,13 +21,12 @@ def test_vf_to_vf_tcp(add_machine, request_ip_vf0, request_ip_vf1):
 	assert len(pkt_list) == 1
 
 
-def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, build_path):
+def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client):
 
 	multiprocessing.Process(name="sniffer", target=vf_to_vf_tcp_vf1_responder, daemon=False).start()
 
-	expected_str = ul_actual_src
-	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
-	eval_cmd_output(add_vip_test, expected_str)
+	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
+		ul_actual_src)
 
 	time.sleep(1)
 
@@ -41,6 +40,5 @@ def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, build_pa
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
 	assert len(pkt_list) == 1
 
-	expected_str = "Delvip"
-	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
-	eval_cmd_output(del_vip_test, expected_str)
+	grpc_client.assert_output(f"--delvip {vm2_name}",
+		"VIP deleted")

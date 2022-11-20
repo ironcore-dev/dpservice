@@ -1,222 +1,145 @@
 from config import *
 from helpers import *
 
-def test_grpc_addmachine_error_102(add_machine, build_path):
+"""
+def test_grpc_addmachine_error_102(add_machine, grpc_client):
 	# Try to add using an existing vm identifier
-	expected_error_str = "error 102"
-	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm2_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
-	eval_cmd_output(add_machine_test, expected_error_str)
+	grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+		"error 102")
 
-def test_grpc_getmachine_single(add_machine, build_path):
+def test_grpc_getmachine_single(add_machine, grpc_client):
 	# Try to get a single existing interface(machine)
-	expected_str = vf1_ip
-	add_machine_test = build_path+"/test/dp_grpc_client --getmachine " + vm2_name
-	eval_cmd_output(add_machine_test, expected_str)
+	grpc_client.assert_output(f"--getmachine {vm2_name}",
+		vf1_ip)
 
-def test_grpc_addmachine_error_106(add_machine, build_path):
+def test_grpc_addmachine_error_106(add_machine, grpc_client):
 	# Try to add with new machine identifer but already given IPv4
-	expected_error_str = "error 106"
-	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm3_name + " --vni "+ vni + " --ipv4 " + vf1_ip + " --ipv6 " + vf1_ipv6
-	eval_cmd_output(add_machine_test, expected_error_str)
+	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+		"error 106")
 
-def test_grpc_delmachine_error_151(add_machine, build_path):
+def test_grpc_delmachine_error_151(add_machine, grpc_client):
 	# Try to delete with machine identifer which doesnt exist
-	expected_str = "error 151"
-	del_machine_test = build_path+"/test/dp_grpc_client --delmachine " + vm3_name
-	eval_cmd_output(del_machine_test, expected_str)
+	grpc_client.assert_output(f"--delmachine {vm3_name}",
+		"error 151")
 
-def test_grpc_add_list_delmachine(add_machine, build_path):
+def test_grpc_add_list_delmachine(add_machine, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
-	expected_str = "net_tap4"
-	add_machine_test = build_path+"/test/dp_grpc_client --addmachine " + vm3_name+ " --vni "+ vni + " --ipv4 " + vf2_ip + " --ipv6 " + vf2_ipv6
-	eval_cmd_output(add_machine_test, expected_str)
-
-	expected_str = vm3_name
-	list_machine_test = build_path+"/test/dp_grpc_client --getmachines "
-	eval_cmd_output(list_machine_test, expected_str)
-
-	expected_str = "Delmachine"
-	del_machine_test = build_path+"/test/dp_grpc_client --delmachine " + vm3_name
-	eval_cmd_output(del_machine_test, expected_str)
-
-	expected_str = vm3_name
-	list_machine_test = build_path+"/test/dp_grpc_client --getmachines "
-	eval_cmd_output(list_machine_test, expected_str, negate=True)
-
-def test_grpc_addroute_error_251(add_machine, build_path):
+	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf2_ip} --ipv6 {vf2_ipv6}",
+		"net_tap4")
+	grpc_client.assert_output(f"--getmachines",
+		vm3_name)
+	grpc_client.assert_output(f"--delmachine {vm3_name}",
+		"deleted an interface with code 0")
+	grpc_client.assert_output(f"--getmachines",
+		vm3_name, negate=True)
+"""
+def test_grpc_addroute_error_251(add_machine, grpc_client):
 	# Try to add a route which is already added
-	expected_str = "error 251"
-	add_route_test = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
-	eval_cmd_output(add_route_test, expected_str)
+	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {vni} --t_ipv6 2a10:afc0:e01f:f408::1",
+		"error 251")
 
-def test_grpc_list_delroutes(add_machine, build_path):
+def test_grpc_list_delroutes(add_machine, grpc_client):
 	# Try to list routes, delete one of them, list and add again
-	expected_str = ov_target_pfx
-	list_route_test = build_path+"/test/dp_grpc_client --listroutes --vni " + vni
-	eval_cmd_output(list_route_test, expected_str)
+	grpc_client.assert_output(f"--listroutes --vni {vni}",
+		ov_target_pfx)
+	grpc_client.assert_output(f"--delroute --vni {vni} --ipv4 {ov_target_pfx} --length 24",
+		"Route deleted")
+	grpc_client.assert_output(f"--listroutes --vni {vni}",
+		ov_target_pfx, negate=True)
+	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {vni} --t_ipv6 2a10:afc0:e01f:f408::1",
+		ov_target_pfx)
 
-	expected_str = "Delroute"
-	del_route_test = build_path+"/test/dp_grpc_client --delroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24"
-	eval_cmd_output(del_route_test, expected_str)
-
-	expected_str = ov_target_pfx
-	list_route_test = build_path+"/test/dp_grpc_client --listroutes --vni " + vni
-	eval_cmd_output(list_route_test, expected_str, negate=True)
-
-	expected_str = "error"
-	add_route_test = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 24 --t_vni " + vni + " --t_ipv6 2a10:afc0:e01f:f408::1"
-	eval_cmd_output(add_route_test, expected_str, negate=True)
-
-def test_grpc_add_list_delVIP(add_machine, build_path):
+def test_grpc_add_list_delVIP(add_machine, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
-	expected_str = ul_actual_src
-	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
-	eval_cmd_output(add_vip_test, expected_str)
-
-	expected_str = virtual_ip
-	get_vip_test = build_path+"/test/dp_grpc_client --getvip " + vm2_name
-	eval_cmd_output(get_vip_test, expected_str)
-
+	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
+		ul_actual_src)
+	grpc_client.assert_output(f"--getvip {vm2_name}",
+		virtual_ip)
 	# Try to add the same vip again
-	expected_str = "351"
-	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm2_name + " --ipv4 " + virtual_ip
-	eval_cmd_output(add_vip_test, expected_str)
-
+	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
+		"error 351")
 	# Try to add to a machine which doesnt exist
-	expected_str = "350"
-	add_vip_test = build_path+"/test/dp_grpc_client --addvip " + vm3_name + " --ipv4 " + virtual_ip
-	eval_cmd_output(add_vip_test, expected_str)
+	grpc_client.assert_output(f"--addvip {vm3_name} --ipv4 {virtual_ip}",
+		"error 350")
+	grpc_client.assert_output(f"--delvip {vm2_name}",
+		"VIP deleted")
+	grpc_client.assert_output(f"--getvip {vm2_name}",
+		virtual_ip, negate=True)
 
-	expected_str = "Delvip"
-	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
-	eval_cmd_output(del_vip_test, expected_str)
-
-	expected_str = virtual_ip
-	get_vip_test = build_path+"/test/dp_grpc_client --getvip " + vm2_name
-	eval_cmd_output(get_vip_test, expected_str, negate=True)
-
-def test_grpc_add_list_delLBVIP(add_machine, build_path):
+def test_grpc_add_list_delLBVIP(add_machine, grpc_client):
 	# Try to add LB VIP, list, test error cases, delete vip and list again
-	expected_str = ul_actual_src
-	add_lbvip_test = build_path+"/test/dp_grpc_client --createlb "+ mylb + " --vni " + vni + " --ipv4 " + virtual_ip + " --port 80 --protocol tcp"
-	eval_cmd_output(add_lbvip_test, expected_str)
+	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp",
+		ul_actual_src)
+	grpc_client.assert_output(f"--addlbvip {mylb} --t_ipv6 {back_ip1}",
+		"LB VIP added")
+	grpc_client.assert_output(f"--listbackips {mylb}",
+		back_ip1)
+	grpc_client.assert_output(f"--addlbvip {mylb} --t_ipv6 {back_ip2}",
+		"LB VIP added")
+	grpc_client.assert_output(f"--listbackips {mylb}",
+		back_ip2)
+	grpc_client.assert_output(f"--dellbvip {mylb} --t_ipv6 {back_ip1}",
+		"LB VIP deleted")
+	grpc_client.assert_output(f"--listbackips {mylb}",
+		back_ip1, negate=True)
+	grpc_client.assert_output(f"--dellbvip {mylb} --t_ipv6 {back_ip2}",
+		"LB VIP deleted")
+	grpc_client.assert_output(f"--listbackips {mylb}",
+		back_ip2, negate=True)
+	grpc_client.assert_output(f"--getlb {mylb}",
+		ul_actual_src)
+	grpc_client.assert_output(f"--dellb {mylb}",
+		"LB deleted")
+	grpc_client.assert_output(f"--getlb {mylb}",
+		ul_actual_src, negate=True)
 
-	expected_str = "LB target added"
-	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip " + mylb + " --t_ipv6 " + back_ip1
-	eval_cmd_output(add_lbvip_test, expected_str)
-
-	expected_str = back_ip1
-	list_backips_test = build_path+"/test/dp_grpc_client --listbackips " + mylb
-	eval_cmd_output(list_backips_test, expected_str)
-
-	expected_str = "LB target added"
-	add_lbvip_test = build_path+"/test/dp_grpc_client --addlbvip " + mylb + " --t_ipv6 " + back_ip2
-	eval_cmd_output(add_lbvip_test, expected_str)
-
-	expected_str = back_ip2
-	list_backips_test = build_path+"/test/dp_grpc_client --listbackips " + mylb
-	eval_cmd_output(list_backips_test, expected_str)
-
-	expected_str = "Dellbvip"
-	del_lbvip_test = build_path+"/test/dp_grpc_client --dellbvip " + mylb + " --t_ipv6 " + back_ip1
-	eval_cmd_output(del_lbvip_test, expected_str)
-
-	expected_str = back_ip1
-	list_backips_test = build_path+"/test/dp_grpc_client --listbackips " + mylb
-	eval_cmd_output(list_backips_test, expected_str, negate=True)
-
-	expected_str = "Dellbvip"
-	del_lbvip_test = build_path+"/test/dp_grpc_client --dellbvip " + mylb + " --t_ipv6 " + back_ip2
-	eval_cmd_output(del_lbvip_test, expected_str)
-
-	expected_str = back_ip2
-	list_backips_test = build_path+"/test/dp_grpc_client --listbackips " + mylb
-	eval_cmd_output(list_backips_test, expected_str, negate=True)
-
-	expected_str = ul_actual_src
-	del_lbvip_test = build_path+"/test/dp_grpc_client --getlb " + mylb
-	eval_cmd_output(del_lbvip_test, expected_str)
-
-	expected_str = "Delete LB Success"
-	del_lbvip_test = build_path+"/test/dp_grpc_client --dellb " + mylb
-	eval_cmd_output(del_lbvip_test, expected_str)
-
-def test_grpc_add_list_delPfx(add_machine, build_path):
+def test_grpc_add_list_delPfx(add_machine, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	expected_str = ul_actual_src
-	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
-	eval_cmd_output(add_pfx_test, expected_str)
-
-	expected_str = pfx_ip
-	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
-	eval_cmd_output(list_pfx_test, expected_str)
-
+	grpc_client.assert_output(f"--addpfx {vm2_name} --ipv4 {pfx_ip} --length 24",
+		ul_actual_src)
+	grpc_client.assert_output(f"--listpfx {vm2_name}",
+		pfx_ip)
 	# Try to add the same pfx again
-	expected_str = "652"
-	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
-	eval_cmd_output(add_pfx_test, expected_str)
-
+	grpc_client.assert_output(f"--addpfx {vm2_name} --ipv4 {pfx_ip} --length 24",
+		"error 652")
 	# Try to add/delete to/from a machine which doesnt exist
-	expected_str = "651"
-	add_pfx_test = build_path+"/test/dp_grpc_client --addpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 24"
-	eval_cmd_output(add_pfx_test, expected_str)
+	grpc_client.assert_output(f"--addpfx {vm3_name} --ipv4 {pfx_ip} --length 24",
+		"error 651")
+	grpc_client.assert_output(f"--delpfx {vm3_name} --ipv4 {pfx_ip} --length 24",
+		"error 701")
+	grpc_client.assert_output(f"--delpfx {vm2_name} --ipv4 {pfx_ip} --length 24",
+		"Prefix deleted")
+	grpc_client.assert_output(f"--listpfx {vm2_name}",
+		pfx_ip, negate=True)
 
-	expected_str = "701"
-	del_pfx_test = build_path+"/test/dp_grpc_client --delpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 24"
-	eval_cmd_output(del_pfx_test, expected_str)
-
-	expected_str = "Delprefix"
-	del_pfx_test = build_path+"/test/dp_grpc_client --delpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 24"
-	eval_cmd_output(del_pfx_test, expected_str)
-
-	expected_str = pfx_ip
-	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
-	eval_cmd_output(list_pfx_test, expected_str, negate=True)
-
-def test_grpc_add_list_delLoadBalancerTargets(add_machine, build_path):
+def test_grpc_add_list_delLoadBalancerTargets(add_machine, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	expected_str = ul_short_src
-	add_pfx_test = build_path+"/test/dp_grpc_client --addlbpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 32"
-	eval_cmd_output(add_pfx_test, expected_str)
-
-	expected_str = pfx_ip
-	list_pfx_test = build_path+"/test/dp_grpc_client --listlbpfx " + vm2_name
-	eval_cmd_output(list_pfx_test, expected_str)
-
+	grpc_client.assert_output(f"--addlbpfx {vm2_name} --ipv4 {pfx_ip} --length 32",
+		ul_short_src)
+	grpc_client.assert_output(f"--listlbpfx {vm2_name}",
+		pfx_ip)
 	# Try to add/delete to/from a machine which doesnt exist
-	expected_str = "651"
-	add_pfx_test = build_path+"/test/dp_grpc_client --addlbpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 32"
-	eval_cmd_output(add_pfx_test, expected_str)
+	grpc_client.assert_output(f"--addlbpfx {vm3_name} --ipv4 {pfx_ip} --length 32",
+		"error 651")
+	grpc_client.assert_output(f"--dellbpfx {vm3_name} --ipv4 {pfx_ip} --length 32",
+		"error 701")
+	grpc_client.assert_output(f"--dellbpfx {vm2_name} --ipv4 {pfx_ip} --length 32",
+		"LB prefix deleted")
+	grpc_client.assert_output(f"--listpfx {vm2_name}",
+		pfx_ip, negate=True)
 
-	expected_str = "701"
-	del_pfx_test = build_path+"/test/dp_grpc_client --dellbpfx " + vm3_name + " --ipv4 " + pfx_ip + " --length 32"
-	eval_cmd_output(del_pfx_test, expected_str)
 
-	expected_str = "DelLBprefix"
-	del_pfx_test = build_path+"/test/dp_grpc_client --dellbpfx " + vm2_name + " --ipv4 " + pfx_ip + " --length 32"
-	eval_cmd_output(del_pfx_test, expected_str)
+def test_grpc_add_list_del_routes_big_reply(add_machine, grpc_client):
+	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
+		ov_target_pfx = f"192.168.{subnet}.0"
+		grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 32 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}",
+			ov_target_pfx)
 
-	expected_str = pfx_ip
-	list_pfx_test = build_path+"/test/dp_grpc_client --listpfx " + vm2_name
-	eval_cmd_output(list_pfx_test, expected_str, negate=True)
+	listing = grpc_client.assert_output(f"--listroutes --vni {vni}",
+		"Listroute called")
+	assert listing.count("Route prefix") == MAX_LINES_ROUTE_REPLY + 1  # +1 for the one already there
 
-# def test_grpc_add_list_del_routes_big_reply(add_machine, build_path):
-# 	expected_str = "Listroute called"
-# 	pfx_first = "192.168."
-# 	pfx_second = 29
-# 	max_lines = MAX_LINES_ROUTE_REPLY + 2 + 1
-# 	for idx in range(MAX_LINES_ROUTE_REPLY):
-# 		pfx_second = pfx_second + 1
-# 		ov_target_pfx = pfx_first + str(pfx_second) + ".0"
-# 		add_ipv4_route_cmd = build_path+"/test/dp_grpc_client --addroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 32 --t_vni " + t_vni + " --t_ipv6 " + ul_actual_dst
-# 		subprocess.run(shlex.split(add_ipv4_route_cmd), stdout=subprocess.DEVNULL)
-# 	list_route_test = build_path + "/test/dp_grpc_client --listroutes --vni " + vni
-# 	#TODO this test case is not complete and needs to handle more than 38 lines
-# 	eval_cmd_output(list_route_test, expected_str, maxlines=max_lines)
-# 	pfx_first = "192.168."
-# 	pfx_second = 29
-# 	for idx in range(MAX_LINES_ROUTE_REPLY):
-# 		pfx_second = pfx_second + 1
-# 		ov_target_pfx = pfx_first + str(pfx_second) + ".0"
-# 		del_route_test = build_path+"/test/dp_grpc_client --delroute --vni " + vni + " --ipv4 " + ov_target_pfx + " --length 32"
-#		subprocess.run(shlex.split(del_route_test), stdout=subprocess.DEVNULL)
+	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
+		ov_target_pfx = f"192.168.{subnet}.0"
+		grpc_client.assert_output(f"--delroute --vni {vni} --ipv4 {ov_target_pfx} --length 32",
+			"Route deleted")
