@@ -10,7 +10,8 @@ def test_network_lb_external_icmp_echo(add_machine, request_ip_vf0, grpc_client)
 				IP(dst=virtual_ip, src=public_ip) /
 				ICMP(type=8, id=0x0040))
 	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=2)
-	assert answer and is_icmp_pkt(answer)
+	assert answer and is_icmp_pkt(answer), \
+		"No ECHO reply"
 
 	grpc_client.assert_output(f"--dellb {mylb}",
 		"LB deleted")

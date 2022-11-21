@@ -24,7 +24,8 @@ def test_vf_to_vf_tcp(add_machine, request_ip_vf0, request_ip_vf1):
 	sendp(tcp_pkt, iface=vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1
+	assert len(pkt_list) == 1, \
+		"No TCP reply"
 
 
 def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client):
@@ -44,7 +45,8 @@ def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, grpc_cli
 	sendp(tcp_pkt, iface=vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1
+	assert len(pkt_list) == 1, \
+		"No TCP reply"
 
 	grpc_client.assert_output(f"--delvip {vm2_name}",
 		"VIP deleted")

@@ -6,25 +6,19 @@ from helpers import *
 def send_icmp_pkt_from_vm1():
 
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=pf0_tap, timeout=10)
-	assert len(pkt_list) == 1, 'Cannot receive network-natted tcp pkt on pf'
+	assert len(pkt_list) == 1, \
+		"No network-natted ICMP packet received on PF"
 
 	pkt = pkt_list[0]
+	src_ip = pkt[IP].src
+	assert src_ip == nat_vip, \
+		f"Bad ICMP request (src ip: {src_ip})"
 
-	if Ether in pkt:
-		pktether = pkt[Ether]
-	if IPv6 in pkt:
-		pktipv6 = pkt[IPv6]
-	if IP in pkt:
-		pktip = pkt[IP]
-	if ICMP in pkt:
-		pkticmp = pkt[ICMP]
-
-	if pktip.src == nat_vip:
-		reply_pkt = (Ether(dst=pktether.src, src=pktether.dst, type=0x86DD) /
-					 IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4) /
-					 IP(dst=pktip.src, src=pktip.dst) /
-					 ICMP(type=0, id=pkticmp.id))
-		sendp(reply_pkt, iface=pf0_tap)
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 ICMP(type=0, id=pkt[ICMP].id))
+	sendp(reply_pkt, iface=pf0_tap)
 
 def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 
@@ -41,20 +35,13 @@ def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 	sendp(icmp_pkt, iface = vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=3)
-	assert len(pkt_list) == 1
+	assert len(pkt_list) == 1, \
+		"No ECHO reply"
 
 	pkt = pkt_list[0]
-
-	if Ether in pkt:
-		pktether = pkt[Ether]
-	if IPv6 in pkt:
-		pktipv6 = pkt[IPv6]
-	if IP in pkt:
-		pktip = pkt[IP]
-	if ICMP in pkt:
-		pkticmp = pkt[ICMP]
-
-	assert pktip.dst == vf0_ip, 'Received wrong icmp packet with ip:'+pktip.dst
+	dst_ip = pkt[IP].dst
+	assert dst_ip == vf0_ip, \
+		f"Bad ECHO reply (dst ip: {dst_ip})"
 
 	grpc_client.assert_output(f"--delnat {vm1_name}",
 		"NAT deleted")
@@ -63,26 +50,21 @@ def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 def send_tcp_pkt_from_vm1():
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=10)
-	assert len(pkt_list) == 1, 'Cannot receive network-natted tcp pkt on pf'
+	assert len(pkt_list) == 1, \
+		"No network-natted TCP packet received on PF"
 
 	pkt = pkt_list[0]
+	src_ip = pkt[IP].src
+	sport = pkt[TCP].sport
+	assert src_ip == nat_vip and sport == nat_local_min_port, \
+		f"Bad TCP packet (ip: {src_ip}, sport: {sport})"
 
-	if Ether in pkt:
-		pktether = pkt[Ether]
-	if IPv6 in pkt:
-		pktipv6 = pkt[IPv6]
-	if IP in pkt:
-		pktip = pkt[IP]
-	if TCP in pkt:
-		pkttcp = pkt[TCP]
-
-	if pktip.src == nat_vip and pkttcp.sport == nat_local_min_port:
-		reply_pkt = (Ether(dst=pktether.src, src=pktether.dst, type=0x86DD) /
-					 IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4) /
-					 IP(dst=pktip.src, src=pktip.dst) /
-					 TCP(sport=pkttcp.dport, dport=pkttcp.sport))
-		time.sleep(1)
-		sendp(reply_pkt, iface=pf0_tap)
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf0_tap)
 
 def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 
@@ -102,20 +84,14 @@ def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 	sendp(tcp_pkt, iface=vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=10)
-	assert len(pkt_list) == 1, 'Cannot receive network-natted tcp pkt on pf'
+	assert len(pkt_list) == 1, \
+		"No network-natted TCP packet received on PF"
 
 	pkt = pkt_list[0]
-
-	if Ether in pkt:
-		pktether = pkt[Ether]
-	if IPv6 in pkt:
-		pktipv6 = pkt[IPv6]
-	if IP in pkt:
-		pktip = pkt[IP]
-	if TCP in pkt:
-		pkttcp = pkt[TCP]
-
-	assert pktip.dst == vf0_ip and pkttcp.dport == 1240, 'Received wrong packet with ip:'+pktip.dst+" dport:"+str(pkttcp.dport)
+	dst_ip = pkt[IP].dst
+	dport = pkt[TCP].dport
+	assert dst_ip == vf0_ip and dport == 1240, \
+		f"Bad TCP packet (ip: {dst_ip}, dport: {dport})"
 
 	grpc_client.assert_output(f"--delnat {vm1_name}",
 		"NAT deleted")
@@ -123,8 +99,8 @@ def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 
 def encaped_tcp_in_ipv6_vip_responder(pf_name):
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=10)
-	# TODO this only makes sense if wanting to time-out here (see below)
-	if len(pkt_list)==0:
+	# with --port-redundancy, threre are two listeners running and only one receives a packet
+	if len(pkt_list) == 0:
 		return
 	pkt = pkt_list[0]
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
@@ -134,12 +110,11 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name):
 	time.sleep(1)
 	sendp(reply_pkt, iface=pf_name)
 
-def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client):
+def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client, port_redundancy):
 
 	threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf0_tap,)).start()
-	# TODO why is this here? This one does not ever fire (even with redundancy)
-	# I thought that was the reason, the comment below seems to indicate that too
-	threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf1_tap,)).start()
+	if port_redundancy:
+		threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf1_tap,)).start()
 
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
 		f"Received underlay route : {ul_actual_src}")
@@ -153,7 +128,8 @@ def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_cli
 	sendp(tcp_pkt, iface=vf1_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf1_tap, timeout=5)
-	assert len(pkt_list) == 1, 'Cannot receive tcp reply via VIP (SNAT)!'
+	assert len(pkt_list) == 1, \
+		"No TCP reply via VIP (SNAT)"
 
 	grpc_client.assert_output(f"--delvip {vm2_name}",
 		"VIP deleted")

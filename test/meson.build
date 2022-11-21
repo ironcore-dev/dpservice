@@ -3,7 +3,6 @@ grpc_client_sources = ['dp_grpc_client.cpp']
 executable('dp_grpc_client', grpc_client_sources, grpc_generated,
   dependencies : [proto_dep, grpc_dep, grpccpp_dep] )
 
-# TODO direct link to client?
 common_args = [ '--build-path='+meson.build_root() ]
 pytest_dir = join_paths(meson.source_root(), 'test')
 

@@ -136,7 +136,10 @@ def test_grpc_add_list_del_routes_big_reply(add_machine, grpc_client):
 
 	listing = grpc_client.assert_output(f"--listroutes --vni {vni}",
 		"Listroute called")
-	assert listing.count("Route prefix") == MAX_LINES_ROUTE_REPLY + 1  # +1 for the one already there
+	route_count = listing.count("Route prefix")
+	# +1 for the one already there (from env setup)
+	assert route_count == MAX_LINES_ROUTE_REPLY + 1, \
+		f"Not all routes have been added ({route_count}/{MAX_LINES_ROUTE_REPLY+1})"
 
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
 		ov_target_pfx = f"192.168.{subnet}.0"

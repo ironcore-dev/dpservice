@@ -39,7 +39,8 @@ def test_ipv4_in_ipv6(add_machine, request_ip_vf0, tun_opt, port_redundancy):
 					 ICMP(type=8))
 	sendp(icmp_echo_pkt, iface=vf0_tap)
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1
+	assert len(pkt_list) == 1, \
+		"No ECHO reply"
 
 	if port_redundancy:
 		time.sleep(0.5)
@@ -49,7 +50,8 @@ def test_ipv4_in_ipv6(add_machine, request_ip_vf0, tun_opt, port_redundancy):
 		sendp(icmp_echo_pkt, iface=vf0_tap)
 		subprocess.check_output(shlex.split("ip link set dev "+pf1_tap+" up"))
 		pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
-		assert len(pkt_list) == 1
+		assert len(pkt_list) == 1, \
+			"No ECHO reply on second PF"
 
 
 def geneve_in_ipv6_icmp6_responder(pf_name):
@@ -75,7 +77,7 @@ def ipv6_in_ipv6_icmp6_responder(pf_name):
 def test_ipv6_in_ipv6(add_machine, tun_opt, port_redundancy):
 
 	if port_redundancy:
-		pytest.skip("port redundancy not supported in ipv6 path")
+		pytest.skip("Port redundancy is not supported for ipv6 in ipv6")
 
 	responder = geneve_in_ipv6_icmp6_responder if tun_opt == tun_type_geneve else ipv6_in_ipv6_icmp6_responder
 	threading.Thread(target=responder, args=(pf0_tap,)).start()
@@ -88,4 +90,5 @@ def test_ipv6_in_ipv6(add_machine, tun_opt, port_redundancy):
 	sendp(icmp_echo_pkt, iface=vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_icmpv6echo_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1
+	assert len(pkt_list) == 1, \
+		"No ECHOv6 reply"

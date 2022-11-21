@@ -13,7 +13,8 @@ def test_network_nat_external_icmp_echo(add_machine, request_ip_vf0, grpc_client
 			    IP(dst=nat_vip, src=public_ip) /
 			    ICMP(type=8, id=0x0040))
 	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=2)
-	assert answer and is_icmp_pkt(answer)
+	assert answer and is_icmp_pkt(answer), \
+		"No ECHO reply"
 
 	grpc_client.assert_output(f"--delnat {vm1_name}",
 		"NAT deleted")
@@ -37,22 +38,16 @@ def test_network_nat_pkt_relay(add_machine, grpc_client):
 
 	threading.Thread(target=send_bounce_pkt_to_pf).start();
 
-	# answer, unanswered = srp(bouce_pkt, iface=pf0_tap, timeout=10)
+	# it seems that pkt_list[0] is the injected packet
 	pkt_list = sniff(count=2, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=10)
-	assert len(pkt_list) == 2
+	assert len(pkt_list) == 2, \
+		"No bounce packet received"
 
-	# it seems that pkt_list[0] is the injected pkt
 	pkt = pkt_list[1]
-
-	if Ether in pkt:
-		pktether = pkt[Ether]
-	if IPv6 in pkt:
-		pktipv6 = pkt[IPv6]
-	if IP in pkt:
-		pktip = pkt[IP]
-	if TCP in pkt:
-		pkttcp = pkt[TCP]
-	assert pktipv6.dst == nat_neigh_ul_dst and pkttcp.dport == 510, 'Received wrong network-nat relayed packet with outer dst ipv6 addr:'+pktipv6.dst+" dport:"+pkttcp.dport
+	dst_ip = pkt[IPv6].dst
+	dport = pkt[TCP].dport
+	assert dst_ip == nat_neigh_ul_dst and dport == 510, \
+		f"Wrong network-nat relayed packet (outer dst ipv6: {dst_ip}, dport: {dport})"
 
 	grpc_client.assert_output(f"--getnat {vm1_name}",
 		nat_vip)
