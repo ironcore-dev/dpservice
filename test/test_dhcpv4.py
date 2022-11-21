@@ -1,12 +1,9 @@
-from scapy.layers.dhcp import *
-from scapy.config import conf
-
-from config import *
+from helpers import *
 
 
 def runtest(interface, macaddr, ipaddr):
 
-	conf.checkIPaddr = False
+	scapy.config.conf.checkIPaddr = False
 	answer = dhcp_request(iface=interface, timeout=5)
 	resp = str(answer[DHCP].options[0][1])
 	assert str(resp) == str(2)

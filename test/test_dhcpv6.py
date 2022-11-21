@@ -1,9 +1,4 @@
-from scapy.all import *
-from scapy.layers.l2 import Ether
-from scapy.layers.inet6 import IPv6
-from scapy.layers.dhcp6 import *
-
-from config import *
+from helpers import *
 
 
 def test_dhcpv6(add_machine):

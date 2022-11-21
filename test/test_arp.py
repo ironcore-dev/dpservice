@@ -1,8 +1,4 @@
-from scapy.all import *
-from scapy.layers.l2 import ARP
-from scapy.layers.inet import Ether
-
-from config import *
+from helpers import *
 
 
 def test_l2_arp(add_machine):

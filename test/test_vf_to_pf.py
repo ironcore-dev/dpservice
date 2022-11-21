@@ -1,9 +1,6 @@
 import threading
-import time
 
-from config import *
 from helpers import *
-from responders import *
 
 
 def send_icmp_pkt_from_vm1():
@@ -123,6 +120,19 @@ def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 	grpc_client.assert_output(f"--delnat {vm1_name}",
 		"NAT deleted")
 
+
+def encaped_tcp_in_ipv6_vip_responder(pf_name):
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=10)
+	# TODO this only makes sense if wanting to time-out here (see below)
+	if len(pkt_list)==0:
+		return
+	pkt = pkt_list[0]
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf_name)
 
 def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client):
 

@@ -1,6 +1,5 @@
 import threading
 
-from config import *
 from helpers import *
 
 

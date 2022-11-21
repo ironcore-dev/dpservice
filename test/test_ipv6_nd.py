@@ -1,6 +1,4 @@
-from scapy.all import *
-
-from config import *
+from helpers import *
 
 
 def test_nd(add_machine):
