@@ -1,10 +1,11 @@
+import os
 import pytest
-import pytest, shlex, subprocess, time
+import shlex
+import subprocess
+import time
+
 from config import *
 from helpers import request_ip
-import time
-import os
-
 from grpc_client import GrpcClient
 
 
@@ -31,67 +32,61 @@ def tun_opt(request):
 def port_redundancy(request):
 	return request.config.getoption("--port-redundancy")
 
-@pytest.fixture(scope="package")
-def prepare_env(request, build_path, tun_opt, port_redundancy):
-	
-	wcmp_opt_str = ""
-	if port_redundancy:
-		wcmp_opt_str = " --wcmp-frac=0.5"
-
-	if os.path.exists(config_file_path) :
-		os.rename(config_file_path, config_file_path + ".backup")
-
-	dp_service_cmd = build_path+"/src/dp_service -l 0,1 --vdev=net_tap0,iface="+pf0_tap+",mac=\""+pf0_mac+"\" "\
-		"--vdev=net_tap1,iface="+pf1_tap+",mac=\""+pf1_mac+ "\" --vdev=net_tap2,"\
-		"iface="+vf0_tap+",mac=\""+vf0_mac + "\" --vdev=net_tap3,iface="+vf1_tap+",mac=\""+vf1_mac+ "\" --vdev=net_tap4,iface="+vf2_tap+",mac=\""+vf2_mac + "\"  -- "\
-		"--pf0="+pf0_tap+" --pf1="+pf1_tap+" --vf-pattern="+vf_patt+" --ipv6="+ul_ipv6+" --no-offload --no-stats"+" --op_env=scapytest " + "--tun_opt=" + tun_opt + wcmp_opt_str + \
-		" --enable-ipv6-overlay"
-	cmd = shlex.split(dp_service_cmd)
-	print(dp_service_cmd)
-	process = subprocess.Popen(cmd, 
-								stdout=subprocess.PIPE,
-								universal_newlines=True)
-
-	while True:
-		output = process.stdout.readline()
-		line = output.strip()
-		
-		if start_str in line:
-			break
-		return_code = process.poll()
-		if return_code is not None:
-			# Process has finished, read rest of the output 
-			for output in process.stdout.readlines():
-				print(output.strip())
-			break
-	def tear_down():
-		process.terminate()
-		time.sleep(1)
-		if os.path.exists(config_file_path + ".backup") :
-			os.rename(config_file_path + ".backup", config_file_path)
-	request.addfinalizer(tear_down)
-	return process
-
-# TODO look into how this actually works
-@pytest.fixture(autouse=True,scope="package")
-def check_dpservice(prepare_env):
-	return_code = prepare_env.poll()
-	assert return_code is None, "dp_service is not running"
 
 @pytest.fixture(scope="package")
 def grpc_client(build_path):
 	return GrpcClient(build_path)
 
+
+# All tests require dp_service to be running
 @pytest.fixture(scope="package")
-def add_machine(tun_opt, grpc_client): # TODO rename to 'add_machines'
+def prepare_env(request, build_path, tun_opt, port_redundancy):
+
+	# TODO this should be done via some option in dp_service, reading a hardcoded path is not the way
+	if os.path.exists(config_file_path):
+		os.rename(config_file_path, config_file_path + ".backup")
+
+	dp_service_cmd = (f'{build_path}/src/dp_service -l 0,1'
+						f' --vdev=net_tap0,iface={pf0_tap},mac="{pf0_mac}"'
+						f' --vdev=net_tap1,iface={pf1_tap},mac="{pf1_mac}"'
+						f' --vdev=net_tap2,iface={vf0_tap},mac="{vf0_mac}"'
+						f' --vdev=net_tap3,iface={vf1_tap},mac="{vf1_mac}"'
+						f' --vdev=net_tap4,iface={vf2_tap},mac="{vf2_mac}"'
+						' --'
+						f' --pf0={pf0_tap} --pf1={pf1_tap} --vf-pattern={vf_patt}'
+						f' --ipv6={ul_ipv6} --enable-ipv6-overlay'
+						 ' --no-offload --no-stats'
+						 ' --op_env=scapytest'
+						f' --tun_opt={tun_opt}')
+	if port_redundancy:
+		dp_service_cmd += ' --wcmp-frac=0.5'
+
+	process = subprocess.Popen(shlex.split(dp_service_cmd),
+								stdout=subprocess.PIPE,
+								universal_newlines=True)
+	# Wait for service to initialize itself (will print a logline)
+	while True:
+		line = process.stdout.readline()
+		if not line:
+			raise AssertionError("dp_service initialization failed")
+		print(line, end='')
+		if start_str in line:
+			break
+
+	def tear_down():
+		process.terminate()
+		# TODO see above
+		if os.path.exists(config_file_path + ".backup") :
+			os.rename(config_file_path + ".backup", config_file_path)
+	request.addfinalizer(tear_down)
+
+# Most tests require interfaces to be up and routing established
+@pytest.fixture(scope="package")
+def prepare_ifaces(prepare_env, tun_opt, grpc_client):
 	# TODO look into this when doing Geneve, is this the right way?
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
-
-	# TODO is this still needed?
-	#time.sleep(5)
-
 
 	print("---------- Init ----------")
 	subprocess.check_output(shlex.split(f"ip link set dev {vf0_tap} up"))
@@ -104,8 +99,10 @@ def add_machine(tun_opt, grpc_client): # TODO rename to 'add_machines'
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", f"Route ip {ov_target_pfx}")
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv6 2002::123 --length 128 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", "target ipv6 2002::123")
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 0.0.0.0 --length 0 --t_vni {vni} --t_ipv6 {ul_actual_dst}", "Route ip 0.0.0.0")
+	# TODO(plague): this is required as service obviously is still doing some initialization
+	# Discuss a logline to wait for
+	time.sleep(3)
 	print("--------------------------")
-
 
 	# TODO this needs explanation, or better yet fixing service startup
 	# (plague): my guess is that it takes some time to apply the GRPC command in service, the client is asynchronous
@@ -122,22 +119,14 @@ def add_machine(tun_opt, grpc_client): # TODO rename to 'add_machines'
 
 # Many tests require IPs already assigned on VFs
 # TODO is this called before arp test?
+=======
+# Some tests require IPv4 addresses assigned
+>>>>>>> ac9d2a5 (Reworked pytest fixtures)
 @pytest.fixture(scope="package")
-def request_ip_vf0(add_machine):
-	request_ip(vf0_tap)
-@pytest.fixture(scope="package")
-def request_ip_vf1(add_machine):
-	request_ip(vf1_tap)
-
-# TODO rework includes?
-
-# TODO remove capsys
-
-# TODO create helper to call sniffers
-# TODO scapy '/' endline
+def prepare_ipv4(prepare_ifaces):
+	request_ip(vf0_tap, vf0_mac, vf0_ip)
+	request_ip(vf1_tap, vf1_mac, vf1_ip)
 
 
 # TODO grpc client needs work - no return code and some command are missing outputs for testing
 # (don't forget to rewrite tests then!)
-
-# TODO move responders back into respective scripts

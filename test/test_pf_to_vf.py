@@ -10,7 +10,7 @@ def send_lb_pkt_to_pf():
 			  TCP(sport=1234, dport=80))
 	delayed_sendp(lb_pkt, pf0_tap)
 
-def test_pf_to_vf_lb_tcp(add_machine, grpc_client):
+def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 
 	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp",
 		ul_actual_src)
@@ -24,7 +24,7 @@ def test_pf_to_vf_lb_tcp(add_machine, grpc_client):
 
 	threading.Thread(target=send_lb_pkt_to_pf).start()
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=7)
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
 		"No packets received"
 

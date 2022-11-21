@@ -5,7 +5,7 @@ from helpers import *
 
 def send_icmp_pkt_from_vm1():
 
-	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=pf0_tap, timeout=10)
+	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=pf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
 		"No network-natted ICMP packet received on PF"
 
@@ -20,7 +20,7 @@ def send_icmp_pkt_from_vm1():
 				 ICMP(type=0, id=pkt[ICMP].id))
 	delayed_sendp(reply_pkt, pf0_tap)
 
-def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
+def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 
 	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
 		"Received underlay route")
@@ -32,7 +32,7 @@ def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 			    ICMP(type=8, id=0x0040))
 	delayed_sendp(icmp_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=3)
+	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
 		"No ECHO reply"
 
@@ -47,7 +47,7 @@ def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 
 def send_tcp_pkt_from_vm1():
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=10)
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
 		"No network-natted TCP packet received on PF"
 
@@ -63,7 +63,7 @@ def send_tcp_pkt_from_vm1():
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, pf0_tap)
 
-def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
+def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 
 	# TODO(plague) I suspect that there is an occasional problem here
 	# as this test is called immediately after the previous one, that established and then teared down the same route
@@ -78,7 +78,7 @@ def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 			   TCP(sport=1240))
 	delayed_sendp(tcp_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=10)
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
 		"No network-natted TCP packet received on PF"
 
@@ -93,7 +93,7 @@ def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 
 
 def encaped_tcp_in_ipv6_vip_responder(pf_name):
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=10)
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=2)
 	# with --port-redundancy, threre are two listeners running and only one receives a packet
 	if len(pkt_list) == 0:
 		return
@@ -104,7 +104,7 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name):
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, pf_name)
 
-def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client, port_redundancy):
+def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 
 	threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf0_tap,)).start()
 	if port_redundancy:
@@ -119,7 +119,7 @@ def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_cli
 			   TCP(sport=1240))
 	delayed_sendp(tcp_pkt, vf1_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf1_tap, timeout=5)
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf1_tap, timeout=2)
 	assert len(pkt_list) == 1, \
 		"No TCP reply via VIP (SNAT)"
 

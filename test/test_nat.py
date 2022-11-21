@@ -3,7 +3,7 @@ import threading
 from helpers import *
 
 
-def test_network_nat_external_icmp_echo(add_machine, request_ip_vf0, grpc_client):
+def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
 
 	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
 		"Received underlay route")
@@ -27,7 +27,7 @@ def send_bounce_pkt_to_pf():
 				 TCP(sport=8989, dport=510))
 	delayed_sendp(bouce_pkt, pf0_tap)
 
-def test_network_nat_pkt_relay(add_machine, grpc_client):
+def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 
 	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
 		"Received underlay route")
@@ -38,7 +38,7 @@ def test_network_nat_pkt_relay(add_machine, grpc_client):
 	threading.Thread(target=send_bounce_pkt_to_pf).start();
 
 	# it seems that pkt_list[0] is the injected packet
-	pkt_list = sniff(count=2, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=10)
+	pkt_list = sniff(count=2, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=5)
 	assert len(pkt_list) == 2, \
 		"No bounce packet received"
 

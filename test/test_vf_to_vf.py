@@ -4,14 +4,14 @@ from helpers import *
 
 
 def vf_to_vf_tcp_responder(vf_name):
-	pkt = sniff(count=1, lfilter=is_tcp_pkt, iface=vf_name, timeout=10)[0]
+	pkt = sniff(count=1, lfilter=is_tcp_pkt, iface=vf_name, timeout=2)[0]
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, vf_name)
 
 
-def test_vf_to_vf_tcp(add_machine, request_ip_vf0, request_ip_vf1):
+def test_vf_to_vf_tcp(prepare_ipv4):
 
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(vf1_tap,)).start()
 
@@ -25,7 +25,7 @@ def test_vf_to_vf_tcp(add_machine, request_ip_vf0, request_ip_vf1):
 		"No TCP reply"
 
 
-def test_vf_to_vf_vip_dnat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client):
+def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(vf1_tap,)).start()
 

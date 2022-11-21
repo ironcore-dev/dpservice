@@ -9,12 +9,21 @@ from scapy.contrib.geneve import GENEVE
 from config import *
 
 
-def request_ip(interface):
+def request_ip(interface, macaddr, ipaddr):
 	scapy.config.conf.checkIPaddr = False
-	answer = dhcp_request(iface=interface, timeout=5)
-	resp = str(answer[DHCP].options[0][1])
-	if resp != '2':
-		raise AssertionError('Invalid DHCP response')
+	answer = dhcp_request(iface=interface, timeout=3)
+	msg_type = answer[DHCP].options[0][1]
+	if msg_type != 2:
+		raise AssertionError(f"DHCP message is not DHCPOFFER (message type: {msg_type})")
+	pkt = (Ether(dst=answer[Ether].src) /
+		   IP(src=ipaddr, dst=answer[IP].src) /
+		   UDP(sport=68, dport=67) /
+		   BOOTP(chaddr=macaddr) /
+		   DHCP(options=[("message-type", "request"), "end"]))
+	answer = srp1(pkt, iface=interface)
+	assigned_ip = answer[BOOTP].yiaddr
+	if assigned_ip != ipaddr:
+		raise AssertionError(f"Wrong address assigned ({assigned_ip})")
 
 
 def is_icmp_pkt(pkt):

@@ -1,7 +1,7 @@
 from helpers import *
 
 
-def test_network_lb_external_icmp_echo(add_machine, request_ip_vf0, grpc_client):
+def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 
 	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp", ul_actual_src)
 

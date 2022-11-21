@@ -1,7 +1,7 @@
 from helpers import *
 
 
-def test_dhcpv6(add_machine):
+def test_dhcpv6(prepare_ifaces):
 
 	DUID = b"00020000ab11b7d4e0eed266171d"
 

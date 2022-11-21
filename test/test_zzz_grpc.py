@@ -1,27 +1,27 @@
 from helpers import *
 
 
-def test_grpc_addmachine_error_102(add_machine, grpc_client):
+def test_grpc_addmachine_error_102(prepare_ifaces, grpc_client):
 	# Try to add using an existing vm identifier
 	grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
 		"error 102")
 
-def test_grpc_getmachine_single(add_machine, grpc_client):
+def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
 	grpc_client.assert_output(f"--getmachine {vm2_name}",
 		vf1_ip)
 
-def test_grpc_addmachine_error_106(add_machine, grpc_client):
+def test_grpc_addmachine_error_106(prepare_ifaces, grpc_client):
 	# Try to add with new machine identifer but already given IPv4
 	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
 		"error 106")
 
-def test_grpc_delmachine_error_151(add_machine, grpc_client):
+def test_grpc_delmachine_error_151(prepare_ifaces, grpc_client):
 	# Try to delete with machine identifer which doesnt exist
 	grpc_client.assert_output(f"--delmachine {vm3_name}",
 		"error 151")
 
-def test_grpc_add_list_delmachine(add_machine, grpc_client):
+def test_grpc_add_list_delmachine(prepare_ifaces, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
 	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf2_ip} --ipv6 {vf2_ipv6}",
 		"net_tap4")
@@ -32,12 +32,12 @@ def test_grpc_add_list_delmachine(add_machine, grpc_client):
 	grpc_client.assert_output(f"--getmachines",
 		vm3_name, negate=True)
 
-def test_grpc_addroute_error_251(add_machine, grpc_client):
+def test_grpc_addroute_error_251(prepare_ifaces, grpc_client):
 	# Try to add a route which is already added
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {vni} --t_ipv6 2a10:afc0:e01f:f408::1",
 		"error 251")
 
-def test_grpc_list_delroutes(add_machine, grpc_client):
+def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 	# Try to list routes, delete one of them, list and add again
 	grpc_client.assert_output(f"--listroutes --vni {vni}",
 		ov_target_pfx)
@@ -48,7 +48,7 @@ def test_grpc_list_delroutes(add_machine, grpc_client):
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {vni} --t_ipv6 2a10:afc0:e01f:f408::1",
 		ov_target_pfx)
 
-def test_grpc_add_list_delVIP(add_machine, grpc_client):
+def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
 		ul_actual_src)
@@ -65,7 +65,7 @@ def test_grpc_add_list_delVIP(add_machine, grpc_client):
 	grpc_client.assert_output(f"--getvip {vm2_name}",
 		virtual_ip, negate=True)
 
-def test_grpc_add_list_delLBVIP(add_machine, grpc_client):
+def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 	# Try to add LB VIP, list, test error cases, delete vip and list again
 	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp",
 		ul_actual_src)
@@ -92,7 +92,7 @@ def test_grpc_add_list_delLBVIP(add_machine, grpc_client):
 	grpc_client.assert_output(f"--getlb {mylb}",
 		ul_actual_src, negate=True)
 
-def test_grpc_add_list_delPfx(add_machine, grpc_client):
+def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	grpc_client.assert_output(f"--addpfx {vm2_name} --ipv4 {pfx_ip} --length 24",
 		ul_actual_src)
@@ -111,7 +111,7 @@ def test_grpc_add_list_delPfx(add_machine, grpc_client):
 	grpc_client.assert_output(f"--listpfx {vm2_name}",
 		pfx_ip, negate=True)
 
-def test_grpc_add_list_delLoadBalancerTargets(add_machine, grpc_client):
+def test_grpc_add_list_delLoadBalancerTargets(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	grpc_client.assert_output(f"--addlbpfx {vm2_name} --ipv4 {pfx_ip} --length 32",
 		ul_short_src)
@@ -128,7 +128,7 @@ def test_grpc_add_list_delLoadBalancerTargets(add_machine, grpc_client):
 		pfx_ip, negate=True)
 
 
-def test_grpc_add_list_del_routes_big_reply(add_machine, grpc_client):
+def test_grpc_add_list_del_routes_big_reply(prepare_ifaces, grpc_client):
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
 		ov_target_pfx = f"192.168.{subnet}.0"
 		grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 32 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}",

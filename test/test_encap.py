@@ -7,7 +7,7 @@ from helpers import *
 
 
 def geneve4_in_ipv6_icmp_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_geneve_encaped_icmp_pkt, iface=pf_name, timeout=10)[0]
+	pkt = sniff(count=1, lfilter=is_geneve_encaped_icmp_pkt, iface=pf_name, timeout=2)[0]
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=17) /
 				 UDP(sport=6081, dport=6081) /
@@ -17,14 +17,14 @@ def geneve4_in_ipv6_icmp_responder(pf_name):
 	delayed_sendp(reply_pkt, pf_name)
 
 def ipv4_in_ipv6_icmp_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_encaped_icmp_pkt, iface=pf_name, timeout=10)[0]
+	pkt = sniff(count=1, lfilter=is_encaped_icmp_pkt, iface=pf_name, timeout=2)[0]
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0))
 	delayed_sendp(reply_pkt, pf_name)
 
-def test_ipv4_in_ipv6(add_machine, request_ip_vf0, tun_opt, port_redundancy):
+def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy):
 
 	responder = geneve4_in_ipv6_icmp_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_icmp_responder
 	threading.Thread(target=responder, args=(pf0_tap,)).start()
@@ -51,7 +51,7 @@ def test_ipv4_in_ipv6(add_machine, request_ip_vf0, tun_opt, port_redundancy):
 
 
 def geneve6_in_ipv6_icmp6_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_geneve_encaped_icmpv6_pkt, iface=pf_name, timeout=10)[0]
+	pkt = sniff(count=1, lfilter=is_geneve_encaped_icmpv6_pkt, iface=pf_name, timeout=2)[0]
 	reply_pkt = (Ether(dst= pkt.getlayer(Ether).src, src= pkt.getlayer(Ether).dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt.getlayer(IPv6,1).dst, nh=17) /
 				 UDP(sport=6081, dport=6081) /
@@ -61,14 +61,14 @@ def geneve6_in_ipv6_icmp6_responder(pf_name):
 	delayed_sendp(reply_pkt, pf_name)
 
 def ipv6_in_ipv6_icmp6_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_encaped_icmpv6_pkt, iface=pf_name, timeout=10)[0]
+	pkt = sniff(count=1, lfilter=is_encaped_icmpv6_pkt, iface=pf_name, timeout=2)[0]
 	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt.getlayer(IPv6,1).dst, nh=0x29) /
 				 IPv6(dst=pkt.getlayer(IPv6,2).src, src=pkt.getlayer(IPv6,2).dst, nh=58) /
 				 ICMPv6EchoReply(type=129))
 	delayed_sendp(reply_pkt, pf_name)
 
-def test_ipv6_in_ipv6(add_machine, tun_opt, port_redundancy):
+def test_ipv6_in_ipv6(prepare_ifaces, tun_opt, port_redundancy):
 
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported for ipv6 in ipv6")
