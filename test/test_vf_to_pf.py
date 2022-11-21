@@ -18,7 +18,7 @@ def send_icmp_pkt_from_vm1():
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0, id=pkt[ICMP].id))
-	sendp(reply_pkt, iface=pf0_tap)
+	delayed_sendp(reply_pkt, pf0_tap)
 
 def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 
@@ -27,12 +27,10 @@ def test_vf_to_pf_network_nat_icmp(add_machine, request_ip_vf0, grpc_client):
 
 	threading.Thread(target=send_icmp_pkt_from_vm1).start()
 
-	time.sleep(1)
-
 	icmp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 			    IP(dst=public_ip, src=vf0_ip) /
 			    ICMP(type=8, id=0x0040))
-	sendp(icmp_pkt, iface = vf0_tap)
+	delayed_sendp(icmp_pkt, vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=3)
 	assert len(pkt_list) == 1, \
@@ -63,8 +61,7 @@ def send_tcp_pkt_from_vm1():
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
-	time.sleep(1)
-	sendp(reply_pkt, iface=pf0_tap)
+	delayed_sendp(reply_pkt, pf0_tap)
 
 def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 
@@ -76,12 +73,10 @@ def test_vf_to_pf_network_nat_tcp(add_machine, request_ip_vf0, grpc_client):
 
 	threading.Thread(target=send_tcp_pkt_from_vm1).start()
 
-	time.sleep(2)
-
 	tcp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 			   IP(dst=public_ip, src=vf0_ip) /
 			   TCP(sport=1240))
-	sendp(tcp_pkt, iface=vf0_tap)
+	delayed_sendp(tcp_pkt, vf0_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=10)
 	assert len(pkt_list) == 1, \
@@ -107,8 +102,7 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name):
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
-	time.sleep(1)
-	sendp(reply_pkt, iface=pf_name)
+	delayed_sendp(reply_pkt, pf_name)
 
 def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_client, port_redundancy):
 
@@ -119,13 +113,11 @@ def test_vf_to_pf_vip_snat(add_machine, request_ip_vf0, request_ip_vf1, grpc_cli
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
 		f"Received underlay route : {ul_actual_src}")
 
-	time.sleep(1)
-
 	# vm2 (vf1) -> PF0/PF1 (internet traffic), vm2 has VIP, check on PFs side, whether VIP is source (SNAT)
 	tcp_pkt = (Ether(dst=pf0_mac, src=vf1_mac, type=0x0800) /
 			   IP(dst=public_ip, src=vf1_ip) /
 			   TCP(sport=1240))
-	sendp(tcp_pkt, iface=vf1_tap)
+	delayed_sendp(tcp_pkt, vf1_tap)
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf1_tap, timeout=5)
 	assert len(pkt_list) == 1, \

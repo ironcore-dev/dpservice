@@ -25,8 +25,7 @@ def send_bounce_pkt_to_pf():
 				 IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4) /
 				 IP(dst=nat_vip, src=public_ip) /
 				 TCP(sport=8989, dport=510))
-	time.sleep(3)
-	sendp(bouce_pkt, iface=pf0_tap)
+	delayed_sendp(bouce_pkt, pf0_tap)
 
 def test_network_nat_pkt_relay(add_machine, grpc_client):
 

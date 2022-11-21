@@ -40,3 +40,8 @@ def is_encaped_icmp_pkt(pkt):
 
 def is_geneve_encaped_icmp_pkt(pkt):
 	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 17 and ICMP in pkt
+
+# Just wait a bit for the other thread (sniffer/responder) to start listening
+def delayed_sendp(packet, interface):
+	time.sleep(0.1)
+	sendp(packet, iface=interface)
