@@ -8,7 +8,9 @@ pytest_dir = join_paths(meson.source_root(), 'test')
 
 redundancy_tests = [ join_paths(pytest_dir, 'test_encap.py') ]
 
-tunnels = [ 'ipip', 'geneve' ]
+# Geneve currently not supported
+#tunnels = [ 'ipip', 'geneve' ]
+tunnels = [ 'ipip' ]
 foreach tunnel : tunnels
   test('Base tests', pytest, suite: tunnel, is_parallel: false, timeout: 60,
     args: [ common_args, '--tun-opt='+tunnel, pytest_dir ])
