@@ -32,11 +32,9 @@ def tun_opt(request):
 def port_redundancy(request):
 	return request.config.getoption("--port-redundancy")
 
-
 @pytest.fixture(scope="package")
 def grpc_client(build_path):
 	return GrpcClient(build_path)
-
 
 # All tests require dp_service to be running
 @pytest.fixture(scope="package")
@@ -61,17 +59,11 @@ def prepare_env(request, build_path, tun_opt, port_redundancy):
 	if port_redundancy:
 		dp_service_cmd += ' --wcmp-frac=0.5'
 
-	process = subprocess.Popen(shlex.split(dp_service_cmd),
-								stdout=subprocess.PIPE,
-								universal_newlines=True)
-	# Wait for service to initialize itself (will print a logline)
-	while True:
-		line = process.stdout.readline()
-		if not line:
-			raise AssertionError("dp_service initialization failed")
-		print(line, end='')
-		if start_str in line:
-			break
+	if GrpcClient.port_open():
+		raise AssertionError("Another service already running")
+
+	process = subprocess.Popen(shlex.split(dp_service_cmd))
+	GrpcClient.wait_for_port()
 
 	def tear_down():
 		process.terminate()

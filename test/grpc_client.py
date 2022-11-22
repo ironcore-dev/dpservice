@@ -1,5 +1,7 @@
 import shlex
+import socket
 import subprocess
+import time
 
 
 class GrpcClient:
@@ -18,3 +20,21 @@ class GrpcClient:
 			assert req_output in output, "Required GRPC output missing"
 
 		return output
+
+	@staticmethod
+	def port_open():
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			try:
+				s.connect(("localhost", 1337))  # TODO add to arguments once dp_service supports one too
+				s.close()
+				return True
+			except ConnectionRefusedError:
+				return False
+
+	@staticmethod
+	def wait_for_port():
+		for i in range(50):
+			if GrpcClient.port_open():
+				return
+			time.sleep(0.1)
+		raise TimeoutError("Waiting for GRPC port timed out")
