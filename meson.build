@@ -15,7 +15,6 @@ grpc_cpp = find_program('grpc_cpp_plugin')
 if get_option('enable_tests')
   pytest = find_program('pytest')
   scapy = find_program('scapy')
-  sh = find_program('sh')
 endif
 if get_option('enable_usermode')
   sudo = find_program('sudo')

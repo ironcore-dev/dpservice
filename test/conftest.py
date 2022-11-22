@@ -126,7 +126,3 @@ def prepare_ifaces(prepare_env, tun_opt, grpc_client):
 def prepare_ipv4(prepare_ifaces):
 	request_ip(vf0_tap, vf0_mac, vf0_ip)
 	request_ip(vf1_tap, vf1_mac, vf1_ip)
-
-
-# TODO grpc client needs work - no return code and some command are missing outputs for testing
-# (don't forget to rewrite tests then!)
