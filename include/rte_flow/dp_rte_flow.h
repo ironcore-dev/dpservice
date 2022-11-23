@@ -83,7 +83,9 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv4 *ipv4_spec,
 							  struct rte_flow_item_ipv4 *ipv4_mask,
-							  struct dp_flow *df, bool dir);
+							  uint32_t *src, size_t nr_src_mask_len,
+ 							  uint32_t *dst, size_t nr_dst_mask_len,
+ 							  uint8_t proto);
 
 int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_udp *udp_spec,

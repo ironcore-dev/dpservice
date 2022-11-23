@@ -81,10 +81,15 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_ipv4_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 													&ol_ipv4_spec, &ol_ipv4_mask,
-													df, DP_IS_DST);
+													NULL, 0,
+													&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
+ 													df->l4_type);
+
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												df, DP_IS_DST);
+												NULL, 0,
+												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
+ 												df->l4_type);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -187,11 +192,21 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
 	}
 
+
+	// replace source ip if vip-nat is enabled
+	struct rte_flow_action_set_ipv4 set_ipv4;
+	
+	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+		action_cnt = create_ipv4_set_action(action, action_cnt,
+										    &set_ipv4, df->src.src_addr, DP_IS_SRC);
+
+
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
 
 	action_cnt = create_raw_decap_action(action, action_cnt,
 										 &raw_decap, NULL, sizeof(struct rte_ether_hdr));
+
 
 	// create flow action -- raw encap
 	uint8_t ipip_encap_hdr[DP_TUNN_IPIP_ENCAP_SIZE];
@@ -286,7 +301,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action, df);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		printf("failed to install encap rule on pf\n");
+		printf("failed to install encap rule on pf %d\n", t_port_id);
 		return 0;
 	}
 
@@ -380,6 +395,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
+	uint32_t actual_ol_ipv4_addr;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
@@ -394,13 +410,23 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 													df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 													df->l4_type);
 	} else {
+		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
+		if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+			actual_ol_ipv4_addr = df->nat_addr;
+		else
+			actual_ol_ipv4_addr = df->dst.dst_addr;
+
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												df, DP_IS_DST);
+												NULL, 0,
+												&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
+												df->l4_type);
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_ipv4_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 													&ol_ipv4_spec, &ol_ipv4_mask,
-													df, DP_IS_DST);
+													NULL, 0,
+													&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
+													df->l4_type);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -462,6 +488,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	if (cross_pf_port)
 		hairpin_pattern_cnt = insert_end_match_pattern(hairpin_pattern, hairpin_pattern_cnt);
 
+
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
 
@@ -478,6 +505,13 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 	action_cnt = create_raw_encap_action(action, action_cnt,
 										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
+
+			// replace source ip if vip-nat is enabled
+	struct rte_flow_action_set_ipv4 set_ipv4;
+	
+	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+		action_cnt = create_ipv4_set_action(action, action_cnt,
+										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
 
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
@@ -530,6 +564,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 		if (!flow) {
 			free_allocated_agectx(agectx);
+			printf("failed to install normal decap flow rule on pf\n");
 			return 0;
 		}
 		// config the content of agectx
@@ -600,6 +635,8 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
+	uint32_t actual_ol_ipv4_src_addr = 0;
+	uint32_t actual_ol_ipv4_dst_addr = 0;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
@@ -608,9 +645,22 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 												df->l4_type);
 	} else {
+
+		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
+		if (df->flags.nat == DP_NAT_CHG_DST_IP)
+			actual_ol_ipv4_dst_addr = df->nat_addr;
+		else
+			actual_ol_ipv4_dst_addr = df->dst.dst_addr;
+
+		// if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+		actual_ol_ipv4_src_addr = df->src.src_addr;
+
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												df, DP_IS_DST);
+												// NULL, 0,
+												&actual_ol_ipv4_src_addr, sizeof(actual_ol_ipv4_src_addr),
+												&actual_ol_ipv4_dst_addr, sizeof(actual_ol_ipv4_dst_addr),
+												df->l4_type);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -665,15 +715,16 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	action_cnt = create_src_mac_set_action(action, action_cnt,
 										   &set_src_mac, dp_get_mac(df->nxt_hop));
 
+	// create flow action -- replace ipv4 address in overlay if vip nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
-
 	if (df->flags.nat == DP_NAT_CHG_DST_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
-
+	
+	// there should be more strict condition to only apply to VIP nat pkt
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->src.src_addr, DP_IS_SRC);
+										    &set_ipv4, df->nat_addr, DP_IS_SRC);
 
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);

@@ -13,7 +13,7 @@ extern "C"
 #include "nodes/ipv6_nd_node.h"
 
 #define DP_TUNN_OPS_OFFLOAD_MAX_PATTERN 7
-#define DP_TUNN_OPS_OFFLOAD_MAX_ACTION 7
+#define DP_TUNN_OPS_OFFLOAD_MAX_ACTION 8
 
 #define DP_TUNN_IPIP_ENCAP_SIZE sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv6_hdr)
 #define DP_TUNN_GENEVE_ENCAP_SIZE sizeof(struct rte_ether_hdr) + \
