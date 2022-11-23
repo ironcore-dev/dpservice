@@ -20,6 +20,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--port-redundancy", action="store_true", help="Test with port redundancy"
 	)
+	parser.addoption(
+		"--attach", action="store_true", help="Attach to a currently running service (for debugging)"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -40,6 +43,11 @@ def grpc_client(build_path):
 # All tests require dp_service to be running
 @pytest.fixture(scope="package")
 def prepare_env(request, build_path, tun_opt, port_redundancy):
+
+	if request.config.getoption("--attach"):
+		print("Attaching to an already running service")
+		GrpcClient.wait_for_port()
+		return
 
 	# TODO this should be done via some option in dp_service, reading a hardcoded path is not the way
 	if os.path.exists(config_file_path):
