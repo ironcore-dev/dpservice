@@ -6,6 +6,7 @@ import time
 
 from config import *
 from helpers import request_ip
+from helpers import interface_up
 from grpc_client import GrpcClient
 
 
@@ -62,8 +63,11 @@ def prepare_env(request, build_path, tun_opt, port_redundancy):
 	if GrpcClient.port_open():
 		raise AssertionError("Another service already running")
 
+	print("------ Service init ------")
+	print(dp_service_cmd)
 	process = subprocess.Popen(shlex.split(dp_service_cmd))
 	GrpcClient.wait_for_port()
+	print("--------------------------")
 
 	def tear_down():
 		process.terminate()
@@ -74,17 +78,19 @@ def prepare_env(request, build_path, tun_opt, port_redundancy):
 
 # Most tests require interfaces to be up and routing established
 @pytest.fixture(scope="package")
-def prepare_ifaces(prepare_env, tun_opt, grpc_client):
+def prepare_ifaces(prepare_env, tun_opt, port_redundancy, grpc_client):
 	# TODO look into this when doing Geneve, is this the right way?
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
 
-	print("---------- Init ----------")
-	subprocess.check_output(shlex.split(f"ip link set dev {vf0_tap} up"))
-	subprocess.check_output(shlex.split(f"ip link set dev {vf1_tap} up"))
-	subprocess.check_output(shlex.split(f"ip link set dev {vf2_tap} up"))
-	subprocess.check_output(shlex.split(f"ip link set dev {pf0_tap} up"))
+	print("---- Interfaces init -----")
+	interface_up(vf0_tap)
+	interface_up(vf1_tap)
+	interface_up(vf2_tap)
+	interface_up(pf0_tap)
+	if port_redundancy:
+		interface_up(pf1_tap)
 	grpc_client.assert_output("--init", "Init called")
 	grpc_client.assert_output(f"--addmachine {vm1_name} --vni {vni} --ipv4 {vf0_ip} --ipv6 {vf0_ipv6}", "Allocated VF for you")
 	grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}", "Allocated VF for you")
@@ -92,7 +98,7 @@ def prepare_ifaces(prepare_env, tun_opt, grpc_client):
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv6 2002::123 --length 128 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", "target ipv6 2002::123")
 	grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 0.0.0.0 --length 0 --t_vni {vni} --t_ipv6 {ul_actual_dst}", "Route ip 0.0.0.0")
 	# TODO(plague): this is required as service obviously is still doing some initialization
-	# Discuss a logline to wait for
+	# Discuss a logline to wait for (would need to rework service outptu handling) or waiting with GRPC thread for this to finish
 	time.sleep(3)
 	print("--------------------------")
 
@@ -116,5 +122,7 @@ def prepare_ifaces(prepare_env, tun_opt, grpc_client):
 >>>>>>> ac9d2a5 (Reworked pytest fixtures)
 @pytest.fixture(scope="package")
 def prepare_ipv4(prepare_ifaces):
+	print("-------- IPs init --------")
 	request_ip(vf0_tap, vf0_mac, vf0_ip)
 	request_ip(vf1_tap, vf1_mac, vf1_ip)
+	print("--------------------------")

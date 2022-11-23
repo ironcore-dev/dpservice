@@ -44,7 +44,6 @@ def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy):
 						 IP(dst="192.168.129.6", src="172.32.10.5") /
 						 ICMP(type=8))
 		delayed_sendp(icmp_echo_pkt, vf0_tap)
-		subprocess.check_output(shlex.split("ip link set dev "+pf1_tap+" up"))
 		pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
 		assert len(pkt_list) == 1, \
 			"No ECHO reply on second PF"
