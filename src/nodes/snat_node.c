@@ -132,9 +132,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst);
 		df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
-		df_ptr->nat_addr = ipv4_hdr->src_addr;
+		// df_ptr->nat_addr = ipv4_hdr->src_addr;
 		// df_ptr->src.src_addr = df_ptr->src.src_addr;
-		// df_ptr->src.src_addr = ipv4_hdr->src_addr;
+		df_ptr->src.src_addr = ipv4_hdr->src_addr;
 		// df_ptr->nat_addr = df_ptr->src.src_addr;
 		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 	}

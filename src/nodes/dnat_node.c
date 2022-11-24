@@ -78,6 +78,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 			ipv4_hdr->dst_addr = htonl(dnat_ip);
 
 			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
+			// df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
+			// df_ptr->nat_addr = ipv4_hdr->dst_addr;
 			df_ptr->nat_addr = df_ptr->dst.dst_addr;
 			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 			dp_nat_chg_ip(df_ptr, ipv4_hdr, m);

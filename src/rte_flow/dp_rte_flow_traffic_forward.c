@@ -64,6 +64,8 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
 
+
+
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_ipv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
@@ -196,7 +198,8 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	// replace source ip if vip-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
 	
-	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+	// if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->src.src_addr, DP_IS_SRC);
 
@@ -411,7 +414,8 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 													df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
-		if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+		// if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+		if (df->flags.nat == DP_NAT_CHG_DST_IP)
 			actual_ol_ipv4_addr = df->nat_addr;
 		else
 			actual_ol_ipv4_addr = df->dst.dst_addr;
@@ -506,10 +510,12 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	action_cnt = create_raw_encap_action(action, action_cnt,
 										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
 
-			// replace source ip if vip-nat is enabled
+	// replace dst ip if vip-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
 	
-	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+	// if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+	// uint32_t ol_new_dst_ip;
+	if (df->flags.nat == DP_NAT_CHG_DST_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
 
