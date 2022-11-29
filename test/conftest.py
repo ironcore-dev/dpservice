@@ -79,6 +79,11 @@ def prepare_env(request, build_path, tun_opt, port_redundancy):
 
 	def tear_down():
 		process.terminate()
+		try:
+			process.wait(5)
+		except subprocess.TimeoutExpired:
+			process.kill()
+			process.wait()
 		# TODO see above
 		if os.path.exists(config_file_path + ".backup") :
 			os.rename(config_file_path + ".backup", config_file_path)
