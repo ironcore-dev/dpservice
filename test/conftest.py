@@ -110,24 +110,7 @@ def prepare_ifaces(prepare_env, tun_opt, port_redundancy, grpc_client):
 	time.sleep(3)
 	print("--------------------------")
 
-	# TODO this needs explanation, or better yet fixing service startup
-	# (plague): my guess is that it takes some time to apply the GRPC command in service, the client is asynchronous
-	# so maybe do a --list* loop here!
-	time.sleep(2)
-
-	# TODO add timeout=2 to all sniff calls missign it (3 cases I think)
-	# TODO all the prints are wrong, either print context too or stay quiet?
-	# (actually not needed, when run via scapy it is verbose enough and colored)
-	# TODO assert is a keyword, not a function
-	# TODO sleeps in test, so at least comment them if not doable?
-	# TODO multiprocessing or threading?
-	# TODO AssertionError instead of assert
-
-# Many tests require IPs already assigned on VFs
-# TODO is this called before arp test?
-=======
 # Some tests require IPv4 addresses assigned
->>>>>>> ac9d2a5 (Reworked pytest fixtures)
 @pytest.fixture(scope="package")
 def prepare_ipv4(prepare_ifaces):
 	print("-------- IPs init --------")

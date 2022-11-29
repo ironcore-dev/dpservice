@@ -3,7 +3,7 @@ import threading
 from helpers import *
 
 
-def send_icmp_pkt_from_vm1():
+def reply_icmp_pkt_from_vm1():
 
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=pf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
@@ -25,7 +25,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
 		"Received underlay route")
 
-	threading.Thread(target=send_icmp_pkt_from_vm1).start()
+	threading.Thread(target=reply_icmp_pkt_from_vm1).start()
 
 	icmp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 			    IP(dst=public_ip, src=vf0_ip) /
@@ -45,7 +45,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 		"NAT deleted")
 
 
-def send_tcp_pkt_from_vm1():
+def reply_tcp_pkt_from_vm1():
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
@@ -71,7 +71,7 @@ def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
 		"Received underlay route")
 
-	threading.Thread(target=send_tcp_pkt_from_vm1).start()
+	threading.Thread(target=reply_tcp_pkt_from_vm1).start()
 
 	tcp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 			   IP(dst=public_ip, src=vf0_ip) /
@@ -92,9 +92,10 @@ def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 		"NAT deleted")
 
 
+# TODO: this can be done better with sniff(iface=[iface1, iface2], but ther is a regression in scany 2.4.5 that broke this
 def encaped_tcp_in_ipv6_vip_responder(pf_name):
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=2)
-	# with --port-redundancy, threre are two listeners running and only one receives a packet
+	# with --port-redundancy, there are two listeners running and only one receives a packet
 	if len(pkt_list) == 0:
 		return
 	pkt = pkt_list[0]
@@ -125,3 +126,53 @@ def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 
 	grpc_client.assert_output(f"--delvip {vm2_name}",
 		"VIP deleted")
+
+
+# TODO: this can be done better with sniff(iface=[iface1, iface2], but ther is a regression in scany 2.4.5 that broke this
+def reply_with_icmp_err_fragment_needed(pf_name):
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=2)
+	# with --port-redundancy, there are two listeners running and only one receives a packet
+	if len(pkt_list) == 0:
+		return
+	pkt = pkt_list[0]
+	orig_ip_pkt = pkt[IP]
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=orig_ip_pkt.src, src=orig_ip_pkt.dst) /
+				 ICMP(type=3, code=4, unused=1280) /
+				 orig_ip_pkt)
+	# https://blog.cloudflare.com/path-mtu-discovery-in-practice/
+	"""
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=orig_ip_pkt.src, src=orig_ip_pkt.dst) /
+				 ICMP(type=3, code=4, unused=1280) /
+				 str(orig_ip_pkt)[:28])
+	"""
+	delayed_sendp(reply_pkt, pf_name)
+
+def test_vm_nat_async_tcp_icmperr(prepare_ifaces, grpc_client, port_redundancy):
+
+	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
+		"Received underlay route")
+
+	threading.Thread(target=reply_with_icmp_err_fragment_needed, args=(pf0_tap,)).start();
+	if (port_redundancy):
+		threading.Thread(target=reply_with_icmp_err_fragment_needed, args=(pf1_tap,)).start();
+
+	tcp_pkt = (Ether(dst=mc_mac, src=vf0_mac, type=0x0800) /
+			   IP(dst=public_ip, src=vf0_ip) /
+			   TCP(sport=1256, dport=500))
+	delayed_sendp(tcp_pkt, vf0_tap)
+
+	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=5)
+	assert len(pkt_list) == 1, \
+		"Cannot receive asymmetric icmp pkt on pf"
+
+	pkt = pkt_list[0]
+	icmp_type = pkt[ICMP].type
+	assert icmp_type == 3, \
+		f"Received wrong icmp packet type: {icmp_type}"
+
+	grpc_client.assert_output(f"--delnat {vm1_name}",
+		"NAT deleted")
