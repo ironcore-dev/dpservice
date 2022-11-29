@@ -1,2 +1,0 @@
-#!/bin/bash
-pytest -v --build_path=$1 --tun_opt=$2 ../test/ -s

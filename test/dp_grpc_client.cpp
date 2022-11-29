@@ -467,8 +467,8 @@ public:
 				request.set_devicename(vm_pci_str);
 			stub_->createInterface(&context, request, &response);
 			if (!response.response().status().error()) {
-				printf("Allocated VF for you %s \n", response.vf().name().c_str());
-				printf("Received underlay route : %s \n", response.response().underlayroute().c_str());
+				printf("Allocated VF for you %s\n", response.vf().name().c_str());
+				printf("Received underlay route : %s\n", response.response().underlayroute().c_str());
 			} else {
 				printf("Received an error %d\n", response.response().status().error());
 			}
@@ -498,9 +498,10 @@ public:
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->addRoute(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("Route added\n");
 	}
 
 	void DelRoute() {
@@ -527,9 +528,10 @@ public:
 			request.set_allocated_route(route);
 			request.set_allocated_vni(vni_msg);
 			stub_->deleteRoute(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("Route deleted\n");
 	}
 
 	void ListRoutes() {
@@ -541,8 +543,7 @@ public:
 			request.set_vni(vni);
 
 			stub_->listRoutes(&context, request, &reply);
-			for (i = 0; i < reply.routes_size(); i++)
-			{
+			for (i = 0; i < reply.routes_size(); i++) {
 				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
 					reply.routes(i).prefix().address().c_str(),
 					reply.routes(i).prefix().prefixlength(),
@@ -563,11 +564,10 @@ public:
 			back_ip->set_address(t_ip6_str);
 			request.set_allocated_targetip(back_ip);
 			stub_->addLoadBalancerTarget(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			} else {
-				printf("LB target added \n");
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("LB VIP added\n");
 	}
 
 	void DelLBVIP() {
@@ -581,9 +581,10 @@ public:
 			back_ip->set_address(t_ip6_str);
 			request.set_allocated_targetip(back_ip);
 			stub_->deleteLoadBalancerTarget(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("LB VIP deleted\n");
 	}
 
 	void ListBackIPs() {
@@ -596,10 +597,7 @@ public:
 
 			stub_->getLoadBalancerTargets(&context, request, &reply);
 			for (i = 0; i < reply.targetips_size(); i++)
-			{
-				printf("Backend ip %s \n",
-					reply.targetips(i).address().c_str());
-			}
+				printf("Backend ip %s\n", reply.targetips(i).address().c_str());
 	}
 
 	void AddVIP() {
@@ -614,11 +612,10 @@ public:
 				vip_ip->set_address(ip_str);
 			request.set_allocated_interfacevipip(vip_ip);
 			stub_->addInterfaceVIP(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
-			} else {
-				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
-			}
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+			else
+				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
 	void AddPfx() {
@@ -636,11 +633,10 @@ public:
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->addInterfacePrefix(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
-			} else {
-				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
-			}
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+			else
+				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
 	void AddLBPfx() {
@@ -658,11 +654,10 @@ public:
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->createInterfaceLoadBalancerPrefix(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
-			} else {
-				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
-			}
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+			else
+				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
 	void CreateLB() {
@@ -709,11 +704,10 @@ public:
 			}
 
 			stub_->createLoadBalancer(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
-			} else {
-				printf("Received underlay route : %s \n", reply.underlayroute().c_str());
-			}
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+			else
+				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
 	void GetLB() {
@@ -726,7 +720,7 @@ public:
 
 			stub_->getLoadBalancer(&context, request, &reply);
 			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
+				printf("Received an error %d\n", reply.status().error());
 			} else {
 				printf("Received LB with vni: %d UL: %s LB ip: %s with ports: ", reply.vni(),
 					   reply.underlayroute().c_str(), reply.lbvipip().address().c_str());
@@ -748,11 +742,10 @@ public:
 			request.set_loadbalancerid(lb_id_str);
 
 			stub_->deleteLoadBalancer(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			} else {
-				printf("Delete LB Success\n");
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("LB deleted\n");
 	}
 
 	void Initialized() {
@@ -769,7 +762,7 @@ public:
 			/* So do not exit with error in that case */
 			if ((reply.uuid().c_str()[0] == '\0') && (ret.error_code() != grpc::StatusCode::ABORTED))
 				exit(1);
-			printf("Received UUID %s \n", reply.uuid().c_str());
+			printf("Received UUID %s\n", reply.uuid().c_str());
 	}
 
 	void Init() {
@@ -798,9 +791,10 @@ public:
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->deleteInterfacePrefix(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("Prefix deleted\n");
 	}
 
 	void ListPfx() {
@@ -812,7 +806,7 @@ public:
 			request.set_interfaceid(machine_str);
 			stub_->listInterfacePrefixes(&context, request, &reply);
 			for (i = 0; i < reply.prefixes_size(); i++) {
-				printf("Route prefix %s len %d \n",
+				printf("Route prefix %s len %d\n",
 					reply.prefixes(i).address().c_str(),
 					reply.prefixes(i).prefixlength());
 			}
@@ -833,9 +827,10 @@ public:
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->deleteInterfaceLoadBalancerPrefix(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("LB prefix deleted\n");
 	}
 
 	void ListLBPfx() {
@@ -861,9 +856,10 @@ public:
 
 			request.set_interfaceid(machine_str);
 			stub_->deleteInterfaceVIP(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("VIP deleted\n");
 	}
 
 	void GetVIP() {
@@ -873,11 +869,10 @@ public:
 
 			request.set_interfaceid(machine_str);
 			stub_->getInterfaceVIP(&context, request, &reply);
-			if (!reply.status().error())
-				printf("Received VIP %s \n", reply.address().c_str());
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
-				printf("Error detected with code %d\n", reply.status().error());
-
+				printf("Received VIP %s\n", reply.address().c_str());
 	}
 
 	void DelInterface() {
@@ -887,9 +882,10 @@ public:
 
 			request.set_interfaceid(machine_str);
 			stub_->deleteInterface(&context, request, &reply);
-			if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-			}
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("Interface deleted\n");
 	}
 
 	void GetInterface() {
@@ -900,7 +896,7 @@ public:
 			request.set_interfaceid(machine_str);
 			stub_->getInterface(&context, request, &reply);
 			if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
+				printf("Received an error %d\n", reply.status().error());
 			} else {
 				printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
 				reply.interface().primaryipv4address().c_str(),
@@ -918,8 +914,7 @@ public:
 			int i;
 
 			stub_->listInterfaces(&context, request, &reply);
-			for (i = 0; i < reply.interfaces_size(); i++)
-			{
+			for (i = 0; i < reply.interfaces_size(); i++) {
 				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).interfaceid().c_str(),
 					reply.interfaces(i).primaryipv4address().c_str(),
 					reply.interfaces(i).primaryipv6address().c_str(),
@@ -943,11 +938,10 @@ public:
 		request.set_minport(min_port);
 		request.set_maxport(max_port);
 		stub_->addNAT(&context, request, &reply);
-		if (reply.status().error()) {
-			printf("Received an error %d \n", reply.status().error());
-		} else {
-			printf("Received underlay route : %s \n", reply.underlayroute().c_str());
-		}
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
+			printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
 	void DelNAT() {
@@ -957,11 +951,10 @@ public:
 
 		request.set_interfaceid(machine_str);
 		stub_->deleteNAT(&context, request, &reply);
-		if (reply.error()) {
-				printf("Received an error %d \n", reply.error());
-		} else {
-				printf("deleted a nat info with code %d \n",reply.error());
-		}
+		if (reply.error())
+			printf("Received an error %d\n", reply.error());
+		else
+			printf("NAT deleted\n");
 	}
 
 	void GetNAT() {
@@ -971,12 +964,11 @@ public:
 
 		request.set_interfaceid(machine_str);
 		stub_->getNAT(&context, request, &reply);
-		if (reply.status().error()) {
-				printf("Received an error %d \n", reply.status().error());
-		} else {
-				printf("Received NAT IP %s with min port: %d and max port: %d\n",
-					   reply.natvipip().address().c_str(), reply.minport(), reply.maxport());
-		}
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
+			printf("Received NAT IP %s with min port: %d and max port: %d\n",
+					reply.natvipip().address().c_str(), reply.minport(), reply.maxport());
 	}
 
 	void AddNeighNAT() {
@@ -999,11 +991,10 @@ public:
 		request.set_underlayroute(t_ip6_str);
 
 		stub_->addNeighborNAT(&context, request, &reply);
-		if (reply.error()) {
-			printf("Received an error %d \n", reply.error());
-		}else{
-			printf("called addneighnat with code %d\n",reply.error());
-		}
+		if (reply.error())
+			printf("Received an error %d\n", reply.error());
+		else
+			printf("Neighbor NAT added\n");
 	}
 
 	void GetNATInfo() {
@@ -1027,14 +1018,14 @@ public:
 		else if (!strcmp(get_nat_info_type_str,"neigh"))
 			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoNeigh);
 		else
-			printf("Wrong query nat info type parameter, either local or neigh \n");
+			printf("Wrong query nat info type parameter, either local or neigh\n");
 
 		stub_->getNATInfo(&context, request, &reply);
 
 		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
 			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
 			for (i = 0; i < reply.natinfoentries_size(); i++) {
-				printf("  %d: IP %s, min_port %d, max_port %d \n", i+1,
+				printf("  %d: IP %s, min_port %d, max_port %d\n", i+1,
 				reply.natinfoentries(i).address().c_str(),
 				reply.natinfoentries(i).minport(),
 				reply.natinfoentries(i).maxport());
@@ -1044,7 +1035,7 @@ public:
 		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
 			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
 			for (i = 0; i < reply.natinfoentries_size(); i++) {
-				printf("  %d: min_port %d, max_port %d --> Underlay IPv6 %s \n", i+1,
+				printf("  %d: min_port %d, max_port %d --> Underlay IPv6 %s\n", i+1,
 				reply.natinfoentries(i).minport(),
 				reply.natinfoentries(i).maxport(),
 				reply.natinfoentries(i).underlayroute().c_str());
@@ -1072,11 +1063,10 @@ public:
 		request.set_maxport(max_port);
 
 		stub_->deleteNeighborNAT(&context, request, &reply);
-		if (reply.error()) {
-			printf("Received an error %d \n", reply.error());
-		}else{
-			printf("called delneighnat with code %d\n",reply.error());
-		}
+		if (reply.error())
+			printf("Received an error %d\n", reply.error());
+		else
+			printf("Neighbor NAT deleted\n");
 	}
 
 private:
