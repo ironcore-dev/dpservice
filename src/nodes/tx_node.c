@@ -12,6 +12,7 @@
 #include "dp_util.h"
 #include "dp_nat.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_debug.h"
 
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
@@ -44,18 +45,15 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
-													struct rte_node *node,
-													void **objs,
-													uint16_t cnt)
+static uint16_t tx_node_process(struct rte_graph *graph,
+								struct rte_node *node,
+								void **objs,
+								uint16_t cnt)
 {
 	struct tx_node_ctx *ctx = (struct tx_node_ctx *)node->ctx;
 	struct rte_mbuf *mbuf0, **pkts;
 	uint16_t port, queue;
 	uint16_t sent_count, i;
-
-	RTE_SET_USED(objs);
-	RTE_SET_USED(cnt);
 
 	/* Get Tx port id */
 	port = ctx->port_id;
@@ -78,13 +76,15 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}
 
-	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,
-								cnt);
+	sent_count = rte_eth_tx_burst(port, queue, pkts, cnt);
+	GRAPHTRACE_BURST_TX(node, sent_count, port);
 
 	/* Redirect unsent pkts to drop node */
-	if (sent_count != cnt)
-		rte_node_enqueue(graph, node, TX_NEXT_DROP,
-						&objs[sent_count], cnt - sent_count);
+	if (sent_count != cnt) {
+		// TODO warn
+		GRAPHTRACE_BURST_NEXT(node, &pkts[sent_count], cnt - sent_count, TX_NEXT_DROP);
+		rte_node_enqueue(graph, node, TX_NEXT_DROP, &pkts[sent_count], cnt - sent_count);
+	}
 
 	return sent_count;
 }

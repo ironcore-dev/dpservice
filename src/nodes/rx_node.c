@@ -6,6 +6,7 @@
 #include "dp_util.h"
 #include "nodes/rx_node_priv.h"
 #include "node_api.h"
+#include "dp_debug.h"
 
 static struct ethdev_rx_node_main ethdev_rx_main;
 
@@ -64,6 +65,7 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 												   struct rte_node *node,
 												   struct rx_node_ctx *ctx)
 {
+	struct rte_mbuf **bufs = (struct rte_mbuf **)node->objs;
 	uint16_t count = 0, next_index;
 	uint16_t port, queue;
 
@@ -73,14 +75,16 @@ static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
 
 	/* Get pkts from port */
 	if (ethdev_rx_main.node_ctx[ctx->port_id].enabled)
-		count = rte_eth_rx_burst(port, queue, (struct rte_mbuf **)node->objs,
-									RTE_GRAPH_BURST_SIZE);
+		count = rte_eth_rx_burst(port, queue, bufs, RTE_GRAPH_BURST_SIZE);
 
 	if (!count)
 		return 0;
 
+	GRAPHTRACE_BURST(node, bufs, count);
+
 	node->idx = count;
 	/* Enqueue to next node */
+	GRAPHTRACE_BURST_NEXT(node, bufs, count, next_index);
 	rte_node_next_stream_move(graph, node, next_index);
 
 	ctx->next = next_index;

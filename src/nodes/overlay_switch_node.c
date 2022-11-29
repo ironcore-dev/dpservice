@@ -9,6 +9,7 @@
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_debug.h"
 
 struct overlay_switch_node_main overlay_switch_node;
 
@@ -37,10 +38,10 @@ static __rte_always_inline bool is_encaped_geneve_pkt(struct rte_mbuf *m)
 	return ntohs(udp_hdr->dst_port) == u_conf->src_port;
 }
 
-static __rte_always_inline int handle_overlay_switch(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t handle_overlay_switch(struct rte_mbuf *m)
 {
 	struct dp_flow *df;
-	uint16_t ret = OVERLAY_SWITCH_NEXT_DROP;
+	rte_edge_t ret = OVERLAY_SWITCH_NEXT_DROP;
 	int proto_id = -1;
 
 	df = get_dp_flow_ptr(m);
@@ -92,7 +93,8 @@ static __rte_always_inline uint16_t overlay_switch_node_process(struct rte_graph
 																uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
-	int i, ret;
+	rte_edge_t next_index;
+	int i;
 
 	// struct dp_flow *df;
 
@@ -101,9 +103,10 @@ static __rte_always_inline uint16_t overlay_switch_node_process(struct rte_graph
 	for (i = 0; i < cnt; i++)
 	{
 		mbuf0 = pkts[i];
-		ret = handle_overlay_switch(mbuf0);
-
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
+		GRAPHTRACE_PKT(node, mbuf0);
+		next_index = handle_overlay_switch(mbuf0);
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;

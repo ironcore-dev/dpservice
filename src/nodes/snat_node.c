@@ -11,6 +11,8 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/snat_node.h"
 #include "dp_util.h"
+#include "dp_debug.h"
+
 
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -148,18 +150,18 @@ static __rte_always_inline uint16_t snat_node_process(struct rte_graph *graph,
 {
 	struct rte_mbuf *mbuf0, **pkts;
 	rte_edge_t next_index;
-	int i, ret;
+	int i;
 
 	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = SNAT_NEXT_DROP;
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		ret = handle_snat(mbuf0);
-		if (ret == 1)
+		GRAPHTRACE_PKT(node, mbuf0);
+		if (handle_snat(mbuf0) == 1)
 			next_index = SNAT_NEXT_FIREWALL;
-
+		else
+			next_index = SNAT_NEXT_DROP;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 

@@ -9,6 +9,8 @@
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_debug.h"
+
 
 struct l2_decap_node_main l2_decap_node;
 
@@ -42,6 +44,7 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 													 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
+	rte_edge_t next_index;
 	int i, ret;
 	
 	pkts = (struct rte_mbuf **)objs;
@@ -49,11 +52,14 @@ static __rte_always_inline uint16_t l2_decap_node_process(struct rte_graph *grap
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		ret = handle_l2_decap(mbuf0);
-		if (!dp_is_pf_port_id(ret))
-			rte_node_enqueue_x1(graph, node, l2_decap_node.next_index[ret], mbuf0);
+		if (dp_is_pf_port_id(ret))
+			next_index = L2_DECAP_OVERLAY_SWITCH;
 		else
-			rte_node_enqueue_x1(graph, node, L2_DECAP_OVERLAY_SWITCH, mbuf0);
+			next_index = l2_decap_node.next_index[ret];
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;

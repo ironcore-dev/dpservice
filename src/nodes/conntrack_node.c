@@ -13,6 +13,7 @@
 #include "dp_nat.h"
 #include <stdio.h>
 #include <unistd.h>
+#include "dp_debug.h"
 
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -80,7 +81,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
 }
 
-static __rte_always_inline int handle_conntrack(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t handle_conntrack(struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -133,19 +134,17 @@ static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *gra
 													 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
-	int i, route;
+	rte_edge_t next_index;
+	int i;
 
 	pkts = (struct rte_mbuf **)objs;
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		route = handle_conntrack(mbuf0);
-
-		if (route >= 0)
-			rte_node_enqueue_x1(graph, node, route,
-								mbuf0);
-		else
-			rte_node_enqueue_x1(graph, node, CONNTRACK_NEXT_DROP, mbuf0);
+		GRAPHTRACE_PKT(node, mbuf0);
+		next_index = handle_conntrack(mbuf0);
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;

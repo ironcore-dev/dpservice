@@ -10,6 +10,8 @@
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/dnat_node.h"
+#include "dp_debug.h"
+
 
 static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -168,11 +170,10 @@ static __rte_always_inline uint16_t dnat_node_process(struct rte_graph *graph,
 	int i, ret;
 
 	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = DNAT_NEXT_DROP;
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		ret = handle_dnat(mbuf0);
 		if (ret == DP_ROUTE_PKT_RELAY)
 			next_index = DNAT_NEXT_PACKET_RELAY;
@@ -180,6 +181,7 @@ static __rte_always_inline uint16_t dnat_node_process(struct rte_graph *graph,
 			next_index = DNAT_NEXT_IPV4_LOOKUP;
 		else
 			next_index = DNAT_NEXT_DROP;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 

@@ -7,6 +7,8 @@
 #include "nodes/dhcpv6_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_debug.h"
+
 
 struct dhcpv6_node_main dhcpv6_node;
 static struct client_id cid;
@@ -157,31 +159,34 @@ static __rte_always_inline uint16_t dhcpv6_node_process(struct rte_graph *graph,
 													 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
-	int i, ret = 0;
+	rte_edge_t next_index;
+	int i;
 
 	pkts = (struct rte_mbuf **)objs;
 
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		if (!dp_is_ip6_overlay_enabled()) {
-			rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
+			next_index = DHCPV6_NEXT_DROP;
 		} else {
-			ret = handle_dhcpv6(mbuf0);
-			if (ret > 0)
-				rte_node_enqueue_x1(graph, node, dhcpv6_node.next_index[mbuf0->port] , mbuf0);
+			if (handle_dhcpv6(mbuf0) > 0)
+				next_index = dhcpv6_node.next_index[mbuf0->port];
 			else
-				rte_node_enqueue_x1(graph, node, DHCPV6_NEXT_DROP, mbuf0);
+				next_index = DHCPV6_NEXT_DROP;
 		}
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
 
     return cnt;
 }
 
-int dhcpv6_set_next(uint16_t port_id, uint16_t next_index)
+int dhcpv6_set_next(uint16_t portid, uint16_t next_index)
 {
 
-	dhcpv6_node.next_index[port_id] = next_index;
+	dhcpv6_node.next_index[portid] = next_index;
 	return 0;
 }
 

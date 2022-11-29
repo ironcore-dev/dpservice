@@ -1,9 +1,14 @@
 project('dp_service', 'c', 'cpp',
-  default_options : ['c_args=-Wno-deprecated-declarations -Werror -Wno-format-truncation', 'cpp_args=-fpermissive'],
+  default_options: ['c_args=-Wno-deprecated-declarations -Werror -Wno-format-truncation', 'cpp_args=-fpermissive'],
   version: run_command('cat', 'include/dp_version.h').stdout().strip().split(' ').get(2).split('"').get(1),
-  license : 'MIT')
-add_global_arguments('-DDEBUG=true', language : 'c')
-dpdk_dep = dependency('libdpdk', version : '>=21.11.0')
+  license: 'MIT')
+
+add_global_arguments('-DDEBUG=true', language: 'c')
+if get_option('enable_graphtrace')
+  add_global_arguments('-DENABLE_GRAPHTRACE', language: 'c')
+endif
+
+dpdk_dep = dependency('libdpdk', version: '>=21.11.0')
 proto_dep = dependency('protobuf')
 grpc_dep = dependency('grpc')
 grpccpp_dep = dependency('grpc++')
@@ -31,5 +36,5 @@ if get_option('enable_tests')
   subdir('test')
 endif
 
-run_target('cppcheck', command : ['cppcheck', '--project=' + 
+run_target('cppcheck', command: ['cppcheck', '--project=' +
   join_paths(meson.build_root(), 'compile_commands.json')])

@@ -8,6 +8,7 @@
 #include "nodes/arp_node_priv.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_debug.h"
 
 
 struct arp_node_main arp_node;
@@ -61,6 +62,7 @@ static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,
 													 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
+	rte_edge_t next_index;
 	int i;
 
 	pkts = (struct rte_mbuf **)objs;
@@ -68,11 +70,14 @@ static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		if (handle_arp(mbuf0)) {
-			rte_node_enqueue_x1(graph, node, arp_node.next_index[mbuf0->port], mbuf0);
+			next_index = arp_node.next_index[mbuf0->port];
 			set_vf_port_status_as_attached(mbuf0->port);
 		} else
-			rte_node_enqueue_x1(graph, node, ARP_NEXT_DROP, mbuf0);
+			next_index = ARP_NEXT_DROP;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
     return cnt;

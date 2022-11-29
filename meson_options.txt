@@ -2,3 +2,5 @@ option('enable_usermode', type: 'boolean', value: false, description:
        'Make the resulting binary runnable without root (requires sudo during build)')
 option('enable_tests', type: 'boolean', value: false, description:
        'Make sure automated testing has all prerequisities')
+option('enable_graphtrace', type: 'boolean', value: false, description:
+       'Build with verbose logging of packet travel over the graph framework (--graphtrace option)')

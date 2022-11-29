@@ -13,6 +13,7 @@
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_debug.h"
 
 struct ipv6_lookup_node_main ipv6_lookup_node;
 
@@ -92,6 +93,7 @@ static __rte_always_inline uint16_t ipv6_lookup_node_process(struct rte_graph *g
 															 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
+	rte_edge_t next_index;
 	int route;
 	int i;
 
@@ -100,11 +102,14 @@ static __rte_always_inline uint16_t ipv6_lookup_node_process(struct rte_graph *g
 	for (i = 0; i < cnt; i++)
 	{
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		route = handle_ipv6_lookup(mbuf0);
 		if (route > 0)
-			rte_node_enqueue_x1(graph, node, route, mbuf0);
+			next_index = route;
 		else
-			rte_node_enqueue_x1(graph, node, IPV6_LOOKUP_NEXT_DROP, mbuf0);
+			next_index = IPV6_LOOKUP_NEXT_DROP;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;

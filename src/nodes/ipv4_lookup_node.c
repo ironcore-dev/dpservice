@@ -12,6 +12,7 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_multi_path.h"
+#include "dp_debug.h"
 
 #include "rte_flow/dp_rte_flow.h"
 
@@ -99,6 +100,7 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 															 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
+	rte_edge_t next_index;
 	int route;
 	int i;
 
@@ -106,16 +108,18 @@ static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *g
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		route = handle_ipv4_lookup(mbuf0);
 		if (route >= 0)
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT,
-								mbuf0);
+			next_index = IPV4_LOOKUP_NEXT_NAT;
 		else if (route == DP_ROUTE_DHCP)
 			// the ethernet header cannot be removed is due to dhcp node needs mac info
 			// TODO: extract mac info in cls node
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
+			next_index = IPV4_LOOKUP_NEXT_DHCP;
 		else
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
+			next_index = IPV4_LOOKUP_NEXT_DROP;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;

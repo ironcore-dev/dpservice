@@ -8,6 +8,7 @@
 #include "dp_lpm.h"
 #include "dp_alias.h"
 #include "dpdk_layer.h"
+#include "dp_debug.h"
 
 #include "nodes/ipip_tunnel_node.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -74,24 +75,24 @@ static __rte_always_inline uint16_t ipip_tunnel_node_process(struct rte_graph *g
 															 uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
+	rte_edge_t next_index;
 	int i;
-	uint8_t ret = IPIP_TUNNEL_NEXT_DROP;
 	struct dp_flow *df;
 
 	pkts = (struct rte_mbuf **)objs;
 
-	for (i = 0; i < cnt; i++)
-	{
+	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		df = get_dp_flow_ptr(mbuf0);
-
 		if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-			ret = handle_ipip_tunnel_encap(mbuf0, df);
-
-		if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-			ret = handle_ipip_tunnel_decap(mbuf0, df);
-
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
+			next_index = handle_ipip_tunnel_encap(mbuf0, df);
+		else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+			next_index = handle_ipip_tunnel_decap(mbuf0, df);
+		else
+			next_index = IPIP_TUNNEL_NEXT_DROP;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;

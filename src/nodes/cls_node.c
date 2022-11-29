@@ -7,6 +7,7 @@
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include "nodes/ipv6_nd_node.h"
+#include "dp_debug.h"
 
 #include "rte_flow/dp_rte_flow.h"
 
@@ -130,6 +131,7 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		init_dp_mbuf_priv1(mbuf0);
 		comp = (mbuf0->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
 		/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
@@ -153,7 +155,8 @@ static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
 				extract_inner_ethernet_header(mbuf0);
 				next_index = CLS_NEXT_IPV6_LOOKUP;
 			}
-		}	
+		}
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
 

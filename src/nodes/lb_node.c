@@ -12,6 +12,7 @@
 #include "dp_alias.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/lb_node.h"
+#include "dp_debug.h"
 
 
 static int lb_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -101,12 +102,12 @@ static __rte_always_inline uint16_t lb_node_process(struct rte_graph *graph,
 	int i;
 
 	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = LB_NEXT_DROP;
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
+		GRAPHTRACE_PKT(node, mbuf0);
 		next_index = handle_lb(mbuf0);
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}	
 

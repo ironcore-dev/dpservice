@@ -61,9 +61,11 @@ int get_overlay_type();
 int get_op_env();
 
 int dp_is_wcmp_enabled();
-
 double dp_get_wcmp_frac();
 void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type);
+
+uint dp_get_graphtrace_level();
+
 void print_ip(unsigned int ip, char *buf);
 
 

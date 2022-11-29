@@ -11,6 +11,8 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_util.h"
 #include "dp_nat.h"
+#include "dp_debug.h"
+
 
 struct packet_relay_node_main packet_relay_node;
 
@@ -25,7 +27,7 @@ static int packet_relay_node_init(const struct rte_graph *graph, struct rte_node
 	return 0;
 }
 
-static __rte_always_inline int lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
 {
 	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -59,10 +61,9 @@ static __rte_always_inline int lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct
 }
 
 
-static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t handle_packet_relay(struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr;
-	uint16_t ret = PACKET_RELAY_NEXT_DROP;
 	struct flow_value *cntrack = NULL;
 
 	df_ptr = get_dp_flow_ptr(m);
@@ -71,7 +72,7 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 		cntrack = df_ptr->conntrack;
 
 	if (!cntrack)
-		return ret;
+		return PACKET_RELAY_NEXT_DROP;
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
@@ -85,7 +86,7 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
 		return lb_nnat_icmp_reply(df_ptr, m);
 
-	return ret;
+	return PACKET_RELAY_NEXT_DROP;
 }
 
 static __rte_always_inline uint16_t packet_relay_node_process(struct rte_graph *graph,
@@ -94,15 +95,17 @@ static __rte_always_inline uint16_t packet_relay_node_process(struct rte_graph *
 																uint16_t cnt)
 {
 	struct rte_mbuf *mbuf0, **pkts;
-	int i, ret;
+	rte_edge_t next_index;
+	int i;
 
 	pkts = (struct rte_mbuf **)objs;
 
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
-		ret = handle_packet_relay(mbuf0);
-
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
+		GRAPHTRACE_PKT(node, mbuf0);
+		next_index = handle_packet_relay(mbuf0);
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
 	}
 
 	return cnt;
