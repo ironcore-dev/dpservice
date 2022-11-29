@@ -32,6 +32,17 @@ extern "C"
 #define DP_L4_PORT_DIR_SRC 1
 #define DP_L4_PORT_DIR_DST 2
 
+#define DP_IP_ICMP_TYPE_ERROR 3
+
+#define DP_IP_ICMP_CODE_DST_PROTO_UNREACHABLE 2
+#define DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE 3
+#define DP_IP_ICMP_CODE_FRAGMENT_NEEDED 4
+
+typedef struct dp_icmp_err_ip_info {
+	struct rte_ipv4_hdr *err_ipv4_hdr;
+	uint16_t	l4_src_port;
+	uint16_t	l4_dst_port;
+} dp_icmp_err_ip_info;
 
 // #define DP_RTE_FLOW_DEFAULT_GROUP	0
 // #define DP_RTE_FLOW_VNET_GROUP		1
@@ -44,6 +55,8 @@ int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m);
 struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
 struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset);
+void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info);
+void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t src_port_v);
 
 uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val);
 uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier);

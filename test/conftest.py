@@ -91,6 +91,7 @@ def add_machine(build_path, tun_opt):
 	subprocess.run(shlex.split("ip link set dev "+vf1_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+vf2_tap+" up"))
 	subprocess.run(shlex.split("ip link set dev "+pf0_tap+" up"))
+	# subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
 	subprocess.run(shlex.split(init_cmd))
 	subprocess.run(shlex.split(add_machine_cmd))
 	subprocess.run(shlex.split(add_machine_cmd2))

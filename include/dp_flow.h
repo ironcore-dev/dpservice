@@ -63,6 +63,7 @@ struct flow_nat_info {
 	uint32_t vni;
 	uint8_t underlay_dst[16];
 	uint8_t l4_type;
+	uint16_t icmp_err_ip_cksum;
 };
 
 
@@ -91,7 +92,7 @@ void dp_add_flow_data(struct flow_key *key, void *data);
 void dp_add_flow(struct flow_key *key);
 void dp_delete_flow(struct flow_key *key);
 bool dp_flow_exists(struct flow_key *key);
-void dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
+int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 void dp_invert_flow_key(struct flow_key *key /* in / out */);
 void dp_init_flowtable(int socket_id);
 void dp_process_aged_flows(int port_id);

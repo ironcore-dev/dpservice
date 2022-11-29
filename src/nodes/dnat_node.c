@@ -32,6 +32,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 	uint32_t dst_ip, vni;
 	uint8_t underlay_dst[16];
 	uint16_t old_icmp_ident = 65535;
+	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
 
 	memset(&key, 0, sizeof(struct flow_key));
 	df_ptr = get_dp_flow_ptr(m);
@@ -84,6 +85,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			ipv4_hdr->dst_addr = htonl(dnat_ip);
+
 			df_ptr->flags.nat = DP_NAT_CHG_DST_IP;
 			df_ptr->nat_addr = df_ptr->dst.dst_addr;
 			df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
@@ -121,11 +123,22 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-				old_icmp_ident = dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
-				if (old_icmp_ident == 65535) {
-					DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n", 
-							htons(cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst));
-					return 0;
+				if (df_ptr->icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
+					old_icmp_ident = dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
+					if (old_icmp_ident == 65535) {
+						DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n",
+								htons(cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst));
+						return 0;
+					}
+				}
+				if (df_ptr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+					dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
+					if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port)
+						return 0;
+
+					icmp_err_ip_info.err_ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
+					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nat_info.icmp_err_ip_cksum;
+					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
 				}
 				
 			} else {

@@ -82,6 +82,7 @@ def is_tcp_vip_src_pkt(pkt):
 			return True
 	return False
 
+
 def ipv4_in_ipv6_responder(pf_name):
 	pkt_list = sniff(count=1,lfilter=is_encaped_icmp_pkt,iface=pf_name,timeout=10)
 
@@ -89,7 +90,6 @@ def ipv4_in_ipv6_responder(pf_name):
 		return 
 
 	pkt=pkt_list[0]
-	pkt.show()
 	if Ether in pkt:
 		pktether=pkt[Ether]
 	if IPv6 in pkt:
@@ -108,7 +108,6 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name):
 		return 
 
 	pkt=pkt_list[0]
-	pkt.show()
 	if Ether in pkt:
 		pktether=pkt[Ether]
 	if IPv6 in pkt:
@@ -125,7 +124,6 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name):
 def geneve_in_ipv6_responder(pf_name):
 	pkt_list = sniff(count=1,lfilter=is_geneve_encaped_icmp_pkt, iface=pf_name,timeout=8)
 	pkt=pkt_list[0]
-	pkt.show()
 
 	if Ether in pkt:
 		pktether=pkt[Ether]
@@ -156,6 +154,9 @@ def test_IPv4inIPv6(capsys, add_machine, tun_opt):
 	pkt_list = sniff(count=1,lfilter=is_icmp_pkt,iface=vf0_tap,timeout=5)
 	if len(pkt_list)==0:
 		raise AssertionError('Cannot receive icmp reply!')
+	
+	d.terminate()
+	time.sleep(1)
 
 @pytest.mark.skipif(port_redundancy == False, reason = "no need to test port redundancy if it is disabled")
 def test_link_redundancy_handling(capsys, add_machine,tun_opt):
@@ -188,6 +189,10 @@ def test_link_redundancy_handling(capsys, add_machine,tun_opt):
 	subprocess.run(shlex.split("ip link set dev "+pf1_tap+" up"))
 	if len(pkt_list)!=1 and len(pkt_list2) !=1:
 		raise AssertionError('Cannot receive icmp reply!')
+	
+	d.terminate()
+	d2.terminate()
+	time.sleep(1)
 
 
 def vf_to_vf_tcp_vf1_responder():
@@ -219,6 +224,9 @@ def test_vf_to_vf_tcp(capsys,add_machine):
 	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=vf0_tap,timeout=2)
 	if len(pkt_list)==0:
 		raise AssertionError('Cannot receive tcp reply!')
+	
+	d.terminate()
+	time.sleep(1)
 
 def eval_cmd_output(cmd_str, exp_error, negate=False, maxlines=5):
 	cmd = shlex.split(cmd_str)
@@ -263,6 +271,8 @@ def test_vf_to_vf_vip_dnat(capsys, add_machine, build_path):
 	if len(pkt_list) == 0:
 		raise AssertionError('Cannot receive tcp reply via VIP (DNAT)!')
 
+	d.terminate()
+	time.sleep(1)
 	expected_str = "Delvip"
 	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
 	eval_cmd_output(del_vip_test, expected_str)
@@ -289,11 +299,14 @@ def test_vf_to_pf_vip_snat(capsys, add_machine, build_path):
 	if len(pkt_list) == 0:
 		raise AssertionError('Cannot receive tcp reply via VIP (SNAT)!')
 
+	d.terminate()
+	d2.terminate()
+	time.sleep(1)
 	expected_str = "Delvip"
 	del_vip_test = build_path+"/test/dp_grpc_client --delvip " + vm2_name
 	eval_cmd_output(del_vip_test, expected_str)
 
-def send_tcp_pkt_from_vm1():
+def reply_tcp_pkt_for_vm1():
 
 	# sys.stdout = open(str(os.getpid()) + ".out", "w")
 	pkt_list = sniff(count=1,lfilter=is_tcp_pkt,iface=pf0_tap,timeout=10)
@@ -302,7 +315,6 @@ def send_tcp_pkt_from_vm1():
 		raise AssertionError('Cannot receive network-natted tcp pkt on pf')
 
 	pkt=pkt_list[0]
-	pkt.show()
 
 	if Ether in pkt:
 		pktether=pkt[Ether]
@@ -318,14 +330,13 @@ def send_tcp_pkt_from_vm1():
 		time.sleep(1)
 		sendp(reply_pkt, iface=pf0_tap)
 
-
 def test_vf_to_pf_network_nat_tcp(capsys, add_machine, build_path):
 
 	expected_str = "Addnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
-	d = multiprocessing.Process(name = "send_tcp_pkt", target = send_tcp_pkt_from_vm1, args=())
+	d = multiprocessing.Process(name = "reply_tcp_pkt", target = reply_tcp_pkt_for_vm1, args=())
 	d.daemon=False
 	d.start()
 
@@ -353,6 +364,8 @@ def test_vf_to_pf_network_nat_tcp(capsys, add_machine, build_path):
 	if pktip.dst !=vf0_ip  or pkttcp.dport != 1240:
 		raise AssertionError('Received wrong packet with ip:'+pktip.dst+" dport:"+ str(pkttcp.dport))
 
+	d.terminate()
+	time.sleep(1)
 	expected_str = "Delnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
@@ -411,10 +424,87 @@ def test_vf_to_pf_network_nat_icmp(capsys, add_machine, build_path):
 	if pktip.dst !=vf0_ip:
 		raise AssertionError('Received wrong icmp packet with ip:'+pktip.dst)
 
+	d.terminate()
+	time.sleep(1)
 	expected_str = "Delnat"
 	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
 	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
+def reply_with_icmp_err_fragment_needed_pf1():
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf1_tap, timeout=10)
+
+	pkt=pkt_list[0]
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+
+	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst)/ICMP(type=3,code=4,unused=1280)/ pktip
+	# https://blog.cloudflare.com/path-mtu-discovery-in-practice/
+	# reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4)/IP(dst=pktip.src, src=pktip.dst)/ICMP(type=3,code=4,unused=1280)/ str(pktip)[:28]
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf1_tap)	
+
+def reply_with_icmp_err_fragment_needed_pf0():
+	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=30)
+	pkt=pkt_list[0]
+
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+
+	reply_pkt = Ether(dst=pktether.src, src=pktether.dst, type=0x86DD)/IPv6(dst=ul_actual_src, src=pktipv6.dst, nh=4) / IP(dst=pktip.src, src=pktip.dst) / ICMP(type=3,code=4,unused=1280)/ pktip
+	time.sleep(1)
+	sendp(reply_pkt, iface=pf0_tap)	
+
+def test_vm_nat_asyc_tcp_icmperr(capsys, add_machine, build_path):
+	expected_str = "Addnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --addnat " + vm1_name + " --ipv4 " + nat_vip + " --min_port " + str(nat_local_min_port) + " --max_port "+ str(nat_local_max_port) 
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
+
+	d = multiprocessing.Process(name = "send_icmperr_pkt", target = reply_with_icmp_err_fragment_needed_pf1, args=())
+	d.daemon=False
+	d.start()
+
+	d2 = multiprocessing.Process(name = "send_icmperr_pkt", target = reply_with_icmp_err_fragment_needed_pf0, args=())
+	d2.daemon=False
+	d2.start()
+
+	tcp_pkt = Ether(dst = mc_mac, src = vf0_mac, type = 0x0800) / IP(dst = public_ip, src = vf0_ip) / TCP(sport=1256, dport=500)
+	time.sleep(3)
+	sendp(tcp_pkt, iface = vf0_tap)
+
+	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap,timeout=15)
+
+	if len(pkt_list)==0:
+		raise AssertionError('Cannot receive asymmetric icmp pkt on pf')
+
+	pkt=pkt_list[0]
+	
+	if Ether in pkt:
+		pktether=pkt[Ether]
+	if IPv6 in pkt:
+		pktipv6 = pkt[IPv6]
+	if IP in pkt:
+		pktip= pkt[IP]
+	if ICMP in pkt:
+		pkticmp= pkt[ICMP]
+
+	if pkticmp.type != 3:
+		raise AssertionError('Received wrong icmp packet with type:' + pkticmp.type)
+
+	d.terminate()
+	d2.terminate()
+	time.sleep(1)
+
+	expected_str = "Delnat"
+	add_net_nat_vm1_test = build_path+"/test/dp_grpc_client --delnat " + vm1_name
+	eval_cmd_output(add_net_nat_vm1_test, expected_str)
 
 
 def send_bounce_pkt_to_pf():
@@ -459,6 +549,8 @@ def test_network_nat_pkt_relay(capsys, add_machine, build_path):
 	if pktipv6.dst != nat_neigh_ul_dst  or pkttcp.dport != 510:
 		raise AssertionError('Received wrong network-nat relayed packet with outer dst ipv6 addr:'+pktipv6.dst+" dport:"+ pkttcp.dport)
 
+	d.terminate()
+	time.sleep(1)
 	expected_str = nat_vip
 	get_net_nat_local_vm1_test = build_path+"/test/dp_grpc_client --getnat " + vm1_name
 	eval_cmd_output(get_net_nat_local_vm1_test, expected_str)
@@ -516,7 +608,6 @@ def test_pf_to_vf_network_lb_tcp(capsys, add_machine, build_path):
 		raise AssertionError('Cannot receive loadbalanced tcp pkt on vf')
 
 	pkt=pkt_list[0]
-	# pkt.show()
 	
 	if Ether in pkt:
 		pktether=pkt[Ether]
