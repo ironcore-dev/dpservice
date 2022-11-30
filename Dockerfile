@@ -78,7 +78,7 @@ iproute2 \
 
 WORKDIR /
 COPY --from=builder /workspace/build/src/dp_service .
-COPY --from=builder /workspace/build/test/dp_grpc_client .
+COPY --from=builder /workspace/build/tools/dp_grpc_client .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
