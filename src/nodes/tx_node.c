@@ -44,16 +44,6 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
-{
-	struct rte_ether_hdr *eth_hdr;
-
-	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
-	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->dst_addr);
-	eth_hdr->ether_type = htons(eth_type);
-	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->src_addr);
-}
-
 static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 													struct rte_node *node,
 													void **objs,
@@ -79,8 +69,6 @@ static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
 			(df->flags.nat >= DP_LB_CHG_UL_DST_IP) || df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 			if (dp_is_pf_port_id(port)) {
 				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-				if (df->flags.nat == DP_LB_RECIRC)
-					rte_node_enqueue_x1(graph, node, TX_NEXT_CLS, mbuf0);
 			} else {
 				rewrite_eth_hdr(mbuf0, port, df->l3_type);
 			}
@@ -113,8 +101,7 @@ static struct rte_node_register tx_node_base = {
 
 	.nb_edges = TX_NEXT_MAX,
 	.next_nodes = {
-			[TX_NEXT_DROP] = "drop",
-			[TX_NEXT_CLS] = "cls",
+			[TX_NEXT_DROP] = "drop"
 		},
 };
 

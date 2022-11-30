@@ -7,6 +7,7 @@
 #include "nodes/ipv6_encap_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_nat.h"
 
 struct ipv6_encap_node_main ipv6_encap_node;
 
@@ -64,10 +65,16 @@ static __rte_always_inline uint16_t ipv6_encap_node_process(struct rte_graph *gr
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
-		if (handle_ipv6_encap(mbuf0, df))
-			rte_node_enqueue_x1(graph, node, ipv6_encap_node.next_index[df->nxt_hop], mbuf0);
-		else
+		if (handle_ipv6_encap(mbuf0, df)) {
+			if (df->flags.nat == DP_LB_RECIRC) {
+				rewrite_eth_hdr(mbuf0, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
+				rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_CLS, mbuf0);
+			} else {
+				rte_node_enqueue_x1(graph, node, ipv6_encap_node.next_index[df->nxt_hop], mbuf0);
+			}
+		} else {
 			rte_node_enqueue_x1(graph, node, IPV6_ENCAP_NEXT_DROP, mbuf0);
+		}
 	}	
 
 	return cnt;
@@ -89,6 +96,7 @@ static struct rte_node_register ipv6_encap_node_base = {
 	.next_nodes =
 		{
 			[IPV6_ENCAP_NEXT_DROP] = "drop",
+			[IPV6_ENCAP_NEXT_CLS] = "cls",
 		},
 };
 

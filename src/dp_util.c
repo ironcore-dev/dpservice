@@ -449,6 +449,16 @@ __rte_always_inline uint16_t dp_get_pf1_port_id()
 	return pf_ports[1][0];
 }
 
+void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
+{
+	struct rte_ether_hdr *eth_hdr;
+
+	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
+	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->dst_addr);
+	eth_hdr->ether_type = htons(eth_type);
+	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->src_addr);
+}
+
 
 void print_ip(unsigned int ip, char *buf)
 {
