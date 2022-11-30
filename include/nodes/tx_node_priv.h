@@ -10,7 +10,6 @@ extern "C" {
 enum
 {
 	TX_NEXT_DROP,
-	TX_NEXT_CLS,
 	TX_NEXT_MAX
 };
 

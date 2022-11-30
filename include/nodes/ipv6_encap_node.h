@@ -10,6 +10,7 @@ extern "C" {
 enum
 {
 	IPV6_ENCAP_NEXT_DROP,
+	IPV6_ENCAP_NEXT_CLS,
 	IPV6_ENCAP_NEXT_MAX
 };
 
