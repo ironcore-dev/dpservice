@@ -77,13 +77,13 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	}
 
 	sent_count = rte_eth_tx_burst(port, queue, pkts, cnt);
-	GRAPHTRACE_BURST_TX(node, sent_count, port);
+	GRAPHTRACE_BURST_TX(node, pkts, sent_count, port);
 
 	/* Redirect unsent pkts to drop node */
 	if (sent_count != cnt) {
-		// TODO warn
-		GRAPHTRACE_BURST_NEXT(node, &pkts[sent_count], cnt - sent_count, TX_NEXT_DROP);
-		rte_node_enqueue(graph, node, TX_NEXT_DROP, &pkts[sent_count], cnt - sent_count);
+		// TODO warning (like rx-periodic with invalid flow)
+		GRAPHTRACE_BURST_NEXT(node, objs + sent_count, cnt - sent_count, TX_NEXT_DROP);
+		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, cnt - sent_count);
 	}
 
 	return sent_count;

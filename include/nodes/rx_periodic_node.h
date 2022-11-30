@@ -10,6 +10,7 @@ extern "C" {
 enum
 {
 	RX_PERIODIC_NEXT_CLS,
+	RX_PERIODIC_NEXT_DROP,
 	RX_PERIODIC_NEXT_MAX
 };
 

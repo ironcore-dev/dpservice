@@ -12,6 +12,7 @@
 #include "grpc/dp_grpc_impl.h"
 #include <unistd.h>
 #include "monitoring/dp_monitoring.h"
+#include "dp_debug.h"
 
 static struct rx_periodic_node_main rx_periodic_node;
 static struct rx_periodic_node_receive_queues rx_periodic_node_recv_queues;
@@ -37,119 +38,76 @@ static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
-static __rte_always_inline void check_aged_flows(uint16_t portid)
+
+static __rte_always_inline void handle_nongraph_queues()
 {
-	if (dp_is_offload_enabled())
-		dp_process_aged_flows(portid);
+	struct rte_mbuf *mbufs[DP_INTERNAL_Q_SIZE];
+	uint count, i;
+
+	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.monitoring_rx, (void **)mbufs, RTE_DIM(mbufs), NULL);
+	for (i = 0; i < count; ++i)
+		dp_process_event_msg(mbufs[i]);
+
+	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.grpc_tx, (void **)mbufs, RTE_DIM(mbufs), NULL);
+	for (i = 0; i < count; ++i)
+		dp_process_request(mbufs[i]);
 }
 
-static __rte_always_inline uint16_t handle_monitoring_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx){
-	struct rte_mbuf *mbufs[32];
-	struct rte_mbuf *mbuf0;
-	int count = 0, i;
-
-	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.monitoring_rx, (void **)mbufs, 32, NULL);
-
-	if (count == 0) {
-		return 0;
-	}
-
-	for (i = 0; i < count; i++) {
-		mbuf0 = mbufs[i];
-		dp_process_event_msg(mbuf0);
-	}
-
-	RTE_SET_USED(ctx);
-
-	return 0;
-}
-
-static __rte_always_inline uint16_t handle_grpc_queue(struct rte_node *node, struct rx_periodic_node_ctx *ctx)
-{
-	struct rte_mbuf **pkts, *mbuf0;
-	int count, i;
-
-	// RTE_GRAPH_BURST_SIZE seems not a good value to set, since the capacity of ring is 32.
-	count = rte_ring_sc_dequeue_burst(rx_periodic_node_recv_queues.grpc_tx, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
-
-	if (count == 0)
-		return 0;
-	pkts = (struct rte_mbuf **)node->objs;
-
-	for (i = 0; i < count; i++) {
-		mbuf0 = pkts[i];
-		dp_process_request(mbuf0);
-	}
-
-	RTE_SET_USED(ctx);	
-
-	return 0;
-}
-
-
-static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
-												   struct rte_node *node,
-												   struct rx_periodic_node_ctx *ctx)
-{
-	struct rte_mbuf **pkts, *mbuf0;
-	uint16_t count, next_index;
-	struct dp_flow *df_ptr;
- 	int i;
-
-	next_index = ctx->next;
-
-	// which condition grpc_tx is null? 
-	if (rx_periodic_node_recv_queues.grpc_tx)
-		handle_grpc_queue(node, ctx);
-
-	if (rx_periodic_node_recv_queues.monitoring_rx)
-		handle_monitoring_queue(node,ctx);
-
-	count = rte_ring_dequeue_burst(rx_periodic_node_recv_queues.periodic_msg_queue, node->objs, RTE_GRAPH_BURST_SIZE, NULL);
-	if (!count)
-		return 0;
-	
-	pkts = (struct rte_mbuf **)node->objs;
- 	for (i = 0; i < count; i++) {
- 		node->idx = 1;
- 		mbuf0 = pkts[i];
- 		df_ptr = alloc_dp_flow_ptr(mbuf0);
- 		if (!df_ptr)
- 			continue;
- 		if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
-			check_aged_flows(mbuf0->port);
- 			next_index = rx_periodic_node.next_index[mbuf0->port];
-		}
- 		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
- 	}
-
-	return count;
-}
-
-static __rte_always_inline uint16_t rx_periodic_node_process(struct rte_graph *graph,
-													struct rte_node *node,
-													void **objs,
-													uint16_t cnt)
+static uint16_t rx_periodic_node_process(struct rte_graph *graph,
+										 struct rte_node *node,
+										 void **objs,
+										 uint16_t cnt)
 {
 	struct rx_periodic_node_ctx *ctx = (struct rx_periodic_node_ctx *)node->ctx;
-	uint16_t n_pkts = 0;
-	uint16_t next_index = ctx->next;
+	struct rte_mbuf *mbuf0;
+	struct dp_flow *df_ptr;
+	rte_edge_t next_index;
+	uint n_pkts, i;
 
-	RTE_SET_USED(objs);
-	RTE_SET_USED(cnt);
+	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
-	n_pkts = process_inline(graph, node, ctx);
+	// TODO(plague, separate PR)
+	// these actually do not belong here, because they have nothing to do with the graph
+	// we are just using the fact that this gets called periodically
+	// I would suggest moving them somewhere else
+	// temporarily into graph_main_loop, later in a separate core?
+	handle_nongraph_queues();
 
-	ctx->next = next_index;
+	// these packets do not come from a port, instead they enter the graph from a periodic message
+	// which also implies that this will mostly return 0
+	n_pkts = rte_ring_dequeue_burst(rx_periodic_node_recv_queues.periodic_msg_queue,
+									objs,
+									RTE_GRAPH_BURST_SIZE,
+									NULL);
+	if (likely(!n_pkts))
+		return 0;
+
+	node->idx = n_pkts;
+	for (i = 0; i < n_pkts; ++i) {
+		mbuf0 = ((struct rte_mbuf **)objs)[i];
+		GRAPHTRACE_PKT(node, mbuf0);
+		df_ptr = alloc_dp_flow_ptr(mbuf0);
+		if (unlikely(!df_ptr)) {
+			DPS_LOG(WARNING, DPSERVICE, "Cannot allocate dp flow pointer for a packet in %s node\n", node->name);
+			next_index = RX_PERIODIC_NEXT_DROP;
+		} else if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
+			if (dp_is_offload_enabled())
+				dp_process_aged_flows(mbuf0->port);
+			next_index = rx_periodic_node.next_index[mbuf0->port];
+		} else
+			next_index = ctx->next;
+		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
+		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
+	}
 
 	return n_pkts;
 }
 
 int rx_periodic_set_next(uint16_t port_id, uint16_t next_index)
- {
- 	rx_periodic_node.next_index[port_id] = next_index;
- 	return 0;
- }
+{
+	rx_periodic_node.next_index[port_id] = next_index;
+	return 0;
+}
 
 static struct rte_node_register rx_periodic_node_base = {
 	.name = "rx-periodic",
@@ -162,6 +120,7 @@ static struct rte_node_register rx_periodic_node_base = {
 	.next_nodes =
 		{
 			[RX_PERIODIC_NEXT_CLS] = "cls",
+			[RX_PERIODIC_NEXT_DROP] = "drop",
 		},
 };
 

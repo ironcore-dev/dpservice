@@ -69,7 +69,7 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
 	uint16_t n_pkts;
 
-	RTE_SET_USED(cnt);  // TODO this or RTE_GRAPH_BURST_SIZE?
+	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
 	if (unlikely(!ethdev_rx_main.node_ctx[ctx->port_id].enabled))
 		return 0;
@@ -78,11 +78,12 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 							  ctx->queue_id,
 							  (struct rte_mbuf **)objs,
 							  RTE_GRAPH_BURST_SIZE);
-	if (likely(n_pkts)) {
-		node->idx = n_pkts;
-		GRAPHTRACE_BURST_NEXT(node, (struct rte_mbuf **)objs, n_pkts, ctx->next);
-		rte_node_next_stream_move(graph, node, ctx->next);
-	}
+	if (unlikely(!n_pkts))
+		return 0;
+
+	node->idx = n_pkts;
+	GRAPHTRACE_BURST_NEXT(node, (struct rte_mbuf **)objs, n_pkts, ctx->next);
+	rte_node_next_stream_move(graph, node, ctx->next);
 
 	return n_pkts;
 }
