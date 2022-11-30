@@ -2,7 +2,7 @@
 
 Dataplane service comes with a set of tests to verify basic functionality. Running these tests requires root privileges and uses TAP interfaces instead of a real NIC. SmartNIC is therefore not needed to run them.
 
-The test infrastructure uses [pytest](https://docs.pytest.org/) and [scapy](https://scapy.net/), meson build system will check for them being installed during configuration phase.
+The test infrastructure uses [pytest](https://docs.pytest.org/) and [scapy](https://scapy.net/), meson build system will check for them being installed during configuration phase if the option is set, use `meson -Denable_tests=true build` or `meson --reconfigure -Denable_tests=true build` on an existing build directory.
 
 
 ## Running tests

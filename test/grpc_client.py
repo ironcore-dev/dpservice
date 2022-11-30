@@ -7,7 +7,7 @@ import time
 class GrpcClient:
 
 	def __init__(self, build_path):
-		self.cmd = build_path + "/test/dp_grpc_client"
+		self.cmd = build_path + "/tools/dp_grpc_client"
 
 	def assert_output(self, args, req_output, negate=False):
 		print("dp_grpc_client", args)
