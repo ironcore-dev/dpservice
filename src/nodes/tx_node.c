@@ -55,7 +55,6 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	uint16_t port, queue;
 	uint16_t sent_count, i;
 
-	/* Get Tx port id */
 	port = ctx->port_id;
 	queue = ctx->queue_id;
 	pkts = (struct rte_mbuf **)objs;
@@ -63,30 +62,35 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	for (i = 0; i < cnt; i++) {
 		mbuf0 = pkts[i];
 		df = get_dp_flow_ptr(mbuf0);
+		// TODO what to do here? drop? is is impossible to happen right now,
+		// but that's hidden by the function
+		// (and the condition was already present below)
+		// NOTE: dropping it would break the burst TX below
+		if (!df)
+			continue;
+		// TODO this condition needs some commenting on what it does
 		if ((mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) ||
-			(df->flags.nat >= DP_LB_CHG_UL_DST_IP) || df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-			if (dp_is_pf_port_id(port)) {
-				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-			} else {
-				rewrite_eth_hdr(mbuf0, port, df->l3_type);
-			}
+			df->flags.nat >= DP_LB_CHG_UL_DST_IP ||
+			df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
+		) {
+			uint16_t new_eth_type = dp_is_pf_port_id(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
+			rewrite_eth_hdr(mbuf0, port, new_eth_type);
 		}
-
-		if (df && df->flags.valid && df->conntrack)
+		if (df->flags.valid && df->conntrack)
 			dp_handle_traffic_forward_offloading(mbuf0, df);
 	}
 
 	sent_count = rte_eth_tx_burst(port, queue, pkts, cnt);
 	GRAPHTRACE_BURST_TX(node, pkts, sent_count, port);
 
-	/* Redirect unsent pkts to drop node */
-	if (sent_count != cnt) {
-		// TODO warning (like rx-periodic with invalid flow)
+	if (unlikely(sent_count != cnt)) {
+		DPS_LOG(WARNING, DPSERVICE, "Not all packets transmitted successfully (%d/%d) in %s node\n", sent_count, cnt, node->name);
 		GRAPHTRACE_BURST_NEXT(node, objs + sent_count, cnt - sent_count, TX_NEXT_DROP);
 		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, cnt - sent_count);
 	}
 
-	return sent_count;
+	// maybe sent_count makes more sense, but cnt is the real number of processed packets by this node
+	return cnt;
 }
 
 struct ethdev_tx_node_main *tx_node_data_get(void)
