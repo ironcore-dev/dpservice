@@ -102,10 +102,11 @@ int dp_send_event_timer_msg()
 
 void dp_process_event_timer_msg(struct rte_mbuf *m)
 {
-	if (dp_is_offload_enabled()) {
+	if (dp_is_offload_enabled() || dp_is_hw_protection_enabled()) {
 		dp_process_aged_flows(dp_get_pf0_port_id());
 		dp_process_aged_flows(dp_get_pf1_port_id());
 	} else {
 		dp_process_aged_flows_non_offload();
 	}
+
 }

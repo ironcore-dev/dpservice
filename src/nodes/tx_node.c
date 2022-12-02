@@ -77,8 +77,11 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			new_eth_type = dp_is_pf_port_id(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
 			rewrite_eth_hdr(pkt, port, new_eth_type);
 		}
-		if (df->flags.valid && df->conntrack)
+		if (df->flags.valid && df->conntrack) {
+			df->conntrack->owner += 1;
 			dp_handle_traffic_forward_offloading(pkt, df);
+		}
+
 	}
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);

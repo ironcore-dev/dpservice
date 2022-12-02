@@ -28,6 +28,7 @@ static int no_offload = 0;
 static int ipv6_overlay = 0;
 static int no_conntrack = 0;
 static int no_stats = 0;
+static int no_hw_protection = 0;
 static int tunnel_opt = DP_FLOW_OVERLAY_TYPE_IPIP;
 static int op_env = DP_OP_ENV_HARDWARE;
 static double wcmp_frac = 1.0;
@@ -75,6 +76,7 @@ static const char op_env_opt_scapytest[] = "scapytest";
 #ifdef ENABLE_GRAPHTRACE
 #	define CMD_LINE_OPT_GRAPHTRACE "graphtrace"
 #endif
+#define CMD_LINE_OPT_NO_HW_PROTECT "no-hw-protect"
 
 enum
 {
@@ -95,6 +97,8 @@ enum
 #ifdef ENABLE_GRAPHTRACE
 	CMD_LINE_OPT_GRAPHTRACE_NUM,
 #endif
+	CMD_LINE_OPT_IPV6_OVERLAY_NUM,
+	CMD_LINE_OPT_NO_HW_PROTECT_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -114,6 +118,7 @@ static const struct option lgopts[] = {
 #ifdef ENABLE_GRAPHTRACE
 	{CMD_LINE_OPT_GRAPHTRACE, 1, 0, CMD_LINE_OPT_GRAPHTRACE_NUM},
 #endif
+	{CMD_LINE_OPT_NO_HW_PROTECT, 0, 0, CMD_LINE_OPT_NO_HW_PROTECT_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -136,6 +141,7 @@ static void dp_print_usage(const char *prgname)
 			"  --"CMD_LINE_OPT_NO_CONNTRACK"         disable connection tracking\n"
 			"  --"CMD_LINE_OPT_ENABLE_IPV6_OVERLAY"  enable IPv6 overlay addresses\n"
 			"  --"CMD_LINE_OPT_NO_OFFLOAD"           disable traffic offloading\n"
+			"  --"CMD_LINE_OPT_NO_HW_PROTECT"        disable hw protection for unknown incoming traffic\n"
 #ifdef ENABLE_GRAPHTRACE
 			"  --"CMD_LINE_OPT_GRAPHTRACE"=LEVEL     verbosity level of packet traversing the graph framework (default: 0)\n"
 #endif
@@ -297,7 +303,9 @@ int dp_parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_NO_CONNTRACK_NUM:
 			no_conntrack = 1;
 			break;
-
+		case CMD_LINE_OPT_NO_HW_PROTECT_NUM:
+			no_hw_protection = 1;
+			break;
 		case CMD_LINE_OPT_NO_STATS_NUM:
 			no_stats = 1;
 			break;
@@ -331,6 +339,14 @@ uint dp_get_graphtrace_level()
 int dp_is_offload_enabled()
 {
 	if (no_offload)
+		return 0;
+	else
+		return 1;
+}
+
+int dp_is_hw_protection_enabled()
+{
+	if (no_hw_protection)
 		return 0;
 	else
 		return 1;

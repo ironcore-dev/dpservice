@@ -78,6 +78,8 @@ struct flow_value {
 	rte_atomic32_t	flow_cnt;
 	struct flow_nat_info	nat_info;
 	uint8_t			action[DP_FLOW_DIR_MAX];
+	uint8_t			owner;
+	uint16_t		drop_pkt;
 };
 
 struct flow_age_ctx {
@@ -90,7 +92,7 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
 void dp_get_flow_data(struct flow_key *key, void **data);
 void dp_add_flow_data(struct flow_key *key, void *data);
 void dp_add_flow(struct flow_key *key);
-void dp_delete_flow(struct flow_key *key);
+int dp_delete_flow(struct flow_key *key);
 bool dp_flow_exists(struct flow_key *key);
 int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 void dp_invert_flow_key(struct flow_key *key /* in / out */);

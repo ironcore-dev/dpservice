@@ -64,6 +64,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 					memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
 
 					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
+					cntrack->owner -= 1;
 					return DNAT_NEXT_PACKET_RELAY;
 				}
 				

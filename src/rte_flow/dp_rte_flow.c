@@ -774,6 +774,13 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 	return ++action_cnt;
 }
 
+int create_drop_action(struct rte_flow_action *action, int action_cnt)
+{
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_DROP;
+	return ++action_cnt;
+}
+
 int create_end_action(struct rte_flow_action *action, int action_cnt)
 {
 
@@ -798,6 +805,7 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 	agectx->rte_flow = flow;
 	// agectx->cntrack->port = port_id; // it is not actually used, considering to remove this field
 	rte_atomic32_inc(&agectx->cntrack->flow_cnt);
+	agectx->cntrack->owner += 1;
 }
 
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
@@ -815,7 +823,7 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 	res = rte_flow_validate(port_id, attr, pattern, action, &error);
 
 	if (res) {
-		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+		printf("Flow can't be validated message: %s on port %d \n", error.message ? error.message : "(no stated reason)", port_id);
 		return NULL;
 	} else {
 		// printf("Flow validated on port %d\n", port_id);

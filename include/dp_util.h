@@ -53,6 +53,7 @@ int dp_is_stats_enabled();
 int dp_is_offload_enabled();
 int dp_is_conntrack_enabled();
 int dp_is_ip6_overlay_enabled();
+int dp_is_hw_protection_enabled();
 
 uint16_t dp_get_pf1_port_id();
 uint16_t dp_get_pf0_port_id();

@@ -177,6 +177,8 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_set_meta *meta_action,
 							uint32_t meta_value);
 
+int create_drop_action(struct rte_flow_action *action, int action_cnt);
+
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,

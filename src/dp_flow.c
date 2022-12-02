@@ -152,10 +152,11 @@ void dp_add_flow(struct flow_key *key)
 	}
 }
 
-void dp_delete_flow(struct flow_key *key)
+int dp_delete_flow(struct flow_key *key)
 {
 	int pos;
 	uint32_t hash_v;
+	int result = 0;
 	
 	if (dp_flow_exists(key)) {
 		hash_v = (uint32_t)dp_get_flow_hash_value(key);
@@ -166,11 +167,14 @@ void dp_delete_flow(struct flow_key *key)
 		else {
 			DPS_LOG(DEBUG, DPSERVICE, "Successfully deleted an existing hash key: %d \n", hash_v);
 			dp_output_flow_key_info(key);
+			result = 1;
 		}
 	} else {
-		DPS_LOG(WARNING, DPSERVICE, "Attempt to delete a non-existing hash key \n");
+		DPS_LOG(DEBUG, DPSERVICE, "Attempt to delete a non-existing hash key \n");
 		dp_output_flow_key_info(key);
 	}
+
+	return result;
 
 }
 
@@ -200,9 +204,12 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 void dp_free_flow(struct flow_value *cntrack)
 {
 	dp_free_network_nat_port(cntrack);
-	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
-	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
-	rte_free(cntrack);
+	if (dp_delete_flow(&cntrack->flow_key[cntrack->dir]))
+		cntrack->owner -= 1;
+	if (dp_delete_flow(&cntrack->flow_key[!cntrack->dir]))
+		cntrack->owner -= 1;
+	if (!cntrack->owner) // cntack->owner == 0
+		rte_free(cntrack);
 }
 
 void dp_free_network_nat_port(struct flow_value *cntrack)
@@ -249,10 +256,14 @@ void dp_process_aged_flows(int port_id)
 		if (!agectx)
 			continue;
 		rte_flow_destroy(port_id, agectx->rte_flow, &error);
-		DPS_LOG(DEBUG, DPSERVICE, "Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
+		DPS_LOG(DEBUG, DPSERVICE, "Aged flow to sw table agectx: rteflow %p flowval: flowcnt %d  rte_flow inserted on port %d\n",
 			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
-		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt)) {
+			agectx->cntrack->owner -= 1;
 			dp_free_flow(agectx->cntrack);
+		} else {
+			agectx->cntrack->owner -= 1;
+		}
 		rte_free(agectx);
 	}
 free:

@@ -42,6 +42,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+	flow_val->owner = 1;
+	flow_val->drop_pkt = 0;
 	dp_add_flow_data(key, flow_val);
 
 	// Only the original flow (outgoing)'s hash value is recorded
@@ -50,6 +52,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	dp_invert_flow_key(key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = *key;
 	dp_add_flow(key);
+	flow_val->owner += 1;
 	dp_add_flow_data(key, flow_val);
 	return flow_val;
 }
