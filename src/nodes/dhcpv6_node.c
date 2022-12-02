@@ -4,10 +4,10 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/dhcpv6_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
-#include "dp_debug.h"
 
 
 struct dhcpv6_node_main dhcpv6_node;
@@ -16,8 +16,6 @@ static struct server_id  sid;
 static struct ia_option recv_ia;
 static struct rapid_commit rapid;
 uint8_t client_id_len;
-static uint8_t port_id;
-
 
 void parse_options(struct dhcpv6_packet* dhcp_pkt, uint8_t len) {
 	uint16_t op_id;
@@ -42,7 +40,7 @@ void parse_options(struct dhcpv6_packet* dhcp_pkt, uint8_t len) {
 	}
 }
 
-void prepare_ia_option() {
+void prepare_ia_option(uint16_t port_id) {
 	recv_ia.op = htons(DP_IA_NA);
 	recv_ia.len = htons(sizeof(struct ia));
 	recv_ia.val.time_1 = INFINITY;
@@ -52,7 +50,7 @@ void prepare_ia_option() {
 	recv_ia.val.addrv6.len = htons(sizeof(struct ia_addr));
 	recv_ia.val.addrv6.addr.time_1 = INFINITY;
 	recv_ia.val.addrv6.addr.time_2 = INFINITY;
-	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_dhcp_range_ip6(port_id),16);
+	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_dhcp_range_ip6(port_id), 16);
 
 	recv_ia.val.addrv6.addr.code.op = htons(DP_STATUS_CODE);
 	recv_ia.val.addrv6.addr.code.len = htons(2);
@@ -71,7 +69,7 @@ static int dhcpv6_node_init(const struct rte_graph *graph, struct rte_node *node
 	return 0;
 }
 
-static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr;
 	struct rte_ipv6_hdr *req_ipv6_hdr; 
@@ -81,7 +79,6 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	uint8_t* own_ip6 = dp_get_gw_ip6(m->port);
 	uint8_t offset = 0;
 	uint8_t index = 0;
-	port_id = m->port;
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
@@ -92,8 +89,6 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	recv_len = rte_pktmbuf_data_len(m);
 	options_len = recv_len -  DHCPV6_FIXED_LEN - sizeof(struct rte_ether_hdr) - sizeof(struct rte_ipv6_hdr ) - sizeof(struct rte_udp_hdr);
 
-	//printf("DHCP msg type:%d\n",type);
-	//printf("DHCP msg len:%d, %d\n",recv_len, options_len);
 	parse_options(dhcp_pkt, options_len);
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_memcpy(req_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
@@ -120,7 +115,7 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 			break;
 
 		default:
-			return 0;
+			return DHCPV6_NEXT_DROP;
 	}
 	sid.op = htons(DP_SERVERID);
 	sid.len = htons(sizeof(struct duid_t));
@@ -128,12 +123,12 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	sid.id.hw_type = htons(DP_DUMMY_HW_ID);
 	rte_ether_addr_copy(&req_eth_hdr->dst_addr, &sid.id.mac);
 
-	prepare_ia_option();
+	prepare_ia_option(m->port);
 
 	if(offset >= options_len) {
-		char *data = rte_pktmbuf_append(m, offset - options_len);		
-		if(data == NULL) {
-			printf("not enough space\n");
+		if (!rte_pktmbuf_append(m, offset - options_len)) {
+			DPS_LOG(WARNING, DPSERVICE, "Not enough space for DHCPv6 options in packet\n");
+			return DHCPV6_NEXT_DROP;
 		}
 	} else {
 		rte_pktmbuf_trim(m, options_len-offset);
@@ -150,43 +145,21 @@ static __rte_always_inline int handle_dhcpv6(struct rte_mbuf *m)
 	req_udp_hdr->dgram_len = htons(offset + DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
 	req_udp_hdr->dgram_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_udp_hdr);
 
-    return 1;
+	return dhcpv6_node.next_index[m->port];
 }
 
-static __rte_always_inline uint16_t dhcpv6_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static uint16_t dhcpv6_node_process(struct rte_graph *graph,
+									struct rte_node *node,
+									void **objs,
+									uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		if (!dp_is_ip6_overlay_enabled()) {
-			next_index = DHCPV6_NEXT_DROP;
-		} else {
-			if (handle_dhcpv6(mbuf0) > 0)
-				next_index = dhcpv6_node.next_index[mbuf0->port];
-			else
-				next_index = DHCPV6_NEXT_DROP;
-		}
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}	
-
-    return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
-int dhcpv6_set_next(uint16_t portid, uint16_t next_index)
+int dhcpv6_set_next(uint16_t port_id, uint16_t next_index)
 {
-
-	dhcpv6_node.next_index[portid] = next_index;
+	dhcpv6_node.next_index[port_id] = next_index;
 	return 0;
 }
 

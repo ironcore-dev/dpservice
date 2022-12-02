@@ -4,6 +4,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "dp_util.h"
+#include "nodes/common_node.h"
 #include "nodes/rx_node_priv.h"
 #include "node_api.h"
 #include "dp_debug.h"
@@ -82,8 +83,7 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 		return 0;
 
 	node->idx = n_pkts;
-	GRAPHTRACE_BURST_NEXT(node, (struct rte_mbuf **)objs, n_pkts, ctx->next);
-	rte_node_next_stream_move(graph, node, ctx->next);
+	dp_forward_graph_packets(graph, node, objs, n_pkts, ctx->next);
 
 	return n_pkts;
 }

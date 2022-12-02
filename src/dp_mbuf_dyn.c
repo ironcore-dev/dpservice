@@ -2,6 +2,9 @@
 #include <rte_malloc.h>
 #include "node_api.h"
 
+// TODO either move into headers or switch to -flto
+// TODO return value never checked, add assertion here
+
 __rte_always_inline struct dp_flow * get_dp_flow_ptr(struct rte_mbuf *m)
 {
 	if (!m)

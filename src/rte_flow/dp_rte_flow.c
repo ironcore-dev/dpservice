@@ -304,7 +304,7 @@ uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
 
 	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	uint16_t old_identifier = 65535;
+	uint16_t old_identifier = DP_IP_ICMP_ID_INVALID;
 	uint32_t cksum;
 
 	df = get_dp_flow_ptr(m);

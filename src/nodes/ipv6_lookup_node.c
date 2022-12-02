@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include <rte_malloc.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/ipv6_lookup_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "nodes/dhcp_node.h"
@@ -13,7 +14,6 @@
 #include "dp_lpm.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
-#include "dp_debug.h"
 
 struct ipv6_lookup_node_main ipv6_lookup_node;
 
@@ -28,24 +28,19 @@ static int ipv6_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
-static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-
-	int ret = 0;
-	int t_vni = 0;
-
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	struct rte_ipv6_hdr *ipv6_hdr;
 	struct vm_route route;
-	struct dp_flow *df_ptr;
+	int t_vni;
+	int ret;
 
-	ret = DP_ROUTE_DROP;
-
-	df_ptr = get_dp_flow_ptr(m);
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-	{
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		t_vni = df_ptr->tun_info.dst_vni;
 		ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *);
 	} else {
+		t_vni = 0;
 		ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
 										   sizeof(struct rte_ether_hdr));
 	}
@@ -61,58 +56,36 @@ static __rte_always_inline int handle_ipv6_lookup(struct rte_mbuf *m)
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
 	ret = lpm_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
+	if (ret < 0)
+		return IPV6_LOOKUP_NEXT_DROP;
 
-	if (ret >= 0)
+	df_ptr->nxt_hop = ret;
+
+	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
+		df_ptr->tun_info.dst_vni = route.vni;
+
+	if (dp_is_pf_port_id(df_ptr->nxt_hop))
 	{
-		df_ptr->nxt_hop = ret;
-
-		if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
-			df_ptr->tun_info.dst_vni = route.vni;
-
-		if (dp_is_pf_port_id(df_ptr->nxt_hop))
-		{
-			rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
-		}
-
-		if (!df_ptr->flags.flow_type)
-			df_ptr->flags.flow_type = DP_FLOW_TYPE_LOCAL;
-
-		ret = IPV6_LOOKUP_NEXT_L2_DECAP;
-
-		if (dp_is_offload_enabled())
-			df_ptr->flags.valid = 1;
+		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	}
 
-	return ret;
+	if (!df_ptr->flags.flow_type)
+		df_ptr->flags.flow_type = DP_FLOW_TYPE_LOCAL;
+
+	if (dp_is_offload_enabled())
+		df_ptr->flags.valid = 1;
+
+	return IPV6_LOOKUP_NEXT_L2_DECAP;
 }
 
-static __rte_always_inline uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
-															 struct rte_node *node,
-															 void **objs,
-															 uint16_t cnt)
+static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
+										 struct rte_node *node,
+										 void **objs,
+										 uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int route;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++)
-	{
-		mbuf0 = pkts[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		route = handle_ipv6_lookup(mbuf0);
-		if (route > 0)
-			next_index = route;
-		else
-			next_index = IPV6_LOOKUP_NEXT_DROP;
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int ipv6_lookup_set_next(uint16_t port_id, uint16_t next_index)

@@ -4,10 +4,10 @@
 #include <rte_arp.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
 #include "dp_mbuf_dyn.h"
+#include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
-#include "dp_debug.h"
 
 #include "rte_flow/dp_rte_flow.h"
 
@@ -22,12 +22,15 @@ enum
 	CLS_NEXT_MAX
 };
 
-static const uint8_t p_nxt[256] __rte_cache_aligned = {
-	[RTE_PTYPE_L3_IPV4] = CLS_NEXT_IPV4_LOOKUP,
+static const uint8_t next_nodes[256] __rte_cache_aligned = {
+	[RTE_PTYPE_L3_IPV4] =
+		CLS_NEXT_IPV4_LOOKUP,
 
-	[RTE_PTYPE_L3_IPV4_EXT] = CLS_NEXT_IPV4_LOOKUP,
+	[RTE_PTYPE_L3_IPV4_EXT] =
+		CLS_NEXT_IPV4_LOOKUP,
 
-	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN] = CLS_NEXT_IPV4_LOOKUP,
+	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN] =
+		CLS_NEXT_IPV4_LOOKUP,
 
 	[RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L2_ETHER] =
 		CLS_NEXT_IPV4_LOOKUP,
@@ -38,11 +41,14 @@ static const uint8_t p_nxt[256] __rte_cache_aligned = {
 	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN | RTE_PTYPE_L2_ETHER] =
 		CLS_NEXT_IPV4_LOOKUP,
 	
-	[RTE_PTYPE_L3_IPV6] = CLS_NEXT_IPV6_LOOKUP,
+	[RTE_PTYPE_L3_IPV6] =
+		CLS_NEXT_IPV6_LOOKUP,
 
-	[RTE_PTYPE_L3_IPV6_EXT] = CLS_NEXT_IPV6_LOOKUP,
+	[RTE_PTYPE_L3_IPV6_EXT] =
+		CLS_NEXT_IPV6_LOOKUP,
 
-	[RTE_PTYPE_L3_IPV6_EXT_UNKNOWN] = CLS_NEXT_IPV6_LOOKUP,
+	[RTE_PTYPE_L3_IPV6_EXT_UNKNOWN] =
+		CLS_NEXT_IPV6_LOOKUP,
 
 	[RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L2_ETHER] =
 		CLS_NEXT_IPV6_LOOKUP,
@@ -65,102 +71,79 @@ static int cls_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 	ctx->next = CLS_NEXT_DROP;
 
-
 	RTE_SET_USED(graph);
 
 	return 0;
 }
 
-static __rte_always_inline int is_arp(struct rte_mbuf *m){
-	struct rte_ether_hdr *req_eth_hdr; 
-	struct rte_arp_hdr *req_arp_hdr;
-
-	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	req_arp_hdr = (struct rte_arp_hdr*) (req_eth_hdr + 1);
-
-	// Validate ethernet / IPv4 ARP values are correct
-	if (req_arp_hdr->arp_hardware != ntohs(1))
-		return 0;
-	if (req_arp_hdr->arp_protocol != ntohs(0x0800))
-		return 0;
-	if (req_arp_hdr->arp_hlen != 6)
-		return 0;
-	if (req_arp_hdr->arp_plen != 4)
-		return 0;
-
-	return 1;
-} 
-
-static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m){
-	struct rte_ether_hdr *req_eth_hdr;
-	struct rte_ipv6_hdr *req_ipv6_hdr;
-	struct icmp6hdr *req_icmp6_hdr;
-
-	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	if ( req_eth_hdr->ether_type != htons(RTE_ETHER_TYPE_IPV6)) 
-		return 0;
-	
-	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
-	if ( req_ipv6_hdr->proto != DP_IP_PROTO_ICMPV6) 
-		return 0;
-
-	req_icmp6_hdr = (struct icmp6hdr*) (req_ipv6_hdr + 1);
-	uint8_t type = req_icmp6_hdr->icmp6_type ;
-
-	if (type != NDISC_NEIGHBOUR_SOLICITATION && type != NDISC_ROUTER_SOLICITATION)
-		return 0;
-
-	return 1;
-} 
-
-
-static __rte_always_inline uint16_t cls_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static __rte_always_inline int is_arp(struct rte_mbuf *m)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	uint8_t comp = 0;
-	int i;
+	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	struct rte_arp_hdr *req_arp_hdr = (struct rte_arp_hdr*)(req_eth_hdr + 1);
+
+	return req_arp_hdr->arp_hardware == ntohs(RTE_ARP_HRD_ETHER)
+		&& req_arp_hdr->arp_hlen == RTE_ETHER_ADDR_LEN
+		&& req_arp_hdr->arp_protocol == ntohs(RTE_ETHER_TYPE_IPV4)
+		&& req_arp_hdr->arp_plen == 4
+		;
+} 
+
+static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m)
+{
+	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr*)(req_eth_hdr + 1);
+	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr*)(req_ipv6_hdr + 1);
+
+	return req_eth_hdr->ether_type == htons(RTE_ETHER_TYPE_IPV6)
+		&& req_ipv6_hdr->proto == DP_IP_PROTO_ICMPV6
+		&& (req_icmp6_hdr->icmp6_type == NDISC_NEIGHBOUR_SOLICITATION
+			|| req_icmp6_hdr->icmp6_type == NDISC_ROUTER_SOLICITATION)
+		;
+} 
+
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+{
+	uint8_t pkt_type = (m->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
 	struct dp_flow *df;
 
-	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = CLS_NEXT_DROP;
+	init_dp_mbuf_priv1(m);
 
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		init_dp_mbuf_priv1(mbuf0);
-		comp = (mbuf0->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
-		/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
-		if (comp == RTE_PTYPE_L2_ETHER && is_arp(mbuf0))
-			next_index = CLS_NEXT_ARP;
-		else if (is_ipv6_nd(mbuf0)) 
-			next_index = CLS_NEXT_IPV6_ND;
-		else if (p_nxt[comp] == CLS_NEXT_IPV4_LOOKUP) { 
-			/* TODO Drop ipv4 packets coming from PF ports */
-			extract_inner_ethernet_header(mbuf0);
-			next_index = CLS_NEXT_IPV4_LOOKUP;
-		} else if (p_nxt[comp] == CLS_NEXT_IPV6_LOOKUP) {
-			df = get_dp_flow_ptr(mbuf0);
-			if (dp_is_pf_port_id(mbuf0->port)){
-				df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
-				extract_outter_ethernet_header(mbuf0);
-				rte_pktmbuf_adj(mbuf0, (uint16_t)sizeof(struct rte_ether_hdr));
-				next_index = CLS_NEXT_OVERLAY_SWITCH;
-			}
-			else{
-				extract_inner_ethernet_header(mbuf0);
-				next_index = CLS_NEXT_IPV6_LOOKUP;
-			}
+	/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
+	if (pkt_type == RTE_PTYPE_L2_ETHER && is_arp(m))
+		return CLS_NEXT_ARP;
+
+	if (is_ipv6_nd(m))
+		return CLS_NEXT_IPV6_ND;
+
+	if (next_nodes[pkt_type] == CLS_NEXT_IPV4_LOOKUP) {
+		/* TODO Drop ipv4 packets coming from PF ports */
+		extract_inner_ethernet_header(m);
+		return CLS_NEXT_IPV4_LOOKUP;
+	}
+
+	if (next_nodes[pkt_type] == CLS_NEXT_IPV6_LOOKUP) {
+		if (dp_is_pf_port_id(m->port)) {
+			df = get_dp_flow_ptr(m);
+			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
+			extract_outter_ethernet_header(m);
+			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
+			return CLS_NEXT_OVERLAY_SWITCH;
+		} else {
+			extract_inner_ethernet_header(m);
+			return CLS_NEXT_IPV6_LOOKUP;
 		}
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}	
+	}
 
-	return cnt;
+	return CLS_NEXT_DROP;
+}
+
+static uint16_t cls_node_process(struct rte_graph *graph,
+								 struct rte_node *node,
+								 void **objs,
+								 uint16_t nb_objs)
+{
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 static struct rte_node_register cls_node_base = {

@@ -8,12 +8,12 @@
 #include "dp_flow.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "nodes/common_node.h"
 #include "nodes/conntrack_node.h"
 #include "nodes/dhcp_node.h"
 #include "dp_nat.h"
 #include <stdio.h>
 #include <unistd.h>
-#include "dp_debug.h"
 
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -81,7 +81,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
 }
 
-static __rte_always_inline rte_edge_t handle_conntrack(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -92,10 +92,10 @@ static __rte_always_inline rte_edge_t handle_conntrack(struct rte_mbuf *m)
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
 	if (extract_inner_l3_header(m, ipv4_hdr, 0) < 0)
-		return DP_ROUTE_DROP;
+		return CONNTRACK_NEXT_DROP;
 
 	if (extract_inner_l4_header(m, ipv4_hdr + 1, 0) < 0)
-		return DP_ROUTE_DROP;
+		return CONNTRACK_NEXT_DROP;
 
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
 		return CONNTRACK_NEXT_DNAT;
@@ -103,24 +103,28 @@ static __rte_always_inline rte_edge_t handle_conntrack(struct rte_mbuf *m)
 	if (!dp_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
-	if ((df_ptr->l4_type == IPPROTO_TCP) || (df_ptr->l4_type == IPPROTO_UDP)
-		|| (df_ptr->l4_type == IPPROTO_ICMP)) {
-			memset(&key, 0, sizeof(struct flow_key));
-			if (dp_build_flow_key(&key, m) < 0) {
-				DPS_LOG(WARNING, DPSERVICE, "failed to build a flow key \n");
-				return DP_ROUTE_DROP;
-			}
-			if (dp_flow_exists(&key)) {
-				dp_get_flow_data(&key, (void **)&flow_val);
-				change_flow_state_dir(&key, flow_val, df_ptr);
-			} else {
-				flow_val = flow_table_insert_entry(&key, df_ptr, m);
-				if (!flow_val)
-					DPS_LOG(ERR, DPSERVICE, "failed to add a flow table entry due to NULL flow_val pointer \n");
-			}
-			flow_val->timestamp = rte_rdtsc();
-			df_ptr->conntrack = flow_val;
+	if (df_ptr->l4_type == IPPROTO_TCP ||
+		df_ptr->l4_type == IPPROTO_UDP ||
+		df_ptr->l4_type == IPPROTO_ICMP
+	) {
+		memset(&key, 0, sizeof(key));
+		if (dp_build_flow_key(&key, m) < 0) {
+			DPS_LOG(WARNING, DPSERVICE, "Failed to build a flow key\n");
+			return CONNTRACK_NEXT_DROP;
 		}
+		if (dp_flow_exists(&key)) {
+			dp_get_flow_data(&key, (void **)&flow_val);
+			change_flow_state_dir(&key, flow_val, df_ptr);
+		} else {
+			flow_val = flow_table_insert_entry(&key, df_ptr, m);
+			if (!flow_val) {
+				DPS_LOG(ERR, DPSERVICE, "Failed to add a flow table entry due to NULL flow_val pointer\n");
+				return CONNTRACK_NEXT_DROP;
+			}
+		}
+		flow_val->timestamp = rte_rdtsc();
+		df_ptr->conntrack = flow_val;
+	}
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		return CONNTRACK_NEXT_LB;
@@ -128,26 +132,13 @@ static __rte_always_inline rte_edge_t handle_conntrack(struct rte_mbuf *m)
 	return CONNTRACK_NEXT_DNAT;
 }
 
-static __rte_always_inline uint16_t conntrack_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static uint16_t conntrack_node_process(struct rte_graph *graph,
+									   struct rte_node *node,
+									   void **objs,
+									   uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		next_index = handle_conntrack(mbuf0);
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 static struct rte_node_register conntrack_node_base = {

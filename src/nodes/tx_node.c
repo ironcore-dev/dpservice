@@ -5,6 +5,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/ipv6_nd_node.h"
 #include "dp_flow.h"
@@ -12,7 +13,6 @@
 #include "dp_util.h"
 #include "dp_nat.h"
 #include "dp_mbuf_dyn.h"
-#include "dp_debug.h"
 
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
@@ -48,49 +48,49 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 static uint16_t tx_node_process(struct rte_graph *graph,
 								struct rte_node *node,
 								void **objs,
-								uint16_t cnt)
+								uint16_t nb_objs)
 {
 	struct tx_node_ctx *ctx = (struct tx_node_ctx *)node->ctx;
-	struct rte_mbuf *mbuf0, **pkts;
-	uint16_t port, queue;
-	uint16_t sent_count, i;
+	uint16_t port = ctx->port_id;
+	uint16_t queue = ctx->queue_id;
+	uint16_t sent_count;
+	uint16_t new_eth_type;
+	struct rte_mbuf *pkt;
+	uint i;
 
-	port = ctx->port_id;
-	queue = ctx->queue_id;
-	pkts = (struct rte_mbuf **)objs;
+	// since this node is emitting packets, dp_forward_* wrapper functions cannot be used
+	// this code should colely resemble the one inside those functions
 
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		df = get_dp_flow_ptr(mbuf0);
-		// TODO what to do here? drop? is is impossible to happen right now,
-		// but that's hidden by the function
-		// (and the condition was already present below)
-		// NOTE: dropping it would break the burst TX below
-		if (!df)
-			continue;
-		// TODO this condition needs some commenting on what it does
-		if ((mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) ||
-			df->flags.nat >= DP_LB_CHG_UL_DST_IP ||
-			df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
+	for (i = 0; i < nb_objs; ++i) {
+		pkt = (struct rte_mbuf *)objs[i];
+		df = get_dp_flow_ptr(pkt);
+		// Rewrite ethernet header for most packets, unless:
+		//  - packet created by rewriting a source packet (pkt->port == port)
+		//  - packet for VF to VF communication (DP_PER_TYPE_DIRECT_TX)
+		//  - packet is coming from loadbalancer node (DP_LB_*)
+		//  - packet is bouncing back to network in scalable NAT (DP_FLOW_TYPE_OUTGOING)
+		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
+			|| df->flags.nat >= DP_LB_CHG_UL_DST_IP
+			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
 		) {
-			uint16_t new_eth_type = dp_is_pf_port_id(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
-			rewrite_eth_hdr(mbuf0, port, new_eth_type);
+			new_eth_type = dp_is_pf_port_id(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
+			rewrite_eth_hdr(pkt, port, new_eth_type);
 		}
 		if (df->flags.valid && df->conntrack)
-			dp_handle_traffic_forward_offloading(mbuf0, df);
+			dp_handle_traffic_forward_offloading(pkt, df);
 	}
 
-	sent_count = rte_eth_tx_burst(port, queue, pkts, cnt);
-	GRAPHTRACE_BURST_TX(node, pkts, sent_count, port);
+	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);
+	GRAPHTRACE_BURST_TX(node, objs, sent_count, port);
 
-	if (unlikely(sent_count != cnt)) {
-		DPS_LOG(WARNING, DPSERVICE, "Not all packets transmitted successfully (%d/%d) in %s node\n", sent_count, cnt, node->name);
-		GRAPHTRACE_BURST_NEXT(node, objs + sent_count, cnt - sent_count, TX_NEXT_DROP);
-		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, cnt - sent_count);
+	if (unlikely(sent_count != nb_objs)) {
+		DPS_LOG(WARNING, DPSERVICE, "Not all packets transmitted successfully (%d/%d) in %s node\n", sent_count, nb_objs, node->name);
+		GRAPHTRACE_BURST_NEXT(node, objs + sent_count, nb_objs - sent_count, TX_NEXT_DROP);
+		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, nb_objs - sent_count);
 	}
 
 	// maybe sent_count makes more sense, but cnt is the real number of processed packets by this node
-	return cnt;
+	return nb_objs;
 }
 
 struct ethdev_tx_node_main *tx_node_data_get(void)

@@ -7,8 +7,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 #include "dpdk_layer.h"
-#include "dp_debug.h"
-
+#include "nodes/common_node.h"
 #include "nodes/geneve_tunnel_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -58,10 +57,9 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_mbuf
 
 static __rte_always_inline rte_edge_t handle_geneve_tunnel_decap(struct rte_mbuf *m, struct dp_flow *df)
 {
-	rte_edge_t route = GENEVE_TUNNEL_NEXT_DROP;
+	rte_edge_t next_index = GENEVE_TUNNEL_NEXT_DROP;
 	struct rte_flow_item_geneve *geneve_hdr;
 	struct rte_udp_hdr *udp_hdr;
-
 
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
 	
@@ -77,43 +75,35 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_decap(struct rte_mbuf
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_flow_item_geneve));
 	if (ntohs(geneve_hdr->protocol) == RTE_ETHER_TYPE_IPV6) {
 		df->l3_type = RTE_ETHER_TYPE_IPV6;
-		route = GENEVE_TUNNEL_NEXT_IPV6_LOOKUP;
-	}
-	else {
+		next_index = GENEVE_TUNNEL_NEXT_IPV6_LOOKUP;
+	} else {
 		df->l3_type = RTE_ETHER_TYPE_IPV4;
-		route = GENEVE_TUNNEL_NEXT_IPV4_LOOKUP;
+		next_index = GENEVE_TUNNEL_NEXT_IPV4_LOOKUP;
 	}
 
-	return route;
-} 
+	return next_index;
+}
 
-static __rte_always_inline uint16_t geneve_tunnel_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int i;
-	struct dp_flow *df;
+	struct dp_flow *df = get_dp_flow_ptr(m);
 
-	pkts = (struct rte_mbuf **)objs;
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+		return handle_geneve_tunnel_encap(m, df);
 
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		df = get_dp_flow_ptr(mbuf0);
-		if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-			next_index = handle_geneve_tunnel_encap(mbuf0, df);
-		else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-			next_index = handle_geneve_tunnel_decap(mbuf0, df);
-		else
-			next_index = GENEVE_TUNNEL_NEXT_DROP;
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}	
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		return handle_geneve_tunnel_decap(m, df);
 
-    return cnt;
+	return GENEVE_TUNNEL_NEXT_DROP;
+}
+
+static uint16_t geneve_tunnel_node_process(struct rte_graph *graph,
+										   struct rte_node *node,
+										   void **objs,
+										   uint16_t nb_objs)
+{
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 

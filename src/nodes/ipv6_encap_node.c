@@ -4,12 +4,12 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/ipv6_encap_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_debug.h"
-
 
 struct ipv6_encap_node_main ipv6_encap_node;
 
@@ -19,14 +19,14 @@ static int ipv6_encap_node_init(const struct rte_graph *graph, struct rte_node *
 
 	ctx->next = IPV6_ENCAP_NEXT_DROP;
 
-
 	RTE_SET_USED(graph);
 
 	return 0;
 }
 
-static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_flow * df)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
+	struct dp_flow *df = get_dp_flow_ptr(m);
 	struct underlay_conf *u_conf = get_underlay_conf();
 	struct rte_ipv6_hdr *ipv6_hdr;
 
@@ -35,9 +35,8 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	m->l2_len = 0; /* We dont have inner l2, when we encapsulate */
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
-
-	if (!ipv6_hdr)
-		return 0;
+	if (unlikely(!ipv6_hdr))
+		return IPV6_ENCAP_NEXT_DROP;
 
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	ipv6_hdr->payload_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
@@ -49,45 +48,25 @@ static __rte_always_inline int handle_ipv6_encap(struct rte_mbuf *m, struct dp_f
 	m->ol_flags |= RTE_MBUF_F_TX_OUTER_IPV6;
 	m->ol_flags |= RTE_MBUF_F_TX_TUNNEL_IP;
 
-	return 1;
+	if (df->flags.nat == DP_LB_RECIRC) {
+		rewrite_eth_hdr(m, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
+		return IPV6_ENCAP_NEXT_CLS;
+	}
+
+	return ipv6_encap_node.next_index[df->nxt_hop];
 } 
 
 static uint16_t ipv6_encap_node_process(struct rte_graph *graph,
 										struct rte_node *node,
 										void **objs,
-										uint16_t cnt)
+										uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	struct dp_flow *df;
-	rte_edge_t next_index;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		df = get_dp_flow_ptr(mbuf0);
-		if (handle_ipv6_encap(mbuf0, df)) {
-			if (df->flags.nat == DP_LB_RECIRC) {
-				rewrite_eth_hdr(mbuf0, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
-				next_index = IPV6_ENCAP_NEXT_CLS;
-			} else {
-				next_index = ipv6_encap_node.next_index[df->nxt_hop];
-			}
-		} else {
-			next_index = IPV6_ENCAP_NEXT_DROP;
-		}
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int ipv6_encap_set_next(uint16_t port_id, uint16_t next_index)
 {
-
 	ipv6_encap_node.next_index[port_id] = next_index;
 	return 0;
 }

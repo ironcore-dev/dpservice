@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "nodes/rx_periodic_node.h"
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
@@ -12,7 +13,6 @@
 #include "grpc/dp_grpc_impl.h"
 #include <unistd.h>
 #include "monitoring/dp_monitoring.h"
-#include "dp_debug.h"
 
 static struct rx_periodic_node_main rx_periodic_node;
 static struct rx_periodic_node_receive_queues rx_periodic_node_recv_queues;
@@ -53,18 +53,25 @@ static __rte_always_inline void handle_nongraph_queues()
 		dp_process_request(mbufs[i]);
 }
 
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+{
+	struct dp_flow *df_ptr = alloc_dp_flow_ptr(m);
+	if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
+		if (dp_is_offload_enabled())
+			dp_process_aged_flows(m->port);
+		return rx_periodic_node.next_index[m->port];
+	}
+	return RX_PERIODIC_NEXT_CLS;
+}
+
 static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 										 struct rte_node *node,
 										 void **objs,
-										 uint16_t cnt)
+										 uint16_t nb_objs)
 {
-	struct rx_periodic_node_ctx *ctx = (struct rx_periodic_node_ctx *)node->ctx;
-	struct rte_mbuf *mbuf0;
-	struct dp_flow *df_ptr;
-	rte_edge_t next_index;
-	uint n_pkts, i;
+	uint n_pkts;
 
-	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
+	RTE_SET_USED(nb_objs);  // this is a source node, input data is not present yet
 
 	// TODO(plague, separate PR)
 	// these actually do not belong here, because they have nothing to do with the graph
@@ -83,24 +90,9 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 		return 0;
 
 	node->idx = n_pkts;
-	for (i = 0; i < n_pkts; ++i) {
-		mbuf0 = ((struct rte_mbuf **)objs)[i];
-		GRAPHTRACE_PKT(node, mbuf0);
-		df_ptr = alloc_dp_flow_ptr(mbuf0);
-		if (unlikely(!df_ptr)) {
-			DPS_LOG(WARNING, DPSERVICE, "Cannot allocate dp flow pointer for a packet in %s node\n", node->name);
-			next_index = RX_PERIODIC_NEXT_DROP;
-		} else if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
-			if (dp_is_offload_enabled())
-				dp_process_aged_flows(mbuf0->port);
-			next_index = rx_periodic_node.next_index[mbuf0->port];
-		} else
-			next_index = ctx->next;
-		GRAPHTRACE_PKT_NEXT(node, mbuf0, next_index);
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}
-
+	dp_foreach_graph_packet(graph, node, objs, n_pkts, get_next_index);
 	return n_pkts;
+
 }
 
 int rx_periodic_set_next(uint16_t port_id, uint16_t next_index)
