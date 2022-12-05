@@ -56,6 +56,7 @@ static __rte_always_inline void handle_nongraph_queues()
 static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr = alloc_dp_flow_ptr(m);
+
 	if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
 		if (dp_is_offload_enabled())
 			dp_process_aged_flows(m->port);
@@ -92,7 +93,6 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 	node->idx = n_pkts;
 	dp_foreach_graph_packet(graph, node, objs, n_pkts, get_next_index);
 	return n_pkts;
-
 }
 
 int rx_periodic_set_next(uint16_t port_id, uint16_t next_index)
@@ -112,7 +112,6 @@ static struct rte_node_register rx_periodic_node_base = {
 	.next_nodes =
 		{
 			[RX_PERIODIC_NEXT_CLS] = "cls",
-			[RX_PERIODIC_NEXT_DROP] = "drop",
 		},
 };
 

@@ -64,11 +64,12 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	for (i = 0; i < nb_objs; ++i) {
 		pkt = (struct rte_mbuf *)objs[i];
 		df = get_dp_flow_ptr(pkt);
-		// Rewrite ethernet header for most packets, unless:
-		//  - packet created by rewriting a source packet (pkt->port == port)
-		//  - packet for VF to VF communication (DP_PER_TYPE_DIRECT_TX)
-		//  - packet is coming from loadbalancer node (DP_LB_*)
-		//  - packet is bouncing back to network in scalable NAT (DP_FLOW_TYPE_OUTGOING)
+		// Rewrite ethernet header for all packets except:
+		//  - packets created by rewriting a source packet (pkt->port == port)
+		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)
+		// Always rewrite regardless the above for:
+		//  - packets coming from loadbalancer node (DP_LB_*)
+		//  - packets already encapsulated for outgoing traffic (DP_FLOW_TYPE_OUTGOING)
 		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
 			|| df->flags.nat >= DP_LB_CHG_UL_DST_IP
 			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING

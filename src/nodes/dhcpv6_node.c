@@ -40,7 +40,8 @@ void parse_options(struct dhcpv6_packet* dhcp_pkt, uint8_t len) {
 	}
 }
 
-void prepare_ia_option(uint16_t port_id) {
+void prepare_ia_option(uint16_t port_id)
+{
 	recv_ia.op = htons(DP_IA_NA);
 	recv_ia.len = htons(sizeof(struct ia));
 	recv_ia.val.time_1 = INFINITY;

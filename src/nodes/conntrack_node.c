@@ -103,9 +103,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 	if (!dp_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
-	if (df_ptr->l4_type == IPPROTO_TCP ||
-		df_ptr->l4_type == IPPROTO_UDP ||
-		df_ptr->l4_type == IPPROTO_ICMP
+	if (df_ptr->l4_type == IPPROTO_TCP
+		|| df_ptr->l4_type == IPPROTO_UDP
+		|| df_ptr->l4_type == IPPROTO_ICMP
 	) {
 		memset(&key, 0, sizeof(key));
 		if (dp_build_flow_key(&key, m) < 0) {

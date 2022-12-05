@@ -79,7 +79,7 @@ static int cls_node_init(const struct rte_graph *graph, struct rte_node *node)
 static __rte_always_inline int is_arp(struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	struct rte_arp_hdr *req_arp_hdr = (struct rte_arp_hdr*)(req_eth_hdr + 1);
+	struct rte_arp_hdr *req_arp_hdr = (struct rte_arp_hdr *)(req_eth_hdr + 1);
 
 	return req_arp_hdr->arp_hardware == ntohs(RTE_ARP_HRD_ETHER)
 		&& req_arp_hdr->arp_hlen == RTE_ETHER_ADDR_LEN
@@ -91,8 +91,8 @@ static __rte_always_inline int is_arp(struct rte_mbuf *m)
 static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr*)(req_eth_hdr + 1);
-	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr*)(req_ipv6_hdr + 1);
+	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
+	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr *)(req_ipv6_hdr + 1);
 
 	return req_eth_hdr->ether_type == htons(RTE_ETHER_TYPE_IPV6)
 		&& req_ipv6_hdr->proto == DP_IP_PROTO_ICMPV6

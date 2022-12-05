@@ -1,3 +1,5 @@
+#ifdef ENABLE_GRAPHTRACE
+
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
@@ -56,3 +58,5 @@ void dp_graphtrace_next(struct rte_node *node, void *obj, rte_edge_t next_index)
 	GRAPHTRACE_PRINT(obj, "%-14s: %p -> %-14s",
 					 node->name, GRAPHTRACE_PKT_ID(obj), node->nodes[next_index]->name);
 }
+
+#endif

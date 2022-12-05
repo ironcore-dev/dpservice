@@ -64,8 +64,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df_ptr->tun_info.dst_vni = route.vni;
 
-	if (dp_is_pf_port_id(df_ptr->nxt_hop))
-	{
+	if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
 		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	}
