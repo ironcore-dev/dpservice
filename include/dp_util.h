@@ -11,6 +11,9 @@ extern "C" {
 #define DP_TIMESTAMP_BUF_SIZE 26
 
 #define RTE_LOGTYPE_DPSERVICE RTE_LOGTYPE_USER1
+#define RTE_LOGTYPE_GRAPHTRACE RTE_LOGTYPE_USER2
+// TODO(plague) this uses local definition but does not hide them properly
+// DPS_LOG(X, Y, "%s", buf); will lead to a bug!
 #define DPS_LOG(l, t, ...)						\
 	do {										\
 	char buf[DP_TIMESTAMP_BUF_SIZE] = {0};		\

@@ -3,9 +3,9 @@
 #include <rte_mbuf.h>
 #include <rte_malloc.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
-#include "dp_debug.h"
 
 
 static __rte_always_inline void prepare_drop(struct rte_mbuf *m)
@@ -33,7 +33,7 @@ static uint16_t drop_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < nb_objs; ++i) {
 		pkt = (struct rte_mbuf *)objs[i];
-		GRAPHTRACE_PKT(node, pkt);
+		dp_graphtrace(node, pkt);
 		prepare_drop(pkt);
 		rte_pktmbuf_free(pkt);
 	}
