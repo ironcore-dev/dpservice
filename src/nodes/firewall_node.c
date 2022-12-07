@@ -4,10 +4,9 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dp_flow.h"
 #include "dp_util.h"
 #include "nodes/firewall_node.h"
+#include "nodes/common_node.h"
 
 
 static int firewall_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -16,38 +15,23 @@ static int firewall_node_init(const struct rte_graph *graph, struct rte_node *no
 
 	ctx->next = FIREWALL_NEXT_DROP;
 
-
 	RTE_SET_USED(graph);
 
 	return 0;
 }
 
-static __rte_always_inline int handle_firewall(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-	return DP_FIREWL_PASS_PACKET;
+	return FIREWALL_NEXT_L2_DECAP;
 }
 
-static __rte_always_inline uint16_t firewall_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static uint16_t firewall_node_process(struct rte_graph *graph,
+									  struct rte_node *node,
+									  void **objs,
+									  uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = FIREWALL_NEXT_DROP;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		if (handle_firewall(mbuf0))
-			next_index = FIREWALL_NEXT_L2_DECAP;
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}	
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 static struct rte_node_register firewall_node_base = {

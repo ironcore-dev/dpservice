@@ -4,6 +4,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/dhcp_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
@@ -21,7 +22,6 @@ static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 	struct dhcp_node_ctx *ctx = (struct dhcp_node_ctx *)node->ctx;
 
 	ctx->next = DHCP_NEXT_DROP;
-
 
 	RTE_SET_USED(graph);
 
@@ -94,7 +94,7 @@ static void parse_options(struct dp_dhcp_header *dhcp_pkt, uint16_t tot_op_len)
 	return;
 }
 
-static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
 	struct dp_dhcp_header *dhcp_hdr;
 	struct rte_ether_hdr *incoming_eth_hdr;
@@ -136,7 +136,8 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 	}
 	incoming_ipv4_hdr->hdr_checksum = 0;
 	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) +
-										    sizeof(struct rte_udp_hdr) + sizeof(struct rte_ipv4_hdr));
+											sizeof(struct rte_udp_hdr) +
+											sizeof(struct rte_ipv4_hdr));
 
 	incoming_udp_hdr->dgram_len = htons(sizeof(struct dp_dhcp_header) + sizeof(struct rte_udp_hdr));
 	incoming_udp_hdr->dst_port =  htons(DP_BOOTP_CLNT_PORT);
@@ -152,7 +153,7 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 			dp_set_neigh_mac(m->port, &incoming_eth_hdr->dst_addr);
 			break;
 		default:
-			return 0;
+			return DHCP_NEXT_DROP;
 
 	}
 	dhcp_hdr->op = DP_BOOTP_REPLY;
@@ -191,30 +192,17 @@ static __rte_always_inline int handle_dhcp(struct rte_mbuf *m)
 
 	dhcp_hdr->options[vend_pos] = DP_DHCP_END;
 
-	return 1;
+	set_vf_port_status_as_attached(m->port);
+	return dhcp_node.next_index[m->port];
 }
 
-static __rte_always_inline uint16_t dhcp_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static uint16_t dhcp_node_process(struct rte_graph *graph,
+								  struct rte_node *node,
+								  void **objs,
+								  uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		if (handle_dhcp(mbuf0)) {
-			rte_node_enqueue_x1(graph, node, dhcp_node.next_index[mbuf0->port], mbuf0);
-			set_vf_port_status_as_attached(mbuf0->port);
-		} else
-			rte_node_enqueue_x1(graph, node, DHCP_NEXT_DROP, mbuf0);
-	}
-
-    return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int dhcp_set_next(uint16_t port_id, uint16_t next_index)

@@ -3,27 +3,20 @@
 #include <rte_mbuf.h>
 #include <rte_malloc.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 
 
 static __rte_always_inline void prepare_drop(struct rte_mbuf *m)
 {
-	struct flow_value *cntrack = NULL;
-	struct dp_flow *df_ptr;
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct flow_value *cntrack = df_ptr->conntrack;
 
-	df_ptr = get_dp_flow_ptr(m);
-
-	if (df_ptr->conntrack)
-		cntrack = df_ptr->conntrack;
-
-	if (!cntrack)
+	if (!cntrack || cntrack->flow_state != DP_FLOW_STATE_NEW)
 		return;
 
-	if (cntrack->flow_state != DP_FLOW_STATE_NEW)
-		return;
-
-	DPS_LOG(DEBUG, DPSERVICE, "Attempt to free flow due to packet drop \n");
+	DPS_LOG(DEBUG, DPSERVICE, "Attempt to free flow due to packet drop\n");
 	dp_free_flow(cntrack);
 }
 
@@ -32,18 +25,17 @@ static uint16_t drop_node_process(struct rte_graph *graph,
 								  void **objs,
 								  uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	int i;
+	struct rte_mbuf *pkt;
+	uint i;
 
 	RTE_SET_USED(node);
 	RTE_SET_USED(graph);
 
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < nb_objs; i++) {
-		mbuf0 = pkts[i];
-		prepare_drop(mbuf0);
-		rte_pktmbuf_free(mbuf0);
+	for (i = 0; i < nb_objs; ++i) {
+		pkt = (struct rte_mbuf *)objs[i];
+		dp_graphtrace(node, pkt);
+		prepare_drop(pkt);
+		rte_pktmbuf_free(pkt);
 	}
 
 	return nb_objs;

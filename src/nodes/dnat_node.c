@@ -10,6 +10,8 @@
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/dnat_node.h"
+#include "nodes/common_node.h"
+
 
 static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -17,31 +19,22 @@ static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 	ctx->next = DNAT_NEXT_DROP;
 
-
 	RTE_SET_USED(graph);
 
 	return 0;
 }
 
-static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct flow_value *cntrack = df_ptr->conntrack;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	struct dp_flow *df_ptr;
-	struct flow_key key;
-	struct flow_value *cntrack = NULL;
-	uint32_t dst_ip, vni;
+	uint32_t dst_ip, vni, dnat_ip;
 	uint8_t underlay_dst[16];
-	uint16_t old_icmp_ident = 65535;
-	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
-
-	memset(&key, 0, sizeof(struct flow_key));
-	df_ptr = get_dp_flow_ptr(m);
-
-	if (df_ptr->conntrack)
-		cntrack = df_ptr->conntrack;
+	struct dp_icmp_err_ip_info icmp_err_ip_info;
 
 	if (!cntrack)
-		return 1;
+		return DNAT_NEXT_IPV4_LOOKUP;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df_ptr->dst.dst_addr);
@@ -50,10 +43,8 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		else
 			vni = df_ptr->tun_info.dst_vni;
 
-		if (dp_is_ip_dnatted(dst_ip, vni)
-		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-			uint32_t dnat_ip = dp_get_vm_dnat_ip(dst_ip, vni);
-
+		if (dp_is_ip_dnatted(dst_ip, vni) && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
+			dnat_ip = dp_get_vm_dnat_ip(dst_ip, vni);
 			// if it is a network nat pkt
 			if (dnat_ip == 0) {
 				// extrack identifier field from icmp reply pkt, which is a reply to VM's icmp request
@@ -63,7 +54,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 				// it is icmp request targeting scalable nat
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP && df_ptr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
 					df_ptr->flags.nat = DP_NAT_CHG_UL_DST_IP;
-					return DP_ROUTE_PKT_RELAY;
+					return DNAT_NEXT_PACKET_RELAY;
 				}
 
 				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
@@ -73,14 +64,14 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 					memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
 
 					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
-					return DP_ROUTE_PKT_RELAY;
+					return DNAT_NEXT_PACKET_RELAY;
 				}
 				
 				// if it is not a nat pkt destinated for its neighboring nat, 
 				// then it is a premature dnat pkt for network nat (sent before any outgoing traffic from VM, 
 				// and it cannot be a standalone new incoming flow for network NAT),
 				// silently drop it now.
-				return 0;
+				return DNAT_NEXT_DROP;
 			}
 
 			ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -98,12 +89,12 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 		}
-		return 1;
+		return DNAT_NEXT_IPV4_LOOKUP;
 	}
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df_ptr->flags.nat = DP_NAT_CHG_UL_DST_IP;
-		return DP_ROUTE_PKT_RELAY;
+		return DNAT_NEXT_PACKET_RELAY;
 	}
 
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_NAT &&
@@ -124,17 +115,17 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 				if (df_ptr->icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
-					old_icmp_ident = dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
-					if (old_icmp_ident == 65535) {
+					if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst) == DP_IP_ICMP_ID_INVALID) {
 						DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n",
 								htons(cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst));
-						return 0;
+						return DNAT_NEXT_DROP;
 					}
 				}
 				if (df_ptr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+					memset(&icmp_err_ip_info, 0, sizeof(icmp_err_ip_info));
 					dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 					if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port)
-						return 0;
+						return DNAT_NEXT_DROP;
 
 					icmp_err_ip_info.err_ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
 					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nat_info.icmp_err_ip_cksum;
@@ -145,7 +136,7 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src)) == 0) {
 					DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's dst port with value %d \n", 
 							htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
-					return 0;
+					return DNAT_NEXT_DROP;
 				}
 			}
 
@@ -155,35 +146,16 @@ static __rte_always_inline int handle_dnat(struct rte_mbuf *m)
 		df_ptr->dst.dst_addr = ipv4_hdr->dst_addr;
 		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 	}
-	return 1;
+	return DNAT_NEXT_IPV4_LOOKUP;
 }
 
-static __rte_always_inline uint16_t dnat_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static uint16_t dnat_node_process(struct rte_graph *graph,
+								  struct rte_node *node,
+								  void **objs,
+								  uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int i, ret;
-
-	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = DNAT_NEXT_DROP;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		ret = handle_dnat(mbuf0);
-		if (ret == DP_ROUTE_PKT_RELAY)
-			next_index = DNAT_NEXT_PACKET_RELAY;
-		else if (ret == 1)
-			next_index = DNAT_NEXT_IPV4_LOOKUP;
-		else
-			next_index = DNAT_NEXT_DROP;
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 static struct rte_node_register dnat_node_base = {

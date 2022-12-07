@@ -8,7 +8,7 @@
 #include "dp_lpm.h"
 #include "dp_alias.h"
 #include "dpdk_layer.h"
-
+#include "nodes/common_node.h"
 #include "nodes/ipip_tunnel_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -25,23 +25,20 @@ static int ipip_tunnel_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
-static __rte_always_inline int handle_ipip_tunnel_encap(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_mbuf *m, struct dp_flow *df)
 {
-	uint8_t route = IPIP_TUNNEL_NEXT_DROP;
-
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
 		df->tun_info.proto_id = DP_IP_PROTO_IPv4_ENCAP;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 		df->tun_info.proto_id = DP_IP_PROTO_IPv6_ENCAP;
 
-	route = IPIP_TUNNEL_NEXT_IPV6_ENCAP;
-	return route;
+	return IPIP_TUNNEL_NEXT_IPV6_ENCAP;
 }
 
-static __rte_always_inline int handle_ipip_tunnel_decap(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(struct rte_mbuf *m, struct dp_flow *df)
 {
-	uint8_t route = IPIP_TUNNEL_NEXT_DROP;
+	rte_edge_t next_index = IPIP_TUNNEL_NEXT_DROP;
 	uint32_t vni_ns;
 	int nxt_hop;
 
@@ -49,52 +46,45 @@ static __rte_always_inline int handle_ipip_tunnel_decap(struct rte_mbuf *m, stru
 	df->tun_info.dst_vni = ntohl(vni_ns);
 
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv4_ENCAP)
-		route = IPIP_TUNNEL_NEXT_IPV4_LOOKUP;
+		next_index = IPIP_TUNNEL_NEXT_IPV4_LOOKUP;
 
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP)
-		route = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
+		next_index = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
 
 	nxt_hop = dp_get_portid_with_alias_handle((void *)df->tun_info.ul_dst_addr6);
 	if (nxt_hop != -1) {
+		df->nxt_hop = nxt_hop;
 		/* TODO We jump over the conntrack node, do we need to conntrack alias prefix */
 		/* routes ? For example if they have statefull firewall rules ? */
-		route = IPIP_TUNNEL_NEXT_FIREWALL;
-		df->nxt_hop = nxt_hop;
+		next_index = IPIP_TUNNEL_NEXT_FIREWALL;
 	}
 
-	if (route != IPIP_TUNNEL_NEXT_DROP)
+	if (next_index != IPIP_TUNNEL_NEXT_DROP)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
 
-	return route;
+	return next_index;
 }
 
-static __rte_always_inline uint16_t ipip_tunnel_node_process(struct rte_graph *graph,
-															 struct rte_node *node,
-															 void **objs,
-															 uint16_t cnt)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	int i;
-	uint8_t ret = IPIP_TUNNEL_NEXT_DROP;
-	struct dp_flow *df;
+	struct dp_flow *df = get_dp_flow_ptr(m);
 
-	pkts = (struct rte_mbuf **)objs;
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+		return handle_ipip_tunnel_encap(m, df);
 
-	for (i = 0; i < cnt; i++)
-	{
-		mbuf0 = pkts[i];
-		df = get_dp_flow_ptr(mbuf0);
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		return handle_ipip_tunnel_decap(m, df);
 
-		if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-			ret = handle_ipip_tunnel_encap(mbuf0, df);
+	return IPIP_TUNNEL_NEXT_DROP;
+}
 
-		if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-			ret = handle_ipip_tunnel_decap(mbuf0, df);
-
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
-	}
-
-	return cnt;
+static uint16_t ipip_tunnel_node_process(struct rte_graph *graph,
+										 struct rte_node *node,
+										 void **objs,
+										 uint16_t nb_objs)
+{
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int ipip_tunnel_set_next(uint16_t port_id, uint16_t next_index)

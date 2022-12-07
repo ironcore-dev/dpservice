@@ -44,7 +44,9 @@ static char tunnel_opt_str[DP_TUNNEL_OPT_SIZE] = {0};
 static char op_env_opt_str[DP_OP_ENV_OPT_SIZE] = {0};
 static char conf_file_str[DP_CONF_FILE_SIZE] = {0};
 static char wcmp_frac_opt_str[DP_WCMP_FRAC_SIZE] = {0};
+static int graphtrace_level = 0;
 
+// TODO(plague): merge with long and use getsubopt()
 static const char short_options[] = "d" /* debug */
 									"D" /* promiscuous */;
 static const char tunnel_opt_geneve[] = "geneve";
@@ -61,15 +63,18 @@ static const char op_env_opt_scapytest[] = "scapytest";
 #define CMD_LINE_OPT_PF1_A "a-pf1"
 #define CMD_LINE_OPT_IPV6 "ipv6"
 #define CMD_LINE_OPT_VF_PATTERN "vf-pattern"
-#define CMD_LINE_OPT_TUNNEL_OPT "tun_opt"
+#define CMD_LINE_OPT_TUN_OPT "tun_opt"
 #define CMD_LINE_OPT_CONF_FILE "conf-file"
 #define CMD_LINE_OPT_OP_ENV "op_env"
 #define CMD_LINE_OPT_VNI "vni"
 #define CMD_LINE_OPT_NO_OFFLOAD "no-offload"
-#define CMD_LINE_OPT_IPV6_OVERLAY "enable-ipv6-overlay"
+#define CMD_LINE_OPT_ENABLE_IPV6_OVERLAY "enable-ipv6-overlay"
 #define CMD_LINE_OPT_NO_CONNTRACK "no-conntrack"
 #define CMD_LINE_OPT_NO_STATS "no-stats"
 #define CMD_LINE_OPT_WCMP_FRAC "wcmp-frac"
+#ifdef ENABLE_GRAPHTRACE
+#	define CMD_LINE_OPT_GRAPHTRACE "graphtrace"
+#endif
 
 enum
 {
@@ -78,7 +83,7 @@ enum
 	CMD_LINE_OPT_PF1_NUM,
 	CMD_LINE_OPT_IPV6_NUM,
 	CMD_LINE_OPT_VF_PATTERN_NUM,
-	CMD_LINE_OPT_TUNNEL_OPT_NUM,
+	CMD_LINE_OPT_TUN_OPT_NUM,
 	CMD_LINE_OPT_OP_ENV_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_NO_OFFLOAD_NUM,
@@ -86,7 +91,10 @@ enum
 	CMD_LINE_OPT_NO_STATS_NUM,
 	CMD_LINE_OPT_CONF_FILE_NUM,
 	CMD_LINE_OPT_WCMP_FRAC_NUM,
-	CMD_LINE_OPT_IPV6_OVERLAY_NUM,
+	CMD_LINE_OPT_ENABLE_IPV6_OVERLAY_NUM,
+#ifdef ENABLE_GRAPHTRACE
+	CMD_LINE_OPT_GRAPHTRACE_NUM,
+#endif
 };
 
 static const struct option lgopts[] = {
@@ -94,15 +102,18 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_PF1, 1, 0, CMD_LINE_OPT_PF1_NUM},
 	{CMD_LINE_OPT_IPV6, 1, 0, CMD_LINE_OPT_IPV6_NUM},
 	{CMD_LINE_OPT_VF_PATTERN, 1, 0, CMD_LINE_OPT_VF_PATTERN_NUM},
-	{CMD_LINE_OPT_TUNNEL_OPT, 1, 0, CMD_LINE_OPT_TUNNEL_OPT_NUM},
+	{CMD_LINE_OPT_TUN_OPT, 1, 0, CMD_LINE_OPT_TUN_OPT_NUM},
 	{CMD_LINE_OPT_OP_ENV, 1, 0, CMD_LINE_OPT_OP_ENV_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_WCMP_FRAC, 1, 0, CMD_LINE_OPT_WCMP_FRAC_NUM},
 	{CMD_LINE_OPT_NO_OFFLOAD, 0, 0, CMD_LINE_OPT_NO_OFFLOAD_NUM},
-	{CMD_LINE_OPT_IPV6_OVERLAY, 0, 0, CMD_LINE_OPT_IPV6_OVERLAY_NUM},
+	{CMD_LINE_OPT_ENABLE_IPV6_OVERLAY, 0, 0, CMD_LINE_OPT_ENABLE_IPV6_OVERLAY_NUM},
 	{CMD_LINE_OPT_NO_CONNTRACK, 0, 0, CMD_LINE_OPT_NO_CONNTRACK_NUM},
 	{CMD_LINE_OPT_NO_STATS, 0, 0, CMD_LINE_OPT_NO_STATS_NUM},
 	{CMD_LINE_OPT_CONF_FILE, 1, 0, CMD_LINE_OPT_CONF_FILE_NUM},
+#ifdef ENABLE_GRAPHTRACE
+	{CMD_LINE_OPT_GRAPHTRACE, 1, 0, CMD_LINE_OPT_GRAPHTRACE_NUM},
+#endif
 	{NULL, 0, 0, 0},
 };
 
@@ -110,21 +121,25 @@ static const struct option lgopts[] = {
 static void dp_print_usage(const char *prgname)
 {
 	fprintf(stderr,
-			"%s [EAL options] --"
-			" -d"
-			" [-D]"
-			" --pf0=pf0_ifname"
-			" --pf0=pf0_ifname"
-			" --ipv6=underlay_ipv6"
-			" --vf-pattern=eth*"
-			" [--tun_opt]=ipip/geneve"
-			" [--wcmp-frac]=[0.0-1.0]"
-			" [--op_env]=scapytest/hardware"
-			" [--conf-file]=/file_path"
-			" [--no-stats]"
-			" [--no-conntrack]"
-			" [--enable-ipv6-overlay]"
-			" [--no-offload]\n",
+			"%s [EAL options] -- [service options]\n"
+			"  -d, -D                                enable debugmode\n"
+			"  --"CMD_LINE_OPT_PF0"=IFNAME           name of first physical interface (e.g. eth0)\n"
+			"  --"CMD_LINE_OPT_PF1"=IFNAME           name of second physical interface (e.g. eth1)\n"
+			"  --"CMD_LINE_OPT_IPV6"=ADDR6           IPv6 underlay address\n"
+			"  --"CMD_LINE_OPT_VF_PATTERN"=PATTERN   virtual interface name pattern (e.g. 'eth1vf')\n"
+			"  --"CMD_LINE_OPT_TUN_OPT"=TUNTYPE      tunnel type to use ('ipip' or 'geneve'; default: 'ipip')\n"
+			"  --"CMD_LINE_OPT_WCMP_FRAC"=FRACTION   wighted-cost-multipath fraction (0.0 - 1.0)\n"
+			"  --"CMD_LINE_OPT_OP_ENV"=ENVTYPE       environment type to use ('scapytest' or 'hardware'; default: 'hardware')\n"
+			"  --"CMD_LINE_OPT_VNI"=NUMBER           virtual network identifier to use\n"
+			"  --"CMD_LINE_OPT_CONF_FILE"=PATH       config file to load (default: '/tmp/dp_service.conf')\n"
+			"  --"CMD_LINE_OPT_NO_STATS"             do not print statistics to stdout\n"
+			"  --"CMD_LINE_OPT_NO_CONNTRACK"         disable connection tracking\n"
+			"  --"CMD_LINE_OPT_ENABLE_IPV6_OVERLAY"  enable IPv6 overlay addresses\n"
+			"  --"CMD_LINE_OPT_NO_OFFLOAD"           disable traffic offloading\n"
+#ifdef ENABLE_GRAPHTRACE
+			"  --"CMD_LINE_OPT_GRAPHTRACE"=LEVEL     verbosity level of packet traversing the graph framework (default: 0)\n"
+#endif
+			"\n",
 			prgname);
 }
 
@@ -207,6 +222,7 @@ int dp_parse_args(int argc, char **argv)
 
 		switch (opt)
 		{
+			// TODO add --help
 		case 'd':
 		/* Intended fallthrough */
 		case 'D':
@@ -230,7 +246,7 @@ int dp_parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_VF_PATTERN_NUM:
 			strncpy(vf_pattern, optarg, IFNAMSIZ - 1);
 			break;
-		case CMD_LINE_OPT_TUNNEL_OPT_NUM:
+		case CMD_LINE_OPT_TUN_OPT_NUM:
 			strncpy(tunnel_opt_str, optarg, DP_TUNNEL_OPT_SIZE - 1);
 			if (!strcmp(tunnel_opt_str, tunnel_opt_geneve))
 			{
@@ -275,7 +291,7 @@ int dp_parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_NO_OFFLOAD_NUM:
 			no_offload = 1;
 			break;
-		case CMD_LINE_OPT_IPV6_OVERLAY_NUM:
+		case CMD_LINE_OPT_ENABLE_IPV6_OVERLAY_NUM:
 			ipv6_overlay = 1;
 			break;
 		case CMD_LINE_OPT_NO_CONNTRACK_NUM:
@@ -285,7 +301,11 @@ int dp_parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_NO_STATS_NUM:
 			no_stats = 1;
 			break;
-
+#ifdef ENABLE_GRAPHTRACE
+		case CMD_LINE_OPT_GRAPHTRACE_NUM:
+			graphtrace_level = atoi(optarg);
+			break;
+#endif
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -301,6 +321,11 @@ int dp_parse_args(int argc, char **argv)
 	dp_handle_conf_file();
 
 	return ret;
+}
+
+uint dp_get_graphtrace_level()
+{
+	return graphtrace_level;
 }
 
 int dp_is_offload_enabled()

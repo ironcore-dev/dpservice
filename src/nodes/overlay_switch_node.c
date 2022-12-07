@@ -4,6 +4,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/overlay_switch_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
@@ -25,93 +26,64 @@ static int overlay_switch_node_init(const struct rte_graph *graph, struct rte_no
 
 static __rte_always_inline bool is_encaped_geneve_pkt(struct rte_mbuf *m)
 {
+	struct underlay_conf *u_conf = get_underlay_conf();
+	struct rte_udp_hdr *udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,  sizeof(struct rte_ipv6_hdr));
 
-	struct rte_udp_hdr *udp_hdr;
-	struct underlay_conf *u_conf;
-
-	u_conf = get_underlay_conf();
-	udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *,
-									  sizeof(struct rte_ipv6_hdr));
-
-	// 	// ??? is it better to say ntohs(udp_hdr->dst_port) == GENEVE_UDP_PORT?
+	// ??? is it better to say ntohs(udp_hdr->dst_port) == GENEVE_UDP_PORT?
 	return ntohs(udp_hdr->dst_port) == u_conf->src_port;
 }
 
-static __rte_always_inline int handle_overlay_switch(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-	struct dp_flow *df;
-	uint16_t ret = OVERLAY_SWITCH_NEXT_DROP;
-	int proto_id = -1;
+	struct dp_flow *df = get_dp_flow_ptr(m);
+	int overlay_type = get_overlay_type();
+	int proto_id;
 
-	df = get_dp_flow_ptr(m);
-
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-	{
-		if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP)
-		{
-			ret = OVERLAY_SWITCH_NEXT_IPIP;
-			return ret;
-		}
-
-		if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
-		{
-			ret = OVERLAY_SWITCH_NEXT_GENEVE;
-			return ret;
-		}
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
+		if (overlay_type == DP_FLOW_OVERLAY_TYPE_IPIP)
+			return OVERLAY_SWITCH_NEXT_IPIP;
+		if (overlay_type == DP_FLOW_OVERLAY_TYPE_GENEVE)
+			return OVERLAY_SWITCH_NEXT_GENEVE;
+		// TODO we should make this an enum, then when using switch(), gcc will check for missing values
+		DPS_LOG(ERR, DPSERVICE, "Invalid overlay type set\n");
+		return OVERLAY_SWITCH_NEXT_DROP;
 	}
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-	{
-
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		proto_id = extract_outer_ipv6_header(m, NULL, 0);
 		if (proto_id < 0)
-			return ret;
+			return OVERLAY_SWITCH_NEXT_DROP;
 
-		if ((proto_id == DP_IP_PROTO_IPv4_ENCAP || proto_id == DP_IP_PROTO_IPv6_ENCAP) && get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP)
-		{
-			ret = OVERLAY_SWITCH_NEXT_IPIP;
+		if ((proto_id == DP_IP_PROTO_IPv4_ENCAP || proto_id == DP_IP_PROTO_IPv6_ENCAP)
+			&& overlay_type == DP_FLOW_OVERLAY_TYPE_IPIP
+		) {
 			df->l3_type = (proto_id == DP_IP_PROTO_IPv4_ENCAP) ? RTE_ETHER_TYPE_IPV4 : RTE_ETHER_TYPE_IPV6;
-			return ret;
+			return OVERLAY_SWITCH_NEXT_IPIP;
 		}
 
-		if (proto_id == DP_IP_PROTO_UDP && is_encaped_geneve_pkt(m) && get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE)
-		{
-			ret = OVERLAY_SWITCH_NEXT_GENEVE;
-			return ret;
+		if (proto_id == DP_IP_PROTO_UDP && is_encaped_geneve_pkt(m)
+			&& overlay_type == DP_FLOW_OVERLAY_TYPE_GENEVE
+		) {
+			return OVERLAY_SWITCH_NEXT_GENEVE;
 		}
 
-		ret = OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
+		return OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
 	}
 
-	return ret;
+	return OVERLAY_SWITCH_NEXT_DROP;
 }
 
-static __rte_always_inline uint16_t overlay_switch_node_process(struct rte_graph *graph,
-																struct rte_node *node,
-																void **objs,
-																uint16_t cnt)
+static uint16_t overlay_switch_node_process(struct rte_graph *graph,
+											struct rte_node *node,
+											void **objs,
+											uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	int i, ret;
-
-	// struct dp_flow *df;
-
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++)
-	{
-		mbuf0 = pkts[i];
-		ret = handle_overlay_switch(mbuf0);
-
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int overlay_switch_set_next(uint16_t port_id, uint16_t next_index)
 {
-
 	overlay_switch_node.next_index[port_id] = next_index;
 	return 0;
 }

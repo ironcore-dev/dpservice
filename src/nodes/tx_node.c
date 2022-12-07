@@ -5,6 +5,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/ipv6_nd_node.h"
 #include "dp_flow.h"
@@ -44,49 +45,53 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline uint16_t tx_node_process(struct rte_graph *graph,
-													struct rte_node *node,
-													void **objs,
-													uint16_t cnt)
+static uint16_t tx_node_process(struct rte_graph *graph,
+								struct rte_node *node,
+								void **objs,
+								uint16_t nb_objs)
 {
 	struct tx_node_ctx *ctx = (struct tx_node_ctx *)node->ctx;
-	struct rte_mbuf *mbuf0, **pkts;
-	uint16_t port, queue;
-	uint16_t sent_count, i;
+	uint16_t port = ctx->port_id;
+	uint16_t queue = ctx->queue_id;
+	uint16_t sent_count;
+	uint16_t new_eth_type;
+	struct rte_mbuf *pkt;
+	uint i;
 
-	RTE_SET_USED(objs);
-	RTE_SET_USED(cnt);
+	// since this node is emitting packets, dp_forward_* wrapper functions cannot be used
+	// this code should colely resemble the one inside those functions
 
-	/* Get Tx port id */
-	port = ctx->port_id;
-	queue = ctx->queue_id;
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		df = get_dp_flow_ptr(mbuf0);
-		if ((mbuf0->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX) ||
-			(df->flags.nat >= DP_LB_CHG_UL_DST_IP) || df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-			if (dp_is_pf_port_id(port)) {
-				rewrite_eth_hdr(mbuf0, port, RTE_ETHER_TYPE_IPV6);
-			} else {
-				rewrite_eth_hdr(mbuf0, port, df->l3_type);
-			}
+	for (i = 0; i < nb_objs; ++i) {
+		pkt = (struct rte_mbuf *)objs[i];
+		df = get_dp_flow_ptr(pkt);
+		// Rewrite ethernet header for all packets except:
+		//  - packets created by rewriting a source packet (pkt->port == port)
+		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)
+		// Always rewrite regardless the above for:
+		//  - packets coming from loadbalancer node (DP_LB_*)
+		//  - packets already encapsulated for outgoing traffic (DP_FLOW_TYPE_OUTGOING)
+		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
+			|| df->flags.nat >= DP_LB_CHG_UL_DST_IP
+			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
+		) {
+			new_eth_type = dp_is_pf_port_id(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
+			rewrite_eth_hdr(pkt, port, new_eth_type);
 		}
-
-		if (df && df->flags.valid && df->conntrack)
-			dp_handle_traffic_forward_offloading(mbuf0, df);
+		if (df->flags.valid && df->conntrack)
+			dp_handle_traffic_forward_offloading(pkt, df);
 	}
 
-	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs,
-								cnt);
+	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);
+	dp_graphtrace_burst_tx(node, objs, sent_count, port);
 
-	/* Redirect unsent pkts to drop node */
-	if (sent_count != cnt)
-		rte_node_enqueue(graph, node, TX_NEXT_DROP,
-						&objs[sent_count], cnt - sent_count);
+	if (unlikely(sent_count != nb_objs)) {
+		DPS_LOG(WARNING, DPSERVICE, "Not all packets transmitted successfully (%d/%d) in %s node\n", sent_count, nb_objs, node->name);
+		dp_graphtrace_burst_next(node, objs + sent_count, nb_objs - sent_count, TX_NEXT_DROP);
+		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, nb_objs - sent_count);
+	}
 
-	return sent_count;
+	// maybe sent_count makes more sense, but cnt is the real number of processed packets by this node
+	return nb_objs;
 }
 
 struct ethdev_tx_node_main *tx_node_data_get(void)

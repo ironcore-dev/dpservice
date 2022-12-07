@@ -4,8 +4,10 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "dp_util.h"
+#include "nodes/common_node.h"
 #include "nodes/rx_node_priv.h"
 #include "node_api.h"
+#include "dp_debug.h"
 
 static struct ethdev_rx_node_main ethdev_rx_main;
 
@@ -60,46 +62,29 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline uint16_t process_inline(struct rte_graph *graph,
-												   struct rte_node *node,
-												   struct rx_node_ctx *ctx)
-{
-	uint16_t count = 0, next_index;
-	uint16_t port, queue;
-
-	port = ctx->port_id;
-	queue = ctx->queue_id;
-	next_index = ctx->next;
-
-	/* Get pkts from port */
-	if (ethdev_rx_main.node_ctx[ctx->port_id].enabled)
-		count = rte_eth_rx_burst(port, queue, (struct rte_mbuf **)node->objs,
-									RTE_GRAPH_BURST_SIZE);
-
-	if (!count)
-		return 0;
-
-	node->idx = count;
-	/* Enqueue to next node */
-	rte_node_next_stream_move(graph, node, next_index);
-
-	ctx->next = next_index;
-
-	return count;
-}
-
-static __rte_always_inline uint16_t rx_node_process(struct rte_graph *graph,
-													struct rte_node *node,
-													void **objs,
-													uint16_t cnt)
+static uint16_t rx_node_process(struct rte_graph *graph,
+								struct rte_node *node,
+								void **objs,
+								uint16_t cnt)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
-	uint16_t n_pkts = 0;
+	uint16_t n_pkts;
 
-	RTE_SET_USED(objs);
-	RTE_SET_USED(cnt);
+	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
-	n_pkts = process_inline(graph, node, ctx);
+	if (unlikely(!ethdev_rx_main.node_ctx[ctx->port_id].enabled))
+		return 0;
+
+	n_pkts = rte_eth_rx_burst(ctx->port_id,
+							  ctx->queue_id,
+							  (struct rte_mbuf **)objs,
+							  RTE_GRAPH_BURST_SIZE);
+	if (unlikely(!n_pkts))
+		return 0;
+
+	node->idx = n_pkts;
+	dp_forward_graph_packets(graph, node, objs, n_pkts, ctx->next);
+
 	return n_pkts;
 }
 

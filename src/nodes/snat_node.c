@@ -9,8 +9,10 @@
 #include "dp_flow.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "nodes/common_node.h"
 #include "nodes/snat_node.h"
 #include "dp_util.h"
+
 
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -23,21 +25,16 @@ static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline int handle_snat(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct flow_value *cntrack = df_ptr->conntrack;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	struct dp_flow *df_ptr;
-	struct flow_value *cntrack = NULL;
 	uint32_t src_ip;
 	struct nat_check_result nat_check;
 
-	df_ptr = get_dp_flow_ptr(m);
-
-	if (df_ptr->conntrack)
-		cntrack = df_ptr->conntrack;
-
 	if (!cntrack)
-		return 1;
+		return SNAT_NEXT_FIREWALL;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		uint16_t nat_port;
@@ -56,19 +53,19 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->src_port, vni, df_ptr->l4_type));
 				if (nat_port == 0) {
 					DPS_LOG(ERR, DPSERVICE, "an invalid network nat port is allocated \n");
-					return 0;
+					return SNAT_NEXT_DROP;
 				}
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == 65535) {
+					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == DP_IP_ICMP_ID_INVALID) {
 						DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n", nat_port);
-						return 0;
+						return SNAT_NEXT_DROP;
 					}
 				} else {
 					if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
 						DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", nat_port);
-						return 0;
+						return SNAT_NEXT_DROP;
 					}
 				}
 
@@ -107,16 +104,16 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
-				if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst) == 65535) {
+				if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst) == DP_IP_ICMP_ID_INVALID) {
 					DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n", 
 							htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
-					return 0;
+					return SNAT_NEXT_DROP;
 				}
 			} else {
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
 					DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", 
 							htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
-					return 0;
+					return SNAT_NEXT_DROP;
 				}
 			}
 
@@ -138,32 +135,17 @@ static __rte_always_inline int handle_snat(struct rte_mbuf *m)
 		df_ptr->src.src_addr = ipv4_hdr->src_addr;
 		dp_nat_chg_ip(df_ptr, ipv4_hdr, m);
 	}
-	return 1;
+
+	return SNAT_NEXT_FIREWALL;
 }
 
-static __rte_always_inline uint16_t snat_node_process(struct rte_graph *graph,
-													 struct rte_node *node,
-													 void **objs,
-													 uint16_t cnt)
+static uint16_t snat_node_process(struct rte_graph *graph,
+								  struct rte_node *node,
+								  void **objs,
+								  uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	rte_edge_t next_index;
-	int i, ret;
-
-	pkts = (struct rte_mbuf **)objs;
-	/* Speculative next */
-	next_index = SNAT_NEXT_DROP;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		ret = handle_snat(mbuf0);
-		if (ret == 1)
-			next_index = SNAT_NEXT_FIREWALL;
-
-		rte_node_enqueue_x1(graph, node, next_index, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 static struct rte_node_register snat_node_base = {

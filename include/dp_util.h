@@ -11,6 +11,9 @@ extern "C" {
 #define DP_TIMESTAMP_BUF_SIZE 26
 
 #define RTE_LOGTYPE_DPSERVICE RTE_LOGTYPE_USER1
+#define RTE_LOGTYPE_GRAPHTRACE RTE_LOGTYPE_USER2
+// TODO(plague) this uses local definition but does not hide them properly
+// DPS_LOG(X, Y, "%s", buf); will lead to a bug!
 #define DPS_LOG(l, t, ...)						\
 	do {										\
 	char buf[DP_TIMESTAMP_BUF_SIZE] = {0};		\
@@ -61,9 +64,11 @@ int get_overlay_type();
 int get_op_env();
 
 int dp_is_wcmp_enabled();
-
 double dp_get_wcmp_frac();
 void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type);
+
+uint dp_get_graphtrace_level();
+
 void print_ip(unsigned int ip, char *buf);
 
 

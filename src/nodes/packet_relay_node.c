@@ -4,6 +4,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/packet_relay_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
@@ -11,6 +12,7 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_util.h"
 #include "dp_nat.h"
+
 
 struct packet_relay_node_main packet_relay_node;
 
@@ -25,20 +27,18 @@ static int packet_relay_node_init(const struct rte_graph *graph, struct rte_node
 	return 0;
 }
 
-static __rte_always_inline int lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
 {
-	struct rte_icmp_hdr *icmp_hdr;
-	struct rte_ipv4_hdr *ipv4_hdr;
+	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
 	uint32_t temp_ip;
 	uint32_t cksum;
 
-	ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
-	icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
-
-	if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
-		icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
-	else
+	if (icmp_hdr->icmp_type != RTE_IP_ICMP_ECHO_REQUEST)
 		return PACKET_RELAY_NEXT_DROP;
+
+	// rewrite the packet and send it back
+	icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
 
 	cksum = ~icmp_hdr->icmp_cksum & 0xffff;
 	cksum += ~RTE_BE16(RTE_IP_ICMP_ECHO_REQUEST << 8) & 0xffff;
@@ -59,19 +59,13 @@ static __rte_always_inline int lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct
 }
 
 
-static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr;
-	uint16_t ret = PACKET_RELAY_NEXT_DROP;
-	struct flow_value *cntrack = NULL;
-
-	df_ptr = get_dp_flow_ptr(m);
-
-	if (df_ptr->conntrack)
-		cntrack = df_ptr->conntrack;
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct flow_value *cntrack = df_ptr->conntrack;
 
 	if (!cntrack)
-		return ret;
+		return PACKET_RELAY_NEXT_DROP;
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
@@ -85,32 +79,20 @@ static __rte_always_inline int handle_packet_relay(struct rte_mbuf *m)
 	if (df_ptr->l4_type == DP_IP_PROTO_ICMP)
 		return lb_nnat_icmp_reply(df_ptr, m);
 
-	return ret;
+	return PACKET_RELAY_NEXT_DROP;
 }
 
-static __rte_always_inline uint16_t packet_relay_node_process(struct rte_graph *graph,
-																struct rte_node *node,
-																void **objs,
-																uint16_t cnt)
+static uint16_t packet_relay_node_process(struct rte_graph *graph,
+										  struct rte_node *node,
+										  void **objs,
+										  uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	int i, ret;
-
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		ret = handle_packet_relay(mbuf0);
-
-		rte_node_enqueue_x1(graph, node, ret, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int packet_relay_set_next(uint16_t port_id, uint16_t next_index)
 {
-
 	packet_relay_node.next_index[port_id] = next_index;
 	return 0;
 }
@@ -134,4 +116,3 @@ struct rte_node_register *packet_relay_node_get(void)
 }
 
 RTE_NODE_REGISTER(packet_relay_node_base);
-

@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include <rte_malloc.h>
 #include "node_api.h"
+#include "nodes/common_node.h"
 #include "nodes/ipv4_lookup_priv.h"
 #include "nodes/dhcp_node.h"
 #include "dp_mbuf_dyn.h"
@@ -28,27 +29,25 @@ static int ipv4_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
-static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr;
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	struct vm_route route;
-	int ret = 0;
 	uint32_t route_key = 0;
 	uint64_t dst_port_id;
 
-	df_ptr = get_dp_flow_ptr(m);
-	if (!df_ptr)
-		return DP_ROUTE_DROP;
-
 	// TODO: add broadcast routes when machine is added
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DP_BOOTP_SRV_PORT)
-		return DP_ROUTE_DHCP;
+		// the ethernet header cannot be removed is due to dhcp node needs mac info
+		// TODO: extract mac info in cls node
+		return IPV4_LOOKUP_NEXT_DHCP;
 
-	ret = lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr, rte_eth_dev_socket_id(m->port), &route, &route_key, &dst_port_id);
-	if (ret < 0)
-		return DP_ROUTE_DROP;
+	if (lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr,
+							 rte_eth_dev_socket_id(m->port),
+							 &route, &route_key, &dst_port_id) < 0)
+		return IPV4_LOOKUP_NEXT_DROP;
 
-	//TODO: it is not exactly correct to use next_hop to directly store next hop port id and convert here. but it is already used in
+	// TODO: it is not exactly correct to use next_hop to directly store next hop port id and convert here. but it is already used in
 	// such way in the original implementation. as long as port number is limited to 256, it is ok.
 	df_ptr->nxt_hop = (uint8_t)dst_port_id;
 
@@ -70,7 +69,7 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_LOCAL || df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		if (!dp_is_pf_port_id(df_ptr->nxt_hop) && get_vf_port_attach_status(df_ptr->nxt_hop) == DP_VF_PORT_DISATTACH)
-			return DP_ROUTE_DROP;
+			return IPV4_LOOKUP_NEXT_DROP;
 	}
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
@@ -83,42 +82,23 @@ static __rte_always_inline int handle_ipv4_lookup(struct rte_mbuf *m)
 
 			// basic logic of port redundancy if one of ports are down
 			if ((selected_port == PEER_PORT && dp_port_get_link_status(dp_layer, peer_port_id) == RTE_ETH_LINK_UP)
-				|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer, owner_port_id) == RTE_ETH_LINK_DOWN)) {
-
+				|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer, owner_port_id) == RTE_ETH_LINK_DOWN)
+			) {
 				df_ptr->nxt_hop = peer_port_id;
 			}
 		}
 	}
 
-	return 0;
+	return IPV4_LOOKUP_NEXT_NAT;
 }
 
-static __rte_always_inline uint16_t ipv4_lookup_node_process(struct rte_graph *graph,
-															 struct rte_node *node,
-															 void **objs,
-															 uint16_t cnt)
+static uint16_t ipv4_lookup_node_process(struct rte_graph *graph,
+										 struct rte_node *node,
+										 void **objs,
+										 uint16_t nb_objs)
 {
-	struct rte_mbuf *mbuf0, **pkts;
-	int route;
-	int i;
-
-	pkts = (struct rte_mbuf **)objs;
-
-	for (i = 0; i < cnt; i++) {
-		mbuf0 = pkts[i];
-		route = handle_ipv4_lookup(mbuf0);
-		if (route >= 0)
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_NAT,
-								mbuf0);
-		else if (route == DP_ROUTE_DHCP)
-			// the ethernet header cannot be removed is due to dhcp node needs mac info
-			// TODO: extract mac info in cls node
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DHCP, mbuf0);
-		else
-			rte_node_enqueue_x1(graph, node, IPV4_LOOKUP_NEXT_DROP, mbuf0);
-	}
-
-	return cnt;
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	return nb_objs;
 }
 
 int ipv4_lookup_set_next(uint16_t port_id, uint16_t next_index)
