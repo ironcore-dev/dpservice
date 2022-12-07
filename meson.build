@@ -18,7 +18,7 @@ libuuid_dep = dependency('uuid')
 protoc = find_program('protoc')
 grpc_cpp = find_program('grpc_cpp_plugin')
 if get_option('enable_tests')
-  pytest = find_program('pytest')
+  pytest = find_program('pytest', 'pytest-3')
   scapy = find_program('scapy')
 endif
 if get_option('enable_usermode')
