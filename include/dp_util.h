@@ -71,7 +71,6 @@ uint dp_get_graphtrace_level();
 
 void print_ip(unsigned int ip, char *buf);
 
-
 #ifdef __cplusplus
 }
 #endif
