@@ -95,7 +95,7 @@ int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr* neigh, struct rte_eth
 		goto cleanup;
 	
 	memset(req, 0, sizeof(struct dp_nlnk_req));
-	req->nl.nlmsg_len = NLMSG_LENGTH(sizeof(struct dp_nlnk_req));
+	req->nl.nlmsg_len = NLMSG_LENGTH(sizeof(struct ndmsg) + sizeof(struct dp_nl_tlv));
 	req->nl.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
 	req->nl.nlmsg_type = RTM_GETNEIGH;
 	req->rt.ndm_type = RTN_UNSPEC;
