@@ -273,7 +273,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	if (cross_pf_port)
 		create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
 	else
-		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
+		create_rte_flow_rule_attr(&attr, 0, 0, 0, 0, 1);
 
 	// uint16_t peer_pf_port_id =  dp_get_pf1_port_id();
 	uint16_t t_port_id = cross_pf_port ? dp_get_pf1_port_id() : m->port;
@@ -514,7 +514,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		// config the content of agectx
 		config_allocated_agectx(agectx, m->port, df, hairpin_flow);
 	} else {
-		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
+		create_rte_flow_rule_attr(&attr, 0, 0, 0, 0, 1);
 		struct rte_flow *flow = NULL;
 
 		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
