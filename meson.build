@@ -1,6 +1,6 @@
 project('dp_service', 'c', 'cpp',
   default_options: ['c_args=-Wno-deprecated-declarations -Werror -Wno-format-truncation', 'cpp_args=-fpermissive'],
-  version: run_command('cat', 'include/dp_version.h').stdout().strip().split(' ').get(2).split('"').get(1),
+  version: run_command('cat', 'include/dp_version.h', check: true).stdout().strip().split(' ').get(2).split('"').get(1),
   license: 'MIT')
 
 add_global_arguments('-DDEBUG=true', language: 'c')
@@ -40,5 +40,8 @@ if get_option('enable_tests')
   subdir('test')
 endif
 
-run_target('cppcheck', command: ['cppcheck', '--project=' +
-  join_paths(meson.build_root(), 'compile_commands.json')])
+cppcheck = find_program('cppcheck', required: false)
+if cppcheck.found()
+  run_target('cppcheck', command: [cppcheck, '--project=' +
+    join_paths(meson.build_root(), 'compile_commands.json')])
+endif
