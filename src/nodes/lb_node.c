@@ -59,7 +59,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 			return LB_NEXT_PACKET_RELAY;
 		}
 
-		target_ip6 = dp_lb_get_backend_ip(dst_ip, vni, df_ptr->dst_port, df_ptr->l4_type);
+		target_ip6 = dp_lb_get_backend_ip(dst_ip, vni, df_ptr->l4_info.trans_port.dst_port, df_ptr->l4_type);
 		if (!target_ip6)
 			return LB_NEXT_DROP;
 

@@ -557,7 +557,7 @@ int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ip
 
 	df_ptr = get_dp_flow_ptr(pkt);
 	dst_ip = ntohl(df_ptr->dst.dst_addr);
-	dst_port = ntohs(df_ptr->dst_port);
+	dst_port = ntohs(df_ptr->l4_info.trans_port.dst_port);
 	dst_vni = df_ptr->tun_info.dst_vni;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {

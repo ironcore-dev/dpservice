@@ -30,13 +30,19 @@ struct dp_flow {
 	uint16_t	nat_port;
 	
 	uint8_t					l4_type;
-	uint16_t				dst_port;
-	uint16_t				src_port;
-	
-	uint8_t					icmp_type;
-	uint8_t					icmp_code;
-	uint16_t				icmp_identifier;
-	uint32_t                dp_flow_hash;
+	union {
+		struct {
+			uint16_t		dst_port;
+			uint16_t		src_port;
+		} trans_port;
+		struct {
+			uint8_t			icmp_type;
+			uint8_t			icmp_code;
+			uint16_t		icmp_identifier;
+		} icmp_field;
+	} l4_info;
+
+	uint32_t		dp_flow_hash;
 
 	struct {
 		uint8_t		ul_src_addr6[16];

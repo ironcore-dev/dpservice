@@ -52,7 +52,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 		return IPV6_LOOKUP_NEXT_DROP;
 
 	// TODO: add broadcast routes when machine is added
-	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->dst_port) == DHCPV6_SERVER_PORT)
+	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->l4_info.trans_port.dst_port) == DHCPV6_SERVER_PORT)
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
 	ret = lpm_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
