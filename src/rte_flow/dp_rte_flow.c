@@ -91,8 +91,8 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		else
 			tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, offset);
 
-		df->dst_port = tcp_hdr->dst_port;
-		df->src_port = tcp_hdr->src_port;
+		df->l4_info.trans_port.dst_port = tcp_hdr->dst_port;
+		df->l4_info.trans_port.src_port = tcp_hdr->src_port;
 		return 0;
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
 		if (hdr != NULL)
@@ -100,8 +100,8 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		else
 			udp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_udp_hdr *, offset);
 
-		df->dst_port = udp_hdr->dst_port;
-		df->src_port = udp_hdr->src_port;
+		df->l4_info.trans_port.dst_port = udp_hdr->dst_port;
+		df->l4_info.trans_port.src_port = udp_hdr->src_port;
 		return 0;
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
 		if (hdr != NULL)
@@ -109,9 +109,9 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		else
 			icmp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_icmp_hdr *, offset);
 
-		df->icmp_type = icmp_hdr->icmp_type;
-		df->icmp_code = icmp_hdr->icmp_code;
-		df->icmp_identifier = icmp_hdr->icmp_ident;
+		df->l4_info.icmp_field.icmp_type = icmp_hdr->icmp_type;
+		df->l4_info.icmp_field.icmp_code = icmp_hdr->icmp_code;
+		df->l4_info.icmp_field.icmp_identifier = icmp_hdr->icmp_ident;
 		return 0;
 	} else if (df->l4_type == DP_IP_PROTO_ICMPV6) {
 		if (hdr != NULL)
@@ -119,7 +119,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		else
 			icmp6_hdr = rte_pktmbuf_mtod_offset(pkt, struct icmp6hdr *, offset);
 
-		df->icmp_type = icmp6_hdr->icmp6_type;
+		df->l4_info.icmp_field.icmp_type = icmp6_hdr->icmp6_type;
 		return 0;
 	}
 
