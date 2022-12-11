@@ -190,8 +190,6 @@ err_key:
 	pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 	if (pos < 0)
 		DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 err:
 	DPS_LOG(ERR, DPSERVICE, "snat table add ip failed\n");
 	return ret;
@@ -252,8 +250,6 @@ err_key:
 	pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 	if (pos < 0)
 		DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 err:
 	DPS_LOG(ERR, DPSERVICE, "snat table add ip failed\n");
 	return ret;
@@ -280,8 +276,6 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 
 		if (pos < 0)
 			DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
-		else
-			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 	}
 
 }
@@ -312,8 +306,6 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 		if (pos < 0) {
 			DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");;
 			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
-		} else {
-			rte_hash_free_key_with_position(ipv4_snat_tbl, pos);
 		}
 	}
 
@@ -388,8 +380,6 @@ err_key:
 	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
 	if (pos < 0)
 		DPS_LOG(WARNING, DPSERVICE, "DNAT hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 err:
 	return ret;
 }
@@ -410,8 +400,6 @@ void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
 	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
 	if (pos < 0)
 		DPS_LOG(WARNING, DPSERVICE, "DNAT hash key already deleted \n");
-	else
-		rte_hash_free_key_with_position(ipv4_dnat_tbl, pos);
 }
 
 void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
