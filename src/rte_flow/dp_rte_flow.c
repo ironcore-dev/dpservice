@@ -792,11 +792,9 @@ void free_allocated_agectx(struct flow_age_ctx *agectx)
 void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 							struct dp_flow *df, struct rte_flow *flow)
 {
-
 	agectx->cntrack = df->conntrack;
 	agectx->dir = agectx->cntrack->dir;
 	agectx->rte_flow = flow;
-	// agectx->cntrack->port = port_id; // it is not actually used, considering to remove this field
 	rte_atomic32_inc(&agectx->cntrack->flow_cnt);
 }
 
