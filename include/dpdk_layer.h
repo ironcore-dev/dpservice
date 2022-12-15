@@ -53,6 +53,7 @@ struct dp_dpdk_layer {
 struct underlay_conf {
 	uint16_t dst_port;
 	uint16_t src_port;
+	// TODO(plague) this is not supported anymore, but removal could break it, look into it
 	uint8_t vni[3];
 	uint8_t rsvd1;
 	/* Virtual IP */
@@ -68,7 +69,7 @@ struct underlay_conf {
 };
 
 /* Functions for internal processing */
-int dp_dpdk_init(int argc, char **argv);
+int dp_dpdk_init(void);
 int dp_init_graph(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_exit(void);

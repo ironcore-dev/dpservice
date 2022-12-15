@@ -1,12 +1,14 @@
 #ifndef __INCLUDE_COMMON_NODE_H__
 #define __INCLUDE_COMMON_NODE_H__
 
-#include "node_api.h"
-#include "dp_util.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <rte_graph_worker.h>
+#include <rte_mbuf.h>
+
+#include "dp_conf.h"
 
 #ifndef ENABLE_GRAPHTRACE
 #	define dp_graphtrace_burst(node, objs, nb_objs)
@@ -20,6 +22,13 @@ void dp_graphtrace_burst_next(struct rte_node *node, void **objs, uint16_t nb_ob
 void dp_graphtrace_burst_tx(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id);
 void dp_graphtrace(struct rte_node *node, void *obj);
 void dp_graphtrace_next(struct rte_node *node, void *obj, rte_edge_t next_index);
+
+enum {
+	DP_GRAPHTRACE_LEVEL_SILENT,
+	DP_GRAPHTRACE_LEVEL_EDGES,
+	DP_GRAPHTRACE_LEVEL_NODES,
+	DP_GRAPHTRACE_LEVEL_MAX = DP_GRAPHTRACE_LEVEL_NODES
+};
 #endif
 
 static __rte_always_inline

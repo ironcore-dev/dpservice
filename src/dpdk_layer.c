@@ -77,7 +77,7 @@ static void signal_handler(int signum)
 
 static void timer_cb()
 {
-	if (dp_is_ip6_overlay_enabled()) {
+	if (dp_conf_is_ipv6_overlay_enabled()) {
 		trigger_nd_ra();
 		trigger_nd_unsol_adv();
 	}
@@ -85,15 +85,11 @@ static void timer_cb()
 	dp_send_event_timer_msg();
 }
 
-int dp_dpdk_init(int argc, char **argv)
+int dp_dpdk_init()
 {
-	int ret;
+	int ret = 0;  // TODO not used!
 	uint64_t hz;
 	uint8_t lcore_id;
-
-	ret = rte_eal_init(argc, argv);
-	if (ret < 0)
-		rte_panic("Cannot init EAL\n");
 
 	memset(&dp_layer, 0, sizeof(struct dp_dpdk_layer));
 
@@ -147,12 +143,10 @@ int dp_dpdk_init(int argc, char **argv)
 
 static int graph_main_loop()
 {
-	struct rte_graph *graph;
+	struct rte_graph *graph = dp_layer.graph;
 
-	while (!force_quit) {
-		graph = dp_layer.graph;
+	while (!force_quit)
 		rte_graph_walk(graph);
-	}
 
 	return 0;
 }
@@ -198,7 +192,7 @@ static int main_core_loop(void)
 
 	while (!force_quit) {
 		/* Accumulate and print stats on main until exit */
-		if (dp_is_stats_enabled() && rte_graph_has_stats_feature())
+		if (dp_conf_is_stats_enabled() && rte_graph_has_stats_feature())
 			print_stats(msg_out, msg_out_len_max);
 
 		cur_tsc = rte_get_timer_cycles();
@@ -209,7 +203,7 @@ static int main_core_loop(void)
 	}
 
 	free(msg_out);
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 int dp_dpdk_main_loop(void)
@@ -231,8 +225,6 @@ void dp_dpdk_exit(void)
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++)
 		free(dp_layer.ports[i]);
-
-	rte_eal_cleanup();
 }
 
 static int dp_cfg_ethdev(int port_id)
@@ -290,18 +282,17 @@ dp_vf_port_attach_status get_vf_port_attach_status(int port_id)
 
 static void dp_install_isolated_mode(int port_id)
 {
-
-	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_IPIP) {
+	switch (dp_conf_get_overlay_type()) {
+	case DP_CONF_OVERLAY_TYPE_IPIP:
 		DPS_LOG(INFO, DPSERVICE, "Init isolation flow rule for IPinIP tunnels\n");
 		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP);
 		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP);
-	}
-
-	if (get_overlay_type() == DP_FLOW_OVERLAY_TYPE_GENEVE) {
+		break;
+	case DP_CONF_OVERLAY_TYPE_GENEVE:
 		DPS_LOG(INFO, DPSERVICE, "Init isolation flow rule for GENEVE tunnels\n");
 		dp_install_isolated_mode_geneve(port_id);
+		break;
 	}
-
 }
 
 static void allocate_pf_hairpin_tx_queue(uint16_t port_id, uint16_t peer_pf_port_id, uint16_t hairpin_queue_offset)
@@ -354,7 +345,7 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 		if_indextoname(dev_info.if_index, ifname);
 		if ((type == DP_PORT_PF) && (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0)) {
 
-			if (get_op_env() != DP_OP_ENV_SCAPYTEST)
+			if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
 				dp_port_flow_isolate(port_id);
 
 			dp_port_prepare(type, port_id, &dp_port_ext);
@@ -372,7 +363,7 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 				last_assigned_vf_idx++;
 
 				//if it belongs to pf0, assign a tx queue from pf1 for it
-				if (dp_is_offload_enabled()) {
+				if (dp_conf_is_offload_enabled()) {
 					allocate_pf_hairpin_tx_queue(port_id, dp_get_pf1_port_id(), last_pf1_hairpin_tx_rx_queue_offset);
 					last_pf1_hairpin_tx_rx_queue_offset++;
 				}
@@ -719,7 +710,7 @@ void dp_stop_interface(int portid, dp_port_type type)
 
 	/* Tap interfaces in test environment can not be stopped */
 	/* due to a bug in dpdk tap device library. */
-	if (get_op_env() != DP_OP_ENV_SCAPYTEST)
+	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
 		ret = rte_eth_dev_stop(portid);
 
 	if (ret < 0) {
@@ -731,6 +722,7 @@ void dp_stop_interface(int portid, dp_port_type type)
 		printf("Port deallocation failed for port %d\n", portid);
 }
 
+// TODO dp_get_dpdk_layer() ?
 struct dp_dpdk_layer *get_dpdk_layer()
 {
 	return &dp_layer;

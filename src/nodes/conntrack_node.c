@@ -102,7 +102,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->l4_info.trans_port.dst_port) == DP_BOOTP_SRV_PORT)
 		return CONNTRACK_NEXT_DNAT;
 
-	if (!dp_is_conntrack_enabled())
+	if (!dp_conf_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
 	if (df_ptr->l4_type == IPPROTO_TCP

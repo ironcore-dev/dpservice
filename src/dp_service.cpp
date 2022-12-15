@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <sys/queue.h>
 
+#include "dp_conf.h"
 #include "dpdk_layer.h"
 #include "dp_util.h"
 #include "dp_flow.h"
@@ -19,17 +20,6 @@
 static char **dp_argv;
 static int dp_argc;
 static char *dp_mlx_args[4];
-
-static void *dp_handle_grpc(__rte_unused void *arg)
-{
-	GRPCService *grpc_svc = new GRPCService();
-
-	grpc_svc->run("[::]:1337");
-
-	delete grpc_svc;
-
-	return NULL;
-}
 
 static inline char *safe_strdup(const char *str)
 {
@@ -62,9 +52,9 @@ static void dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	}
 	// add mellanox args (remember that they can be written to, so strdup())
 	dp_mlx_args[0] = dp_argv[i++] = safe_strdup("-a");
-	dp_mlx_args[1] = dp_argv[i++] = safe_strdup(dp_get_pf0_opt_a());
+	dp_mlx_args[1] = dp_argv[i++] = safe_strdup(dp_conf_get_eal_a_pf0());
 	dp_mlx_args[2] = dp_argv[i++] = safe_strdup("-a");
-	dp_mlx_args[3] = dp_argv[i++] = safe_strdup(dp_get_pf1_opt_a());
+	dp_mlx_args[3] = dp_argv[i++] = safe_strdup(dp_conf_get_eal_a_pf1());
 	// add original dp_service args
 	if (argend >= 0) {
 		for (int j = argend; j < argc; ++j)
@@ -84,6 +74,21 @@ static void dp_args_free_mellanox()
 	free(dp_argv);
 }
 
+static int dp_eal_init(int *argc_ptr, char ***argv_ptr)
+{
+	if (dp_is_mellanox_opt_set())
+		dp_args_add_mellanox(argc_ptr, argv_ptr);
+	return rte_eal_init(*argc_ptr, *argv_ptr);
+}
+
+static void dp_eal_cleanup()
+{
+	rte_eal_cleanup();
+	if (dp_is_mellanox_opt_set())
+		dp_args_free_mellanox();
+}
+
+
 static void dp_init_interfaces()
 {
 	struct dp_port_ext pf0_port, pf1_port, vf_port;
@@ -94,13 +99,14 @@ static void dp_init_interfaces()
 	memset(&vf_port, 0, sizeof(vf_port));
 
 	/* Init the PFs which were received via command line */
-	memcpy(pf0_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+	// TODO(plague) use strcpy, size of name from conf is not known here
+	memcpy(pf0_port.port_name, dp_conf_get_pf0_name(), IFNAMSIZ);
 	dp_init_interface(&pf0_port, DP_PORT_PF);
 
-	memcpy(pf1_port.port_name, dp_get_pf1_name(), IFNAMSIZ);
+	memcpy(pf1_port.port_name, dp_conf_get_pf1_name(), IFNAMSIZ);
 	dp_init_interface(&pf1_port, DP_PORT_PF);
 
-	memcpy(vf_port.port_name, dp_get_vf_pattern(), IFNAMSIZ);
+	memcpy(vf_port.port_name, dp_conf_get_vf_pattern(), IFNAMSIZ);
 
 	active_vfs = dp_get_num_of_vfs();
 	if (active_vfs > DP_MAX_VF_PRO_PORT)
@@ -110,7 +116,7 @@ static void dp_init_interfaces()
 	for (i = 0; i < active_vfs; i++)
 		dp_init_interface(&vf_port, DP_PORT_VF);
 	
-	if (dp_is_offload_enabled())
+	if (dp_conf_is_offload_enabled())
 		hairpin_vfs_to_pf();
 
 	// TODO(plague): proper refactoring in a follow-up PR
@@ -123,46 +129,90 @@ static void dp_init_interfaces()
 	dp_init_lb_tables(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_vm_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	dp_init_alias_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
-	if (dp_is_wcmp_enabled())
-		fill_port_select_table(dp_get_wcmp_frac());
+	if (dp_conf_is_wcmp_enabled())
+		fill_port_select_table(dp_conf_get_wcmp_frac());
 }
 
-int main(int argc, char **argv)
+static void *dp_handle_grpc(__rte_unused void *arg)
 {
-	int ret;
+	GRPCService *grpc_svc = new GRPCService();
+	grpc_svc->run("[::]:1337");
+	delete grpc_svc;
+	return NULL;
+}
 
-	dp_handle_conf_file();
-	if (dp_is_mellanox_opt_set())
-		dp_args_add_mellanox(&argc, &argv);
-
-	ret = dp_dpdk_init(argc, argv);
-	argc -= ret;
-	argv += ret;
-
-	rte_openlog_stream(stdout);
-	DPS_LOG(INFO, DPSERVICE, "Starting DP Service version %s\n", DP_SERVICE_VERSION);
-	ret = dp_parse_args(argc, argv);
-	if (ret < 0)
-		rte_exit(EXIT_FAILURE, "Invalid dp_service parameters\n");
-
-	if (!dp_is_conntrack_enabled() && dp_is_offload_enabled())
-		rte_exit(EXIT_FAILURE, "Disabled conntrack requires disabled offloading !\n");
-
-	dp_init_interfaces();
-
-	ret = rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL,
-							dp_handle_grpc, NULL);
-	if (ret < 0)
-		rte_exit(EXIT_FAILURE, "Cannot create grpc thread\n");
+static int run_threads()
+{
+	if (rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL, dp_handle_grpc, NULL)) {
+		DPS_LOG(CRIT, DPSERVICE, "Cannot create grpc thread\n");
+		return EXIT_FAILURE;
+	}
 
 	dp_dpdk_main_loop();
 
 	pthread_join(*dp_get_ctrl_thread_id(), NULL);
 
+	return EXIT_SUCCESS;
+}
+
+static int run_service()
+{
+	int retval;
+
+	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
+		fprintf(stderr, "Disabled conntrack requires disabled offloading!\n");
+		return EXIT_FAILURE;
+	}
+
+	rte_openlog_stream(stdout);
+	// from this point on, only DPS_LOG should be used for errors
+
+	DPS_LOG(INFO, DPSERVICE, "Starting DP Service version %s\n", DP_SERVICE_VERSION);
+
+	dp_dpdk_init();
+	// TODO retval not implemented
+
+	dp_init_interfaces();
+	// TODO retval not implemented
+
+	retval = run_threads();
+
 	dp_dpdk_exit();
 
-	if (dp_is_mellanox_opt_set())
-		dp_args_free_mellanox();
+	return retval;
+}
 
-	return 0;
+int main(int argc, char **argv)
+{
+	int retval = EXIT_SUCCESS;
+	int eal_argcount;
+	enum dp_conf_runmode runmode;
+
+	// Read the config file first because it can contain EAL arguments
+	// (those need to be injected *before* rte_eal_init())
+	if (dp_conf_parse_file(getenv("DP_CONF")) < 0)
+		return EXIT_FAILURE;
+
+	eal_argcount = dp_eal_init(&argc, &argv);
+	if (eal_argcount < 0) {
+		fprintf(stderr, "Failed to initialize EAL\n");
+		return EXIT_FAILURE;
+	}
+
+	runmode = dp_conf_parse_args(argc - eal_argcount, argv + eal_argcount);
+	switch (runmode) {
+	case DP_CONF_RUNMODE_ERROR:
+		retval = EXIT_FAILURE;
+		break;
+	case DP_CONF_RUNMODE_EXIT:
+		retval = EXIT_SUCCESS;
+		break;
+	case DP_CONF_RUNMODE_NORMAL:
+		retval = run_service();
+		break;
+	}
+
+	dp_eal_cleanup();
+
+	return retval;
 }

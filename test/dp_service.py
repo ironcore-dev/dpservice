@@ -8,8 +8,6 @@ from config import *
 from grpc_client import GrpcClient
 from helpers import interface_up
 
-# TODO this should be done a better way
-config_file_path = "/tmp/dp_service.conf"
 
 class DpService:
 
@@ -32,7 +30,7 @@ class DpService:
 					f' --pf0={pf0_tap} --pf1={pf1_tap} --vf-pattern={vf_patt}'
 					f' --ipv6={ul_ipv6} --enable-ipv6-overlay'
 					 ' --no-offload --no-stats'
-					 ' --op_env=scapytest'
+					 ' --nic-type=tap'
 					f' --tun_opt={tun_opt}')
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-frac=0.5'
@@ -41,15 +39,9 @@ class DpService:
 		return self.cmd
 
 	def start(self):
-		# TODO see above
-		if os.path.exists(config_file_path):
-			os.rename(config_file_path, config_file_path + ".backup")
-		self.process = subprocess.Popen(shlex.split(self.cmd))
+		self.process = subprocess.Popen(shlex.split(self.cmd), env={"DP_CONF": ""})
 
 	def stop(self):
-		# TODO see above
-		if os.path.exists(config_file_path + ".backup") :
-			os.rename(config_file_path + ".backup", config_file_path)
 		self.process.terminate()
 		try:
 			self.process.wait(5)
@@ -110,7 +102,3 @@ if __name__ == '__main__':
 		print(f"Killed with signal {-ret}")
 	elif ret > 0:
 		print(f"Failed with code {ret}")
-
-	# TODO see above
-	if os.path.exists(config_file_path + ".backup") :
-		os.rename(config_file_path + ".backup", config_file_path)
