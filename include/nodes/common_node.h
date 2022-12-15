@@ -1,6 +1,7 @@
 #ifndef __INCLUDE_COMMON_NODE_H__
 #define __INCLUDE_COMMON_NODE_H__
 
+#include "node_api.h"
 #include "dp_util.h"
 
 #ifdef __cplusplus
@@ -8,11 +9,13 @@ extern "C" {
 #endif
 
 #ifndef ENABLE_GRAPHTRACE
+#	define dp_graphtrace_burst(node, objs, nb_objs)
 #	define dp_graphtrace_burst_next(node, objs, nb_objs, next_index)
 #	define dp_graphtrace_burst_tx(node, objs, nb_objs, port_id)
 #	define dp_graphtrace(node, obj)
 #	define dp_graphtrace_next(node, obj, next_index)
 #else
+void dp_graphtrace_burst(struct rte_node *node, void **objs, uint16_t nb_objs);
 void dp_graphtrace_burst_next(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index);
 void dp_graphtrace_burst_tx(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id);
 void dp_graphtrace(struct rte_node *node, void *obj);

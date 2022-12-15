@@ -25,6 +25,15 @@ static inline void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size
 
 #define GRAPHTRACE_PKT_ID(PKT) (PKT)
 
+void dp_graphtrace_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
+{
+	if (dp_get_graphtrace_level() < 2)
+		return;
+	for (uint i = 0; i < nb_objs; ++i)
+		GRAPHTRACE_PRINT(objs[i], "%-14s: %p                  ",
+						 node->name, GRAPHTRACE_PKT_ID(objs[i]));
+}
+
 void dp_graphtrace_burst_next(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index)
 {
 	if (dp_get_graphtrace_level() < 1)
@@ -47,7 +56,7 @@ void dp_graphtrace(struct rte_node *node, void *obj)
 {
 	if (dp_get_graphtrace_level() < 2)
 		return;
-	GRAPHTRACE_PRINT(obj, "%-14s: %p",
+	GRAPHTRACE_PRINT(obj, "%-14s: %p                  ",
 					 node->name, GRAPHTRACE_PKT_ID(obj));
 }
 
