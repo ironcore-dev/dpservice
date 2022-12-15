@@ -2,11 +2,11 @@
 #include "dp_flow.h"
 #include "dp_util.h"
 #include "node_api.h"
-#include "dp_mbuf_dyn.h"
 #include <rte_errno.h>
 #include <rte_icmp.h>
 #include "dp_nat.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_refcount.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static uint64_t timeout = 0;
@@ -197,8 +197,10 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 	return true;
 }
 
-void dp_free_flow(struct flow_value *cntrack)
+void dp_free_flow(struct dp_ref *ref)
 {
+	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
+
 	dp_free_network_nat_port(cntrack);
 	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
@@ -252,7 +254,7 @@ void dp_process_aged_flows(int port_id)
 		DPS_LOG(DEBUG, DPSERVICE, "Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
 			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
 		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
-			dp_free_flow(agectx->cntrack);
+			dp_ref_dec(&agectx->cntrack->ref_count);
 		rte_free(agectx);
 	}
 free:
@@ -272,7 +274,7 @@ void dp_process_aged_flows_non_offload(void)
 						    (void **)&flow_val, &iter) >= 0) {
 		if (unlikely((cur - flow_val->timestamp) > timeout)) {
 			DPS_LOG(DEBUG, DPSERVICE, "Attempt to free aged non-offloading flow \n");
-			dp_free_flow(flow_val);
+			dp_ref_dec(&flow_val->ref_count);
 		}
 	}
 }

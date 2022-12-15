@@ -12,6 +12,7 @@
 #include "nodes/conntrack_node.h"
 #include "nodes/dhcp_node.h"
 #include "dp_nat.h"
+#include "dp_refcount.h"
 #include <stdio.h>
 #include <unistd.h>
 
@@ -42,6 +43,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+	dp_ref_init(&flow_val->ref_count, dp_free_flow);
 	dp_add_flow_data(key, flow_val);
 
 	// Only the original flow (outgoing)'s hash value is recorded

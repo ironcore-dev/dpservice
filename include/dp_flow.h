@@ -7,6 +7,7 @@
 #include <rte_malloc.h>
 #include "dpdk_layer.h"
 #include "node_api.h"
+#include "dp_refcount.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +79,7 @@ struct flow_value {
 	rte_atomic32_t	flow_cnt;
 	struct flow_nat_info	nat_info;
 	uint8_t			action[DP_FLOW_DIR_MAX];
+	struct dp_ref	ref_count;
 };
 
 struct flow_age_ctx {
@@ -97,7 +99,7 @@ void dp_invert_flow_key(struct flow_key *key /* in / out */);
 void dp_init_flowtable(int socket_id);
 void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
-void dp_free_flow(struct flow_value *cntrack);
+void dp_free_flow(struct dp_ref *ref);
 void dp_free_network_nat_port(struct flow_value *cntrack);
 
 hash_sig_t dp_get_flow_hash_value(struct flow_key *key);
