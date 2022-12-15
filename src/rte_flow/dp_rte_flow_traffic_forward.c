@@ -1,5 +1,6 @@
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 #include "dp_nat.h"
+#include "dp_util.h"
 
 static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
@@ -64,8 +65,6 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
 
-
-
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_ipv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
@@ -85,13 +84,13 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 													&ol_ipv4_spec, &ol_ipv4_mask,
 													NULL, 0,
 													&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
- 													df->l4_type);
+													df->l4_type);
 
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
 												NULL, 0,
 												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
- 												df->l4_type);
+												df->l4_type);
 	}
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -176,7 +175,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		if (!hairpin_agectx)
 			return 0;
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
-										&flow_age, 60, hairpin_agectx);
+										&flow_age, 30, hairpin_agectx);
 
 		// create flow action -- end
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
@@ -188,7 +187,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, hairpin_pattern, hairpin_action, df);
 		if (!hairpin_flow) {
 			free_allocated_agectx(hairpin_agectx);
-			printf("failed to install hairpin queue flow rule on vf\n");
+			DPS_LOG(ERR, DPSERVICE, "Failed to install hairpin queue flow rule on vf %d \n", m->port);
 			return 0;
 		}
 		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
@@ -197,8 +196,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 	// replace source ip if vip-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
-	
-	// if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
+
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->src.src_addr, DP_IS_SRC);
@@ -271,7 +269,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	if (!agectx)
 		return 0;
 	action_cnt = create_flow_age_action(action, action_cnt,
-										&flow_age, 60, agectx);
+										&flow_age, 30, agectx);
 
 
 	// create flow action -- send to port
@@ -304,7 +302,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action, df);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		printf("failed to install encap rule on pf %d\n", t_port_id);
+		DPS_LOG(ERR, DPSERVICE, "Failed to install encap rule on pf %d\n", t_port_id);
 		return 0;
 	}
 
@@ -320,20 +318,24 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	bool cross_pf_port = m->port == dp_get_pf0_port_id() ? false : true;
 
 	struct rte_flow_attr attr;
-
+	int hairpin_pattern_cnt = 0;
 	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
 	int pattern_cnt = 0;
 	struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
-	int hairpin_pattern_cnt = 0;
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
+
+	#if !defined(ENABLE_DPDK_22_11)
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int hairpin_action_cnt = 0;
 
-	memset(pattern, 0, sizeof(pattern));
-	// memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
-	memset(action, 0, sizeof(action));
+	memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
 	memset(hairpin_action, 0, sizeof(hairpin_action));
+	#endif
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
 
 
 	uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
@@ -414,7 +416,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 													df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
-		// if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
 		if (df->flags.nat == DP_NAT_CHG_DST_IP)
 			actual_ol_ipv4_addr = df->nat_addr;
 		else
@@ -512,9 +513,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 	// replace dst ip if vip-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
-	
-	// if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
-	// uint32_t ol_new_dst_ip;
+
 	if (df->flags.nat == DP_NAT_CHG_DST_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
@@ -527,7 +526,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		return 0;
 
 	action_cnt = create_flow_age_action(action, action_cnt,
-											&flow_age, 60, agectx);
+											&flow_age, 30, agectx);
 
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 	struct rte_flow_action_queue queue_action;
@@ -570,13 +569,14 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 		if (!flow) {
 			free_allocated_agectx(agectx);
-			printf("failed to install normal decap flow rule on pf\n");
+			DPS_LOG(ERR, DPSERVICE, "Failed to install normal decap flow rule on pf %d\n", m->port);
 			return 0;
 		}
 		// config the content of agectx
 		config_allocated_agectx(agectx, m->port, df, flow);
 	}
 
+	#if !defined(ENABLE_DPDK_22_11)
 	// create flow action -- set dst mac
 	/* This redundant action is needed to make hairpin work*/
 	struct rte_flow_action_set_mac set_dst_mac;
@@ -591,7 +591,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		if (!hairpin_agectx)
 			return 0;
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
-											&hairpin_flow_age, 60, hairpin_agectx);
+											&hairpin_flow_age, 30, hairpin_agectx);
 		// create flow action -- end
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
 		// validate and install rte flow
@@ -601,11 +601,12 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action, df);
 		if (!hairpin_flow_P2) {
 			free_allocated_agectx(hairpin_agectx);
-			printf("failed to install hairpin queue flow rule on pf\n");
+			DPS_LOG(ERR, DPSERVICE, "Failed  to install hairpin queue flow rule on vf %d\n", (uint16_t)df->nxt_hop);
 			return 0;
 		}
 		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
 	}
+	#endif
 
 	return 1;
 }
@@ -658,12 +659,10 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 		else
 			actual_ol_ipv4_dst_addr = df->dst.dst_addr;
 
-		// if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_VIP)
 		actual_ol_ipv4_src_addr = df->src.src_addr;
 
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												// NULL, 0,
 												&actual_ol_ipv4_src_addr, sizeof(actual_ol_ipv4_src_addr),
 												&actual_ol_ipv4_dst_addr, sizeof(actual_ol_ipv4_dst_addr),
 												df->l4_type);
@@ -726,7 +725,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	if (df->flags.nat == DP_NAT_CHG_DST_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
-	
+
 	// there should be more strict condition to only apply to VIP nat pkt
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
@@ -739,7 +738,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	if (!agectx)
 		return 0;
 	action_cnt = create_flow_age_action(action, action_cnt,
-										&flow_age, 60, agectx);
+										&flow_age, 30, agectx);
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
 
