@@ -52,6 +52,4 @@ pfx_ip = "174.23.4.0"
 mylb = "my_lb"
 lb_tcp_dst_port = 80
 
-config_file_path = "/tmp/dp_service.conf"
-
 MAX_LINES_ROUTE_REPLY = 36
