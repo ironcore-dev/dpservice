@@ -1,11 +1,6 @@
-#include <rte_debug.h>
 #include <rte_graph.h>
 #include <rte_mbuf.h>
-#include <rte_malloc.h>
-#include "node_api.h"
 #include "nodes/common_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_util.h"
 
 
 static uint16_t drop_node_process(struct rte_graph *graph,
@@ -13,12 +8,11 @@ static uint16_t drop_node_process(struct rte_graph *graph,
 								  void **objs,
 								  uint16_t nb_objs)
 {
-	struct rte_mbuf **pkts = (struct rte_mbuf **)objs;
-
 	RTE_SET_USED(node);
 	RTE_SET_USED(graph);
 
-	rte_pktmbuf_free_bulk(pkts, nb_objs);
+	dp_graphtrace_burst(node, objs, nb_objs);
+	rte_pktmbuf_free_bulk((struct rte_mbuf **)objs, nb_objs);
 	return nb_objs;
 }
 
