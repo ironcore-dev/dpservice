@@ -25,3 +25,7 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --no-offload | None | disable traffic offloading |  |
 | --graphtrace | LEVEL | verbosity level of packet traversing the graph framework |  |
 | --color | MODE | output colorization mode | 'never' (default), 'always' or 'auto' |
+
+## Configuration file
+Unless an environment variable `DP_CONF` is set to override the path, `dp_service` uses `/tmp/dp_service.conf` to read configuration before processing any arguments.
+This way you can provide any arguments via such file and simplify the commandline use. The helper script `prepare.sh` generates such a file for Mellanox users.

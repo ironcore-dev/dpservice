@@ -180,6 +180,10 @@ def generate_md(options):
 		opts = option.shopt
 		opts = f"-{opts}, --{option.lgopt}" if opts else f"--{option.lgopt}"
 		print(f"| {opts} | {option.arg} | {option.help_str} | {option.help_choices} |")
+	print("")
+	print("## Configuration file")
+	print("Unless an environment variable `DP_CONF` is set to override the path, `dp_service` uses `/tmp/dp_service.conf` to read configuration before processing any arguments.")
+	print("This way you can provide any arguments via such file and simplify the commandline use. The helper script `prepare.sh` generates such a file for Mellanox users.")
 
 
 def print_warning():
@@ -197,7 +201,7 @@ if __name__ == "__main__":
 	parser.add_argument("-s", "--specs", action="store", default=f"{script_path}/dp_conf.json")
 	parser.add_argument("--source", action="store", default=f"{script_path}/../src/dp_conf_opts.c")
 	parser.add_argument("--header", action="store", default=f"{script_path}/../include/dp_conf_opts.h")
-	parser.add_argument("--markdown", action="store", default=f"{script_path}/../docs/commandline.md")
+	parser.add_argument("--markdown", action="store", default=f"{script_path}/../docs/deployment/commandline.md")
 	args = parser.parse_args()
 
 	with open(args.specs, "r") as infile:
