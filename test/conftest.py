@@ -1,4 +1,5 @@
 import pytest
+import os
 
 from config import *
 from dp_service import DpService
@@ -7,8 +8,9 @@ from helpers import request_ip
 
 
 def pytest_addoption(parser):
+	script_dir = os.path.dirname(os.path.abspath(__file__))
 	parser.addoption(
-		"--build-path", action="store", default="../build", help="Path to the root build directory"
+		"--build-path", action="store", default=f"{script_dir}/../build", help="Path to the root build directory"
 	)
 	parser.addoption(
 		"--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Tunnel type"
