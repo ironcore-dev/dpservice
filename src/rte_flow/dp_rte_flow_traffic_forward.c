@@ -199,7 +199,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->src.src_addr, DP_IS_SRC);
+										    &set_ipv4, df->nat_addr, DP_IS_SRC);
 
 
 	// create flow action -- raw decap
@@ -610,7 +610,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 	return 1;
 }
-
 
 static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *m, struct dp_flow *df)
 {
