@@ -82,6 +82,9 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	if (unlikely(!n_pkts))
 		return 0;
 
+	// TODO hmm, should layer be better accessible? or hide this inside the func? or just a better macro?
+	dp_pdump_dump_if_monitored(&get_dpdk_layer()->pdump, ctx->port_id, (struct rte_mbuf **)objs, n_pkts);
+
 	node->idx = n_pkts;
 	dp_forward_graph_packets(graph, node, objs, n_pkts, ctx->next);
 

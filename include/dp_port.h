@@ -12,6 +12,11 @@
 extern "C" {
 #endif
 
+#define DP_MAX_PF_PORT		2
+#define DP_MAX_VF_PRO_PORT	61
+#define DP_ACTIVE_VF_PORT	4
+#define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
+
 typedef enum {
 	DP_PORT_PF,
 	DP_PORT_VF,

@@ -8,11 +8,12 @@ dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'dp_lb.
 			  'nodes/snat_node.c', 'grpc/dp_grpc_service.cpp', 'grpc/dp_async_grpc.cpp', 'grpc/dp_grpc_impl.c', 'dp_flow.c',
 			  'dp_netlink.c','rte_flow/dp_rte_flow.c','rte_flow/dp_rte_flow_init.c','rte_flow/dp_rte_flow_traffic_forward.c',
 			  'monitoring/dp_monitoring.c','monitoring/dp_event.c',
+			  'monitoring/dp_pdump.c'
  			]
 # TODO(plague) look into autogereration of such dependencies (source file list)
 
-exe = executable('dp_service', [dp_sources, grpc_generated], include_directories : [inc],
-			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep] )
+exe = executable('dp_service', [dp_sources, grpc_generated], include_directories: [inc],
+			dependencies: [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep] )
 
 if get_option('enable_usermode')
 custom_target('dp_service_user', depends: exe, input: exe, output: 'dp_service_user',
@@ -21,3 +22,8 @@ custom_target('dp_service_user', depends: exe, input: exe, output: 'dp_service_u
   console: true
 )
 endif
+
+# TODO refactor this file
+# TODO move pcap dependency and maybe make it optional?
+dumper = executable('dp_dumpcap', [ 'dp_dumpcap.c', 'monitoring/dp_pdump_client.c' ], include_directories: [inc],
+					dependencies: [dpdk_dep, dependency('pcap')] )

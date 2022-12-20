@@ -17,6 +17,7 @@
 #include "dp_alias.h"
 #include "grpc/dp_grpc_service.h"
 #include "dp_multi_path.h"
+#include "monitoring/dp_pdump.h"
 
 static char **dp_argv;
 static int dp_argc;
@@ -132,6 +133,11 @@ static void dp_init_interfaces()
 	dp_init_alias_handle_tbl(rte_eth_dev_socket_id(dp_get_pf0_port_id()));
 	if (dp_conf_is_wcmp_enabled())
 		fill_port_select_table(dp_conf_get_wcmp_frac());
+
+	// TODO I don't like it requiring layer here...
+	// TODO where to put cleanup() ??
+	if (dp_pdump_init(&get_dpdk_layer()->pdump) < 0)
+		rte_exit(EXIT_FAILURE, "Cannot initialize pdump\n");
 }
 
 static void *dp_handle_grpc(__rte_unused void *arg)

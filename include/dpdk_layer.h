@@ -10,14 +10,12 @@
 #include <pthread.h>
 
 #include "dp_port.h"
+#include "monitoring/dp_pdump.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define DP_MAX_PF_PORT		2
-#define DP_MAX_VF_PRO_PORT	126
-#define DP_ACTIVE_VF_PORT	4
-#define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
+
 #define DP_NR_STD_RX_QUEUES		1
 #define DP_NR_STD_TX_QUEUES		1
 #define DP_NR_VF_HAIRPIN_RX_TX_QUEUES	1
@@ -43,11 +41,12 @@ struct dp_dpdk_layer {
 	uint16_t						nr_vf_hairpin_rx_tx_queues;
 	char							graph_name[RTE_GRAPH_NAMESIZE];
 	struct							rte_graph *graph;
-	rte_graph_t					graph_id;
+	rte_graph_t						graph_id;
 	struct rte_ring					*grpc_tx_queue;
 	struct rte_ring					*grpc_rx_queue;
 	struct rte_ring					*periodic_msg_queue;
 	struct rte_ring					*monitoring_rx_queue;
+	struct dp_pdump					pdump;
 };
 
 struct underlay_conf {

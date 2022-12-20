@@ -13,6 +13,7 @@
 #include "dp_util.h"
 #include "dp_nat.h"
 #include "dp_mbuf_dyn.h"
+#include "monitoring/dp_pdump.h"
 
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
@@ -80,6 +81,9 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		if (df->flags.valid && df->conntrack)
 			dp_handle_traffic_forward_offloading(pkt, df);
 	}
+
+	// TODO hmm, should layer be better accessible? or hide this inside the func? or just a better macro?
+	dp_pdump_dump_if_monitored(&get_dpdk_layer()->pdump, port, (struct rte_mbuf **)objs, nb_objs);
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);
 	dp_graphtrace_burst_tx(node, objs, sent_count, port);

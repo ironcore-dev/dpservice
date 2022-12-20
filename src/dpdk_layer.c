@@ -1,3 +1,4 @@
+#include "dpdk_layer.h"
 #include <unistd.h>
 #include "rte_malloc.h"
 #include "dpdk_layer.h"
@@ -98,15 +99,15 @@ int dp_dpdk_init()
 												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE + 32,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
-
-	if (dp_layer.rte_mempool == NULL)
+	if (!dp_layer.rte_mempool)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
 	dp_layer.nr_std_rx_queues = DP_NR_STD_RX_QUEUES;
 	dp_layer.nr_std_tx_queues = DP_NR_STD_TX_QUEUES;
 
 	dp_layer.nr_vf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
-	dp_layer.nr_pf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_get_num_of_vfs();
+	// TODO fix this when rebased for new cmdline (disable this for TAP)
+	dp_layer.nr_pf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES/* * dp_get_num_of_vfs()*/;
 
 	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.grpc_tx_queue)
