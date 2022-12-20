@@ -129,11 +129,11 @@ static int parse_opt(int opt, const char *arg)
 		return opt_strcpy(vf_pattern, arg, sizeof(vf_pattern));
 	case OPT_IPV6:
 		return opt_str_to_ipv6(get_underlay_conf()->src_ip6, arg);
-	case OPT_TUN_OPT:
+	case OPT_OVERLAY_TYPE:
 		return opt_str_to_enum((int *)&overlay_type, arg, overlay_type_choices, RTE_DIM(overlay_type_choices));
 	case OPT_NIC_TYPE:
 		return opt_str_to_enum((int *)&nic_type, arg, nic_type_choices, RTE_DIM(nic_type_choices));
-	case OPT_WCMP_FRAC:
+	case OPT_WCMP_FRACTION:
 		wcmp_enabled = true;
 		return opt_str_to_double(&wcmp_frac, arg, 0.0, 1.0);
 	case OPT_NO_OFFLOAD:

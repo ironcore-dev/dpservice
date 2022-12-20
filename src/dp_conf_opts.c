@@ -13,8 +13,8 @@ _OPT_SHOPT_MAX = 255,
 	OPT_PF1,
 	OPT_IPV6,
 	OPT_VF_PATTERN,
-	OPT_TUN_OPT,
-	OPT_WCMP_FRAC,
+	OPT_OVERLAY_TYPE,
+	OPT_WCMP_FRACTION,
 	OPT_NIC_TYPE,
 	OPT_NO_STATS,
 	OPT_NO_CONNTRACK,
@@ -36,8 +36,8 @@ static const struct option longopts[] = {
 	{ "pf1", 1, 0, OPT_PF1 },
 	{ "ipv6", 1, 0, OPT_IPV6 },
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
-	{ "tun_opt", 1, 0, OPT_TUN_OPT },
-	{ "wcmp-frac", 1, 0, OPT_WCMP_FRAC },
+	{ "overlay-type", 1, 0, OPT_OVERLAY_TYPE },
+	{ "wcmp-fraction", 1, 0, OPT_WCMP_FRACTION },
 	{ "nic-type", 1, 0, OPT_NIC_TYPE },
 	{ "no-stats", 0, 0, OPT_NO_STATS },
 	{ "no-conntrack", 0, 0, OPT_NO_CONNTRACK },
@@ -62,21 +62,21 @@ static const char *nic_type_choices[] = {
 static void print_help_args(FILE *outfile)
 {
 	fprintf(outfile, "%s",
-		" -h, --help                 display this help and exit\n"
-		" -v, --version              display version and exit\n"
-		"     --pf0=IFNAME           first physical interface (e.g. eth0)\n"
-		"     --pf1=IFNAME           second physical interface (e.g. eth1)\n"
-		"     --ipv6=ADDR6           IPv6 underlay address\n"
-		"     --vf-pattern=PATTERN   virtual interface name pattern (e.g. 'eth1vf')\n"
-		"     --tun_opt=TUNTYPE      overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
-		"     --wcmp-frac=FRACTION   weighted-cost-multipath fraction (0.0 - 1.0)\n"
-		"     --nic-type=NICTYPE     NIC type to use: 'hw' (default) or 'tap'\n"
-		"     --no-stats             do not print statistics to stdout\n"
-		"     --no-conntrack         disable connection tracking\n"
-		"     --enable-ipv6-overlay  enable IPv6 overlay addresses\n"
-		"     --no-offload           disable traffic offloading\n"
+		" -h, --help                    display this help and exit\n"
+		" -v, --version                 display version and exit\n"
+		"     --pf0=IFNAME              first physical interface (e.g. eth0)\n"
+		"     --pf1=IFNAME              second physical interface (e.g. eth1)\n"
+		"     --ipv6=ADDR6              IPv6 underlay address\n"
+		"     --vf-pattern=PATTERN      virtual interface name pattern (e.g. 'eth1vf')\n"
+		"     --overlay-type=TYPE       overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
+		"     --wcmp-fraction=FRACTION  weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)\n"
+		"     --nic-type=NICTYPE        NIC type to use: 'hw' (default) or 'tap'\n"
+		"     --no-stats                do not print periodic statistics to stdout\n"
+		"     --no-conntrack            disable connection tracking\n"
+		"     --enable-ipv6-overlay     enable IPv6 overlay addresses\n"
+		"     --no-offload              disable traffic offloading\n"
 #ifdef ENABLE_GRAPHTRACE
-		"     --graphtrace=LEVEL     verbosity level of packet traversing the graph framework\n"
+		"     --graphtrace=LEVEL        verbosity level of packet traversing the graph framework\n"
 #endif
 	);
 }

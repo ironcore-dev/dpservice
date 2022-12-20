@@ -34,7 +34,6 @@ spec:
       - args:
         - -l 0,1
         - --
-        - --no-stats
         - --no-offload
         image: dp-service
         imagePullPolicy: IfNotPresent

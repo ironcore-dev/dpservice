@@ -30,10 +30,9 @@ class DpService:
 					f' --pf0={pf0_tap} --pf1={pf1_tap} --vf-pattern={vf_patt}'
 					f' --ipv6={ul_ipv6} --enable-ipv6-overlay'
 					 ' --no-offload --no-stats'
-					 ' --nic-type=tap'
-					f' --tun_opt={tun_opt}')
+					f' --nic-type=tap --overlay-type={tun_opt}')
 		if self.port_redundancy:
-			self.cmd += ' --wcmp-frac=0.5'
+			self.cmd += ' --wcmp-fraction=0.5'
 
 	def get_cmd(self):
 		return self.cmd

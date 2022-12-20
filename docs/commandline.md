@@ -15,10 +15,10 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --pf1 | IFNAME | second physical interface (e.g. eth1) |  |
 | --ipv6 | ADDR6 | IPv6 underlay address |  |
 | --vf-pattern | PATTERN | virtual interface name pattern (e.g. 'eth1vf') |  |
-| --tun_opt | TUNTYPE | overlay tunnel type to use | 'ipip' (default) or 'geneve' |
-| --wcmp-frac | FRACTION | weighted-cost-multipath fraction (0.0 - 1.0) |  |
+| --overlay-type | TYPE | overlay tunnel type to use | 'ipip' (default) or 'geneve' |
+| --wcmp-fraction | FRACTION | weighted-cost-multipath coefficient for pf0 (0.0 - 1.0) |  |
 | --nic-type | NICTYPE | NIC type to use | 'hw' (default) or 'tap' |
-| --no-stats | None | do not print statistics to stdout |  |
+| --no-stats | None | do not print periodic statistics to stdout |  |
 | --no-conntrack | None | disable connection tracking |  |
 | --enable-ipv6-overlay | None | enable IPv6 overlay addresses |  |
 | --no-offload | None | disable traffic offloading |  |
