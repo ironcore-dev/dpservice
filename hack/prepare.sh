@@ -4,8 +4,7 @@ CONF_FILE="/tmp/dp_service.conf"
 PF0_NAME=""
 PF0_PCI_ADDR=""
 PF1_PCI_ADDR=""
-NUM_VF=61
-VF_START=2
+NUM_VF=126
 NUM_PAGES=4
 
 timestamp() {
@@ -112,13 +111,14 @@ fi
 
 maxvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_totalvfs)
 numvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_numvfs)
+VF_START=$(cat /sys/class/net/$PF0_NAME/device/sriov_offset)
 mod_vf_count=0
 prefix_count=0
+hex_prefix_count=0
 
 if [ $numvfs -eq 0 ]; then
-    allowedvfs=$((maxvfs - VF_START))
-    if [ "$allowedvfs" -lt "$NUM_VF" ]; then
-        NUM_VF=$allowedvfs
+    if [ "$maxvfs" -lt "$NUM_VF" ]; then
+        NUM_VF=$maxvfs
     fi
     echo "$(timestamp): creating "$NUM_VF" VFs"
     echo $NUM_VF > /sys/class/net/$PF0_NAME/device/sriov_numvfs
@@ -129,8 +129,13 @@ if [ $numvfs -eq 0 ]; then
         mod_vf_count=$(($i%8))
         if [ $mod_vf_count -eq 0 ]; then
             prefix_count=$[$prefix_count + 1]
+	    hex_prefix_count=$(printf '%x' $prefix_count)
         fi
-        echo $modified_pci$prefix_count"."$mod_vf_count > /sys/bus/pci/drivers/mlx5_core/unbind
+        digits=${#hex_prefix_count}
+        if [ $digits -eq 2 ]; then
+            modified_pci=${PF0_PCI_ADDR::-4}
+        fi
+        echo $modified_pci$hex_prefix_count"."$mod_vf_count > /sys/bus/pci/drivers/mlx5_core/unbind
     done
     sleep 2
     echo "$(timestamp): changing eswitch mode for "$PF0_PCI_ADDR" to switchdev"
@@ -140,6 +145,8 @@ if [ $numvfs -eq 0 ]; then
         echo "0" > $numvfs_file
         exit_msg "Unable to set eswitch mode"
     fi
+else
+    NUM_VF=$numvfs
 fi
 
 }

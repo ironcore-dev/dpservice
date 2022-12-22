@@ -42,7 +42,7 @@ RUN unzip dpdk-${DPDK_VER}.zip
 
 ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
-RUN cd $DPDK_DIR && meson -Dmax_ethports=65 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
+RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
 common/cpt,common/iavf,\
 common/octeontx,common/octeontx2,common/cnxk,common/qat,regex/octeontx2,net/cnxk,dma/cnxk,\
 common/sfc_efx,common/auxiliary,common/dpaa,common/fslmc,common/ifpga,common/vdev,common/vmbus,\
