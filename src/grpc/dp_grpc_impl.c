@@ -388,7 +388,8 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 	uint16_t p_id = 0;
 
 	memset(&pf_port, 0, sizeof(pf_port));
-	memcpy(pf_port.port_name, dp_get_pf0_name(), IFNAMSIZ);
+	// TODO(plague) use strcpy, size of name from conf is not known
+	memcpy(pf_port.port_name, dp_conf_get_pf0_name(), IFNAMSIZ);
 
 	if (req->add_machine.name[0] != '\0') {
 		if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
@@ -440,7 +441,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			goto route_err;
 		}
 		dp_start_interface(&pf_port, port_id, DP_PORT_VF);
-		if (dp_is_offload_enabled())
+		if (dp_conf_is_offload_enabled())
 			bind_vf_with_peer_pf_port((uint16_t)port_id);
 		/* TODO get the pci info of this port and fill it accordingly */
 		rep->vf_pci.bus = 2;

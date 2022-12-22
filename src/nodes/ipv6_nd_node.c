@@ -88,7 +88,7 @@ static uint16_t ipv6_nd_node_process(struct rte_graph *graph,
 									 void **objs,
 									 uint16_t nb_objs)
 {
-	if (dp_is_ip6_overlay_enabled())
+	if (dp_conf_is_ipv6_overlay_enabled())
 		dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
 	else
 		dp_forward_graph_packets(graph, node, objs, nb_objs, IPV6_ND_NEXT_DROP);

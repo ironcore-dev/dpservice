@@ -36,17 +36,16 @@ static __rte_always_inline bool is_encaped_geneve_pkt(struct rte_mbuf *m)
 static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 {
 	struct dp_flow *df = get_dp_flow_ptr(m);
-	int overlay_type = get_overlay_type();
+	enum dp_conf_overlay_type overlay_type = dp_conf_get_overlay_type();
 	int proto_id;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-		if (overlay_type == DP_FLOW_OVERLAY_TYPE_IPIP)
+		switch (overlay_type) {
+		case DP_CONF_OVERLAY_TYPE_IPIP:
 			return OVERLAY_SWITCH_NEXT_IPIP;
-		if (overlay_type == DP_FLOW_OVERLAY_TYPE_GENEVE)
+		case DP_CONF_OVERLAY_TYPE_GENEVE:
 			return OVERLAY_SWITCH_NEXT_GENEVE;
-		// TODO we should make this an enum, then when using switch(), gcc will check for missing values
-		DPS_LOG(ERR, DPSERVICE, "Invalid overlay type set\n");
-		return OVERLAY_SWITCH_NEXT_DROP;
+		}
 	}
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
@@ -55,14 +54,14 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 			return OVERLAY_SWITCH_NEXT_DROP;
 
 		if ((proto_id == DP_IP_PROTO_IPv4_ENCAP || proto_id == DP_IP_PROTO_IPv6_ENCAP)
-			&& overlay_type == DP_FLOW_OVERLAY_TYPE_IPIP
+			&& overlay_type == DP_CONF_OVERLAY_TYPE_IPIP
 		) {
 			df->l3_type = (proto_id == DP_IP_PROTO_IPv4_ENCAP) ? RTE_ETHER_TYPE_IPV4 : RTE_ETHER_TYPE_IPV6;
 			return OVERLAY_SWITCH_NEXT_IPIP;
 		}
 
 		if (proto_id == DP_IP_PROTO_UDP && is_encaped_geneve_pkt(m)
-			&& overlay_type == DP_FLOW_OVERLAY_TYPE_GENEVE
+			&& overlay_type == DP_CONF_OVERLAY_TYPE_GENEVE
 		) {
 			return OVERLAY_SWITCH_NEXT_GENEVE;
 		}

@@ -1,0 +1,104 @@
+[
+  {
+    "shopt": "h",
+    "lgopt": "help",
+    "help": "display this help and exit"
+  },
+  {
+    "shopt": "v",
+    "lgopt": "version",
+    "help": "display version and exit"
+  },
+  {
+    "lgopt": "pf0",
+    "arg": "IFNAME",
+    "help": "first physical interface (e.g. eth0)",
+    "var": "pf0_name",
+    "type": "char",
+    "array_size": "IF_NAMESIZE"
+  },
+  {
+    "lgopt": "pf1",
+    "arg": "IFNAME",
+    "help": "second physical interface (e.g. eth1)",
+    "var": "pf1_name",
+    "type": "char",
+    "array_size": "IF_NAMESIZE"
+  },
+  {
+    "lgopt": "ipv6",
+    "arg": "ADDR6",
+    "help": "IPv6 underlay address"
+  },
+  {
+    "lgopt": "vf-pattern",
+    "arg": "PATTERN",
+    "help": "virtual interface name pattern (e.g. 'eth1vf')",
+    "var": "vf_pattern",
+    "type": "char",
+    "array_size": "IF_NAMESIZE"
+  },
+  {
+    "lgopt": "overlay-type",
+    "arg": "TYPE",
+    "help": "overlay tunnel type to use",
+    "var": "overlay_type",
+    "type": "enum",
+    "choices": [ "ipip", "geneve" ],
+    "default": "ipip"
+  },
+  {
+    "lgopt": "wcmp-fraction",
+    "arg": "FRACTION",
+    "help": "weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)",
+    "var": "wcmp_frac",
+    "type": "double",
+    "default": "1.0"
+  },
+  {
+    "lgopt": "nic-type",
+    "arg": "NICTYPE",
+    "help": "NIC type to use",
+    "var": "nic_type",
+    "type": "enum",
+    "choices": [ "hw", "tap" ],
+    "default": "hw"
+  },
+  {
+    "lgopt": "no-stats",
+    "help": "do not print periodic statistics to stdout",
+    "var": "stats_enabled",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "lgopt": "no-conntrack",
+    "help": "disable connection tracking",
+    "var": "conntrack_enabled",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "lgopt": "enable-ipv6-overlay",
+    "help": "enable IPv6 overlay addresses",
+    "var": "ipv6_overlay_enabled",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "lgopt": "no-offload",
+    "help": "disable traffic offloading",
+    "var": "offload_enabled",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "lgopt": "graphtrace",
+    "arg": "LEVEL",
+    "help": "verbosity level of packet traversing the graph framework",
+    "var": "graphtrace_level",
+    "type": "int",
+    "default": "0",
+    "ifdef": "ENABLE_GRAPHTRACE"
+  }
+]

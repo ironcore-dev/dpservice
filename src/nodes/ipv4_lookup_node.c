@@ -64,7 +64,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 	if (!df_ptr->flags.flow_type)
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
-	if (dp_is_offload_enabled())
+	if (dp_conf_is_offload_enabled())
 		df_ptr->flags.valid = 1;
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_LOCAL || df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
@@ -74,7 +74,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		// rewrite outgoing port if WCMP algorithm decides to do so
-		if (dp_is_wcmp_enabled()) {
+		if (dp_conf_is_wcmp_enabled()) {
 			egress_pf_port selected_port = calculate_port_by_hash(df_ptr->dp_flow_hash);
 			struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 			uint16_t owner_port_id = dp_get_pf0_port_id();

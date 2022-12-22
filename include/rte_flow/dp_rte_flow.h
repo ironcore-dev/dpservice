@@ -15,6 +15,8 @@ extern "C"
 #include "dp_lpm.h"
 
 #include "node_api.h"
+// TODO remove this after done with refctoring overlay tpye!
+#include "dp_conf.h"
 
 #define DP_FLOW_TYPE_LOCAL		1
 #define DP_FLOW_TYPE_OUTGOING	2
@@ -22,9 +24,6 @@ extern "C"
 
 #define DP_FLOW_WEST_EAST		0
 #define DP_FLOW_SOUTH_NORTH		1
-
-#define DP_FLOW_OVERLAY_TYPE_IPIP	0
-#define DP_FLOW_OVERLAY_TYPE_GENEVE	1
 
 #define DP_IS_SRC false
 #define DP_IS_DST true
