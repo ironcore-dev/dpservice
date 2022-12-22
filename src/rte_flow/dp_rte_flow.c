@@ -403,29 +403,30 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	return ++pattern_cnt;
 }
 
+// this is a pure function that only take primitive information
 int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							  struct rte_flow_item_ipv4 *ipv4_spec,
-							  struct rte_flow_item_ipv4 *ipv4_mask,
-							  struct dp_flow *df, bool dir)
+								struct rte_flow_item_ipv4 *ipv4_spec,
+								struct rte_flow_item_ipv4 *ipv4_mask,
+								uint32_t *src, size_t nr_src_mask_len,
+								uint32_t *dst, size_t nr_dst_mask_len,
+								uint8_t proto)
 {
 
 	memset(ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
 	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 
-	if (dir == DP_IS_SRC) {
-		ipv4_spec->hdr.src_addr = df->src.src_addr;
-		memcpy(&ipv4_mask->hdr.src_addr, ipv4_addr_mask, sizeof(ipv4_spec->hdr.src_addr));
+
+	if (src) {
+		ipv4_spec->hdr.src_addr = *src;
+		memcpy(&ipv4_mask->hdr.src_addr, ipv4_addr_mask, nr_src_mask_len);
 	}
 
-	if (dir == DP_IS_DST) {
-		if (df->flags.nat == DP_NAT_CHG_DST_IP)
-			ipv4_spec->hdr.dst_addr = df->nat_addr;
-		else
-			ipv4_spec->hdr.dst_addr = df->dst.dst_addr;
-		memcpy(&ipv4_mask->hdr.dst_addr, ipv4_addr_mask, sizeof(ipv4_spec->hdr.dst_addr));
+	if (dst) {
+		ipv4_spec->hdr.dst_addr = *dst;
+		memcpy(&ipv4_mask->hdr.dst_addr, ipv4_addr_mask, nr_dst_mask_len);
 	}
 
-	ipv4_spec->hdr.next_proto_id = df->l4_type;
+	ipv4_spec->hdr.next_proto_id = proto;
 	ipv4_mask->hdr.next_proto_id = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
