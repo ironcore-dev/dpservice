@@ -67,9 +67,10 @@ int CreateLBCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	uint16_t i, size;
-	Status *err_status;
+	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new CreateLBCall(service_, cq_);
@@ -82,8 +83,10 @@ int CreateLBCall::Proceed()
 		request.add_lb.vni = request_.vni();
 		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.lbvipip().address().c_str(),
+			ret_val = inet_aton(request_.lbvipip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.back.back_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_CREATE_LB_ERR);
 			size = (request_.lbports_size() >= DP_LB_PORT_SIZE) ? DP_LB_PORT_SIZE : request_.lbports_size();
 			for (i = 0; i < size; i++) {
 				request.add_lb.lbports[i].port = request_.lbports(i).port();
@@ -95,7 +98,8 @@ int CreateLBCall::Proceed()
 		} else {
 			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -110,7 +114,6 @@ int CreateLBCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -223,6 +226,8 @@ int AddLBVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
+	Status *err_status = new Status();
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new AddLBVIPCall(service_, cq_);
@@ -235,12 +240,15 @@ int AddLBVIPCall::Proceed()
 				 request_.loadbalancerid().c_str());
 		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
 			request.add_lb_vip.ip_type = RTE_ETHER_TYPE_IPV6;
-			inet_pton(AF_INET6, request_.targetip().address().c_str(),
+			ret_val = inet_pton(AF_INET6, request_.targetip().address().c_str(),
 					  request.add_lb_vip.back.back_addr6);
+			if (ret_val <= 0)
+				err_status->set_error(DP_ERROR_VM_ADD_LB_VIP);
 		} else {
 			request.add_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -264,6 +272,8 @@ int DelLBVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
+	Status *err_status = new Status();
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new DelLBVIPCall(service_, cq_);
@@ -275,12 +285,15 @@ int DelLBVIPCall::Proceed()
 				 request_.loadbalancerid().c_str());
 		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
 			request.del_lb_vip.ip_type = RTE_ETHER_TYPE_IPV6;
-			inet_pton(AF_INET6, request_.targetip().address().c_str(),
+			ret_val = inet_pton(AF_INET6, request_.targetip().address().c_str(),
 					  request.del_lb_vip.back.back_addr6);
+			if (ret_val <= 0)
+				err_status->set_error(DP_ERROR_VM_DEL_LB_VIP);
 		} else {
 			request.del_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -354,6 +367,7 @@ int AddPfxCall::Proceed()
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new AddPfxCall(service_, cq_);
@@ -365,11 +379,14 @@ int AddPfxCall::Proceed()
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_ADD_PFX);
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -397,6 +414,8 @@ int DelPfxCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
+	Status *err_status = new Status();
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new DelPfxCall(service_, cq_);
@@ -408,11 +427,14 @@ int DelPfxCall::Proceed()
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_DEL_PFX);
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -487,6 +509,7 @@ int CreateLBTargetPfxCall::Proceed()
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new CreateLBTargetPfxCall(service_, cq_);
@@ -498,8 +521,13 @@ int CreateLBTargetPfxCall::Proceed()
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+			if (ret_val == 0) {
+				DPS_LOG(INFO, DPSERVICE, "GRPC CreateLBTargetPfx wrong target pfx address: %s\n", request_.prefix().address().c_str());
+				status_ = AWAIT_MSG;
+				return -1;
+			}
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
 		request.add_pfx.pfx_lb_enabled = 1;
@@ -532,6 +560,7 @@ int DelLBTargetPfxCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new DelLBTargetPfxCall(service_, cq_);
@@ -543,8 +572,13 @@ int DelLBTargetPfxCall::Proceed()
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_pfx.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
+			if (ret_val == 0) {
+				DPS_LOG(INFO, DPSERVICE, "GRPC DelLBTargetPfx wrong target prefix address: %s\n", request_.prefix().address().c_str());
+				status_ = AWAIT_MSG;
+				return -1;
+			}
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
 		dp_send_to_worker(&request);
@@ -624,6 +658,7 @@ int AddVIPCall::Proceed()
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new AddVIPCall(service_, cq_);
@@ -635,10 +670,13 @@ int AddVIPCall::Proceed()
 				 "%s", request_.interfaceid().c_str());
 		if (request_.interfacevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.interfacevipip().address().c_str(),
+			ret_val = inet_aton(request_.interfacevipip().address().c_str(),
 					  (in_addr*)&request.add_vip.vip.vip_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_ADD_LB_VIP);
 		}
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -744,6 +782,7 @@ int AddInterfaceCall::Proceed()
 	IpAdditionResponse *ip_resp = new IpAdditionResponse();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new AddInterfaceCall(service_, cq_);
@@ -753,21 +792,25 @@ int AddInterfaceCall::Proceed()
 				request_.interfaceid().c_str(), request_.ipv4config().primaryaddress().c_str(),
 				request_.devicename().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		err_status->set_error(EXIT_SUCCESS);
 		request.add_machine.vni = request_.vni();
-		inet_aton(request_.ipv4config().primaryaddress().c_str(),
-				  (in_addr*)&request.add_machine.ip4_addr);
-		inet_aton(request_.ipv4config().pxeconfig().nextserver().c_str(),
-				  (in_addr*)&request.add_machine.ip4_pxe_addr);
+		ret_val = inet_aton(request_.ipv4config().primaryaddress().c_str(),
+				(in_addr*)&request.add_machine.ip4_addr);
+		if (ret_val == 0)
+			err_status->set_error(DP_ERROR_VM_ADD);
+		if (!request_.ipv4config().pxeconfig().nextserver().empty()) {
+			ret_val = inet_aton(request_.ipv4config().pxeconfig().nextserver().c_str(),
+					(in_addr*)&request.add_machine.ip4_pxe_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_ADD);
+		}
 		snprintf(request.add_machine.pxe_str, VM_MACHINE_PXE_STR_LEN, "%s",
 				 request_.ipv4config().pxeconfig().bootfilename().c_str());
 		snprintf(request.add_machine.name, sizeof(request.add_machine.name), "%s",
 				 request_.devicename().c_str());
-		uint8_t ret = inet_pton(AF_INET6, request_.ipv6config().primaryaddress().c_str(),
+		ret_val = inet_pton(AF_INET6, request_.ipv6config().primaryaddress().c_str(),
 								request.add_machine.ip6_addr6);
-		if(ret < 0)
+		if (ret_val <= 0)
 			err_status->set_error(DP_ERROR_VM_ADD_IPV6_FORMAT);
-
 		snprintf(request.add_machine.machine_id, VM_MACHINE_ID_STR_LEN, "%s",
 				 request_.interfaceid().c_str());
 		if (!err_status->error())
@@ -899,6 +942,8 @@ int AddRouteCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply= {0};
+	Status *err_status = new Status();
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new AddRouteCall(service_, cq_);
@@ -911,19 +956,26 @@ int AddRouteCall::Proceed()
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
 		request.route.trgt_vni = request_.route().nexthopvni();
-		inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
+		ret_val = inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
 				  request.route.trgt_ip.addr6);
+		if (ret_val <= 0)
+			err_status->set_error(DP_ERROR_VM_ADD_IPV6_FORMAT);
 		request.route.pfx_length = request_.route().prefix().prefixlength();
 		if(request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.route().prefix().address().c_str(),
-					  (in_addr*)&request.route.pfx_ip.addr);
+			ret_val = inet_aton(request_.route().prefix().address().c_str(),
+					(in_addr*)&request.route.pfx_ip.addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_ADD_RT);
 		} else {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
-			inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
-					  request.route.pfx_ip.addr6);
+			ret_val = inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
+					request.route.pfx_ip.addr6);
+			if (ret_val <= 0)
+				err_status->set_error(DP_ERROR_VM_ADD_IPV6_FORMAT);
 		}
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -946,7 +998,9 @@ int AddRouteCall::Proceed()
 int DelRouteCall::Proceed()
 {
 	dp_request request = {0};
-	dp_reply reply= {0};
+	dp_reply reply = {0};
+	int ret_val;
+	Status *err_status = new Status();
 
 	if (status_ == REQUEST) {
 		new DelRouteCall(service_, cq_);
@@ -957,19 +1011,28 @@ int DelRouteCall::Proceed()
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
 		request.route.trgt_vni = request_.route().nexthopvni();
-		inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
-				  request.route.trgt_ip.addr6);
+		if (!request_.route().nexthopaddress().empty()) {
+			ret_val = inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
+					request.route.trgt_ip.addr6);
+			if (ret_val <= 0)
+				err_status->set_error(DP_ERROR_VM_DEL_RT);
+		}
 		request.route.pfx_length = request_.route().prefix().prefixlength();
-		if(request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.route().prefix().address().c_str(),
-					  (in_addr*)&request.route.pfx_ip.addr);
+			ret_val = inet_aton(request_.route().prefix().address().c_str(),
+					(in_addr*)&request.route.pfx_ip.addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_DEL_RT);
 		} else {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
-			inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
-					  request.route.pfx_ip.addr6);
+			ret_val = inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
+					request.route.pfx_ip.addr6);
+			if (ret_val <= 0)
+				err_status->set_error(DP_ERROR_VM_DEL_RT);
 		}
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -1063,6 +1126,7 @@ int AddNATVIPCall::Proceed()
 	Status *err_status = new Status();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new AddNATVIPCall(service_, cq_);
@@ -1073,8 +1137,10 @@ int AddNATVIPCall::Proceed()
 				 "%s", request_.interfaceid().c_str());
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_nat_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natvipip().address().c_str(),
+			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_ADD_NAT);
 		}
 
 		// maybe add a validity check here to ensure minport is not greater than 2^30
@@ -1083,7 +1149,8 @@ int AddNATVIPCall::Proceed()
 
 		DPS_LOG(INFO, DPSERVICE, "GRPC AddNATVIP is called to add a local NAT entry: interface %s -> NAT IP %s, with port range [%d, %d) \n",
 				 request_.interfaceid().c_str(), request_.natvipip().address().c_str(), request_.minport(), request_.maxport());
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -1193,7 +1260,7 @@ int AddNeighborNATCall::Proceed()
 {
 	dp_request request = {0};
 	struct dp_reply reply = {0};
-
+	int ret_val;
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
@@ -1204,17 +1271,25 @@ int AddNeighborNATCall::Proceed()
 		request.add_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_nat_neigh.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natvipip().address().c_str(),
+			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_nat_neigh.vip.vip_addr);
+			if (ret_val == 0) {
+				DPS_LOG(INFO, DPSERVICE, "GRPC AddNeighborNAT wrong NAT IP %s\n", request_.natvipip().address().c_str());
+				status_ = AWAIT_MSG;
+				return -1;
+			}
 		}
-
 		// maybe add a validity check here to ensure minport is not greater than 2^30
 		request.add_nat_neigh.vni = request_.vni();
 		request.add_nat_neigh.port_range[0] = request_.minport();
 		request.add_nat_neigh.port_range[1] = request_.maxport();
-		inet_pton(AF_INET6, request_.underlayroute().c_str(),
-				  request.add_nat_neigh.route);
-
+		ret_val = inet_pton(AF_INET6, request_.underlayroute().c_str(),
+				request.add_nat_neigh.route);
+		if (ret_val <= 0) {
+			DPS_LOG(INFO, DPSERVICE, "GRPC AddNeighborNAT wrong route IP %s\n", request_.underlayroute().c_str());
+			status_ = AWAIT_MSG;
+			return -1;
+		}
 		DPS_LOG(INFO, DPSERVICE, "GRPC AddNeighborNAT is called to add a neigh NAT entry: NAT IP %s, port range [%d, %d) for vni %d, with route %s \n",
 				request_.natvipip().address().c_str(), request_.minport(), request_.maxport(), request_.vni(), request_.underlayroute().c_str());
 		dp_send_to_worker(&request);
@@ -1243,6 +1318,7 @@ int DeleteNeighborNATCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new DeleteNeighborNATCall(service_, cq_);
@@ -1253,15 +1329,18 @@ int DeleteNeighborNATCall::Proceed()
 
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.del_nat_neigh.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natvipip().address().c_str(),
+			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.del_nat_neigh.vip.vip_addr);
+			if (ret_val == 0) {
+				DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNeighborNAT wrong NAT IP %s\n", request_.natvipip().address().c_str());
+				status_ = AWAIT_MSG;
+				return -1;
+			}
 		}
-
 		// maybe add a validity check here to ensure minport is not greater than 2^30
 		request.del_nat_neigh.vni = request_.vni();
 		request.del_nat_neigh.port_range[0] = request_.minport();
 		request.del_nat_neigh.port_range[1] = request_.maxport();
-
 		DPS_LOG(INFO, DPSERVICE, "GRPC DeleteNeighborNAT is called to delete a neigh NAT entry: NAT IP %s, port range [%d, %d) for vni %d \n", 
 				request_.natvipip().address().c_str(), request_.minport(), request_.maxport(), request_.vni());
 		dp_send_to_worker(&request);
@@ -1357,6 +1436,8 @@ int GetNATInfoCall::Proceed()
 	struct in_addr addr;
 	NATIP *nat_ip = new NATIP();
 	char buf[INET6_ADDRSTRLEN];
+	Status *err_status = new Status();
+	int ret_val;
 
 	if (status_ == REQUEST) {
 		new GetNATInfoCall(service_, cq_);
@@ -1372,12 +1453,15 @@ int GetNATInfoCall::Proceed()
 
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.get_nat_entry.ip_type = RTE_ETHER_TYPE_IPV4;
-			inet_aton(request_.natvipip().address().c_str(),
+			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.get_nat_entry.vip.vip_addr);
+			if (ret_val == 0)
+				err_status->set_error(DP_ERROR_VM_GET_NAT);
 		}
 
 		DPS_LOG(INFO, DPSERVICE, "GRPC getNATInfo is called to get entries for NAT IP %s \n", request_.natvipip().address().c_str());
-		dp_send_to_worker(&request);
+		if (!err_status->error())
+			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
