@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <sys/queue.h>
 
+#include "dp_error.h"
 #include "dp_conf.h"
 #include "dpdk_layer.h"
 #include "dp_util.h"
@@ -190,7 +191,7 @@ int main(int argc, char **argv)
 
 	// Read the config file first because it can contain EAL arguments
 	// (those need to be injected *before* rte_eal_init())
-	if (dp_conf_parse_file(getenv("DP_CONF")) < 0)
+	if (DP_FAILED(dp_conf_parse_file(getenv("DP_CONF"))))
 		return EXIT_FAILURE;
 
 	eal_argcount = dp_eal_init(&argc, &argv);

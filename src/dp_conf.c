@@ -8,6 +8,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 
+#include "dp_error.h"
 #include "dp_version.h"
 #include "nodes/common_node.h"  // graphtrace level limit
 #include "dpdk_layer.h"  // underlay conf struct
@@ -44,19 +45,17 @@ const char *dp_conf_get_eal_a_pf1()
 }
 
 
-// TODO underscores -> dashes in all arguments
-
 static inline int opt_strcpy(char *dst, const char *src, size_t max_size)
 {
 	size_t len = strlen(src);
 
 	if (len >= max_size) {
 		fprintf(stderr, "Value '%s' is too long (max %lu characters)\n", src, max_size-1);
-		return -1;
+		return DP_ERROR;
 	}
 
 	memcpy(dst, src, len+1);  // including \0
-	return 0;
+	return DP_OK;
 }
 
 static inline int opt_str_to_int(int *dst, const char *src, int min, int max)
@@ -67,15 +66,15 @@ static inline int opt_str_to_int(int *dst, const char *src, int min, int max)
 	result = strtol(src, &endptr, 10);
 	if (*endptr) {
 		fprintf(stderr, "Value '%s' is not an integer\n", src);
-		return -1;
+		return DP_ERROR;
 	}
 	if (result < min || result > max) {
 		fprintf(stderr, "Value '%s' is not in range %d-%d\n", src, min, max);
-		return -1;
+		return DP_ERROR;
 	}
 
 	*dst = (int)result;  // this is fine, limited by min/max
-	return 0;
+	return DP_OK;
 }
 
 static inline int opt_str_to_double(double *dst, const char *src, double min, double max)
@@ -86,24 +85,24 @@ static inline int opt_str_to_double(double *dst, const char *src, double min, do
 	result = strtod(src, &endptr);
 	if (*endptr) {
 		fprintf(stderr, "Value '%s' is not a double\n", src);
-		return -1;
+		return DP_ERROR;
 	}
 	if (result < min || result > max) {
 		fprintf(stderr, "Value '%s' is not in range %lf-%lf\n", src, min, max);
-		return -1;
+		return DP_ERROR;
 	}
 
 	*dst = result;
-	return 0;
+	return DP_OK;
 }
 
 static int opt_str_to_ipv6(void *dst, const char *arg)
 {
 	if (inet_pton(AF_INET6, arg, dst) != 1) {
 		fprintf(stderr, "Invalid IPv6 address format: '%s'\n", arg);
-			return -1;
+			return DP_ERROR;
 	}
-	return 0;
+	return DP_OK;
 }
 
 static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uint choice_count)
@@ -111,11 +110,11 @@ static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uin
 	for (int i = 0; i < choice_count; ++i) {
 		if (!strcmp(choices[i], arg)) {
 			*dst = i;
-			return 0;
+			return DP_OK;
 		}
 	}
 	fprintf(stderr, "Invalid choice '%s'\n", arg);
-	return -1;
+	return DP_ERROR;
 }
 
 static int parse_opt(int opt, const char *arg)
@@ -138,23 +137,23 @@ static int parse_opt(int opt, const char *arg)
 		return opt_str_to_double(&wcmp_frac, arg, 0.0, 1.0);
 	case OPT_NO_OFFLOAD:
 		offload_enabled = false;
-		return 0;
+		return DP_OK;
 	case OPT_NO_CONNTRACK:
 		conntrack_enabled = false;
-		return 0;
+		return DP_OK;
 	case OPT_NO_STATS:
 		stats_enabled = false;
-		return 0;
+		return DP_OK;
 	case OPT_ENABLE_IPV6_OVERLAY:
 		ipv6_overlay_enabled = true;
-		return 0;
+		return DP_OK;
 #ifdef ENABLE_GRAPHTRACE
 	case OPT_GRAPHTRACE:
 		return opt_str_to_int(&graphtrace_level, arg, 0, DP_GRAPHTRACE_LEVEL_MAX);
 #endif
 	default:
 		fprintf(stderr, "Unimplemented option %d\n", opt);
-		return -1;
+		return DP_ERROR;
 	}
 }
 
@@ -167,7 +166,7 @@ static inline void print_usage(const char *progname, FILE *outfile)
 enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
 {
 	const char *progname = argv[0];
-	int opt, ret;
+	int opt;
 
 	while ((opt = getopt_long(argc, argv, OPTSTRING, longopts, NULL)) != -1) {
 		switch (opt) {
@@ -181,8 +180,7 @@ enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
 			print_usage(progname, stderr);
 			return DP_CONF_RUNMODE_ERROR;
 		default:
-			ret = parse_opt(opt, optarg);
-			if (ret < 0)
+			if (DP_FAILED(parse_opt(opt, optarg)))
 				return DP_CONF_RUNMODE_ERROR;
 		}
 	}
@@ -210,12 +208,12 @@ static int parse_line(char *line, int lineno)
 
 	// Ignore comments and empty lines
 	if (*line == '#' || *line == '\n')
-		return 0;
+		return DP_OK;
 
 	key = strtok(line, " \t\n");
 	if (!key) {
 		fprintf(stderr, "Config file error: no key on line %d\n", lineno);
-		return -1;
+		return DP_ERROR;
 	}
 
 	longopt = get_opt_by_name(key);
@@ -223,7 +221,7 @@ static int parse_line(char *line, int lineno)
 	value = strtok(NULL, " \t\n");
 	if (!value && (!longopt || longopt->has_arg)) {
 		fprintf(stderr, "Config file error: value required for key '%s' on line %d\n", key, lineno);
-		return -1;
+		return DP_ERROR;
 	}
 
 	// Config-file-specific keys
@@ -235,7 +233,7 @@ static int parse_line(char *line, int lineno)
 	// Otherwise support all long options
 	if (!longopt) {
 		fprintf(stderr, "Config file: unknown key '%s'\n", key);
-		return -1;
+		return DP_ERROR;
 	}
 
 	return parse_opt(longopt->val, value);
@@ -247,11 +245,11 @@ static int parse_file(FILE *file)
 	size_t linesize = 0;
 	ssize_t linelen;
 	int lineno = 0;
-	int ret = 0;
+	int ret = DP_OK;
 
 	while ((linelen = getline(&line, &linesize, file)) > 0) {
 		ret = parse_line(line, lineno);
-		if (ret < 0)
+		if (DP_FAILED(ret))
 			break;
 		lineno++;
 	}
@@ -271,9 +269,9 @@ int dp_conf_parse_file(const char *env_filename)
 		// do not warn about the default file (optional to use)
 		// also empty value can be provided used on purpose (to disable its use)
 		if (!env_filename || !*filename)
-			return 0;
+			return DP_OK;
 		fprintf(stderr, "Error opening config file '%s'\n", filename);
-		return -1;
+		return DP_ERROR;
 	}
 
 	ret = parse_file(file);
