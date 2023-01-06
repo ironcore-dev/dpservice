@@ -21,6 +21,7 @@
 #include "rte_flow/dp_rte_flow_init.h"
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
+#include "dp_error.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
@@ -87,7 +88,7 @@ static void timer_cb()
 
 int dp_dpdk_init()
 {
-	int ret = 0;  // TODO not used!
+	int ret = DP_OK;  // TODO not used!
 	uint64_t hz;
 	uint8_t lcore_id;
 

@@ -1,11 +1,25 @@
 #ifndef __INCLUDE_DP_ERROR_H__
 #define __INCLUDE_DP_ERROR_H__
 
+// TODO(plague) move log somewhere and include that only?
+#include "dp_util.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+enum {
+	DP_ERROR = -1,
+	DP_OK = 0
+};
 
+// NOTICE: this can be used directly with a function call, do not use RET multiple times
+#define DP_FAILED(RET) ((RET) < 0)
+
+
+/*
+ * GRPC error values, do not change them!
+ */
 #define DP_ERROR_VM_ADD								100
 #define DP_ERROR_VM_ADD_IPV6_FORMAT					101
 #define DP_ERROR_VM_ADD_VM_NAME_ERR					102
