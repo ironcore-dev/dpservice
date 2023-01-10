@@ -53,7 +53,7 @@ static __rte_always_inline void handle_nongraph_queues()
 		dp_process_request(mbufs[i]);
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr = alloc_dp_flow_ptr(m);
 

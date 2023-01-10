@@ -15,6 +15,7 @@ static inline void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size
 	// TODO add more as needed
 }
 
+// does not use DPNODE_LOG_* due to output alignment
 #define GRAPHTRACE_PRINT(PKT, FORMAT, ...) do { \
 	char _graphtrace_buf[512]; \
 	dp_graphtrace_print_pkt((PKT), _graphtrace_buf, sizeof(_graphtrace_buf)); \

@@ -83,7 +83,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -111,7 +111,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 	) {
 		memset(&key, 0, sizeof(key));
 		if (dp_build_flow_key(&key, m) < 0) {
-			DPS_LOG(WARNING, DPSERVICE, "Failed to build a flow key\n");
+			DPNODE_LOG_WARNING(node, "Failed to build a flow key");
 			return CONNTRACK_NEXT_DROP;
 		}
 		if (dp_flow_exists(&key)) {
@@ -120,7 +120,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 		} else {
 			flow_val = flow_table_insert_entry(&key, df_ptr, m);
 			if (!flow_val) {
-				DPS_LOG(ERR, DPSERVICE, "Failed to add a flow table entry due to NULL flow_val pointer\n");
+				DPNODE_LOG_WARNING(node, "Failed to add a flow table entry due to NULL flow_val pointer");
 				return CONNTRACK_NEXT_DROP;
 			}
 		}

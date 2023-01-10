@@ -20,7 +20,7 @@ static int firewall_node_init(const struct rte_graph *graph, struct rte_node *no
 	return 0;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	return FIREWALL_NEXT_L2_DECAP;
 }

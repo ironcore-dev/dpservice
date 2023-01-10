@@ -25,7 +25,7 @@ static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	struct flow_value *cntrack = df_ptr->conntrack;
@@ -52,19 +52,19 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 			if (nat_check.is_network_natted) {
 				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->l4_info.trans_port.src_port, vni, df_ptr->l4_type));
 				if (nat_port == 0) {
-					DPS_LOG(ERR, DPSERVICE, "an invalid network nat port is allocated \n");
+					DPNODE_LOG_WARNING(node, "An invalid network nat port is allocated");
 					return SNAT_NEXT_DROP;
 				}
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == DP_IP_ICMP_ID_INVALID) {
-						DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n", nat_port);
+						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d", nat_port);
 						return SNAT_NEXT_DROP;
 					}
 				} else {
 					if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
-						DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", nat_port);
+						DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port with value %d", nat_port);
 						return SNAT_NEXT_DROP;
 					}
 				}
@@ -104,13 +104,13 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 				if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst) == DP_IP_ICMP_ID_INVALID) {
-					DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n", 
+					DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d",
 							htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
 					return SNAT_NEXT_DROP;
 				}
 			} else {
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
-					DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's src port with value %d \n", 
+					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port with value %d",
 							htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
 					return SNAT_NEXT_DROP;
 				}

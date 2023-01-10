@@ -101,7 +101,7 @@ static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m)
 		;
 } 
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	uint8_t pkt_type = (m->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
 	struct dp_flow *df;

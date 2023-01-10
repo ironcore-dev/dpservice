@@ -13,6 +13,7 @@
 #include "dp_util.h"
 #include "dp_nat.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_log.h"
 
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
@@ -85,7 +86,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	dp_graphtrace_burst_tx(node, objs, sent_count, port);
 
 	if (unlikely(sent_count != nb_objs)) {
-		DPS_LOG(WARNING, DPSERVICE, "Not all packets transmitted successfully (%d/%d) in %s node\n", sent_count, nb_objs, node->name);
+		DPNODE_LOG_WARNING(node, "Not all packets transmitted successfully (%d/%d)", sent_count, nb_objs);
 		dp_graphtrace_burst_next(node, objs + sent_count, nb_objs - sent_count, TX_NEXT_DROP);
 		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, nb_objs - sent_count);
 	}

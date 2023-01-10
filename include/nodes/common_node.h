@@ -36,7 +36,8 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 							 struct rte_node *node,
 							 void **objs,
 							 uint16_t nb_objs,
-							 rte_edge_t (*get_next_index)(struct rte_mbuf *pkt))
+							 rte_edge_t (*get_next_index)(struct rte_node *node,
+														  struct rte_mbuf *pkt))
 {
 	struct rte_mbuf *pkt;
 	rte_edge_t next_index;
@@ -45,7 +46,7 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 	for (i = 0; i < nb_objs; ++i) {
 		pkt = (struct rte_mbuf *)objs[i];
 		dp_graphtrace(node, pkt);
-		next_index = get_next_index(pkt);
+		next_index = get_next_index(node, pkt);
 		dp_graphtrace_next(node, pkt, next_index);
 		rte_node_enqueue_x1(graph, node, next_index, pkt);
 	}
