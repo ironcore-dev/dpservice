@@ -10,12 +10,11 @@ extern "C" {
 
 #define RTE_LOGTYPE_DPSERVICE RTE_LOGTYPE_USER1
 #define RTE_LOGTYPE_DPGRAPH   RTE_LOGTYPE_USER2
-// TODO create more, use, and document them
+#define RTE_LOGTYPE_DPGRPC    RTE_LOGTYPE_USER3
 
-// TODO do we want the same lengths or not? (showcase)
 #define _DP_LOG_TYPE_SERVICE "SERVICE"
 #define _DP_LOG_TYPE_GRAPH   "GRAPH"
-// TODO GRPC for sure
+#define _DP_LOG_TYPE_GRPC    "GRPC"
 
 // some of these are intentionally commented-out to prevent usage
 // (static_assert cannot be used here due to token pasting below)
@@ -37,9 +36,9 @@ __rte_format_printf(3, 4)
 #endif
 void _dp_log(unsigned int level, unsigned int logtype,
 #ifdef DEBUG
-			  const char *file, unsigned int line, const char *function,
+			 const char *file, unsigned int line, const char *function,
 #endif
-			  const char *format, ...);
+			 const char *format, ...);
 
 #ifdef DEBUG
 #	define _DP_LOG_DEBUGINFO __FILE__, __LINE__, __FUNCTION__,
@@ -59,11 +58,15 @@ void _dp_log(unsigned int level, unsigned int logtype,
 #define DPS_LOG_INFO(FORMAT, ...)    DP_LOG(INFO,    SERVICE, FORMAT, ##__VA_ARGS__)
 #define DPS_LOG_DEBUG(FORMAT, ...)   DP_LOG(DEBUG,   SERVICE, FORMAT, ##__VA_ARGS__)
 
+#define DPGRPC_LOG_ERR(FORMAT, ...)     DP_LOG(ERR,     GRPC, FORMAT, ##__VA_ARGS__)
+#define DPGRPC_LOG_WARNING(FORMAT, ...) DP_LOG(WARNING, GRPC, FORMAT, ##__VA_ARGS__)
+#define DPGRPC_LOG_INFO(FORMAT, ...)    DP_LOG(INFO,    GRPC, FORMAT, ##__VA_ARGS__)
+#define DPGRPC_LOG_DEBUG(FORMAT, ...)   DP_LOG(DEBUG,   GRPC, FORMAT, ##__VA_ARGS__)
+
 #define DPNODE_LOG_ERR(NODE, FORMAT, ...)     DP_LOG(ERR,     GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
 #define DPNODE_LOG_WARNING(NODE, FORMAT, ...) DP_LOG(WARNING, GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
 #define DPNODE_LOG_INFO(NODE, FORMAT, ...)    DP_LOG(INFO,    GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
 #define DPNODE_LOG_DEBUG(NODE, FORMAT, ...)   DP_LOG(DEBUG,   GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
-
 
 void dp_log_set_thread_name(const char *name);
 

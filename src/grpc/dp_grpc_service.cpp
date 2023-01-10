@@ -28,7 +28,7 @@ void GRPCService::run(std::string listen_address)
 	this->cq_ = builder.AddCompletionQueue();
 	this->server_= builder.BuildAndStart();
 	dp_log_set_thread_name("grpc");
-	DPS_LOG(INFO, DPSERVICE, "Server initialized and listening on %s\n", listen_address.c_str());
+	DPGRPC_LOG_INFO("Server initialized and listening on %s", listen_address.c_str());
 	HandleRpcs();
 }
 
