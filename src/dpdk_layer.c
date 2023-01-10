@@ -22,6 +22,7 @@
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
 #include "dp_error.h"
+#include "dp_log.h"
 
 static volatile bool force_quit;
 static int last_assigned_vf_idx = 0;
@@ -86,9 +87,9 @@ static void timer_cb()
 	dp_send_event_timer_msg();
 }
 
+// TODO(plague): neds proper retval
 int dp_dpdk_init()
 {
-	int ret = DP_OK;  // TODO not used!
 	uint64_t hz;
 	uint8_t lcore_id;
 
@@ -102,11 +103,15 @@ int dp_dpdk_init()
 	if (dp_layer.rte_mempool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
+	dp_layer.num_of_vfs = dp_get_num_of_vfs();
+	if (DP_FAILED(dp_layer.num_of_vfs))
+		return DP_ERROR;
+
 	dp_layer.nr_std_rx_queues = DP_NR_STD_RX_QUEUES;
 	dp_layer.nr_std_tx_queues = DP_NR_STD_TX_QUEUES;
 
 	dp_layer.nr_vf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
-	dp_layer.nr_pf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_get_num_of_vfs();
+	dp_layer.nr_pf_hairpin_rx_tx_queues = DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer.num_of_vfs;
 
 	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!dp_layer.grpc_tx_queue)
@@ -138,7 +143,7 @@ int dp_dpdk_init()
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	return ret;
+	return DP_OK;
 }
 
 
@@ -206,20 +211,24 @@ static int main_core_loop(void)
 	}
 
 	free(msg_out);
-	return EXIT_SUCCESS;
+	return DP_OK;
 }
 
 int dp_dpdk_main_loop(void)
 {
+	int ret;
+
 	DPS_LOG_INFO("DPDK main loop started");
 
 	/* Launch per-lcore init on every worker lcore */
-	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
+	ret = rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot launch lcores %s", dp_strerror(ret));
+		return ret;
+	}
 
 	/* Launch timer loop on main core */
-	main_core_loop();
-
-	return 0;
+	return main_core_loop();
 }
 
 void dp_dpdk_exit(void)
@@ -241,6 +250,7 @@ static int dp_cfg_ethdev(int port_id)
 	return 0;
 }
 
+// TODO(plague): move to dp_port?
 static int dp_port_prepare(dp_port_type type, int port_id,
 						   struct dp_port_ext *port_ext)
 {
@@ -255,7 +265,7 @@ static int dp_port_prepare(dp_port_type type, int port_id,
 	return 0;
 }
 
-
+// TODO(plague): move to dp_port?
 static int dp_port_flow_isolate(int port_id)
 {
 	struct rte_flow_error error;
@@ -283,19 +293,22 @@ dp_vf_port_attach_status get_vf_port_attach_status(int port_id)
 	return status;
 }
 
-static void dp_install_isolated_mode(int port_id)
+static int dp_install_isolated_mode(int port_id)
 {
 	switch (dp_conf_get_overlay_type()) {
 	case DP_CONF_OVERLAY_TYPE_IPIP:
 		DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
-		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP);
-		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP);
+		if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP))
+			|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP)))
+			return DP_ERROR;
 		break;
 	case DP_CONF_OVERLAY_TYPE_GENEVE:
 		DPS_LOG_INFO("Init isolation flow rule for GENEVE tunnels");
-		dp_install_isolated_mode_geneve(port_id);
+		if (DP_FAILED(dp_install_isolated_mode_geneve(port_id)))
+			return DP_ERROR;
 		break;
 	}
+	return DP_OK;
 }
 
 static void allocate_pf_hairpin_tx_queue(uint16_t port_id, uint16_t peer_pf_port_id, uint16_t hairpin_queue_offset)
@@ -339,13 +352,12 @@ int dp_init_interface(struct dp_port_ext *port, dp_port_type type)
 	RTE_ETH_FOREACH_DEV(port_id) {
 		struct rte_eth_dev_info dev_info;
 
-		ret = rte_eth_dev_info_get(port_id, &dev_info);
+		ret = dp_get_dev_info(port_id, &dev_info, ifname);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
 					"Error during getting device (port %u) info: %s\n",
 					port_id, strerror(-ret));
 
-		if_indextoname(dev_info.if_index, ifname);
 		if ((type == DP_PORT_PF) && (strncmp(dp_port_ext.port_name, ifname, IF_NAMESIZE) == 0)) {
 
 			if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
@@ -515,26 +527,25 @@ static inline int dp_graph_export(const char graph_name[RTE_GRAPH_NAMESIZE])
 {
 	int ret;
 	FILE *f;
-	char fname[RTE_GRAPH_NAMESIZE + 5];
+	char fname[RTE_GRAPH_NAMESIZE + 5];  // + ".dot\0"
 
 	if (snprintf(fname, sizeof(fname), "%s.dot", graph_name) >= sizeof(fname)) {
 		DPS_LOG_ERR("Cannot export graph, name too long");
-		return -ENOMEM;
+		return DP_ERROR;
 	}
 	f = fopen(fname, "w");
 	if (!f) {
-		ret = -errno;
-		DPS_LOG_ERR("Cannot open graph export file for writing (%s)", rte_strerror(errno));
-		return ret;
+		DPS_LOG_ERR("Cannot open graph export file for writing %s", dp_strerror(errno));
+		return DP_ERROR;
 	}
 	ret = rte_graph_export(dp_layer.graph_name, f);
-	if (ret)
-		DPS_LOG_ERR("rte_graph_export() failed (%d)", ret);
+	if (DP_FAILED(ret))
+		DPS_LOG_ERR("rte_graph_export() failed %s", dp_strerror(ret));
 	fclose(f);
 	return ret;
 }
 
-int dp_init_graph(void)
+int dp_graph_init(void)
 {
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
@@ -545,24 +556,24 @@ int dp_init_graph(void)
 	struct rx_node_config rx_cfg;
 	struct rx_periodic_node_config rx_periodic_cfg;
 	int ret, i, id;
-	struct rte_graph_param graph_conf;
+	struct rte_graph_param graph_conf = {0};
 	const char **node_patterns;
 	int nb_patterns;
 	uint32_t lcore_id;
 
 	/* Graph Initialization */
 	nb_patterns = RTE_DIM(default_patterns);
+	// TODO(plague): this constant should be DP_NR_STD_RX_QUEUES, but needs testing as it is smaller (1)!
 	node_patterns = malloc((2 + nb_patterns) * sizeof(*node_patterns));
-	if (!node_patterns)
-		return -ENOMEM;
-	memcpy(node_patterns, default_patterns,
-	       nb_patterns * sizeof(*node_patterns));
-
-	memset(&graph_conf, 0, sizeof(graph_conf));
+	// TODO(plague): thre's no free(), dp_graph_free() needed
+	if (!node_patterns) {
+		DPS_LOG_ERR("Cannot allocate graph node patterns");
+		return DP_ERROR;
+	}
+	memcpy(node_patterns, default_patterns, nb_patterns * sizeof(*node_patterns));
 	graph_conf.node_patterns = node_patterns;
 
 	/* Graph Configuration */
-
 	tx_node_data = tx_node_data_get();
 	tx_node = tx_node_get();
 	rx_node = rx_node_get();
@@ -579,77 +590,91 @@ int dp_init_graph(void)
 	rx_periodic_cfg.grpc_tx = dp_layer.grpc_tx_queue;
 	rx_periodic_cfg.grpc_rx = dp_layer.grpc_rx_queue;
 	rx_periodic_cfg.monitoring_rx = dp_layer.monitoring_rx_queue;
+	// TODO(plague): the whole DP node api needs work, either this will be void or properly check
+	// (this will apply on many places below)
 	ret = config_rx_periodic_node(&rx_periodic_cfg);
 
 	for (i = 0; i < dp_layer.dp_port_cnt; i++) {
+		// TODO(plague): just create a function for the loop?
 		snprintf(name, sizeof(name), "%u-%u", dp_layer.ports[i]->dp_port_id, 0);
 		/* Clone a new rx node with same edges as parent */
 		id = rte_node_clone(rx_node->id, name);
-		if (id == RTE_NODE_ID_INVALID)
-			return -EIO;
+		if (id == RTE_NODE_ID_INVALID) {
+			DPS_LOG_ERR("Cannot clone rx node %s", dp_strerror(rte_errno));
+			return DP_ERROR;
+		}
 		rx_cfg.port_id = dp_layer.ports[i]->dp_port_id;
 		rx_cfg.queue_id = 0;
 		rx_cfg.node_id = id;
+		// TODO(plague): DP node api
 		ret = config_rx_node(&rx_cfg);
 
 		snprintf(name, sizeof(name), "%u", dp_layer.ports[i]->dp_port_id);
 		id = rte_node_clone(tx_node->id, name);
+		if (id == RTE_NODE_ID_INVALID) {
+			DPS_LOG_ERR("Cannot clone rx node %s", dp_strerror(rte_errno));
+			return DP_ERROR;
+		}
 		tx_node_data->nodes[dp_layer.ports[i]->dp_port_id] = id;
 		tx_node_data->port_ids[dp_layer.ports[i]->dp_port_id] = dp_layer.ports[i]->dp_port_id;
 
 		snprintf(name, sizeof(name), "tx-%u", dp_layer.ports[i]->dp_port_id);
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_VF) {
-			rte_node_edge_update(arp_node->id, RTE_EDGE_ID_INVALID,
-						&next_nodes, 1);
-			ret = arp_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(arp_node->id) - 1);
-			if (ret < 0)
+			// TODO(plague): all these can fail with RTE_EDGE_ID_INVALID and set rte_errno
+			rte_node_edge_update(arp_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			// TODO(plague): maybe rework DP node api to do each in one call
+			// TODO(plague): update retval checks
+			ret = arp_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(arp_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
-			rte_node_edge_update(rx_periodic_node->id, RTE_EDGE_ID_INVALID,
-						&next_nodes, 1);
-			ret = rx_periodic_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(rx_periodic_node->id) - 1);
-			if (ret < 0)
+			}
+			rte_node_edge_update(rx_periodic_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = rx_periodic_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(rx_periodic_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
-			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID,
-						&next_nodes, 1);
-			ret = ipv6_nd_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(ipv6_nd_node->id) - 1);
-			if (ret < 0)
+			}
+			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = ipv6_nd_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(ipv6_nd_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
-			rte_node_edge_update(dhcp_node->id, RTE_EDGE_ID_INVALID,
-			&next_nodes, 1);
-			ret = dhcp_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(dhcp_node->id) - 1);
-			if (ret < 0)
+			}
+			rte_node_edge_update(dhcp_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = dhcp_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(dhcp_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
-			rte_node_edge_update(dhcpv6_node->id, RTE_EDGE_ID_INVALID,
-			&next_nodes, 1);
-			ret = dhcpv6_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(dhcpv6_node->id) - 1);
-			if (ret < 0)
+			}
+			rte_node_edge_update(dhcpv6_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = dhcpv6_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(dhcpv6_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
-			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID,
-			&next_nodes, 1);
-			ret = l2_decap_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(l2_decap_node->id) - 1);
-			if (ret < 0)
+			}
+			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = l2_decap_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(l2_decap_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
+			}
 		}
 
 		if (dp_layer.ports[i]->dp_p_type == DP_PORT_PF) {
-			rte_node_edge_update(ipv6_encap_node->id, RTE_EDGE_ID_INVALID,
-			&next_nodes, 1);
-			ret = ipv6_encap_set_next(
-				dp_layer.ports[i]->dp_port_id, rte_node_edge_count(ipv6_encap_node->id) - 1);
-			if (ret < 0)
+			rte_node_edge_update(ipv6_encap_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = ipv6_encap_set_next(dp_layer.ports[i]->dp_port_id, rte_node_edge_count(ipv6_encap_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
+			}
 		}
 	}
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {
+		// TODO(plague): just create a function for the loop
 		rte_graph_t graph_id;
 
-		if (rte_lcore_is_enabled(lcore_id) == 0)
+		if (!rte_lcore_is_enabled(lcore_id))
 			continue;
 
 		graph_conf.nb_node_patterns = nb_patterns;
@@ -659,24 +684,22 @@ int dp_init_graph(void)
 				"worker_%u", lcore_id);
 
 		graph_id = rte_graph_create(dp_layer.graph_name, &graph_conf);
-		if (graph_id == RTE_GRAPH_ID_INVALID)
-			rte_exit(EXIT_FAILURE,
-					"rte_graph_create(): graph_id invalid for lcore %u\n",
-					lcore_id);
-		ret = dp_graph_export(dp_layer.graph_name);
-		if (ret < 0)
-			return ret;
+		if (graph_id == RTE_GRAPH_ID_INVALID) {
+			DPS_LOG_ERR("Cannot create graph for lcore %u %s", lcore_id, dp_strerror(rte_errno));
+			return DP_ERROR;
+		}
+		if (DP_FAILED(dp_graph_export(dp_layer.graph_name)))
+			return DP_ERROR;
 
 		dp_layer.graph_id = graph_id;
 		dp_layer.graph = rte_graph_lookup(dp_layer.graph_name);
-
-		if (!dp_layer.graph)
-			rte_exit(EXIT_FAILURE,
-					"rte_graph_lookup(): graph %s not found\n",
-					dp_layer.graph_name);
+		if (!dp_layer.graph) {
+			DPS_LOG_ERR("Graph %s not found after creation for lcore %u", dp_layer.graph_name, lcore_id);
+			return DP_ERROR;
+		}
 	}
 
-	return 0;
+	return DP_OK;
 }
 
 __rte_always_inline struct underlay_conf *get_underlay_conf()
@@ -689,20 +712,21 @@ __rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
 	gen_conf = *u_conf;
 }
 
-void dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type)
+int dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type)
 {
-	int ret;
+	// TODO(plague): refactor to return the port (prevents multiple lookups)
+	if (DP_FAILED(dp_port_allocate(&dp_layer, portid, port_ext, type)))
+		return DP_ERROR;
 
-	ret = dp_port_allocate(&dp_layer, portid, port_ext, type);
-	if (ret < 0) {
-		printf("Can not allocate port\n ");
-		return;
-	}
-	if (type == DP_PORT_PF)
-		dp_install_isolated_mode(portid);
+	if (type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
+		if (DP_FAILED(dp_install_isolated_mode(portid)))
+			return DP_ERROR;
 
 	enable_rx_node(portid);
+	// TODO(plague): currently silently fails on bad id,
+	// but once this has pointer, it can be nicer
 	dp_port_set_link_status(&dp_layer, portid, RTE_ETH_LINK_UP);
+	return DP_OK;
 }
 
 void dp_stop_interface(int portid, dp_port_type type)

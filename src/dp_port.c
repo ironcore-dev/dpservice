@@ -1,7 +1,10 @@
-#include "dp_port.h"
-#include "dp_lpm.h"
+#include "dp_error.h"
 #include "dp_log.h"
+#include "dp_lpm.h"
 #include "dp_netlink.h"
+#include "dp_port.h"
+
+// TODO(plague): refactor names to dp_port_*
 
 /* Ethernet port configured with default settings. 8< */
 struct rte_eth_conf port_conf = {
@@ -54,13 +57,12 @@ int dp_port_init(struct dp_port *port, int port_id, struct dp_port_ext *port_det
 	int ret;
 	uint16_t i;
 
-	ret = rte_eth_dev_info_get(port_id, &dev_info);
+	ret = dp_get_dev_info(port_id, &dev_info, ifname);
 	if (ret != 0)
 		rte_exit(EXIT_FAILURE,
 				"Error during getting device (port %u) info: %s\n",
 				port_id, strerror(-ret));
 
-	if_indextoname(dev_info.if_index, ifname);
 	DPS_LOG_INFO("INIT initializing port: %d (%s)", port_id, ifname);
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
@@ -194,6 +196,11 @@ void print_link_info(int port_id, char *out, size_t out_size)
 		stats.oerrors);
 }
 
+// TODO(plague): refactor these:
+// 1 - port_id is unique, should ask first where possible
+// 2 - vf/pf type argument, but functions named _vf_ ?
+// 3 - some of them are copies, should call one another
+// 4 - maybe consolidate logging
 int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char *pf_name)
 {
 	int i;
@@ -203,7 +210,9 @@ int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char *pf_name)
 			dp_layer->ports[i]->dp_p_type == DP_PORT_PF)
 			return dp_layer->ports[i]->dp_port_id;
 	}
-	return -1;
+
+	DPS_LOG_ERR("Cannot find PF port '%s'", pf_name);
+	return DP_ERROR;
 }
 
 
@@ -232,9 +241,11 @@ int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type)
 			return dp_layer->ports[i]->dp_port_id;
 	}
 
-	return -1;
+	DPS_LOG_ERR("No available ports");
+	return DP_ERROR;
 }
 
+// TODO(plague): this can be PF port too, no checks!
 static struct dp_port *dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	int i;
@@ -246,9 +257,11 @@ static struct dp_port *dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_la
 			return dp_layer->ports[i];
 	}
 
+	DPS_LOG_ERR("Port %d not found", portid);
 	return NULL;
 }
 
+// TODO(plague): this can be PF port too, no checks!
 struct dp_port *dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	int i;
@@ -258,6 +271,7 @@ struct dp_port *dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid
 		if (dp_layer->ports[i]->dp_port_id == portid)
 			return dp_layer->ports[i];
 
+	DPS_LOG_ERR("Port %d not found", portid);
 	return NULL;
 }
 
@@ -265,8 +279,11 @@ bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid)
 {
 	struct dp_port *vf_port = dp_get_vf_port_per_id(dp_layer, portid);
 
-	if (!vf_port)
+	if (!vf_port) {
+		DPS_LOG_ERR("Port %d not found", portid);
+		// TODO(plague): better than false which indicates we can use it, but this is a bad construct
 		return true;
+	}
 
 	return (vf_port->dp_allocated != 0);
 }
@@ -286,25 +303,29 @@ int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid)
 int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_ext *port_ext, dp_port_type type)
 {
 	struct dp_port *vf_port;
-	int port_id = -1, ret;
+	int port_id, ret;
 
+	// TODO(plague): these should return the port pointer
 	if (type == DP_PORT_PF) {
 		port_id = dp_get_pf_port_id_with_name(dp_layer, port_ext->port_name);
+		if (DP_FAILED(port_id))
+			return DP_ERROR;
 	} else {
 		vf_port = dp_get_vf_port_per_id(dp_layer, portid);
-		if (vf_port) {
-			port_id = vf_port->dp_port_id;
-			vf_port->dp_allocated = 1;
-		} else {
-			return port_id;
+		if (!vf_port) {
+			DPS_LOG_ERR("VF port %d not found", portid);
+			return DP_ERROR;
 		}
+		port_id = vf_port->dp_port_id;
+		vf_port->dp_allocated = 1;
 	}
+
 	ret = rte_eth_dev_start(port_id);
-	if (ret < 0) {
-		rte_exit(EXIT_FAILURE,
-				"rte_eth_dev_start:err=%d, port=%u\n",
-				ret, port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port %d %s", port_id, dp_strerror(ret));
+		return DP_ERROR;
 	}
+
 	return port_id;
 }
 

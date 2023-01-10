@@ -11,7 +11,7 @@ static struct rte_hash *vm_handle_tbl = NULL;
 static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
 
-static void init_vm_table(void)
+static inline void init_vm_table(void)
 {
 	for (uint8_t i = 0; i < DP_MAX_PORTS; i++) {
 		for (uint8_t rib_index = 0; rib_index < DP_NB_SOCKETS; rib_index++) {
@@ -21,25 +21,16 @@ static void init_vm_table(void)
 	}
 }
 
-void dp_init_vm_handle_tbl(int socket_id)
+int dp_lpm_init(int socket_id)
 {
-	struct rte_hash_parameters handle_table_params = {
-		.name = NULL,
-		.entries = DP_MAX_PORTS,
-		.key_len =  VM_MACHINE_ID_STR_LEN,
-		.hash_func = rte_jhash,
-		.hash_func_init_val = 0xfee1900d,
-		.extra_flag = 0,
-	};
-	char s[64];
-
-	snprintf(s, sizeof(s), "vm_handle_table_%u", socket_id);
-	handle_table_params.name = s;
-	handle_table_params.socket_id = socket_id;
-	vm_handle_tbl = rte_hash_create(&handle_table_params);
-	init_vm_table();
+	vm_handle_tbl = dp_create_jhash_table(DP_MAX_PORTS, VM_MACHINE_ID_STR_LEN,
+										  "vm_handle_table", socket_id);
 	if (!vm_handle_tbl)
-		rte_exit(EXIT_FAILURE, "create vm handle table failed\n");
+		return DP_ERROR;
+
+	init_vm_table();
+
+	return DP_OK;
 }
 
 int dp_map_vm_handle(void *key, uint16_t portid)

@@ -77,7 +77,7 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, i
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
 						 struct vm_route *r, int socketid);
 
-void dp_init_vm_handle_tbl(int socket_id);
+int dp_lpm_init(int socket_id);
 int dp_map_vm_handle(void *key, uint16_t portid);
 int dp_get_portid_with_vm_handle(void *key);
 void dp_del_portid_with_vm_handle(void *key);

@@ -1,7 +1,37 @@
-
 #include "rte_flow/dp_rte_flow_init.h"
 
-void dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
+#include "dp_error.h"
+#include "dp_log.h"
+#include "rte_flow/dp_rte_flow.h"
+
+
+static int create_flow(int port_id,
+					   struct rte_flow_attr *attr,
+					   struct rte_flow_item *pattern,
+					   struct rte_flow_action *action)
+{
+	int ret;
+	struct rte_flow *flow;
+	struct rte_flow_error error = {0};
+
+	ret = rte_flow_validate(port_id, attr, pattern, action, &error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Flow isolation cannot be validated on port %d: %s %s", port_id, error.message, dp_strerror(ret));
+		return DP_ERROR;
+	}
+
+	flow = rte_flow_create(port_id, attr, pattern, action, &error);
+	if (!flow) {
+		DPS_LOG_ERR("Flow isolation cannot be created on port %d: %s %s", port_id, error.message, dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+// TODO(plague): retval checking is not finished here, just bare minimum done
+// TODO(plague): these two look too similar, maybe it can be refactored
+int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
 
 	// create flow attributes
@@ -47,24 +77,10 @@ void dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	int res;
-	struct rte_flow *flow;
-
-	struct rte_flow_error error;
-
-	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
-
-	if (res) {
-		printf("Isolete flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
-	} else {
-		// printf("Isolate flow validated on port %d\n ", port_id);
-		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
-		if (!flow)
-			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
-	}
+	return create_flow(port_id, &attr, pattern, action);
 }
 
-void dp_install_isolated_mode_geneve(int port_id)
+int dp_install_isolated_mode_geneve(int port_id)
 {
 	struct underlay_conf *u_conf;
 
@@ -122,18 +138,5 @@ void dp_install_isolated_mode_geneve(int port_id)
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	int res;
-	struct rte_flow *flow;
-	struct rte_flow_error error;
-
-	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
-
-	if (res) {
-		printf("Isolete flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
-	} else {
-		// printf("Isolate flow validated on port %d\n ", port_id);
-		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
-		if (!flow)
-			printf("Isolate flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
-	}
+	return create_flow(port_id, &attr, pattern, action);
 }

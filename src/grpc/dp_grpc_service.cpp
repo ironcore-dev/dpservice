@@ -20,16 +20,21 @@ GRPCService::~GRPCService()
 	free(uuid);
 }
 
-void GRPCService::run(std::string listen_address)
+bool GRPCService::run(std::string listen_address)
 {
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
 	builder.RegisterService(this);
 	this->cq_ = builder.AddCompletionQueue();
-	this->server_= builder.BuildAndStart();
-	dp_log_set_thread_name("grpc");
+	this->server_ = builder.BuildAndStart();
+	if (this->server_ == nullptr) {
+		DPGRPC_LOG_ERR("Server failed to start on %s", listen_address.c_str());
+		return false;
+	}
+
 	DPGRPC_LOG_INFO("Server initialized and listening on %s", listen_address.c_str());
 	HandleRpcs();
+	return true;
 }
 
 char* GRPCService::GetUUID()

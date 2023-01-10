@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-#define FLOW_MAX				1*1024*1024UL
+#define FLOW_MAX				(1*1024*1024UL)
 #define DP_FLOW_DEFAULT_TIMEOUT	30 /* In seconds */
 
 enum {
@@ -96,7 +96,7 @@ void dp_delete_flow(struct flow_key *key);
 bool dp_flow_exists(struct flow_key *key);
 int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 void dp_invert_flow_key(struct flow_key *key /* in / out */);
-void dp_init_flowtable(int socket_id);
+int dp_flow_init(int socket_id);
 void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct dp_ref *ref);

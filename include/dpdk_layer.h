@@ -14,17 +14,18 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define DP_MAX_PF_PORT		2
-#define DP_MAX_VF_PRO_PORT	126
-#define DP_ACTIVE_VF_PORT	4
-#define DP_MAX_PORTS		DP_MAX_PF_PORT * DP_MAX_VF_PRO_PORT
+
+#define DP_MAX_PF_PORTS			2
+#define DP_MAX_VF_PORTS			126
+#define DP_MAX_PORTS			(DP_MAX_PF_PORTS * DP_MAX_VF_PORTS)
+
 #define DP_NR_STD_RX_QUEUES		1
 #define DP_NR_STD_TX_QUEUES		1
 #define DP_NR_VF_HAIRPIN_RX_TX_QUEUES	1
 #define MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		2
 #define DP_INTERNAL_Q_SIZE	32
-#define DP_MBUF_ARR_SIZE	(DP_INTERNAL_Q_SIZE / 4) * 3
+#define DP_MBUF_ARR_SIZE	((DP_INTERNAL_Q_SIZE / 4) * 3)
 
 #define NB_MBUF(nports)                  \
 	RTE_MAX((2 * 1 * 1024 +              \
@@ -48,6 +49,7 @@ struct dp_dpdk_layer {
 	struct rte_ring					*grpc_rx_queue;
 	struct rte_ring					*periodic_msg_queue;
 	struct rte_ring					*monitoring_rx_queue;
+	int								num_of_vfs;
 };
 
 struct underlay_conf {
@@ -70,13 +72,16 @@ struct underlay_conf {
 
 /* Functions for internal processing */
 int dp_dpdk_init(void);
-int dp_init_graph(void);
+int dp_graph_init(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_exit(void);
 
 /* Functions for the control plane */
+
+/** @return port_id of the initialized interface */
 int dp_init_interface(struct dp_port_ext *port, dp_port_type type);
-void dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type);
+
+int dp_start_interface(struct dp_port_ext *port_ext, int portid, dp_port_type type);
 void dp_stop_interface(int portid, dp_port_type type);
 
 void set_underlay_conf(struct underlay_conf *u_conf);

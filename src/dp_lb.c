@@ -8,47 +8,25 @@
 #include <rte_rib6.h>
 #include "dp_error.h"
 #include "dp_flow.h"
-#include "dp_util.h"
+#include "dp_log.h"
 #include "dp_lb.h"
-
-struct rte_hash_parameters ipv4_lb_table_params = {
-	.name = NULL,
-	.entries = DP_LB_TABLE_MAX,
-	.key_len =  sizeof(struct lb_key),
-	.hash_func = rte_jhash,
-	.hash_func_init_val = 0xfee1900d,
-	.extra_flag = 0,
-};
-
-struct rte_hash_parameters lb_id_map_table_params = {
-	.name = NULL,
-	.entries = DP_LB_TABLE_MAX,
-	.key_len =  DP_LB_ID_SIZE,
-	.hash_func = rte_jhash,
-	.hash_func_init_val = 0xfee1900e,
-	.extra_flag = 0,
-};
 
 static struct rte_hash *ipv4_lb_tbl = NULL;
 static struct rte_hash *id_map_lb_tbl = NULL;
 
-void dp_init_lb_tables(int socket_id)
+int dp_lb_init(int socket_id)
 {
-	char s[64];
+	ipv4_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, sizeof(struct lb_key),
+										"ipv4_lb_table", socket_id);
+	if (!ipv4_lb_tbl)
+		return DP_ERROR;
 
-	snprintf(s, sizeof(s), "ipv4_lb_table_%u", socket_id);
-	ipv4_lb_table_params.name = s;
-	ipv4_lb_table_params.socket_id = socket_id;
-	ipv4_lb_tbl = rte_hash_create(&ipv4_lb_table_params);
-	if(!ipv4_lb_tbl)
-		rte_exit(EXIT_FAILURE, "create ipv4 lb table failed\n");
-
-	snprintf(s, sizeof(s), "lb_id_map_table_%u", socket_id);
-	lb_id_map_table_params.name = s;
-	lb_id_map_table_params.socket_id = socket_id;
-	id_map_lb_tbl = rte_hash_create(&lb_id_map_table_params);
+	id_map_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, DP_LB_ID_SIZE,
+										  "lb_id_map_table", socket_id);
 	if (!id_map_lb_tbl)
-		rte_exit(EXIT_FAILURE, "create id map lb table failed\n");
+		return DP_ERROR;
+
+	return DP_OK;
 }
 
 static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value *l_val)

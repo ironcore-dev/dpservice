@@ -28,7 +28,7 @@ struct lb_value {
 	uint16_t	back_end_cnt;
 };
 
-void dp_init_lb_tables(int socket_id);
+int dp_lb_init(int socket_id);
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_lb_ip(uint32_t vm_ip, uint32_t vni);
 uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16_t proto);
