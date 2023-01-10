@@ -146,6 +146,8 @@ static int graph_main_loop()
 {
 	struct rte_graph *graph = dp_layer.graph;
 
+	dp_log_set_thread_name("worker");
+
 	while (!force_quit)
 		rte_graph_walk(graph);
 

@@ -2,7 +2,7 @@
 
 #include "nodes/common_node.h"
 #include <rte_ethdev.h>
-#include "dp_util.h"
+#include "dp_log.h"
 
 static inline void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufsize)
 {
@@ -15,10 +15,10 @@ static inline void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size
 	// TODO add more as needed
 }
 
-#define GRAPHTRACE_PRINT(PKT, FMT, ...) do { \
+#define GRAPHTRACE_PRINT(PKT, FORMAT, ...) do { \
 	char _graphtrace_buf[512]; \
 	dp_graphtrace_print_pkt((PKT), _graphtrace_buf, sizeof(_graphtrace_buf)); \
-	DPS_LOG(INFO, GRAPHTRACE, FMT ": %s\n", __VA_ARGS__, _graphtrace_buf); \
+	DP_LOG(INFO, GRAPH, FORMAT ": %s\n", __VA_ARGS__, _graphtrace_buf); \
 } while (0)
 
 #define GRAPHTRACE_PKT_ID(PKT) (PKT)

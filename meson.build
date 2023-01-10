@@ -3,7 +3,7 @@ project('dp_service', 'c', 'cpp',
   version: run_command('cat', 'include/dp_version.h', check: true).stdout().strip().split(' ').get(2).split('"').get(1),
   license: 'MIT')
 
-add_global_arguments('-DDEBUG=true', language: 'c')
+add_global_arguments('-DDEBUG=true', language: ['c', 'cpp'])
 if get_option('enable_graphtrace')
   add_global_arguments('-DENABLE_GRAPHTRACE', language: 'c')
 endif

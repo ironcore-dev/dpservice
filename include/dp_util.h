@@ -12,24 +12,18 @@ extern "C" {
 
 #include "dp_conf.h"
 
-#define DP_TIMESTAMP_BUF_SIZE 26
-
-#define RTE_LOGTYPE_DPSERVICE RTE_LOGTYPE_USER1
-#define RTE_LOGTYPE_GRAPHTRACE RTE_LOGTYPE_USER2
-// TODO(plague) this uses local definition but does not hide them properly
-// DPS_LOG(X, Y, "%s", buf); will lead to a bug!
-// TODO(plague) --log-level=1 will cause this to print only time!
-#define DPS_LOG(l, t, ...)						\
-	do {										\
-	char buf[DP_TIMESTAMP_BUF_SIZE] = {0};		\
-	if ((uint32_t)rte_log_get_level(RTE_LOGTYPE_ ## t) >= RTE_LOG_ ## l) {\
-	time_t now = time(NULL);					\
-	strftime(buf, DP_TIMESTAMP_BUF_SIZE - 1, "%Y-%m-%d %H:%M:%S", gmtime(&now));\
-	fprintf(rte_log_get_stream(), "%s ", buf);	\
-	rte_log(RTE_LOG_ ## l,						\
-		 RTE_LOGTYPE_ ## t, # t ": " __VA_ARGS__);\
-	};											\
-	} while (0)
+// TODO(plague): remove this once DPS_LOG is no longer in use
+#include "dp_log.h"
+#define _DP_LOG_TYPE_DPSERVICE "DPSERVICE"
+#define _DP_LOG_TYPE_GRAPHTRACE "GRAPHTRACE"
+#define RTE_LOGTYPE_DPDPSERVICE RTE_LOGTYPE_DPSERVICE
+#define RTE_LOGTYPE_GRAPHTRACE RTE_LOGTYPE_DPGRAPH
+#define DPS_LOG(LEVEL, LOGTYPE, FORMAT, ...) \
+	_dp_log(RTE_LOG_##LEVEL, RTE_LOGTYPE_##LOGTYPE, \
+			_DP_LOG_DEBUGINFO \
+			_DP_LOG_LEVEL_##LEVEL " " _DP_LOG_TYPE_##LOGTYPE ": " FORMAT, \
+			##__VA_ARGS__)
+// ---
 
 #define VM_MACHINE_ID_STR_LEN	64
 #define VM_MACHINE_PXE_STR_LEN	32
