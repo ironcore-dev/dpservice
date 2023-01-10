@@ -7,11 +7,10 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_flow.h"
-#include "dp_util.h"
+#include "dp_log.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/common_node.h"
 #include "nodes/snat_node.h"
-#include "dp_util.h"
 
 
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)

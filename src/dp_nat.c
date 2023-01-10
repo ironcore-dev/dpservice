@@ -189,9 +189,9 @@ out:
 err_key:
 	pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 	if (pos < 0)
-		DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
+		DPS_LOG_WARNING("SNAT hash key already deleted");
 err:
-	DPS_LOG(ERR, DPSERVICE, "snat table add ip failed\n");
+	DPS_LOG_ERR("snat table add ip failed");
 	return ret;
 }
 
@@ -249,9 +249,9 @@ out:
 err_key:
 	pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 	if (pos < 0)
-		DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
+		DPS_LOG_WARNING("SNAT hash key already deleted");
 err:
-	DPS_LOG(ERR, DPSERVICE, "snat table add ip failed\n");
+	DPS_LOG_ERR("snat table add ip failed");
 	return ret;
 }
 
@@ -275,7 +275,7 @@ void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
 		if (pos < 0)
-			DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");
+			DPS_LOG_WARNING("SNAT hash key already deleted");
 	}
 
 }
@@ -304,7 +304,7 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 		pos = rte_hash_del_key(ipv4_snat_tbl, &nkey);
 
 		if (pos < 0) {
-			DPS_LOG(WARNING, DPSERVICE, "SNAT hash key already deleted \n");;
+			DPS_LOG_WARNING("SNAT hash key already deleted");;
 			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
 		}
 	}
@@ -379,7 +379,7 @@ out:
 err_key:
 	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
 	if (pos < 0)
-		DPS_LOG(WARNING, DPSERVICE, "DNAT hash key already deleted \n");
+		DPS_LOG_WARNING("DNAT hash key already deleted");
 err:
 	return ret;
 }
@@ -399,7 +399,7 @@ void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
 
 	pos = rte_hash_del_key(ipv4_dnat_tbl, &nkey);
 	if (pos < 0)
-		DPS_LOG(WARNING, DPSERVICE, "DNAT hash key already deleted \n");
+		DPS_LOG_WARNING("DNAT hash key already deleted");
 }
 
 void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
@@ -474,7 +474,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 	TAILQ_FOREACH(next, &nat_headp, entries) {
 		if (dp_cmp_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
-			DPS_LOG(ERR, DPSERVICE, "cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d \n",
+			DPS_LOG_ERR("cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d",
 					nat_ipv4, vni, min_port, max_port);
 			return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
 		}
@@ -483,7 +483,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	new_entry = (network_nat_entry *)rte_zmalloc("network_nat_array", sizeof(network_nat_entry), RTE_CACHE_LINE_SIZE);
 
 	if (!new_entry) {
-		DPS_LOG(ERR, DPSERVICE, "failed to allocate network nat entry for ip: %4x, vni: %d \n", nat_ipv4, vni);
+		DPS_LOG_ERR("failed to allocate network nat entry for ip: %4x, vni: %d", nat_ipv4, vni);
 		return DP_ERROR_VM_ADD_NEIGHNAT_ALLOC;
 	}
 
@@ -591,7 +591,7 @@ uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_
 	}
 
 	if (rte_hash_add_key(ipv4_network_dnat_tbl, (const void *)&network_key) < 0) {
-		DPS_LOG(ERR, DPSERVICE, "failed to add to ipv4 network dnat table \n");
+		DPS_LOG_ERR("failed to add to ipv4 network dnat table");
 		return 0;
 	}
 

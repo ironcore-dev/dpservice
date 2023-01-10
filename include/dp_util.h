@@ -12,19 +12,6 @@ extern "C" {
 
 #include "dp_conf.h"
 
-// TODO(plague): remove this once DPS_LOG is no longer in use
-#include "dp_log.h"
-#define _DP_LOG_TYPE_DPSERVICE "DPSERVICE"
-#define _DP_LOG_TYPE_GRAPHTRACE "GRAPHTRACE"
-#define RTE_LOGTYPE_DPDPSERVICE RTE_LOGTYPE_DPSERVICE
-#define RTE_LOGTYPE_GRAPHTRACE RTE_LOGTYPE_DPGRAPH
-#define DPS_LOG(LEVEL, LOGTYPE, FORMAT, ...) \
-	_dp_log(RTE_LOG_##LEVEL, RTE_LOGTYPE_##LOGTYPE, \
-			_DP_LOG_DEBUGINFO \
-			_DP_LOG_LEVEL_##LEVEL " " _DP_LOG_TYPE_##LOGTYPE ": " FORMAT, \
-			##__VA_ARGS__)
-// ---
-
 #define VM_MACHINE_ID_STR_LEN	64
 #define VM_MACHINE_PXE_STR_LEN	32
 #define DP_LB_ID_SIZE			64

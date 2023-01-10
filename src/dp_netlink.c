@@ -6,8 +6,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <rte_ethdev.h>
-#include <dp_util.h>
+#include "dp_util.h"
 #include "dp_netlink.h"
+#include "dp_log.h"
 
 static int dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neigh,
 						struct rte_ether_addr *own_mac)
@@ -130,7 +131,7 @@ int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr* neigh, struct rte_eth
 	nh = (struct nlmsghdr *)dp_nlink_reply;
 	// TODO this should be an error in production
 	if (dp_read_ngh(nh, nll, neigh, own_mac) < 0)
-		DPS_LOG(WARNING, DPSERVICE, "WARNING: No neighboring router found\n");
+		DPS_LOG_WARNING("No neighboring router found");
 
 err2:
 	free(dp_nlink_reply);

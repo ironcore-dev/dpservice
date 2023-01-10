@@ -211,7 +211,7 @@ static int main_core_loop(void)
 
 int dp_dpdk_main_loop(void)
 {
-	DPS_LOG(INFO, DPSERVICE, "DPDK main loop started\n");
+	DPS_LOG_INFO("DPDK main loop started");
 
 	/* Launch per-lcore init on every worker lcore */
 	rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
@@ -264,8 +264,8 @@ static int dp_port_flow_isolate(int port_id)
 	/* Poisoning to make sure PMDs update it in case of error. */
 	memset(&error, 0x66, sizeof(error));
 	if (rte_flow_isolate(port_id, set, &error))
-		DPS_LOG(ERR, DPSERVICE, "Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
-	DPS_LOG(INFO, DPSERVICE, "Ingress traffic on port %u is %s to the defined flow rules\n",
+		DPS_LOG_ERR("Flow can't be validated, message: %s", error.message ? error.message : "(no stated reason)");
+	DPS_LOG_INFO("Ingress traffic on port %u is %s to the defined flow rules",
 			port_id,
 			set ? "now restricted" : "not restricted anymore");
 	return 0;
@@ -287,12 +287,12 @@ static void dp_install_isolated_mode(int port_id)
 {
 	switch (dp_conf_get_overlay_type()) {
 	case DP_CONF_OVERLAY_TYPE_IPIP:
-		DPS_LOG(INFO, DPSERVICE, "Init isolation flow rule for IPinIP tunnels\n");
+		DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
 		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP);
 		dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP);
 		break;
 	case DP_CONF_OVERLAY_TYPE_GENEVE:
-		DPS_LOG(INFO, DPSERVICE, "Init isolation flow rule for GENEVE tunnels\n");
+		DPS_LOG_INFO("Init isolation flow rule for GENEVE tunnels");
 		dp_install_isolated_mode_geneve(port_id);
 		break;
 	}
@@ -518,18 +518,18 @@ static inline int dp_graph_export(const char graph_name[RTE_GRAPH_NAMESIZE])
 	char fname[RTE_GRAPH_NAMESIZE + 5];
 
 	if (snprintf(fname, sizeof(fname), "%s.dot", graph_name) >= sizeof(fname)) {
-		DPS_LOG(ERR, DPSERVICE, "Cannot export graph, name too long\n");
+		DPS_LOG_ERR("Cannot export graph, name too long");
 		return -ENOMEM;
 	}
 	f = fopen(fname, "w");
 	if (!f) {
 		ret = -errno;
-		DPS_LOG(ERR, DPSERVICE, "Cannot open graph export file for writing (%s)\n", rte_strerror(errno));
+		DPS_LOG_ERR("Cannot open graph export file for writing (%s)", rte_strerror(errno));
 		return ret;
 	}
 	ret = rte_graph_export(dp_layer.graph_name, f);
 	if (ret)
-		DPS_LOG(ERR, DPSERVICE, "rte_graph_export() failed (%d)\n", ret);
+		DPS_LOG_ERR("rte_graph_export() failed (%d)", ret);
 	fclose(f);
 	return ret;
 }

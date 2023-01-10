@@ -145,7 +145,7 @@ static void *dp_handle_grpc(__rte_unused void *arg)
 static int run_threads()
 {
 	if (rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL, dp_handle_grpc, NULL)) {
-		DPS_LOG(ERR, DPSERVICE, "Cannot create grpc thread\n");
+		DPS_LOG_ERR("Cannot create grpc thread");
 		return EXIT_FAILURE;
 	}
 
@@ -167,9 +167,8 @@ static int run_service()
 
 	rte_openlog_stream(stdout);
 	dp_log_set_thread_name("control");
-	// from this point on, only DPS_LOG should be used for errors
-
-	DPS_LOG(INFO, DPSERVICE, "Starting DP Service version %s\n", DP_SERVICE_VERSION);
+	DPS_LOG_INFO("Starting DP Service version %s", DP_SERVICE_VERSION);
+	// from this point on, only DPS_LOG should be used
 
 	dp_dpdk_init();
 	// TODO retval not implemented

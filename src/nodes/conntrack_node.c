@@ -6,7 +6,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 #include "dp_flow.h"
-#include "dp_util.h"
+#include "dp_log.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/common_node.h"
 #include "nodes/conntrack_node.h"

@@ -18,7 +18,7 @@ static __thread char thread_name[16] = "thread";
 
 void dp_log_set_thread_name(const char *name)
 {
-	strncpy(thread_name, name, sizeof(thread_name));
+	snprintf(thread_name, sizeof(thread_name), "%s", name);
 }
 
 
@@ -73,14 +73,10 @@ void _dp_log(unsigned int level, unsigned int logtype,
 	vfprintf(f, format, args);
 	va_end(args);
 
-	// TODO temporary till refacoring done!
-	if (format[strlen(format)-1] != '\n')
 #ifdef DEBUG
 	fprintf(f, " [%s:%u:%s()]", file, line, function);
 #endif
 
-	// TODO temporary till refactoring done!
-	if (format[strlen(format)-1] != '\n')
 	fputc('\n', f);
 
 	fflush(f);

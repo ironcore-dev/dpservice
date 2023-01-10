@@ -1,6 +1,6 @@
 #include "dp_port.h"
 #include "dp_lpm.h"
-#include "dp_util.h"
+#include "dp_log.h"
 #include "dp_netlink.h"
 
 /* Ethernet port configured with default settings. 8< */
@@ -61,7 +61,7 @@ int dp_port_init(struct dp_port *port, int port_id, struct dp_port_ext *port_det
 				port_id, strerror(-ret));
 
 	if_indextoname(dev_info.if_index, ifname);
-	DPS_LOG(INFO, DPSERVICE, "INIT initializing port: %d (%s)\n", port_id, ifname);
+	DPS_LOG_INFO("INIT initializing port: %d (%s)", port_id, ifname);
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
 
@@ -117,7 +117,7 @@ int dp_port_init(struct dp_port *port, int port_id, struct dp_port_ext *port_det
 
 	if (port->dp_p_type == DP_PORT_VF) {
 		ret = rte_eth_promiscuous_enable(port_id);
-		DPS_LOG(INFO, DPSERVICE, "INIT setting interface number %d in promiscuous mode\n", port_id);
+		DPS_LOG_INFO("INIT setting interface number %d in promiscuous mode", port_id);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
 					":: promiscuous mode enable failed: err=%s, port=%u\n",

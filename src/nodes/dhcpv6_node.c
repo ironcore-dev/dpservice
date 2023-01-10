@@ -8,6 +8,7 @@
 #include "nodes/dhcpv6_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_log.h"
 
 
 struct dhcpv6_node_main dhcpv6_node;
