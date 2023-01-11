@@ -67,7 +67,7 @@ int CreateLBCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	uint16_t i, size;
-	Status *err_status;
+	std::unique_ptr<Status> err_status(new Status());
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -110,9 +110,8 @@ int CreateLBCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -161,7 +160,7 @@ int GetLBCall::Proceed()
 	dp_reply reply = {0};
 	uint8_t buf_bin[16];
 	struct in_addr addr;
-	Status *err_status;
+	std::unique_ptr<Status> err_status(new Status());
 	LBPort *lb_port;
 	LBIP *lb_ip;
 	int i;
@@ -208,9 +207,8 @@ int GetLBCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(reply_.vni(), buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -351,7 +349,7 @@ int AddPfxCall::Proceed()
 	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -384,7 +382,7 @@ int AddPfxCall::Proceed()
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -484,7 +482,7 @@ int CreateLBTargetPfxCall::Proceed()
 	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -519,7 +517,7 @@ int CreateLBTargetPfxCall::Proceed()
 		inet_ntop(AF_INET6, reply.route.trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -621,7 +619,7 @@ int AddVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -654,7 +652,7 @@ int AddVIPCall::Proceed()
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -700,7 +698,7 @@ int GetVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	struct in_addr addr;
 
 	if (status_ == REQUEST) {
@@ -726,7 +724,7 @@ int GetVIPCall::Proceed()
 		reply_.set_address(inet_ntoa(addr));
 		status_ = FINISH;
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -740,7 +738,7 @@ int AddInterfaceCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	VirtualFunction *vf = new VirtualFunction();
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	IpAdditionResponse *ip_resp = new IpAdditionResponse();
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
@@ -794,7 +792,7 @@ int AddInterfaceCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		ip_resp->set_underlayroute(buf_str);
-		ip_resp->set_allocated_status(err_status);
+		ip_resp->set_allocated_status(err_status.get());
 		reply_.set_allocated_response(ip_resp);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -844,7 +842,7 @@ int GetInterfaceCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	dp_vm_info *vm_info;
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	Interface *machine = new Interface();
 	struct in_addr addr;
 	uint8_t buf_bin[16];
@@ -885,7 +883,7 @@ int GetInterfaceCall::Proceed()
 		machine->set_underlayroute(buf_str);
 		reply_.set_allocated_interface(machine);
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1060,7 +1058,7 @@ int AddNATVIPCall::Proceed()
 	struct dp_reply reply = {0};
 
 	grpc::Status ret = grpc::Status::OK;
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -1099,7 +1097,7 @@ int AddNATVIPCall::Proceed()
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1112,7 +1110,7 @@ int GetNATVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	std::unique_ptr<Status> err_status(new Status());
 	struct in_addr addr;
 	NATIP *nat_ip;
 
@@ -1143,7 +1141,7 @@ int GetNATVIPCall::Proceed()
 		reply_.set_minport(reply.nat_entry.min_port);
 		status_ = FINISH;
 		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(err_status.get());
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
