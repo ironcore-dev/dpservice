@@ -96,7 +96,7 @@ done < <(devlink port)
 function detect_ipv6() {
 while read l1; do
     if [ "$l1" != "::1/128" ]; then
-        modified=${l1::-4}
+        modified=${l1%/*}
         echo "ipv6 "$modified >> $CONF_FILE
     fi
 done < <(ip -6 -o addr show lo | awk '{print $4}')
