@@ -15,6 +15,12 @@ enum dp_conf_nic_type {
 	DP_CONF_NIC_TYPE_TAP,
 };
 
+enum dp_conf_color {
+	DP_CONF_COLOR_NEVER,
+	DP_CONF_COLOR_ALWAYS,
+	DP_CONF_COLOR_AUTO,
+};
+
 const char *dp_conf_get_pf0_name();
 const char *dp_conf_get_pf1_name();
 const char *dp_conf_get_vf_pattern();
@@ -28,3 +34,4 @@ const bool dp_conf_is_offload_enabled();
 #ifdef ENABLE_GRAPHTRACE
 const int dp_conf_get_graphtrace_level();
 #endif
+const enum dp_conf_color dp_conf_get_color();

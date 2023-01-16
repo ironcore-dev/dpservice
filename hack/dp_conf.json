@@ -100,5 +100,14 @@
     "type": "int",
     "default": "0",
     "ifdef": "ENABLE_GRAPHTRACE"
+  },
+  {
+    "lgopt": "color",
+    "arg": "MODE",
+    "help": "output colorization mode",
+    "var": "color",
+    "type": "enum",
+    "choices": [ "never", "always", "auto" ],
+    "default": "never"
   }
 ]

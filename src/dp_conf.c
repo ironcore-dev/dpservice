@@ -151,6 +151,8 @@ static int parse_opt(int opt, const char *arg)
 	case OPT_GRAPHTRACE:
 		return opt_str_to_int(&graphtrace_level, arg, 0, DP_GRAPHTRACE_LEVEL_MAX);
 #endif
+	case OPT_COLOR:
+		return opt_str_to_enum((int *)&color, arg, color_choices, RTE_DIM(color_choices));
 	default:
 		fprintf(stderr, "Unimplemented option %d\n", opt);
 		return DP_ERROR;
