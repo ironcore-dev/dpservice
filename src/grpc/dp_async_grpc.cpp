@@ -351,7 +351,7 @@ int AddPfxCall::Proceed()
 	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	Status *err_status;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -383,6 +383,7 @@ int AddPfxCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -484,7 +485,7 @@ int CreateLBTargetPfxCall::Proceed()
 	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	Status *err_status;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -518,6 +519,7 @@ int CreateLBTargetPfxCall::Proceed()
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.route.trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -621,7 +623,7 @@ int AddVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	Status *err_status;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -653,6 +655,7 @@ int AddVIPCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -700,7 +703,7 @@ int GetVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	Status *err_status;
 	struct in_addr addr;
 
 	if (status_ == REQUEST) {
@@ -725,6 +728,7 @@ int GetVIPCall::Proceed()
 		addr.s_addr = reply.get_vip.vip.vip_addr;
 		reply_.set_address(inet_ntoa(addr));
 		status_ = FINISH;
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -739,11 +743,12 @@ int AddInterfaceCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	VirtualFunction *vf = new VirtualFunction();
-	Status *err_status = new Status();
-	IpAdditionResponse *ip_resp = new IpAdditionResponse();
+	VirtualFunction *vf;
+	Status *err_status;
+	IpAdditionResponse *ip_resp;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
+	bool err = false;
 
 	if (status_ == REQUEST) {
 		new AddInterfaceCall(service_, cq_);
@@ -753,7 +758,6 @@ int AddInterfaceCall::Proceed()
 				request_.interfaceid().c_str(), request_.ipv4config().primaryaddress().c_str(),
 				request_.devicename().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		err_status->set_error(EXIT_SUCCESS);
 		request.add_machine.vni = request_.vni();
 		inet_aton(request_.ipv4config().primaryaddress().c_str(),
 				  (in_addr*)&request.add_machine.ip4_addr);
@@ -766,11 +770,10 @@ int AddInterfaceCall::Proceed()
 		uint8_t ret = inet_pton(AF_INET6, request_.ipv6config().primaryaddress().c_str(),
 								request.add_machine.ip6_addr6);
 		if(ret < 0)
-			err_status->set_error(DP_ERROR_VM_ADD_IPV6_FORMAT);
-
+			err = true;
 		snprintf(request.add_machine.machine_id, VM_MACHINE_ID_STR_LEN, "%s",
 				 request_.interfaceid().c_str());
-		if (!err_status->error())
+		if (!err)
 			dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -778,21 +781,22 @@ int AddInterfaceCall::Proceed()
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (!err_status->error()) {
-			dp_fill_head(&reply.com_head, call_type_, 0, 1);
-			if (dp_recv_from_worker(&reply))
-				return -1;
-			vf->set_name(reply.vf_pci.name);
-			vf->set_bus(reply.vf_pci.bus);
-			vf->set_domain(reply.vf_pci.domain);
-			vf->set_slot(reply.vf_pci.slot);
-			vf->set_function(reply.vf_pci.function);
-			reply_.set_allocated_vf(vf);
-			err_status->set_error(reply.com_head.err_code);
-		}
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		vf = new VirtualFunction();
+		vf->set_name(reply.vf_pci.name);
+		vf->set_bus(reply.vf_pci.bus);
+		vf->set_domain(reply.vf_pci.domain);
+		vf->set_slot(reply.vf_pci.slot);
+		vf->set_function(reply.vf_pci.function);
+		reply_.set_allocated_vf(vf);
+		err_status = new Status();
+		err_status->set_error(reply.com_head.err_code);
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		ip_resp = new IpAdditionResponse();
 		ip_resp->set_underlayroute(buf_str);
 		ip_resp->set_allocated_status(err_status);
 		reply_.set_allocated_response(ip_resp);
@@ -844,8 +848,8 @@ int GetInterfaceCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	dp_vm_info *vm_info;
-	Status *err_status = new Status();
-	Interface *machine = new Interface();
+	Status *err_status;
+	Interface *machine;
 	struct in_addr addr;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
@@ -872,6 +876,7 @@ int GetInterfaceCall::Proceed()
 
 		vm_info = &reply.vm_info;
 		addr.s_addr = htonl(vm_info->ip_addr);
+		machine = new Interface();
 		machine->set_primaryipv4address(inet_ntoa(addr));
 		inet_ntop(AF_INET6, vm_info->ip6_addr, buf_str, INET6_ADDRSTRLEN);
 		machine->set_primaryipv6address(buf_str);
@@ -884,6 +889,7 @@ int GetInterfaceCall::Proceed()
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		machine->set_underlayroute(buf_str);
 		reply_.set_allocated_interface(machine);
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		status_ = FINISH;
@@ -1060,7 +1066,7 @@ int AddNATVIPCall::Proceed()
 	struct dp_reply reply = {0};
 
 	grpc::Status ret = grpc::Status::OK;
-	Status *err_status = new Status();
+	Status *err_status;
 	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -1098,6 +1104,7 @@ int AddNATVIPCall::Proceed()
 		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
 		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -1112,7 +1119,7 @@ int GetNATVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status = new Status();
+	Status *err_status;
 	struct in_addr addr;
 	NATIP *nat_ip;
 
@@ -1142,6 +1149,7 @@ int GetNATVIPCall::Proceed()
 		reply_.set_maxport(reply.nat_entry.max_port);
 		reply_.set_minport(reply.nat_entry.min_port);
 		status_ = FINISH;
+		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
 		reply_.set_allocated_status(err_status);
 		responder_.Finish(reply_, ret, this);
@@ -1355,7 +1363,7 @@ int GetNATInfoCall::Proceed()
 	NATInfoEntry *rep_nat_entry;
 	dp_nat_entry *dp_nat_item;
 	struct in_addr addr;
-	NATIP *nat_ip = new NATIP();
+	NATIP *nat_ip;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
@@ -1386,18 +1394,16 @@ int GetNATInfoCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.get_nat_entry.ip_type = RTE_ETHER_TYPE_IPV4;
+			nat_ip = new NATIP();
 			nat_ip->set_address(request_.natvipip().address().c_str());
 			nat_ip->set_ipversion(request_.natvipip().ipversion());
 			reply_.set_allocated_natvipip(nat_ip);
 		}
-
 		reply_.set_natinfotype(request_.natinfotype());
-
 		do {
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
 			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-
 			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
 				rep_nat_entry = reply_.add_natinfoentries();
 				dp_nat_item = &((&reply->nat_entry)[i]);
@@ -1406,12 +1412,10 @@ int GetNATInfoCall::Proceed()
 					rep_nat_entry->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 					rep_nat_entry->set_address(inet_ntoa(addr));
 				}
-
 				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
 					inet_ntop(AF_INET6, dp_nat_item->underlay_route, buf, INET6_ADDRSTRLEN);
 					rep_nat_entry->set_underlayroute(buf);
 				}
-
 				rep_nat_entry->set_minport(dp_nat_item->min_port);
 				rep_nat_entry->set_maxport(dp_nat_item->max_port);
 			}
