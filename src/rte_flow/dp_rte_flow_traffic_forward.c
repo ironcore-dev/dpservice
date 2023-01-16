@@ -1,6 +1,6 @@
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 #include "dp_nat.h"
-#include "dp_util.h"
+#include "dp_log.h"
 
 static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
@@ -187,7 +187,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, hairpin_pattern, hairpin_action, df);
 		if (!hairpin_flow) {
 			free_allocated_agectx(hairpin_agectx);
-			DPS_LOG(ERR, DPSERVICE, "Failed to install hairpin queue flow rule on vf %d \n", m->port);
+			DPS_LOG_ERR("Failed to install hairpin queue flow rule on vf %d", m->port);
 			return 0;
 		}
 		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
@@ -305,7 +305,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action, df);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG(ERR, DPSERVICE, "Failed to install encap rule on pf %d\n", t_port_id);
+		DPS_LOG_ERR("Failed to install encap rule on pf %d", t_port_id);
 		return 0;
 	}
 
@@ -573,7 +573,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 		if (!flow) {
 			free_allocated_agectx(agectx);
-			DPS_LOG(ERR, DPSERVICE, "Failed to install normal decap flow rule on pf %d\n", m->port);
+			DPS_LOG_ERR("Failed to install normal decap flow rule on pf %d", m->port);
 			return 0;
 		}
 		// config the content of agectx
@@ -605,7 +605,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action, df);
 		if (!hairpin_flow_P2) {
 			free_allocated_agectx(hairpin_agectx);
-			DPS_LOG(ERR, DPSERVICE, "Failed  to install hairpin queue flow rule on vf %d\n", (uint16_t)df->nxt_hop);
+			DPS_LOG_ERR("Failed  to install hairpin queue flow rule on vf %d", (uint16_t)df->nxt_hop);
 			return 0;
 		}
 		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
@@ -764,6 +764,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	return 1;
 }
 
+// TODO maybe pass node for better logging
 int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
 {
 

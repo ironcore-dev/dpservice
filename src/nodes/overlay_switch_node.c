@@ -33,7 +33,7 @@ static __rte_always_inline bool is_encaped_geneve_pkt(struct rte_mbuf *m)
 	return ntohs(udp_hdr->dst_port) == u_conf->src_port;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = get_dp_flow_ptr(m);
 	enum dp_conf_overlay_type overlay_type = dp_conf_get_overlay_type();

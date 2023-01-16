@@ -1,6 +1,6 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
-#include "dp_util.h"
+#include "dp_log.h"
 #include "node_api.h"
 #include <rte_errno.h>
 #include <rte_icmp.h>
@@ -52,15 +52,15 @@ static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *ke
 
 				print_ip(df_ptr->src.src_addr, ip_src_buf);
 				print_ip(df_ptr->dst.dst_addr, ip_dst_buf);
-				DPS_LOG(DEBUG, DPSERVICE, "received a ICMP error message with unsupported error code \n");
-				DPS_LOG(DEBUG, DPSERVICE, "icmp, src_ip: %s, dst_ip: %s, error code %d \n", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
+				DPS_LOG_DEBUG("received a ICMP error message with unsupported error code");
+				DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, error code %d", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
 				return -1;
 			}
 
 		dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 
 		if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port) {
-			DPS_LOG(WARNING, DPSERVICE, "failed to extract attached ip header in icmp error message during icmp flow key building \n");
+			DPS_LOG_WARNING("failed to extract attached ip header in icmp error message during icmp flow key building");
 			return -1;
 		}
 
@@ -147,7 +147,7 @@ void dp_add_flow(struct flow_key *key)
 		rte_exit(EXIT_FAILURE, "flow table for port add key failed\n");
 	else {
 		hash_v = (uint32_t)dp_get_flow_hash_value(key);
-		DPS_LOG(DEBUG, DPSERVICE, "Successfully added a hash key: %d \n", hash_v);
+		DPS_LOG_DEBUG("Successfully added a hash key: %d", hash_v);
 		dp_output_flow_key_info(key);
 	}
 }
@@ -162,13 +162,13 @@ void dp_delete_flow(struct flow_key *key)
 		pos = rte_hash_del_key(ipv4_flow_tbl, key);
 		if (pos < 0)
 			// Negative return value of rte_hash_del_key only appears when its parameters are invalid under this if condition
-			DPS_LOG(WARNING, DPSERVICE, "Hash key deleting function's parameters are invalid \n");
+			DPS_LOG_WARNING("Hash key deleting function's parameters are invalid");
 		else {
-			DPS_LOG(DEBUG, DPSERVICE, "Successfully deleted an existing hash key: %d \n", hash_v);
+			DPS_LOG_DEBUG("Successfully deleted an existing hash key: %d", hash_v);
 			dp_output_flow_key_info(key);
 		}
 	} else {
-		DPS_LOG(WARNING, DPSERVICE, "Attempt to delete a non-existing hash key \n");
+		DPS_LOG_WARNING("Attempt to delete a non-existing hash key");
 		dp_output_flow_key_info(key);
 	}
 
@@ -220,7 +220,7 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 		int ret = dp_remove_network_snat_port(nat_ip, nat_port, vni, cntrack->nat_info.l4_type);
 
 		if (ret < 0)
-			DPS_LOG(ERR, DPSERVICE, "failed to remove an allocated network NAT port: %d, vni %d , with error code %d \n", nat_port, vni, ret);
+			DPS_LOG_ERR("failed to remove an allocated network NAT port: %d, vni %d , with error code %d", nat_port, vni, ret);
 	}
 }
 
@@ -251,7 +251,7 @@ void dp_process_aged_flows(int port_id)
 		if (!agectx)
 			continue;
 		rte_flow_destroy(port_id, agectx->rte_flow, &error);
-		DPS_LOG(DEBUG, DPSERVICE, "Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d\n",
+		DPS_LOG_DEBUG("Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d",
 			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
 		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
 			dp_ref_dec(&agectx->cntrack->ref_count);
@@ -273,7 +273,7 @@ void dp_process_aged_flows_non_offload(void)
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
 						    (void **)&flow_val, &iter) >= 0) {
 		if (unlikely((cur - flow_val->timestamp) > timeout)) {
-			DPS_LOG(DEBUG, DPSERVICE, "Attempt to free aged non-offloading flow \n");
+			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
 		}
 	}
@@ -298,14 +298,14 @@ void dp_output_flow_key_info(struct flow_key *key)
 	print_ip(key->ip_dst, ip_dst_buf);
 
 	if (key->proto == IPPROTO_TCP)
-		DPS_LOG(DEBUG, DPSERVICE, "tcp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d \n", 
+		DPS_LOG_DEBUG("tcp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
 				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
 	
 	if (key->proto == IPPROTO_UDP)
-		DPS_LOG(DEBUG, DPSERVICE, "udp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d \n", 
+		DPS_LOG_DEBUG("udp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
 				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
 
 	if (key->proto == IPPROTO_ICMP)
-		DPS_LOG(DEBUG, DPSERVICE, "icmp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d \n", 
+		DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
 				ip_src_buf, ip_dst_buf, key->src.type_src, key->port_dst);
 }

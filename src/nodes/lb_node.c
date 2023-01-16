@@ -36,7 +36,7 @@ static __rte_always_inline void lb_alias_check(struct dp_flow *df_ptr, uint16_t 
 		df_ptr->flags.nat = DP_LB_RECIRC;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	struct flow_value *cntrack = df_ptr->conntrack;

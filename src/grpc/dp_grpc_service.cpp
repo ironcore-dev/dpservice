@@ -5,6 +5,7 @@
 #include "dp_port.h"
 #include "dpdk_layer.h"
 #include <rte_mbuf.h>
+#include "dp_log.h"
 
 
 GRPCService::GRPCService()
@@ -26,7 +27,8 @@ void GRPCService::run(std::string listen_address)
 	builder.RegisterService(this);
 	this->cq_ = builder.AddCompletionQueue();
 	this->server_= builder.BuildAndStart();
-	DPS_LOG(INFO, DPSERVICE, "Server initialized and listening on %s\n", listen_address.c_str());
+	dp_log_set_thread_name("grpc");
+	DPGRPC_LOG_INFO("Server initialized and listening on %s", listen_address.c_str());
 	HandleRpcs();
 }
 

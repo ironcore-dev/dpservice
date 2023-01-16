@@ -1,20 +1,24 @@
 #ifndef __INCLUDE_DP_ERROR_H__
 #define __INCLUDE_DP_ERROR_H__
 
-// TODO(plague) move log somewhere and include that only?
-#include "dp_util.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "dp_log.h"
 
 enum {
 	DP_ERROR = -1,
 	DP_OK = 0
 };
 
-// NOTICE: this can be used directly with a function call, do not use RET multiple times
-#define DP_FAILED(RET) ((RET) < 0)
+// NOTICE: these can be used directly with a function call, do not use RET multiple times
+
+#define DP_FAILED(RET) \
+	((RET) < 0)
+
+#define DP_FAILED_LOG(RET, LOGGER, ...) \
+	(DP_FAILED(RET) ? LOGGER(__VA_ARGS__), true : false)
 
 
 /*

@@ -28,7 +28,7 @@ static int ipv6_lookup_node_init(const struct rte_graph *graph, struct rte_node 
 	return 0;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	struct rte_ipv6_hdr *ipv6_hdr;

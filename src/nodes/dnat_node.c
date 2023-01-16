@@ -7,7 +7,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_flow.h"
-#include "dp_util.h"
+#include "dp_log.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/dnat_node.h"
 #include "nodes/common_node.h"
@@ -24,7 +24,7 @@ static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	struct flow_value *cntrack = df_ptr->conntrack;
@@ -116,7 +116,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 			if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 				if (df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
 					if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst) == DP_IP_ICMP_ID_INVALID) {
-						DPS_LOG(ERR, DPSERVICE, "Error to replace icmp hdr's identifier with value %d \n",
+						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d",
 								htons(cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst));
 						return DNAT_NEXT_DROP;
 					}
@@ -134,7 +134,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 				
 			} else {
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src)) == 0) {
-					DPS_LOG(ERR, DPSERVICE, "Error to replace l4 hdr's dst port with value %d \n", 
+					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's dst port with value %d",
 							htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
 					return DNAT_NEXT_DROP;
 				}

@@ -94,7 +94,7 @@ static void parse_options(struct dp_dhcp_header *dhcp_pkt, uint16_t tot_op_len)
 	return;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_dhcp_header *dhcp_hdr;
 	struct rte_ether_hdr *incoming_eth_hdr;

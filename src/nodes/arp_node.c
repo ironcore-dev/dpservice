@@ -56,7 +56,7 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	return true;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *pkt)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *pkt)
 {
 	if (!arp_handled(pkt))
 		return ARP_NEXT_DROP;

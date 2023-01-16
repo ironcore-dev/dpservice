@@ -8,6 +8,7 @@
 #include "nodes/dhcpv6_node.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_log.h"
 
 
 struct dhcpv6_node_main dhcpv6_node;
@@ -70,7 +71,7 @@ static int dhcpv6_node_init(const struct rte_graph *graph, struct rte_node *node
 	return 0;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr;
 	struct rte_ipv6_hdr *req_ipv6_hdr; 
@@ -128,7 +129,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_mbuf *m)
 
 	if(offset >= options_len) {
 		if (!rte_pktmbuf_append(m, offset - options_len)) {
-			DPS_LOG(WARNING, DPSERVICE, "Not enough space for DHCPv6 options in packet\n");
+			DPNODE_LOG_WARNING(node, "Not enough space for DHCPv6 options in packet");
 			return DHCPV6_NEXT_DROP;
 		}
 	} else {

@@ -53,11 +53,11 @@ int dp_func()
 
   ret = lib_call();
   if (ret < 0)
-      return ret;
+    return ret;
 
   ret = lib_call2();
   if (ret == LIB_ERR_VALUE)
-      return DP_ERROR;
+    return DP_ERROR;
 
   return DP_OK;
 }
@@ -68,13 +68,28 @@ int caller()
 
   ret = dp_func();
   if (DP_FAILED(ret))
-      return ret;
+    return ret;
 
   ret = dp_func2();
   if (DP_FAILED(ret))
-      return ret;
+    return ret;
 
   return dp_func3();
 }
 ```
 Sticking to `ret` for the return value also helps with readability (as it will be always the same in all uses of the helper).
+
+There is also a helper macro `DP_FAILED_LOG()` for making logging easier:
+```c
+  ret = dp_func();
+  if (DP_FAILED_LOG(ret, DPS_LOG_ERR, "dp_func() failed with %d", ret))
+    return ret;
+```
+instead of
+```c
+  ret = dp_func();
+  if (DP_FAILED(ret)) {
+    DPS_LOG_ERR("dp_func() failed with %d", ret);
+    return ret;
+  }
+```
