@@ -17,6 +17,7 @@
 #include "dp_alias.h"
 #include "grpc/dp_grpc_service.h"
 #include "dp_multi_path.h"
+#include "dp_log.h"
 
 static char **dp_argv;
 static int dp_argc;
@@ -165,7 +166,7 @@ static int run_service()
 		return EXIT_FAILURE;
 	}
 
-	rte_openlog_stream(stdout);
+	dp_log_init();
 	dp_log_set_thread_name("control");
 	DPS_LOG_INFO("Starting DP Service version %s", DP_SERVICE_VERSION);
 	// from this point on, only DPS_LOG should be used

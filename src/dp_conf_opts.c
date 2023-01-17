@@ -23,6 +23,7 @@ _OPT_SHOPT_MAX = 255,
 #ifdef ENABLE_GRAPHTRACE
 	OPT_GRAPHTRACE,
 #endif
+	OPT_COLOR,
 };
 
 #define OPTSTRING \
@@ -46,6 +47,7 @@ static const struct option longopts[] = {
 #ifdef ENABLE_GRAPHTRACE
 	{ "graphtrace", 1, 0, OPT_GRAPHTRACE },
 #endif
+	{ "color", 1, 0, OPT_COLOR },
 	{ NULL, }
 };
 
@@ -57,6 +59,12 @@ static const char *overlay_type_choices[] = {
 static const char *nic_type_choices[] = {
 	"hw",
 	"tap",
+};
+
+static const char *color_choices[] = {
+	"never",
+	"always",
+	"auto",
 };
 
 static void print_help_args(FILE *outfile)
@@ -78,6 +86,7 @@ static void print_help_args(FILE *outfile)
 #ifdef ENABLE_GRAPHTRACE
 		"     --graphtrace=LEVEL        verbosity level of packet traversing the graph framework\n"
 #endif
+		"     --color=MODE              output colorization mode: 'never' (default), 'always' or 'auto'\n"
 	);
 }
 
@@ -94,6 +103,7 @@ static bool offload_enabled = true;
 #ifdef ENABLE_GRAPHTRACE
 static int graphtrace_level = 0;
 #endif
+static enum dp_conf_color color = DP_CONF_COLOR_NEVER;
 
 const char *dp_conf_get_pf0_name()
 {
@@ -152,3 +162,8 @@ const int dp_conf_get_graphtrace_level()
 }
 
 #endif
+const enum dp_conf_color dp_conf_get_color()
+{
+	return color;
+}
+

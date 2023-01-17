@@ -70,6 +70,8 @@ void _dp_log(unsigned int level, unsigned int logtype,
 
 void dp_log_set_thread_name(const char *name);
 
+int dp_log_init();
+
 #ifdef __cplusplus
 }
 #endif
