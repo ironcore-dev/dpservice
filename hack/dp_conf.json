@@ -48,6 +48,14 @@
     "default": "ipip"
   },
   {
+    "lgopt": "dhcp-mtu",
+    "arg": "SIZE",
+    "help": "set the mtu field in DHCP responses (68 - 1500)",
+    "var": "dhcp_mtu",
+    "type": "int",
+    "default": 1500
+  },
+  {
     "lgopt": "wcmp-fraction",
     "arg": "FRACTION",
     "help": "weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)",

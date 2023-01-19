@@ -34,7 +34,6 @@ extern "C" {
 #define DP_DHCP_ACK			0x05
 #define DP_DHCP_INFINITE	0xffffffff
 #define DP_DHCP_MASK		0xffffffff
-#define DP_DHCP_MTU_VALUE	0x005DC
 
 #define DHCP_MAGIC_COOKIE 0x63825363
 

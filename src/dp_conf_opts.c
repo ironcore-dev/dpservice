@@ -14,6 +14,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_IPV6,
 	OPT_VF_PATTERN,
 	OPT_OVERLAY_TYPE,
+	OPT_DHCP_MTU,
 	OPT_WCMP_FRACTION,
 	OPT_NIC_TYPE,
 	OPT_NO_STATS,
@@ -38,6 +39,7 @@ static const struct option longopts[] = {
 	{ "ipv6", 1, 0, OPT_IPV6 },
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
 	{ "overlay-type", 1, 0, OPT_OVERLAY_TYPE },
+	{ "dhcp-mtu", 1, 0, OPT_DHCP_MTU },
 	{ "wcmp-fraction", 1, 0, OPT_WCMP_FRACTION },
 	{ "nic-type", 1, 0, OPT_NIC_TYPE },
 	{ "no-stats", 0, 0, OPT_NO_STATS },
@@ -77,6 +79,7 @@ static void print_help_args(FILE *outfile)
 		"     --ipv6=ADDR6              IPv6 underlay address\n"
 		"     --vf-pattern=PATTERN      virtual interface name pattern (e.g. 'eth1vf')\n"
 		"     --overlay-type=TYPE       overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
+		"     --dhcp-mtu=SIZE           set the mtu field in DHCP responses (68 - 1500)\n"
 		"     --wcmp-fraction=FRACTION  weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)\n"
 		"     --nic-type=NICTYPE        NIC type to use: 'hw' (default) or 'tap'\n"
 		"     --no-stats                do not print periodic statistics to stdout\n"
@@ -94,6 +97,7 @@ static char pf0_name[IF_NAMESIZE];
 static char pf1_name[IF_NAMESIZE];
 static char vf_pattern[IF_NAMESIZE];
 static enum dp_conf_overlay_type overlay_type = DP_CONF_OVERLAY_TYPE_IPIP;
+static int dhcp_mtu = 1500;
 static double wcmp_frac = 1.0;
 static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_HW;
 static bool stats_enabled = true;
@@ -123,6 +127,11 @@ const char *dp_conf_get_vf_pattern()
 const enum dp_conf_overlay_type dp_conf_get_overlay_type()
 {
 	return overlay_type;
+}
+
+const int dp_conf_get_dhcp_mtu()
+{
+	return dhcp_mtu;
 }
 
 const double dp_conf_get_wcmp_frac()

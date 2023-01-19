@@ -13,9 +13,13 @@ from config import *
 def request_ip(interface, macaddr, ipaddr):
 	scapy.config.conf.checkIPaddr = False
 	answer = dhcp_request(iface=interface, timeout=3)
-	msg_type = answer[DHCP].options[0][1]
+	options = answer[DHCP].options
+	msg_type = next((opt[1] for opt in options if opt[0] == 'message-type'), None)
 	if msg_type != 2:
 		raise AssertionError(f"DHCP message is not DHCPOFFER (message type: {msg_type})")
+	mtu = next((opt[1] for opt in options if opt[0] == 'interface-mtu'), None)
+	if mtu != dhcp_mtu:
+		raise AssertionError(f"DHCP message does not specify custom MTU ({mtu} instead of {dhcp_mtu})")
 	pkt = (Ether(dst=answer[Ether].src) /
 		   IP(src=ipaddr, dst=answer[IP].src) /
 		   UDP(sport=68, dport=67) /
