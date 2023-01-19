@@ -6,7 +6,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 {
 
 	struct underlay_conf *u_conf = get_underlay_conf();
-	bool cross_pf_port = df->nxt_hop == dp_get_pf0_port_id() ? false : true;
+	bool cross_pf_port = df->nxt_hop == dp_port_get_pf0_id() ? false : true;
 
 	struct rte_flow_attr attr;
 
@@ -299,8 +299,8 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		#endif
 	}
 
-	// uint16_t peer_pf_port_id =  dp_get_pf1_port_id();
-	uint16_t t_port_id = cross_pf_port ? dp_get_pf1_port_id() : m->port;
+	// uint16_t peer_pf_port_id =  dp_port_get_pf1_id();
+	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
 
 	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action, df);
 	if (!flow) {
@@ -318,7 +318,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 {
 
 	struct underlay_conf *u_conf = get_underlay_conf();
-	bool cross_pf_port = m->port == dp_get_pf0_port_id() ? false : true;
+	bool cross_pf_port = m->port == dp_port_get_pf0_id() ? false : true;
 
 	struct rte_flow_attr attr;
 	int hairpin_pattern_cnt = 0;
@@ -537,7 +537,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	struct rte_flow_action_port_id send_to_port;
 
 	if (cross_pf_port) {
-		uint16_t hairpin_rx_queue_id = get_pf_hairpin_rx_queue((uint16_t)df->nxt_hop);
+		uint16_t hairpin_rx_queue_id = dp_port_get_pf_hairpin_rx_queue((uint16_t)df->nxt_hop);
 
 		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
 	} else {

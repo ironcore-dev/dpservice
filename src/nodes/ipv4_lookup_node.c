@@ -56,7 +56,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df_ptr->tun_info.dst_vni = route.vni;
 
-	if (dp_is_pf_port_id(df_ptr->nxt_hop)) {
+	if (dp_port_is_pf(df_ptr->nxt_hop)) {
 		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	}
@@ -68,7 +68,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df_ptr->flags.valid = 1;
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_LOCAL || df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (!dp_is_pf_port_id(df_ptr->nxt_hop) && get_vf_port_attach_status(df_ptr->nxt_hop) == DP_VF_PORT_DISATTACH)
+		if (!dp_port_is_pf(df_ptr->nxt_hop) && dp_port_get_vf_attach_status(df_ptr->nxt_hop) == DP_VF_PORT_DETACHED)
 			return IPV4_LOOKUP_NEXT_DROP;
 	}
 
@@ -76,13 +76,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// rewrite outgoing port if WCMP algorithm decides to do so
 		if (dp_conf_is_wcmp_enabled()) {
 			egress_pf_port selected_port = calculate_port_by_hash(df_ptr->dp_flow_hash);
-			struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-			uint16_t owner_port_id = dp_get_pf0_port_id();
-			uint16_t peer_port_id = dp_get_pf1_port_id();
-
+			uint16_t owner_port_id = dp_port_get_pf0_id();
+			uint16_t peer_port_id = dp_port_get_pf1_id();
 			// basic logic of port redundancy if one of ports are down
-			if ((selected_port == PEER_PORT && dp_port_get_link_status(dp_layer, peer_port_id) == RTE_ETH_LINK_UP)
-				|| (selected_port == OWNER_PORT && dp_port_get_link_status(dp_layer, owner_port_id) == RTE_ETH_LINK_DOWN)
+			if ((selected_port == PEER_PORT && dp_port_get_link_status(peer_port_id) == RTE_ETH_LINK_UP)
+				|| (selected_port == OWNER_PORT && dp_port_get_link_status(owner_port_id) == RTE_ETH_LINK_DOWN)
 			) {
 				df_ptr->nxt_hop = peer_port_id;
 			}

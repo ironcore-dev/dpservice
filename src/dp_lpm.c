@@ -60,6 +60,7 @@ err:
 	return EXIT_FAILURE;
 }
 
+// TODO(plague?): this needs DP_FAILED() handling, but also uint16_t retval
 int dp_get_portid_with_vm_handle(void *key)
 {
 	uint16_t *p_port_id;
@@ -232,7 +233,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 			goto err;
 		}
 		/* This is an external route */
-		if (dp_is_pf_port_id(portid)) {
+		if (dp_port_is_pf(portid)) {
 			route = rte_rib_get_ext(node);
 			route->vni = t_vni;
 			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
@@ -322,7 +323,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 	do {
 		node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL);
 		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
-			dp_is_pf_port_id(next_hop) && ext_routes) {
+			dp_port_is_pf(next_hop) && ext_routes) {
 			if (rep->com_head.msg_count &&
 			    (rep->com_head.msg_count % msg_per_buf == 0)) {
 				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
@@ -386,7 +387,7 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 			goto err;
 
 		/* This is an external route */
-		if (dp_is_pf_port_id(portid)) {
+		if (dp_port_is_pf(portid)) {
 			route = rte_rib6_get_ext(node);
 			route->vni = t_vni;
 			rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
@@ -566,7 +567,7 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, i
 	if (node) {
 		if (rte_rib_get_nh(node, &next_hop) != 0)
 			return DP_ROUTE_DROP;
-		if (dp_is_pf_port_id(next_hop))
+		if (dp_port_is_pf(next_hop))
 			*r = *(struct vm_route *)rte_rib_get_ext(node);
 
 		*dst_port_id = next_hop;
@@ -599,7 +600,7 @@ int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6
 	if (node) {
 		if (rte_rib6_get_nh(node, &next_hop) != 0)
 			return DP_ROUTE_DROP;
-		if (dp_is_pf_port_id(next_hop))
+		if (dp_port_is_pf(next_hop))
 			*r = *(struct vm_route *)rte_rib6_get_ext(node);
 		 return next_hop;
 	}

@@ -1,30 +1,8 @@
-#include <rte_common.h>
-#include "dp_util.h"
-#include "dp_flow.h"
 #include "monitoring/dp_event.h"
-
-void dp_port_set_link_status(struct dp_dpdk_layer *dp_layer, int port_id, uint8_t status)
-{
-	for (int i = 0; i < DP_MAX_PORTS; i++) {
-		if (dp_layer->ports[i]->dp_port_id == port_id) {
-			dp_layer->ports[i]->link_status = status;
-			break;
-		}
-	}
-}
-
-uint8_t dp_port_get_link_status(struct dp_dpdk_layer *dp_layer, int port_id)
-{
-	uint8_t ret = RTE_ETH_LINK_DOWN;
-
-	for (int i = 0; i < DP_MAX_PORTS; i++) {
-		if (dp_layer->ports[i]->dp_port_id == port_id) {
-			ret = dp_layer->ports[i]->link_status;
-			break;
-		}
-	}
-	return ret;
-}
+#include <rte_common.h>
+#include "dp_flow.h"
+#include "dp_log.h"
+#include "dp_util.h"
 
 static int dp_send_event_link_msg(uint16_t port_id, uint8_t status)
 {
@@ -75,9 +53,10 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 {
 	dp_event_msg *status_msg = rte_pktmbuf_mtod(m, dp_event_msg *);
 	uint16_t port_id = status_msg->event_entry.link_status.port_id;
-	uint8_t	status = status_msg->event_entry.link_status.status;
+	uint8_t status = status_msg->event_entry.link_status.status;
 
-	dp_port_set_link_status(get_dpdk_layer(), port_id, status);
+	// TODO(plague) can fail
+	dp_port_set_link_status(port_id, status);
 }
 
 int dp_send_event_timer_msg()
@@ -103,8 +82,8 @@ int dp_send_event_timer_msg()
 void dp_process_event_timer_msg(struct rte_mbuf *m)
 {
 	if (dp_conf_is_offload_enabled()) {
-		dp_process_aged_flows(dp_get_pf0_port_id());
-		dp_process_aged_flows(dp_get_pf1_port_id());
+		dp_process_aged_flows(dp_port_get_pf0_id());
+		dp_process_aged_flows(dp_port_get_pf1_id());
 	} else {
 		dp_process_aged_flows_non_offload();
 	}

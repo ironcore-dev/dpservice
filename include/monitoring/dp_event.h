@@ -12,10 +12,6 @@ extern "C" {
 #include "dp_monitoring.h"
 
 
-void dp_port_set_link_status(struct dp_dpdk_layer *dp_layer,int port_id, uint8_t status);
-
-uint8_t dp_port_get_link_status(struct dp_dpdk_layer *dp_layer,int port_id);
-
 int dp_link_status_change_event_callback(uint16_t port_id, 
 												enum rte_eth_event_type type, 
 												void *param,

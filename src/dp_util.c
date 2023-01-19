@@ -8,23 +8,7 @@
 #define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"
 #define DP_SYSFS_MAX_PATH 256
 
-// TODO(plague) struct instead of [2] or -1 for id as invalid or something
-static uint16_t pf_ports[DP_MAX_PF_PORTS][2] = {0};
-
-void dp_add_pf_port_id(uint16_t id)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PF_PORTS; i++)
-		if (!pf_ports[i][1])
-		{
-			pf_ports[i][0] = id;
-			pf_ports[i][1] = 1;
-			return;
-		}
-}
-
-int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IF_NAMESIZE])
+int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IFNAMSIZ])
 {
 	int ret;
 
@@ -74,7 +58,7 @@ static int get_num_of_vfs_pattern()
 {
 	int count = 0;
 	uint16_t port_id;
-	char ifname[IF_NAMESIZE] = {0};
+	char ifname[IFNAMSIZ] = {0};
 	struct rte_eth_dev_info dev_info;
 	const char *pattern = dp_conf_get_vf_pattern();
 
@@ -103,26 +87,6 @@ int dp_get_num_of_vfs()
 		return DP_ERROR;
 	}
 	return vfs;
-}
-
-bool dp_is_pf_port_id(uint16_t id)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PF_PORTS; i++)
-		if (pf_ports[i][1] && (pf_ports[i][0] == id))
-			return true;
-	return false;
-}
-
-uint16_t dp_get_pf0_port_id()
-{
-	return pf_ports[0][0];
-}
-
-uint16_t dp_get_pf1_port_id()
-{
-	return pf_ports[1][0];
 }
 
 void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)

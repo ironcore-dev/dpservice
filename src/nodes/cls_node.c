@@ -122,7 +122,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (next_nodes[pkt_type] == CLS_NEXT_IPV6_LOOKUP) {
-		if (dp_is_pf_port_id(m->port)) {
+		if (dp_port_is_pf(m->port)) {
 			df = get_dp_flow_ptr(m);
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 			extract_outter_ethernet_header(m);

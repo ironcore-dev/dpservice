@@ -367,9 +367,9 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_del_route(dp_get_pf0_port_id(), dp_get_vm_vni(port_id), 0,
+		if (dp_del_route(dp_port_get_pf0_id(), dp_get_vm_vni(port_id), 0,
 					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
-					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_DEL_PFX;
 			goto err;
 		}
@@ -383,18 +383,18 @@ err:
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
-	struct dp_port_ext pf_port;
-	int port_id = 0, err_code = EXIT_SUCCESS;
+	uint16_t port_id = DP_INVALID_PORT_ID;
+	int err_code = EXIT_SUCCESS;
 	uint16_t p_id = 0;
 
-	memset(&pf_port, 0, sizeof(pf_port));
-	// TODO(plague) use strcpy, size of name from conf is not known
-	memcpy(pf_port.port_name, dp_conf_get_pf0_name(), IFNAMSIZ);
-
+	// TODO(plague?): this seems to be a misnomer, this name comes from vm_pci argument
 	if (req->add_machine.name[0] != '\0') {
 		if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
-			if (dp_is_port_allocated(get_dpdk_layer(), p_id)) {
+			// TODO(plague): there are actually multiple error states here, see the function itself
+			// ot maybe just create function that takes the name directly
+			if (!dp_port_is_vf_free(p_id)) {
 				err_code = DP_ERROR_VM_ALREADY_ALLOCATED;
+				// TODO as below, fill in properly
 				rep->vf_pci.bus = 2;
 				rep->vf_pci.domain = 2;
 				rep->vf_pci.function = 2;
@@ -407,10 +407,10 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			goto err;
 		}
 	} else {
-		port_id = dp_get_next_avail_vf_id(get_dpdk_layer(), DP_PORT_VF);
+		port_id = dp_port_get_free_vf_port_id();
 	}
 
-	if (port_id >= 0) {
+	if (port_id != DP_INVALID_PORT_ID) {
 		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
 			goto err;
@@ -440,10 +440,8 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT6;
 			goto route_err;
 		}
-		// TODO(chandra?): both calls can fail
-		dp_start_interface(&pf_port, port_id, DP_PORT_VF);
-		if (dp_conf_is_offload_enabled())
-			bind_vf_with_peer_pf_port((uint16_t)port_id);
+		// TODO(chandra?): call can fail!
+		dp_port_start(port_id);
 		/* TODO get the pci info of this port and fill it accordingly */
 		rep->vf_pci.bus = 2;
 		rep->vf_pci.domain = 2;
@@ -480,7 +478,8 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	dp_stop_interface(port_id, DP_PORT_VF);
+	// TODO(chandra?): this can fail now; also this expects uint16_t port type
+	dp_port_stop(port_id);
 	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), !DP_LPM_ROLLBACK);
 	return ret;
@@ -522,15 +521,15 @@ static int dp_process_addroute(dp_request *req, dp_reply *rep)
 	int ret = EXIT_SUCCESS;
 
 	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_add_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+		ret = dp_add_route(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 						   ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
-						    req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()));
+						    req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 		if (ret)
 			goto err;
 	} else {
-		if (dp_add_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+		if (dp_add_route6(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
-					  req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_ADD_RT_FAIL6;
 			goto err;
 		}
@@ -546,16 +545,16 @@ static int dp_process_delroute(dp_request *req, dp_reply *rep)
 	int ret = EXIT_SUCCESS;
 
 	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_del_route(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+		if (dp_del_route(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
-					 req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+					 req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_DEL_RT;
 			goto err;
 		}
 	} else {
-		if (dp_del_route6(dp_get_pf0_port_id(), req->route.vni, req->route.trgt_vni,
+		if (dp_del_route6(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
-					  req->route.pfx_length, rte_eth_dev_socket_id(dp_get_pf0_port_id()))) {
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_DEL_RT;
 			goto err;
 		}
@@ -753,7 +752,7 @@ static int dp_process_listroute(dp_request *req, struct rte_mbuf *req_mbuf, stru
 {
 	uint32_t vni = req->route.vni;
 
-	dp_list_routes(vni, req_mbuf, rte_eth_dev_socket_id(dp_get_pf0_port_id()), 0, rep_arr, DP_SHOW_EXT_ROUTES);
+	dp_list_routes(vni, req_mbuf, rte_eth_dev_socket_id(dp_port_get_pf0_id()), 0, rep_arr, DP_SHOW_EXT_ROUTES);
 
 	return EXIT_SUCCESS;
 }
@@ -799,7 +798,7 @@ static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_m
 	}
 
 	dp_list_routes(dp_get_vm_vni(port_id), m,
-					rte_eth_dev_socket_id(dp_get_pf0_port_id()), port_id, rep_arr, DP_SHOW_INT_ROUTES);
+					rte_eth_dev_socket_id(dp_port_get_pf0_id()), port_id, rep_arr, DP_SHOW_INT_ROUTES);
 
 out:
 	return EXIT_SUCCESS;

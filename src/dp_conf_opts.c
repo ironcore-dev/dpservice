@@ -99,9 +99,9 @@ static void print_help_args(FILE *outfile)
 	);
 }
 
-static char pf0_name[IF_NAMESIZE];
-static char pf1_name[IF_NAMESIZE];
-static char vf_pattern[IF_NAMESIZE];
+static char pf0_name[IFNAMSIZ];
+static char pf1_name[IFNAMSIZ];
+static char vf_pattern[IFNAMSIZ];
 static enum dp_conf_overlay_type overlay_type = DP_CONF_OVERLAY_TYPE_IPIP;
 static int dhcp_mtu = 1500;
 static double wcmp_frac = 1.0;
