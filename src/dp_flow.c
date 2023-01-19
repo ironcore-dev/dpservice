@@ -1,35 +1,29 @@
-#include "dp_lpm.h"
 #include "dp_flow.h"
-#include "dp_log.h"
-#include "node_api.h"
-#include <rte_errno.h>
+
 #include <rte_icmp.h>
+
+#include "dp_error.h"
+#include "dp_log.h"
+#include "dp_lpm.h"
 #include "dp_nat.h"
-#include "rte_flow/dp_rte_flow.h"
 #include "dp_refcount.h"
+#include "dp_util.h"
+#include "node_api.h"
+#include "rte_flow/dp_rte_flow.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static uint64_t timeout = 0;
 
-void dp_init_flowtable(int socket_id)
+int dp_flow_init(int socket_id)
 {
-	struct rte_hash_parameters ipv4_table_params = {
-		.name = NULL,
-		.entries = FLOW_MAX,
-		.key_len =  sizeof(struct flow_key),
-		.hash_func = rte_jhash,
-		.hash_func_init_val = 0xfee1900d,
-		.extra_flag = 0,
-	};
-	char s[64];
-
-	snprintf(s, sizeof(s), "ipv4_flow_table_%u", socket_id);
-	ipv4_table_params.name = s;
-	ipv4_table_params.socket_id = socket_id;
-	ipv4_flow_tbl = rte_hash_create(&ipv4_table_params);
+	ipv4_flow_tbl = dp_create_jhash_table(FLOW_MAX, sizeof(struct flow_key),
+										  "ipv4_flow_table", socket_id);
 	if (!ipv4_flow_tbl)
-		rte_exit(EXIT_FAILURE, "create ipv4 flow table failed\n");
+		return DP_ERROR;
+
 	timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT;
+
+	return DP_OK;
 }
 
 static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)

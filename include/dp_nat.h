@@ -60,7 +60,7 @@ struct nat_check_result {
 	bool	is_network_natted;
 };
 
-void dp_init_nat_tables(int socket_id);
+int dp_nat_init(int socket_id);
 void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni);

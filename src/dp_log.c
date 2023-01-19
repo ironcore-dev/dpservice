@@ -31,7 +31,7 @@ int dp_log_init()
 
 	ret = rte_openlog_stream(stdout);
 	if (DP_FAILED(ret)) {
-		fprintf(stderr, "Cannot open logging stream\n");
+		fprintf(stderr, "Cannot open logging stream %s\n", dp_strerror(ret));
 		return ret;
 	}
 

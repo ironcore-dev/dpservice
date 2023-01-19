@@ -440,6 +440,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT6;
 			goto route_err;
 		}
+		// TODO(chandra?): both calls can fail
 		dp_start_interface(&pf_port, port_id, DP_PORT_VF);
 		if (dp_conf_is_offload_enabled())
 			bind_vf_with_peer_pf_port((uint16_t)port_id);

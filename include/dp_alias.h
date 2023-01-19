@@ -20,7 +20,7 @@ typedef struct dp_alias_value {
 	uint16_t length;
 } dp_alias_value;
 
-void dp_init_alias_handle_tbl(int socket_id);
+int dp_alias_init(int socket_id);
 int dp_map_alias_handle(void *key, dp_alias_value *val);
 int dp_get_portid_with_alias_handle(void *key);
 void dp_del_portid_with_alias_handle(dp_alias_value *val);

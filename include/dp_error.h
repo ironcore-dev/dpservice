@@ -5,22 +5,21 @@
 extern "C" {
 #endif
 
-#include "dp_log.h"
+#include <rte_errno.h>
 
-enum {
-	DP_ERROR = -1,
-	DP_OK = 0
-};
+#define DP_OK 0
+#define DP_ERROR (-RTE_MAX_ERRNO)
 
 // NOTICE: these can be used directly with a function call, do not use RET multiple times
-
 #define DP_FAILED(RET) \
 	((RET) < 0)
-
 #define DP_FAILED_LOG(RET, LOGGER, ...) \
 	(DP_FAILED(RET) ? LOGGER(__VA_ARGS__), true : false)
 
+const char *dp_strerror(int error);
 
+
+// TODO(plague): separate PR - add strerror for these
 /*
  * GRPC error values, do not change them!
  */

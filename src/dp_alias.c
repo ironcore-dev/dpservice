@@ -1,26 +1,17 @@
 #include <rte_malloc.h>
 #include "dp_alias.h"
+#include "dp_error.h"
 
 static struct rte_hash *alias_handle_tbl = NULL;
 
-void dp_init_alias_handle_tbl(int socket_id)
+int dp_alias_init(int socket_id)
 {
-	struct rte_hash_parameters handle_table_params = {
-		.name = NULL,
-		.entries = DP_ALIAS_MAX_TABLE_SIZE,
-		.key_len =  DP_ALIAS_IPV6_ADDR_SIZE,
-		.hash_func = rte_jhash,
-		.hash_func_init_val = 0xfee1900a,
-		.extra_flag = 0,
-	};
-	char s[64];
-
-	snprintf(s, sizeof(s), "alias_handle_table_%u", socket_id);
-	handle_table_params.name = s;
-	handle_table_params.socket_id = socket_id;
-	alias_handle_tbl = rte_hash_create(&handle_table_params);
+	alias_handle_tbl = dp_create_jhash_table(DP_ALIAS_MAX_TABLE_SIZE, DP_ALIAS_IPV6_ADDR_SIZE,
+										     "alias_handle_table", socket_id);
 	if (!alias_handle_tbl)
-		rte_exit(EXIT_FAILURE, "create alias handle table failed\n");
+		return DP_ERROR;
+
+	return DP_OK;
 }
 
 int dp_map_alias_handle(void *key, dp_alias_value *val)

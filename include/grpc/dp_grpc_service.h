@@ -22,12 +22,13 @@ private:
 	void *uuid;
 	uint16_t pfx_counter = 1;
 	bool initialized = false;
+
+	void HandleRpcs();
 	
 public:
 	GRPCService();
 	~GRPCService();
-	void run(std::string listen_address);
-	void HandleRpcs();
+	bool run(std::string listen_address);
 	char* GetUUID();
 	void SetInitStatus(bool status);
 	bool IsInitialized();

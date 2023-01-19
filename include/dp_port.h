@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 
+// TODO(plague) refactor typedefs
 typedef enum {
 	DP_PORT_PF,
 	DP_PORT_VF,
@@ -22,6 +23,7 @@ typedef enum {
 	DP_VF_PORT_ATTACH,
 } dp_vf_port_attach_status;
 
+// TODO(plague): what does the name represent?
 struct dp_port_ext {
 	char					port_name[IFNAMSIZ];
 	struct rte_ether_addr	port_mac;
@@ -34,7 +36,7 @@ struct dp_port {
 	dp_port_type				dp_p_type;
 	int							dp_p_port_id;
 	int							dp_port_id;
-	int							dp_allocated;
+	int							dp_allocated;  // TODO(plague): boolean
 	uint8_t						vf_name[IFNAMSIZ];
 	struct dp_port_ext			dp_port_ext;
 	char						node_name[RTE_NODE_NAMESIZE];

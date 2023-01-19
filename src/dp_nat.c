@@ -10,6 +10,7 @@
 #include "node_api.h"
 #include "dp_nat.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_log.h"
 
 TAILQ_HEAD(network_nat_head, network_nat_entry);
 
@@ -19,50 +20,26 @@ static struct rte_hash *ipv4_snat_tbl = NULL;
 static struct rte_hash *ipv4_network_dnat_tbl = NULL;
 static struct network_nat_head nat_headp;
 
-void dp_init_nat_tables(int socket_id)
+int dp_nat_init(int socket_id)
 {
-	struct rte_hash_parameters ipv4_nat_table_params = {
-		.name = NULL,
-		.entries = DP_NAT_TABLE_MAX,
-		.key_len =  sizeof(struct nat_key),
-		.hash_func = rte_jhash,
-		.hash_func_init_val = 0xfee1900d,
-		.extra_flag = 0,
-	};
-
-	struct rte_hash_parameters ipv4_network_dnat_table_params = {
-		.name = NULL,
-		.entries = DP_NAT_TABLE_MAX,
-		.key_len =  sizeof(struct network_dnat_key),
-		.hash_func = rte_jhash,
-		.hash_func_init_val = 0xfee1900e,
-		.extra_flag = 0,
-	};
-	char s[64];
-
-	snprintf(s, sizeof(s), "ipv4_snat_table_%u", socket_id);
-	ipv4_nat_table_params.name = s;
-	ipv4_nat_table_params.socket_id = socket_id;
-	ipv4_snat_tbl = rte_hash_create(&ipv4_nat_table_params);
+	ipv4_snat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct nat_key),
+										  "ipv4_snat_table", socket_id);
 	if (!ipv4_snat_tbl)
-		rte_exit(EXIT_FAILURE, "create ipv4 snat table failed\n");
+		return DP_ERROR;
 
-	snprintf(s, sizeof(s), "ipv4_dnat_table_%u", socket_id);
-	ipv4_nat_table_params.name = s;
-	ipv4_nat_table_params.socket_id = socket_id;
-	ipv4_dnat_tbl = rte_hash_create(&ipv4_nat_table_params);
+	ipv4_dnat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct nat_key),
+										  "ipv4_dnat_table", socket_id);
 	if (!ipv4_dnat_tbl)
-		rte_exit(EXIT_FAILURE, "create ipv4 dnat table failed\n");
+		return DP_ERROR;
 
-
-	snprintf(s, sizeof(s), "ipv4_network_dnat_table_%u", socket_id);
-	ipv4_network_dnat_table_params.name = s;
-	ipv4_network_dnat_table_params.socket_id = socket_id;
-	ipv4_network_dnat_tbl = rte_hash_create(&ipv4_network_dnat_table_params);
+	ipv4_network_dnat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct network_dnat_key),
+												  "ipv4_network_dnat_table", socket_id);
 	if (!ipv4_network_dnat_tbl)
-		rte_exit(EXIT_FAILURE, "create ipv4 network dnat table failed\n");
+		return DP_ERROR;
 
 	TAILQ_INIT(&nat_headp);
+
+	return DP_OK;
 }
 
 void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result)

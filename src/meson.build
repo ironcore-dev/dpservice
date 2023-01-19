@@ -8,7 +8,7 @@ dp_sources = ['dp_service.cpp', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'dp_lb.
 			  'nodes/snat_node.c', 'grpc/dp_grpc_service.cpp', 'grpc/dp_async_grpc.cpp', 'grpc/dp_grpc_impl.c', 'dp_flow.c',
 			  'dp_netlink.c','rte_flow/dp_rte_flow.c','rte_flow/dp_rte_flow_init.c','rte_flow/dp_rte_flow_traffic_forward.c',
 			  'monitoring/dp_monitoring.c','monitoring/dp_event.c',
-			  'dp_log.c',
+			  'dp_log.c', 'dp_error.c',
  			]
 # TODO(plague) look into autogereration of such dependencies (source file list)
 
