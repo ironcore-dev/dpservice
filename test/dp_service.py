@@ -20,7 +20,7 @@ class DpService:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += (f'{self.build_path}/src/dp_service -l 0,1'
+		self.cmd += (f'{self.build_path}/src/dp_service -l 0,1 --no-pci'
 					f' --vdev=net_tap0,iface={pf0_tap},mac="{pf0_mac}"'
 					f' --vdev=net_tap1,iface={pf1_tap},mac="{pf1_mac}"'
 					f' --vdev=net_tap2,iface={vf0_tap},mac="{vf0_mac}"'
@@ -29,6 +29,7 @@ class DpService:
 					 ' --'
 					f' --pf0={pf0_tap} --pf1={pf1_tap} --vf-pattern={vf_patt}'
 					f' --ipv6={ul_ipv6} --enable-ipv6-overlay'
+					f' --dhcp-mtu={dhcp_mtu}'
 					 ' --no-offload --no-stats'
 					f' --nic-type=tap --overlay-type={tun_opt}')
 		if self.port_redundancy:

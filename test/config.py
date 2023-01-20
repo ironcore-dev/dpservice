@@ -21,6 +21,7 @@ ul_actual_dst="2a10:afc0:e01f:f408:0:64::"
 ul_actual_src="2a10:afc0:e01f:f403:0:64::"
 ul_short_src="2a10:afc0:e01f:f403::"
 tun_type_geneve="geneve"
+dhcp_mtu = 1337
 
 bcast_mac = "ff:ff:ff:ff:ff:ff"
 null_ip = "0.0.0.0"

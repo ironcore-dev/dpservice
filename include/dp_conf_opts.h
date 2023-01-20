@@ -25,6 +25,7 @@ const char *dp_conf_get_pf0_name();
 const char *dp_conf_get_pf1_name();
 const char *dp_conf_get_vf_pattern();
 const enum dp_conf_overlay_type dp_conf_get_overlay_type();
+const int dp_conf_get_dhcp_mtu();
 const double dp_conf_get_wcmp_frac();
 const enum dp_conf_nic_type dp_conf_get_nic_type();
 const bool dp_conf_is_stats_enabled();

@@ -179,7 +179,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	dhcp_srv_ident = htonl(dp_get_gw_ip4());
 	net_mask = htonl(DP_DHCP_MASK);
-	mtu = htons(DP_DHCP_MTU_VALUE);
+	mtu = htons(dp_conf_get_dhcp_mtu());
 
 	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_type, DP_DHCP_MSG_TYPE, 1);
 	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_lease, DP_DHCP_LEASE_MSG, 4);

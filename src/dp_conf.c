@@ -132,6 +132,8 @@ static int parse_opt(int opt, const char *arg)
 		return opt_str_to_enum((int *)&overlay_type, arg, overlay_type_choices, RTE_DIM(overlay_type_choices));
 	case OPT_NIC_TYPE:
 		return opt_str_to_enum((int *)&nic_type, arg, nic_type_choices, RTE_DIM(nic_type_choices));
+	case OPT_DHCP_MTU:
+		return opt_str_to_int(&dhcp_mtu, arg, 68, 1500);  // RFC 791, RFC 894
 	case OPT_WCMP_FRACTION:
 		wcmp_enabled = true;
 		return opt_str_to_double(&wcmp_frac, arg, 0.0, 1.0);
