@@ -1,201 +1,110 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-CONF_FILE="/tmp/dp_service.conf"
-PF0_NAME=""
-PF0_PCI_ADDR=""
-PF1_PCI_ADDR=""
-NUM_VF=126
-NUM_PAGES=4
+set -Eeuo pipefail
 
-timestamp() {
-    date +"%Y-%m-%d_%H-%M-%S-%3N"
+#
+# Use as /usr/local/sbin/dp-prepare.sh
+#
+
+NUMVFS=126
+CONFIG="/tmp/dp_service.conf"
+
+function log() {
+	echo "$(date +"%Y-%m-%d_%H-%M-%S-%3N") $1"
 }
 
-
-exit_msg() {
-    echo "$(timestamp): ERROR: $1" >&2
-    exit 1
+function err() {
+	echo "$(date +"%Y-%m-%d_%H-%M-%S-%3N") ERROR: $1" 1>&2
+	exit 1
 }
 
-
-function detect_pfs() {
-count=0
-read_next=0
-while read l1; do
-    if [[ $l1 =~ physical ]]; then
-        IFS=" "
-        for i in $l1; do
-            if [ $read_next -eq 1 ]; then
-                read_next=0
-                if [ $count -eq 0 ]; then
-                    PF0_NAME=$i
-                fi
-                echo "pf"$count" "$i >> $CONF_FILE
-                count=$[$count + 1]
-            fi
-            if [ "$i" = "netdev" ]; then
-                read_next=1
-            fi
-            if [[ "$i" == "pci"* ]]; then
-                IFS="/"
-                for k in $i; do
-                    if [ $count -eq 0 ]; then
-                        if [[ "$k" == "0000:"* ]]; then
-                            PF0_PCI_ADDR=$k
-                            echo "$(timestamp): detected PF0 "$PF0_PCI_ADDR
-                        fi
-                    fi
-                    if [ $count -eq 1 ]; then
-                        if [[ "$k" == "0000:"* ]]; then
-                            PF1_PCI_ADDR=$k
-                            echo "$(timestamp): detected PF1 "$PF1_PCI_ADDR
-                        fi
-                    fi
-                done
-            fi
-            IFS=" "
-        done
-        if [ $count -eq 2 ]; then
-            break
-        fi
-    fi
-done < <(devlink port)
-
-if [ $count -ne 2 ]; then
-    exit_msg "Need at least 2 PFs"
-fi
+function get_pf() {
+	readarray -t devs < <(devlink dev | awk -F/ '{print $2}')
 }
 
-
-function detect_vfs() {
-count=0
-read_next=0
-while read l1; do
-    if [[ $l1 =~ pcivf || $l1 =~ virtual ]]; then
-        IFS=" "
-        for i in $l1; do
-            if [ $read_next -eq 1 ]; then
-                read_next=0
-                modified=${i::-1}
-                echo "vf-pattern "$modified >> $CONF_FILE
-                echo "$(timestamp): detected vf pattern "$modified
-                count=$[$count + 1]
-            fi
-            if [ "$i" = "netdev" ]; then
-                read_next=1
-            fi
-        done
-        if [ $count -eq 1 ]; then
-            break
-        fi
-    fi
-done < <(devlink port)
+function validate() {
+	# we check if we have devlink available
+	if ! command -v devlink 2> /dev/null; then
+		err "devlink not available, exiting"
+	fi
 }
 
-
-function detect_ipv6() {
-while read l1; do
-    if [ "$l1" != "::1/128" ]; then
-        modified=${l1%/*}
-        echo "ipv6 "$modified >> $CONF_FILE
-    fi
-done < <(ip -6 -o addr show lo | awk '{print $4}')
+function validate_pf() {
+	# we check if sr-iov is enabled and the dev is using the mlx5 driver
+	for pf in "${devs[@]}"; do
+		if [ ! -f "/sys/bus/pci/devices/$pf/sriov_numvfs" ]; then
+			err "pf $pf doesn't support sriov, exiting"
+		fi
+		if [ ! -L "/sys/bus/pci/drivers/mlx5_core/$pf" ]; then
+			err "pf $pf is not using the proper driver, exiting"
+		fi
+	done
 }
 
+function create_vf() {
+	local pf="${devs[0]}"
+	# we disable automatic binding so that VFs don't get created, saves a lot of time
+	# plus we don't need to unbind them before enabling switchdev mode
+	log "disabling automatic binding of VFs on pf: $pf"
+	echo 0 > /sys/bus/pci/devices/$pf/sriov_drivers_autoprobe
 
-function configure_vfs() {
+	# calculating amount of VFs to create, 126 if more are available, or maximum available 
+	totalvfs=$(cat /sys/bus/pci/devices/$pf/sriov_totalvfs)
+	actualvfs=$((NUMVFS<totalvfs ? NUMVFS : totalvfs))
+	log "creating $actualvfs virtual functions"
+	echo $actualvfs > /sys/bus/pci/devices/$pf/sriov_numvfs
 
-if [ ! -f /sys/class/net/$PF0_NAME/device/sriov_totalvfs ] || [ ! -d /sys/bus/pci/drivers/mlx5_core ]; then
-   exit_msg "Mellanox card with SR-IOV enabled is required"
-fi
-
-maxvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_totalvfs)
-numvfs=$(cat /sys/class/net/$PF0_NAME/device/sriov_numvfs)
-VF_START=$(cat /sys/class/net/$PF0_NAME/device/sriov_offset)
-mod_vf_count=0
-prefix_count=0
-hex_prefix_count=0
-
-if [ $numvfs -eq 0 ]; then
-    if [ "$maxvfs" -lt "$NUM_VF" ]; then
-        NUM_VF=$maxvfs
-    fi
-    echo "$(timestamp): creating "$NUM_VF" VFs"
-    echo $NUM_VF > /sys/class/net/$PF0_NAME/device/sriov_numvfs
-    modified_pci=${PF0_PCI_ADDR::-3}
-    sleep 1
-
-    for ((i=$VF_START;i<=1+$NUM_VF;i+=1)); do
-        mod_vf_count=$(($i%8))
-        if [ $mod_vf_count -eq 0 ]; then
-            prefix_count=$[$prefix_count + 1]
-	    hex_prefix_count=$(printf '%x' $prefix_count)
-        fi
-        digits=${#hex_prefix_count}
-        if [ $digits -eq 2 ]; then
-            modified_pci=${PF0_PCI_ADDR::-4}
-        fi
-        echo $modified_pci$hex_prefix_count"."$mod_vf_count > /sys/bus/pci/drivers/mlx5_core/unbind
-    done
-    sleep 2
-    echo "$(timestamp): changing eswitch mode for "$PF0_PCI_ADDR" to switchdev"
-    devlink dev eswitch set pci/$PF0_PCI_ADDR mode switchdev
-    if [ $? -ne 0 ]; then
-        echo "$(timestamp): reverting to 0 VFs"
-        echo "0" > $numvfs_file
-        exit_msg "Unable to set eswitch mode"
-    fi
-else
-    NUM_VF=$numvfs
-fi
-
+	# enable switchdev mode, this operation takes most time
+	log "enabling switchdev for $pf"	
+	if ! devlink dev eswitch set pci/$pf mode switchdev; then
+		log "can't set eswitch mode, setting VFs to 0"
+		echo 0 > /sys/bus/pci/devices/$pf/sriov_numvfs
+	fi	
+	log "now waiting for everything to settle"
+	udevadm settle
 }
 
-
-function configure_hugepages() {
-if [ -d /sys/kernel/mm/hugepages/hugepages-1048576kB ]; then
-    numpages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages)
-    if [ $numpages -eq 0 ]; then
-        echo $NUM_PAGES > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
-        mkdir -p /dev/hugepages1G
-        mount -t hugetlbfs -o pagesize=1G none /dev/hugepages1G
-    fi
-elif [ -d /sys/kernel/mm/hugepages/hugepages-2048kB ]; then
-    echo "$(timestamp): WARNING: Using 2MB hugepages only" >&2
-    numpages=$(cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages)
-    if [ $numpages -eq 0 ]; then
-       echo $(($NUM_PAGES*512)) > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-       mkdir -p /dev/hugepages
-       mount -t hugetlbfs -o pagesize=2M none /dev/hugepages
-    fi
-else
-    exit_msg "No hugepage support"
-fi
+function get_pattern() {
+	local dev=$1
+	pattern=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk 'match($5, /(.*[a-z_])[0-9]{1,3}$/, a) {print a[1]}' | uniq)
+	if [ -z "$pattern" ]; then
+		err "can't determine the pattern for $dev"
+	fi
+	echo "$pattern"
 }
 
-
-function prepare_melanox_param() {
-PARAM=$[$NUM_VF - 1]
-echo "a-pf0 "$PF0_PCI_ADDR",class=rxq_cqe_comp_en=0,rx_vec_en=1,representor=pf[0]vf[0-"$PARAM"]" >> $CONF_FILE
-echo "a-pf1 "$PF1_PCI_ADDR",class=rxq_cqe_comp_en=0,rx_vec_en=1" >> $CONF_FILE
+function get_ifname() {
+	local dev=$1
+	devlink port | grep pci/$dev/ | grep physical | awk '{ print $5}'
 }
 
+function get_ipv6() {
+	# TODO: this needs to be done in a better way
+	while read -r l1; do
+		if [ "$l1" != "::1/128" ]; then
+        		echo ${l1%/*}
+			break
+    		fi
+	done < <(ip -6 -o addr show lo | awk '{print $4}')
+}
 
-echo "# This has been generated by prepare.sh" > $CONF_FILE
-echo "no-stats" >> $CONF_FILE
+function make_config() {
+	: > "$CONFIG" 
+	{ echo "# This has been generated by prepare.sh"
+	echo "no-stats";
+	echo "pf0 $(get_ifname ${devs[0]})";
+	echo "pf1 $(get_ifname ${devs[1]})";
+	echo "vf-pattern $(get_pattern ${devs[0]})";
+	echo "ipv6 $(get_ipv6)";
+	echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,representor=pf[0]vf[0-$[$actualvfs-1]]";
+	echo "a-pf1 ${devs[1]},class=rxq_cqe_comp_en=0,rx_vec_en=1"; } >> "$CONFIG"
+}
 
-echo "$(timestamp): detecting PFs"
-detect_pfs
-echo "$(timestamp): configuring VFs"
-configure_vfs
-echo "$(timestamp): configuring hugepages"
-configure_hugepages
-echo "$(timestamp): detecting VFs"
-detect_vfs
-echo "$(timestamp): detecting underlay ipv6 address"
-detect_ipv6
-echo "$(timestamp): calculating mellanox parameters"
-prepare_melanox_param
-echo "$(timestamp): all results written to "$CONF_FILE
+# main
+validate
+get_pf
+validate_pf
+create_vf
+make_config
 
-exit 0
+exit
