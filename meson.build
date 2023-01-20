@@ -27,7 +27,7 @@ if get_option('enable_tests')
 endif
 if get_option('enable_usermode')
   sudo = find_program('sudo')
-  setcap = find_program('setcap')
+  setcap = find_program('setcap', '/usr/sbin/setcap')
 endif
 
 inc = include_directories('include')

@@ -2,14 +2,14 @@
 
 To communicate with the `dp_service` process, you need to use GRPC (currently running hardcoded at localhost on port 1337).
 
-This repository comes with a simple command-line GRPC client with dataplane service commands presented as command-line arguments. You can find it in the build directory as `test/dp_grpc_client`. To communicate with `dp_service`, you need to first [initialize a connection](#initialize-a-connection) with it.
+This repository comes with a simple command-line GRPC client with dataplane service commands presented as command-line arguments. You can find it in the build directory as `test/dp_grpc_client`. To communicate with dp-service, you need to first [initialize a connection](#initialize-a-connection) with it.
 
 
 ## Initialize a connection
 ```bash
 dp_grpc_client --init
 ```
-This command needs to be run once after starting a new `dp_service` process. Only then you can run other commands. You need to have `dp_service` up and running on the same machine.
+This command needs to be run once after starting a new `dp_service` process. Only then you can run other commands. You need to have dp-service up and running on the same machine.
 
 ## Add a virtual interface (machine)
 ```bash
