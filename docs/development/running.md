@@ -45,6 +45,16 @@ Currently, dp-service only supports Mellanoc NICs and virtual interfaces for tes
 ### Mellanox cards
 To prepare Mellanox cards to work with `dp_service` a `prepare.sh` script in `hack/` is provided. It should create appropriate number of virtual interfaces and put them into *switchdev mode*. For more information and/or troubleshooting, please see [Mellanox specific documentation](mellanox.md)
 
+In order to have this preparation happen automatically on every boot, you can use the `hack/preparedp.service` systemd unit.
+```bash
+cp hack/prepare.sh /usr/local/sbin/dp-prepare.sh
+chmod +x /usr/local/sbin/dp-prepare.sh
+cp hack/preparedp.service /etc/systemd/system/preparedp.service
+systemctl daemon-reload
+systemctl enable preparedp.service
+
+```
+
 Then you can simply run `dp_service -l0,1 -- --no-stats --no-offload` for the most basic setup. See help output for more info.
 
 ### Virtual interfaces
