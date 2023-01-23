@@ -43,16 +43,17 @@ struct snat_data {
 	uint16_t	network_nat_port_range[2];
 };
 
-struct network_dnat_key {
-	uint32_t	nat_ip;
+struct netnat_portmap_key {
+	uint32_t	vm_src_ip;
 	uint32_t	vni;
-	uint16_t	nat_port;
-	uint8_t	l4_type;
+	uint16_t	vm_src_port;
+	// uint8_t	l4_type;
 };
 
-struct network_dnat_value {
-	uint32_t	vm_ip;
-	uint16_t	vm_port;
+struct netnat_portmap_data {
+	// uint32_t	nat_ip;
+	uint16_t	nat_port;
+	uint16_t	flow_cnt;
 };
 
 struct nat_check_result {
