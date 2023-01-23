@@ -1,21 +1,40 @@
+#define _GNU_SOURCE
+#include <string.h>  // need memmem()
+
+#include "nodes/dhcp_node.h"
+
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+
+#include "dp_error.h"
+#include "dp_log.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
+#include "dpdk_layer.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/dhcp_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dpdk_layer.h"
-
-#define IS_PXE_TFTP(p_mode) (p_mode == DP_PXE_MODE_TFTP)
-#define IS_PXE_HTTP(p_mode) (p_mode == DP_PXE_MODE_HTTP)
 
 struct dhcp_node_main dhcp_node;
-static uint8_t msg_type;
-static dp_pxe_mode pxe_mode = DP_PXE_MODE_NONE;
+
+// constant after init, precompute them
+static uint32_t dhcp_lease = DP_DHCP_INFINITE;
+static uint32_t server_ip;
+static uint32_t net_mask = DP_DHCP_MASK_NL;
+static uint16_t iface_mtu;
+static uint16_t udp_hdr_dst_port;
+static uint16_t udp_hdr_src_port;
+static uint32_t dhcp_hdr_magic;
+
+// list of (mask/address -> address):
+//   169.254.0.0/16 -> 0.0.0.0
+//   0.0.0.0/0 -> server_ip
+static uint8_t classless_route_prefix[] = { 16, 169, 254, 0, 0, 0, 0, 0 };
+static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip)];
+
 
 static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -25,172 +44,218 @@ static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 
 	RTE_SET_USED(graph);
 
+	server_ip = htonl(dp_get_gw_ip4());
+	iface_mtu = htons(dp_conf_get_dhcp_mtu());
+
+	dhcp_hdr_magic = htonl(DHCP_MAGIC_COOKIE);
+
+	udp_hdr_dst_port = htons(DP_BOOTP_CLI_PORT);
+	udp_hdr_src_port = htons(DP_BOOTP_SRV_PORT);
+
+	rte_memcpy(classless_route, classless_route_prefix, sizeof(classless_route_prefix));
+	rte_memcpy(classless_route+sizeof(classless_route_prefix), &server_ip, sizeof(server_ip));
+
 	return 0;
 }
 
-static uint32_t add_dhcp_option(uint8_t *pos, void *value, uint8_t opt, uint8_t size)
+static __rte_always_inline int add_dhcp_option(uint8_t **pos_ptr, uint8_t *end, uint8_t opt, void *value, uint8_t size)
 {
-	uint32_t temp = 0;
+	uint8_t *pos = *pos_ptr;
 
-	*pos = opt;
-	pos++;
-	*pos = size;
-	pos++;
+	if (pos + 2 + size >= end)
+		return DP_ERROR;
 
-	if (opt == DP_DHCP_STATIC_ROUT) {
-		*pos = 16;
-		pos++;
-		*pos = 169;
-		pos++;
-		*pos = 254;
-		pos++;
-		rte_memcpy(pos, &temp, sizeof(temp));
-		pos = pos + sizeof(temp);
-		*pos = 0;
-		pos++;
-		temp = htonl(dp_get_gw_ip4());
-		rte_memcpy(pos, &temp, sizeof(temp));
-	} else {
-		rte_memcpy(pos, value, size);
-	}
-
-	return size + 2;
+	*pos++ = opt;
+	*pos++ = size;
+	rte_memcpy(pos, value, size);
+	*pos_ptr += 2 + size;
+	return DP_OK;
 }
 
-static void parse_options(struct dp_dhcp_header *dhcp_pkt, uint16_t tot_op_len)
+/** @return size of generated options or error */
+static __rte_always_inline int add_dhcp_options(struct dp_dhcp_header *dhcp_hdr,
+												 uint8_t msg_type,
+												 enum dp_pxe_mode pxe_mode)
 {
-	char user_class_inf[DP_USER_CLASS_INF_SIZE] = {0};
-	char vnd_cls_ident[DP_VND_CLASS_IDENT] = {0};
-	uint8_t op_len;
-	uint8_t op;
+	uint8_t *pos = dhcp_hdr->options;
+	uint8_t *end = pos + DHCP_MAX_OPTIONS_LEN;
 
-	for (int i = 0; i < tot_op_len; i += op_len) {
-		op = dhcp_pkt->options[i];
-		i++;
-		op_len = dhcp_pkt->options[i];
-		i++;
-		switch (op) {
-			case DP_DHCP_MSG_TYPE:
-				msg_type = dhcp_pkt->options[i];
+	if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_MESSAGE_TYPE, &msg_type, sizeof(msg_type)))
+		|| DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_IP_LEASE_TIME, &dhcp_lease, sizeof(dhcp_lease)))
+		|| DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_SERVER_ID, &server_ip, sizeof(server_ip)))
+		|| DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_CLASSLESS_ROUTE, &classless_route, sizeof(classless_route)))
+		|| DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_SUBNET_MASK, &net_mask, sizeof(net_mask)))
+		|| DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_INTERFACE_MTU, &iface_mtu, sizeof(iface_mtu)))
+	)
+		return DP_ERROR;
+
+	if (pxe_mode != DP_PXE_MODE_NONE)
+		if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_ROUTER, &server_ip, sizeof(server_ip))))
+			return DP_ERROR;
+
+	if (pos >= end)
+		return DP_ERROR;
+	*pos++ = DHCP_OPT_END;
+
+	return pos - dhcp_hdr->options;
+}
+
+static int parse_options(struct dp_dhcp_header *dhcp_pkt,
+						 int options_len,
+						 uint8_t *msg_type,
+						 enum dp_pxe_mode *pxe_mode)
+{
+	uint8_t op_type;
+	uint8_t op_len;
+	int result = DP_ERROR;  // need at least msg_type
+
+	for (int i = 0; i < options_len; i += op_len) {
+		op_type = dhcp_pkt->options[i++];
+		if (op_type == DHCP_OPT_PAD)
+			continue;
+		if (op_type == DHCP_OPT_END)
 			break;
-			case DP_DHCP_USR_CLS_INF:
-				snprintf(user_class_inf,
-						 op_len <= (DP_USER_CLASS_INF_SIZE - 1) ? op_len + 1 : (DP_USER_CLASS_INF_SIZE - 1),
-						 "%s", &dhcp_pkt->options[i]);
-				if (strncmp(user_class_inf, DP_USER_CLASS_INF_COMP_STR, DP_USER_CLASS_INF_SIZE - 1) == 0)
-					pxe_mode = DP_PXE_MODE_HTTP;
+		if (i > options_len) {
+			DPS_LOG_WARNING("Malformed DHCP option");
+			return DP_ERROR;
+		}
+		op_len = dhcp_pkt->options[i++];
+		if (i + op_len > options_len) {
+			DPS_LOG_WARNING("Malformed DHCP option");
+			return DP_ERROR;
+		}
+		switch (op_type) {
+		case DHCP_OPT_MESSAGE_TYPE:
+			*msg_type = dhcp_pkt->options[i];
+			result = DP_OK;
 			break;
-			case DP_DHCP_VND_CLS_IDT:
-				snprintf(vnd_cls_ident,
-						 op_len <= (DP_VND_CLASS_IDENT - 1) ? op_len : (DP_VND_CLASS_IDENT - 1),
-						 "%s", &dhcp_pkt->options[i]);
-				if (strstr(vnd_cls_ident, DP_VND_CLS_IDT_COMP_STR))
-					pxe_mode = DP_PXE_MODE_TFTP;
+		case DHCP_OPT_USER_CLASS:
+			if (op_len == DP_USER_CLASS_INF_LEN
+				&& !memcmp(&dhcp_pkt->options[i], DP_USER_CLASS_INF_COMP_STR, DP_USER_CLASS_INF_LEN)
+			)
+				*pxe_mode = DP_PXE_MODE_HTTP;
 			break;
-			default:
+		case DHCP_OPT_VENDOR_CLASS_ID:
+			if (op_len >= DP_VND_CLASS_ID_LEN
+				&& memmem(&dhcp_pkt->options[i], op_len, DP_VND_CLASS_ID_COMP_STR, DP_VND_CLASS_ID_LEN)
+			)
+				*pxe_mode = DP_PXE_MODE_TFTP;
+			break;
+		default:
 			break;
 		}
 	}
-	return;
+	return result;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_dhcp_header *dhcp_hdr;
 	struct rte_ether_hdr *incoming_eth_hdr;
 	struct rte_ipv4_hdr *incoming_ipv4_hdr;
 	struct rte_udp_hdr *incoming_udp_hdr;
-	uint8_t dhcp_type = DP_DHCP_OFFER;
-	uint32_t dhcp_lease = DP_DHCP_INFINITE;
-	uint32_t dhcp_srv_ident, net_mask;
-	uint8_t vend_pos = 0;
-	uint16_t mtu, options_len;
-	uint32_t pxe_srv_ip = 0;
+	struct dp_dhcp_header *dhcp_hdr;
+	int options_len, header_size;
+	uint8_t msg_type;
+
+	// TODO(gg): Once PXE is tested, possibly remove 'static' if not needed
+	static enum dp_pxe_mode pxe_mode = DP_PXE_MODE_NONE;
+	uint32_t pxe_srv_ip;
 	char pxe_srv_ip_str[INET_ADDRSTRLEN];
+	uint8_t response_type;
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	incoming_ipv4_hdr = (struct rte_ipv4_hdr *) (incoming_eth_hdr + 1);
-	incoming_udp_hdr = (struct rte_udp_hdr *) (incoming_ipv4_hdr + 1);
-	dhcp_hdr = rte_pktmbuf_mtod_offset(m, struct dp_dhcp_header *,
-									   sizeof(struct rte_ether_hdr)
-									   + sizeof(struct rte_ipv4_hdr)
-									   + sizeof(struct rte_udp_hdr));
+	incoming_ipv4_hdr = (struct rte_ipv4_hdr *)(incoming_eth_hdr + 1);
+	incoming_udp_hdr = (struct rte_udp_hdr *)(incoming_ipv4_hdr + 1);
+	dhcp_hdr = (struct dp_dhcp_header *)(incoming_udp_hdr + 1);
+	options_len = rte_pktmbuf_data_len(m)
+					- ((uint8_t *)dhcp_hdr - (uint8_t *)incoming_eth_hdr)
+					- offsetof(struct dp_dhcp_header, options);
 
+	if (dhcp_hdr->op != DP_BOOTP_REQUEST) {
+		DPNODE_LOG_WARNING(node, "Not a DHCP request");
+		return DHCP_NEXT_DROP;
+	}
 
-	options_len = rte_pktmbuf_data_len(m) - DHCP_FIXED_LEN - sizeof(struct rte_ether_hdr);
-	parse_options(dhcp_hdr, options_len);
+	if (DP_FAILED(parse_options(dhcp_hdr, options_len, &msg_type, &pxe_mode))) {
+		DPNODE_LOG_WARNING(node, "Invalid DHCP packet received");
+		return DHCP_NEXT_DROP;
+	}
+
+	if (msg_type == DHCPDISCOVER) {
+		response_type = DHCPOFFER;
+	} else if (msg_type == DHCPREQUEST) {
+		response_type = DHCPACK;
+	} else {
+		DPNODE_LOG_WARNING(node, "Unhandled DHCP message type %u", msg_type);
+		return DHCP_NEXT_DROP;
+	}
+
+	/* rewrite the packet and send it back as a response */
 
 	m->ol_flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = sizeof(struct rte_ipv4_hdr);
-	m->pkt_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_udp_hdr) + sizeof(struct dp_dhcp_header);
-	m->data_len = m->pkt_len;
+
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
 	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
-	incoming_ipv4_hdr->src_addr = htonl(dp_get_gw_ip4());
-	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode)) {
+	if (response_type == DHCPACK)
+		dp_set_neigh_mac(m->port, &incoming_eth_hdr->dst_addr);
+
+	incoming_ipv4_hdr->src_addr = server_ip;
+
+	incoming_udp_hdr->dst_port = udp_hdr_dst_port;
+	incoming_udp_hdr->src_port = udp_hdr_src_port;
+
+	dhcp_hdr->op = DP_BOOTP_REPLY;
+	dhcp_hdr->magic = dhcp_hdr_magic;
+	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port));
+	dhcp_hdr->giaddr = server_ip;
+	rte_memcpy(dhcp_hdr->chaddr, incoming_eth_hdr->dst_addr.addr_bytes, 6);
+
+	if (pxe_mode != DP_PXE_MODE_NONE) {
+		memset(&incoming_eth_hdr->dst_addr, ~0, sizeof(incoming_eth_hdr->dst_addr));
+		incoming_ipv4_hdr->dst_addr = 0xFFFFFFFF;
 		pxe_srv_ip = htonl(dp_get_vm_pxe_ip4(m->port));
-		incoming_ipv4_hdr->dst_addr = htonl(0xFFFFFFFF);
+		dhcp_hdr->siaddr = pxe_srv_ip;
+		switch (pxe_mode) {
+		case DP_PXE_MODE_TFTP:
+			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s", DP_PXE_TFTP_PATH);
+			break;
+		case DP_PXE_MODE_HTTP:
+			if (!inet_ntop(AF_INET, &pxe_srv_ip, pxe_srv_ip_str, INET_ADDRSTRLEN)) {
+				DPNODE_LOG_WARNING(node, "Cannot convert PXE server IP %s", dp_strerror(errno));
+				return DHCP_NEXT_DROP;
+			}
+			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
+					"http://", pxe_srv_ip_str, dp_get_vm_pxe_str(m->port));
+			break;
+		case DP_PXE_MODE_NONE:
+			assert(false);
+		}
 	} else {
 		incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port));
+		dhcp_hdr->siaddr = server_ip;
 	}
+
+	options_len = add_dhcp_options(dhcp_hdr, response_type, pxe_mode);
+	if (DP_FAILED(options_len)) {
+		DPNODE_LOG_WARNING(node, "DHCP response options too large for a packet");
+		return DHCP_NEXT_DROP;
+	}
+
+	// packet length changed because of new options, recompute envelopes
+	header_size = offsetof(struct dp_dhcp_header, options) + options_len;
 	incoming_ipv4_hdr->hdr_checksum = 0;
-	incoming_ipv4_hdr->total_length = htons(sizeof(struct dp_dhcp_header) +
-											sizeof(struct rte_udp_hdr) +
-											sizeof(struct rte_ipv4_hdr));
-
-	incoming_udp_hdr->dgram_len = htons(sizeof(struct dp_dhcp_header) + sizeof(struct rte_udp_hdr));
-	incoming_udp_hdr->dst_port =  htons(DP_BOOTP_CLNT_PORT);
-	incoming_udp_hdr->src_port =  htons(DP_BOOTP_SRV_PORT);
+	incoming_ipv4_hdr->total_length = htons(sizeof(struct rte_ipv4_hdr)
+											+ sizeof(struct rte_udp_hdr)
+											+ header_size);
+	incoming_udp_hdr->dgram_len = htons(sizeof(struct rte_udp_hdr) + header_size);
 	incoming_udp_hdr->dgram_cksum = rte_ipv4_phdr_cksum(incoming_ipv4_hdr, m->ol_flags);
-
-	switch (msg_type) {
-		case DHCPDISCOVER:
-			dhcp_type = DP_DHCP_OFFER;
-			break;
-		case DHCPREQUEST:
-			dhcp_type = DP_DHCP_ACK;
-			dp_set_neigh_mac(m->port, &incoming_eth_hdr->dst_addr);
-			break;
-		default:
-			return DHCP_NEXT_DROP;
-
-	}
-	dhcp_hdr->op = DP_BOOTP_REPLY;
-	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port));
-	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode))
-		dhcp_hdr->siaddr  = pxe_srv_ip;
-	else
-		dhcp_hdr->siaddr  = htonl(dp_get_gw_ip4());
-	dhcp_hdr->giaddr = htonl(dp_get_gw_ip4());
-	rte_memcpy(dhcp_hdr->chaddr, incoming_eth_hdr->dst_addr.addr_bytes, 6);
-	memset(dhcp_hdr->options, 0, sizeof(dhcp_hdr->options));
-	if (IS_PXE_TFTP(pxe_mode))
-		snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s",
-				 DP_PXE_TFTP_PATH);
-	if (IS_PXE_HTTP(pxe_mode)) {
-		inet_ntop(AF_INET, &pxe_srv_ip, pxe_srv_ip_str, INET_ADDRSTRLEN);
-		snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
-				 "http://", pxe_srv_ip_str, dp_get_vm_pxe_str(m->port));
-	}
-	dhcp_hdr->magic = htonl(DHCP_MAGIC_COOKIE);
-	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode))
-		memset(&incoming_eth_hdr->dst_addr, ~0, sizeof(incoming_eth_hdr->dst_addr));
-
-	dhcp_srv_ident = htonl(dp_get_gw_ip4());
-	net_mask = htonl(DP_DHCP_MASK);
-	mtu = htons(dp_conf_get_dhcp_mtu());
-
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_type, DP_DHCP_MSG_TYPE, 1);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_lease, DP_DHCP_LEASE_MSG, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_srv_ident, DP_DHCP_SRV_IDENT, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_srv_ident, DP_DHCP_STATIC_ROUT, 12);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &net_mask, DP_DHCP_SUBNET_MASK, 4);
-	vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &mtu, DP_DHCP_MTU, 2);
-	if (IS_PXE_TFTP(pxe_mode) || IS_PXE_HTTP(pxe_mode))
-		vend_pos += add_dhcp_option(&dhcp_hdr->options[vend_pos], &dhcp_srv_ident, DP_DHCP_ROUTER, 4);
-
-	dhcp_hdr->options[vend_pos] = DP_DHCP_END;
+	m->pkt_len = sizeof(struct rte_ether_hdr)
+				 + sizeof(struct rte_ipv4_hdr)
+				 + sizeof(struct rte_udp_hdr)
+				 + header_size;
+	m->data_len = m->pkt_len;
 
 	set_vf_port_status_as_attached(m->port);
 	return dhcp_node.next_index[m->port];
@@ -207,7 +272,6 @@ static uint16_t dhcp_node_process(struct rte_graph *graph,
 
 int dhcp_set_next(uint16_t port_id, uint16_t next_index)
 {
-
 	dhcp_node.next_index[port_id] = next_index;
 	return 0;
 }

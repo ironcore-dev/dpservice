@@ -32,7 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
 	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr *)(req_ipv6_hdr + 1);
 	uint8_t icmp_type = req_icmp6_hdr->icmp6_type;
-	uint8_t *rt_ip = dp_get_gw_ip6();
+	const uint8_t *rt_ip = dp_get_gw_ip6();
 	struct nd_msg *nd_msg;
 	struct ra_msg *req_ra_msg;
 

@@ -90,7 +90,7 @@ void trigger_nd_unsol_adv()
 	struct icmp6hdr *icmp6_hdr;
 	uint16_t pkt_size;
 	struct rte_mbuf *pkt;
-	uint8_t* rt_ip = dp_get_gw_ip6();
+	const uint8_t *rt_ip = dp_get_gw_ip6();
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 
 	pkt = rte_pktmbuf_alloc(dp_layer->rte_mempool);
@@ -143,7 +143,7 @@ void trigger_nd_ra()
 	uint16_t pkt_size;
 	struct rte_mbuf *pkt_buf;
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-	uint8_t* rt_ip = dp_get_gw_ip6();
+	const uint8_t *rt_ip = dp_get_gw_ip6();
 
 	pkt_buf = rte_pktmbuf_alloc(dp_layer->rte_mempool);
 	if (!pkt_buf)

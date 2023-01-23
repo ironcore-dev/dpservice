@@ -78,7 +78,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_udp_hdr *req_udp_hdr;
 	struct dhcpv6_packet *dhcp_pkt;
 	uint8_t type, recv_len, options_len;
-	uint8_t* own_ip6 = dp_get_gw_ip6(m->port);
+	const uint8_t *own_ip6 = dp_get_gw_ip6();
 	uint8_t offset = 0;
 	uint8_t index = 0;
 

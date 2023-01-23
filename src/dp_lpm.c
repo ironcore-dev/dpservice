@@ -8,8 +8,8 @@
 static struct vm_entry vm_table[DP_MAX_PORTS];
 static struct rte_hash *vm_handle_tbl = NULL;
 
-static uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
-static uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
+static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
+static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
 
 static inline void init_vm_table(void)
 {
@@ -86,7 +86,7 @@ uint32_t dp_get_gw_ip4()
 	return dp_router_gw_ip4;
 }
 
-uint8_t *dp_get_gw_ip6()
+const uint8_t *dp_get_gw_ip6()
 {
 	return dp_router_gw_ip6;
 }
