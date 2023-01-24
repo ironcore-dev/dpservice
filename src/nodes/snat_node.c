@@ -49,7 +49,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			}
 
 			if (nat_check.is_network_natted) {
-				nat_port = htons(dp_allocate_network_snat_port(src_ip, df_ptr->l4_info.trans_port.src_port, vni, df_ptr->l4_type));
+				nat_port = htons(dp_allocate_network_snat_port(src_ip, ntohs(df_ptr->l4_info.trans_port.src_port), vni, df_ptr->l4_type));
 				if (nat_port == 0) {
 					DPNODE_LOG_WARNING(node, "An invalid network nat port is allocated");
 					return SNAT_NEXT_DROP;

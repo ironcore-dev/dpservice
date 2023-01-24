@@ -598,7 +598,7 @@ uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_
 
 	// No data is needed for now, since the mapped port info has been writen into conntrack table
 	// only key existence is important here
-
+	printf("original port: %d, select a port %d \n", vm_port, allocated_port);
 	return allocated_port;
 }
 
@@ -615,19 +615,27 @@ int dp_remove_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni, 
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void **)&portmap_data);
 	
-	if (ret < 0)
+	if (ret > 0) {
+		portmap_data->flow_cnt--;
+		if (!portmap_data->flow_cnt)
+			if (rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key) < 0)
+				return -1;
+		return 0;
+	} else if (ret == -ENOENT)
+		return 0;
+	else
 		return -1;
 	
-	portmap_data->flow_cnt--;
-	if (!portmap_data->flow_cnt)
-		if (rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key) < 0)
-			return -1;
+	// portmap_data->flow_cnt--;
+	// if (!portmap_data->flow_cnt)
+	// 	if (rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key) < 0)
+	// 		return -1;
 
 	// ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key);
 	// if (ret == -ENOENT)
 	// 	return -2;
 
-	return 0;
+	// return 0;
 }
 
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
