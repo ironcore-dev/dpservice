@@ -30,6 +30,7 @@ class DpService:
 					f' --pf0={pf0_tap} --pf1={pf1_tap} --vf-pattern={vf_patt}'
 					f' --ipv6={ul_ipv6} --enable-ipv6-overlay'
 					f' --dhcp-mtu={dhcp_mtu}'
+					f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 ' --no-offload --no-stats'
 					f' --nic-type=tap --overlay-type={tun_opt}')
 		if self.port_redundancy:

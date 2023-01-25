@@ -13,7 +13,6 @@
 #include "nodes/common_node.h"  // graphtrace level limit
 #include "dpdk_layer.h"  // underlay conf struct
 
-// TODO(plague) document this and the env var (there's a separate doc branch)
 #define DP_CONF_DEFAULT_CONF_FILE "/tmp/dp_service.conf"
 
 // magic number, hopefully large enough to hold the full '-a' EAL argument
@@ -25,9 +24,14 @@
 #include "dp_conf_opts.c"
 
 // custom storage variables and getters
+struct dp_conf_dhcp_dns_private {
+	int len;
+	uint8_t *array;
+};
 static bool wcmp_enabled = false;
 static char eal_a_pf0[DP_EAL_A_MAXLEN] = {0};
 static char eal_a_pf1[DP_EAL_A_MAXLEN] = {0};
+static struct dp_conf_dhcp_dns_private dhcp_dns = {0};
 
 int dp_conf_is_wcmp_enabled()
 {
@@ -42,6 +46,11 @@ const char *dp_conf_get_eal_a_pf0()
 const char *dp_conf_get_eal_a_pf1()
 {
 	return eal_a_pf1;
+}
+
+const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns()
+{
+	return (struct dp_conf_dhcp_dns *)&dhcp_dns;
 }
 
 
@@ -117,6 +126,36 @@ static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uin
 	return DP_ERROR;
 }
 
+static int add_dhcp_dns(const char *str)
+{
+	uint8_t *tmp;
+	uint32_t ip;
+	struct in_addr addr;
+
+	if (inet_aton(str, &addr) != 1) {
+		fprintf(stderr, "Invalid IPv4 address '%s'\n", str);
+		return DP_ERROR;
+	}
+
+	// RFC 2132 - array length is stored in a byte
+	if (dhcp_dns.len + 4 > UINT8_MAX) {
+		fprintf(stderr, "Too many DHCP DNS addresses specified\n");
+		return DP_ERROR;
+	}
+
+	tmp = (uint8_t *)realloc(dhcp_dns.array, dhcp_dns.len + 4);
+	if (!tmp) {
+		fprintf(stderr, "Cannot allocate memory for DNS address\n");
+		return DP_ERROR;
+	}
+	dhcp_dns.array = tmp;
+
+	ip = htonl(addr.s_addr);
+	rte_memcpy(&dhcp_dns.array[dhcp_dns.len], &ip, sizeof(ip));
+	dhcp_dns.len += 4;
+	return DP_OK;
+}
+
 static int parse_opt(int opt, const char *arg)
 {
 	switch (opt) {
@@ -134,6 +173,8 @@ static int parse_opt(int opt, const char *arg)
 		return opt_str_to_enum((int *)&nic_type, arg, nic_type_choices, RTE_DIM(nic_type_choices));
 	case OPT_DHCP_MTU:
 		return opt_str_to_int(&dhcp_mtu, arg, 68, 1500);  // RFC 791, RFC 894
+	case OPT_DHCP_DNS:
+		return add_dhcp_dns(arg);
 	case OPT_WCMP_FRACTION:
 		wcmp_enabled = true;
 		return opt_str_to_double(&wcmp_frac, arg, 0.0, 1.0);
@@ -282,4 +323,9 @@ int dp_conf_parse_file(const char *env_filename)
 
 	fclose(file);
 	return ret;
+}
+
+void dp_conf_free()
+{
+	free(dhcp_dns.array);
 }

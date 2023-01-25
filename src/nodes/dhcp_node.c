@@ -58,7 +58,7 @@ static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline int add_dhcp_option(uint8_t **pos_ptr, uint8_t *end, uint8_t opt, void *value, uint8_t size)
+static __rte_always_inline int add_dhcp_option(uint8_t **pos_ptr, uint8_t *end, uint8_t opt, const void *value, uint8_t size)
 {
 	uint8_t *pos = *pos_ptr;
 
@@ -79,6 +79,7 @@ static __rte_always_inline int add_dhcp_options(struct dp_dhcp_header *dhcp_hdr,
 {
 	uint8_t *pos = dhcp_hdr->options;
 	uint8_t *end = pos + DHCP_MAX_OPTIONS_LEN;
+	const struct dp_conf_dhcp_dns *dhcp_dns = dp_conf_get_dhcp_dns();
 
 	if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_MESSAGE_TYPE, &msg_type, sizeof(msg_type)))
 		|| DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_IP_LEASE_TIME, &dhcp_lease, sizeof(dhcp_lease)))
@@ -91,6 +92,10 @@ static __rte_always_inline int add_dhcp_options(struct dp_dhcp_header *dhcp_hdr,
 
 	if (pxe_mode != DP_PXE_MODE_NONE)
 		if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_ROUTER, &server_ip, sizeof(server_ip))))
+			return DP_ERROR;
+
+	if (dhcp_dns->len)
+		if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_DNS, dhcp_dns->array, dhcp_dns->len)))
 			return DP_ERROR;
 
 	if (pos >= end)
@@ -186,7 +191,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	} else if (msg_type == DHCPREQUEST) {
 		response_type = DHCPACK;
 	} else {
-		DPNODE_LOG_WARNING(node, "Unhandled DHCP message type %u", msg_type);
+		// unhandled by design
+		DPNODE_LOG_DEBUG(node, "Unhandled DHCP message type %u", msg_type);
 		return DHCP_NEXT_DROP;
 	}
 

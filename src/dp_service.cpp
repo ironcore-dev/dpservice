@@ -247,6 +247,7 @@ int main(int argc, char **argv)
 	}
 
 	dp_eal_cleanup();
+	dp_conf_free();
 
 	return retval;
 }
