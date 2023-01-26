@@ -51,9 +51,16 @@ struct netnat_portmap_key {
 };
 
 struct netnat_portmap_data {
-	// uint32_t	nat_ip;
+	uint32_t	nat_ip;
 	uint16_t	nat_port;
 	uint16_t	flow_cnt;
+};
+
+struct netnat_portoverload_tbl_key {
+	uint32_t nat_ip;
+	uint32_t nat_port;
+	uint32_t dst_ip;
+	uint32_t dst_port;
 };
 
 struct nat_check_result {
@@ -88,8 +95,10 @@ uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
 int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 uint16_t dp_allocate_network_snat_port(uint32_t vm_ip, uint16_t vm_port, uint32_t vni, uint8_t l4_type);
+uint16_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni);
 int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6);
-int dp_remove_network_snat_port(uint32_t nat_ip, uint16_t nat_port, uint32_t vni, uint8_t l4_type);
+// int dp_remove_network_snat_port(uint32_t nat_ip, uint16_t nat_port, uint32_t vni, uint8_t l4_type);
+int dp_remove_network_snat_port(const struct flow_value *cntrack);
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni);
