@@ -203,16 +203,15 @@ void dp_free_flow(struct dp_ref *ref)
 
 void dp_free_network_nat_port(struct flow_value *cntrack)
 {
+	char printed_ip_buf[18] = {0};
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-		// vm_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
-		vni = cntrack->nat_info.vni;
-		vm_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
 		int ret = dp_remove_network_snat_port((const struct flow_value *)cntrack);
-
-		if (ret < 0)
-			DPS_LOG_ERR("failed to remove an allocated network NAT port: %d, vni %d", vm_port, vni);
-		
+		if (DP_FAILED(ret)){
+			print_ip(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst, printed_ip_buf);
+			DPS_LOG_ERR("failed to remove an allocated network NAT port: %s::%d", printed_ip_buf, 
+						cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
+		}
 	}
 }
 

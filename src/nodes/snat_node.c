@@ -11,6 +11,7 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/common_node.h"
 #include "nodes/snat_node.h"
+#include "dp_error.h"
 
 
 static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -31,6 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv4_hdr *ipv4_hdr;
 	uint32_t src_ip;
 	struct nat_check_result nat_check;
+	char printed_ip_buf[18] = {0};
 
 	if (!cntrack)
 		return SNAT_NEXT_FIREWALL;
@@ -49,11 +51,14 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			}
 
 			if (nat_check.is_network_natted) {
-				nat_port = htons(dp_allocate_network_snat_port(df_ptr, vni));
-				if (nat_port == 0) {
-					DPNODE_LOG_WARNING(node, "An invalid network nat port is allocated");
+				uint32_t ret_netnat = htons(dp_allocate_network_snat_port(df_ptr, vni));
+				if (DP_FAILED(ret_netnat)) {
+					print_ip(src_ip, printed_ip_buf);
+					DPNODE_LOG_WARNING(node, "Failed to allocate a valid network nat port for %s:%d", printed_ip_buf, 
+										ntohs(df_ptr->l4_info.trans_port.src_port));
 					return SNAT_NEXT_DROP;
 				}
+				nat_port = (uint16_t)ret_netnat;
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
