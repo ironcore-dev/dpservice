@@ -34,14 +34,14 @@ int dp_nat_init(int socket_id)
 		return DP_ERROR;
 
 	ipv4_netnat_portmap_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct netnat_portmap_key),
-												  "ipv4_network_dnat_table", socket_id);
-												  
+												  "ipv4_netnat_portmap_table", socket_id);
+
 	if (!ipv4_netnat_portmap_tbl)
 		return DP_ERROR;
 
 	ipv4_netnat_portoverload_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct netnat_portoverload_tbl_key),
 												  "ipv4_netnat_portoverload_tbl", socket_id);
-	
+
 	if (!ipv4_netnat_portoverload_tbl)
 		return DP_ERROR;
 
@@ -546,12 +546,12 @@ int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 {
 	struct nat_key nkey = {0};
 	struct snat_data *data;
-	struct netnat_portoverload_tbl_key portoverload_tbl_key= {0};
+	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
 	struct netnat_portmap_key portmap_key = {0};
 	struct netnat_portmap_data *portmap_data;
 	uint16_t min_port, max_port, allocated_port = 0, tmp_port = 0;
 	uint32_t vm_src_info_hash;
-	int res;
+	int ret;
 
 	uint32_t vm_ip = ntohl(df_ptr->src.src_addr);
 	uint16_t vm_port = ntohs(df_ptr->l4_info.trans_port.src_port);
@@ -569,14 +569,14 @@ int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 	portmap_key.vni = vni;
 	portmap_key.vm_src_port = vm_port;
 
-	res = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void**)&portmap_data);
-	
+	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
+
 	// DP_FAILED is not enough
-	if (res > 0) {
+	if (ret > 0) {
 		portmap_data->flow_cnt++;
 		return portmap_data->nat_port;
-	} else if (res == -EINVAL)
-		return 0;
+	} else if (ret == -EINVAL)
+		return -DP_NETNAT_ERR_PORTMAP_INVALID_KEY;
 
 	min_port = data->network_nat_port_range[0];
 	max_port = data->network_nat_port_range[1];
@@ -584,21 +584,23 @@ int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 	portoverload_tbl_key.nat_ip = data->network_nat_ip;
 	portoverload_tbl_key.dst_ip = ntohl(df_ptr->dst.dst_addr);
 	portoverload_tbl_key.dst_port = ntohs(df_ptr->l4_info.trans_port.dst_port);
-	
+	portoverload_tbl_key.l4_type = df_ptr->l4_type;
+
 	vm_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, &portmap_key);
 
 	for (uint16_t p = 0; p < max_port - min_port; p++) {
-		tmp_port = min_port + (vm_src_info_hash + p) % (max_port - min_port);
+		tmp_port = min_port + (uint16_t)((vm_src_info_hash + p) % (uint32_t)(max_port - min_port));
 		portoverload_tbl_key.nat_port = tmp_port;
-		int ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
+		ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 
 		if (ret == -ENOENT) {
 			allocated_port = tmp_port;
 			break;
-		}
+		} else if (ret == -EINVAL)
+			return -DP_NETNAT_ERR_PORTOVERLOADMAP_INVALID_KEY;
 	}
 
-	if (!allocated_port){
+	if (!allocated_port) {
 		return -DP_NETNAT_ERR_NO_VALID_NAT_PORT;
 	}
 
@@ -623,17 +625,18 @@ int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 int dp_remove_network_snat_port(const struct flow_value *cntrack)
 {
 	struct netnat_portmap_key portmap_key = {0};
-	struct netnat_portoverload_tbl_key portoverload_tbl_key= {0};
+	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
 	struct netnat_portmap_data *portmap_data;
-	int ret;
+	int ret = 0;
 
 	portoverload_tbl_key.nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst;
 	portoverload_tbl_key.nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
 	portoverload_tbl_key.dst_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst;
 	portoverload_tbl_key.dst_port = cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst;
+	portoverload_tbl_key.l4_type = cntrack->flow_key[DP_FLOW_DIR_ORG].proto;
 
 	ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, (const void *)&portoverload_tbl_key);
-	if (ret > 0) {
+	if (ret >= 0) {
 		if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key)))
 				return DP_ERROR;
 		return DP_OK;
@@ -644,22 +647,22 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 
 	portmap_key.vm_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
 	portmap_key.vm_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
-	portmap_key.vni = cntrack->nat_info.vni;;
-	// network_key.l4_type = l4_type;
+	portmap_key.vni = cntrack->nat_info.vni;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void **)&portmap_data);
-	
-	if (ret > 0) {
+
+	if (ret >= 0) {
 		portmap_data->flow_cnt--;
-		if (!portmap_data->flow_cnt)
+		if (!portmap_data->flow_cnt) {
+			rte_free(portmap_data);
 			if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key)))
 				return DP_ERROR;
+		}
 		return DP_OK;
 	} else if (ret == -ENOENT)
 		return DP_OK;
 	else
 		return DP_ERROR;
-	
 }
 
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)

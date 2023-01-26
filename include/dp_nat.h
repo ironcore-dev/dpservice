@@ -25,6 +25,8 @@ enum {
 	DP_NETNAT_ERR_ZERO,
 	DP_NETNAT_ERR_VALIDATION_FAILED,
 	DP_NETNAT_ERR_NO_VALID_NAT_PORT,
+	DP_NETNAT_ERR_PORTMAP_INVALID_KEY,
+	DP_NETNAT_ERR_PORTOVERLOADMAP_INVALID_KEY,
 	DP_NETNAT_ERR_FAILED_TO_ADD_KEY,
 };
 
@@ -54,7 +56,6 @@ struct netnat_portmap_key {
 	uint32_t	vm_src_ip;
 	uint32_t	vni;
 	uint16_t	vm_src_port;
-	// uint8_t	l4_type;
 };
 
 struct netnat_portmap_data {
@@ -65,9 +66,10 @@ struct netnat_portmap_data {
 
 struct netnat_portoverload_tbl_key {
 	uint32_t nat_ip;
-	uint32_t nat_port;
+	uint16_t nat_port;
 	uint32_t dst_ip;
-	uint32_t dst_port;
+	uint16_t dst_port;
+	uint8_t	l4_type;
 };
 
 struct nat_check_result {

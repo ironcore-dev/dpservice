@@ -33,6 +33,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	uint32_t src_ip;
 	struct nat_check_result nat_check;
 	char printed_ip_buf[18] = {0};
+	uint32_t ret_netnat;
 
 	if (!cntrack)
 		return SNAT_NEXT_FIREWALL;
@@ -51,11 +52,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			}
 
 			if (nat_check.is_network_natted) {
-				uint32_t ret_netnat = htons(dp_allocate_network_snat_port(df_ptr, vni));
+				ret_netnat = htons(dp_allocate_network_snat_port(df_ptr, vni));
+				
 				if (DP_FAILED(ret_netnat)) {
 					print_ip(src_ip, printed_ip_buf);
-					DPNODE_LOG_WARNING(node, "Failed to allocate a valid network nat port for %s:%d", printed_ip_buf, 
-										ntohs(df_ptr->l4_info.trans_port.src_port));
+					DPNODE_LOG_WARNING(node, "Failed to allocate a valid network nat port for %s:%d with error: %d", printed_ip_buf,
+										ntohs(df_ptr->l4_info.trans_port.src_port), ret_netnat);
 					return SNAT_NEXT_DROP;
 				}
 				nat_port = (uint16_t)ret_netnat;
