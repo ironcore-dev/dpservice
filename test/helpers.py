@@ -20,6 +20,9 @@ def request_ip(interface, macaddr, ipaddr):
 	mtu = next((opt[1] for opt in options if opt[0] == 'interface-mtu'), None)
 	if mtu != dhcp_mtu:
 		raise AssertionError(f"DHCP message does not specify custom MTU ({mtu} instead of {dhcp_mtu})")
+	dns_servers = next((opt[1:] for opt in options if opt[0] == 'name_server'), None)
+	if not dns_servers or dhcp_dns1 not in dns_servers or dhcp_dns2 not in dns_servers:
+		raise AssertionError(f"DHCP message does not specify the right DNS servers: {dns_servers} instead of {dhcp_dns1} and {dhcp_dns2}")
 	pkt = (Ether(dst=answer[Ether].src) /
 		   IP(src=ipaddr, dst=answer[IP].src) /
 		   UDP(sport=68, dport=67) /

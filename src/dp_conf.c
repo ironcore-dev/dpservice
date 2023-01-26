@@ -9,11 +9,11 @@
 #include <arpa/inet.h>
 
 #include "dp_error.h"
+#include "dp_log.h"
 #include "dp_version.h"
 #include "nodes/common_node.h"  // graphtrace level limit
 #include "dpdk_layer.h"  // underlay conf struct
 
-// TODO(plague) document this and the env var (there's a separate doc branch)
 #define DP_CONF_DEFAULT_CONF_FILE "/tmp/dp_service.conf"
 
 // magic number, hopefully large enough to hold the full '-a' EAL argument
@@ -25,9 +25,14 @@
 #include "dp_conf_opts.c"
 
 // custom storage variables and getters
+struct dp_conf_dhcp_dns_private {
+	int len;
+	uint8_t *array;
+};
 static bool wcmp_enabled = false;
 static char eal_a_pf0[DP_EAL_A_MAXLEN] = {0};
 static char eal_a_pf1[DP_EAL_A_MAXLEN] = {0};
+static struct dp_conf_dhcp_dns_private dhcp_dns = {0};
 
 int dp_conf_is_wcmp_enabled()
 {
@@ -44,13 +49,18 @@ const char *dp_conf_get_eal_a_pf1()
 	return eal_a_pf1;
 }
 
+const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns()
+{
+	return (struct dp_conf_dhcp_dns *)&dhcp_dns;
+}
+
 
 static inline int opt_strcpy(char *dst, const char *src, size_t max_size)
 {
 	size_t len = strlen(src);
 
 	if (len >= max_size) {
-		fprintf(stderr, "Value '%s' is too long (max %lu characters)\n", src, max_size-1);
+		DP_EARLY_ERR("Value '%s' is too long (max %lu characters)", src, max_size-1);
 		return DP_ERROR;
 	}
 
@@ -65,11 +75,11 @@ static inline int opt_str_to_int(int *dst, const char *src, int min, int max)
 
 	result = strtol(src, &endptr, 10);
 	if (*endptr) {
-		fprintf(stderr, "Value '%s' is not an integer\n", src);
+		DP_EARLY_ERR("Value '%s' is not an integer", src);
 		return DP_ERROR;
 	}
 	if (result < min || result > max) {
-		fprintf(stderr, "Value '%s' is not in range %d-%d\n", src, min, max);
+		DP_EARLY_ERR("Value '%s' is not in range %d-%d", src, min, max);
 		return DP_ERROR;
 	}
 
@@ -84,11 +94,11 @@ static inline int opt_str_to_double(double *dst, const char *src, double min, do
 
 	result = strtod(src, &endptr);
 	if (*endptr) {
-		fprintf(stderr, "Value '%s' is not a double\n", src);
+		DP_EARLY_ERR("Value '%s' is not a double", src);
 		return DP_ERROR;
 	}
 	if (result < min || result > max) {
-		fprintf(stderr, "Value '%s' is not in range %lf-%lf\n", src, min, max);
+		DP_EARLY_ERR("Value '%s' is not in range %lf-%lf", src, min, max);
 		return DP_ERROR;
 	}
 
@@ -99,7 +109,7 @@ static inline int opt_str_to_double(double *dst, const char *src, double min, do
 static int opt_str_to_ipv6(void *dst, const char *arg)
 {
 	if (inet_pton(AF_INET6, arg, dst) != 1) {
-		fprintf(stderr, "Invalid IPv6 address format: '%s'\n", arg);
+		DP_EARLY_ERR("Invalid IPv6 address format: '%s'", arg);
 			return DP_ERROR;
 	}
 	return DP_OK;
@@ -113,8 +123,38 @@ static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uin
 			return DP_OK;
 		}
 	}
-	fprintf(stderr, "Invalid choice '%s'\n", arg);
+	DP_EARLY_ERR("Invalid choice '%s'", arg);
 	return DP_ERROR;
+}
+
+static int add_dhcp_dns(const char *str)
+{
+	uint8_t *tmp;
+	uint32_t ip;
+	struct in_addr addr;
+
+	if (inet_aton(str, &addr) != 1) {
+		DP_EARLY_ERR("Invalid IPv4 address '%s'", str);
+		return DP_ERROR;
+	}
+
+	// RFC 2132 - array length is stored in a byte
+	if (dhcp_dns.len + 4 > UINT8_MAX) {
+		DP_EARLY_ERR("Too many DHCP DNS addresses specified");
+		return DP_ERROR;
+	}
+
+	tmp = (uint8_t *)realloc(dhcp_dns.array, dhcp_dns.len + 4);
+	if (!tmp) {
+		DP_EARLY_ERR("Cannot allocate memory for DNS address");
+		return DP_ERROR;
+	}
+	dhcp_dns.array = tmp;
+
+	ip = htonl(addr.s_addr);
+	rte_memcpy(&dhcp_dns.array[dhcp_dns.len], &ip, sizeof(ip));
+	dhcp_dns.len += 4;
+	return DP_OK;
 }
 
 static int parse_opt(int opt, const char *arg)
@@ -134,6 +174,8 @@ static int parse_opt(int opt, const char *arg)
 		return opt_str_to_enum((int *)&nic_type, arg, nic_type_choices, RTE_DIM(nic_type_choices));
 	case OPT_DHCP_MTU:
 		return opt_str_to_int(&dhcp_mtu, arg, 68, 1500);  // RFC 791, RFC 894
+	case OPT_DHCP_DNS:
+		return add_dhcp_dns(arg);
 	case OPT_WCMP_FRACTION:
 		wcmp_enabled = true;
 		return opt_str_to_double(&wcmp_frac, arg, 0.0, 1.0);
@@ -156,7 +198,7 @@ static int parse_opt(int opt, const char *arg)
 	case OPT_COLOR:
 		return opt_str_to_enum((int *)&color, arg, color_choices, RTE_DIM(color_choices));
 	default:
-		fprintf(stderr, "Unimplemented option %d\n", opt);
+		DP_EARLY_ERR("Unimplemented option %d", opt);
 		return DP_ERROR;
 	}
 }
@@ -216,7 +258,7 @@ static int parse_line(char *line, int lineno)
 
 	key = strtok(line, " \t\n");
 	if (!key) {
-		fprintf(stderr, "Config file error: no key on line %d\n", lineno);
+		DP_EARLY_ERR("Config file error: no key on line %d", lineno);
 		return DP_ERROR;
 	}
 
@@ -224,7 +266,7 @@ static int parse_line(char *line, int lineno)
 
 	value = strtok(NULL, " \t\n");
 	if (!value && (!longopt || longopt->has_arg)) {
-		fprintf(stderr, "Config file error: value required for key '%s' on line %d\n", key, lineno);
+		DP_EARLY_ERR("Config file error: value required for key '%s' on line %d", key, lineno);
 		return DP_ERROR;
 	}
 
@@ -236,7 +278,7 @@ static int parse_line(char *line, int lineno)
 
 	// Otherwise support all long options
 	if (!longopt) {
-		fprintf(stderr, "Config file: unknown key '%s'\n", key);
+		DP_EARLY_ERR("Config file: unknown key '%s'", key);
 		return DP_ERROR;
 	}
 
@@ -274,7 +316,7 @@ int dp_conf_parse_file(const char *env_filename)
 		// also empty value can be provided used on purpose (to disable its use)
 		if (!env_filename || !*filename)
 			return DP_OK;
-		fprintf(stderr, "Error opening config file '%s'\n", filename);
+		DP_EARLY_ERR("Error opening config file '%s'", filename);
 		return DP_ERROR;
 	}
 
@@ -282,4 +324,9 @@ int dp_conf_parse_file(const char *env_filename)
 
 	fclose(file);
 	return ret;
+}
+
+void dp_conf_free()
+{
+	free(dhcp_dns.array);
 }

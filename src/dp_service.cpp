@@ -33,7 +33,7 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	// will be adding two devices (4 args) + terminator
 	dp_argv = (char **)calloc(argc + 5, sizeof(*dp_argv));
 	if (!dp_argv) {
-		fprintf(stderr, "Cannot allocate argument array\n");
+		DP_EARLY_ERR("Cannot allocate argument array");
 		return DP_ERROR;
 	}
 
@@ -52,7 +52,7 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
 	dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
 	if (!dp_mlx_args[0] || !dp_mlx_args[1] || !dp_mlx_args[2] || !dp_mlx_args[3]) {
-		fprintf(stderr, "Cannot allocate Mellanox arguments\n");
+		DP_EARLY_ERR("Cannot allocate Mellanox arguments");
 		return DP_ERROR;
 	}
 
@@ -195,7 +195,7 @@ static int run_service()
 	int result;
 
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
-		fprintf(stderr, "Disabled conntrack requires disabled offloading!\n");
+		DP_EARLY_ERR("Disabled conntrack requires disabled offloading!");
 		return DP_ERROR;
 	}
 
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
 
 	eal_argcount = dp_eal_init(&argc, &argv);
 	if (DP_FAILED(eal_argcount)) {
-		fprintf(stderr, "Failed to initialize EAL\n");
+		DP_EARLY_ERR("Failed to initialize EAL");
 		return EXIT_FAILURE;
 	}
 
@@ -247,6 +247,7 @@ int main(int argc, char **argv)
 	}
 
 	dp_eal_cleanup();
+	dp_conf_free();
 
 	return retval;
 }

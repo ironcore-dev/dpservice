@@ -1,60 +1,59 @@
 #ifndef __INCLUDE_DHCP_NODE_PRIV_H__
 #define __INCLUDE_DHCP_NODE_PRIV_H__
 
+#include <stdint.h>
 #include "dpdk_layer.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define DP_BOOTP_SRV_PORT	67
-#define DP_BOOTP_CLNT_PORT	68
-#define DP_BOOTP_REQUEST	1
-#define DP_BOOTP_REPLY		2
+#define DP_BOOTP_SRV_PORT 67
+#define DP_BOOTP_CLI_PORT 68
+#define DP_BOOTP_REQUEST  1
+#define DP_BOOTP_REPLY    2
 
-#define DP_DHCP_MSG_TYPE	0x35
-#define DP_DHCP_SRV_IDENT	0x36
-#define DP_DHCP_STATIC_ROUT	0x79
-#define DP_DHCP_SUBNET_MASK	0x01
-#define DP_DHCP_USR_CLS_INF	0x4D
-#define DP_DHCP_VND_CLS_IDT	0x3C
-#define DP_DHCP_MTU			0x1A
+/* DHCP options; RFC 2132, 3004, 3442 */
+#define DHCP_OPT_PAD             0
+#define DHCP_OPT_SUBNET_MASK     1
+#define DHCP_OPT_ROUTER          3
+#define DHCP_OPT_DNS             6
+#define DHCP_OPT_INTERFACE_MTU   26
+#define DHCP_OPT_IP_LEASE_TIME   51
+#define DHCP_OPT_MESSAGE_TYPE    53
+#define DHCP_OPT_SERVER_ID       54
+#define DHCP_OPT_VENDOR_CLASS_ID 60
+#define DHCP_OPT_USER_CLASS      77
+#define DHCP_OPT_CLASSLESS_ROUTE 121
+#define DHCP_OPT_END             255
 
-/* DHCP message types. */
-#define DHCPDISCOVER	1
-#define DHCPOFFER	2
-#define DHCPREQUEST	3
-#define DHCPDECLINE	4
-#define DHCPACK	5
-#define DP_DHCP_LEASE_MSG	0x33
+/* DHCP message types; RFC 2132 */
+#define DHCPDISCOVER 1
+#define DHCPOFFER    2
+#define DHCPREQUEST  3
+#define DHCPDECLINE  4
+#define DHCPACK      5
 
-#define DP_DHCP_ROUTER		0x03
-#define DP_DHCP_END			0xFF
-#define DP_DHCP_OFFER		0x02
-#define DP_DHCP_ACK			0x05
-#define DP_DHCP_INFINITE	0xffffffff
-#define DP_DHCP_MASK		0xffffffff
+#define DP_DHCP_INFINITE 0xffffffff
+#define DP_DHCP_MASK_NL  0xffffffff
 
 #define DHCP_MAGIC_COOKIE 0x63825363
 
-#define DHCP_UDP_OVERHEAD	(20 + /* IP header */			\
-			    	8)   /* UDP header */
-#define DHCP_FIXED_NON_UDP	236 + 4 /* Magic cookie 4 bytes */
-#define DHCP_FIXED_LEN	(DHCP_FIXED_NON_UDP + DHCP_UDP_OVERHEAD)
-#define DHCP_MTU_MAX	1500
-#define DHCP_MTU_MIN	576
+#define DHCP_MTU_MAX 1500
 
-#define DHCP_MAX_OPTION_LEN	(DHCP_MTU_MAX - DHCP_FIXED_LEN)
-#define DHCP_MIN_OPTION_LEN     (DHCP_MTU_MIN - DHCP_FIXED_LEN)
+#define DHCP_MAX_OPTIONS_LEN \
+	(DHCP_MTU_MAX \
+	- sizeof(struct rte_ether_hdr) \
+	- sizeof(struct rte_ipv4_hdr) \
+	- sizeof(struct rte_udp_hdr) \
+	- offsetof(struct dp_dhcp_header, options))
 
-#define DHCP_HEADER_LEN 236
+#define DP_USER_CLASS_INF_COMP_STR "iPXE"
+#define DP_VND_CLASS_ID_COMP_STR   "PXEClient:Arch:00007"
+#define DP_PXE_TFTP_PATH           "ipxe/x86_64/ipxe.new"
 
-#define DP_USER_CLASS_INF_SIZE	5
-#define DP_VND_CLASS_IDENT		33
-
-#define DP_USER_CLASS_INF_COMP_STR	"iPXE"
-#define DP_VND_CLS_IDT_COMP_STR		"PXEClient:Arch:00007"
-#define DP_PXE_TFTP_PATH			"ipxe/x86_64/ipxe.new"
+#define DP_USER_CLASS_INF_LEN (sizeof(DP_USER_CLASS_INF_COMP_STR)-1)
+#define DP_VND_CLASS_ID_LEN   (sizeof(DP_VND_CLASS_ID_COMP_STR)-1)
 
 struct dp_dhcp_header {
 	uint8_t		op;
@@ -72,18 +71,15 @@ struct dp_dhcp_header {
 	char		sname[64];
 	char		file[128];
 	uint32_t	magic;
-	uint8_t		options[DHCP_MIN_OPTION_LEN];
+	uint8_t		options[1];
 };
-#define DP_DHCP_HEADER_LEN == sizeof(struct dp_dhcp_header))
 
-enum
-{
+enum {
 	DHCP_NEXT_DROP,
 	DHCP_NEXT_MAX
 };
 
-struct dhcp_node_ctx
-{
+struct dhcp_node_ctx {
 	uint16_t next;
 };
 
@@ -91,14 +87,15 @@ struct dhcp_node_main {
 	uint16_t next_index[DP_MAX_PORTS];
 };
 
-typedef enum dp_pxe_mode {
+enum dp_pxe_mode {
 	DP_PXE_MODE_NONE,
 	DP_PXE_MODE_TFTP,
 	DP_PXE_MODE_HTTP,
-} dp_pxe_mode;
+};
 
 struct rte_node_register *dhcp_node_get(void);
 int dhcp_set_next(uint16_t port_id, uint16_t next_index);
+
 #ifdef __cplusplus
 }
 #endif

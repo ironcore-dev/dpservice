@@ -15,6 +15,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_VF_PATTERN,
 	OPT_OVERLAY_TYPE,
 	OPT_DHCP_MTU,
+	OPT_DHCP_DNS,
 	OPT_WCMP_FRACTION,
 	OPT_NIC_TYPE,
 	OPT_NO_STATS,
@@ -40,6 +41,7 @@ static const struct option longopts[] = {
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
 	{ "overlay-type", 1, 0, OPT_OVERLAY_TYPE },
 	{ "dhcp-mtu", 1, 0, OPT_DHCP_MTU },
+	{ "dhcp-dns", 1, 0, OPT_DHCP_DNS },
 	{ "wcmp-fraction", 1, 0, OPT_WCMP_FRACTION },
 	{ "nic-type", 1, 0, OPT_NIC_TYPE },
 	{ "no-stats", 0, 0, OPT_NO_STATS },
@@ -80,6 +82,7 @@ static void print_help_args(FILE *outfile)
 		"     --vf-pattern=PATTERN      virtual interface name pattern (e.g. 'eth1vf')\n"
 		"     --overlay-type=TYPE       overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
 		"     --dhcp-mtu=SIZE           set the mtu field in DHCP responses (68 - 1500)\n"
+		"     --dhcp-dns=IPv4           set the domain name server field in DHCP responses (can be used multiple times)\n"
 		"     --wcmp-fraction=FRACTION  weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)\n"
 		"     --nic-type=NICTYPE        NIC type to use: 'hw' (default) or 'tap'\n"
 		"     --no-stats                do not print periodic statistics to stdout\n"

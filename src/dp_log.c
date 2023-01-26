@@ -31,7 +31,7 @@ int dp_log_init()
 
 	ret = rte_openlog_stream(stdout);
 	if (DP_FAILED(ret)) {
-		fprintf(stderr, "Cannot open logging stream %s\n", dp_strerror(ret));
+		DP_EARLY_ERR("Cannot open logging stream %s", dp_strerror(ret));
 		return ret;
 	}
 
@@ -128,6 +128,23 @@ void _dp_log(unsigned int level, unsigned int logtype,
 
 	if (log_colors)
 		clear_color(f);
+
+	fputc('\n', f);
+
+	fflush(f);
+
+	funlockfile(f);
+}
+
+void _dp_log_early(FILE *f, const char *format, ...)
+{
+	va_list args;
+
+	flockfile(f);
+
+	va_start(args, format);
+	vfprintf(f, format, args);
+	va_end(args);
 
 	fputc('\n', f);
 

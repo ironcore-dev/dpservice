@@ -83,7 +83,7 @@ int dp_get_portid_with_vm_handle(void *key);
 void dp_del_portid_with_vm_handle(void *key);
 
 uint32_t dp_get_gw_ip4();
-uint8_t* dp_get_gw_ip6();
+const uint8_t *dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_dhcp_range_ip6(uint16_t portid);
 uint8_t* dp_get_vm_ip6(uint16_t portid);

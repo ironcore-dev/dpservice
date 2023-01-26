@@ -72,6 +72,12 @@ void dp_log_set_thread_name(const char *name);
 
 int dp_log_init();
 
+/** Use this for logging before dp_log_init() */
+__rte_cold __rte_format_printf(2, 3)
+void _dp_log_early(FILE *f, const char *format, ...);
+
+#define DP_EARLY_ERR(FORMAT, ...) _dp_log_early(stderr, FORMAT, ##__VA_ARGS__)
+
 #ifdef __cplusplus
 }
 #endif

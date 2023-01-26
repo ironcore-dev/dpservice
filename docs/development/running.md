@@ -52,7 +52,6 @@ chmod +x /usr/local/sbin/dp-prepare.sh
 cp hack/preparedp.service /etc/systemd/system/preparedp.service
 systemctl daemon-reload
 systemctl enable preparedp.service
-
 ```
 
 Then you can simply run `dp_service -l0,1 -- --no-stats --no-offload` for the most basic setup. See help output for more info.

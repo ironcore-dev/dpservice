@@ -56,6 +56,11 @@
     "default": 1500
   },
   {
+    "lgopt": "dhcp-dns",
+    "arg": "IPv4",
+    "help": "set the domain name server field in DHCP responses (can be used multiple times)"
+  },
+  {
     "lgopt": "wcmp-fraction",
     "arg": "FRACTION",
     "help": "weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)",
