@@ -153,13 +153,17 @@ static int init_interfaces()
 
 static void *dp_handle_grpc(__rte_unused void *arg)
 {
+	GRPCService *grpc_svc;
+	char addr[12];  // '[::]:65535\0'
+
 	dp_log_set_thread_name("grpc");
 
-	GRPCService *grpc_svc = new GRPCService();
+	grpc_svc = new GRPCService();
 
-	// TODO(plague) address/port in config
+	snprintf(addr, sizeof(addr), "[::]:%d", dp_conf_get_grpc_port());
+
 	// we are in a thread, proper teardown would be complicated here, so exit instead
-	if (!grpc_svc->run("[::]:1337"))
+	if (!grpc_svc->run(addr))
 		rte_exit(EXIT_FAILURE, "Cannot run without working GRPC server\n");
 
 	delete grpc_svc;

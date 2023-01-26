@@ -197,6 +197,8 @@ static int parse_opt(int opt, const char *arg)
 #endif
 	case OPT_COLOR:
 		return opt_str_to_enum((int *)&color, arg, color_choices, RTE_DIM(color_choices));
+	case OPT_GRPC_PORT:
+		return opt_str_to_int(&grpc_port, arg, 1024, 65535);
 	default:
 		DP_EARLY_ERR("Unimplemented option %d", opt);
 		return DP_ERROR;

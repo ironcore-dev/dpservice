@@ -122,5 +122,13 @@
     "type": "enum",
     "choices": [ "never", "always", "auto" ],
     "default": "never"
+  },
+  {
+    "lgopt": "grpc-port",
+    "arg": "PORT",
+    "help": "listen for gRPC clients on this port",
+    "var": "grpc_port",
+    "type": "int",
+    "default": 1337
   }
 ]
