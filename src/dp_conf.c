@@ -130,7 +130,6 @@ static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uin
 static int add_dhcp_dns(const char *str)
 {
 	uint8_t *tmp;
-	uint32_t ip;
 	struct in_addr addr;
 
 	if (inet_aton(str, &addr) != 1) {
@@ -151,8 +150,7 @@ static int add_dhcp_dns(const char *str)
 	}
 	dhcp_dns.array = tmp;
 
-	ip = htonl(addr.s_addr);
-	rte_memcpy(&dhcp_dns.array[dhcp_dns.len], &ip, sizeof(ip));
+	rte_memcpy(&dhcp_dns.array[dhcp_dns.len], &addr.s_addr, sizeof(addr.s_addr));
 	dhcp_dns.len += 4;
 	return DP_OK;
 }

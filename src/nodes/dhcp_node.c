@@ -111,7 +111,7 @@ static int parse_options(struct dp_dhcp_header *dhcp_pkt,
 						 enum dp_pxe_mode *pxe_mode)
 {
 	uint8_t op_type;
-	uint8_t op_len;
+	uint8_t op_len = 0;
 	int result = DP_ERROR;  // need at least msg_type
 
 	for (int i = 0; i < options_len; i += op_len) {
