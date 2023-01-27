@@ -542,7 +542,7 @@ int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ip
 	return 0;
 }
 
-int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
+int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 {
 	struct nat_key nkey = {0};
 	struct snat_data *data;
@@ -600,9 +600,8 @@ int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 			return -DP_NETNAT_ERR_PORTOVERLOADMAP_INVALID_KEY;
 	}
 
-	if (!allocated_port) {
+	if (!allocated_port)
 		return -DP_NETNAT_ERR_NO_VALID_NAT_PORT;
-	}
 
 	if (DP_FAILED(rte_hash_add_key(ipv4_netnat_portoverload_tbl, (const void *)&portoverload_tbl_key))) {
 		DPS_LOG_ERR("failed to add a key to ipv4 network nat port overloading check table");
@@ -622,7 +621,7 @@ int32_t dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 	return (int32_t)allocated_port;
 }
 
-int dp_remove_network_snat_port(const struct flow_value *cntrack)
+int dp_remove_network_snat_port(struct flow_value *cntrack)
 {
 	struct netnat_portmap_key portmap_key = {0};
 	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
@@ -639,10 +638,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	if (ret >= 0) {
 		if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key)))
 				return DP_ERROR;
-		return DP_OK;
-	} else if (ret == -ENOENT) {
-		return DP_OK;
-	} else
+	} else if (ret == -EINVAL)
 		return DP_ERROR;
 
 	portmap_key.vm_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;

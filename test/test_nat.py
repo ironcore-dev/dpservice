@@ -35,7 +35,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	grpc_client.assert_output(f"--addneighnat --ipv4 {nat_vip} --vni {vni} --min_port {nat_neigh_min_port} --max_port {nat_neigh_max_port} --t_ipv6 {nat_neigh_ul_dst}",
 		"Neighbor NAT added")
 
-	threading.Thread(target=send_bounce_pkt_to_pf).start();
+	threading.Thread(target=send_bounce_pkt_to_pf).start()
 
 	# it seems that pkt_list[0] is the injected packet
 	pkt_list = sniff(count=2, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=5)

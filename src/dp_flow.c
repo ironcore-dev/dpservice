@@ -204,9 +204,10 @@ void dp_free_flow(struct dp_ref *ref)
 void dp_free_network_nat_port(struct flow_value *cntrack)
 {
 	char printed_ip_buf[18] = {0};
+	int ret;
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-		int ret = dp_remove_network_snat_port((const struct flow_value *)cntrack);
+		ret = dp_remove_network_snat_port(cntrack);
 		if (DP_FAILED(ret)) {
 			print_ip(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst, printed_ip_buf);
 			DPS_LOG_ERR("failed to remove an allocated network NAT port: %s::%d, code %d", printed_ip_buf,
