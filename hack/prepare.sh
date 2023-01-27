@@ -31,14 +31,21 @@ function validate() {
 
 function validate_pf() {
 	# we check if sr-iov is enabled and the dev is using the mlx5 driver
+	unset valid_devs
 	for pf in "${devs[@]}"; do
+	    log "check pf $pf"
 		if [ ! -f "/sys/bus/pci/devices/$pf/sriov_numvfs" ]; then
-			err "pf $pf doesn't support sriov, exiting"
+			log "pf $pf doesn't support sriov, excluding"
+			continue
 		fi
 		if [ ! -L "/sys/bus/pci/drivers/mlx5_core/$pf" ]; then
-			err "pf $pf is not using the proper driver, exiting"
+			log "pf $pf is not using the proper driver, excluding"
+			continue
 		fi
+		echo "pf $pf is valid"
+		valid_devs+=( $pf )
 	done
+	devs=("${valid_devs[@]}") 
 }
 
 function create_vf() {

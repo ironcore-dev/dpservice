@@ -74,6 +74,8 @@ procps \
 libuuid1 \
 libgrpc++1 \
 iproute2 \
+udev \
+gawk \
 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
