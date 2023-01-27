@@ -36,3 +36,4 @@ const bool dp_conf_is_offload_enabled();
 const int dp_conf_get_graphtrace_level();
 #endif
 const enum dp_conf_color dp_conf_get_color();
+const int dp_conf_get_grpc_port();

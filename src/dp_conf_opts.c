@@ -26,6 +26,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_GRAPHTRACE,
 #endif
 	OPT_COLOR,
+	OPT_GRPC_PORT,
 };
 
 #define OPTSTRING \
@@ -52,6 +53,7 @@ static const struct option longopts[] = {
 	{ "graphtrace", 1, 0, OPT_GRAPHTRACE },
 #endif
 	{ "color", 1, 0, OPT_COLOR },
+	{ "grpc-port", 1, 0, OPT_GRPC_PORT },
 	{ NULL, }
 };
 
@@ -93,6 +95,7 @@ static void print_help_args(FILE *outfile)
 		"     --graphtrace=LEVEL        verbosity level of packet traversing the graph framework\n"
 #endif
 		"     --color=MODE              output colorization mode: 'never' (default), 'always' or 'auto'\n"
+		"     --grpc-port=PORT          listen for gRPC clients on this port\n"
 	);
 }
 
@@ -111,6 +114,7 @@ static bool offload_enabled = true;
 static int graphtrace_level = 0;
 #endif
 static enum dp_conf_color color = DP_CONF_COLOR_NEVER;
+static int grpc_port = 1337;
 
 const char *dp_conf_get_pf0_name()
 {
@@ -177,5 +181,10 @@ const int dp_conf_get_graphtrace_level()
 const enum dp_conf_color dp_conf_get_color()
 {
 	return color;
+}
+
+const int dp_conf_get_grpc_port()
+{
+	return grpc_port;
 }
 
