@@ -90,6 +90,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key key;
+	int key_search_result;
 
 	df_ptr = get_dp_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -110,20 +111,25 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		|| df_ptr->l4_type == IPPROTO_UDP
 		|| df_ptr->l4_type == IPPROTO_ICMP
 	) {
-		memset(&key, 0, sizeof(key));
-		if (dp_build_flow_key(&key, m) < 0) {
-			DPNODE_LOG_WARNING(node, "Failed to build a flow key");
+
+		memset(&key, 0, sizeof(struct flow_key));
+		if (unlikely(dp_build_flow_key(&key, m) < 0)) {
+			DPNODE_LOG_WARNING(node, "Failed to build a flow key\n");
 			return CONNTRACK_NEXT_DROP;
 		}
-		if (dp_flow_exists(&key)) {
-			dp_get_flow_data(&key, (void **)&flow_val);
-			change_flow_state_dir(&key, flow_val, df_ptr);
-		} else {
+
+		key_search_result = dp_get_flow_data(&key, (void **)&flow_val);
+		if (unlikely(key_search_result == -ENOENT)) {
 			flow_val = flow_table_insert_entry(&key, df_ptr, m);
 			if (!flow_val) {
-				DPNODE_LOG_WARNING(node, "Failed to add a flow table entry due to NULL flow_val pointer");
+				DPNODE_LOG_WARNING(node, "Failed to add a flow table entry due to NULL flow_val pointer\n");
 				return CONNTRACK_NEXT_DROP;
 			}
+		} else if (key_search_result == -EINVAL) {
+			DPNODE_LOG_ERR(node, "Conntrack operation: hash key search failed due to invalid parameters\n");
+			return CONNTRACK_NEXT_DROP;
+		} else {
+			change_flow_state_dir(&key, flow_val, df_ptr);
 		}
 		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;

@@ -89,7 +89,7 @@ struct flow_age_ctx {
 };
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
-void dp_get_flow_data(struct flow_key *key, void **data);
+int dp_get_flow_data(struct flow_key *key, void **data);
 void dp_add_flow_data(struct flow_key *key, void *data);
 void dp_add_flow(struct flow_key *key);
 void dp_delete_flow(struct flow_key *key);
