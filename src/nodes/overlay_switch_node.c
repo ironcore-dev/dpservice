@@ -77,7 +77,7 @@ static uint16_t overlay_switch_node_process(struct rte_graph *graph,
 											void **objs,
 											uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, (int32_t)OVERLAY_SWITCH_NEXT_IPIP, get_next_index);
 	return nb_objs;
 }
 

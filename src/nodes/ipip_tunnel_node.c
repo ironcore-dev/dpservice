@@ -85,7 +85,7 @@ static uint16_t ipip_tunnel_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, -1, get_next_index);
 	return nb_objs;
 }
 

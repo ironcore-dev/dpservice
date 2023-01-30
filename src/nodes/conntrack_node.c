@@ -168,7 +168,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			flow_val = prev_flow_val;
 			change_flow_state_dir(key, flow_val, df_ptr);
 		}
-		
+
 		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;
 	}
@@ -184,7 +184,7 @@ static uint16_t conntrack_node_process(struct rte_graph *graph,
 									   void **objs,
 									   uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, (int32_t)CONNTRACK_NEXT_DNAT, get_next_index);
 	return nb_objs;
 }
 

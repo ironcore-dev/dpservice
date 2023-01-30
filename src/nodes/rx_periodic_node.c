@@ -91,7 +91,7 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 		return 0;
 
 	node->idx = n_pkts;
-	dp_foreach_graph_packet(graph, node, objs, n_pkts, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, n_pkts, -1, get_next_index);
 	return n_pkts;
 }
 
