@@ -13,17 +13,17 @@ This command needs to be run once after starting a new `dp_service` process. Onl
 
 ## Add a virtual interface (machine)
 ```bash
-dp_grpc_client --addmachine testvm1 --vni 100 --ipv4 172.32.4.9
+dp_grpc_client --addmachine testvm1 --vm_pci 0000:01:00.0_representor_vf0 --vni 100 --ipv4 172.32.4.9
 ```
-This command adds a virtual machine with VNI 100 (Virtual Network Identifier) and IPv4 overlay 172.32.4.9 and assigns the name `testvm1` to the VM. It also prints the PCI details of the to virtual machine assigned virtual port.
+This command adds a virtual machine with VNI 100 (Virtual Network Identifier) and IPv4 overlay 172.32.4.9 and assigns the name `testvm1` to the VM. You need to specify the virtual port to assign to the VM. (In case of TAP devices, use the `net_tap#` EAL name instead of a PCI address.)
 
 Use the name `testvm1` in order to address this VM again.
 ```bash
-dp_grpc_client --addmachine testvm1 --vni 100 --ipv4 172.32.4.9 --ipv6 2010::1
+dp_grpc_client --addmachine testvm1 --vm_pci 0000:01:00.0_representor_vf0 --vni 100 --ipv4 172.32.4.9 --ipv6 2010::1
 ```
 You can also specify overlay IPv6 to assign. The overlay can be dual-stack possible.
 ```bash
-dp_grpc_client --addmachine testvm1 --vni 100 --ipv4 172.32.4.9 --ipv6 2010::1 --pxe_ip 192.168.129.1 --pxe_str /ipxe/boot.ipxe
+dp_grpc_client --addmachine testvm1 --vm_pci 0000:01:00.0_representor_vf0 --vni 100 --ipv4 172.32.4.9 --ipv6 2010::1 --pxe_ip 192.168.129.1 --pxe_str /ipxe/boot.ipxe
 ```
 In case the VM needs pxe-boot, the options for the pxe-boot can be added. `--pxe_ip` is the overlay IP where TFTP and HTTP pxe servers are residing, `--pxe_str` is the path for ipxe file on the HTTP server.
 

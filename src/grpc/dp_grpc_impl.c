@@ -388,26 +388,27 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 	uint16_t p_id = 0;
 
 	// TODO(plague?): this seems to be a misnomer, this name comes from vm_pci argument
-	if (req->add_machine.name[0] != '\0') {
-		if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
-			// TODO(plague): there are actually multiple error states here, see the function itself
-			// ot maybe just create function that takes the name directly
-			if (!dp_port_is_vf_free(p_id)) {
-				err_code = DP_ERROR_VM_ALREADY_ALLOCATED;
-				// TODO as below, fill in properly
-				rep->vf_pci.bus = 2;
-				rep->vf_pci.domain = 2;
-				rep->vf_pci.function = 2;
-				rte_eth_dev_get_name_by_port(p_id, rep->vf_pci.name);
-				goto err;
-			}
-			port_id = p_id;
-		} else {
-			err_code = DP_ERROR_VM_CANT_GET_NAME;
+	if (req->add_machine.name[0] == '\0') {
+		err_code = DP_ERROR_VM_CANT_GET_NAME;
+		goto err;
+	}
+
+	if (!rte_eth_dev_get_port_by_name(req->add_machine.name, &p_id)) {
+		// TODO(plague): there are actually multiple error states here, see the function itself
+		// ot maybe just create function that takes the name directly
+		if (!dp_port_is_vf_free(p_id)) {
+			err_code = DP_ERROR_VM_ALREADY_ALLOCATED;
+			// TODO as below, fill in properly
+			rep->vf_pci.bus = 2;
+			rep->vf_pci.domain = 2;
+			rep->vf_pci.function = 2;
+			rte_eth_dev_get_name_by_port(p_id, rep->vf_pci.name);
 			goto err;
 		}
+		port_id = p_id;
 	} else {
-		port_id = dp_port_get_free_vf_port_id();
+		err_code = DP_ERROR_VM_CANT_GET_NAME;
+		goto err;
 	}
 
 	if (port_id != DP_INVALID_PORT_ID) {
@@ -443,6 +444,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		// TODO(chandra?): call can fail!
 		dp_port_start(port_id);
 		/* TODO get the pci info of this port and fill it accordingly */
+		// NOTE: this should be part of dp_port structure so no rte_ call should be needed at this point
 		rep->vf_pci.bus = 2;
 		rep->vf_pci.domain = 2;
 		rep->vf_pci.function = 2;

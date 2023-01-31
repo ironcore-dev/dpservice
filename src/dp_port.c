@@ -156,14 +156,6 @@ bool dp_port_is_vf_free(uint16_t port_id)
 	return port && port->port_type == DP_PORT_VF && !port->allocated;
 }
 
-uint16_t dp_port_get_free_vf_port_id()
-{
-	DP_FOREACH_PORT(&dp_ports, port)
-		if (port->port_type == DP_PORT_VF && !port->allocated)
-			return port->port_id;
-	return DP_INVALID_PORT_ID;
-}
-
 
 static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
 {

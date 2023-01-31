@@ -1,10 +1,15 @@
 from helpers import *
 
 
-def test_grpc_addmachine_error_102(prepare_ifaces, grpc_client):
+def test_grpc_addmachine_error_109(prepare_ifaces, grpc_client):
 	# Try to add using an existing vm identifier
-	grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
-		"error 102")
+	grpc_client.assert_output(f"--addmachine {vm2_name} --vm_pci net_tap3 --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+		"error 109")
+
+def test_grpc_addmachine_error_110(prepare_ifaces, grpc_client):
+	# Try to add without specifying PCI address
+	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+		"error 110")
 
 def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
@@ -13,7 +18,7 @@ def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 
 def test_grpc_addmachine_error_106(prepare_ifaces, grpc_client):
 	# Try to add with new machine identifer but already given IPv4
-	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+	grpc_client.assert_output(f"--addmachine {vm3_name} --vm_pci net_tap4 --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
 		"error 106")
 
 def test_grpc_delmachine_error_151(prepare_ifaces, grpc_client):
@@ -23,7 +28,7 @@ def test_grpc_delmachine_error_151(prepare_ifaces, grpc_client):
 
 def test_grpc_add_list_delmachine(prepare_ifaces, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
-	grpc_client.assert_output(f"--addmachine {vm3_name} --vni {vni} --ipv4 {vf2_ip} --ipv6 {vf2_ipv6}",
+	grpc_client.assert_output(f"--addmachine {vm3_name} --vm_pci net_tap4 --vni {vni} --ipv4 {vf2_ip} --ipv6 {vf2_ipv6}",
 		"net_tap4")
 	grpc_client.assert_output(f"--getmachines",
 		vm3_name)
