@@ -306,19 +306,6 @@ int hairpin_vfs_to_pf(void)
 	return ret;
 }
 
-// TODO(plague): remove unused
-int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id)
-{
-	int ret = 0;
-
-	ret = rte_eth_hairpin_bind(tx_port_id, rx_port_id);
-	if (ret < 0) {
-		printf("Failed to bind %d to %d, due to error: %d\n", tx_port_id, rx_port_id, ret);
-		return ret;
-	}
-	return ret;
-}
-
 int bind_vf_with_peer_pf_port(uint16_t port_id)
 {
 	int ret = 0;
@@ -348,30 +335,6 @@ int bind_vf_with_peer_pf_port(uint16_t port_id)
 
 	return ret;
 }
-
-// TODO(plague): remove unused
-int hairpin_ports_bind_all(uint16_t port_id)
-{
-	int ret = 0;
-	int i = 0;
-	uint16_t peer_ports[RTE_MAX_ETHPORTS];
-	int peer_ports_num = 0;
-
-	peer_ports_num = rte_eth_hairpin_get_peer_ports(port_id,
-			peer_ports, RTE_MAX_ETHPORTS, 1);
-
-	if (peer_ports_num < 0)
-		return -1;
-
-	for (i = 0; i < peer_ports_num; i++) {
-		ret = hairpin_ports_bind(port_id, peer_ports[i]);
-		if (ret < 0)
-			return ret;
-	}
-
-	return ret;
-}
-
 
 static inline int dp_graph_export(const char graph_name[RTE_GRAPH_NAMESIZE])
 {

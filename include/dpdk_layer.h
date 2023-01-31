@@ -77,9 +77,6 @@ struct dp_dpdk_layer *get_dpdk_layer();
 pthread_t *dp_get_ctrl_thread_id();
 
 int hairpin_vfs_to_pf(void);
-// TODO(plague): remove unused
-// int hairpin_ports_bind(uint16_t tx_port_id, uint16_t rx_port_id);
-// int hairpin_ports_bind_all(uint16_t port_id);
 int bind_vf_with_peer_pf_port(uint16_t port_id);
 
 #ifdef __cplusplus
