@@ -30,19 +30,15 @@ extern "C" {
 		 1 * MEMPOOL_CACHE_SIZE), 29184u)
 
 struct dp_dpdk_layer {
-	struct rte_mempool				*rte_mempool;
-	uint16_t						nr_std_rx_queues;
-	uint16_t						nr_std_tx_queues;
-	uint16_t						nr_pf_hairpin_rx_tx_queues;
-	uint16_t						nr_vf_hairpin_rx_tx_queues;
-	char							graph_name[RTE_GRAPH_NAMESIZE];
-	struct							rte_graph *graph;
-	rte_graph_t						graph_id;
-	struct rte_ring					*grpc_tx_queue;
-	struct rte_ring					*grpc_rx_queue;
-	struct rte_ring					*periodic_msg_queue;
-	struct rte_ring					*monitoring_rx_queue;
-	int								num_of_vfs;
+	struct rte_mempool	*rte_mempool;
+	char				graph_name[RTE_GRAPH_NAMESIZE];
+	struct				rte_graph *graph;
+	rte_graph_t			graph_id;
+	struct rte_ring		*grpc_tx_queue;
+	struct rte_ring		*grpc_rx_queue;
+	struct rte_ring		*periodic_msg_queue;
+	struct rte_ring		*monitoring_rx_queue;
+	int					num_of_vfs;
 };
 
 struct underlay_conf {
@@ -63,23 +59,17 @@ struct underlay_conf {
 	uint16_t default_port;
 };
 
-/* Functions for internal processing */
 int dp_dpdk_init(void);
 int dp_graph_init(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_exit(void);
-
-/* Functions for the control plane */
 
 void set_underlay_conf(struct underlay_conf *u_conf);
 struct underlay_conf *get_underlay_conf();
 struct dp_dpdk_layer *get_dpdk_layer();
 pthread_t *dp_get_ctrl_thread_id();
 
-int hairpin_vfs_to_pf(void);
-int bind_vf_with_peer_pf_port(uint16_t port_id);
-
 #ifdef __cplusplus
 }
 #endif
-#endif /* _DP_SERVICE_H_ */
+#endif

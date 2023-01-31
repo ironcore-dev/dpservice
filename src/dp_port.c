@@ -1,4 +1,5 @@
 #include "dp_error.h"
+#include "dp_hairpin.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_netlink.h"
@@ -84,14 +85,34 @@ static inline struct dp_port *get_port(uint16_t port_id)
 	return NULL;
 }
 
-int dp_port_set_link_status(uint16_t port_id, uint8_t status)
+struct dp_port *dp_port_get(uint16_t port_id)
 {
 	struct dp_port *port = get_port(port_id);
 
-	if (!port) {
+	if (!port)
 		DPS_LOG_ERR("Port %d not registered in dp-service", port_id);
-		return DP_ERROR;
+
+	return port;
+}
+
+struct dp_port *dp_port_get_vf(uint16_t port_id)
+{
+	struct dp_port *port = get_port(port_id);
+
+	if (!port || port->port_type != DP_PORT_VF) {
+		DPS_LOG_ERR("VF port %d not registered in dp-service", port_id);
+		return NULL;
 	}
+
+	return port;
+}
+
+int dp_port_set_link_status(uint16_t port_id, uint8_t status)
+{
+	struct dp_port *port = dp_port_get(port_id);
+
+	if (!port)
+		return DP_ERROR;
 
 	port->link_status = status;
 	return DP_OK;
@@ -109,12 +130,10 @@ uint8_t dp_port_get_link_status(uint16_t port_id)
 
 int dp_port_set_vf_attach_status(uint16_t port_id, enum dp_vf_port_attach_status status)
 {
-	struct dp_port *port = get_port(port_id);
+	struct dp_port *port = dp_port_get_vf(port_id);
 
-	if (!port || port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port %d not registered in dp-service", port_id);
+	if (!port)
 		return DP_ERROR;
-	}
 
 	port->attach_status = status;
 	return DP_OK;
@@ -145,18 +164,6 @@ uint16_t dp_port_get_free_vf_port_id()
 	return DP_INVALID_PORT_ID;
 }
 
-uint16_t dp_port_get_pf_hairpin_rx_queue(uint16_t port_id)
-{
-	struct dp_port *port = get_port(port_id);
-
-	if (!port || port->port_type != DP_PORT_VF) {
-		// TODO(plague): this needs another look and maybe retval
-		return 0;
-	}
-
-	return get_dpdk_layer()->nr_std_rx_queues - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
-}
-
 
 static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
 {
@@ -172,11 +179,11 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
 	nr_hairpin_queues = port_type == DP_PORT_VF
-		? dp_layer->nr_vf_hairpin_rx_tx_queues
-		: dp_layer->nr_pf_hairpin_rx_tx_queues;
+		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
+		: DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs;
 	ret = rte_eth_dev_configure(port_id,
-								dp_layer->nr_std_rx_queues + nr_hairpin_queues,
-								dp_layer->nr_std_tx_queues + nr_hairpin_queues,
+								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
+								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
 								&port_conf);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot configure eth device for port %d %s", port_id, dp_strerror(ret));
@@ -187,7 +194,7 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	rxq_conf.offloads = port_conf.rxmode.offloads;
 
 	/* RX and TX queues config */
-	for (int i = 0; i < dp_layer->nr_std_rx_queues; ++i) {
+	for (int i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
 		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
 									 rte_eth_dev_socket_id(port_id),
 									 &rxq_conf,
@@ -201,7 +208,7 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	txq_conf = dev_info->default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
-	for (int i = 0; i < dp_layer->nr_std_tx_queues; ++i) {
+	for (int i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
 		ret = rte_eth_tx_queue_setup(port_id, i, 2048,
 									 rte_eth_dev_socket_id(port_id),
 									 &txq_conf);
@@ -429,9 +436,13 @@ int dp_ports_init()
 		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
 		return DP_ERROR;
 
-	if (dp_conf_is_offload_enabled())
-		if (DP_FAILED(hairpin_vfs_to_pf()))
-			return DP_ERROR;
+	if (dp_conf_is_offload_enabled()) {
+		DP_FOREACH_PORT(&dp_ports, port) {
+			if (port->port_type == DP_PORT_VF)
+				if (DP_FAILED(dp_hairpin_setup(port)))
+					return DP_ERROR;
+		}
+	}
 
 	return DP_OK;
 }
@@ -465,11 +476,9 @@ int dp_port_start(uint16_t port_id)
 	struct dp_port *port;
 	int ret;
 
-	port = get_port(port_id);
-	if (!port) {
-		DPS_LOG_ERR("Port %d not registered in dp-service", port_id);
+	port = dp_port_get(port_id);
+	if (!port)
 		return DP_ERROR;
-	}
 
 	ret = rte_eth_dev_start(port_id);
 	if (DP_FAILED(ret)) {
@@ -488,7 +497,7 @@ int dp_port_start(uint16_t port_id)
 
 	// TODO(plague): research - this ordering is due to previously being in GRPC, but it seems this should be done earlier?
 	if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled())
-		if (DP_FAILED(bind_vf_with_peer_pf_port(port_id)))
+		if (DP_FAILED(dp_hairpin_bind(port)))
 			return DP_ERROR;
 
 	return DP_OK;
@@ -499,11 +508,9 @@ int dp_port_stop(uint16_t port_id)
 	struct dp_port *port;
 	int ret;
 
-	port = get_port(port_id);
-	if (!port) {
-		DPS_LOG_ERR("Port %d not registered in dp-service", port_id);
+	port = dp_port_get(port_id);
+	if (!port)
 		return DP_ERROR;
-	}
 
 	// TODO(plague): research - no need to tear down hairpins?
 

@@ -45,13 +45,14 @@ struct dp_ports {
 
 struct dp_ports *get_dp_ports();
 
+struct dp_port *dp_port_get(uint16_t port_id);
+struct dp_port *dp_port_get_vf(uint16_t port_id);
 int dp_port_set_link_status(uint16_t port_id, uint8_t status);
 uint8_t dp_port_get_link_status(uint16_t port_id);
 int dp_port_set_vf_attach_status(uint16_t port_id, enum dp_vf_port_attach_status status);
 enum dp_vf_port_attach_status dp_port_get_vf_attach_status(uint16_t port_id);
 bool dp_port_is_vf_free(uint16_t port_id);
 uint16_t dp_port_get_free_vf_port_id();
-uint16_t dp_port_get_pf_hairpin_rx_queue(uint16_t port_id);
 
 int dp_ports_init();
 void dp_ports_free();
