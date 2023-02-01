@@ -24,9 +24,16 @@
 #include "dp_error.h"
 #include "dp_log.h"
 
+// all times in seconds
+#define TIMER_MESSAGE_INTERVAL 30
+// make sure that we do not sleep (and do stuff) longer than the manage interval
+// that would make the code miss it (see main_core_loop())
+#define TIMER_MANAGE_INTERVAL 10
+#define STATS_SLEEP 1
+
 static volatile bool force_quit;
-static struct rte_timer timer;
-static uint64_t timer_res;
+static struct rte_timer message_timer;
+static uint64_t timer_manage_interval;
 
 static const char * const default_patterns[] = {
 	"rx-*",
@@ -64,60 +71,87 @@ static struct underlay_conf gen_conf = {
 	.default_port = 443,
 };
 
-static void timer_cb()
+static void message_timer_cb()
 {
 	if (dp_conf_is_ipv6_overlay_enabled()) {
 		trigger_nd_ra();
 		trigger_nd_unsol_adv();
 	}
 	trigger_garp();
-	dp_send_event_timer_msg();
+	if (DP_FAILED(dp_send_event_timer_msg()))
+		DPS_LOG_WARNING("Cannot send timer event");
 }
 
-// TODO(plague): neds proper retval
+static int timers_init()
+{
+	uint64_t hz = rte_get_timer_hz();;
+	int ret;
+
+	ret = rte_timer_subsystem_init();
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot init timer subsystem %s", dp_strerror(ret));
+		return ret;
+	}
+
+	rte_timer_init(&message_timer);
+
+	timer_manage_interval = hz * TIMER_MANAGE_INTERVAL;
+
+	ret = rte_timer_reset(&message_timer,
+						  hz * TIMER_MESSAGE_INTERVAL,
+						  PERIODICAL,
+						  rte_lcore_id(),
+						  message_timer_cb,
+						  NULL);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start message timer");  // there is no errno for this
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
 int dp_dpdk_init()
 {
-	uint64_t hz;
-	uint8_t lcore_id;
-
-	memset(&dp_layer, 0, sizeof(struct dp_dpdk_layer));
+	memset(&dp_layer, 0, sizeof(dp_layer));
 
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS),
 												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE + 32,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
-
-	if (dp_layer.rte_mempool == NULL)
-		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
+	if (!dp_layer.rte_mempool) {
+		DPS_LOG_ERR("Cannot create mbuf pool %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 
 	dp_layer.num_of_vfs = dp_get_num_of_vfs();
 	if (DP_FAILED(dp_layer.num_of_vfs))
 		return DP_ERROR;
 
 	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.grpc_tx_queue)
-		printf("Error creating grpc tx queue\n");
+	if (!dp_layer.grpc_tx_queue) {
+		DPS_LOG_ERR("Error creating grpc tx queue %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 	dp_layer.grpc_rx_queue = rte_ring_create("grpc_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.grpc_rx_queue)
-		printf("Error creating grpc rx queue\n");
+	if (!dp_layer.grpc_rx_queue) {
+		DPS_LOG_ERR("Error creating grpc rx queue %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.periodic_msg_queue)
-		printf("Error creating periodic_msg_queue queue\n");
+	if (!dp_layer.periodic_msg_queue) {
+		DPS_LOG_ERR("Error creating periodic messages queue %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 	/* TODO Monitoring queue needs to be multiproducer, single consumer */
 	dp_layer.monitoring_rx_queue = rte_ring_create("monitoring_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.monitoring_rx_queue)
-		printf("Error creating monitoring rx queue\n");
+	if (!dp_layer.monitoring_rx_queue) {
+		DPS_LOG_ERR("Error creating monitoring rx queue %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 
-	// init the timer subsystem
-	rte_timer_subsystem_init();
-	//init the timer
-	rte_timer_init(&timer);
-
-
-	hz = rte_get_timer_hz();
-	timer_res = hz * 10; // 10 seconds
-	lcore_id = rte_lcore_id();
-	rte_timer_reset(&timer, hz*30, PERIODICAL, lcore_id, timer_cb, NULL);
+	if (DP_FAILED(timers_init()))
+		return DP_ERROR;
 
 	force_quit = false;
 
@@ -148,59 +182,74 @@ static int graph_main_loop()
 	return 0;
 }
 
-static void print_stats(char *msg_out, size_t msg_len)
+static inline struct rte_graph_cluster_stats *create_stats()
 {
-	const char topLeft[] = {27, '[', '1', ';', '1', 'H', '\0'};
-	const char clr[] = {27, '[', '2', 'J', '\0'};
-	struct rte_graph_cluster_stats_param s_param;
+	static const char *patterns[] = { "worker_*" };
+	struct rte_graph_cluster_stats_param s_param = {
+		.socket_id = SOCKET_ID_ANY,
+		.fn = NULL,
+		.f = stdout,
+		.nb_graph_patterns = 1,
+		.graph_patterns = patterns,
+	};
 	struct rte_graph_cluster_stats *stats;
-	const char *pattern = "worker_*";
-
-	/* Prepare stats object */
-	memset(&s_param, 0, sizeof(s_param));
-	s_param.f = stdout;
-	s_param.socket_id = SOCKET_ID_ANY;
-	s_param.graph_patterns = &pattern;
-	s_param.nb_graph_patterns = 1;
 
 	stats = rte_graph_cluster_stats_create(&s_param);
-	if (stats == NULL)
-		rte_exit(EXIT_FAILURE, "Unable to create stats object\n");
+	if (!stats)
+		DPS_LOG_ERR("Unable to create cluster stats %s", dp_strerror(rte_errno));
 
-	/* Clear screen and move to top left */
-	printf("%s%s", clr, topLeft);
+	return stats;
+}
+
+static inline void print_stats(struct rte_graph_cluster_stats *stats)
+{
+	static const char caret_top_left[] = {27, '[', '1', ';', '1', 'H', '\0'};
+	static const char clear_screen[] = {27, '[', '2', 'J', '\0'};
+
+	printf("%s%s", clear_screen, caret_top_left);
+	// this actually prints using a function specified in create_stats()
 	rte_graph_cluster_stats_get(stats, 0);
-	dp_port_print_link_info(0, msg_out, msg_len);
-	//if (strlen(msg_out))
-	//bb	printf("%s", msg_out);
+}
 
-	sleep(1);
-
+static inline void free_stats(struct rte_graph_cluster_stats *stats)
+{
 	rte_graph_cluster_stats_destroy(stats);
 }
 
 static int main_core_loop(void)
 {
-	uint64_t prev_tsc = 0, cur_tsc;
-	char *msg_out = NULL;
-	size_t msg_out_len_max = 400;
+	uint64_t cur_tsc;
+	uint64_t prev_tsc = 0;
+	int ret = DP_OK;
+	struct rte_graph_cluster_stats *stats = NULL;
 
-	msg_out = malloc(msg_out_len_max + 1);
+	if (dp_conf_is_stats_enabled() && rte_graph_has_stats_feature()) {
+		stats = create_stats();
+		if (!stats)
+			return DP_ERROR;
+	}
 
 	while (!force_quit) {
-		/* Accumulate and print stats on main until exit */
-		if (dp_conf_is_stats_enabled() && rte_graph_has_stats_feature())
-			print_stats(msg_out, msg_out_len_max);
-
 		cur_tsc = rte_get_timer_cycles();
-		if ((cur_tsc - prev_tsc) > timer_res) {
-			rte_timer_manage();
+		if ((cur_tsc - prev_tsc) > timer_manage_interval) {
+			ret = rte_timer_manage();
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));
+				break;
+			}
 			prev_tsc = cur_tsc;
+		}
+
+		if (stats) {
+			print_stats(stats);
+			sleep(STATS_SLEEP);
 		}
 	}
 
-	free(msg_out);
-	return DP_OK;
+	if (stats)
+		free_stats(stats);
+
+	return ret;
 }
 
 int dp_dpdk_main_loop(void)
