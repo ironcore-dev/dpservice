@@ -55,7 +55,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				ret_netnat = dp_allocate_network_snat_port(df_ptr, vni);
 
 				if (DP_FAILED(ret_netnat)) {
-					print_ip(src_ip, printed_ip_buf);
+					dp_fill_ipv4_print_buff(src_ip, printed_ip_buf);
 					DPNODE_LOG_WARNING(node, "Failed to allocate a valid network nat port for %s:%d with error: %d", printed_ip_buf,
 										ntohs(df_ptr->l4_info.trans_port.src_port), ret_netnat);
 					return SNAT_NEXT_DROP;

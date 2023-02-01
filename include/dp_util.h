@@ -39,7 +39,7 @@ int dp_get_num_of_vfs();
 
 void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type);
 
-void print_ip(unsigned int ip, char *buf);
+void dp_fill_ipv4_print_buff(unsigned int ip, char *buf);
 
 
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id);
