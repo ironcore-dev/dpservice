@@ -25,7 +25,6 @@
 #include "dp_log.h"
 
 static volatile bool force_quit;
-static pthread_t ctrl_thread_tid;
 static struct rte_timer timer;
 static uint64_t timer_res;
 
@@ -64,16 +63,6 @@ static struct underlay_conf gen_conf = {
 	.src_ip6 = {0},
 	.default_port = 443,
 };
-
-static void signal_handler(int signum)
-{
-	if (signum == SIGINT || signum == SIGTERM) {
-		printf("\n\nSignal %d received, preparing to exit...\n",
-		       signum);
-		force_quit = true;
-		pthread_cancel(ctrl_thread_tid);
-	}
-}
 
 static void timer_cb()
 {
@@ -132,15 +121,18 @@ int dp_dpdk_init()
 
 	force_quit = false;
 
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
-
 	return DP_OK;
 }
 
 void dp_dpdk_exit(void)
 {
 	dp_ports_free();
+}
+
+void dp_force_quit()
+{
+	DPS_LOG_INFO("Stopping service...");
+	force_quit = true;
 }
 
 
@@ -423,9 +415,4 @@ __rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
 struct dp_dpdk_layer *get_dpdk_layer()
 {
 	return &dp_layer;
-}
-
-pthread_t *dp_get_ctrl_thread_id()
-{
-	return &ctrl_thread_tid;
 }

@@ -1,5 +1,5 @@
 #include <errno.h>
-#include <pthread.h>
+#include <signal.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@
 #include "dp_port.h"
 #include "dp_version.h"
 #include "dpdk_layer.h"
-#include "grpc/dp_grpc_service.h"
+#include "grpc/dp_grpc_thread.h"
 
 static char **dp_argv;
 static int dp_argc;
@@ -92,6 +92,15 @@ static void dp_eal_cleanup()
 		dp_args_free_mellanox();
 }
 
+static void signal_handler(int signum)
+{
+	if (signum == SIGINT || signum == SIGTERM) {
+		// this is specifically printf() to communicate with the sender
+		printf("\n\nSignal %d received, preparing to exit...\n", signum);
+		dp_force_quit();
+		dp_grpc_thread_cancel();
+	}
+}
 
 static int init_interfaces()
 {
@@ -125,45 +134,20 @@ static int init_interfaces()
 	return DP_OK;
 }
 
-static void *dp_handle_grpc(__rte_unused void *arg)
-{
-	GRPCService *grpc_svc;
-	char addr[12];  // '[::]:65535\0'
-
-	dp_log_set_thread_name("grpc");
-
-	grpc_svc = new GRPCService();
-
-	snprintf(addr, sizeof(addr), "[::]:%d", dp_conf_get_grpc_port());
-
-	// we are in a thread, proper teardown would be complicated here, so exit instead
-	if (!grpc_svc->run(addr))
-		rte_exit(EXIT_FAILURE, "Cannot run without working GRPC server\n");
-
-	delete grpc_svc;
-	return NULL;
-}
-
 static inline int run_dpdk_service()
 {
-	int ret, result;
+	int result;
 
 	if (DP_FAILED(init_interfaces()))
 		return DP_ERROR;
 
-	ret = rte_ctrl_thread_create(dp_get_ctrl_thread_id(), "grpc-thread", NULL, dp_handle_grpc, NULL);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot create grpc thread %s", dp_strerror(ret));
-		return ret;
-	}
+	if (DP_FAILED(dp_grpc_thread_start()))
+		return DP_ERROR;
 
 	result = dp_dpdk_main_loop();
 
-	ret = pthread_join(*dp_get_ctrl_thread_id(), NULL);  // returns errno on failure
-	if (ret) {
-		DPS_LOG_ERR("Cannot join grpc thread %s", dp_strerror(ret));
+	if (DP_FAILED(dp_grpc_thread_join()))
 		return DP_ERROR;
-	}
 
 	return result;
 }
@@ -172,6 +156,7 @@ static int run_service()
 {
 	int result;
 
+	// pre-init sanity checks
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
 		DP_EARLY_ERR("Disabled conntrack requires disabled offloading!");
 		return DP_ERROR;
@@ -183,6 +168,13 @@ static int run_service()
 	dp_log_set_thread_name("control");
 	DPS_LOG_INFO("Starting DP Service version %s", DP_SERVICE_VERSION);
 	// from this point on, only DPS_LOG should be used
+
+	if (signal(SIGINT, signal_handler) == SIG_ERR
+		|| signal(SIGTERM, signal_handler) == SIG_ERR
+	) {
+		DPS_LOG_ERR("Cannot setup signal handling %s", dp_strerror(errno));
+		return DP_ERROR;
+	}
 
 	if (DP_FAILED(dp_dpdk_init()))
 		return DP_ERROR;

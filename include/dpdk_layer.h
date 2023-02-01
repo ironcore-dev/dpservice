@@ -6,9 +6,6 @@
 #include <rte_timer.h>
 #include <rte_cycles.h>
 
-#include <signal.h>
-#include <pthread.h>
-
 #include "dp_port.h"
 
 #ifdef __cplusplus
@@ -64,10 +61,11 @@ int dp_graph_init(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_exit(void);
 
+void dp_force_quit();
+
 void set_underlay_conf(struct underlay_conf *u_conf);
 struct underlay_conf *get_underlay_conf();
 struct dp_dpdk_layer *get_dpdk_layer();
-pthread_t *dp_get_ctrl_thread_id();
 
 #ifdef __cplusplus
 }
