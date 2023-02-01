@@ -571,8 +571,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
 
-	// DP_FAILED is not enough
-	if (ret > 0) {
+	if (!DP_FAILED(ret)) {
 		portmap_data->flow_cnt++;
 		return portmap_data->nat_port;
 	} else if (ret == -EINVAL)
@@ -635,7 +634,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 	portoverload_tbl_key.l4_type = cntrack->flow_key[DP_FLOW_DIR_ORG].proto;
 
 	ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, (const void *)&portoverload_tbl_key);
-	if (ret >= 0) {
+	if (!DP_FAILED(ret)) {
 		if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key)))
 				return DP_ERROR;
 	} else if (ret == -EINVAL)
@@ -647,7 +646,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void **)&portmap_data);
 
-	if (ret >= 0) {
+	if (!DP_FAILED(ret)) {
 		portmap_data->flow_cnt--;
 		if (!portmap_data->flow_cnt) {
 			rte_free(portmap_data);
