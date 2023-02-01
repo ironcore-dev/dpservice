@@ -58,8 +58,8 @@ class DpService:
 		if self.port_redundancy:
 			interface_up(pf1_tap)
 		grpc_client.assert_output("--init", "Init called")
-		grpc_client.assert_output(f"--addmachine {vm1_name} --vni {vni} --ipv4 {vf0_ip} --ipv6 {vf0_ipv6}", "Allocated VF for you")
-		grpc_client.assert_output(f"--addmachine {vm2_name} --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}", "Allocated VF for you")
+		grpc_client.assert_output(f"--addmachine {vm1_name} --vm_pci net_tap2 --vni {vni} --ipv4 {vf0_ip} --ipv6 {vf0_ipv6}", "Allocated VF for you")
+		grpc_client.assert_output(f"--addmachine {vm2_name} --vm_pci net_tap3 --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}", "Allocated VF for you")
 		grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", f"Route ip {ov_target_pfx}")
 		grpc_client.assert_output(f"--addroute --vni {vni} --ipv6 2002::123 --length 128 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", "target ipv6 2002::123")
 		grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 0.0.0.0 --length 0 --t_vni {vni} --t_ipv6 {ul_actual_dst}", "Route ip 0.0.0.0")

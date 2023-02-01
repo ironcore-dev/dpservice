@@ -33,7 +33,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 
-	if (dp_is_pf_port_id(df->nxt_hop))
+	if (dp_port_is_pf(df->nxt_hop))
 		return L2_DECAP_OVERLAY_SWITCH;
 
 	return l2_decap_node.next_index[df->nxt_hop];

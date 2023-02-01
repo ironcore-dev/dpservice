@@ -15,13 +15,13 @@ void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t et
 	struct dp_flow *df_ptr;
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
+	struct dp_ports *ports = get_dp_ports();
 
 	// send pkt to all allocated VFs
-	for (int i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((dp_layer->ports[i]->dp_p_type == DP_PORT_VF) &&
-			dp_layer->ports[i]->dp_allocated) {
+	DP_FOREACH_PORT(ports, port) {
+		if (port->port_type == DP_PORT_VF && port->allocated) {
 				struct rte_mbuf *clone_buf = rte_pktmbuf_copy(pkt,dp_layer->rte_mempool, 0, UINT32_MAX);
-				clone_buf->port = dp_layer->ports[i]->dp_port_id;
+				clone_buf->port = port->port_id;
 				eth_hdr = rte_pktmbuf_mtod(clone_buf, struct rte_ether_hdr *);
 				rte_ether_addr_copy(dp_get_mac(clone_buf->port), &eth_hdr->src_addr);
 				if(eth_type == RTE_ETHER_TYPE_ARP) {

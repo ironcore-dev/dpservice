@@ -15,7 +15,7 @@
     "help": "first physical interface (e.g. eth0)",
     "var": "pf0_name",
     "type": "char",
-    "array_size": "IF_NAMESIZE"
+    "array_size": "IFNAMSIZ"
   },
   {
     "lgopt": "pf1",
@@ -23,7 +23,7 @@
     "help": "second physical interface (e.g. eth1)",
     "var": "pf1_name",
     "type": "char",
-    "array_size": "IF_NAMESIZE"
+    "array_size": "IFNAMSIZ"
   },
   {
     "lgopt": "ipv6",
@@ -36,7 +36,7 @@
     "help": "virtual interface name pattern (e.g. 'eth1vf')",
     "var": "vf_pattern",
     "type": "char",
-    "array_size": "IF_NAMESIZE"
+    "array_size": "IFNAMSIZ"
   },
   {
     "lgopt": "overlay-type",

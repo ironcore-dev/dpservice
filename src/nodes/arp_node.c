@@ -7,7 +7,9 @@
 #include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/arp_node_priv.h"
+#include "dp_error.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_log.h"
 #include "dp_lpm.h"
 
 
@@ -56,12 +58,16 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	return true;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *pkt)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *pkt)
 {
 	if (!arp_handled(pkt))
 		return ARP_NEXT_DROP;
 
-	set_vf_port_status_as_attached(pkt->port);
+	if (DP_FAILED(dp_port_set_vf_attach_status(pkt->port, DP_VF_PORT_ATTACHED))) {
+		DPNODE_LOG_ERR(node, "Cannot attach port %d", pkt->port);
+		return ARP_NEXT_DROP;
+	}
+
 	return arp_node.next_index[pkt->port];
 }
 

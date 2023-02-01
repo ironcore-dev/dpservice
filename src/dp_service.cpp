@@ -15,6 +15,7 @@
 #include "dp_lpm.h"
 #include "dp_multi_path.h"
 #include "dp_nat.h"
+#include "dp_port.h"
 #include "dp_version.h"
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_service.h"
@@ -94,47 +95,20 @@ static void dp_eal_cleanup()
 
 static int init_interfaces()
 {
-	struct dp_port_ext pf0_port = {0};
-	struct dp_port_ext pf1_port = {0};
-	struct dp_port_ext vf_port = {0};
-	uint16_t pf0_id;
-	uint16_t pf1_id;
 	int pf0_socket;
 
-	/* Init the PFs which were received via command line */
-	strncpy(pf0_port.port_name, dp_conf_get_pf0_name(), sizeof(pf0_port.port_name));
-	if (DP_FAILED(dp_init_interface(&pf0_port, DP_PORT_PF)))
+	if (DP_FAILED(dp_ports_init())
+		|| DP_FAILED(dp_graph_init()))
 		return DP_ERROR;
 
-	strncpy(pf1_port.port_name, dp_conf_get_pf1_name(), sizeof(pf1_port.port_name));
-	if (DP_FAILED(dp_init_interface(&pf1_port, DP_PORT_PF)))
+	// VFs are started by GRPC later
+	if (DP_FAILED(dp_port_start(dp_port_get_pf0_id()))
+		|| DP_FAILED(dp_port_start(dp_port_get_pf1_id())))
 		return DP_ERROR;
 
-	strncpy(vf_port.port_name, dp_conf_get_vf_pattern(), sizeof(vf_port.port_name));
-
-	/* Init all possible VFs, GRPC will kick them off later */
-	for (int i = 0; i < get_dpdk_layer()->num_of_vfs; ++i)
-		if (DP_FAILED(dp_init_interface(&vf_port, DP_PORT_VF)))
-			return DP_ERROR;
-
-	if (dp_conf_is_offload_enabled())
-		if (DP_FAILED(hairpin_vfs_to_pf()))
-			return DP_ERROR;
-
-	if (DP_FAILED(dp_graph_init()))
-		return DP_ERROR;
-
-	// TODO(plague): will be done a little bit better in a followup PR
-	pf0_id = dp_get_pf0_port_id();
-	pf1_id = dp_get_pf1_port_id();
-
-	if (DP_FAILED(dp_start_interface(&pf0_port, pf0_id, DP_PORT_PF))
-		|| DP_FAILED(dp_start_interface(&pf1_port, pf1_id, DP_PORT_PF)))
-		return DP_ERROR;
-
-	pf0_socket = rte_eth_dev_socket_id(pf0_id);
+	pf0_socket = rte_eth_dev_socket_id(dp_port_get_pf0_id());
 	if (DP_FAILED(pf0_socket)) {
-		DPS_LOG_ERR("Cannot get numa socket for pf0 port %d %s", pf0_id, dp_strerror(pf0_socket));
+		DPS_LOG_ERR("Cannot get numa socket for pf0 port %d %s", dp_port_get_pf0_id(), dp_strerror(pf0_socket));
 		return DP_ERROR;
 	}
 

@@ -33,11 +33,8 @@ static inline bool dp_is_mellanox_opt_set()
 		&& dp_conf_get_eal_a_pf1()[0] != '\0';
 }
 
-uint16_t dp_get_pf1_port_id();
-uint16_t dp_get_pf0_port_id();
-bool dp_is_pf_port_id(uint16_t id);
-void dp_add_pf_port_id(uint16_t id);
-int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IF_NAMESIZE]);
+int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IFNAMSIZ]);
+
 int dp_get_num_of_vfs();
 
 void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type);

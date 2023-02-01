@@ -1,171 +1,267 @@
 #include "dp_error.h"
+#include "dp_hairpin.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_netlink.h"
 #include "dp_port.h"
+#include "monitoring/dp_event.h"
+#include "nodes/rx_node_priv.h"
+#include "rte_flow/dp_rte_flow_init.h"
 
-// TODO(plague): refactor names to dp_port_*
-
-/* Ethernet port configured with default settings. 8< */
-struct rte_eth_conf port_conf = {
+const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
-			.mq_mode = RTE_ETH_MQ_RX_NONE,
+		.mq_mode = RTE_ETH_MQ_RX_NONE,
 	},
 	.txmode = {
-			.offloads =
-				RTE_ETH_TX_OFFLOAD_IPV4_CKSUM  |
-				RTE_ETH_TX_OFFLOAD_UDP_CKSUM   |
-				RTE_ETH_TX_OFFLOAD_TCP_CKSUM   |
-				RTE_ETH_TX_OFFLOAD_IP_TNL_TSO
+		.offloads =
+			RTE_ETH_TX_OFFLOAD_IPV4_CKSUM |
+			RTE_ETH_TX_OFFLOAD_UDP_CKSUM |
+			RTE_ETH_TX_OFFLOAD_TCP_CKSUM |
+			RTE_ETH_TX_OFFLOAD_IP_TNL_TSO
 	},
 	.rx_adv_conf = {
-			.rss_conf = {
-					.rss_key = NULL,
-					.rss_hf = RTE_ETH_RSS_IP,
-					},
-					},
+		.rss_conf = {
+			.rss_key = NULL,
+			.rss_hf = RTE_ETH_RSS_IP,
+		},
+	},
 	.intr_conf = {
 		.lsc = 1, /**< lsc interrupt feature enabled */
 	},
 };
 
-struct dp_port *dp_port_create(struct dp_dpdk_layer *dp_layer, dp_port_type type)
+static uint16_t pf_ports[DP_MAX_PF_PORTS];
+static struct dp_ports dp_ports;
+
+struct dp_ports *get_dp_ports()
 {
-	struct dp_port *port;
+	return &dp_ports;
+}
 
-	port = malloc(sizeof(struct dp_port));
+static void dp_port_init_pf_table()
+{
+	for (int i = 0; i < DP_MAX_PF_PORTS; ++i)
+		pf_ports[i] = DP_INVALID_PORT_ID;
+}
+
+uint16_t dp_port_get_pf0_id()
+{
+	return pf_ports[0];
+}
+
+uint16_t dp_port_get_pf1_id()
+{
+	return pf_ports[1];
+}
+
+bool dp_port_is_pf(uint16_t port_id)
+{
+	if (port_id == DP_INVALID_PORT_ID)
+		return false;
+	for (int i = 0; i < DP_MAX_PF_PORTS; ++i)
+		if (pf_ports[i] == port_id)
+			return true;
+	return false;
+}
+
+static int dp_port_register_pf(uint16_t port_id)
+{
+	for (int i = 0; i < DP_MAX_PF_PORTS; ++i) {
+		if (pf_ports[i] == DP_INVALID_PORT_ID) {
+			pf_ports[i] = port_id;
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("To many physical ports, maximum %d supported", DP_MAX_PF_PORTS);
+	return DP_ERROR;
+}
+
+
+static inline struct dp_port *get_port(uint16_t port_id)
+{
+	DP_FOREACH_PORT(&dp_ports, port)
+		if (port->port_id == port_id)
+			return port;
+	return NULL;
+}
+
+struct dp_port *dp_port_get(uint16_t port_id)
+{
+	struct dp_port *port = get_port(port_id);
+
 	if (!port)
-		return NULL;
-
-	memset(port, 0, sizeof(struct dp_port));
-	port->dp_layer = dp_layer;
-	port->dp_allocated = 0;
-	port->dp_p_type = type;
+		DPS_LOG_ERR("Port %d not registered in dp-service", port_id);
 
 	return port;
 }
 
-
-int dp_port_init(struct dp_port *port, int port_id, struct dp_port_ext *port_details)
+struct dp_port *dp_port_get_vf(uint16_t port_id)
 {
+	struct dp_port *port = get_port(port_id);
+
+	if (!port || port->port_type != DP_PORT_VF) {
+		DPS_LOG_ERR("VF port %d not registered in dp-service", port_id);
+		return NULL;
+	}
+
+	return port;
+}
+
+int dp_port_set_link_status(uint16_t port_id, uint8_t status)
+{
+	struct dp_port *port = dp_port_get(port_id);
+
+	if (!port)
+		return DP_ERROR;
+
+	port->link_status = status;
+	return DP_OK;
+}
+
+uint8_t dp_port_get_link_status(uint16_t port_id)
+{
+	struct dp_port *port = get_port(port_id);
+
+	if (!port)
+		return RTE_ETH_LINK_DOWN;
+
+	return port->link_status;
+}
+
+int dp_port_set_vf_attach_status(uint16_t port_id, enum dp_vf_port_attach_status status)
+{
+	struct dp_port *port = dp_port_get_vf(port_id);
+
+	if (!port)
+		return DP_ERROR;
+
+	port->attach_status = status;
+	return DP_OK;
+}
+
+enum dp_vf_port_attach_status dp_port_get_vf_attach_status(uint16_t port_id)
+{
+	struct dp_port *port = get_port(port_id);
+
+	if (!port || port->port_type != DP_PORT_VF)
+		return DP_VF_PORT_DETACHED;
+
+	return port->attach_status;
+}
+
+bool dp_port_is_vf_free(uint16_t port_id)
+{
+	struct dp_port *port = get_port(port_id);
+
+	return port && port->port_type == DP_PORT_VF && !port->allocated;
+}
+
+
+static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
+{
+	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	struct rte_ether_addr pf_neigh_mac;
-	char ifname[IF_NAMESIZE] = {0};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
-	struct rte_eth_dev_info dev_info;
-
+	struct rte_eth_conf port_conf = port_conf_default;
+	uint16_t nr_hairpin_queues;
 	int ret;
-	uint16_t i;
 
-	ret = dp_get_dev_info(port_id, &dev_info, ifname);
-	if (ret != 0)
-		rte_exit(EXIT_FAILURE,
-				"Error during getting device (port %u) info: %s\n",
-				port_id, strerror(-ret));
+	/* Default config */
+	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
-	DPS_LOG_INFO("INIT initializing port: %d (%s)", port_id, ifname);
-
-	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
-
-	if (port->dp_p_type == DP_PORT_VF)
-		ret = rte_eth_dev_configure(port_id,
-								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_vf_hairpin_rx_tx_queues,
-								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_vf_hairpin_rx_tx_queues, &port_conf);
-	else
-		ret = rte_eth_dev_configure(port_id,
-								port->dp_layer->nr_std_rx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues,
-								port->dp_layer->nr_std_tx_queues + port->dp_layer->nr_pf_hairpin_rx_tx_queues, &port_conf);
-
-	if (ret < 0) {
-		rte_exit(EXIT_FAILURE,
-				":: cannot configure device: err=%d, port=%u\n",
-				ret, port_id);
+	nr_hairpin_queues = port_type == DP_PORT_VF
+		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
+		: DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs;
+	ret = rte_eth_dev_configure(port_id,
+								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
+								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
+								&port_conf);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure eth device for port %d %s", port_id, dp_strerror(ret));
+		return DP_ERROR;
 	}
 
-	rxq_conf = dev_info.default_rxconf;
+	rxq_conf = dev_info->default_rxconf;
 	rxq_conf.offloads = port_conf.rxmode.offloads;
-	/* >8 End of ethernet port configured with default settings. */
 
-	/* Configuring number of RX and TX queues connected to single port. 8< */
-	for (i = 0; i < port->dp_layer->nr_std_rx_queues; i++) {
+	/* RX and TX queues config */
+	for (int i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
 		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
-									rte_eth_dev_socket_id(port_id),
-									&rxq_conf,
-									port->dp_layer->rte_mempool);
-		if (ret != 0) {
-			rte_exit(EXIT_FAILURE,
-					":: Rx queue setup failed: err=%d, port=%u\n",
-					ret, port_id);
+									 rte_eth_dev_socket_id(port_id),
+									 &rxq_conf,
+									 dp_layer->rte_mempool);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Rx queue setup failed for port %d %s", port_id, dp_strerror(ret));
+			return DP_ERROR;
 		}
-		/* Add this rx node to its graph */
-		snprintf(port->node_name,
-				 RTE_NODE_NAMESIZE, "ethdev_rx-%u-%u", port_id, i);
 	}
 
-	txq_conf = dev_info.default_txconf;
+	txq_conf = dev_info->default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
-	for (i = 0; i < port->dp_layer->nr_std_tx_queues; i++) {
+	for (int i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
 		ret = rte_eth_tx_queue_setup(port_id, i, 2048,
-									rte_eth_dev_socket_id(port_id),
-									&txq_conf);
-		if (ret != 0) {
-			rte_exit(EXIT_FAILURE,
-					":: Tx queue setup failed: err=%d, port=%u\n",
-					ret, port_id);
+									 rte_eth_dev_socket_id(port_id),
+									 &txq_conf);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Tx queue setup failed for port %d %s", port_id, dp_strerror(ret));
+			return DP_ERROR;
 		}
 	}
-	/* >8 End of Configuring RX and TX queues connected to single port. */
 
-	if (port->dp_p_type == DP_PORT_VF) {
+	/* dp-service specific config */
+	if (port_type == DP_PORT_VF) {
+		DPS_LOG_INFO("INIT setting port %d to promiscuous mode", port_id);
 		ret = rte_eth_promiscuous_enable(port_id);
-		DPS_LOG_INFO("INIT setting interface number %d in promiscuous mode", port_id);
-		if (ret != 0)
-			rte_exit(EXIT_FAILURE,
-					":: promiscuous mode enable failed: err=%s, port=%u\n",
-					rte_strerror(-ret), port_id);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Promiscuous mode setting failed for port %d %s", port_id, dp_strerror(ret));
+			return DP_ERROR;
+		}
 	}
 
 	dp_set_mac(port_id);
 
-	if (port->dp_p_type == DP_PORT_PF) {
-		dp_get_pf_neigh_mac(dev_info.if_index, &pf_neigh_mac, dp_get_mac(port_id));
+	if (port_type == DP_PORT_PF) {
+		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, dp_get_mac(port_id))))
+			return DP_ERROR;
 		dp_set_neigh_mac(port_id, &pf_neigh_mac);
 	}
 
-	if (port->dp_p_type == DP_PORT_VF)
-		memcpy(port->vf_name, ifname, IF_NAMESIZE);
-	port->dp_port_id = port_id;
-	port->dp_port_ext = *port_details;
-	return 0;
+	return DP_OK;
 }
 
-void print_link_info(int port_id, char *out, size_t out_size)
+void dp_port_print_link_info(uint16_t port_id, char *out, size_t out_size)
 {
-	struct rte_eth_stats stats;
+	struct rte_eth_stats stats = {0};
 	struct rte_ether_addr mac_addr;
 	struct rte_eth_link eth_link;
 	uint16_t mtu;
 	int ret;
 
-	memset(&stats, 0, sizeof(stats));
-	rte_eth_stats_get(port_id, &stats);
+	ret = rte_eth_stats_get(port_id, &stats);
+	if (DP_FAILED(ret)) {
+		snprintf(out, out_size, "\n%d: stats get failed %s", port_id, dp_strerror(ret));
+		return;
+	}
 
 	ret = rte_eth_macaddr_get(port_id, &mac_addr);
-	if (ret != 0) {
-		snprintf(out, out_size, "\n%d: MAC address get failed: %s",
-			 port_id, rte_strerror(-ret));
+	if (DP_FAILED(ret)) {
+		snprintf(out, out_size, "\n%d: MAC address get failed %s", port_id, dp_strerror(ret));
 		return;
 	}
 
 	ret = rte_eth_link_get(port_id, &eth_link);
-	if (ret < 0) {
-		snprintf(out, out_size, "\n%d: link get failed: %s",
-			 port_id, rte_strerror(-ret));
+	if (DP_FAILED(ret)) {
+		snprintf(out, out_size, "\n%d: link get failed %s", port_id, dp_strerror(ret));
 		return;
 	}
 
-	rte_eth_dev_get_mtu(port_id, &mtu);
+	ret = rte_eth_dev_get_mtu(port_id, &mtu);
+	if (DP_FAILED(ret)) {
+		snprintf(out, out_size, "\n%d: mtu get failed %s", port_id, dp_strerror(ret));
+		return;
+	}
 
 	snprintf(out, out_size,
 		"\n"
@@ -196,129 +292,185 @@ void print_link_info(int port_id, char *out, size_t out_size)
 		stats.oerrors);
 }
 
-// TODO(plague): refactor these:
-// 1 - port_id is unique, should ask first where possible
-// 2 - vf/pf type argument, but functions named _vf_ ?
-// 3 - some of them are copies, should call one another
-// 4 - maybe consolidate logging
-int dp_get_pf_port_id_with_name(struct dp_dpdk_layer *dp_layer, char *pf_name)
-{
-	int i;
 
-	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((strncmp(dp_layer->ports[i]->dp_port_ext.port_name, pf_name, IF_NAMESIZE) == 0) &&
-			dp_layer->ports[i]->dp_p_type == DP_PORT_PF)
-			return dp_layer->ports[i]->dp_port_id;
+static int dp_port_flow_isolate(uint16_t port_id)
+{
+	struct rte_flow_error error;
+	int ret;
+
+	/* Poisoning to make sure PMDs update it in case of error. */
+	memset(&error, 0x66, sizeof(error));
+	ret = rte_flow_isolate(port_id, 1, &error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Flows cannot be isolated (%s) %s",
+					error.message ? error.message : "(null)", dp_strerror(ret));
+		return DP_ERROR;
 	}
-
-	DPS_LOG_ERR("Cannot find PF port '%s'", pf_name);
-	return DP_ERROR;
+	DPS_LOG_INFO("Ingress traffic on port %u is now restricted to the defined flow rules", port_id);
+	return DP_OK;
 }
 
-
-struct dp_port *dp_get_next_avail_vf_port(struct dp_dpdk_layer *dp_layer, dp_port_type type)
+static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type type)
 {
-	int i;
+	static int last_pf1_hairpin_tx_rx_queue_offset = 1;
+	struct dp_port *port;
+	int ret;
 
-	/* Find first not allocated vfport */
-	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((dp_layer->ports[i]->dp_p_type == type) &&
-			!dp_layer->ports[i]->dp_allocated)
-			return dp_layer->ports[i];
-	}
-
-	return NULL;
-}
-
-int dp_get_next_avail_vf_id(struct dp_dpdk_layer *dp_layer, dp_port_type type)
-{
-	int i;
-
-	/* Find first not allocated vfport */
-	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((dp_layer->ports[i]->dp_p_type == type) &&
-			!dp_layer->ports[i]->dp_allocated)
-			return dp_layer->ports[i]->dp_port_id;
-	}
-
-	DPS_LOG_ERR("No available ports");
-	return DP_ERROR;
-}
-
-// TODO(plague): this can be PF port too, no checks!
-static struct dp_port *dp_get_alloced_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
-{
-	int i;
-
-	/* Find the corresponding internal vf port structure */
-	for (i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if (dp_layer->ports[i]->dp_allocated &&
-			 (dp_layer->ports[i]->dp_port_id == portid))
-			return dp_layer->ports[i];
-	}
-
-	DPS_LOG_ERR("Port %d not found", portid);
-	return NULL;
-}
-
-// TODO(plague): this can be PF port too, no checks!
-struct dp_port *dp_get_vf_port_per_id(struct dp_dpdk_layer *dp_layer, int portid)
-{
-	int i;
-
-	/* Find the corresponding internal vf port structure */
-	for (i = 0; i < dp_layer->dp_port_cnt; i++)
-		if (dp_layer->ports[i]->dp_port_id == portid)
-			return dp_layer->ports[i];
-
-	DPS_LOG_ERR("Port %d not found", portid);
-	return NULL;
-}
-
-bool dp_is_port_allocated(struct dp_dpdk_layer *dp_layer, int portid)
-{
-	struct dp_port *vf_port = dp_get_vf_port_per_id(dp_layer, portid);
-
-	if (!vf_port) {
-		DPS_LOG_ERR("Port %d not found", portid);
-		// TODO(plague): better than false which indicates we can use it, but this is a bad construct
-		return true;
-	}
-
-	return (vf_port->dp_allocated != 0);
-}
-
-int dp_port_deallocate(struct dp_dpdk_layer *dp_layer, int portid)
-{
-	struct dp_port *vf_port = dp_get_alloced_vf_port_per_id(dp_layer, portid);
-
-	if (!vf_port)
-		return 0;
-
-	vf_port->dp_allocated = 0;
-
-	return 1;
-}
-
-int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_ext *port_ext, dp_port_type type)
-{
-	struct dp_port *vf_port;
-	int port_id, ret;
-
-	// TODO(plague): these should return the port pointer
 	if (type == DP_PORT_PF) {
-		port_id = dp_get_pf_port_id_with_name(dp_layer, port_ext->port_name);
-		if (DP_FAILED(port_id))
-			return DP_ERROR;
-	} else {
-		vf_port = dp_get_vf_port_per_id(dp_layer, portid);
-		if (!vf_port) {
-			DPS_LOG_ERR("VF port %d not found", portid);
-			return DP_ERROR;
-		}
-		port_id = vf_port->dp_port_id;
-		vf_port->dp_allocated = 1;
+		if (DP_FAILED(dp_port_register_pf(port_id)))
+			return NULL;
+		if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
+			if (DP_FAILED(dp_port_flow_isolate(port_id)))
+				return NULL;
 	}
+
+	if (DP_FAILED(dp_port_init_ethdev(port_id, dev_info, type)))
+		return NULL;
+
+	// oveflow check done by liming the number of calls to this function
+	port = dp_ports.end++;
+	port->port_type = type;
+	port->port_id = port_id;
+
+	switch (type) {
+	case DP_PORT_PF:
+		ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot register link status callback %s", dp_strerror(ret));
+			return NULL;
+		}
+		break;
+	case DP_PORT_VF:
+		// All VFs belong to pf0, assign a tx queue from pf1 for it
+		if (dp_conf_is_offload_enabled()) {
+			port->peer_pf_port_id = dp_port_get_pf1_id();
+			port->peer_pf_hairpin_tx_rx_queue_offset = last_pf1_hairpin_tx_rx_queue_offset++;
+			if (last_pf1_hairpin_tx_rx_queue_offset > UINT8_MAX) {
+				DPS_LOG_ERR("Too many VFs, cannot create more hairpins");
+				return NULL;
+			}
+		}
+		// No link status callback, VFs are not critical for cross-hypervisor communication
+		break;
+	}
+	return port;
+}
+
+static int dp_port_init_pf(const char *pf_name)
+{
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	char ifname[IFNAMSIZ] = {0};
+	struct dp_port *port;
+
+	RTE_ETH_FOREACH_DEV(port_id) {
+		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
+			return DP_ERROR;
+		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
+			DPS_LOG_INFO("INIT initializing PF port: %d (%s)", port_id, ifname);
+			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_PF);
+			if (!port)
+				return DP_ERROR;
+			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("No such PF: '%s'", pf_name);
+	return DP_ERROR;
+}
+
+static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
+{
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	char ifname[IFNAMSIZ] = {0};
+	uint32_t vf_count = 0;
+	struct dp_port *port;
+
+	RTE_ETH_FOREACH_DEV(port_id) {
+		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
+			return DP_ERROR;
+		if (strstr(ifname, vf_pattern) && ++vf_count <= num_of_vfs) {
+			DPS_LOG_INFO("INIT initializing VF port: %d (%s)", port_id, ifname);
+			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_VF);
+			if (!port)
+				return DP_ERROR;
+			snprintf(port->port_name, sizeof(port->port_name), "%s", vf_pattern);
+			snprintf(port->vf_name, sizeof(port->vf_name), "%s", ifname);
+		}
+	}
+	if (!vf_count) {
+		DPS_LOG_ERR("No such VF: '%s'", vf_pattern);
+		return DP_ERROR;
+	} else if (vf_count < num_of_vfs) {
+		DPS_LOG_ERR("Not all VFs initialized (%d/%d)", vf_count, num_of_vfs);
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
+int dp_ports_init()
+{
+	int num_of_vfs = get_dpdk_layer()->num_of_vfs;
+	int num_of_ports = DP_MAX_PF_PORTS + num_of_vfs;
+
+	dp_port_init_pf_table();
+	dp_ports.ports = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
+	if (!dp_ports.ports) {
+		DPS_LOG_ERR("Cannot allocate port table");
+		return DP_ERROR;
+	}
+	dp_ports.end = dp_ports.ports;
+
+	// these need to be done in order
+	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
+		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
+		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
+		return DP_ERROR;
+
+	if (dp_conf_is_offload_enabled()) {
+		DP_FOREACH_PORT(&dp_ports, port) {
+			if (port->port_type == DP_PORT_VF)
+				if (DP_FAILED(dp_hairpin_setup(port)))
+					return DP_ERROR;
+		}
+	}
+
+	return DP_OK;
+}
+
+void dp_ports_free()
+{
+	free(dp_ports.ports);
+}
+
+
+static int dp_port_install_isolated_mode(int port_id)
+{
+	switch (dp_conf_get_overlay_type()) {
+	case DP_CONF_OVERLAY_TYPE_IPIP:
+		DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
+		if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP))
+			|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP)))
+			return DP_ERROR;
+		break;
+	case DP_CONF_OVERLAY_TYPE_GENEVE:
+		DPS_LOG_INFO("Init isolation flow rule for GENEVE tunnels");
+		if (DP_FAILED(dp_install_isolated_mode_geneve(port_id)))
+			return DP_ERROR;
+		break;
+	}
+	return DP_OK;
+}
+
+int dp_port_start(uint16_t port_id)
+{
+	struct dp_port *port;
+	int ret;
+
+	port = dp_port_get(port_id);
+	if (!port)
+		return DP_ERROR;
 
 	ret = rte_eth_dev_start(port_id);
 	if (DP_FAILED(ret)) {
@@ -326,36 +478,46 @@ int dp_port_allocate(struct dp_dpdk_layer *dp_layer, int portid, struct dp_port_
 		return DP_ERROR;
 	}
 
-	return port_id;
+	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
+		if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
+			return DP_ERROR;
+
+	enable_rx_node(port_id);
+
+	port->link_status = RTE_ETH_LINK_UP;
+	port->allocated = true;
+
+	// TODO(plague): research - this ordering is due to previously being in GRPC, but it seems this should be done earlier?
+	if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled())
+		if (DP_FAILED(dp_hairpin_bind(port)))
+			return DP_ERROR;
+
+	return DP_OK;
 }
 
-void dp_set_vf_attach_status(struct dp_dpdk_layer *dp_layer, int portid, dp_vf_port_attach_status attach_status)
+int dp_port_stop(uint16_t port_id)
 {
+	struct dp_port *port;
+	int ret;
 
-	for (uint i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((dp_layer->ports[i]->dp_p_type == DP_PORT_VF) &&
-			dp_layer->ports[i]->dp_port_id == portid){
-				dp_layer->ports[i]->attached = attach_status;
-				break;
+	port = dp_port_get(port_id);
+	if (!port)
+		return DP_ERROR;
+
+	// TODO(plague): research - no need to tear down hairpins?
+
+	disable_rx_node(port_id);
+
+	/* Tap interfaces in test environment can not be stopped */
+	/* due to a bug in dpdk tap device library. */
+	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
+		ret = rte_eth_dev_stop(port_id);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot stop eth port %d %s", port_id, dp_strerror(ret));
+			return DP_ERROR;
 		}
 	}
-}
 
-dp_vf_port_attach_status get_vf_attach_status(struct dp_dpdk_layer *dp_layer, int portid)
-{
-	dp_vf_port_attach_status status = DP_VF_PORT_DISATTACH;
-
-	for (uint i = 0; i < dp_layer->dp_port_cnt; i++) {
-		if ((dp_layer->ports[i]->dp_p_type == DP_PORT_VF) && dp_layer->ports[i]->dp_port_id == portid) {
-			status = dp_layer->ports[i]->attached;
-			break;
-		}
-	}
-
-	return status;
-}
-
-void dp_port_exit()
-{
-
+	port->allocated = false;
+	return DP_OK;
 }

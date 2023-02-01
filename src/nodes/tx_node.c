@@ -75,7 +75,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			|| df->flags.nat >= DP_LB_CHG_UL_DST_IP
 			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
 		) {
-			new_eth_type = dp_is_pf_port_id(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
+			new_eth_type = dp_port_is_pf(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
 			rewrite_eth_hdr(pkt, port, new_eth_type);
 		}
 		if (df->flags.valid && df->conntrack)
