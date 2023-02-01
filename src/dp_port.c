@@ -231,68 +231,6 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	return DP_OK;
 }
 
-void dp_port_print_link_info(uint16_t port_id, char *out, size_t out_size)
-{
-	struct rte_eth_stats stats = {0};
-	struct rte_ether_addr mac_addr;
-	struct rte_eth_link eth_link;
-	uint16_t mtu;
-	int ret;
-
-	ret = rte_eth_stats_get(port_id, &stats);
-	if (DP_FAILED(ret)) {
-		snprintf(out, out_size, "\n%d: stats get failed %s", port_id, dp_strerror(ret));
-		return;
-	}
-
-	ret = rte_eth_macaddr_get(port_id, &mac_addr);
-	if (DP_FAILED(ret)) {
-		snprintf(out, out_size, "\n%d: MAC address get failed %s", port_id, dp_strerror(ret));
-		return;
-	}
-
-	ret = rte_eth_link_get(port_id, &eth_link);
-	if (DP_FAILED(ret)) {
-		snprintf(out, out_size, "\n%d: link get failed %s", port_id, dp_strerror(ret));
-		return;
-	}
-
-	ret = rte_eth_dev_get_mtu(port_id, &mtu);
-	if (DP_FAILED(ret)) {
-		snprintf(out, out_size, "\n%d: mtu get failed %s", port_id, dp_strerror(ret));
-		return;
-	}
-
-	snprintf(out, out_size,
-		"\n"
-		"%s: flags=<%s> mtu %u\n"
-		"\tether %02X:%02X:%02X:%02X:%02X:%02X rxqueues %u txqueues %u\n"
-		"\tport# %u  speed %s\n"
-		"\tRX packets %" PRIu64"  bytes %" PRIu64"\n"
-		"\tRX errors %" PRIu64"  missed %" PRIu64"  no-mbuf %" PRIu64"\n"
-		"\tTX packets %" PRIu64"  bytes %" PRIu64"\n"
-		"\tTX errors %" PRIu64"\n",
-		"pf0",
-		eth_link.link_status == 0 ? "DOWN" : "UP",
-		mtu,
-		mac_addr.addr_bytes[0], mac_addr.addr_bytes[1],
-		mac_addr.addr_bytes[2], mac_addr.addr_bytes[3],
-		mac_addr.addr_bytes[4], mac_addr.addr_bytes[5],
-		1,
-		1,
-		port_id,
-		rte_eth_link_speed_to_str(eth_link.link_speed),
-		stats.ipackets,
-		stats.ibytes,
-		stats.ierrors,
-		stats.imissed,
-		stats.rx_nombuf,
-		stats.opackets,
-		stats.obytes,
-		stats.oerrors);
-}
-
-
 static int dp_port_flow_isolate(uint16_t port_id)
 {
 	struct rte_flow_error error;

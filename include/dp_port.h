@@ -64,8 +64,6 @@ bool dp_port_is_pf(uint16_t port_id);
 int dp_port_start(uint16_t port_id);
 int dp_port_stop(uint16_t port_id);
 
-void dp_port_print_link_info(uint16_t port_id, char *out, size_t out_size);
-
 #define DP_FOREACH_PORT(DP_PORTS, VARNAME) \
 	for (struct dp_port *VARNAME = (DP_PORTS)->ports; \
 		 VARNAME < (DP_PORTS)->end; \
