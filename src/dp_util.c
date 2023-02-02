@@ -100,7 +100,7 @@ void rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 }
 
 
-void print_ip(unsigned int ip, char *buf)
+void dp_fill_ipv4_print_buff(unsigned int ip, char *buf)
 {
 	snprintf(buf, 18, "%d.%d.%d.%d",
 		(ip >> 24) & 0xFF,

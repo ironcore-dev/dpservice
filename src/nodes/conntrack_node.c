@@ -47,7 +47,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	dp_add_flow_data(key, flow_val);
 
 	// Only the original flow (outgoing)'s hash value is recorded
-	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
+	// Implicit casting from hash_sig_t to uint32_t!
+	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
 	dp_invert_flow_key(key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = *key;
@@ -80,7 +81,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	}
-	df_ptr->dp_flow_hash = (uint32_t)dp_get_flow_hash_value(key);
+	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 }
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)

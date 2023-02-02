@@ -44,8 +44,8 @@ static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *ke
 			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE
 			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_FRAGMENT_NEEDED) {
 
-				print_ip(df_ptr->src.src_addr, ip_src_buf);
-				print_ip(df_ptr->dst.dst_addr, ip_dst_buf);
+				dp_fill_ipv4_print_buff(df_ptr->src.src_addr, ip_src_buf);
+				dp_fill_ipv4_print_buff(df_ptr->dst.dst_addr, ip_dst_buf);
 				DPS_LOG_DEBUG("received a ICMP error message with unsupported error code");
 				DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, error code %d", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
 				return -1;
@@ -140,7 +140,7 @@ void dp_add_flow(struct flow_key *key)
 	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
 		rte_exit(EXIT_FAILURE, "flow table for port add key failed\n");
 	else {
-		hash_v = (uint32_t)dp_get_flow_hash_value(key);
+		hash_v = dp_get_conntrack_flow_hash_value(key);
 		DPS_LOG_DEBUG("Successfully added a hash key: %d", hash_v);
 		dp_output_flow_key_info(key);
 	}
@@ -152,7 +152,7 @@ void dp_delete_flow(struct flow_key *key)
 	uint32_t hash_v;
 	
 	if (dp_flow_exists(key)) {
-		hash_v = (uint32_t)dp_get_flow_hash_value(key);
+		hash_v = dp_get_conntrack_flow_hash_value(key);
 		pos = rte_hash_del_key(ipv4_flow_tbl, key);
 		if (pos < 0)
 			// Negative return value of rte_hash_del_key only appears when its parameters are invalid under this if condition
@@ -203,18 +203,16 @@ void dp_free_flow(struct dp_ref *ref)
 
 void dp_free_network_nat_port(struct flow_value *cntrack)
 {
-	uint32_t nat_ip;
-	uint32_t vni;
-	uint16_t nat_port;
+	char printed_ip_buf[18] = {0};
+	int ret;
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-		nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst;
-		vni = cntrack->nat_info.vni;
-		nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
-		int ret = dp_remove_network_snat_port(nat_ip, nat_port, vni, cntrack->nat_info.l4_type);
-
-		if (ret < 0)
-			DPS_LOG_ERR("failed to remove an allocated network NAT port: %d, vni %d , with error code %d", nat_port, vni, ret);
+		ret = dp_remove_network_snat_port(cntrack);
+		if (DP_FAILED(ret)) {
+			dp_fill_ipv4_print_buff(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst, printed_ip_buf);
+			DPS_LOG_ERR("failed to remove an allocated network NAT port: %s::%d, code %d", printed_ip_buf,
+						cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst, ret);
+		}
 	}
 }
 
@@ -273,7 +271,7 @@ void dp_process_aged_flows_non_offload(void)
 	}
 }
 
-hash_sig_t dp_get_flow_hash_value(struct flow_key *key)
+hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
 {
 
 	//It is not necessary to first test if this key exists, since for now, this function
@@ -288,8 +286,8 @@ void dp_output_flow_key_info(struct flow_key *key)
 	char ip_src_buf[18]={0};
 	char ip_dst_buf[18]={0};
 
-	print_ip(key->ip_src, ip_src_buf);
-	print_ip(key->ip_dst, ip_dst_buf);
+	dp_fill_ipv4_print_buff(key->ip_src, ip_src_buf);
+	dp_fill_ipv4_print_buff(key->ip_dst, ip_dst_buf);
 
 	if (key->proto == IPPROTO_TCP)
 		DPS_LOG_DEBUG("tcp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
