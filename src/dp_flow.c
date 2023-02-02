@@ -11,6 +11,27 @@
 #include "node_api.h"
 #include "rte_flow/dp_rte_flow.h"
 
+// TODO(plague): debug only
+static void log_key(struct flow_key *key, const char *log_prefix)
+{
+	char ip_src_buf[18] = {0};
+	char ip_dst_buf[18] = {0};
+	char *proto = "unknown";
+
+	dp_fill_ipv4_print_buff(key->ip_src, ip_src_buf);
+	dp_fill_ipv4_print_buff(key->ip_dst, ip_dst_buf);
+
+	if (key->proto == IPPROTO_TCP)
+		proto = "tcp";
+	else if (key->proto == IPPROTO_UDP)
+		proto = "udp";
+	else if (key->proto == IPPROTO_ICMP)
+		proto = "icmp";
+
+	DPS_LOG_INFO("%-10s flow: %s, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
+				 log_prefix, proto, ip_src_buf, ip_dst_buf, key->src.type_src, key->port_dst);
+}
+
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static uint64_t timeout = 0;
 
@@ -100,6 +121,8 @@ int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* i
 		break;
 	}
 
+	log_key(key, "Created");
+
 	return result;
 }
 
@@ -121,6 +144,8 @@ void dp_invert_flow_key(struct flow_key *key /* in / out */)
 		if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
 			key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
 	}
+
+	log_key(key, "Inverted");
 }
 
 bool dp_flow_exists(struct flow_key *key)
@@ -144,6 +169,8 @@ void dp_add_flow(struct flow_key *key)
 		DPS_LOG_DEBUG("Successfully added a hash key: %d", hash_v);
 		dp_output_flow_key_info(key);
 	}
+
+	log_key(key, "Added");
 }
 
 void dp_delete_flow(struct flow_key *key)
@@ -151,6 +178,8 @@ void dp_delete_flow(struct flow_key *key)
 	int pos;
 	uint32_t hash_v;
 	
+	log_key(key, "Deleting");
+
 	if (dp_flow_exists(key)) {
 		hash_v = dp_get_conntrack_flow_hash_value(key);
 		pos = rte_hash_del_key(ipv4_flow_tbl, key);
@@ -265,6 +294,7 @@ void dp_process_aged_flows_non_offload(void)
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
 						    (void **)&flow_val, &iter) >= 0) {
 		if (unlikely((cur - flow_val->timestamp) > timeout)) {
+			log_key((struct flow_key *)next_key, "Aged");
 			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
 		}
