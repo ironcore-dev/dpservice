@@ -6,6 +6,7 @@
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
+#include "dp_vnf.h"
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_impl.h"
 
@@ -298,7 +299,7 @@ static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t rou
 static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	dp_alias_value alias_val;
+	dp_vnf_value vnf_val;
 	uint8_t ul_addr6[16];
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
@@ -309,11 +310,11 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
-	alias_val.portid = port_id;
-	alias_val.length = req->add_pfx.pfx_length;
+	vnf_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.portid = port_id;
+	vnf_val.length = req->add_pfx.pfx_length;
 	dp_generate_underlay_ipv6(DP_UNDEFINED_VNI, ul_addr6, sizeof(ul_addr6));
-	dp_map_alias_handle((void *)ul_addr6, &alias_val);
+	dp_map_vnf_handle((void *)ul_addr6, &vnf_val);
 	memcpy(rep->route.trgt_ip.addr6, ul_addr6, sizeof(rep->route.trgt_ip.addr6));
 
 	return EXIT_SUCCESS;
@@ -325,7 +326,7 @@ err:
 static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	dp_alias_value alias_val;
+	dp_vnf_value vnf_val;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -335,10 +336,10 @@ static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
-	alias_val.portid = port_id;
-	alias_val.length = req->add_pfx.pfx_length;
-	dp_del_portid_with_alias_handle(&alias_val);
+	vnf_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.portid = port_id;
+	vnf_val.length = req->add_pfx.pfx_length;
+	dp_del_portid_with_vnf_handle(&vnf_val);
 
 	return ret;
 err:
@@ -804,7 +805,7 @@ static int dp_process_listlb_pfxs(dp_request *req, struct rte_mbuf *m, struct rt
 		goto out;
 	}
 
-	dp_list_alias_routes(m, port_id, rep_arr);
+	dp_list_vnf_routes(m, port_id, rep_arr);
 
 out:
 	return EXIT_SUCCESS;

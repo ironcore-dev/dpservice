@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <sys/queue.h>
 
-#include "dp_alias.h"
+#include "dp_vnf.h"
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_flow.h"
@@ -133,7 +133,7 @@ static int init_interfaces()
 		|| DP_FAILED(dp_nat_init(pf0_socket))
 		|| DP_FAILED(dp_lb_init(pf0_socket))
 		|| DP_FAILED(dp_lpm_init(pf0_socket))
-		|| DP_FAILED(dp_alias_init(pf0_socket)))
+		|| DP_FAILED(dp_vnf_init(pf0_socket)))
 		return DP_ERROR;
 
 	return DP_OK;
