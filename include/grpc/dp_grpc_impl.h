@@ -91,7 +91,6 @@ typedef struct dp_pfx {
 		uint8_t		pfx_addr6[16];
 	} pfx_ip;
 	uint32_t	pfx_length;
-	uint32_t	pfx_lb_enabled;
 	uint8_t		pfx_ul_addr6[16];
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_pfx;

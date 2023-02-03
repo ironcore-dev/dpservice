@@ -12,6 +12,8 @@
 #define DP_SHOW_EXT_ROUTES true
 #define DP_SHOW_INT_ROUTES false
 
+static uint16_t pfx_counter = 1;
+
 void dp_last_mbuf_from_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[])
 {
 	dp_reply *rep;
@@ -278,10 +280,26 @@ err:
 	return ret;
 }
 
+static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t route_size)
+{
+	uint32_t l_vni = htonl(vni);
+
+	memcpy(route, get_underlay_conf()->src_ip6, route_size);
+	memcpy(route + 8, &l_vni, 4);
+	if (vni == 0) {
+		memcpy(route + 12, &pfx_counter, 2);
+		memset(route + 14, 0, 2);
+	} else {
+		memset(route + 12, 0, 4);
+	}
+	pfx_counter++;
+}
+
 static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
 	dp_alias_value alias_val;
+	uint8_t ul_addr6[16];
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -294,9 +312,9 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 	alias_val.portid = port_id;
 	alias_val.length = req->add_pfx.pfx_length;
-	dp_map_alias_handle((void *)req->add_pfx.pfx_ul_addr6, &alias_val);
-
-	memcpy(rep->route.trgt_ip.addr6, req->add_pfx.pfx_ul_addr6, sizeof(rep->route.trgt_ip.addr6));
+	dp_generate_underlay_ipv6(DP_UNDEFINED_VNI, ul_addr6, sizeof(ul_addr6));
+	dp_map_alias_handle((void *)ul_addr6, &alias_val);
+	memcpy(rep->route.trgt_ip.addr6, ul_addr6, sizeof(rep->route.trgt_ip.addr6));
 
 	return EXIT_SUCCESS;
 err:
@@ -342,11 +360,10 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
-					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
-			if (!req->add_pfx.pfx_lb_enabled) {
+						 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))
+		) {
 				ret = DP_ERROR_VM_ADD_PFX_ROUTE;
 				goto err;
-			}
 		}
 	}
 

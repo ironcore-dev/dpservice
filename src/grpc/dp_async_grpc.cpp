@@ -498,12 +498,10 @@ int ListPfxCall::Proceed()
 
 int CreateLBTargetPfxCall::Proceed()
 {
-	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
+	char buf_str[INET6_ADDRSTRLEN];
 	dp_request request = {0};
 	dp_reply reply = {0};
 	Status *err_status;
-	uint8_t buf_bin[16];
-	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -522,9 +520,6 @@ int CreateLBTargetPfxCall::Proceed()
 				DPGRPC_LOG_WARNING("CreateLBTargetPfx: wrong target pfx address: %s\n", request_.prefix().address().c_str());
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		request.add_pfx.pfx_lb_enabled = 1;
-		grpc_service->CalculateUnderlayRoute(DP_UNDEFINED_VNI, buf_bin, sizeof(buf_bin));
-		memcpy(request.add_pfx.pfx_ul_addr6, buf_bin, sizeof(request.add_pfx.pfx_ul_addr6));
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
