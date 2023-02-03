@@ -60,7 +60,7 @@ int dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result 
 	nkey.vni = vni;
 
 	ret = rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data);
-	if (ret < 0) {
+	if (DP_FAILED(ret)) {
 		result->is_vip_natted = false;
 		result->is_network_natted = false;
 		if (ret == -ENOENT)

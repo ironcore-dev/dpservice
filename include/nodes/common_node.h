@@ -31,6 +31,8 @@ enum {
 };
 #endif
 
+#define DP_GRAPH_NO_SPECULATED_NODE -1
+
 static __rte_always_inline
 void dp_foreach_graph_packet(struct rte_graph *graph,
 							 struct rte_node *node,
@@ -46,7 +48,7 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 	void **to_next, **from;
 	uint16_t last_spec = 0;
 	uint16_t held = 0;
-	
+
 	// If there is a valid speculated node, the pkts are moved to next node using rte_node_next_stream_move
 	// otherwise, always using rte_node_enqueue_x1
 	if (speculated_node >= 0) {
@@ -92,7 +94,7 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 			dp_graphtrace_next(node, pkt, next_index);
 			rte_node_enqueue_x1(graph, node, next_index, pkt);
 		}
-	
+
 	}
 }
 

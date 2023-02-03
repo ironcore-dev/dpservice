@@ -29,7 +29,7 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 
 	RTE_SET_USED(graph);
 
-	prev_key = NULL; 
+	prev_key = NULL;
 	curr_key = &first_key;
 
 	return 0;
@@ -91,15 +91,15 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 }
 
-static __rte_always_inline uint8_t compare_next_n_bytes(const unsigned char* first_val, const unsigned char* second_val, uint8_t nr_bytes)
+static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned char *first_val, const unsigned char *second_val, uint8_t nr_bytes)
 {
 
-	for (uint8_t i = 0; i < nr_bytes; i++){
+	for (uint8_t i = 0; i < nr_bytes; i++) {
 		if ((first_val[i] ^ second_val[i]) > 0)
-			return 0;
+			return false;
 	}
 
-	return 1;
+	return true;
 }
 
 
@@ -110,7 +110,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct dp_flow *df_ptr;
 	struct flow_key *key;
 	int key_search_result;
-	uint8_t key_cmp_result;
+	bool key_cmp_result;
 
 	df_ptr = get_dp_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -140,10 +140,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		}
 
 		if (prev_key)
-			key_cmp_result = compare_next_n_bytes((const unsigned char*)prev_key,
-													(const unsigned char*)curr_key,
+			key_cmp_result = dp_test_next_n_bytes_identical((const unsigned char *)prev_key,
+													(const unsigned char *)curr_key,
 													sizeof(struct flow_key));
-		if (!prev_key || !key_cmp_result){
+		if (!prev_key || !key_cmp_result) {
 			key_search_result = dp_get_flow_data(key, (void **)&flow_val);
 			if (unlikely(key_search_result == -ENOENT)) {
 				flow_val = flow_table_insert_entry(key, df_ptr, m);
