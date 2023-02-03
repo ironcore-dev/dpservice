@@ -111,10 +111,29 @@ static int timers_init()
 	return DP_OK;
 }
 
-int dp_dpdk_init()
+static inline void timers_free()
 {
-	memset(&dp_layer, 0, sizeof(dp_layer));
+	rte_timer_subsystem_finalize();
+}
 
+static inline int ring_init(const char *name, struct rte_ring **p_ring)
+{
+	*p_ring = rte_ring_create(name, DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	if (!*p_ring) {
+		DPS_LOG_ERR("Error creating '%s' ring buffer %s", name, dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
+static inline void ring_free(struct rte_ring *ring)
+{
+	rte_ring_free(ring);;
+}
+
+/** unsafe - does not do cleanup on failure */
+static int dp_dpdk_layer_init_unsafe()
+{
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS),
 												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE + 32,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
@@ -128,27 +147,12 @@ int dp_dpdk_init()
 	if (DP_FAILED(dp_layer.num_of_vfs))
 		return DP_ERROR;
 
-	dp_layer.grpc_tx_queue = rte_ring_create("grpc_tx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.grpc_tx_queue) {
-		DPS_LOG_ERR("Error creating grpc tx queue %s", dp_strerror(rte_errno));
+	/* TODO monitoring_rx_queue queue needs to be multiproducer, single consumer */
+	if (DP_FAILED(ring_init("grpc_tx_queue", &dp_layer.grpc_tx_queue))
+		|| DP_FAILED(ring_init("grpc_rx_queue", &dp_layer.grpc_rx_queue))
+		|| DP_FAILED(ring_init("periodic_msg_queue", &dp_layer.periodic_msg_queue))
+		|| DP_FAILED(ring_init("monitoring_rx_queue", &dp_layer.monitoring_rx_queue)))
 		return DP_ERROR;
-	}
-	dp_layer.grpc_rx_queue = rte_ring_create("grpc_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.grpc_rx_queue) {
-		DPS_LOG_ERR("Error creating grpc rx queue %s", dp_strerror(rte_errno));
-		return DP_ERROR;
-	}
-	dp_layer.periodic_msg_queue = rte_ring_create("periodic_msg_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.periodic_msg_queue) {
-		DPS_LOG_ERR("Error creating periodic messages queue %s", dp_strerror(rte_errno));
-		return DP_ERROR;
-	}
-	/* TODO Monitoring queue needs to be multiproducer, single consumer */
-	dp_layer.monitoring_rx_queue = rte_ring_create("monitoring_rx_queue", DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
-	if (!dp_layer.monitoring_rx_queue) {
-		DPS_LOG_ERR("Error creating monitoring rx queue %s", dp_strerror(rte_errno));
-		return DP_ERROR;
-	}
 
 	if (DP_FAILED(timers_init()))
 		return DP_ERROR;
@@ -158,9 +162,26 @@ int dp_dpdk_init()
 	return DP_OK;
 }
 
-void dp_dpdk_exit(void)
+int dp_dpdk_layer_init()
 {
-	dp_ports_free();
+	// set all to NULL-equivalent, so free-on-failure is safe
+	memset(&dp_layer, 0, sizeof(dp_layer));
+	if (DP_FAILED(dp_dpdk_layer_init_unsafe())) {
+		dp_dpdk_layer_free();
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
+void dp_dpdk_layer_free(void)
+{
+	// all functions are safe to call before init
+	timers_free();
+	ring_free(dp_layer.monitoring_rx_queue);
+	ring_free(dp_layer.periodic_msg_queue);
+	ring_free(dp_layer.grpc_rx_queue);
+	ring_free(dp_layer.grpc_tx_queue);
+	rte_mempool_free(dp_layer.rte_mempool);
 }
 
 void dp_force_quit()

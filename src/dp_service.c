@@ -134,6 +134,12 @@ static int init_interfaces()
 	return DP_OK;
 }
 
+static void free_interfaces()
+{
+	// TODO(plague): free graph once that code is refactored
+	dp_ports_free();
+}
+
 static inline int run_dpdk_service()
 {
 	int result;
@@ -147,7 +153,9 @@ static inline int run_dpdk_service()
 	result = dp_dpdk_main_loop();
 
 	if (DP_FAILED(dp_grpc_thread_join()))
-		return DP_ERROR;
+		result = DP_ERROR;
+
+	free_interfaces();
 
 	return result;
 }
@@ -176,12 +184,12 @@ static int run_service()
 		return DP_ERROR;
 	}
 
-	if (DP_FAILED(dp_dpdk_init()))
+	if (DP_FAILED(dp_dpdk_layer_init()))
 		return DP_ERROR;
 
 	result = run_dpdk_service();
 
-	dp_dpdk_exit();
+	dp_dpdk_layer_free();
 
 	return result;
 }
