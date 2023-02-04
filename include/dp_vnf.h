@@ -14,17 +14,30 @@ extern "C" {
 #define DP_VNF_MAX_TABLE_SIZE 100
 #define DP_VNF_IPV6_ADDR_SIZE 16
 
-typedef struct dp_vnf_value {
-	uint32_t ip;
-	uint16_t portid;
-	uint16_t length;
-} dp_vnf_value;
+enum vnf_type {
+	DP_VNF_TYPE_UNDEFINED,
+	DP_VNF_TYPE_LB_ALIAS,
+};
+
+struct dp_vnf_lb_alias {
+	uint32_t	ip;
+	uint16_t	length;
+};
+
+struct dp_vnf_value {
+	enum vnf_type	v_type;
+	uint32_t		vni;
+	uint16_t		portid;
+	union {
+		struct dp_vnf_lb_alias lb_alias;
+	} vnf;
+};
 
 int dp_vnf_init(int socket_id);
-int dp_map_vnf_handle(void *key, dp_vnf_value *val);
+int dp_map_vnf_handle(void *key, struct dp_vnf_value *val);
 int dp_get_portid_with_vnf_handle(void *key);
-void dp_del_portid_with_vnf_handle(dp_vnf_value *val);
-int dp_list_vnf_routes(struct rte_mbuf *m, uint16_t portid,
+void dp_del_portid_with_vnf_handle(struct dp_vnf_value *val);
+int dp_list_vnf_lb_alias_routes(struct rte_mbuf *m, uint16_t portid,
 						 struct rte_mbuf *rep_arr[]);
 
 #ifdef __cplusplus

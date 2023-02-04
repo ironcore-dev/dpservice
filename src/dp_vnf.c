@@ -14,11 +14,11 @@ int dp_vnf_init(int socket_id)
 	return DP_OK;
 }
 
-int dp_map_vnf_handle(void *key, dp_vnf_value *val)
+int dp_map_vnf_handle(void *key, struct dp_vnf_value *val)
 {
-	dp_vnf_value *temp_val;
+	struct dp_vnf_value *temp_val;
 
-	temp_val = rte_zmalloc("vnf_handle_mapping", sizeof(dp_vnf_value), RTE_CACHE_LINE_SIZE);
+	temp_val = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf_value), RTE_CACHE_LINE_SIZE);
 	if (!temp_val) {
 		printf("vnf handle for port %d malloc data failed\n", val->portid);
 		return EXIT_FAILURE;
@@ -42,7 +42,7 @@ err:
 
 int dp_get_portid_with_vnf_handle(void *key)
 {
-	dp_vnf_value *temp_val;
+	struct dp_vnf_value *temp_val;
 	uint16_t ret_val;
 
 	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
@@ -52,9 +52,9 @@ int dp_get_portid_with_vnf_handle(void *key)
 	return ret_val;
 }
 
-void dp_del_portid_with_vnf_handle(dp_vnf_value *val)
+void dp_del_portid_with_vnf_handle(struct dp_vnf_value *val)
 {
-	dp_vnf_value *temp_val = NULL;
+	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
 	int32_t ret;
 	void *key;
@@ -65,18 +65,22 @@ void dp_del_portid_with_vnf_handle(dp_vnf_value *val)
 		if (ret == -ENOENT)
 			break;
 
-		if ((val->portid == temp_val->portid) && (val->ip == temp_val->ip) && (val->length == temp_val->length)) {
+		if ((val->portid == temp_val->portid)
+			&& (val->vnf.lb_alias.ip == temp_val->vnf.lb_alias.ip)
+			&& (val->vnf.lb_alias.length == temp_val->vnf.lb_alias.length)
+			&& (val->v_type == temp_val->v_type)
+		) {
 			rte_free(temp_val);
 			rte_hash_del_key(vnf_handle_tbl, key);
 		}
 	}
 }
 
-int dp_list_vnf_routes(struct rte_mbuf *m, uint16_t portid, struct rte_mbuf *rep_arr[])
+int dp_list_vnf_lb_alias_routes(struct rte_mbuf *m, uint16_t portid, struct rte_mbuf *rep_arr[])
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
-	dp_vnf_value *temp_val;
+	struct dp_vnf_value *temp_val;
 	uint16_t msg_per_buf;
 	dp_route *rp_route;
 	uint32_t iter = 0;
@@ -100,6 +104,9 @@ int dp_list_vnf_routes(struct rte_mbuf *m, uint16_t portid, struct rte_mbuf *rep
 		if (portid != temp_val->portid)
 			continue;
 
+		if (temp_val->v_type != DP_VNF_TYPE_LB_ALIAS)
+			continue;
+
 		if (rep->com_head.msg_count &&
 			(rep->com_head.msg_count % msg_per_buf == 0)) {
 
@@ -113,8 +120,8 @@ int dp_list_vnf_routes(struct rte_mbuf *m, uint16_t portid, struct rte_mbuf *rep
 		rep->com_head.msg_count++;
 
 		rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		rp_route->pfx_ip.addr = temp_val->ip;
-		rp_route->pfx_length = temp_val->length;
+		rp_route->pfx_ip.addr = temp_val->vnf.lb_alias.ip;
+		rp_route->pfx_length = temp_val->vnf.lb_alias.length;
 		memcpy(rp_route->trgt_ip.addr6, key, sizeof(rp_route->trgt_ip.addr6));
 	}
 
