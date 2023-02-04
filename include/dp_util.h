@@ -8,6 +8,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/if.h>
+#include <rte_byteorder.h>
 #include <rte_ethdev.h>
 #include <rte_hash.h>
 #include <rte_log.h>
@@ -43,6 +44,25 @@ void dp_fill_ipv4_print_buff(unsigned int ip, char *buf);
 
 
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id);
+
+
+// inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
+// TODO(plague): apply this to dp_fill_ipv4_print_buff()
+#define DP_IPV4_PRINT_FMT       "%u.%u.%u.%u"
+#define DP_IPV4_PRINT_BYTES(ip) (ip) & 0xFF, \
+								((ip) >> 8) & 0xFF, \
+								((ip) >> 16) & 0xFF, \
+								((ip) >> 24) & 0xFF
+
+#define DP_IPV6_PRINT_FMT       "%x:%x:%x:%x:%x:%x:%x:%x"
+#define DP_IPV6_PRINT_BYTES(ip) rte_cpu_to_be_16(((uint16_t *)(ip))[0]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[1]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[2]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[3]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[4]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[5]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[6]), \
+								rte_cpu_to_be_16(((uint16_t *)(ip))[7])
 
 #ifdef __cplusplus
 }

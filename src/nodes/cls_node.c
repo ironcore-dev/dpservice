@@ -127,6 +127,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 			extract_outter_ethernet_header(m);
 			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
+			m->packet_type &= ~RTE_PTYPE_L2_MASK;
 			return CLS_NEXT_OVERLAY_SWITCH;
 		} else {
 			extract_inner_ethernet_header(m);

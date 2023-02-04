@@ -29,6 +29,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = get_dp_flow_ptr(m);
 	struct underlay_conf *u_conf = get_underlay_conf();
 	struct rte_ipv6_hdr *ipv6_hdr;
+	uint32_t tunnel_type = dp_conf_get_overlay_type() == DP_CONF_OVERLAY_TYPE_GENEVE
+		? RTE_PTYPE_TUNNEL_GENEVE
+		: RTE_PTYPE_TUNNEL_IP;
+	// TODO(plague): optimization PR - u_conf and tunnel_type can be prepared in init()
 
 	m->outer_l2_len = sizeof(struct rte_ether_hdr);
 	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
@@ -44,6 +48,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
 	ipv6_hdr->proto = df->tun_info.proto_id;
+
+	if (RTE_ETH_IS_IPV4_HDR(m->packet_type))
+		m->packet_type = RTE_PTYPE_L3_IPV6 | tunnel_type | RTE_PTYPE_INNER_L3_IPV4;
+	else
+		m->packet_type = RTE_PTYPE_L3_IPV6 | tunnel_type | RTE_PTYPE_INNER_L3_IPV6;
 
 	m->ol_flags |= RTE_MBUF_F_TX_OUTER_IPV6;
 	m->ol_flags |= RTE_MBUF_F_TX_TUNNEL_IP;

@@ -38,6 +38,11 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_mbuf
 	if (!udp_hdr || !geneve_hdr)
 		return GENEVE_TUNNEL_NEXT_DROP;
 
+	if (RTE_ETH_IS_IPV4_HDR(m->packet_type))
+		m->packet_type = RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_GENEVE | RTE_PTYPE_INNER_L3_IPV4;
+	else
+		m->packet_type = RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_GENEVE | RTE_PTYPE_INNER_L3_IPV6;
+
 	udp_hdr->dst_port = htons(u_conf->dst_port);
     df->tun_info.dst_port=htons(u_conf->dst_port);
 	/* TODO compute here from df values inner 5 tuple a CRC16 hash instead as src port */
@@ -45,9 +50,11 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_mbuf
 	udp_hdr->src_port = htons(u_conf->src_port);
     df->tun_info.src_port=htons(u_conf->src_port);
 	
-    memcpy(geneve_hdr->vni, &df->tun_info.dst_vni, sizeof(geneve_hdr->vni));
 	geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
 	geneve_hdr->protocol = htons(df->l3_type);
+	// TODO this does not seem right as we are copying into 3B array from an int
+	memcpy(geneve_hdr->vni, &df->tun_info.dst_vni, sizeof(geneve_hdr->vni));
+	geneve_hdr->rsvd1 = 0;
 
 	df->tun_info.proto_id=DP_IP_PROTO_UDP;
 	
@@ -62,12 +69,14 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_decap(struct rte_mbuf
 	struct rte_udp_hdr *udp_hdr;
 
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
-	
+
 	udp_hdr=rte_pktmbuf_mtod(m, struct rte_udp_hdr*);
 	df->tun_info.src_port=udp_hdr->src_port;
 	df->tun_info.dst_port=udp_hdr->dst_port;
 	
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_udp_hdr));
+
+	m->packet_type &= ~(RTE_PTYPE_L4_MASK | RTE_PTYPE_L3_MASK);
 	
 	geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
 	rte_memcpy(&df->tun_info.dst_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));
@@ -76,9 +85,11 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_decap(struct rte_mbuf
 	if (ntohs(geneve_hdr->protocol) == RTE_ETHER_TYPE_IPV6) {
 		df->l3_type = RTE_ETHER_TYPE_IPV6;
 		next_index = GENEVE_TUNNEL_NEXT_IPV6_LOOKUP;
+		m->packet_type |= RTE_PTYPE_L3_IPV6;
 	} else {
 		df->l3_type = RTE_ETHER_TYPE_IPV4;
 		next_index = GENEVE_TUNNEL_NEXT_IPV4_LOOKUP;
+		m->packet_type |= RTE_PTYPE_L3_IPV4;
 	}
 
 	return next_index;
