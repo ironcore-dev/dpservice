@@ -60,6 +60,21 @@ struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbu
 	return m_new;
 }
 
+static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t route_size)
+{
+	uint32_t l_vni = htonl(vni);
+
+	memcpy(route, get_underlay_conf()->src_ip6, route_size);
+	memcpy(route + 8, &l_vni, 4);
+	if (vni == 0) {
+		memcpy(route + 12, &pfx_counter, 2);
+		memset(route + 14, 0, 2);
+	} else {
+		memset(route + 12, 0, 4);
+	}
+	pfx_counter++;
+}
+
 int dp_send_to_worker(dp_request *req)
 {
 	struct rte_mbuf *m = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
@@ -111,12 +126,13 @@ __rte_always_inline void dp_fill_head(dp_com_head *head, uint16_t type,
 
 static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int ret = EXIT_SUCCESS;
 	int vni = req->add_lb.vni;
 
 	if (req->add_lb.ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_create_lb((void *)req->add_lb.lb_id, ntohl(req->add_lb.vip.vip_addr), req->add_lb.vni,
-						 req->add_lb.lbports)) {
+		dp_generate_underlay_ipv6(vni, ul_addr6, sizeof(ul_addr6));
+		if (dp_create_lb(&req->add_lb, ul_addr6)) {
 			ret = DP_ERROR_CREATE_LB_ERR;
 			goto err;
 		}
@@ -124,6 +140,7 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 		ret = DP_ERROR_CREATE_LB_UNSUPP_IP;
 		goto err;
 	}
+	rte_memcpy(rep->get_lb.ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	rep->vni = vni;
 	return EXIT_SUCCESS;
 err:
@@ -281,26 +298,11 @@ err:
 	return ret;
 }
 
-static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t route_size)
-{
-	uint32_t l_vni = htonl(vni);
-
-	memcpy(route, get_underlay_conf()->src_ip6, route_size);
-	memcpy(route + 8, &l_vni, 4);
-	if (vni == 0) {
-		memcpy(route + 12, &pfx_counter, 2);
-		memset(route + 14, 0, 2);
-	} else {
-		memset(route + 12, 0, 4);
-	}
-	pfx_counter++;
-}
-
 static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
 	struct dp_vnf_value vnf_val;
-	uint8_t ul_addr6[16];
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -317,7 +319,7 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 	vnf_val.vnf.lb_alias.length = req->add_pfx.pfx_length;
 	dp_generate_underlay_ipv6(DP_UNDEFINED_VNI, ul_addr6, sizeof(ul_addr6));
 	dp_map_vnf_handle((void *)ul_addr6, &vnf_val);
-	memcpy(rep->route.trgt_ip.addr6, ul_addr6, sizeof(rep->route.trgt_ip.addr6));
+	rte_memcpy(rep->route.trgt_ip.addr6, ul_addr6, sizeof(rep->route.trgt_ip.addr6));
 
 	return EXIT_SUCCESS;
 err:

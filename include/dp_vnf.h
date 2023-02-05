@@ -12,7 +12,6 @@ extern "C" {
 #endif
 
 #define DP_VNF_MAX_TABLE_SIZE 100
-#define DP_VNF_IPV6_ADDR_SIZE 16
 
 enum vnf_type {
 	DP_VNF_TYPE_UNDEFINED,

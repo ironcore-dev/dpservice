@@ -69,7 +69,6 @@ int CreateLBCall::Proceed()
 	dp_reply reply = {0};
 	uint16_t i, size;
 	Status *err_status;
-	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -110,9 +109,7 @@ int CreateLBCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.get_lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
@@ -163,7 +160,6 @@ int GetLBCall::Proceed()
 	char buf_str[INET6_ADDRSTRLEN];
 	dp_request request = {0};
 	dp_reply reply = {0};
-	uint8_t buf_bin[16];
 	struct in_addr addr;
 	Status *err_status;
 	LBPort *lb_port;
@@ -208,9 +204,7 @@ int GetLBCall::Proceed()
 			if (reply.get_lb.lbports[i].protocol == DP_IP_PROTO_UDP)
 				lb_port->set_protocol(UDP);
 		}
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->CalculateUnderlayRoute(reply_.vni(), buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.get_lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);

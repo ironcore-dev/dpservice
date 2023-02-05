@@ -11,7 +11,8 @@
 extern "C" {
 #endif
 
-#define DP_UNDEFINED_VNI 0
+#define DP_UNDEFINED_VNI		0
+#define DP_VNF_IPV6_ADDR_SIZE	16
 
 typedef enum {
 	DP_REQ_TYPE_NONE,
@@ -81,6 +82,7 @@ typedef struct dp_lb {
 		uint8_t		vip_addr6[16];
 	} vip;
 	uint32_t	vni;
+	uint8_t		ul_addr6[16];
 	struct dp_lb_port lbports[DP_LB_PORT_SIZE];
 } dp_lb;
 
