@@ -412,9 +412,11 @@ err:
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint16_t port_id = DP_INVALID_PORT_ID;
 	int err_code = EXIT_SUCCESS;
 	uint16_t p_id = 0;
+	uint32_t vni;
 
 	// TODO(plague?): this seems to be a misnomer, this name comes from vm_pci argument
 	if (req->add_machine.name[0] == '\0') {
@@ -445,6 +447,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
 			goto err;
 		}
+		vni = req->add_machine.vni;
 		if (setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM4;
 			goto handle_err;
@@ -482,6 +485,9 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		err_code = DP_ERROR_VM_ADD_VM_NO_VFS;
 		goto err;
 	}
+
+	dp_generate_underlay_ipv6(vni, ul_addr6, sizeof(ul_addr6));
+	rte_memcpy(rep->vf_pci.ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	return EXIT_SUCCESS;
 /* Rollback the changes, in case of an error */
 route_err:
@@ -543,6 +549,8 @@ static int dp_process_getmachine(dp_request *req, dp_reply *rep)
 	rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(port_id),
 		sizeof(vm_info->machine_id));
 	rte_eth_dev_get_name_by_port(port_id, rep->vm_info.pci_name);
+	/* TODO guvenc this should come from the vm table and should be already added by add_machine */
+	dp_generate_underlay_ipv6(vm_info->vni, rep->vm_info.ul_addr6, sizeof(rep->vm_info.ul_addr6));
 
 	return ret;
 err:

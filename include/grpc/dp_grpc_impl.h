@@ -221,6 +221,7 @@ typedef struct dp_vf_pci {
 	uint32_t	bus;
 	uint32_t	slot;
 	uint32_t	function;
+	uint8_t		ul_addr6[16];
 } dp_vf_pci;
 
 typedef struct dp_vm_info {
@@ -229,6 +230,7 @@ typedef struct dp_vm_info {
 	uint8_t		machine_id[VM_MACHINE_ID_STR_LEN];
 	uint32_t	vni;
 	char		pci_name[RTE_ETH_NAME_MAX_LEN];
+	uint8_t		ul_addr6[16];
 } dp_vm_info;
 
 typedef struct dp_lb_backip {

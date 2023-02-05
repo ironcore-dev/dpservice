@@ -754,7 +754,6 @@ int AddInterfaceCall::Proceed()
 	VirtualFunction *vf;
 	Status *err_status;
 	IpAdditionResponse *ip_resp;
-	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -806,9 +805,7 @@ int AddInterfaceCall::Proceed()
 		reply_.set_allocated_vf(vf);
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->CalculateUnderlayRoute(request_.vni(), buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.vf_pci.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		ip_resp = new IpAdditionResponse();
 		ip_resp->set_underlayroute(buf_str);
 		ip_resp->set_allocated_status(err_status);
@@ -864,7 +861,6 @@ int GetInterfaceCall::Proceed()
 	Status *err_status;
 	Interface *machine;
 	struct in_addr addr;
-	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
@@ -897,9 +893,7 @@ int GetInterfaceCall::Proceed()
 		machine->set_vni(vm_info->vni);
 		machine->set_pcidpname(vm_info->pci_name);
 
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->CalculateUnderlayRoute(vm_info->vni, buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.vm_info.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		machine->set_underlayroute(buf_str);
 		reply_.set_allocated_interface(machine);
 		err_status = new Status();
@@ -1339,7 +1333,6 @@ int ListInterfacesCall::Proceed()
 	uint16_t read_so_far = 0;
 	int i;
 	char buf_str[INET6_ADDRSTRLEN];
-	uint8_t buf_bin[16];
 
 	if (status_ == REQUEST) {
 		new ListInterfacesCall(service_, cq_);
@@ -1354,7 +1347,6 @@ int ListInterfacesCall::Proceed()
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 		do {
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
@@ -1369,8 +1361,7 @@ int ListInterfacesCall::Proceed()
 				machine->set_interfaceid((char *)vm_info->machine_id);
 				machine->set_vni(vm_info->vni);
 				machine->set_pcidpname(vm_info->pci_name);
-				grpc_service->CalculateUnderlayRoute(vm_info->vni, buf_bin, sizeof(buf_bin));
-				inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+				inet_ntop(AF_INET6, vm_info->ul_addr6, buf_str, INET6_ADDRSTRLEN);
 				machine->set_underlayroute(buf_str);
 			}
 			read_so_far += (reply->com_head.msg_count - read_so_far);
