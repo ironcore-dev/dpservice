@@ -259,7 +259,7 @@ typedef struct dp_reply {
 		dp_route		route;
 		dp_lb_backip	back_ip;
 		dp_nat_entry	nat_entry;
-		uint32_t		vni;
+		uint8_t			ul_addr6[16];
 	};
 } dp_reply;
 

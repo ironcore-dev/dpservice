@@ -141,7 +141,6 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 	rte_memcpy(rep->get_lb.ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
-	rep->vni = vni;
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;
@@ -217,6 +216,7 @@ err:
 
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_vip.machine_id);
@@ -239,7 +239,8 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		if (ret)
 			goto err_snat;
 	}
-	rep->vni = dp_get_vm_vni(port_id);
+	dp_generate_underlay_ipv6(dp_get_vm_vni(port_id), ul_addr6, sizeof(ul_addr6));
+	rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
 err_snat:
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
@@ -355,6 +356,7 @@ err:
 
 static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
@@ -373,8 +375,8 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 				goto err;
 		}
 	}
-
-	rep->vni = dp_get_vm_vni(port_id);
+	dp_generate_underlay_ipv6(dp_get_vm_vni(port_id), ul_addr6, sizeof(ul_addr6));
+	rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;
@@ -600,6 +602,7 @@ err:
 
 static int dp_process_addnat(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
@@ -624,7 +627,8 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
 			goto err;
 	}
-	rep->vni = vm_vni;
+	dp_generate_underlay_ipv6(vm_vni, ul_addr6, sizeof(ul_addr6));
+	rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;

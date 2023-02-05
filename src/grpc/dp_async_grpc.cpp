@@ -352,11 +352,9 @@ int GetLBVIPBackendsCall::Proceed()
 
 int AddPfxCall::Proceed()
 {
-	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 	dp_request request = {0};
 	dp_reply reply = {0};
 	Status *err_status;
-	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -387,8 +385,7 @@ int AddPfxCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
@@ -635,7 +632,6 @@ int AddVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	Status *err_status;
-	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -665,9 +661,7 @@ int AddVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
@@ -1102,7 +1096,6 @@ int AddNATVIPCall::Proceed()
 
 	grpc::Status ret = grpc::Status::OK;
 	Status *err_status;
-	uint8_t buf_bin[16];
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -1138,9 +1131,7 @@ int AddNATVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->CalculateUnderlayRoute(reply.vni, buf_bin, sizeof(buf_bin));
-		inet_ntop(AF_INET6, buf_bin, buf_str, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);
