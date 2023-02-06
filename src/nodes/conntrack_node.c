@@ -36,6 +36,11 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 	return 0;
 }
 
+// static __rte_always_inline void set_flow_timeout_value(struct dp_flow *df_ptr, struct flow_value *flow_val)
+// {
+// 	flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
+// }
+
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df_ptr, struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
@@ -51,6 +56,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+	// set_flow_timeout_value(df_ptr, flow_val);
+	flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
 	dp_add_flow_data(key, flow_val);
 

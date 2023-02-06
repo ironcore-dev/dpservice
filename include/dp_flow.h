@@ -8,13 +8,16 @@
 #include "dpdk_layer.h"
 #include "node_api.h"
 #include "dp_refcount.h"
+#include "dp_timer.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define FLOW_MAX				(1*1024*1024UL)
-#define DP_FLOW_DEFAULT_TIMEOUT	30 /* In seconds */
+
+#define DP_FLOW_DEFAULT_TIMEOUT	30  /* In seconds */
+#define DP_FLOW_UDP_TIMEOUT		1
 
 enum {
 	DP_FLOW_DIR_ORG,
@@ -77,6 +80,8 @@ struct flow_value {
 	uint16_t		flow_state;
 	uint16_t		dir;
 	uint16_t		port;
+	uint64_t		timestamp;
+	uint8_t			timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint8_t			lb_dst_addr6[16];
 	uint8_t			action[DP_FLOW_DIR_MAX];
 	struct dp_ref	ref_count;

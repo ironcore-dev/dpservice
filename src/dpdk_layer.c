@@ -26,17 +26,11 @@
 #include "dp_port.h"
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_timer.h"
 
-// all times in seconds
-#define TIMER_MESSAGE_INTERVAL 30
-// make sure that we do not sleep (and do stuff) longer than the manage interval
-// that would make the code miss it (see main_core_loop())
-#define TIMER_MANAGE_INTERVAL 10
 #define STATS_SLEEP 1
 
 static volatile bool force_quit;
-static struct rte_timer message_timer;
-static uint64_t timer_manage_interval;
 
 static const char * const default_patterns[] = {
 	"rx-*",
@@ -74,50 +68,10 @@ static struct underlay_conf gen_conf = {
 	.default_port = 443,
 };
 
-static void message_timer_cb()
-{
-	if (dp_conf_is_ipv6_overlay_enabled()) {
-		trigger_nd_ra();
-		trigger_nd_unsol_adv();
-	}
-	trigger_garp();
-	if (DP_FAILED(dp_send_event_timer_msg()))
-		DPS_LOG_WARNING("Cannot send timer event");
-}
 
-static int timers_init()
-{
-	uint64_t hz = rte_get_timer_hz();;
-	int ret;
 
-	ret = rte_timer_subsystem_init();
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot init timer subsystem %s", dp_strerror(ret));
-		return ret;
-	}
 
-	rte_timer_init(&message_timer);
 
-	timer_manage_interval = hz * TIMER_MANAGE_INTERVAL;
-
-	ret = rte_timer_reset(&message_timer,
-						  hz * TIMER_MESSAGE_INTERVAL,
-						  PERIODICAL,
-						  rte_lcore_id(),
-						  message_timer_cb,
-						  NULL);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start message timer");  // there is no errno for this
-		return DP_ERROR;
-	}
-
-	return DP_OK;
-}
-
-static inline void timers_free()
-{
-	rte_timer_subsystem_finalize();
-}
 
 static inline int ring_init(const char *name, struct rte_ring **p_ring)
 {
@@ -255,7 +209,7 @@ static int main_core_loop(void)
 
 	while (!force_quit) {
 		cur_tsc = rte_get_timer_cycles();
-		if ((cur_tsc - prev_tsc) > timer_manage_interval) {
+		if ((cur_tsc - prev_tsc) > dp_get_timer_manage_interval()) {
 			ret = rte_timer_manage();
 			if (DP_FAILED(ret)) {
 				DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));

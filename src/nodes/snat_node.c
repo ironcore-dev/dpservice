@@ -78,6 +78,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					}
 				}
 
+				if (df_ptr->l4_type == DP_IP_PROTO_UDP)
+					cntrack->timeout_value = DP_FLOW_UDP_TIMEOUT;
+
 				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
 				cntrack->nat_info.vni = vni;
 				cntrack->nat_info.l4_type = df_ptr->l4_type;
