@@ -15,7 +15,7 @@ enum
 {
 	CLS_NEXT_ARP,
 	CLS_NEXT_IPV6_ND,
-	CLS_NEXT_IPV4_LOOKUP,
+	CLS_NEXT_CONNTRACK,
 	CLS_NEXT_IPV6_LOOKUP,
 	CLS_NEXT_OVERLAY_SWITCH,
 	CLS_NEXT_DROP,
@@ -24,22 +24,22 @@ enum
 
 static const uint8_t next_nodes[256] __rte_cache_aligned = {
 	[RTE_PTYPE_L3_IPV4] =
-		CLS_NEXT_IPV4_LOOKUP,
+		CLS_NEXT_CONNTRACK,
 
 	[RTE_PTYPE_L3_IPV4_EXT] =
-		CLS_NEXT_IPV4_LOOKUP,
+		CLS_NEXT_CONNTRACK,
 
 	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN] =
-		CLS_NEXT_IPV4_LOOKUP,
+		CLS_NEXT_CONNTRACK,
 
 	[RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_IPV4_LOOKUP,
+		CLS_NEXT_CONNTRACK,
 
 	[RTE_PTYPE_L3_IPV4_EXT | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_IPV4_LOOKUP,
+		CLS_NEXT_CONNTRACK,
 
 	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_IPV4_LOOKUP,
+		CLS_NEXT_CONNTRACK,
 	
 	[RTE_PTYPE_L3_IPV6] =
 		CLS_NEXT_IPV6_LOOKUP,
@@ -115,10 +115,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (is_ipv6_nd(m))
 		return CLS_NEXT_IPV6_ND;
 
-	if (next_nodes[pkt_type] == CLS_NEXT_IPV4_LOOKUP) {
+	if (next_nodes[pkt_type] == CLS_NEXT_CONNTRACK) {
 		/* TODO Drop ipv4 packets coming from PF ports */
 		extract_inner_ethernet_header(m);
-		return CLS_NEXT_IPV4_LOOKUP;
+		return CLS_NEXT_CONNTRACK;
 	}
 
 	if (next_nodes[pkt_type] == CLS_NEXT_IPV6_LOOKUP) {
@@ -156,7 +156,7 @@ static struct rte_node_register cls_node_base = {
 		{
 			[CLS_NEXT_ARP] = "arp",
 			[CLS_NEXT_IPV6_ND] = "ipv6_nd",
-			[CLS_NEXT_IPV4_LOOKUP] = "conntrack",
+			[CLS_NEXT_CONNTRACK] = "conntrack",
 			[CLS_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
 			[CLS_NEXT_OVERLAY_SWITCH] = "overlay_switch",
 			[CLS_NEXT_DROP] = "drop",
