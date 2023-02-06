@@ -22,10 +22,19 @@ The drawback here is that you need to put the same capabilites to the `gdb` proc
 ## Debugging the test-suite
 Normally, tests are run via the `meson test` command. For easier debugging once the tests fails, direct call to `pytest` in `test/` directory is recommended. Even only running the appropriate `test_*.py` can be better.
 
-Additionally, `pytest` supports the `--attach` argument, which makes it not start its own service process and instead attaches to an already running one. This is a way for the developer to run a service under debugger and then let the tests run on it.
+Additionally, `pytest` supports the `--attach` argument, which makes it not start its own service process and instead attaches to an already running one (instead of using the provided wrapper script `dp_service.py` to run it). This is a way for the developer to run a service under debugger and then let the tests run on it.
 
 Of course, you need to use the same command-line arguments as the test-suite would use. For that, run the test once with `pytest -s` and then look at the output. The service command-line will be there.
 
 ### GDB Signal handler
 As the TUN/TAP driver uses signals, it is recommended to use `handle signal SIG35 nostop pass noprint` while debugging the test-suite (as this is just the first of real-time signal values used, you may need to add more).
 
+
+## Debugging graph nodes
+To provide a rudimentary packet analysis while the packet is being processed inside dp-service, there is a meson feature `enable_graphtrace` that compiles-in an extra command-line option `--graphtrace`. This allows you to see packet data as it travels through the DPDK graph (as opposed to nly seeing ingress/egress packets using `tcpdump`).
+
+To enable this feature, you need to configure it in meson: `meson setup --reconfigure -Denable_graphtrace=true build/`. Then you can add `--graphtrace=<level>` to actually enable logging at run-time. The parameter `level` is an integer, higher level will cause more verbosity.
+
+> Currently the exact verbosity of a given number can change as this feature is still being worked on.
+
+Be aware that this will produce large amounts of logs, so only use it for debugging and if possible, on a prepared traffic flow.
