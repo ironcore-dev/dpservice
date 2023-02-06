@@ -625,6 +625,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 
 	ret = rte_hash_add_key_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void *)portmap_data);
 	if (DP_FAILED(ret)) {
+		rte_free(portmap_data);
 		DPS_LOG_ERR("Failed to add ipv4 network nat portmap data %s", dp_strerror(ret));
 		return ret;
 	}
