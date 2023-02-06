@@ -59,8 +59,10 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(struct rte_mbuf *
 		next_index = IPIP_TUNNEL_NEXT_FIREWALL;
 	}
 
-	if (next_index != IPIP_TUNNEL_NEXT_DROP)
+	if (next_index != IPIP_TUNNEL_NEXT_DROP) {
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
+		m->packet_type &= ~RTE_PTYPE_L3_MASK;
+	}
 
 	return next_index;
 }

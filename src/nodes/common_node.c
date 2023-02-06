@@ -2,26 +2,180 @@
 
 #include "nodes/common_node.h"
 #include <rte_ethdev.h>
+#include <rte_ip.h>
 #include "dp_log.h"
+#include "dp_mbuf_dyn.h"
+#include "rte_flow/dp_rte_flow.h"
+#include "dp_util.h"
 
-static inline void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufsize)
+#define PRINT_LAYER(PPOS, BUF, BUFSIZE, FORMAT, ...) do { \
+	if (*(PPOS) < (BUFSIZE)) \
+		*(PPOS) += snprintf((BUF) + *(PPOS), (BUFSIZE) - *(PPOS), \
+					"%s" FORMAT, \
+					*(PPOS) ? " / " : "", \
+					##__VA_ARGS__); \
+} while (0)
+
+static void dp_graphtrace_print_ether(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
 {
-	struct rte_ether_hdr *frame = rte_pktmbuf_mtod((struct rte_mbuf *)pkt, struct rte_ether_hdr *);
+	struct rte_ether_hdr *ether_hdr = (struct rte_ether_hdr *)*p_pkt_data;
 
-	snprintf(buf, bufsize,
-			 RTE_ETHER_ADDR_PRT_FMT " -> " RTE_ETHER_ADDR_PRT_FMT,
-			 RTE_ETHER_ADDR_BYTES(&frame->src_addr), RTE_ETHER_ADDR_BYTES(&frame->dst_addr));
+	PRINT_LAYER(p_pos, buf, bufsize,
+		RTE_ETHER_ADDR_PRT_FMT " -> " RTE_ETHER_ADDR_PRT_FMT,
+		RTE_ETHER_ADDR_BYTES(&ether_hdr->src_addr), RTE_ETHER_ADDR_BYTES(&ether_hdr->dst_addr));
 
-	// TODO add more as needed
+	*p_pkt_data = ether_hdr + 1;
+}
+
+static int dp_graphtrace_print_ipv4(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)*p_pkt_data;
+
+	PRINT_LAYER(p_pos, buf, bufsize,
+		DP_IPV4_PRINT_FMT " -> " DP_IPV4_PRINT_FMT,
+		DP_IPV4_PRINT_BYTES(ipv4_hdr->src_addr), DP_IPV4_PRINT_BYTES(ipv4_hdr->dst_addr));
+
+	*p_pkt_data = ipv4_hdr + 1;
+	return ipv4_hdr->next_proto_id;
+}
+
+static int dp_graphtrace_print_ipv6(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)*p_pkt_data;
+
+	PRINT_LAYER(p_pos, buf, bufsize,
+		DP_IPV6_PRINT_FMT " -> " DP_IPV6_PRINT_FMT,
+		DP_IPV6_PRINT_BYTES(ipv6_hdr->src_addr), DP_IPV6_PRINT_BYTES(ipv6_hdr->dst_addr));
+
+	*p_pkt_data = ipv6_hdr + 1;
+	return ipv6_hdr->proto;
+}
+
+static void dp_graphtrace_print_udp(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)*p_pkt_data;
+
+	PRINT_LAYER(p_pos, buf, bufsize,
+		"UDP %d -> %d",
+		ntohs(udp_hdr->src_port), ntohs(udp_hdr->dst_port));
+
+	*p_pkt_data = udp_hdr + 1;
+}
+
+static void dp_graphtrace_print_tcp(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	struct rte_tcp_hdr *tcp_hdr = (struct rte_tcp_hdr *)*p_pkt_data;
+
+	PRINT_LAYER(p_pos, buf, bufsize,
+		"TCP %d -> %d",
+		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port));
+
+	*p_pkt_data = tcp_hdr + 1;
+}
+
+static void dp_graphtrace_print_icmp(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)*p_pkt_data;
+
+	PRINT_LAYER(p_pos, buf, bufsize,
+		"ICMP %d-%d",
+		icmp_hdr->icmp_type, icmp_hdr->icmp_code);
+
+	*p_pkt_data = icmp_hdr + 1;
+}
+
+static void dp_graphtrace_print_geneve(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	struct rte_flow_item_geneve *geneve_hdr = (struct rte_flow_item_geneve *)*p_pkt_data;
+
+	PRINT_LAYER(p_pos, buf, bufsize,
+		"GNV %02x%02x%02x",
+		geneve_hdr->vni[0], geneve_hdr->vni[1], geneve_hdr->vni[2]);
+
+	*p_pkt_data = geneve_hdr + 1;
+}
+
+static inline void dp_graphtrace_print_l4(int proto, void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
+{
+	if (proto == IPPROTO_UDP)
+		dp_graphtrace_print_udp(p_pkt_data, p_pos, buf, bufsize);
+	else if (proto == IPPROTO_TCP)
+		dp_graphtrace_print_tcp(p_pkt_data, p_pos, buf, bufsize);
+	else if (proto == IPPROTO_ICMP || proto == IPPROTO_ICMPV6)
+		dp_graphtrace_print_icmp(p_pkt_data, p_pos, buf, bufsize);
+}
+
+static void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufsize)
+{
+	void *pkt_data = rte_pktmbuf_mtod((struct rte_mbuf *)pkt, void *);
+	uint32_t inner_l3_type = pkt->packet_type & RTE_PTYPE_INNER_L3_MASK;
+	size_t pos = 0;
+	int proto = 0;
+
+	if (pkt->packet_type & RTE_PTYPE_L2_MASK)
+		dp_graphtrace_print_ether(&pkt_data, &pos, buf, bufsize);
+
+	if (RTE_ETH_IS_IPV4_HDR(pkt->packet_type))
+		proto = dp_graphtrace_print_ipv4(&pkt_data, &pos, buf, bufsize);
+	else if (RTE_ETH_IS_IPV6_HDR(pkt->packet_type))
+		proto = dp_graphtrace_print_ipv6(&pkt_data, &pos, buf, bufsize);
+	else {
+		if ((pkt->packet_type & RTE_PTYPE_L4_MASK) == RTE_PTYPE_L4_UDP)
+			proto = IPPROTO_UDP;
+		else if ((pkt->packet_type & RTE_PTYPE_L4_MASK) == RTE_PTYPE_L4_TCP)
+			proto = IPPROTO_TCP;
+		else if ((pkt->packet_type & RTE_PTYPE_L4_MASK) == RTE_PTYPE_L4_ICMP)
+			proto = IPPROTO_ICMP;
+	}
+
+	dp_graphtrace_print_l4(proto, &pkt_data, &pos, buf, bufsize);
+
+	if (!(pkt->packet_type & RTE_PTYPE_TUNNEL_MASK))
+		return;
+
+	if (pkt->packet_type & RTE_PTYPE_INNER_L2_MASK)
+		dp_graphtrace_print_ether(&pkt_data, &pos, buf, bufsize);
+
+	if ((pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) == RTE_PTYPE_TUNNEL_GENEVE)
+		dp_graphtrace_print_geneve(&pkt_data, &pos, buf, bufsize);
+	else if ((pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) != RTE_PTYPE_TUNNEL_IP)
+		return;
+
+	// for bitwise reason there is no macro for inner types
+	if (inner_l3_type == RTE_PTYPE_INNER_L3_IPV4
+		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4_EXT
+		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4_EXT_UNKNOWN
+	) {
+		proto = dp_graphtrace_print_ipv4(&pkt_data, &pos, buf, bufsize);
+	} else if (inner_l3_type == RTE_PTYPE_INNER_L3_IPV6
+			|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV6_EXT
+			|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV6_EXT_UNKNOWN
+	) {
+		proto = dp_graphtrace_print_ipv6(&pkt_data, &pos, buf, bufsize);
+	} else {
+		if ((pkt->packet_type & RTE_PTYPE_INNER_L4_MASK) == RTE_PTYPE_INNER_L4_UDP)
+			proto = IPPROTO_UDP;
+		else if ((pkt->packet_type & RTE_PTYPE_INNER_L4_MASK) == RTE_PTYPE_INNER_L4_TCP)
+			proto = IPPROTO_TCP;
+		else if ((pkt->packet_type & RTE_PTYPE_INNER_L4_MASK) == RTE_PTYPE_INNER_L4_ICMP)
+			proto = IPPROTO_ICMP;
+	}
+
+	dp_graphtrace_print_l4(proto, &pkt_data, &pos, buf, bufsize);
 }
 
 // does not use DPNODE_LOG_* due to output alignment
+#define GRAPHTRACE_LOG(FORMAT, ...) DP_LOG(INFO, GRAPH, FORMAT, ##__VA_ARGS__)
+// shorter lines for debugging
+// #define GRAPHTRACE_LOG(FORMAT, ...) printf("GRAPHTRACE: " FORMAT "\n", ##__VA_ARGS__)
+
 #define GRAPHTRACE_PRINT(PKT, FORMAT, ...) do { \
 	char _graphtrace_buf[512]; \
 	dp_graphtrace_print_pkt((PKT), _graphtrace_buf, sizeof(_graphtrace_buf)); \
-	DP_LOG(INFO, GRAPH, FORMAT ": %s\n", __VA_ARGS__, _graphtrace_buf); \
+	GRAPHTRACE_LOG(FORMAT ": %s", __VA_ARGS__, _graphtrace_buf); \
 } while (0)
 
+// TODO: use a unique id (saved in mbuf data)
 #define GRAPHTRACE_PKT_ID(PKT) (PKT)
 
 void dp_graphtrace_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
