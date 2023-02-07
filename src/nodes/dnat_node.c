@@ -154,7 +154,7 @@ static uint16_t dnat_node_process(struct rte_graph *graph,
 								  void **objs,
 								  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, (int32_t)DNAT_NEXT_IPV4_LOOKUP, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, DNAT_NEXT_IPV4_LOOKUP, get_next_index);
 	return nb_objs;
 }
 

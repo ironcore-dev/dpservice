@@ -184,7 +184,7 @@ static uint16_t conntrack_node_process(struct rte_graph *graph,
 									   void **objs,
 									   uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, (int32_t)CONNTRACK_NEXT_DNAT, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, CONNTRACK_NEXT_DNAT, get_next_index);
 	return nb_objs;
 }
 

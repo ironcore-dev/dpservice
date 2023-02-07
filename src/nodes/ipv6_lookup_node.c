@@ -83,7 +83,7 @@ static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, (int32_t)IPV6_LOOKUP_NEXT_L2_DECAP, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV6_LOOKUP_NEXT_L2_DECAP, get_next_index);
 	return nb_objs;
 }
 

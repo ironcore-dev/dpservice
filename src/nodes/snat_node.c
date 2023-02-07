@@ -152,7 +152,7 @@ static uint16_t snat_node_process(struct rte_graph *graph,
 								  void **objs,
 								  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, (int32_t)SNAT_NEXT_FIREWALL, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, SNAT_NEXT_FIREWALL, get_next_index);
 	return nb_objs;
 }
 
