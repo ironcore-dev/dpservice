@@ -174,10 +174,14 @@ void dp_add_flow_data(struct flow_key *key, void *data)
 		rte_exit(EXIT_FAILURE, "flow table for port add data failed\n");
 }
 
-void dp_get_flow_data(struct flow_key *key, void **data)
+int dp_get_flow_data(struct flow_key *key, void **data)
 {
-	if (rte_hash_lookup_data(ipv4_flow_tbl, key, data) < 0)
+	int result = rte_hash_lookup_data(ipv4_flow_tbl, key, data);
+
+	if (DP_FAILED(result))
 		data = NULL;
+
+	return result;
 }
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)

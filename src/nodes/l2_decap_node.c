@@ -46,7 +46,7 @@ static uint16_t l2_decap_node_process(struct rte_graph *graph,
 									  void **objs,
 									  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, L2_DECAP_OVERLAY_SWITCH, get_next_index);
 	return nb_objs;
 }
 

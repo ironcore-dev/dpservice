@@ -30,7 +30,7 @@ static uint16_t firewall_node_process(struct rte_graph *graph,
 									  void **objs,
 									  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, FIREWALL_NEXT_L2_DECAP, get_next_index);
 	return nb_objs;
 }
 

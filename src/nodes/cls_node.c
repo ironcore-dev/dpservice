@@ -143,7 +143,7 @@ static uint16_t cls_node_process(struct rte_graph *graph,
 								 void **objs,
 								 uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, CLS_NEXT_CONNTRACK, get_next_index);
 	return nb_objs;
 }
 

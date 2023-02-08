@@ -50,7 +50,7 @@ int dp_nat_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result)
+int dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result)
 {
 	struct nat_key nkey;
 	int ret;
@@ -59,16 +59,14 @@ void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
 
-	ret = rte_hash_lookup(ipv4_snat_tbl, &nkey);
-	if (ret < 0) {
+	ret = rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data);
+	if (DP_FAILED(ret)) {
 		result->is_vip_natted = false;
 		result->is_network_natted = false;
-		return;
-	}
-	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
-		result->is_vip_natted = false;
-		result->is_network_natted = false;
-		return;
+		if (ret == -ENOENT)
+			return DP_OK;
+		else
+			return DP_ERROR;
 	}
 
 	if (data->vip_ip == 0)
@@ -80,6 +78,8 @@ void dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result
 		result->is_network_natted = false;
 	else
 		result->is_network_natted = true;
+
+	return DP_OK;
 
 }
 

@@ -42,7 +42,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		uint16_t nat_port;
 		uint32_t vni =  dp_get_vm_vni(m->port);
 		src_ip = ntohl(df_ptr->src.src_addr);
-		dp_check_if_ip_natted(src_ip, vni, &nat_check);
+		if (DP_FAILED(dp_check_if_ip_natted(src_ip, vni, &nat_check))) {
+			DPNODE_LOG_WARNING(node, "Failed to perform snat table searching");
+			return SNAT_NEXT_DROP;
+		}
+
 		if ((nat_check.is_vip_natted || nat_check.is_network_natted) && df_ptr->flags.public_flow == DP_FLOW_SOUTH_NORTH
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -148,7 +152,7 @@ static uint16_t snat_node_process(struct rte_graph *graph,
 								  void **objs,
 								  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, SNAT_NEXT_FIREWALL, get_next_index);
 	return nb_objs;
 }
 

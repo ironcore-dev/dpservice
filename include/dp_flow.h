@@ -60,24 +60,24 @@ struct flow_key {
 } __rte_packed;
 
 struct flow_nat_info {
-	uint8_t nat_type;
 	uint32_t vni;
+	uint16_t icmp_err_ip_cksum;
+	uint8_t nat_type;
 	uint8_t underlay_dst[16];
 	uint8_t l4_type;
-	uint16_t icmp_err_ip_cksum;
-};
+} __rte_packed;
 
 
 struct flow_value {
+	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
+	struct flow_nat_info	nat_info;
+	uint64_t		timestamp;
+	rte_atomic32_t	flow_cnt;
 	uint16_t		flow_status;
 	uint16_t		flow_state;
-	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
 	uint16_t		dir;
 	uint16_t		port;
-	uint64_t		timestamp;
 	uint8_t			lb_dst_addr6[16];
-	rte_atomic32_t	flow_cnt;
-	struct flow_nat_info	nat_info;
 	uint8_t			action[DP_FLOW_DIR_MAX];
 	struct dp_ref	ref_count;
 };
@@ -89,7 +89,7 @@ struct flow_age_ctx {
 };
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
-void dp_get_flow_data(struct flow_key *key, void **data);
+int dp_get_flow_data(struct flow_key *key, void **data);
 void dp_add_flow_data(struct flow_key *key, void *data);
 void dp_add_flow(struct flow_key *key);
 void dp_delete_flow(struct flow_key *key);
