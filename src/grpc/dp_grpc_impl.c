@@ -412,7 +412,6 @@ err:
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint16_t port_id = DP_INVALID_PORT_ID;
 	int err_code = EXIT_SUCCESS;
 	uint16_t p_id = 0;
@@ -486,8 +485,8 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	dp_generate_underlay_ipv6(vni, ul_addr6, sizeof(ul_addr6));
-	rte_memcpy(rep->vf_pci.ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
+	dp_generate_underlay_ipv6(vni, dp_get_vm_ul_ip6(port_id), sizeof(sizeof(rep->vf_pci.ul_addr6)));
+	rte_memcpy(rep->vf_pci.ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(rep->vf_pci.ul_addr6));
 	return EXIT_SUCCESS;
 /* Rollback the changes, in case of an error */
 route_err:
@@ -549,8 +548,7 @@ static int dp_process_getmachine(dp_request *req, dp_reply *rep)
 	rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(port_id),
 		sizeof(vm_info->machine_id));
 	rte_eth_dev_get_name_by_port(port_id, rep->vm_info.pci_name);
-	/* TODO guvenc this should come from the vm table and should be already added by add_machine */
-	dp_generate_underlay_ipv6(vm_info->vni, rep->vm_info.ul_addr6, sizeof(rep->vm_info.ul_addr6));
+	rte_memcpy(rep->vm_info.ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(rep->vm_info.ul_addr6));
 
 	return ret;
 err:
@@ -781,6 +779,7 @@ static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rt
 		rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(act_ports[i]),
 			sizeof(vm_info->machine_id));
 		rte_eth_dev_get_name_by_port(act_ports[i], vm_info->pci_name);
+		rte_memcpy(vm_info->ul_addr6, dp_get_vm_ul_ip6(act_ports[i]), sizeof(vm_info->ul_addr6));
 	}
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
