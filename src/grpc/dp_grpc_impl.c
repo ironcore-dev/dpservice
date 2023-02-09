@@ -228,9 +228,10 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		dp_generate_underlay_ipv6(dp_get_vm_vni(port_id), ul_addr6, sizeof(ul_addr6));
 		ret = dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 						  ntohl(req->add_vip.vip.vip_addr),
-						  dp_get_vm_vni(port_id));
+						  dp_get_vm_vni(port_id), ul_addr6);
 		if (ret)
 			goto err;
 		ret = dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
@@ -238,9 +239,8 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 						  dp_get_vm_vni(port_id));
 		if (ret)
 			goto err_snat;
+		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	}
-	dp_generate_underlay_ipv6(dp_get_vm_vni(port_id), ul_addr6, sizeof(ul_addr6));
-	rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
 err_snat:
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
@@ -276,6 +276,7 @@ err:
 static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
+	struct snat_data *s_data;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
@@ -285,14 +286,15 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	rep->get_vip.vip.vip_addr = htonl(dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
-														dp_get_vm_vni(port_id)));
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
+										 dp_get_vm_vni(port_id));
 
-	if (!rep->get_vip.vip.vip_addr) {
+	if (!s_data || !s_data->vip_ip) {
 		ret = DP_ERROR_VM_GET_NAT_NO_IP_SET;
 		goto err;
 	}
-
+	rep->get_vip.vip.vip_addr = htonl(s_data->vip_ip);
+	rte_memcpy(rep->get_vip.ul_addr6, s_data->ul_ip6, sizeof(rep->ul_addr6));
 	return ret;
 err:
 	rep->com_head.err_code = ret;
@@ -630,6 +632,7 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 
 		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr),
 								0, vm_vni);
+		/*TODO (guvenc) in case of an error, we need to rollback the network snat ip, see how addVIP is doing it */
 		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
 			goto err;
 	}

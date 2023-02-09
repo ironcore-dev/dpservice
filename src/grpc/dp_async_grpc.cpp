@@ -709,6 +709,7 @@ int DelVIPCall::Proceed()
 
 int GetVIPCall::Proceed()
 {
+	char buf_str[INET6_ADDRSTRLEN];
 	dp_request request = {0};
 	dp_reply reply = {0};
 	Status *err_status;
@@ -735,6 +736,8 @@ int GetVIPCall::Proceed()
 		reply_.set_ipversion(dpdkonmetal::IPVersion::IPv4);
 		addr.s_addr = reply.get_vip.vip.vip_addr;
 		reply_.set_address(inet_ntoa(addr));
+		inet_ntop(AF_INET6, reply.get_vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
+		reply_.set_underlayroute(buf_str);
 		status_ = FINISH;
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);

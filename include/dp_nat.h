@@ -41,6 +41,7 @@ struct snat_data {
 	uint32_t	vip_ip;
 	uint32_t	network_nat_ip;
 	uint16_t	network_nat_port_range[2];
+	uint8_t		ul_ip6[16];
 };
 
 struct netnat_portmap_key {
@@ -71,7 +72,8 @@ struct nat_check_result {
 int dp_nat_init(int socket_id);
 void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni);
+struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni);
+int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_ipv6);
 
 void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni);
 bool dp_is_ip_dnatted(uint32_t d_ip, uint32_t vni);

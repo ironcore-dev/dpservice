@@ -872,7 +872,8 @@ public:
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else
-				printf("Received VIP %s\n", reply.address().c_str());
+				printf("Received VIP %s underlayroute %s\n",
+					   reply.address().c_str(), reply.underlayroute().c_str());
 	}
 
 	void DelInterface() {

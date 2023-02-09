@@ -203,6 +203,7 @@ message InterfaceVIPIP {
 	Status status = 1;
 	IPVersion ipVersion = 2;
 	bytes address = 3;	// Can be both ipv4 and ipv6
+	bytes underlayRoute = 4;
 }
 
 message LBIP {

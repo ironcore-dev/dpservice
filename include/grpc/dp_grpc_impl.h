@@ -67,12 +67,13 @@ typedef struct dp_lb_port {
 } dp_lb_port;
 
 typedef struct dp_vip {
-	uint32_t ip_type;
+	uint32_t	ip_type;
 	union {
 		uint32_t	vip_addr;
 		uint8_t		vip_addr6[16];
 	} vip;
-	char machine_id[VM_MACHINE_ID_STR_LEN];
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+	uint8_t		ul_addr6[16];
 } dp_vip;
 
 typedef struct dp_lb {

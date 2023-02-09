@@ -97,6 +97,20 @@ uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 	return data->vip_ip;
 }
 
+struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni)
+{
+	struct nat_key nkey;
+	struct snat_data *data;
+
+	nkey.ip = vm_ip;
+	nkey.vni = vni;
+
+	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
+		return 0;
+
+	return data;
+}
+
 struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni)
 {
 	struct snat_data *data;
@@ -125,7 +139,7 @@ uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 	return data->network_nat_ip;
 }
 
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
+int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_ipv6)
 {
 	int ret = EXIT_SUCCESS;
 	struct nat_key nkey;
@@ -136,7 +150,9 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
 	nkey.vni = vni;
 
 	if (rte_hash_lookup(ipv4_snat_tbl, &nkey) >= 0) {
+		/* Behind the same key, we can have NAT IP and VIP */
 		if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
+			/*TODO (guvenc) this doesnt seem to be a correct return value */
 			ret = DP_REQ_TYPE_ADD_NATVIP;
 			goto err;
 		}
@@ -144,7 +160,8 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
 		if (data->vip_ip != 0) {
 			ret = DP_ERROR_VM_ADD_NAT_IP_EXISTS;
 			goto err;
-		} else {
+		} else { /*TODO (guvenc) Why do we need this else ? A vip was not deleted and will be overwritten ?*/
+			rte_memcpy(data->ul_ip6, ul_ipv6, sizeof(data->ul_ip6));
 			data->vip_ip = s_ip;
 			return ret;
 		}
@@ -161,6 +178,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni)
 		ret = DP_ERROR_VM_ADD_NAT_ADD_KEY;
 		goto err_key;
 	}
+	rte_memcpy(data->ul_ip6, ul_ipv6, sizeof(data->ul_ip6));
 	data->vip_ip = s_ip;
 	data->network_nat_ip = 0;
 
