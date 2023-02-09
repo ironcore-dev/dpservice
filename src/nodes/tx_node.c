@@ -8,6 +8,7 @@
 #include "nodes/common_node.h"
 #include "nodes/tx_node_priv.h"
 #include "nodes/ipv6_nd_node.h"
+#include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
@@ -76,7 +77,9 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
 		) {
 			new_eth_type = dp_port_is_pf(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
-			rewrite_eth_hdr(pkt, port, new_eth_type);
+			if (unlikely(DP_FAILED(rewrite_eth_hdr(pkt, port, new_eth_type))))
+				DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
+			// since this is done in burst, just send out a bad packet..
 		}
 		if (df->flags.valid && df->conntrack)
 			dp_handle_traffic_forward_offloading(pkt, df);
