@@ -624,8 +624,10 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 	vm_vni = dp_get_vm_vni(port_id);
 
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		dp_generate_underlay_ipv6(vm_vni, ul_addr6, sizeof(ul_addr6));
 		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
-									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
+									    vm_vni, (uint16_t)req->add_nat_vip.port_range[0],
+									    (uint16_t)req->add_nat_vip.port_range[1], ul_addr6);
 
 		if (ret)
 			goto err;
@@ -635,9 +637,8 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 		/*TODO (guvenc) in case of an error, we need to rollback the network snat ip, see how addVIP is doing it */
 		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
 			goto err;
+		rte_memcpy(rep->nat_entry.underlay_route, ul_addr6, sizeof(rep->nat_entry.underlay_route));
 	}
-	dp_generate_underlay_ipv6(vm_vni, ul_addr6, sizeof(ul_addr6));
-	rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
 err:
 	rep->com_head.err_code = ret;

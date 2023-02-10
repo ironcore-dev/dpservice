@@ -1148,6 +1148,7 @@ int GetNATVIPCall::Proceed()
 	Status *err_status;
 	struct in_addr addr;
 	NATIP *nat_ip;
+	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
 		new GetNATVIPCall(service_, cq_);
@@ -1174,6 +1175,8 @@ int GetNATVIPCall::Proceed()
 		reply_.set_allocated_natvipip(nat_ip);
 		reply_.set_maxport(reply.nat_entry.max_port);
 		reply_.set_minport(reply.nat_entry.min_port);
+		inet_ntop(AF_INET6, reply.nat_entry.underlay_route, buf, INET6_ADDRSTRLEN);
+		reply_.set_underlayroute(buf);
 		status_ = FINISH;
 		err_status = new Status();
 		err_status->set_error(reply.com_head.err_code);

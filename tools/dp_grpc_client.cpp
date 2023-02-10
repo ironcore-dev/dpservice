@@ -968,8 +968,9 @@ public:
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
-			printf("Received NAT IP %s with min port: %d and max port: %d\n",
-					reply.natvipip().address().c_str(), reply.minport(), reply.maxport());
+			printf("Received NAT IP %s with min port: %d and max port: %d underlay %s\n",
+					reply.natvipip().address().c_str(), reply.minport(), reply.maxport(),
+					reply.underlayroute().c_str());
 	}
 
 	void AddNeighNAT() {

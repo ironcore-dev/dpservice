@@ -198,7 +198,8 @@ err:
 	return ret;
 }
 
-int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
+int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port,
+							  uint16_t max_port, uint8_t *ul_ipv6)
 {
 	int ret = EXIT_SUCCESS;
 	struct nat_key nkey;
@@ -240,12 +241,12 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 	data->vip_ip = 0;
 	data->network_nat_port_range[0] = min_port;
 	data->network_nat_port_range[1] = max_port;
+	rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_ip6));
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
 		ret = DP_ERROR_VM_ADD_NETNAT_ADD_DATA;
 		goto out;
 	}
-
 	return ret;
 out:
 	rte_free(data);

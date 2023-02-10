@@ -63,6 +63,7 @@ message GetNATResponse {
 	NATIP natVIPIP = 2;
 	uint32 minPort = 3; // port should be uint16 (less than 65536)
 	uint32 maxPort = 4;
+	bytes underlayRoute = 5;
 }
 
 message CreateLoadBalancerResponse {
