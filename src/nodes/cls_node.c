@@ -22,44 +22,6 @@ enum
 	CLS_NEXT_MAX
 };
 
-static const uint8_t next_nodes[256] __rte_cache_aligned = {
-	[RTE_PTYPE_L3_IPV4] =
-		CLS_NEXT_CONNTRACK,
-
-	[RTE_PTYPE_L3_IPV4_EXT] =
-		CLS_NEXT_CONNTRACK,
-
-	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN] =
-		CLS_NEXT_CONNTRACK,
-
-	[RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_CONNTRACK,
-
-	[RTE_PTYPE_L3_IPV4_EXT | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_CONNTRACK,
-
-	[RTE_PTYPE_L3_IPV4_EXT_UNKNOWN | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_CONNTRACK,
-	
-	[RTE_PTYPE_L3_IPV6] =
-		CLS_NEXT_IPV6_LOOKUP,
-
-	[RTE_PTYPE_L3_IPV6_EXT] =
-		CLS_NEXT_IPV6_LOOKUP,
-
-	[RTE_PTYPE_L3_IPV6_EXT_UNKNOWN] =
-		CLS_NEXT_IPV6_LOOKUP,
-
-	[RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_IPV6_LOOKUP,
-
-	[RTE_PTYPE_L3_IPV6_EXT | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_IPV6_LOOKUP,
-
-	[RTE_PTYPE_L3_IPV6_EXT_UNKNOWN | RTE_PTYPE_L2_ETHER] =
-		CLS_NEXT_IPV6_LOOKUP,
-};
-
 struct cls_node_ctx
 {
 	uint16_t next;
@@ -94,8 +56,7 @@ static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m)
 	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
 	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr *)(req_ipv6_hdr + 1);
 
-	return req_eth_hdr->ether_type == htons(RTE_ETHER_TYPE_IPV6)
-		&& req_ipv6_hdr->proto == DP_IP_PROTO_ICMPV6
+	return req_ipv6_hdr->proto == DP_IP_PROTO_ICMPV6
 		&& (req_icmp6_hdr->icmp6_type == NDISC_NEIGHBOUR_SOLICITATION
 			|| req_icmp6_hdr->icmp6_type == NDISC_ROUTER_SOLICITATION)
 		;
@@ -103,33 +64,38 @@ static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m)
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	uint8_t pkt_type = (m->packet_type & (RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK));
-	struct dp_flow *df;
+	uint32_t l2_type = m->packet_type & RTE_PTYPE_L2_MASK;
+	uint32_t l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
+	struct dp_flow *df = init_dp_flow_ptr(m);
 
-	init_dp_mbuf_priv1(m);
+	if (unlikely(l2_type != RTE_PTYPE_L2_ETHER))
+		return CLS_NEXT_DROP;
 
-	/* Mellanox PMD drivers do net set detailed L2 ptype information in mbuf */
-	if (pkt_type == RTE_PTYPE_L2_ETHER && is_arp(m))
-		return CLS_NEXT_ARP;
+	if (unlikely(l3_type == 0)) {
+		// Manual test, because Mellanox PMD drivers do not set detailed L2 packet_type in mbuf
+		if (is_arp(m))
+			return CLS_NEXT_ARP;
+		return CLS_NEXT_DROP;
+	}
 
-	if (is_ipv6_nd(m))
-		return CLS_NEXT_IPV6_ND;
-
-	if (next_nodes[pkt_type] == CLS_NEXT_CONNTRACK) {
+	if (RTE_ETH_IS_IPV4_HDR(l3_type)) {
 		/* TODO Drop ipv4 packets coming from PF ports */
 		extract_inner_ethernet_header(m);
 		return CLS_NEXT_CONNTRACK;
 	}
 
-	if (next_nodes[pkt_type] == CLS_NEXT_IPV6_LOOKUP) {
+	if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
 		if (dp_port_is_pf(m->port)) {
-			df = get_dp_flow_ptr(m);
+			if (unlikely(is_ipv6_nd(m)))
+				return CLS_NEXT_DROP;
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 			extract_outter_ethernet_header(m);
 			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 			m->packet_type &= ~RTE_PTYPE_L2_MASK;
 			return CLS_NEXT_OVERLAY_SWITCH;
 		} else {
+			if (is_ipv6_nd(m))
+				return CLS_NEXT_IPV6_ND;
 			extract_inner_ethernet_header(m);
 			return CLS_NEXT_IPV6_LOOKUP;
 		}

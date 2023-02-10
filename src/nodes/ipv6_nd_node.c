@@ -36,8 +36,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct nd_msg *nd_msg;
 	struct ra_msg *req_ra_msg;
 
-	init_dp_mbuf_priv1(m);
-	
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_memcpy(req_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), sizeof(req_eth_hdr->src_addr.addr_bytes));
 

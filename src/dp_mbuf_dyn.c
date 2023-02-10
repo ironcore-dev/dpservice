@@ -5,14 +5,7 @@
 // TODO either move into headers or switch to -flto
 // TODO return value never checked, add assertion here
 
-__rte_always_inline struct dp_flow * get_dp_flow_ptr(struct rte_mbuf *m)
-{
-	if (!m)
-		return NULL;
-	return (struct dp_flow *)(m + 1);
-}
-
-__rte_always_inline struct dp_flow * alloc_dp_flow_ptr(struct rte_mbuf *m)
+__rte_always_inline struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m)
 {
 	if (!m)
 		return NULL;
@@ -20,8 +13,19 @@ __rte_always_inline struct dp_flow * alloc_dp_flow_ptr(struct rte_mbuf *m)
 	return (struct dp_flow *)(m + 1);
 }
 
-__rte_always_inline void init_dp_mbuf_priv1(struct rte_mbuf *m)
+__rte_always_inline struct dp_flow *alloc_dp_flow_ptr(struct rte_mbuf *m)
 {
-	if (m)
-		memset((void*)(m + 1), 0, sizeof(struct dp_flow));
+	if (!m)
+		return NULL;
+
+	return (struct dp_flow *)(m + 1);
+}
+
+__rte_always_inline struct dp_flow *init_dp_flow_ptr(struct rte_mbuf *m)
+{
+	if (!m)
+		return NULL;
+
+	memset(m + 1, 0, sizeof(struct dp_flow));
+	return (struct dp_flow *)(m + 1);
 }
