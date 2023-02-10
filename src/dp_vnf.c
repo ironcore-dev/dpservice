@@ -21,7 +21,7 @@ int dp_map_vnf_handle(void *key, struct dp_vnf_value *val)
 	temp_val = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf_value), RTE_CACHE_LINE_SIZE);
 	if (!temp_val) {
 		printf("vnf handle for port %d malloc data failed\n", val->portid);
-		return EXIT_FAILURE;
+		return DP_ERROR;
 	}
 
 	RTE_VERIFY(val->portid < DP_MAX_PORTS);
@@ -33,11 +33,11 @@ int dp_map_vnf_handle(void *key, struct dp_vnf_value *val)
 		printf("vnf handle for port %d add data failed\n", temp_val->portid);
 		goto err;
 	}
-	return EXIT_SUCCESS;
+	return DP_OK;
 
 err:
 	rte_free(temp_val);
-	return EXIT_FAILURE;
+	return DP_ERROR;
 }
 
 int dp_get_portid_with_vnf_handle(void *key)
@@ -66,8 +66,8 @@ void dp_del_portid_with_vnf_handle(struct dp_vnf_value *val)
 			break;
 
 		if ((val->portid == temp_val->portid)
-			&& (val->vnf.lb_alias.ip == temp_val->vnf.lb_alias.ip)
-			&& (val->vnf.lb_alias.length == temp_val->vnf.lb_alias.length)
+			&& (val->vnf.alias_pfx.ip == temp_val->vnf.alias_pfx.ip)
+			&& (val->vnf.alias_pfx.length == temp_val->vnf.alias_pfx.length)
 			&& (val->v_type == temp_val->v_type)
 		) {
 			rte_free(temp_val);
@@ -76,7 +76,7 @@ void dp_del_portid_with_vnf_handle(struct dp_vnf_value *val)
 	}
 }
 
-int dp_list_vnf_lb_alias_routes(struct rte_mbuf *m, uint16_t portid, struct rte_mbuf *rep_arr[])
+int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type v_type, struct rte_mbuf *rep_arr[])
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
@@ -104,7 +104,7 @@ int dp_list_vnf_lb_alias_routes(struct rte_mbuf *m, uint16_t portid, struct rte_
 		if (portid != temp_val->portid)
 			continue;
 
-		if (temp_val->v_type != DP_VNF_TYPE_LB_ALIAS)
+		if (temp_val->v_type != v_type)
 			continue;
 
 		if (rep->com_head.msg_count &&
@@ -120,9 +120,9 @@ int dp_list_vnf_lb_alias_routes(struct rte_mbuf *m, uint16_t portid, struct rte_
 		rep->com_head.msg_count++;
 
 		rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		rp_route->pfx_ip.addr = temp_val->vnf.lb_alias.ip;
-		rp_route->pfx_length = temp_val->vnf.lb_alias.length;
-		memcpy(rp_route->trgt_ip.addr6, key, sizeof(rp_route->trgt_ip.addr6));
+		rp_route->pfx_ip.addr = temp_val->vnf.alias_pfx.ip;
+		rp_route->pfx_length = temp_val->vnf.alias_pfx.length;
+		rte_memcpy(rp_route->trgt_ip.addr6, key, sizeof(rp_route->trgt_ip.addr6));
 	}
 
 	if (rep_arr_size < 0) {

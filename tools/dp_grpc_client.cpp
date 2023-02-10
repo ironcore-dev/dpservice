@@ -806,9 +806,10 @@ public:
 			request.set_interfaceid(machine_str);
 			stub_->listInterfacePrefixes(&context, request, &reply);
 			for (i = 0; i < reply.prefixes_size(); i++) {
-				printf("Route prefix %s len %d\n",
+				printf("Route prefix %s len %d underlayroute %s\n",
 					reply.prefixes(i).address().c_str(),
-					reply.prefixes(i).prefixlength());
+					reply.prefixes(i).prefixlength(),
+					reply.prefixes(i).underlayroute().c_str());
 			}
 	}
 

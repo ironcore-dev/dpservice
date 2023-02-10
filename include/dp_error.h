@@ -86,6 +86,7 @@ const char *dp_strerror(int error);
 #define DP_ERROR_VM_ADD_PFX							650
 #define DP_ERROR_VM_ADD_PFX_NO_VM					651
 #define DP_ERROR_VM_ADD_PFX_ROUTE					652
+#define DP_ERROR_VM_ADD_PFX_VNF_ERR					653
 #define DP_ERROR_VM_DEL_PFX							700
 #define DP_ERROR_VM_DEL_PFX_NO_VM					701
 #define DP_ERROR_CREATE_LB_UNSUPP_IP				750

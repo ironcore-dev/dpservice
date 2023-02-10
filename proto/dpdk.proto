@@ -77,6 +77,7 @@ message Prefix {
 	IPVersion ipVersion = 1;
 	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
 	uint32 prefixLength = 3;  // max length is 32 for IPv4 and 128 for IPv6
+	bytes underlayRoute = 4;
 }
 
 message LBPrefix {

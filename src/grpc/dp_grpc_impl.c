@@ -38,6 +38,45 @@ uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep
 	return msg_per_buf;
 }
 
+static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t route_size)
+{
+	uint32_t l_vni = htonl(vni);
+
+	memcpy(route, get_underlay_conf()->src_ip6, route_size);
+	memcpy(route + 8, &l_vni, 4);
+	if (vni == 0) {
+		memcpy(route + 12, &pfx_counter, 2);
+		memset(route + 14, 0, 2);
+	} else {
+		memset(route + 12, 0, 4);
+	}
+	pfx_counter++;
+}
+
+static __rte_always_inline int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
+													  uint16_t portid, uint8_t *ul_addr6)
+{
+	int vni = dp_get_vm_vni(portid);
+
+	if (v_type == DP_VNF_TYPE_LB_ALIAS_PFX)
+		vni = DP_UNDEFINED_VNI;
+
+	dp_generate_underlay_ipv6(vni, ul_addr6, sizeof(ul_addr6));
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = vni;
+	return dp_map_vnf_handle((void *)ul_addr6, val);
+}
+
+static __rte_always_inline void dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
+													  uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	dp_del_portid_with_vnf_handle(val);
+}
+
 struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
 {
 	dp_reply *rep, *rep_new;
@@ -58,21 +97,6 @@ struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbu
 	rep_arr[*size] = m_curr;
 
 	return m_new;
-}
-
-static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t route_size)
-{
-	uint32_t l_vni = htonl(vni);
-
-	memcpy(route, get_underlay_conf()->src_ip6, route_size);
-	memcpy(route + 8, &l_vni, 4);
-	if (vni == 0) {
-		memcpy(route + 12, &pfx_counter, 2);
-		memset(route + 14, 0, 2);
-	} else {
-		memset(route + 12, 0, 4);
-	}
-	pfx_counter++;
 }
 
 int dp_send_to_worker(dp_request *req)
@@ -304,7 +328,7 @@ err:
 static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	struct dp_vnf_value vnf_val;
+	struct dp_vnf_value vnf_val = {0};
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
@@ -315,13 +339,12 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	vnf_val.v_type = DP_VNF_TYPE_LB_ALIAS;
-	vnf_val.portid = port_id;
-	vnf_val.vni = dp_get_vm_vni(port_id);
-	vnf_val.vnf.lb_alias.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
-	vnf_val.vnf.lb_alias.length = req->add_pfx.pfx_length;
-	dp_generate_underlay_ipv6(DP_UNDEFINED_VNI, ul_addr6, sizeof(ul_addr6));
-	dp_map_vnf_handle((void *)ul_addr6, &vnf_val);
+	vnf_val.vnf.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.vnf.alias_pfx.length = req->add_pfx.pfx_length;
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id, ul_addr6))) {
+		ret = DP_ERROR_VM_ADD_PFX_VNF_ERR;
+		goto err;
+	}
 	rte_memcpy(rep->route.trgt_ip.addr6, ul_addr6, sizeof(rep->route.trgt_ip.addr6));
 
 	return EXIT_SUCCESS;
@@ -333,7 +356,7 @@ err:
 static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	struct dp_vnf_value vnf_val;
+	struct dp_vnf_value vnf_val = {0};
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -343,12 +366,9 @@ static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	vnf_val.v_type = DP_VNF_TYPE_LB_ALIAS;
-	vnf_val.portid = port_id;
-	vnf_val.vni = dp_get_vm_vni(port_id);
-	vnf_val.vnf.lb_alias.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
-	vnf_val.vnf.lb_alias.length = req->add_pfx.pfx_length;
-	dp_del_portid_with_vnf_handle(&vnf_val);
+	vnf_val.vnf.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.vnf.alias_pfx.length = req->add_pfx.pfx_length;
+	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
 
 	return ret;
 err:
@@ -360,6 +380,7 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 {
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int port_id, ret = EXIT_SUCCESS;
+	struct dp_vnf_value vnf_val = {0};
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -376,10 +397,20 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 				ret = DP_ERROR_VM_ADD_PFX_ROUTE;
 				goto err;
 		}
+		vnf_val.vnf.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+		vnf_val.vnf.alias_pfx.length = req->add_pfx.pfx_length;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id, ul_addr6))) {
+			ret = DP_ERROR_VM_ADD_PFX_VNF_ERR;
+			goto err_vnf;
+		}
+		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	}
-	dp_generate_underlay_ipv6(dp_get_vm_vni(port_id), ul_addr6, sizeof(ul_addr6));
-	rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	return EXIT_SUCCESS;
+
+err_vnf:
+	dp_del_route(port_id, dp_get_vm_vni(port_id), 0,
+				ntohl(req->add_pfx.pfx_ip.pfx_addr), NULL,
+				req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id));
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -388,6 +419,7 @@ err:
 static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
+	struct dp_vnf_value vnf_val = {0};
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -402,9 +434,14 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
 					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_DEL_PFX;
-			goto err;
+			rep->com_head.err_code = ret;
+			/* try to delete the vnf entry anyways */
 		}
 	}
+
+	vnf_val.vnf.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.vnf.alias_pfx.length = req->add_pfx.pfx_length;
+	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id);
 
 	return ret;
 err:
@@ -826,7 +863,7 @@ static int dp_process_listlb_pfxs(dp_request *req, struct rte_mbuf *m, struct rt
 		goto out;
 	}
 
-	dp_list_vnf_lb_alias_routes(m, port_id, rep_arr);
+	dp_list_vnf_alias_routes(m, port_id, DP_VNF_TYPE_LB_ALIAS_PFX, rep_arr);
 
 out:
 	return EXIT_SUCCESS;
@@ -844,8 +881,7 @@ static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_m
 		goto out;
 	}
 
-	dp_list_routes(dp_get_vm_vni(port_id), m,
-					rte_eth_dev_socket_id(dp_port_get_pf0_id()), port_id, rep_arr, DP_SHOW_INT_ROUTES);
+	dp_list_vnf_alias_routes(m, port_id, DP_VNF_TYPE_ALIAS_PFX, rep_arr);
 
 out:
 	return EXIT_SUCCESS;

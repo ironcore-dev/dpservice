@@ -441,6 +441,7 @@ int DelPfxCall::Proceed()
 
 int ListPfxCall::Proceed()
 {
+	char buf_str[INET6_ADDRSTRLEN];
 	dp_request request = {0};
 	struct rte_mbuf *mbuf = NULL;
 	struct dp_reply *reply;
@@ -475,6 +476,8 @@ int ListPfxCall::Proceed()
 				pfx->set_address(inet_ntoa(addr));
 				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 				pfx->set_prefixlength(rp_route->pfx_length);
+				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
+				pfx->set_underlayroute(buf_str);
 			}
 		}
 		rte_pktmbuf_free(mbuf);
