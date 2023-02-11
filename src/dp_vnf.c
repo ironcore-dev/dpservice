@@ -40,19 +40,37 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_portid_with_vnf_handle(void *key)
+int dp_get_portid_with_vnf_key(void *key)
 {
 	struct dp_vnf_value *temp_val;
 	uint16_t ret_val;
 
 	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
 		return -1;
+
+	/*TODO (guvenc) remove this check */
+	if (temp_val->v_type != DP_VNF_TYPE_LB_ALIAS_PFX)
+		return -1;
+
 	ret_val = temp_val->portid;
 
 	return ret_val;
 }
 
-void dp_del_portid_with_vnf_handle(struct dp_vnf_value *val)
+int dp_del_vnf_with_vnf_key(void *key)
+{
+	struct dp_vnf_value *temp_val;
+
+	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
+		return DP_ERROR;
+
+	rte_free(temp_val);
+	rte_hash_del_key(vnf_handle_tbl, key);
+
+	return DP_OK;
+}
+
+void dp_del_vnf_with_value(struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;

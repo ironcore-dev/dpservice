@@ -30,7 +30,7 @@ static __rte_always_inline void lb_vnf_check(struct dp_flow *df_ptr, uint16_t po
 {
 	df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	df_ptr->nxt_hop = port;
-	if (dp_get_portid_with_vnf_handle(df_ptr->tun_info.ul_dst_addr6) == -1)
+	if (dp_get_portid_with_vnf_key(df_ptr->tun_info.ul_dst_addr6) == -1)
 		df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
 	else
 		df_ptr->flags.nat = DP_LB_RECIRC;

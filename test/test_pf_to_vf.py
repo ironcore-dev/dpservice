@@ -13,7 +13,7 @@ def send_lb_pkt_to_pf():
 def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 
 	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp",
-		ul_actual_src)
+		ul_short_src)
 
 	output = grpc_client.assert_output(f"--addlbpfx {vm1_name} --ipv4 {virtual_ip} --length 32",
 		ul_short_src)

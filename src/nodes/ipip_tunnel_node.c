@@ -51,7 +51,7 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(struct rte_mbuf *
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP)
 		next_index = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
 
-	nxt_hop = dp_get_portid_with_vnf_handle((void *)df->tun_info.ul_dst_addr6);
+	nxt_hop = dp_get_portid_with_vnf_key((void *)df->tun_info.ul_dst_addr6);
 	if (nxt_hop != -1) {
 		df->nxt_hop = nxt_hop;
 		/* TODO We jump over the conntrack node, do we need to conntrack vnf prefix */

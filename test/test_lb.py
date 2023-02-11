@@ -3,7 +3,7 @@ from helpers import *
 
 def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 
-	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp", ul_actual_src)
+	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp", ul_short_src)
 
 	icmp_pkt = (Ether(dst=mc_mac, src=pf0_mac, type=0x86DD) /
 				IPv6(dst=ul_actual_dst, src=ul_actual_src, nh=4) /

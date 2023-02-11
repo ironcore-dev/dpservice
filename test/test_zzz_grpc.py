@@ -73,7 +73,7 @@ def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 	# Try to add LB VIP, list, test error cases, delete vip and list again
 	grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp",
-		ul_actual_src)
+		ul_short_src)
 	grpc_client.assert_output(f"--addlbvip {mylb} --t_ipv6 {back_ip1}",
 		"LB VIP added")
 	grpc_client.assert_output(f"--listbackips {mylb}",
@@ -91,11 +91,11 @@ def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 	grpc_client.assert_output(f"--listbackips {mylb}",
 		back_ip2, negate=True)
 	grpc_client.assert_output(f"--getlb {mylb}",
-		ul_actual_src)
+		ul_short_src)
 	grpc_client.assert_output(f"--dellb {mylb}",
 		"LB deleted")
 	grpc_client.assert_output(f"--getlb {mylb}",
-		ul_actual_src, negate=True)
+		ul_short_src, negate=True)
 
 def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
