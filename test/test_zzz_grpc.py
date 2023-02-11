@@ -56,7 +56,7 @@ def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
-		ul_actual_src)
+		ul_short_src)
 	grpc_client.assert_output(f"--getvip {vm2_name}",
 		virtual_ip)
 	# Try to add the same vip again

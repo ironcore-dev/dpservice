@@ -135,7 +135,7 @@ def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 		threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf1_tap,)).start()
 
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
-		f"Received underlay route : {ul_actual_src}")
+		f"Received underlay route : {ul_short_src}")
 
 	# vm2 (vf1) -> PF0/PF1 (internet traffic), vm2 has VIP, check on PFs side, whether VIP is source (SNAT)
 	tcp_pkt = (Ether(dst=pf0_mac, src=vf1_mac, type=0x0800) /

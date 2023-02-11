@@ -18,6 +18,7 @@ enum vnf_type {
 	DP_VNF_TYPE_LB_ALIAS_PFX,
 	DP_VNF_TYPE_ALIAS_PFX,
 	DP_VNF_TYPE_LB,
+	DP_VNF_TYPE_VIP,
 };
 
 struct dp_vnf_alias {

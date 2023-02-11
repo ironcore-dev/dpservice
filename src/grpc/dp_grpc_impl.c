@@ -59,7 +59,7 @@ static __rte_always_inline int dp_insert_vnf_entry(struct dp_vnf_value *val, enu
 	int temp_vni = vni;
 
 	/*TODO (guvenc) remove this check */
-	if (v_type == DP_VNF_TYPE_LB || v_type == DP_VNF_TYPE_LB_ALIAS_PFX)
+	if (v_type == DP_VNF_TYPE_LB || v_type == DP_VNF_TYPE_LB_ALIAS_PFX || v_type == DP_VNF_TYPE_VIP)
 		temp_vni = DP_UNDEFINED_VNI;
 
 	dp_generate_underlay_ipv6(temp_vni, ul_addr6, sizeof(ul_addr6));
@@ -257,6 +257,7 @@ err:
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	struct dp_vnf_value vnf_val = {0};
 	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_vip.machine_id);
@@ -268,12 +269,16 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_generate_underlay_ipv6(dp_get_vm_vni(port_id), ul_addr6, sizeof(ul_addr6));
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
+			ret = DP_ERROR_VM_ADD_NAT_VNF_ERR;
+			goto err;
+		}
 		ret = dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 						  ntohl(req->add_vip.vip.vip_addr),
 						  dp_get_vm_vni(port_id), ul_addr6);
 		if (ret)
-			goto err;
+			goto err_vnf;
+
 		ret = dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
 						  dp_get_dhcp_range_ip4(port_id),
 						  dp_get_vm_vni(port_id));
@@ -284,6 +289,8 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 	return EXIT_SUCCESS;
 err_snat:
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+err_vnf:
+	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -292,7 +299,7 @@ err:
 static int dp_process_delvip(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	u_int32_t vip;
+	struct snat_data *s_data;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
@@ -302,10 +309,15 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	vip = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
-							dp_get_vm_vni(port_id));
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
+										 dp_get_vm_vni(port_id));
+	if (!s_data) {
+		ret = DP_ERROR_VM_DEL_NAT_NO_SNAT;
+		goto err;
+	}
+	dp_del_vnf_with_vnf_key(s_data->ul_ip6);
+	dp_del_vm_dnat_ip(s_data->vip_ip, dp_get_vm_vni(port_id));
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
-	dp_del_vm_dnat_ip(vip, dp_get_vm_vni(port_id));
 
 	return ret;
 err:

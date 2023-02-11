@@ -97,20 +97,6 @@ uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
 	return data->vip_ip;
 }
 
-struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni)
-{
-	struct nat_key nkey;
-	struct snat_data *data;
-
-	nkey.ip = vm_ip;
-	nkey.vni = vni;
-
-	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
-		return 0;
-
-	return data;
-}
-
 struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni)
 {
 	struct snat_data *data;

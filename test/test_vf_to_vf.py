@@ -30,7 +30,7 @@ def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(vf1_tap,)).start()
 
 	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
-		ul_actual_src)
+		ul_short_src)
 
 	# vm1 (vf0) -> vm2 (vf2), vm2 has VIP, send packet to VIP from vm1 side, whether the packet is received
 	# and sent back by vm2 (DNAT)
