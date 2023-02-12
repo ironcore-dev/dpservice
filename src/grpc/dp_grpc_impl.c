@@ -56,15 +56,7 @@ static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t rou
 static __rte_always_inline int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
 													  uint16_t portid, int vni, uint8_t *ul_addr6)
 {
-	int temp_vni = vni;
-
-	/*TODO (guvenc) remove this check */
-	if (v_type == DP_VNF_TYPE_LB || v_type == DP_VNF_TYPE_LB_ALIAS_PFX
-		|| v_type == DP_VNF_TYPE_VIP || v_type == DP_VNF_TYPE_NAT
-	)
-		temp_vni = DP_UNDEFINED_VNI;
-
-	dp_generate_underlay_ipv6(temp_vni, ul_addr6, sizeof(ul_addr6));
+	dp_generate_underlay_ipv6(DP_UNDEFINED_VNI, ul_addr6, sizeof(ul_addr6));
 	val->v_type = v_type;
 	val->portid = portid;
 	val->vni = vni;
@@ -481,7 +473,9 @@ err:
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint16_t port_id = DP_INVALID_PORT_ID;
+	struct dp_vnf_value vnf_val = {0};
 	int err_code = EXIT_SUCCESS;
 	uint16_t p_id = 0;
 	uint32_t vni;
@@ -511,11 +505,15 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 	}
 
 	if (port_id != DP_INVALID_PORT_ID) {
-		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
-			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
+		vni = req->add_machine.vni;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_INTERFACE_IP, vni, port_id, ul_addr6))) {
+			err_code = DP_ERROR_VM_ADD_VM_VNF_ERROR;
 			goto err;
 		}
-		vni = req->add_machine.vni;
+		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
+			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
+			goto err_vnf;
+		}
 		if (setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM4;
 			goto handle_err;
@@ -553,8 +551,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		err_code = DP_ERROR_VM_ADD_VM_NO_VFS;
 		goto err;
 	}
-
-	dp_generate_underlay_ipv6(vni, dp_get_vm_ul_ip6(port_id), sizeof(sizeof(rep->vf_pci.ul_addr6)));
+	rte_memcpy(dp_get_vm_ul_ip6(port_id), ul_addr6, sizeof(ul_addr6));
 	rte_memcpy(rep->vf_pci.ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(rep->vf_pci.ul_addr6));
 	return EXIT_SUCCESS;
 /* Rollback the changes, in case of an error */
@@ -566,6 +563,8 @@ lpm_err:
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), DP_LPM_ROLLBACK);
 handle_err:
 	dp_del_portid_with_vm_handle(req->add_machine.machine_id);
+err_vnf:
+	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
 	rep->com_head.err_code = err_code;
 	return EXIT_FAILURE;
@@ -582,6 +581,7 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 		ret = DP_ERROR_VM_DEL_VM_NOT_FND;
 		goto err;
 	}
+	dp_del_vnf_with_vnf_key(dp_get_vm_ul_ip6(port_id));
 
 	// TODO(chandra?): this can fail now; also this expects uint16_t port type
 	dp_port_stop(port_id);

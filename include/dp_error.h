@@ -33,6 +33,7 @@ const char *dp_strerror(int error);
 #define DP_ERROR_VM_ADD_VM_NO_VFS					108
 #define DP_ERROR_VM_ALREADY_ALLOCATED				109
 #define DP_ERROR_VM_CANT_GET_NAME					110
+#define DP_ERROR_VM_ADD_VM_VNF_ERROR				111
 #define DP_ERROR_VM_DEL								150
 #define DP_ERROR_VM_DEL_VM_NOT_FND					151
 #define DP_ERROR_VM_GET_VM_NOT_FND					171

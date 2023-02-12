@@ -100,7 +100,7 @@ def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	grpc_client.assert_output(f"--addpfx {vm2_name} --ipv4 {pfx_ip} --length 24",
-		ul_actual_src)
+		ul_short_src)
 	grpc_client.assert_output(f"--listpfx {vm2_name}",
 		pfx_ip)
 	# Try to add the same pfx again

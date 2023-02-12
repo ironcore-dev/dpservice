@@ -20,6 +20,7 @@ enum vnf_type {
 	DP_VNF_TYPE_LB,
 	DP_VNF_TYPE_VIP,
 	DP_VNF_TYPE_NAT,
+	DP_VNF_TYPE_INTERFACE_IP,
 };
 
 struct dp_vnf_alias {
