@@ -30,7 +30,7 @@ def send_bounce_pkt_to_pf():
 def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 
 	grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
-		"Received underlay route")
+		ul_short_src)
 
 	grpc_client.assert_output(f"--addneighnat --ipv4 {nat_vip} --vni {vni} --min_port {nat_neigh_min_port} --max_port {nat_neigh_max_port} --t_ipv6 {nat_neigh_ul_dst}",
 		"Neighbor NAT added")
@@ -70,4 +70,4 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 		"error 374")
 
 	grpc_client.assert_output(f"--delnat {vm1_name}",
-		"error 362")
+		"error 451")

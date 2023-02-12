@@ -19,6 +19,7 @@ enum vnf_type {
 	DP_VNF_TYPE_ALIAS_PFX,
 	DP_VNF_TYPE_LB,
 	DP_VNF_TYPE_VIP,
+	DP_VNF_TYPE_NAT,
 };
 
 struct dp_vnf_alias {

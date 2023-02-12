@@ -59,7 +59,9 @@ static __rte_always_inline int dp_insert_vnf_entry(struct dp_vnf_value *val, enu
 	int temp_vni = vni;
 
 	/*TODO (guvenc) remove this check */
-	if (v_type == DP_VNF_TYPE_LB || v_type == DP_VNF_TYPE_LB_ALIAS_PFX || v_type == DP_VNF_TYPE_VIP)
+	if (v_type == DP_VNF_TYPE_LB || v_type == DP_VNF_TYPE_LB_ALIAS_PFX
+		|| v_type == DP_VNF_TYPE_VIP || v_type == DP_VNF_TYPE_NAT
+	)
 		temp_vni = DP_UNDEFINED_VNI;
 
 	dp_generate_underlay_ipv6(temp_vni, ul_addr6, sizeof(ul_addr6));
@@ -676,6 +678,7 @@ err:
 static int dp_process_addnat(dp_request *req, dp_reply *rep)
 {
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	struct dp_vnf_value vnf_val = {0};
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
@@ -689,22 +692,27 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 	vm_vni = dp_get_vm_vni(port_id);
 
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dp_generate_underlay_ipv6(vm_vni, ul_addr6, sizeof(ul_addr6));
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
+			ret = DP_ERROR_VM_ADD_NAT_VNF_ERR;
+			goto err;
+		}
 		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
 									    vm_vni, (uint16_t)req->add_nat_vip.port_range[0],
 									    (uint16_t)req->add_nat_vip.port_range[1], ul_addr6);
 
 		if (ret)
-			goto err;
+			goto err_vnf;
 
 		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr),
 								0, vm_vni);
 		/*TODO (guvenc) in case of an error, we need to rollback the network snat ip, see how addVIP is doing it */
 		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
-			goto err;
-		rte_memcpy(rep->nat_entry.underlay_route, ul_addr6, sizeof(rep->nat_entry.underlay_route));
+			goto err_vnf;
+		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	}
 	return EXIT_SUCCESS;
+err_vnf:
+	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -714,16 +722,22 @@ err:
 static int dp_process_delnat(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	uint32_t vm_vni;
+	struct snat_data *s_data;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
 	if (port_id < 0) {
 		ret = DP_ERROR_VM_GET_VM_NOT_FND;
 		goto err;
 	}
-	vm_vni = dp_get_vm_vni(port_id);
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
+										 dp_get_vm_vni(port_id));
+	if (!s_data) {
+		ret = DP_ERROR_VM_DEL_NAT_NO_SNAT;
+		goto err;
+	}
+	dp_del_vnf_with_vnf_key(s_data->ul_nat_ip6);
 
-	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), vm_vni);
+	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (ret)
 		goto err;
 
