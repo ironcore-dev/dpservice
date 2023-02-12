@@ -1,5 +1,7 @@
 #include "dp_util.h"
 
+#include <rte_jhash.h>
+
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_log.h"
 #include "dp_error.h"
@@ -110,6 +112,7 @@ void dp_fill_ipv4_print_buff(unsigned int ip, char *buf)
 		ip & 0xFF);
 }
 
+// TODO(plague): there is no free()
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id)
 {
 	struct rte_hash *result;
@@ -119,7 +122,7 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 
 	struct rte_hash_parameters params = {
 		.name = full_name,
-		.entries = FLOW_MAX,
+		.entries = entries,
 		.key_len = key_len,
 		.hash_func = rte_jhash,
 		.hash_func_init_val = 0xfee1900d,  // "random" IV
