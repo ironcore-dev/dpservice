@@ -38,10 +38,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df_ptr->dst.dst_addr);
-		if (df_ptr->tun_info.dst_vni == 0)
-			vni = dp_get_vm_vni(m->port);
-		else
-			vni = df_ptr->tun_info.dst_vni;
+		vni = df_ptr->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df_ptr->tun_info.dst_vni;
 
 		if (dp_is_ip_dnatted(dst_ip, vni) && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			dnat_ip = dp_get_vm_dnat_ip(dst_ip, vni);

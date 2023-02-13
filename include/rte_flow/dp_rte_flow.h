@@ -43,9 +43,6 @@ typedef struct dp_icmp_err_ip_info {
 	uint16_t	l4_dst_port;
 } dp_icmp_err_ip_info;
 
-// #define DP_RTE_FLOW_DEFAULT_GROUP	0
-// #define DP_RTE_FLOW_VNET_GROUP		1
-
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
 uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt);
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, ipv4/ipv6 header

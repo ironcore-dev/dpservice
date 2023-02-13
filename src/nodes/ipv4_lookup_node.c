@@ -12,6 +12,7 @@
 #include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_flow.h"
+#include "dp_vnf.h"
 #include "dp_multi_path.h"
 
 #include "rte_flow/dp_rte_flow.h"
@@ -42,14 +43,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// TODO: extract mac info in cls node
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	if (lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr,
-							 rte_eth_dev_socket_id(m->port),
-							 &route, &route_key, &dst_port_id) < 0)
-		return IPV4_LOOKUP_NEXT_DROP;
-
-	// TODO: it is not exactly correct to use next_hop to directly store next hop port id and convert here. but it is already used in
-	// such way in the original implementation. as long as port number is limited to 256, it is ok.
-	df_ptr->nxt_hop = (uint8_t)dst_port_id;
+	/* Do the lpm lookup, if VNF table couldnt figure out the next hop */
+	if (df_ptr->nxt_hop == DP_VNF_TYPE_UNDEFINED) {
+		if (lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr,
+								rte_eth_dev_socket_id(m->port),
+								&route, &route_key, &dst_port_id) < 0)
+			return IPV4_LOOKUP_NEXT_DROP;
+		df_ptr->nxt_hop = (uint8_t)dst_port_id;
+	}
 
 	df_ptr->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 

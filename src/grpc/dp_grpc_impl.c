@@ -54,7 +54,7 @@ static void dp_generate_underlay_ipv6(uint32_t vni, uint8_t* route, uint32_t rou
 }
 
 static __rte_always_inline int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
-													  uint16_t portid, int vni, uint8_t *ul_addr6)
+												   int vni, uint16_t portid, uint8_t *ul_addr6)
 {
 	dp_generate_underlay_ipv6(DP_UNDEFINED_VNI, ul_addr6, sizeof(ul_addr6));
 	val->v_type = v_type;
@@ -363,7 +363,7 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 
 	vnf_val.vnf.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 	vnf_val.vnf.alias_pfx.length = req->add_pfx.pfx_length;
-	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id, dp_get_vm_vni(port_id), ul_addr6))) {
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
 		ret = DP_ERROR_VM_ADD_PFX_VNF_ERR;
 		goto err;
 	}
@@ -421,7 +421,7 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 		}
 		vnf_val.vnf.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 		vnf_val.vnf.alias_pfx.length = req->add_pfx.pfx_length;
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id, dp_get_vm_vni(port_id), ul_addr6))) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
 			ret = DP_ERROR_VM_ADD_PFX_VNF_ERR;
 			goto err_vnf;
 		}

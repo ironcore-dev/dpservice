@@ -57,6 +57,16 @@ int dp_get_portid_with_vnf_key(void *key)
 	return ret_val;
 }
 
+struct dp_vnf_value *dp_get_vnf_value_with_key(void *key)
+{
+	struct dp_vnf_value *temp_val;
+
+	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
+		return NULL;
+
+	return temp_val;
+}
+
 int dp_del_vnf_with_vnf_key(void *key)
 {
 	struct dp_vnf_value *temp_val;
