@@ -19,7 +19,7 @@ ul_ipv6 = "2a10:afc0:e01f:f403::1"
 # vni 100 (0x64) is encoded in these addresses
 ul_actual_dst="2a10:afc0:e01f:f408:0:64::"
 ul_actual_src="2a10:afc0:e01f:f403:0:64::"
-ul_short_src="2a10:afc0:e01f:f403::"
+ul_short_src="2a10:afc0:e01f:f403:"
 tun_type_geneve="geneve"
 dhcp_mtu = 1337
 dhcp_dns1 = "8.8.4.4"

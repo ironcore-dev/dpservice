@@ -82,8 +82,9 @@ def prepare_ifaces(request, dp_service, tun_opt, port_redundancy, grpc_client):
 		return
 
 	print("---- Interfaces init -----")
-	dp_service.init_ifaces(grpc_client)
+	vm1_ipv6 = dp_service.init_ifaces(grpc_client)
 	print("--------------------------")
+	return vm1_ipv6
 
 
 # Some tests require IPv4 addresses assigned
@@ -93,3 +94,4 @@ def prepare_ipv4(prepare_ifaces):
 	request_ip(vf0_tap, vf0_mac, vf0_ip)
 	request_ip(vf1_tap, vf1_mac, vf1_ip)
 	print("--------------------------")
+	return prepare_ifaces
