@@ -1,6 +1,7 @@
 #include <rte_malloc.h>
 #include "dp_vnf.h"
 #include "dp_error.h"
+#include "dp_log.h"
 
 static struct rte_hash *vnf_handle_tbl = NULL;
 
@@ -14,13 +15,13 @@ int dp_vnf_init(int socket_id)
 	return DP_OK;
 }
 
-int dp_map_vnf_handle(void *key, struct dp_vnf_value *val)
+int dp_set_vnf_value(void *key, struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val;
 
 	temp_val = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf_value), RTE_CACHE_LINE_SIZE);
 	if (!temp_val) {
-		printf("vnf handle for port %d malloc data failed\n", val->portid);
+		DPS_LOG_WARNING("vnf handle for port %d malloc data failed\n", val->portid);
 		return DP_ERROR;
 	}
 
@@ -29,8 +30,8 @@ int dp_map_vnf_handle(void *key, struct dp_vnf_value *val)
 		goto err;
 
 	*temp_val = *val;
-	if (rte_hash_add_key_data(vnf_handle_tbl, key, temp_val) < 0) {
-		printf("vnf handle for port %d add data failed\n", temp_val->portid);
+	if (DP_FAILED(rte_hash_add_key_data(vnf_handle_tbl, key, temp_val))) {
+		DPS_LOG_WARNING("vnf handle for port %d add data failed\n", temp_val->portid);
 		goto err;
 	}
 	return DP_OK;
@@ -40,17 +41,16 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_portid_with_vnf_key(void *key)
+int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type)
 {
 	struct dp_vnf_value *temp_val;
 	uint16_t ret_val;
 
-	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
-		return -1;
+	if (DP_FAILED(rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val)))
+		return DP_ERROR;
 
-	/*TODO (guvenc) remove this check */
-	if (temp_val->v_type != DP_VNF_TYPE_LB_ALIAS_PFX)
-		return -1;
+	if (temp_val->v_type != v_type)
+		return DP_ERROR;
 
 	ret_val = temp_val->portid;
 
@@ -61,7 +61,7 @@ struct dp_vnf_value *dp_get_vnf_value_with_key(void *key)
 {
 	struct dp_vnf_value *temp_val;
 
-	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
+	if (DP_FAILED(rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val)))
 		return NULL;
 
 	return temp_val;
@@ -71,16 +71,17 @@ int dp_del_vnf_with_vnf_key(void *key)
 {
 	struct dp_vnf_value *temp_val;
 
-	if (rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val) < 0)
+	if (DP_FAILED(rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val)))
 		return DP_ERROR;
 
 	rte_free(temp_val);
-	rte_hash_del_key(vnf_handle_tbl, key);
+	if (DP_FAILED(rte_hash_del_key(vnf_handle_tbl, key)))
+		return DP_ERROR;
 
 	return DP_OK;
 }
 
-void dp_del_vnf_with_value(struct dp_vnf_value *val)
+int dp_del_vnf_with_value(struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
@@ -94,14 +95,16 @@ void dp_del_vnf_with_value(struct dp_vnf_value *val)
 			break;
 
 		if ((val->portid == temp_val->portid)
-			&& (val->vnf.alias_pfx.ip == temp_val->vnf.alias_pfx.ip)
-			&& (val->vnf.alias_pfx.length == temp_val->vnf.alias_pfx.length)
+			&& (val->alias_pfx.ip == temp_val->alias_pfx.ip)
+			&& (val->alias_pfx.length == temp_val->alias_pfx.length)
 			&& (val->v_type == temp_val->v_type)
 		) {
 			rte_free(temp_val);
-			rte_hash_del_key(vnf_handle_tbl, key);
+			if (DP_FAILED(rte_hash_del_key(vnf_handle_tbl, key)))
+				return DP_ERROR;
 		}
 	}
+	return DP_OK;
 }
 
 int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type v_type, struct rte_mbuf *rep_arr[])
@@ -117,7 +120,7 @@ int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type 
 	void *key;
 
 	if (rte_hash_count(vnf_handle_tbl) == 0)
-		goto err;
+		goto out;
 
 	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
 										    &rep_arr_size, sizeof(dp_route));
@@ -148,18 +151,18 @@ int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type 
 		rep->com_head.msg_count++;
 
 		rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		rp_route->pfx_ip.addr = temp_val->vnf.alias_pfx.ip;
-		rp_route->pfx_length = temp_val->vnf.alias_pfx.length;
+		rp_route->pfx_ip.addr = temp_val->alias_pfx.ip;
+		rp_route->pfx_length = temp_val->alias_pfx.length;
 		rte_memcpy(rp_route->trgt_ip.addr6, key, sizeof(rp_route->trgt_ip.addr6));
 	}
 
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return EXIT_SUCCESS;
+		return DP_OK;
 	}
 
-err:
+out:
 	rep_arr[--rep_arr_size] = m_curr;
 
-	return EXIT_SUCCESS;
+	return DP_OK;
 }

@@ -105,32 +105,24 @@ static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned ch
 
 static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df_ptr)
 {
-	struct dp_vnf_value *vnf_val;
-
-	df_ptr->nxt_hop = DP_VNF_TYPE_UNDEFINED;
-
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		vnf_val = dp_get_vnf_value_with_key((void *)df_ptr->tun_info.ul_dst_addr6);
-		if (!vnf_val)
-			return CONNTRACK_NEXT_DNAT;
-
-		df_ptr->tun_info.dst_vni = vnf_val->vni;
-		if (vnf_val->v_type == DP_VNF_TYPE_LB)
+		switch (df_ptr->vnf_type) {
+		case DP_VNF_TYPE_LB:
 			return CONNTRACK_NEXT_LB;
-
-		df_ptr->nxt_hop = vnf_val->portid;
-		if (vnf_val->v_type == DP_VNF_TYPE_VIP || vnf_val->v_type == DP_VNF_TYPE_NAT)
+			break;
+		case DP_VNF_TYPE_VIP:
+		case DP_VNF_TYPE_NAT:
 			return CONNTRACK_NEXT_DNAT;
-
-		if (vnf_val->v_type == DP_VNF_TYPE_LB_ALIAS_PFX ||
-		    vnf_val->v_type == DP_VNF_TYPE_INTERFACE_IP ||
-			vnf_val->v_type == DP_VNF_TYPE_ALIAS_PFX
-		)
+			break;
+		case DP_VNF_TYPE_LB_ALIAS_PFX:
+		case DP_VNF_TYPE_INTERFACE_IP:
+		case DP_VNF_TYPE_ALIAS_PFX:
 			return CONNTRACK_NEXT_FIREWALL;
-
-		return CONNTRACK_NEXT_LB;
+			break;
+		default:
+			return CONNTRACK_NEXT_LB;
+		}
 	}
-
 	return CONNTRACK_NEXT_DNAT;
 }
 
@@ -203,7 +195,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 		flow_val->timestamp = rte_rdtsc();
 		df_ptr->conntrack = flow_val;
-	} /* TODO (guvenc) else here to drop the packets which are not TCP, UDP or ICMP ? */
+	} else {
+		return CONNTRACK_NEXT_DROP;
+	}
 
 	return dp_find_nxt_graph_node(df_ptr);
 }

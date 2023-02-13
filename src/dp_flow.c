@@ -146,7 +146,7 @@ void dp_add_flow(struct flow_key *key)
 	}
 }
 
-void dp_delete_flow(struct flow_key *key)
+void dp_delete_flow_key(struct flow_key *key)
 {
 	int pos;
 	uint32_t hash_v;
@@ -200,8 +200,8 @@ void dp_free_flow(struct dp_ref *ref)
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
 
 	dp_free_network_nat_port(cntrack);
-	dp_delete_flow(&cntrack->flow_key[cntrack->dir]);
-	dp_delete_flow(&cntrack->flow_key[!cntrack->dir]);
+	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
+	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
 	rte_free(cntrack);
 }
 

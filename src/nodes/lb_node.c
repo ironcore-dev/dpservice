@@ -10,6 +10,7 @@
 #include "dp_util.h"
 #include "dp_lb.h"
 #include "dp_vnf.h"
+#include "dp_error.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "nodes/common_node.h"
 #include "nodes/lb_node.h"
@@ -26,11 +27,11 @@ static int lb_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return 0;
 }
 
-static __rte_always_inline void lb_vnf_check(struct dp_flow *df_ptr, uint16_t port)
+static __rte_always_inline void dp_lb_pfx_vnf_check(struct dp_flow *df_ptr, uint16_t port)
 {
 	df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	df_ptr->nxt_hop = port;
-	if (dp_get_portid_with_vnf_key(df_ptr->tun_info.ul_dst_addr6) == -1)
+	if (DP_FAILED(dp_get_portid_with_vnf_key(df_ptr->tun_info.ul_dst_addr6, DP_VNF_TYPE_LB_ALIAS_PFX)))
 		df_ptr->flags.nat = DP_LB_CHG_UL_DST_IP;
 	else
 		df_ptr->flags.nat = DP_LB_RECIRC;
@@ -63,16 +64,16 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (!target_ip6)
 			return LB_NEXT_DROP;
 
-		memcpy(df_ptr->tun_info.ul_dst_addr6, target_ip6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-		memcpy(cntrack->lb_dst_addr6, df_ptr->tun_info.ul_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, target_ip6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+		rte_memcpy(cntrack->lb_dst_addr6, df_ptr->tun_info.ul_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
 		cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
-		lb_vnf_check(df_ptr, m->port);
+		dp_lb_pfx_vnf_check(df_ptr, m->port);
 		return LB_NEXT_OVERLAY_SWITCH;
 	}
 
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB && cntrack->dir == DP_FLOW_DIR_ORG) {
-		memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-		lb_vnf_check(df_ptr, m->port);
+		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+		dp_lb_pfx_vnf_check(df_ptr, m->port);
 		return LB_NEXT_OVERLAY_SWITCH;
 	}
 

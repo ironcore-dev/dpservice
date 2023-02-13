@@ -44,7 +44,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return IPV4_LOOKUP_NEXT_DHCP;
 
 	/* Do the lpm lookup, if VNF table couldnt figure out the next hop */
-	if (df_ptr->nxt_hop == DP_VNF_TYPE_UNDEFINED) {
+	if (df_ptr->tun_info.dst_vni == DP_VNF_TYPE_UNDEFINED) {
 		if (lpm_lookup_ip4_route(m->port, df_ptr->tun_info.dst_vni, df_ptr,
 								rte_eth_dev_socket_id(m->port),
 								&route, &route_key, &dst_port_id) < 0)

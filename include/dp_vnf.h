@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define DP_VNF_MAX_TABLE_SIZE 100
+#define DP_VNF_MAX_TABLE_SIZE 1000
 
 enum vnf_type {
 	DP_VNF_TYPE_UNDEFINED,
@@ -29,20 +29,18 @@ struct dp_vnf_alias {
 };
 
 struct dp_vnf_value {
-	enum vnf_type	v_type;
-	uint32_t		vni;
-	uint16_t		portid;
-	union {
-		struct dp_vnf_alias alias_pfx;
-	} vnf;
+	enum vnf_type		v_type;
+	uint32_t			vni;
+	uint16_t			portid;
+	struct dp_vnf_alias	alias_pfx;
 };
 
 int dp_vnf_init(int socket_id);
-int dp_map_vnf_handle(void *key, struct dp_vnf_value *val);
+int dp_set_vnf_value(void *key, struct dp_vnf_value *val);
 struct dp_vnf_value *dp_get_vnf_value_with_key(void *key);
-int dp_get_portid_with_vnf_key(void *key);
+int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);
 int dp_del_vnf_with_vnf_key(void *key);
-void dp_del_vnf_with_value(struct dp_vnf_value *val);
+int dp_del_vnf_with_value(struct dp_vnf_value *val);
 int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid,
 								enum vnf_type v_type, struct rte_mbuf *rep_arr[]);
 

@@ -88,7 +88,7 @@ const uint8_t *dp_get_gw_ip6();
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_dhcp_range_ip6(uint16_t portid);
 uint8_t* dp_get_vm_ip6(uint16_t portid);
-uint8_t* dp_get_vm_ul_ip6(uint16_t portid);
+uint8_t *dp_get_vm_ul_ip6(uint16_t portid);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 uint8_t* ip6, uint8_t depth, int socketid);
 int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
@@ -102,7 +102,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid);
 void dp_set_vm_ip6(uint16_t portid, uint8_t* ipv6);
-void dp_set_vm_ul_ip6(uint16_t portid, uint8_t* ipv6);
+void dp_set_vm_ul_ip6(uint16_t portid, uint8_t *ipv6);
 void dp_set_mac(uint16_t portid);
 struct rte_ether_addr *dp_get_mac(uint16_t portid);
 void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr* neigh);

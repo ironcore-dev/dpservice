@@ -138,15 +138,14 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_i
 	if (rte_hash_lookup(ipv4_snat_tbl, &nkey) >= 0) {
 		/* Behind the same key, we can have NAT IP and VIP */
 		if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
-			/*TODO (guvenc) this doesnt seem to be a correct return value */
-			ret = DP_REQ_TYPE_ADD_NATVIP;
+			ret = DP_ERROR_VM_ADD_NAT;
 			goto err;
 		}
 
 		if (data->vip_ip != 0) {
 			ret = DP_ERROR_VM_ADD_NAT_IP_EXISTS;
 			goto err;
-		} else { /*TODO (guvenc) Why do we need this else ? A vip was not deleted and will be overwritten ?*/
+		} else {
 			rte_memcpy(data->ul_ip6, ul_ipv6, sizeof(data->ul_ip6));
 			data->vip_ip = s_ip;
 			return ret;
@@ -205,6 +204,7 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 			ret = DP_ERROR_VM_ADD_NETNAT_IP_EXISTS;
 			goto err;
 		} else {
+			rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_ip6));
 			data->network_nat_ip = s_ip;
 			data->network_nat_port_range[0] = min_port;
 			data->network_nat_port_range[1] = max_port;

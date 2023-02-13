@@ -41,15 +41,20 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(struct rte_mbuf *
 	rte_edge_t next_index = IPIP_TUNNEL_NEXT_DROP;
 	struct dp_vnf_value *vnf_val;
 
+	vnf_val = dp_get_vnf_value_with_key((void *)df->tun_info.ul_dst_addr6);
+	if (vnf_val) {
+		df->tun_info.dst_vni = vnf_val->vni;
+		df->vnf_type = vnf_val->v_type;
+		df->nxt_hop = vnf_val->portid;
+	} else {
+		return IPIP_TUNNEL_NEXT_DROP;
+	}
+
 	if (df->tun_info.proto_id == DP_IP_PROTO_IPv4_ENCAP)
 		next_index = IPIP_TUNNEL_NEXT_IPV4_CONNTRACK;
 
-	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP) {
-		vnf_val = dp_get_vnf_value_with_key((void *)df->tun_info.ul_dst_addr6);
-		if (vnf_val)
-			df->tun_info.dst_vni = vnf_val->vni;
+	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP)
 		next_index = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
-	}
 
 	if (next_index != IPIP_TUNNEL_NEXT_DROP) {
 		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));

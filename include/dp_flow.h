@@ -92,7 +92,7 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
 int dp_get_flow_data(struct flow_key *key, void **data);
 void dp_add_flow_data(struct flow_key *key, void *data);
 void dp_add_flow(struct flow_key *key);
-void dp_delete_flow(struct flow_key *key);
+void dp_delete_flow_key(struct flow_key *key);
 bool dp_flow_exists(struct flow_key *key);
 int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 void dp_invert_flow_key(struct flow_key *key /* in / out */);
