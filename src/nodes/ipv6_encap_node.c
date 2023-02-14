@@ -6,7 +6,9 @@
 #include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_encap_node.h"
+#include "dp_error.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_debug.h"
@@ -39,8 +41,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	m->l2_len = 0; /* We dont have inner l2, when we encapsulate */
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
-	if (unlikely(!ipv6_hdr))
+	if (unlikely(!ipv6_hdr)) {
+		DPNODE_LOG_WARNING(node, "No space in mbuf for IPv6 header");
 		return IPV6_ENCAP_NEXT_DROP;
+	}
 
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	ipv6_hdr->payload_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
@@ -58,7 +62,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	m->ol_flags |= RTE_MBUF_F_TX_TUNNEL_IP;
 
 	if (df->flags.nat == DP_LB_RECIRC) {
-		rewrite_eth_hdr(m, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
+		if (unlikely(DP_FAILED(rewrite_eth_hdr(m, df->nxt_hop, RTE_ETHER_TYPE_IPV6)))) {
+			DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
+			return IPV6_ENCAP_NEXT_DROP;
+		}
 		return IPV6_ENCAP_NEXT_CLS;
 	}
 

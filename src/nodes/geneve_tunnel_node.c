@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_log.h"
 #include "dp_lpm.h"
 #include "dpdk_layer.h"
 #include "nodes/common_node.h"
@@ -25,7 +26,9 @@ static int geneve_tunnel_node_init(const struct rte_graph *graph, struct rte_nod
 }
 
 
-static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_node *node,
+																 struct rte_mbuf *m,
+																 struct dp_flow *df)
 {
 	struct underlay_conf *u_conf = get_underlay_conf();
 	struct rte_flow_item_geneve *geneve_hdr;
@@ -35,8 +38,10 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_mbuf
 	geneve_hdr = (struct rte_flow_item_geneve *)rte_pktmbuf_prepend(m, sizeof(struct rte_flow_item_geneve));
 	udp_hdr = (struct rte_udp_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_udp_hdr));
 
-	if (!udp_hdr || !geneve_hdr)
+	if (unlikely(!udp_hdr || !geneve_hdr)) {
+		DPNODE_LOG_WARNING(node, "No space in mbuf for GeNeVe headers");
 		return GENEVE_TUNNEL_NEXT_DROP;
+	}
 
 	if (RTE_ETH_IS_IPV4_HDR(m->packet_type))
 		m->packet_type = RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_GENEVE | RTE_PTYPE_INNER_L3_IPV4;
@@ -95,12 +100,12 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_decap(struct rte_mbuf
 	return next_index;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = get_dp_flow_ptr(m);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-		return handle_geneve_tunnel_encap(m, df);
+		return handle_geneve_tunnel_encap(node, m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		return handle_geneve_tunnel_decap(m, df);
