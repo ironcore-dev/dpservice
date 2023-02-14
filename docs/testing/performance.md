@@ -96,6 +96,9 @@ Hash lookups in the hot code path of packet processing contribute most to the pe
 Reducing the number of accessing hash tables by performing batch lookups seems to be able to improve the performance. One potential function is `rte_hash_lookup_bulk_data`.
 But in practice, the control logic that partitions incoming pkts and tracks different processing results brings more penalty than benefits of memory accessing.
 
+### Hash function selection
+DPDK offers multiple hashing functions. Some of them are optimized based on the key length. A helper function `dp_create_jhash_table()` already selects the proper function automatically.
+
 ## Graph node
 Using the graph node framework also brings non-negligible performance penalty, due to the movement of pkts among nodes. Under the assumption of retaining the number of the graph nodes in dp-service, optimizing the approach of handling packets in each node is the direction to go.
 

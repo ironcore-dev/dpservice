@@ -116,11 +116,44 @@ void dp_fill_ipv4_print_buff(unsigned int ip, char *buf)
 		ip & 0xFF);
 }
 
+
+static uint32_t dp_jhash_1word(const void *key, uint32_t length, uint32_t initval)
+{
+	return rte_jhash_1word(((const uint32_t *)key)[0], initval);
+}
+
+static uint32_t dp_jhash_2words(const void *key, uint32_t length, uint32_t initval)
+{
+	return rte_jhash_2words(((const uint32_t *)key)[0], ((const uint32_t *)key)[1], initval);
+}
+
+static uint32_t dp_jhash_3words(const void *key, uint32_t length, uint32_t initval)
+{
+	return rte_jhash_3words(((const uint32_t *)key)[0], ((const uint32_t *)key)[1], ((const uint32_t *)key)[2], initval);
+}
+
+static uint32_t dp_jhash_nwords(const void *key, uint32_t length, uint32_t initval)
+{
+	return rte_jhash_32b(key, length / 4, initval);
+}
+
 // TODO(plague): there is no free()
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id)
 {
 	struct rte_hash *result;
 	char full_name[64];
+	rte_hash_function hash_func;
+
+	if (key_len == 4)
+		hash_func = dp_jhash_1word;
+	else if (key_len == 8)
+		hash_func = dp_jhash_2words;
+	else if (key_len == 12)
+		hash_func = dp_jhash_3words;
+	else if (!(key_len % 4))
+		hash_func = dp_jhash_nwords;
+	else
+		hash_func = rte_jhash;
 
 	snprintf(full_name, sizeof(full_name), "%s_%u", name, socket_id);
 
@@ -128,7 +161,7 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 		.name = full_name,
 		.entries = entries,
 		.key_len = key_len,
-		.hash_func = rte_jhash,
+		.hash_func = hash_func,
 		.hash_func_init_val = 0xfee1900d,  // "random" IV
 		.socket_id = socket_id,
 		.extra_flag = 0,
