@@ -128,8 +128,7 @@ static int init_interfaces()
 		|| DP_FAILED(dp_alias_init(pf0_socket)))
 		return DP_ERROR;
 
-	if (dp_conf_is_wcmp_enabled())
-		fill_port_select_table(dp_conf_get_wcmp_frac());
+	dp_multipath_init();
 
 	return DP_OK;
 }

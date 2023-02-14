@@ -1,25 +1,51 @@
 #include "dp_multi_path.h"
+
 #include <math.h>
+#include <rte_common.h>
+#include <rte_ethdev.h>
 
-static egress_pf_port pf0_egress_select_table[port_select_table_size];
+#include "dp_conf.h"
+#include "dp_port.h"
 
-void fill_port_select_table(double frac)
+#define PORT_SELECT_TABLE_SIZE 10
+
+enum egress_pf_port {
+	OWNER_PORT,
+	PEER_PORT,
+};
+
+static enum egress_pf_port pf0_egress_select_table[PORT_SELECT_TABLE_SIZE];
+
+void dp_multipath_init()
 {
+	if (!dp_conf_is_wcmp_enabled())
+		return;
 
-	uint8_t round_frac = (uint8_t)round(frac * 10);
+	double frac = dp_conf_get_wcmp_frac();
+	int round_frac = RTE_MIN((int)round(frac * 10), PORT_SELECT_TABLE_SIZE);
 
-	for (uint8_t i = 0; i < round_frac; i++) {
+	for (int i = 0; i < round_frac; ++i)
 		pf0_egress_select_table[i] = OWNER_PORT;
-	}
 
-	for (uint8_t i = round_frac; i < port_select_table_size; i++) {
+	for (int i = round_frac; i < PORT_SELECT_TABLE_SIZE; ++i)
 		pf0_egress_select_table[i] = PEER_PORT;
-	}
 }
 
-egress_pf_port calculate_port_by_hash(uint32_t hash)
+uint16_t dp_multipath_get_pf(uint32_t hash)
 {
-	uint8_t modulo = hash % port_select_table_size;
+	if (!dp_conf_is_wcmp_enabled())
+		return dp_port_get_pf0_id();
 
-	return pf0_egress_select_table[modulo];
+	enum egress_pf_port selected_port = pf0_egress_select_table[hash % PORT_SELECT_TABLE_SIZE];
+	uint16_t owner_port_id = dp_port_get_pf0_id();
+	uint16_t peer_port_id = dp_port_get_pf1_id();
+
+	// basic logic of port redundancy if one of ports are down
+	if ((selected_port == PEER_PORT && dp_port_get_link_status(peer_port_id) == RTE_ETH_LINK_UP)
+		|| (selected_port == OWNER_PORT && dp_port_get_link_status(owner_port_id) == RTE_ETH_LINK_DOWN)
+	) {
+		return peer_port_id;
+	}
+
+	return owner_port_id;
 }

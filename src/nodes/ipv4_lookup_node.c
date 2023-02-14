@@ -72,20 +72,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			return IPV4_LOOKUP_NEXT_DROP;
 	}
 
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-		// rewrite outgoing port if WCMP algorithm decides to do so
-		if (dp_conf_is_wcmp_enabled()) {
-			egress_pf_port selected_port = calculate_port_by_hash(df_ptr->dp_flow_hash);
-			uint16_t owner_port_id = dp_port_get_pf0_id();
-			uint16_t peer_port_id = dp_port_get_pf1_id();
-			// basic logic of port redundancy if one of ports are down
-			if ((selected_port == PEER_PORT && dp_port_get_link_status(peer_port_id) == RTE_ETH_LINK_UP)
-				|| (selected_port == OWNER_PORT && dp_port_get_link_status(owner_port_id) == RTE_ETH_LINK_DOWN)
-			) {
-				df_ptr->nxt_hop = peer_port_id;
-			}
-		}
-	}
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+		df_ptr->nxt_hop = dp_multipath_get_pf(df_ptr->dp_flow_hash);
 
 	return IPV4_LOOKUP_NEXT_NAT;
 }
