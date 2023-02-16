@@ -4,6 +4,7 @@ This page is intended as a general overview and table of contents for all develo
 ## Basic usage guides and study sources
 | Page |   |
 |------|---|
+| [design.md](design.md) | Overall design |
 | [building.md](building.md) | How to build the service from source |
 | [running.md](running.md) | What is needed to run the service on your machine and command-line documentation |
 | [debugging.md](debugging.md) | How to make debugging easier |
