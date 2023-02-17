@@ -33,13 +33,13 @@ int dp_nat_init(int socket_id)
 	if (!ipv4_dnat_tbl)
 		return DP_ERROR;
 
-	ipv4_netnat_portmap_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct netnat_portmap_key),
+	ipv4_netnat_portmap_tbl = dp_create_jhash_table(FLOW_MAX, sizeof(struct netnat_portmap_key),
 												  "ipv4_netnat_portmap_table", socket_id);
 
 	if (!ipv4_netnat_portmap_tbl)
 		return DP_ERROR;
 
-	ipv4_netnat_portoverload_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct netnat_portoverload_tbl_key),
+	ipv4_netnat_portoverload_tbl = dp_create_jhash_table(FLOW_MAX, sizeof(struct netnat_portoverload_tbl_key),
 												  "ipv4_netnat_portoverload_tbl", socket_id);
 
 	if (!ipv4_netnat_portoverload_tbl)
