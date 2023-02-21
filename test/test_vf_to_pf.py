@@ -82,7 +82,7 @@ def send_tcp_through_port(port):
 
 	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
-		"No network-natted TCP packet received on PF"
+		"No network-natted TCP packet received on VF"
 
 	pkt = pkt_list[0]
 	dst_ip = pkt[IP].dst
@@ -190,7 +190,7 @@ def test_vm_nat_async_tcp_icmperr(prepare_ifaces, grpc_client, port_redundancy):
 
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=5)
 	assert len(pkt_list) == 1, \
-		"Cannot receive asymmetric icmp pkt on pf"
+		"Cannot receive asymmetric ICMP packet on VF"
 
 	pkt = pkt_list[0]
 	icmp_type = pkt[ICMP].type

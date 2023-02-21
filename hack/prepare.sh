@@ -73,7 +73,7 @@ function create_vf() {
 
 function get_pattern() {
 	local dev=$1
-	pattern=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk 'match($5, /(.*[a-z_])[0-9]{1,3}$/, a) {print a[1]}' | uniq)
+	pattern=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk '{print $5}' | sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | uniq)
 	if [ -z "$pattern" ]; then
 		err "can't determine the pattern for $dev"
 	fi

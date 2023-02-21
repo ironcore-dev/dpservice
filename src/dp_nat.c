@@ -407,7 +407,7 @@ void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			tcp_hdr->cksum = 0;
 			m->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
-			m->l4_len = (tcp_hdr->data_off & 0xf0) >> 2;
+			m->l4_len = DP_TCP_HDR_LEN(tcp_hdr);
 		break;
 		case IPPROTO_UDP:
 			udp_hdr =  (struct rte_udp_hdr *)(ipv4_hdr + 1);

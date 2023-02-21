@@ -19,10 +19,14 @@
 #include "nodes/ipv6_lookup_node.h"
 #include "nodes/ipip_tunnel_node.h"
 #include "nodes/packet_relay_node.h"
+#ifdef ENABLE_VIRTSVC
+#	include "nodes/virtsvc_node.h"
+#endif
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_telemetry.h"
 
 // all times in seconds
 #define TIMER_MESSAGE_INTERVAL 30
@@ -34,6 +38,9 @@
 static volatile bool force_quit;
 static struct rte_timer message_timer;
 static uint64_t timer_manage_interval;
+struct rte_graph_cluster_stats *telemetry_stats = NULL;
+rte_node_t nb_nodes = 0;
+static inline struct rte_graph_cluster_stats *create_telemetry_stats();
 
 static const char * const default_patterns[] = {
 	"rx-*",
@@ -170,6 +177,9 @@ int dp_dpdk_layer_init()
 		dp_dpdk_layer_free();
 		return DP_ERROR;
 	}
+	if (DP_FAILED(dp_telemetry_init()))
+		return DP_ERROR;
+
 	return DP_OK;
 }
 
@@ -182,6 +192,8 @@ void dp_dpdk_layer_free(void)
 	ring_free(dp_layer.grpc_rx_queue);
 	ring_free(dp_layer.grpc_tx_queue);
 	rte_mempool_free(dp_layer.rte_mempool);
+	//need to move this to graph delete after jays code refactoring
+	rte_graph_cluster_stats_destroy(telemetry_stats);
 }
 
 void dp_force_quit()
@@ -202,6 +214,26 @@ static int graph_main_loop()
 
 	return 0;
 }
+
+static inline struct rte_graph_cluster_stats *create_telemetry_stats()
+{
+	const char *pattern = "worker_*";
+	struct rte_graph_cluster_stats_param s_param = { 
+		.socket_id = SOCKET_ID_ANY,
+		.fn = dp_stats_cb,
+		.f = stdout,
+		.nb_graph_patterns = 1,
+		.graph_patterns = &pattern,
+	};
+	struct rte_graph_cluster_stats *stats;
+
+	stats = rte_graph_cluster_stats_create(&s_param);
+	if (!stats)
+	DPS_LOG_ERR("Unable to create cluster stats %s", dp_strerror(rte_errno));
+
+	return stats;
+}
+
 
 static inline struct rte_graph_cluster_stats *create_stats()
 {
@@ -318,6 +350,9 @@ int dp_graph_init(void)
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
 	struct rte_node_register *dhcpv6_node, *rx_periodic_node;
+#ifdef ENABLE_VIRTSVC
+	struct rte_node_register *virtsvc_node;
+#endif
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
@@ -353,6 +388,9 @@ int dp_graph_init(void)
 	dhcp_node = dhcp_node_get();
 	dhcpv6_node = dhcpv6_node_get();
 	rx_periodic_node = rx_periodic_node_get();
+#ifdef ENABLE_VIRTSVC
+	virtsvc_node = virtsvc_node_get();
+#endif
 
 	/* it is not really needed to init queues in this way, and init can be done within node's init function */
 	rx_periodic_cfg.periodic_msg_queue = dp_layer.periodic_msg_queue;
@@ -428,6 +466,14 @@ int dp_graph_init(void)
 				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
 			}
+#ifdef ENABLE_VIRTSVC
+			rte_node_edge_update(virtsvc_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = virtsvc_set_next(port->port_id, rte_node_edge_count(virtsvc_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
+				return ret;
+			}
+#endif
 		}
 
 		if (port->port_type == DP_PORT_PF) {
@@ -437,6 +483,14 @@ int dp_graph_init(void)
 				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
 			}
+#ifdef ENABLE_VIRTSVC
+			rte_node_edge_update(virtsvc_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = virtsvc_set_next(port->port_id, rte_node_edge_count(virtsvc_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
+				return ret;
+			}
+#endif
 		}
 	}
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {
@@ -468,6 +522,13 @@ int dp_graph_init(void)
 		}
 	}
 
+	if (dp_conf_is_stats_enabled() && rte_graph_has_stats_feature()) {
+		telemetry_stats = create_telemetry_stats();
+		if (!telemetry_stats)
+			return DP_ERROR;
+	}
+	nb_nodes = dp_layer.graph->nb_nodes;
+
 	return DP_OK;
 }
 
@@ -486,3 +547,5 @@ struct dp_dpdk_layer *get_dpdk_layer()
 {
 	return &dp_layer;
 }
+
+
