@@ -11,6 +11,9 @@ dp_sources = ['dp_service.c', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'dp_lb.c'
 			  'dp_log.c', 'dp_error.c', 'dp_hairpin.c', 'grpc/dp_grpc_thread.cpp'
  			]
 # TODO(plague) look into autogereration of such dependencies (source file list)
+if get_option('enable_virtual_services')
+	dp_sources += [ 'nodes/virtsvc_node.c', 'dp_virtsvc.c' ]
+endif
 
 exe = executable('dp_service', [dp_sources, grpc_generated], include_directories : [inc],
 			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep] )

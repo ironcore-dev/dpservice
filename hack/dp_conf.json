@@ -61,6 +61,18 @@
     "help": "set the domain name server field in DHCP responses (can be used multiple times)"
   },
   {
+    "lgopt": "udp-virtsvc",
+    "arg": "IPv4,port,IPv6,port",
+    "help": "map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service",
+    "ifdef": "ENABLE_VIRTSVC"
+  },
+  {
+    "lgopt": "tcp-virtsvc",
+    "arg": "IPv4,port,IPv6,port",
+    "help": "map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service",
+    "ifdef": "ENABLE_VIRTSVC"
+  },
+  {
     "lgopt": "wcmp-fraction",
     "arg": "FRACTION",
     "help": "weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)",

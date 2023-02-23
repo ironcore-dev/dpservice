@@ -19,6 +19,9 @@
 #include "nodes/ipv6_lookup_node.h"
 #include "nodes/ipip_tunnel_node.h"
 #include "nodes/packet_relay_node.h"
+#ifdef ENABLE_VIRTSVC
+#	include "nodes/virtsvc_node.h"
+#endif
 #include "monitoring/dp_monitoring.h"
 #include "dp_port.h"
 #include "dp_error.h"
@@ -318,6 +321,9 @@ int dp_graph_init(void)
 	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
 	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
 	struct rte_node_register *dhcpv6_node, *rx_periodic_node;
+#ifdef ENABLE_VIRTSVC
+	struct rte_node_register *virtsvc_node;
+#endif
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
 	const char *next_nodes = name;
@@ -353,6 +359,9 @@ int dp_graph_init(void)
 	dhcp_node = dhcp_node_get();
 	dhcpv6_node = dhcpv6_node_get();
 	rx_periodic_node = rx_periodic_node_get();
+#ifdef ENABLE_VIRTSVC
+	virtsvc_node = virtsvc_node_get();
+#endif
 
 	/* it is not really needed to init queues in this way, and init can be done within node's init function */
 	rx_periodic_cfg.periodic_msg_queue = dp_layer.periodic_msg_queue;
@@ -428,6 +437,14 @@ int dp_graph_init(void)
 				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
 			}
+#ifdef ENABLE_VIRTSVC
+			rte_node_edge_update(virtsvc_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = virtsvc_set_next(port->port_id, rte_node_edge_count(virtsvc_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
+				return ret;
+			}
+#endif
 		}
 
 		if (port->port_type == DP_PORT_PF) {
@@ -437,6 +454,14 @@ int dp_graph_init(void)
 				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
 				return ret;
 			}
+#ifdef ENABLE_VIRTSVC
+			rte_node_edge_update(virtsvc_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
+			ret = virtsvc_set_next(port->port_id, rte_node_edge_count(virtsvc_node->id) - 1);
+			if (ret < 0) {
+				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
+				return ret;
+			}
+#endif
 		}
 	}
 	for (lcore_id = 1; lcore_id < RTE_MAX_LCORE; lcore_id++) {

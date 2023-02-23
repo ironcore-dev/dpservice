@@ -5,4 +5,6 @@ option('enable_tests', type: 'boolean', value: false, description:
 option('enable_graphtrace', type: 'boolean', value: false, description:
        'Build with verbose logging of packet travel over the graph framework (--graphtrace option)')
 option('enable_dpdk_22_11_support', type: 'boolean', value: false, description:
-       'enable compatibility code for dpdk version 22.11')
+       'Enable compatibility code for dpdk version 22.11')
+option('enable_virtual_services', type: 'boolean', value: false, description:
+       'Build with virtual services functionality')

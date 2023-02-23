@@ -56,3 +56,13 @@ mylb = "my_lb"
 lb_tcp_dst_port = 80
 
 MAX_LINES_ROUTE_REPLY = 36
+
+virtsvc_udp_svc_ipv6 = "2a00:da8:fff6::1"
+virtsvc_udp_svc_port = 53
+virtsvc_udp_virtual_ip = "1.2.3.4"
+virtsvc_udp_virtual_port = 5353
+
+virtsvc_tcp_svc_ipv6 = "2a00:da8:fff6::2"
+virtsvc_tcp_svc_port = 443
+virtsvc_tcp_virtual_ip = "5.6.7.8"
+virtsvc_tcp_virtual_port = 4443
