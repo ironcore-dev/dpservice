@@ -621,15 +621,14 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 			dp_del_route6(portid, vm_table[portid].vni, 0,
 					vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
 		}
-		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	} else {
 		vm_table[portid].vm_ready = 0;
 		if (vm_table[portid].ipv6_rib[socketid])
 			rte_rib6_free(vm_table[portid].ipv6_rib[socketid]);
 		if (vm_table[portid].ipv4_rib[socketid])
 			rte_rib_free(vm_table[portid].ipv4_rib[socketid]);
-		memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
-		// own mac address in the vm_entry needs to be refilled due to the above cleaning process
-		dp_set_mac(portid);
 	}
+	memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
+	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
+	dp_set_mac(portid);
 }
