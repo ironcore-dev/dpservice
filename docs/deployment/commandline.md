@@ -18,6 +18,8 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --overlay-type | TYPE | overlay tunnel type to use | 'ipip' (default) or 'geneve' |
 | --dhcp-mtu | SIZE | set the mtu field in DHCP responses (68 - 1500) |  |
 | --dhcp-dns | IPv4 | set the domain name server field in DHCP responses (can be used multiple times) |  |
+| --udp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service |  |
+| --tcp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service |  |
 | --wcmp-fraction | FRACTION | weighted-cost-multipath coefficient for pf0 (0.0 - 1.0) |  |
 | --nic-type | NICTYPE | NIC type to use | 'hw' (default) or 'tap' |
 | --no-stats | None | do not print periodic statistics to stdout |  |

@@ -11,7 +11,7 @@ from helpers import interface_up
 
 class DpService:
 
-	def __init__(self, build_path, tun_opt, port_redundancy, gdb=False):
+	def __init__(self, build_path, tun_opt, port_redundancy, gdb=False, test_virtsvc=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 
@@ -35,6 +35,9 @@ class DpService:
 					f' --nic-type=tap --overlay-type={tun_opt}')
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-fraction=0.5'
+		if test_virtsvc:
+			self.cmd += (f' --udp-virtsvc="{virtsvc_udp_virtual_ip},{virtsvc_udp_virtual_port},{virtsvc_udp_svc_ipv6},{virtsvc_udp_svc_port}"'
+						f' --tcp-virtsvc="{virtsvc_tcp_virtual_ip},{virtsvc_tcp_virtual_port},{virtsvc_tcp_svc_ipv6},{virtsvc_tcp_svc_port}"')
 
 	def get_cmd(self):
 		return self.cmd

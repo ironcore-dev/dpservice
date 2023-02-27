@@ -1,10 +1,13 @@
+#include "dp_alias.h"
+#include "dp_error.h"
+#include "dp_lb.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
-#include "dp_lb.h"
-#include "dp_alias.h"
-#include <dp_error.h>
-#include "grpc/dp_grpc_impl.h"
+#ifdef ENABLE_VIRTSVC
+#	include "dp_virtsvc.h"
+#endif
 #include "dpdk_layer.h"
+#include "grpc/dp_grpc_impl.h"
 
 #define DP_SHOW_EXT_ROUTES true
 #define DP_SHOW_INT_ROUTES false
@@ -484,6 +487,9 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 	dp_port_stop(port_id);
 	dp_del_portid_with_vm_handle(req->del_machine.machine_id);
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), !DP_LPM_ROLLBACK);
+#ifdef ENABLE_VIRTSVC
+	dp_virtsvc_del_vm(port_id);
+#endif
 	return ret;
 err:
 	rep->com_head.err_code = ret;

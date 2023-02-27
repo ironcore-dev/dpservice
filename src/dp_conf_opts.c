@@ -16,6 +16,12 @@ _OPT_SHOPT_MAX = 255,
 	OPT_OVERLAY_TYPE,
 	OPT_DHCP_MTU,
 	OPT_DHCP_DNS,
+#ifdef ENABLE_VIRTSVC
+	OPT_UDP_VIRTSVC,
+#endif
+#ifdef ENABLE_VIRTSVC
+	OPT_TCP_VIRTSVC,
+#endif
 	OPT_WCMP_FRACTION,
 	OPT_NIC_TYPE,
 	OPT_NO_STATS,
@@ -43,6 +49,12 @@ static const struct option longopts[] = {
 	{ "overlay-type", 1, 0, OPT_OVERLAY_TYPE },
 	{ "dhcp-mtu", 1, 0, OPT_DHCP_MTU },
 	{ "dhcp-dns", 1, 0, OPT_DHCP_DNS },
+#ifdef ENABLE_VIRTSVC
+	{ "udp-virtsvc", 1, 0, OPT_UDP_VIRTSVC },
+#endif
+#ifdef ENABLE_VIRTSVC
+	{ "tcp-virtsvc", 1, 0, OPT_TCP_VIRTSVC },
+#endif
 	{ "wcmp-fraction", 1, 0, OPT_WCMP_FRACTION },
 	{ "nic-type", 1, 0, OPT_NIC_TYPE },
 	{ "no-stats", 0, 0, OPT_NO_STATS },
@@ -76,26 +88,32 @@ static const char *color_choices[] = {
 static void print_help_args(FILE *outfile)
 {
 	fprintf(outfile, "%s",
-		" -h, --help                    display this help and exit\n"
-		" -v, --version                 display version and exit\n"
-		"     --pf0=IFNAME              first physical interface (e.g. eth0)\n"
-		"     --pf1=IFNAME              second physical interface (e.g. eth1)\n"
-		"     --ipv6=ADDR6              IPv6 underlay address\n"
-		"     --vf-pattern=PATTERN      virtual interface name pattern (e.g. 'eth1vf')\n"
-		"     --overlay-type=TYPE       overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
-		"     --dhcp-mtu=SIZE           set the mtu field in DHCP responses (68 - 1500)\n"
-		"     --dhcp-dns=IPv4           set the domain name server field in DHCP responses (can be used multiple times)\n"
-		"     --wcmp-fraction=FRACTION  weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)\n"
-		"     --nic-type=NICTYPE        NIC type to use: 'hw' (default) or 'tap'\n"
-		"     --no-stats                do not print periodic statistics to stdout\n"
-		"     --no-conntrack            disable connection tracking\n"
-		"     --enable-ipv6-overlay     enable IPv6 overlay addresses\n"
-		"     --no-offload              disable traffic offloading\n"
-#ifdef ENABLE_GRAPHTRACE
-		"     --graphtrace=LEVEL        verbosity level of packet traversing the graph framework\n"
+		" -h, --help                             display this help and exit\n"
+		" -v, --version                          display version and exit\n"
+		"     --pf0=IFNAME                       first physical interface (e.g. eth0)\n"
+		"     --pf1=IFNAME                       second physical interface (e.g. eth1)\n"
+		"     --ipv6=ADDR6                       IPv6 underlay address\n"
+		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
+		"     --overlay-type=TYPE                overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
+		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
+		"     --dhcp-dns=IPv4                    set the domain name server field in DHCP responses (can be used multiple times)\n"
+#ifdef ENABLE_VIRTSVC
+		"     --udp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service\n"
 #endif
-		"     --color=MODE              output colorization mode: 'never' (default), 'always' or 'auto'\n"
-		"     --grpc-port=PORT          listen for gRPC clients on this port\n"
+#ifdef ENABLE_VIRTSVC
+		"     --tcp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service\n"
+#endif
+		"     --wcmp-fraction=FRACTION           weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)\n"
+		"     --nic-type=NICTYPE                 NIC type to use: 'hw' (default) or 'tap'\n"
+		"     --no-stats                         do not print periodic statistics to stdout\n"
+		"     --no-conntrack                     disable connection tracking\n"
+		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
+		"     --no-offload                       disable traffic offloading\n"
+#ifdef ENABLE_GRAPHTRACE
+		"     --graphtrace=LEVEL                 verbosity level of packet traversing the graph framework\n"
+#endif
+		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
+		"     --grpc-port=PORT                   listen for gRPC clients on this port\n"
 	);
 }
 

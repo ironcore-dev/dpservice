@@ -28,6 +28,8 @@ extern "C" {
 								((mac1)->addr_bytes[4] == (mac2)->addr_bytes[4]) && \
 								((mac1)->addr_bytes[5] == (mac2)->addr_bytes[5]))
 
+#define DP_TCP_HDR_LEN(TCP_HDR) (((TCP_HDR)->data_off & 0xf0) >> 2)
+
 static inline bool dp_is_mellanox_opt_set()
 {
 	return dp_conf_get_eal_a_pf0()[0] != '\0'
@@ -44,6 +46,8 @@ void dp_fill_ipv4_print_buff(unsigned int ip, char *buf);
 
 
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id);
+
+void dp_free_jhash_table(struct rte_hash *table);
 
 
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES

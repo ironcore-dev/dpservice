@@ -17,6 +17,9 @@
 #include "dp_nat.h"
 #include "dp_port.h"
 #include "dp_version.h"
+#ifdef ENABLE_VIRTSVC
+#	include "dp_virtsvc.h"
+#endif
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_thread.h"
 
@@ -106,7 +109,18 @@ static int init_interfaces()
 {
 	int pf0_socket;
 
+	dp_multipath_init();
+
+	pf0_socket = rte_eth_dev_socket_id(dp_port_get_pf0_id());
+	if (DP_FAILED(pf0_socket)) {
+		DPS_LOG_ERR("Cannot get numa socket for pf0 port %d %s", dp_port_get_pf0_id(), dp_strerror(pf0_socket));
+		return DP_ERROR;
+	}
+
 	if (DP_FAILED(dp_ports_init())
+#ifdef ENABLE_VIRTSVC
+		|| DP_FAILED(dp_virtsvc_init(pf0_socket))
+#endif
 		|| DP_FAILED(dp_graph_init()))
 		return DP_ERROR;
 
@@ -115,12 +129,6 @@ static int init_interfaces()
 		|| DP_FAILED(dp_port_start(dp_port_get_pf1_id())))
 		return DP_ERROR;
 
-	pf0_socket = rte_eth_dev_socket_id(dp_port_get_pf0_id());
-	if (DP_FAILED(pf0_socket)) {
-		DPS_LOG_ERR("Cannot get numa socket for pf0 port %d %s", dp_port_get_pf0_id(), dp_strerror(pf0_socket));
-		return DP_ERROR;
-	}
-
 	if (DP_FAILED(dp_flow_init(pf0_socket))
 		|| DP_FAILED(dp_nat_init(pf0_socket))
 		|| DP_FAILED(dp_lb_init(pf0_socket))
@@ -128,13 +136,14 @@ static int init_interfaces()
 		|| DP_FAILED(dp_alias_init(pf0_socket)))
 		return DP_ERROR;
 
-	dp_multipath_init();
-
 	return DP_OK;
 }
 
 static void free_interfaces()
 {
+#ifdef ENABLE_VIRTSVC
+	dp_virtsvc_free();
+#endif
 	// TODO(plague): free graph once that code is refactored
 	dp_ports_free();
 }

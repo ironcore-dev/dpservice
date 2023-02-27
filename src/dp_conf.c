@@ -10,6 +10,7 @@
 
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_util.h"
 #include "dp_version.h"
 #include "nodes/common_node.h"  // graphtrace level limit
 #include "dpdk_layer.h"  // underlay conf struct
@@ -25,14 +26,13 @@
 #include "dp_conf_opts.c"
 
 // custom storage variables and getters
-struct dp_conf_dhcp_dns_private {
-	int len;
-	uint8_t *array;
-};
 static bool wcmp_enabled = false;
 static char eal_a_pf0[DP_EAL_A_MAXLEN] = {0};
 static char eal_a_pf1[DP_EAL_A_MAXLEN] = {0};
-static struct dp_conf_dhcp_dns_private dhcp_dns = {0};
+static struct dp_conf_dhcp_dns dhcp_dns = {0};
+#ifdef ENABLE_VIRTSVC
+static struct dp_conf_virtual_services virtual_services = {0};
+#endif
 
 int dp_conf_is_wcmp_enabled()
 {
@@ -51,8 +51,15 @@ const char *dp_conf_get_eal_a_pf1()
 
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns()
 {
-	return (struct dp_conf_dhcp_dns *)&dhcp_dns;
+	return &dhcp_dns;
 }
+
+#ifdef ENABLE_VIRTSVC
+const struct dp_conf_virtual_services *dp_conf_get_virtual_services()
+{
+	return &virtual_services;
+}
+#endif
 
 
 static inline int opt_strcpy(char *dst, const char *src, size_t max_size)
@@ -155,6 +162,99 @@ static int add_dhcp_dns(const char *str)
 	return DP_OK;
 }
 
+#ifdef ENABLE_VIRTSVC
+static int add_virtsvc(uint16_t proto, const char *str)
+{
+	struct dp_conf_virtsvc *tmp;
+	unsigned long longport;
+	struct in_addr from_addr;
+	rte_be16_t from_port;
+	struct in6_addr to_addr;
+	rte_be16_t to_port;
+	char parse_str[256];  // more than enough to hold a valid quadruple
+	char *tok;
+	char *endptr;
+
+	// strtok() is destructive, make a copy
+	snprintf(parse_str, sizeof(parse_str), "%s", str);
+
+	tok = strtok(parse_str, ",");
+	if (!tok) {
+		DP_EARLY_ERR("Missing virtual service IPv4");
+		return DP_ERROR;
+	}
+	if (inet_aton(tok, &from_addr) != 1) {
+		DP_EARLY_ERR("Invalid virtual service IPv4 address '%s'", tok);
+		return DP_ERROR;
+	}
+
+	tok = strtok(NULL, ",");
+	if (!tok) {
+		DP_EARLY_ERR("Missing virtual service IPv4 port");
+		return DP_ERROR;
+	}
+	longport = strtoul(tok, &endptr, 10);
+	if (!*tok || *endptr || !longport || longport > UINT16_MAX) {
+		DP_EARLY_ERR("Invalid virtual service IPv4 port '%s'", tok);
+		return DP_ERROR;
+	}
+	from_port = htons(longport);
+
+	tok = strtok(NULL, ",");
+	if (!tok) {
+		DP_EARLY_ERR("Missing virtual service IPv6");
+		return DP_ERROR;
+	}
+	if (inet_pton(AF_INET6, tok, &to_addr) != 1) {
+		DP_EARLY_ERR("Invalid virtual service IPv6 address '%s'", tok);
+		return DP_ERROR;
+	}
+
+	tok = strtok(NULL, ",");
+	if (!tok) {
+		DP_EARLY_ERR("Missing virtual service IPv6 port");
+		return DP_ERROR;
+	}
+	longport = strtoul(tok, &endptr, 10);
+	if (!*tok || *endptr || !longport || longport > UINT16_MAX) {
+		DP_EARLY_ERR("Invalid virtual service IPv6 port '%s'", tok);
+		return DP_ERROR;
+	}
+	to_port = htons(longport);
+
+	// prevent virtual/service address duplicates
+	for (int i = 0; i < virtual_services.nb_entries; ++i) {
+		tmp = &virtual_services.entries[i];
+		if (tmp->proto == proto) {
+			if (tmp->virtual_addr == from_addr.s_addr && tmp->virtual_port == from_port) {
+				DP_EARLY_ERR("IPv4 specification already used for '%s'", str);
+				return DP_ERROR;
+			} else if (!memcmp(&tmp->service_addr, &to_addr, sizeof(to_addr)) && tmp->service_port == to_port) {
+				DP_EARLY_ERR("IPv6 specification already used for '%s'", str);
+				return DP_ERROR;
+			}
+		}
+	}
+
+	tmp = (struct dp_conf_virtsvc *)realloc(virtual_services.entries,
+											(virtual_services.nb_entries + 1) * sizeof(struct dp_conf_virtsvc));
+	if (!tmp) {
+		DP_EARLY_ERR("Cannot allocate memory for virtual service");
+		return DP_ERROR;
+	}
+	virtual_services.entries = tmp;
+
+	tmp += virtual_services.nb_entries;
+	tmp->proto = proto;
+	tmp->virtual_addr = from_addr.s_addr;
+	tmp->virtual_port = from_port;
+	rte_memcpy(&tmp->service_addr, &to_addr, sizeof(to_addr));
+	tmp->service_port = to_port;
+	virtual_services.nb_entries++;
+	return DP_OK;
+}
+#endif
+
 static int parse_opt(int opt, const char *arg)
 {
 	switch (opt) {
@@ -174,6 +274,12 @@ static int parse_opt(int opt, const char *arg)
 		return opt_str_to_int(&dhcp_mtu, arg, 68, 1500);  // RFC 791, RFC 894
 	case OPT_DHCP_DNS:
 		return add_dhcp_dns(arg);
+#ifdef ENABLE_VIRTSVC
+	case OPT_TCP_VIRTSVC:
+		return add_virtsvc(IPPROTO_TCP, arg);
+	case OPT_UDP_VIRTSVC:
+		return add_virtsvc(IPPROTO_UDP, arg);
+#endif
 	case OPT_WCMP_FRACTION:
 		wcmp_enabled = true;
 		return opt_str_to_double(&wcmp_frac, arg, 0.0, 1.0);
@@ -329,4 +435,7 @@ int dp_conf_parse_file(const char *env_filename)
 void dp_conf_free()
 {
 	free(dhcp_dns.array);
+#ifdef ENABLE_VIRTSVC
+	free(virtual_services.entries);
+#endif
 }

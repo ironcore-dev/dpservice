@@ -14,6 +14,12 @@ Since the Linux kernel style is the starting point, this project is also using t
 
 As part of GitHub CI, this script will be run on your PR automatically and can lead to a failed check.
 
+If you want to make sure this check is run automatically on your side, think about using [Git hooks](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks).
+```bash
+echo -e '#!/bin/sh\n./code_check/check.sh' > .git/hooks/pre-push
+chmod a+x .git/hooks/pre-push
+```
+
 
 ## Consistency
 There can be multiple acceptable ways to achieve your goal, but be consistent, otherwise it makes the reader question why are thing done differently. Take examples from existing code and commits and be consistent with those, unless refactoring is in order.

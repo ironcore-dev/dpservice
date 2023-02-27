@@ -4,6 +4,9 @@
 #include "dp_lpm.h"
 #include "dp_netlink.h"
 #include "dp_port.h"
+#ifdef ENABLE_VIRTSVC
+#	include "dp_virtsvc.h"
+#endif
 #include "monitoring/dp_event.h"
 #include "nodes/rx_node_priv.h"
 #include "rte_flow/dp_rte_flow_init.h"
@@ -398,7 +401,11 @@ static int dp_port_install_isolated_mode(int port_id)
 			return DP_ERROR;
 		break;
 	}
+#ifdef ENABLE_VIRTSVC
+	return dp_virtsvc_install_isolation_rules(port_id);
+#else
 	return DP_OK;
+#endif
 }
 
 int dp_port_start(uint16_t port_id)

@@ -5,6 +5,10 @@
 #include <rte_flow.h>
 #include "dp_flow.h"
 
+#ifdef ENABLE_VIRTSVC
+#	include "dp_virtsvc.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,9 +57,15 @@ struct dp_flow {
 		uint16_t	dst_port;	//dst_port in outter udp header
 		uint32_t	dst_vni;
 	} tun_info;
+	// TODO(plague): port_id is uint16_t though, theoretically this is too little
 	uint8_t				nxt_hop;
 	uint8_t				periodic_type;
-	struct flow_value	*conntrack;
+	union {
+		struct flow_value	*conntrack;
+#ifdef ENABLE_VIRTSVC
+		struct dp_virtsvc	*virtsvc;
+#endif
+	};
 };
 
 struct dp_mbuf_priv1 {

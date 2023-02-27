@@ -1,7 +1,15 @@
-common_args = [ '--build-path='+meson.build_root() ]
 pytest_dir = join_paths(meson.source_root(), 'test')
 
-redundancy_tests = [ join_paths(pytest_dir, 'test_encap.py') ]
+common_args = [ '--build-path='+meson.build_root() ]
+if get_option('enable_virtual_services')
+	common_args += '--virtsvc'
+endif
+
+redundancy_tests = []
+redundancy_enabled_py = [ 'test_encap.py', 'test_virtsvc.py' ]
+foreach py : redundancy_enabled_py
+  redundancy_tests += join_paths(pytest_dir, py)
+endforeach
 
 # Geneve currently not supported
 #tunnels = [ 'ipip', 'geneve' ]

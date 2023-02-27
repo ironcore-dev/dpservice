@@ -7,7 +7,9 @@ add_global_arguments('-DDEBUG=true', language: ['c', 'cpp'])
 if get_option('enable_graphtrace')
   add_global_arguments('-DENABLE_GRAPHTRACE', language: 'c')
 endif
-
+if get_option('enable_virtual_services')
+  add_global_arguments('-DENABLE_VIRTSVC', language: ['c', 'cpp'])
+endif
 if get_option('enable_dpdk_22_11_support')
   add_global_arguments('-DENABLE_DPDK_22_11', language: 'c')
 endif
