@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 // all times in seconds
-#define TIMER_MESSAGE_INTERVAL 1
+#define TIMER_MESSAGE_INTERVAL 5 // increase frequency to check flow table
 #define TIMER_DP_MAINTAINANCE_INTERVAL 30
 // make sure that we do not sleep (and do stuff) longer than the manage interval
 // that would make the code miss it (see main_core_loop())

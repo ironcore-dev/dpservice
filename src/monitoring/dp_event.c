@@ -84,7 +84,7 @@ void dp_process_event_timer_msg(struct rte_mbuf *m)
 	if (dp_conf_is_offload_enabled()) {
 		dp_process_aged_flows(dp_port_get_pf0_id());
 		dp_process_aged_flows(dp_port_get_pf1_id());
-	} 
+	}
 
 	dp_process_aged_flows_non_offload();
 }

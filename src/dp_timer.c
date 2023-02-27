@@ -12,14 +12,12 @@ static uint64_t rte_timer_resolution_in_hz;
 
 static void dp_message_timer_cb()
 {
-	// printf("message timer is triggerd \n");
 	if (DP_FAILED(dp_send_event_timer_msg()))
 		DPS_LOG_WARNING("Cannot send timer event");
 }
 
 static void dp_maintenance_timer_cb()
 {
-	// printf("maintainance timer is triggerd \n");
 	if (dp_conf_is_ipv6_overlay_enabled()) {
 		trigger_nd_ra();
 		trigger_nd_unsol_adv();
@@ -44,7 +42,7 @@ int timers_init()
 
 	rte_timer_resolution_in_hz = rte_get_timer_hz();
 	dp_timer_manage_interval = dp_get_rte_timer_resolution() * TIMER_MANAGE_INTERVAL;
-	
+
 	ret = rte_timer_subsystem_init();
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot init timer subsystem %s", dp_strerror(ret));
@@ -61,16 +59,20 @@ int timers_init()
 						  lcore_id,
 						  dp_message_timer_cb,
 						  NULL);
-	// lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start message timer");  // there is no errno for this
+		return DP_ERROR;
+	}
+
 	ret = rte_timer_reset(&dp_maintenance_timer,
 						  dp_get_rte_timer_resolution() * TIMER_DP_MAINTAINANCE_INTERVAL,
 						  PERIODICAL,
 						  lcore_id,
 						  dp_maintenance_timer_cb,
 						  NULL);
-	
+
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start message timer");  // there is no errno for this
+		DPS_LOG_ERR("Cannot start maintenance timer");  // there is no errno for this
 		return DP_ERROR;
 	}
 

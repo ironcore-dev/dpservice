@@ -16,8 +16,8 @@ extern "C" {
 
 #define FLOW_MAX				(1*1024*1024UL)
 
-#define DP_FLOW_DEFAULT_TIMEOUT	30  /* In seconds */
-#define DP_FLOW_UDP_TIMEOUT		1
+#define DP_FLOW_DEFAULT_TIMEOUT	(30 / TIMER_MESSAGE_INTERVAL)  /* In seconds */
+#define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24 / TIMER_MESSAGE_INTERVAL)
 
 enum {
 	DP_FLOW_DIR_ORG,
@@ -50,6 +50,16 @@ enum {
 	DP_FLOW_ACTION_DROP,
 };
 
+enum {
+	DP_FLOW_TCP_STATE_ZERO,
+	DP_FLOW_TCP_STATE_NEW,
+	DP_FLOW_TCP_STATE_NEW_SYN,
+	DP_FLOW_TCP_STATE_NEW_SYNACK,
+	DP_FLOW_TCP_STATE_ESTABLISHED,
+	DP_FLOW_TCP_STATE_FIN_ACK,
+	DP_FLOW_TCP_STATE_RST_FIN,
+};
+
 struct flow_key {
 	uint32_t ip_dst;
 	uint32_t ip_src;
@@ -76,15 +86,15 @@ struct flow_value {
 	struct flow_nat_info	nat_info;
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
+	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		flow_status;
 	uint16_t		flow_state;
 	uint16_t		dir;
 	uint16_t		port;
-	uint64_t		timestamp;
-	uint8_t			timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint8_t			lb_dst_addr6[16];
 	uint8_t			action[DP_FLOW_DIR_MAX];
 	struct dp_ref	ref_count;
+	void			*extra_state;
 };
 
 struct flow_age_ctx {

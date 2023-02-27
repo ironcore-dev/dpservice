@@ -13,8 +13,6 @@
 #include "dp_timer.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
-// static uint64_t timeout = 0;
-static uint64_t rte_timer_resolution_in_hz;
 
 int dp_flow_init(int socket_id)
 {
@@ -22,9 +20,6 @@ int dp_flow_init(int socket_id)
 										  "ipv4_flow_table", socket_id);
 	if (!ipv4_flow_tbl)
 		return DP_ERROR;
-	
-	rte_timer_resolution_in_hz = rte_get_timer_hz();
-	// timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT;
 
 	return DP_OK;
 }
@@ -210,6 +205,10 @@ void dp_free_flow(struct dp_ref *ref)
 	dp_free_network_nat_port(cntrack);
 	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
+
+	if (cntrack->extra_state)
+		rte_free(cntrack->extra_state);
+
 	rte_free(cntrack);
 }
 
