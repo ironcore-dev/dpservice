@@ -35,6 +35,7 @@ spec:
         - -l 0,1
         - --
         - --no-offload
+        - --dhcp-dns=8.8.8.8
         image: dp-service
         imagePullPolicy: IfNotPresent
         name: dp-service
