@@ -108,6 +108,11 @@ function make_config() {
 }
 
 # main
+if [ -e $CONFIG ]; then
+    echo "File $CONFIG already exists"
+    exit
+fi
+
 validate
 get_pf
 validate_pf
