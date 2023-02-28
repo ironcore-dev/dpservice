@@ -74,31 +74,44 @@ def interface_up(interface):
 	subprocess.check_output(shlex.split(cmd))
 
 
-# TODO(plague): PR to use this everywhere
 def validate_checksums(pkt):
+	# NOTE: As checksums are offloaded, tunneled checksums are not computed
+	tunneled = type(pkt.getlayer(1)) == IPv6 and IP in pkt
 	if IPv6 in pkt:
-		assert pkt[IPv6].plen == len(pkt)-54, \
+		assert pkt[IPv6].plen == len(pkt[IPv6])-40, \
 			"Invalid IPv6 packet length"
 	if IP in pkt:
-		assert pkt[IP].len == len(pkt) - 14, \
+		assert pkt[IP].len == len(pkt[IP]), \
 			"Invalid IPv4 packet length"
 		ipv4 = pkt[IP].copy()
 		chksum = ipv4.chksum
-		del ipv4.chksum
-		ipv4 = IP(raw(ipv4))
-		assert ipv4.chksum == chksum, \
-			"Invalid IPv4 checksum"
+		if not tunneled or chksum != 0:
+			del ipv4.chksum
+			ipv4 = IP(raw(ipv4))
+			assert ipv4.chksum == chksum, \
+				"Invalid IPv4 checksum"
 	if TCP in pkt:
 		tcp = pkt[TCP].copy()
 		chksum = tcp.chksum
-		del tcp.chksum
-		tcp = TCP(raw(tcp))
-		assert tcp.chksum == chksum, \
-			"Invalid TCP checksum"
+		if not tunneled or chksum != 0:
+			del tcp.chksum
+			tcp = TCP(raw(tcp))
+			assert tcp.chksum == chksum, \
+				"Invalid TCP checksum"
 	if UDP in pkt:
 		udp = pkt[UDP].copy()
 		chksum = udp.chksum
-		del udp.chksum
-		udp = UDP(raw(udp))
-		assert udp.chksum == chksum, \
-			"Invalid UDP checksum"
+		if not tunneled or chksum != 0:
+			del udp.chksum
+			udp = UDP(raw(udp))
+			assert udp.chksum == chksum, \
+				"Invalid UDP checksum"
+
+def sniff_packet(iface, lfilter, skip=0):
+	count = skip+1
+	pkt_list = sniff(count=count, lfilter=lfilter, iface=iface, timeout=count*sniff_timeout)
+	assert len(pkt_list) == count, \
+		f"No reply on {iface}"
+	pkt = pkt_list[skip]
+	validate_checksums(pkt)
+	return pkt

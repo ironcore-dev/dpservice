@@ -66,3 +66,5 @@ virtsvc_tcp_svc_ipv6 = "2a00:da8:fff6::2"
 virtsvc_tcp_svc_port = 443
 virtsvc_tcp_virtual_ip = "5.6.7.8"
 virtsvc_tcp_virtual_port = 4443
+
+sniff_timeout = 2

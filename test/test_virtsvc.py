@@ -13,19 +13,11 @@ def reply_udp(pf_name):
 
 	global udp_used_port
 
-	pkt_list = sniff(count=1, lfilter=is_udp_pkt, iface=pf_name, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No request packet on PF"
-
-	pkt = pkt_list[0]
-	validate_checksums(pkt)
-
+	pkt = sniff_packet(pf_name, is_udp_pkt)
 	assert pkt[IPv6].dst == virtsvc_udp_svc_ipv6, \
 		"Request to wrong IPv6 address"
-
 	assert pkt[UDP].dport == virtsvc_udp_svc_port, \
 		"Request to wrong UDP port"
-
 	assert udp_used_port != pkt[UDP].sport, \
 		"UDP port reused over multiple connections"
 
@@ -45,19 +37,11 @@ def request_udp(l4_port, pf_name):
 			   UDP(dport=virtsvc_udp_virtual_port, sport=l4_port))
 	delayed_sendp(udp_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_udp_pkt, iface=vf0_tap, timeout=3)
-	assert len(pkt_list) == 1, \
-		"No reply packet received on VF"
-
-	pkt = pkt_list[0]
-	validate_checksums(pkt)
-
+	pkt = sniff_packet(vf0_tap, is_udp_pkt)
 	assert pkt[IP].src == virtsvc_udp_virtual_ip, \
 		"Got answer from wrong UDP source port"
-
 	assert pkt[UDP].sport == virtsvc_udp_virtual_port, \
 		"Got answer from wrong UDP source port"
-
 	assert pkt[UDP].dport == l4_port, \
 		"Got answer to wrong UDP destination port"
 
@@ -77,11 +61,7 @@ def tcp_reset():
 
 def get_server_packet(pf_name):
 	global tcp_used_port
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No request packet on PF"
-	pkt = pkt_list[0]
-	validate_checksums(pkt)
+	pkt = sniff_packet(pf_name, is_tcp_pkt)
 	assert pkt[IPv6].dst == virtsvc_tcp_svc_ipv6, \
 		"Request to wrong IPv6 address"
 	assert pkt[TCP].dport == virtsvc_tcp_svc_port, \
@@ -146,11 +126,7 @@ def reply_tcp(pf_name):
 		"Expected an ACK packet"
 
 def get_client_packet(port):
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=3)
-	assert len(pkt_list) == 1, \
-		"No reply packet received on VF"
-	pkt = pkt_list[0]
-	validate_checksums(pkt)
+	pkt = sniff_packet(vf0_tap, is_tcp_pkt)
 	assert pkt[IP].src == virtsvc_tcp_virtual_ip, \
 		"Got answer from wrong TCP source port"
 	assert pkt[TCP].sport == virtsvc_tcp_virtual_port, \

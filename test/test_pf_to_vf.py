@@ -24,11 +24,7 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 
 	threading.Thread(target=send_lb_pkt_to_pf).start()
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No packets received"
-
-	pkt = pkt_list[0]
+	pkt = sniff_packet(vf0_tap, is_tcp_pkt)
 	dst_ip = pkt[IP].dst
 	dport = pkt[TCP].dport
 	assert dst_ip == virtual_ip and dport == 80, \

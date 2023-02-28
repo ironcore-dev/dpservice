@@ -7,7 +7,7 @@ from helpers import *
 
 
 def geneve4_in_ipv6_icmp_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_geneve_encaped_icmp_pkt, iface=pf_name, timeout=2)[0]
+	pkt = sniff_packet(pf_name, is_geneve_encaped_icmp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=17) /
 				 UDP(sport=6081, dport=6081) /
@@ -17,7 +17,7 @@ def geneve4_in_ipv6_icmp_responder(pf_name):
 	delayed_sendp(reply_pkt, pf_name)
 
 def ipv4_in_ipv6_icmp_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_encaped_icmp_pkt, iface=pf_name, timeout=2)[0]
+	pkt = sniff_packet(pf_name, is_encaped_icmp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
@@ -30,9 +30,9 @@ def send_ipv4_icmp(dst_ip, pf_name, responder):
 					 IP(dst=dst_ip, src=vf0_ip) /
 					 ICMP(type=8))
 	delayed_sendp(icmp_echo_pkt, vf0_tap)
-	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No ECHO reply on "+pf_name
+	pkt = sniff_packet(vf0_tap, is_icmp_pkt)
+	assert pkt[ICMP].type == 0, \
+		"Wrong ICMP reply"
 
 def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy):
 	responder = geneve4_in_ipv6_icmp_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_icmp_responder
@@ -42,7 +42,7 @@ def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy):
 
 
 def geneve6_in_ipv6_icmp6_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_geneve_encaped_icmpv6_pkt, iface=pf_name, timeout=2)[0]
+	pkt = sniff_packet(pf_name, is_geneve_encaped_icmpv6_pkt)
 	reply_pkt = (Ether(dst= pkt.getlayer(Ether).src, src= pkt.getlayer(Ether).dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt.getlayer(IPv6,1).dst, nh=17) /
 				 UDP(sport=6081, dport=6081) /
@@ -52,7 +52,7 @@ def geneve6_in_ipv6_icmp6_responder(pf_name):
 	delayed_sendp(reply_pkt, pf_name)
 
 def ipv6_in_ipv6_icmp6_responder(pf_name):
-	pkt = sniff(count=1, lfilter=is_encaped_icmpv6_pkt, iface=pf_name, timeout=2)[0]
+	pkt = sniff_packet(pf_name, is_encaped_icmpv6_pkt)
 	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst, type=0x86DD) /
 				 IPv6(dst=ul_actual_src, src=pkt.getlayer(IPv6,1).dst, nh=0x29) /
 				 IPv6(dst=pkt.getlayer(IPv6,2).src, src=pkt.getlayer(IPv6,2).dst, nh=58) /
@@ -72,6 +72,6 @@ def test_ipv6_in_ipv6(prepare_ifaces, tun_opt, port_redundancy):
 					 ICMPv6EchoRequest())
 	delayed_sendp(icmp_echo_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_icmpv6echo_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No ECHOv6 reply"
+	pkt = sniff_packet(vf0_tap, is_icmpv6echo_pkt)
+	assert pkt[ICMPv6EchoReply].type == 129, \
+		"Bad ECHOv6 reply"
