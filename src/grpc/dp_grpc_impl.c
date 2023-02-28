@@ -1,16 +1,20 @@
-#include "dp_alias.h"
 #include "dp_error.h"
 #include "dp_lb.h"
+#include <time.h>
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
+#include "dp_vnf.h"
+#include "dp_log.h"
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_impl.h"
 
 #define DP_SHOW_EXT_ROUTES true
 #define DP_SHOW_INT_ROUTES false
+
+static uint32_t pfx_counter = 1;
 
 void dp_last_mbuf_from_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[])
 {
@@ -33,6 +37,51 @@ uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep
 	rep->com_head.msg_count = 0;
 
 	return msg_per_buf;
+}
+
+static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t *route)
+{
+	uint32_t local = htonl(pfx_counter);
+	uint8_t random_byte;
+
+	srand(time(NULL));
+	random_byte = rand() % 256;
+
+	/* First 8 bytes for host */
+	rte_memcpy(route, get_underlay_conf()->src_ip6, DP_VNF_IPV6_ADDR_SIZE);
+	/* Following 2 bytes for kernel routing and 1 byte reserved */
+	memset(route + 8, 0, 3);
+	/* 1 byte random value */
+	rte_memcpy(route + 11, &random_byte, 1);
+	/* 4 byte counter */
+	rte_memcpy(route + 12, &local, 4);
+
+	pfx_counter++;
+}
+
+static __rte_always_inline int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
+												   int vni, uint16_t portid, uint8_t *ul_addr6)
+{
+	dp_generate_underlay_ipv6(ul_addr6);
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = vni;
+	return dp_set_vnf_value((void *)ul_addr6, val);
+}
+
+static __rte_always_inline void dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
+													uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	dp_del_vnf_with_value(val);
+}
+
+static __rte_always_inline void dp_remove_vnf_with_key(uint8_t *key)
+{
+	if (DP_FAILED(dp_del_vnf_with_vnf_key(key)))
+		DPGRPC_LOG_WARNING("VNF key does not exist");
 }
 
 struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
@@ -108,21 +157,29 @@ __rte_always_inline void dp_fill_head(dp_com_head *head, uint16_t type,
 
 static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	struct dp_vnf_value vnf_val = {0};
 	int ret = EXIT_SUCCESS;
 	int vni = req->add_lb.vni;
 
 	if (req->add_lb.ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_create_lb((void *)req->add_lb.lb_id, ntohl(req->add_lb.vip.vip_addr), req->add_lb.vni,
-						 req->add_lb.lbports)) {
-			ret = DP_ERROR_CREATE_LB_ERR;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB, vni, 0, ul_addr6))) {
+			ret = DP_ERROR_CREATE_LB_VNF_ERR;
 			goto err;
+		}
+		if (dp_create_lb(&req->add_lb, ul_addr6)) {
+			ret = DP_ERROR_CREATE_LB_ERR;
+			goto err_vnf;
 		}
 	}  else {
 		ret = DP_ERROR_CREATE_LB_UNSUPP_IP;
 		goto err;
 	}
-	rep->vni = vni;
+	rte_memcpy(rep->get_lb.ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
+
+err_vnf:
+	dp_remove_vnf_with_key(ul_addr6);
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -131,6 +188,14 @@ err:
 static int dp_process_del_lb(dp_request *req, dp_reply *rep)
 {
 	int ret;
+
+	ret = dp_get_lb((void *)req->del_lb.lb_id, &rep->get_lb);
+	if (ret) {
+		rep->com_head.err_code = ret;
+		return ret;
+	}
+
+	dp_remove_vnf_with_key(rep->get_lb.ul_addr6);
 
 	ret = dp_delete_lb((void *)req->del_lb.lb_id);
 	if (ret) {
@@ -197,6 +262,8 @@ err:
 
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	struct dp_vnf_value vnf_val = {0};
 	int port_id, ret = EXIT_SUCCESS;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_vip.machine_id);
@@ -208,21 +275,28 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
+			ret = DP_ERROR_VM_ADD_NAT_VNF_ERR;
+			goto err;
+		}
 		ret = dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
 						  ntohl(req->add_vip.vip.vip_addr),
-						  dp_get_vm_vni(port_id));
+						  dp_get_vm_vni(port_id), ul_addr6);
 		if (ret)
-			goto err;
+			goto err_vnf;
+
 		ret = dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr),
 						  dp_get_dhcp_range_ip4(port_id),
 						  dp_get_vm_vni(port_id));
 		if (ret)
 			goto err_snat;
+		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	}
-	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
 err_snat:
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+err_vnf:
+	dp_remove_vnf_with_key(ul_addr6);
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -231,7 +305,7 @@ err:
 static int dp_process_delvip(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	u_int32_t vip;
+	struct snat_data *s_data;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
@@ -241,10 +315,15 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	vip = dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
-							dp_get_vm_vni(port_id));
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
+										 dp_get_vm_vni(port_id));
+	if (!s_data) {
+		ret = DP_ERROR_VM_DEL_NAT_NO_SNAT;
+		goto err;
+	}
+	dp_remove_vnf_with_key(s_data->ul_ip6);
+	dp_del_vm_dnat_ip(s_data->vip_ip, dp_get_vm_vni(port_id));
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
-	dp_del_vm_dnat_ip(vip, dp_get_vm_vni(port_id));
 
 	return ret;
 err:
@@ -255,6 +334,7 @@ err:
 static int dp_process_getvip(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
+	struct snat_data *s_data;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_machine.machine_id);
 
@@ -264,14 +344,15 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	rep->get_vip.vip.vip_addr = htonl(dp_get_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
-														dp_get_vm_vni(port_id)));
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
+										 dp_get_vm_vni(port_id));
 
-	if (!rep->get_vip.vip.vip_addr) {
+	if (!s_data || !s_data->vip_ip) {
 		ret = DP_ERROR_VM_GET_NAT_NO_IP_SET;
 		goto err;
 	}
-
+	rep->get_vip.vip.vip_addr = htonl(s_data->vip_ip);
+	rte_memcpy(rep->get_vip.ul_addr6, s_data->ul_ip6, sizeof(rep->ul_addr6));
 	return ret;
 err:
 	rep->com_head.err_code = ret;
@@ -281,7 +362,8 @@ err:
 static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	dp_alias_value alias_val;
+	struct dp_vnf_value vnf_val = {0};
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -291,12 +373,13 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
-	alias_val.portid = port_id;
-	alias_val.length = req->add_pfx.pfx_length;
-	dp_map_alias_handle((void *)req->add_pfx.pfx_ul_addr6, &alias_val);
-
-	memcpy(rep->route.trgt_ip.addr6, req->add_pfx.pfx_ul_addr6, sizeof(rep->route.trgt_ip.addr6));
+	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
+		ret = DP_ERROR_VM_ADD_PFX_VNF_ERR;
+		goto err;
+	}
+	rte_memcpy(rep->route.trgt_ip.addr6, ul_addr6, sizeof(rep->route.trgt_ip.addr6));
 
 	return EXIT_SUCCESS;
 err:
@@ -307,7 +390,7 @@ err:
 static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	dp_alias_value alias_val;
+	struct dp_vnf_value vnf_val = {0};
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -317,10 +400,9 @@ static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 
-	alias_val.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
-	alias_val.portid = port_id;
-	alias_val.length = req->add_pfx.pfx_length;
-	dp_del_portid_with_alias_handle(&alias_val);
+	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
+	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
 
 	return ret;
 err:
@@ -330,7 +412,9 @@ err:
 
 static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int port_id, ret = EXIT_SUCCESS;
+	struct dp_vnf_value vnf_val = {0};
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -342,16 +426,25 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
-					 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))) {
-			if (!req->add_pfx.pfx_lb_enabled) {
+						 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))
+		) {
 				ret = DP_ERROR_VM_ADD_PFX_ROUTE;
 				goto err;
-			}
 		}
+		vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+		vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
+			ret = DP_ERROR_VM_ADD_PFX_VNF_ERR;
+			goto err_vnf;
+		}
+		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	}
-
-	rep->vni = dp_get_vm_vni(port_id);
 	return EXIT_SUCCESS;
+
+err_vnf:
+	dp_del_route(port_id, dp_get_vm_vni(port_id), 0,
+				ntohl(req->add_pfx.pfx_ip.pfx_addr), NULL,
+				req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id));
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -360,6 +453,7 @@ err:
 static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
+	struct dp_vnf_value vnf_val = {0};
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 
@@ -374,9 +468,14 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
 					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_DEL_PFX;
-			goto err;
+			rep->com_head.err_code = ret;
+			/* try to delete the vnf entry anyways */
 		}
 	}
+
+	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
+	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
+	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id);
 
 	return ret;
 err:
@@ -386,9 +485,12 @@ err:
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint16_t port_id = DP_INVALID_PORT_ID;
+	struct dp_vnf_value vnf_val = {0};
 	int err_code = EXIT_SUCCESS;
 	uint16_t p_id = 0;
+	uint32_t vni;
 
 	// TODO(plague?): this seems to be a misnomer, this name comes from vm_pci argument
 	if (req->add_machine.name[0] == '\0') {
@@ -415,9 +517,14 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 	}
 
 	if (port_id != DP_INVALID_PORT_ID) {
+		vni = req->add_machine.vni;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_INTERFACE_IP, vni, port_id, ul_addr6))) {
+			err_code = DP_ERROR_VM_ADD_VM_VNF_ERROR;
+			goto err;
+		}
 		if (dp_map_vm_handle(req->add_machine.machine_id, port_id)) {
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
-			goto err;
+			goto err_vnf;
 		}
 		if (setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM4;
@@ -456,6 +563,8 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		err_code = DP_ERROR_VM_ADD_VM_NO_VFS;
 		goto err;
 	}
+	rte_memcpy(dp_get_vm_ul_ip6(port_id), ul_addr6, sizeof(ul_addr6));
+	rte_memcpy(rep->vf_pci.ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(rep->vf_pci.ul_addr6));
 	return EXIT_SUCCESS;
 /* Rollback the changes, in case of an error */
 route_err:
@@ -466,6 +575,8 @@ lpm_err:
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), DP_LPM_ROLLBACK);
 handle_err:
 	dp_del_portid_with_vm_handle(req->add_machine.machine_id);
+err_vnf:
+	dp_remove_vnf_with_key(ul_addr6);
 err:
 	rep->com_head.err_code = err_code;
 	return EXIT_FAILURE;
@@ -482,6 +593,7 @@ static int dp_process_delmachine(dp_request *req, dp_reply *rep)
 		ret = DP_ERROR_VM_DEL_VM_NOT_FND;
 		goto err;
 	}
+	dp_remove_vnf_with_key(dp_get_vm_ul_ip6(port_id));
 
 	// TODO(chandra?): this can fail now; also this expects uint16_t port type
 	dp_port_stop(port_id);
@@ -517,6 +629,7 @@ static int dp_process_getmachine(dp_request *req, dp_reply *rep)
 	rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(port_id),
 		sizeof(vm_info->machine_id));
 	rte_eth_dev_get_name_by_port(port_id, rep->vm_info.pci_name);
+	rte_memcpy(rep->vm_info.ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(rep->vm_info.ul_addr6));
 
 	return ret;
 err:
@@ -576,6 +689,8 @@ err:
 
 static int dp_process_addnat(dp_request *req, dp_reply *rep)
 {
+	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	struct dp_vnf_value vnf_val = {0};
 	int port_id, ret = EXIT_SUCCESS;
 	uint32_t vm_vni;
 
@@ -589,19 +704,28 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 	vm_vni = dp_get_vm_vni(port_id);
 
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
+			ret = DP_ERROR_VM_ADD_NAT_VNF_ERR;
+			goto err;
+		}
 		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
-									vm_vni, (uint16_t)req->add_nat_vip.port_range[0], (uint16_t)req->add_nat_vip.port_range[1]);
+									    vm_vni, (uint16_t)req->add_nat_vip.port_range[0],
+									    (uint16_t)req->add_nat_vip.port_range[1], ul_addr6);
 
 		if (ret)
-			goto err;
+			goto err_vnf;
 
 		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr),
 								0, vm_vni);
 		if (ret && ret != DP_ERROR_VM_ADD_DNAT_IP_EXISTS)
-			goto err;
+			goto err_dnat;
+		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
 	}
-	rep->vni = vm_vni;
 	return EXIT_SUCCESS;
+err_dnat:
+	dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+err_vnf:
+	dp_remove_vnf_with_key(ul_addr6);
 err:
 	rep->com_head.err_code = ret;
 	return ret;
@@ -611,16 +735,22 @@ err:
 static int dp_process_delnat(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	uint32_t vm_vni;
+	struct snat_data *s_data;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
 	if (port_id < 0) {
 		ret = DP_ERROR_VM_GET_VM_NOT_FND;
 		goto err;
 	}
-	vm_vni = dp_get_vm_vni(port_id);
+	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
+										 dp_get_vm_vni(port_id));
+	if (!s_data) {
+		ret = DP_ERROR_VM_DEL_NAT_NO_SNAT;
+		goto err;
+	}
+	dp_remove_vnf_with_key(s_data->ul_nat_ip6);
 
-	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), vm_vni);
+	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (ret)
 		goto err;
 
@@ -653,7 +783,7 @@ static int dp_process_getnat(dp_request *req, dp_reply *rep)
 
 	rep->nat_entry.min_port = s_data->network_nat_port_range[0];
 	rep->nat_entry.max_port = s_data->network_nat_port_range[1];
-
+	rte_memcpy(rep->nat_entry.underlay_route, s_data->ul_nat_ip6, sizeof(rep->nat_entry.underlay_route));
 	return ret;
 err:
 	rep->com_head.err_code = ret;
@@ -745,6 +875,7 @@ static int dp_process_listmachine(dp_request *req, struct rte_mbuf *m, struct rt
 		rte_memcpy(vm_info->machine_id, dp_get_vm_machineid(act_ports[i]),
 			sizeof(vm_info->machine_id));
 		rte_eth_dev_get_name_by_port(act_ports[i], vm_info->pci_name);
+		rte_memcpy(vm_info->ul_addr6, dp_get_vm_ul_ip6(act_ports[i]), sizeof(vm_info->ul_addr6));
 	}
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
@@ -787,7 +918,7 @@ static int dp_process_listlb_pfxs(dp_request *req, struct rte_mbuf *m, struct rt
 		goto out;
 	}
 
-	dp_list_alias_routes(m, port_id, rep_arr);
+	dp_list_vnf_alias_routes(m, port_id, DP_VNF_TYPE_LB_ALIAS_PFX, rep_arr);
 
 out:
 	return EXIT_SUCCESS;
@@ -805,8 +936,7 @@ static int dp_process_listpfxs(dp_request *req, struct rte_mbuf *m, struct rte_m
 		goto out;
 	}
 
-	dp_list_routes(dp_get_vm_vni(port_id), m,
-					rte_eth_dev_socket_id(dp_port_get_pf0_id()), port_id, rep_arr, DP_SHOW_INT_ROUTES);
+	dp_list_vnf_alias_routes(m, port_id, DP_VNF_TYPE_ALIAS_PFX, rep_arr);
 
 out:
 	return EXIT_SUCCESS;

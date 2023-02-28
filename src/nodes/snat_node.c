@@ -91,7 +91,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 			/* Expect the new destination in this conntrack object */
 			cntrack->flow_status = DP_FLOW_STATUS_SRC_NAT;
-			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
 			if (nat_check.is_network_natted)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = ntohs(nat_port);

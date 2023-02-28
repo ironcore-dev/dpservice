@@ -57,6 +57,7 @@ struct dp_flow {
 		uint16_t	dst_port;	//dst_port in outter udp header
 		uint32_t	dst_vni;
 	} tun_info;
+	uint8_t				vnf_type;
 	// TODO(plague): port_id is uint16_t though, theoretically this is too little
 	uint8_t				nxt_hop;
 	uint8_t				periodic_type;

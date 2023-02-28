@@ -168,6 +168,12 @@ uint8_t *dp_get_vm_ip6(uint16_t portid)
 	return vm_table[portid].info.vm_ipv6;
 }
 
+uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	return vm_table[portid].ul_ipv6;
+}
+
 static struct rte_rib *get_lpm(int vni, const int socketid)
 {
 	int i;
@@ -458,6 +464,12 @@ void dp_set_vm_ip6(uint16_t portid, uint8_t *ipv6)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(&vm_table[portid].info.vm_ipv6, ipv6, 16);
+}
+
+void dp_set_vm_ul_ip6(uint16_t portid, uint8_t *ipv6)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	rte_memcpy(&vm_table[portid].ul_ipv6, ipv6, 16);
 }
 
 void dp_set_mac(uint16_t portid)

@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define DP_UNDEFINED_VNI 0
+#define DP_VNF_IPV6_ADDR_SIZE	16
 
 typedef enum {
 	DP_REQ_TYPE_NONE,
@@ -66,21 +66,23 @@ typedef struct dp_lb_port {
 } dp_lb_port;
 
 typedef struct dp_vip {
-	uint32_t ip_type;
+	uint32_t	ip_type;
 	union {
 		uint32_t	vip_addr;
-		uint8_t		vip_addr6[16];
+		uint8_t		vip_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} vip;
-	char machine_id[VM_MACHINE_ID_STR_LEN];
+	char		machine_id[VM_MACHINE_ID_STR_LEN];
+	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 } dp_vip;
 
 typedef struct dp_lb {
 	uint32_t	ip_type;
 	union {
 		uint32_t	vip_addr;
-		uint8_t		vip_addr6[16];
+		uint8_t		vip_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} vip;
 	uint32_t	vni;
+	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_lb_port lbports[DP_LB_PORT_SIZE];
 } dp_lb;
 
@@ -88,11 +90,10 @@ typedef struct dp_pfx {
 	uint32_t pfx_ip_type;
 	union {
 		uint32_t	pfx_addr;
-		uint8_t		pfx_addr6[16];
+		uint8_t		pfx_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} pfx_ip;
 	uint32_t	pfx_length;
-	uint32_t	pfx_lb_enabled;
-	uint8_t		pfx_ul_addr6[16];
+	uint8_t		pfx_ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 } dp_pfx;
 
@@ -105,13 +106,13 @@ typedef struct dp_lb_vip {
 	uint32_t	ip_type;
 	union {
 		uint32_t	back_addr;
-		uint8_t		back_addr6[16];
+		uint8_t		back_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} back;
 } dp_lb_vip;
 
 typedef struct dp_addmachine {
 	uint32_t	ip4_addr;
-	uint8_t		ip6_addr6[16];
+	uint8_t		ip6_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 	uint32_t	vni;
 	uint32_t	ip4_pxe_addr;
@@ -144,7 +145,7 @@ typedef struct dp_add_lb {
 	uint32_t	ip_type;
 	union {
 		uint32_t	vip_addr;
-		uint8_t		vip_addr6[16];
+		uint8_t		vip_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} vip;
 	uint32_t	vni;
 	struct dp_lb_port lbports[DP_LB_PORT_SIZE];
@@ -162,13 +163,13 @@ typedef struct dp_addroute {
 	uint32_t	pfx_ip_type;
 	union {
 		uint32_t	addr;
-		uint8_t		addr6[16];
+		uint8_t		addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} pfx_ip;
 	uint32_t	pfx_length;
 	uint32_t	trgt_hop_ip_type;
 	union {
 		uint32_t	addr;
-		uint8_t		addr6[16];
+		uint8_t		addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} trgt_ip;
 	uint32_t	vni;
 	uint32_t	trgt_vni;
@@ -180,11 +181,11 @@ typedef struct dp_nat_vip {
 	uint32_t ip_type;
 	union {
 		uint32_t	vip_addr;
-		uint8_t		vip_addr6[16];
+		uint8_t		vip_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} vip;
 	char machine_id[VM_MACHINE_ID_STR_LEN];
 	uint32_t port_range[2];
-	uint8_t		route[16];
+	uint8_t		route[DP_VNF_IPV6_ADDR_SIZE];
 	uint32_t	vni;
 } dp_net_nat;
 
@@ -220,32 +221,34 @@ typedef struct dp_vf_pci {
 	uint32_t	bus;
 	uint32_t	slot;
 	uint32_t	function;
+	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 } dp_vf_pci;
 
 typedef struct dp_vm_info {
 	uint32_t	ip_addr;
-	uint8_t		ip6_addr[16];
+	uint8_t		ip6_addr[DP_VNF_IPV6_ADDR_SIZE];
 	uint8_t		machine_id[VM_MACHINE_ID_STR_LEN];
 	uint32_t	vni;
 	char		pci_name[RTE_ETH_NAME_MAX_LEN];
+	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 } dp_vm_info;
 
 typedef struct dp_lb_backip {
 	union {
 		uint32_t	addr;
-		uint8_t		addr6[16];
+		uint8_t		addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} b_ip;
 } dp_lb_backip;
 
 typedef struct dp_nat_entry {
 	union {
 		uint32_t	addr;
-		uint8_t		addr6[16];
+		uint8_t		addr6[DP_VNF_IPV6_ADDR_SIZE];
 	} m_ip;
 	uint32_t	min_port;
 	uint32_t	max_port;
 	uint8_t		entry_type; // DP_NETNAT_INFO_TYPE_LOCAL or DP_NETNAT_INFO_TYPE_NEIGHBOR
-	uint8_t		underlay_route[16];
+	uint8_t		underlay_route[DP_VNF_IPV6_ADDR_SIZE];
 } dp_nat_entry;
 
 typedef struct dp_reply {
@@ -258,7 +261,7 @@ typedef struct dp_reply {
 		dp_route		route;
 		dp_lb_backip	back_ip;
 		dp_nat_entry	nat_entry;
-		uint32_t		vni;
+		uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	};
 } dp_reply;
 

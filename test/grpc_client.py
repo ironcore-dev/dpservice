@@ -2,6 +2,7 @@ import shlex
 import socket
 import subprocess
 import time
+import re
 
 
 class GrpcClient:
@@ -10,6 +11,7 @@ class GrpcClient:
 		self.cmd = build_path + "/tools/dp_grpc_client"
 
 	def assert_output(self, args, req_output, negate=False):
+		ipv6_address = ""
 		print("dp_grpc_client", args)
 		output = subprocess.check_output([self.cmd] + shlex.split(args)).decode('utf8').strip()
 		print(" >", output.replace("\n", "\n > "))
@@ -19,7 +21,12 @@ class GrpcClient:
 		else:
 			assert req_output in output, "Required GRPC output missing"
 
-		return output
+		match = re.search(r'\b([a-f0-9:]+)\b', output)
+
+		if match:
+			ipv6_address = match.group(1)
+
+		return output, ipv6_address
 
 	@staticmethod
 	def port_open():

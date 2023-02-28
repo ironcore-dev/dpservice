@@ -5,7 +5,7 @@ install_headers('dp_service.h', 'node_api.h', 'dp_port.h', 'dpdk_layer.h', 'dp_n
 				'nodes/firewall_node.h',
 				'nodes/overlay_switch_node.h','nodes/ipip_tunnel_node.h',
 				'nodes/conntrack_node.h', 'nodes/dnat_node.h', 'nodes/lb_node.h',
-				'dp_alias.h', 
+				'dp_vnf.h',
 				'nodes/snat_node.h', 'nodes/geneve_tunnel_node.h', 'nodes/packet_relay_node.h','dp_util.h', 'dp_error.h',
 				'grpc/dp_grpc_service.h', 'dp_flow.h', 'dp_refcount.h', 'grpc/dp_async_grpc.h',
 				'grpc/dp_grpc_impl.h', 'dp_netlink.h','rte_flow/dp_rte_flow.h','rte_flow/dp_rte_flow_init.h','rte_flow/dp_rte_flow_traffic_forward.h',

@@ -52,14 +52,14 @@ err:
 	return EXIT_FAILURE;
 }
 
-int dp_create_lb(void *id_key, uint32_t v_ip, uint32_t vni, struct dp_lb_port ports[])
+int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey;
 	uint32_t i;
 
-	nkey.ip = v_ip;
-	nkey.vni = vni;
+	nkey.ip = ntohl(add_lb->vip.vip_addr);
+	nkey.vni = add_lb->vni;
 
 	lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 	if (!lb_val)
@@ -68,12 +68,13 @@ int dp_create_lb(void *id_key, uint32_t v_ip, uint32_t vni, struct dp_lb_port po
 	if (rte_hash_add_key_data(ipv4_lb_tbl, &nkey, lb_val) < 0)
 		goto out;
 
-	if (dp_map_lb_handle(id_key, &nkey, lb_val))
+	if (dp_map_lb_handle((void *)add_lb->lb_id, &nkey, lb_val))
 		goto out;
 
+	rte_memcpy(lb_val->lb_ul_addr, ul_ip, DP_VNF_IPV6_ADDR_SIZE);
 	for (i = 0; i < DP_LB_PORT_SIZE; i++) {
-		lb_val->ports[i].port = ntohs(ports[i].port);
-		lb_val->ports[i].protocol = ports[i].protocol;
+		lb_val->ports[i].port = ntohs(add_lb->lbports[i].port);
+		lb_val->ports[i].protocol = add_lb->lbports[i].protocol;
 	}
 
 	return EXIT_SUCCESS;
@@ -98,6 +99,7 @@ int dp_get_lb(void *id_key, dp_lb *list_lb)
 	list_lb->ip_type = RTE_ETHER_TYPE_IPV4;
 	list_lb->vni = lb_k->vni;
 	list_lb->vip.vip_addr = htonl(lb_k->ip);
+	rte_memcpy(list_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_PORT_SIZE; i++) {
 		list_lb->lbports[i].port = htons(lb_val->ports[i].port);
