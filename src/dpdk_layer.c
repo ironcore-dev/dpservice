@@ -26,6 +26,7 @@
 #include "dp_port.h"
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_telemetry.h"
 
 // all times in seconds
 #define TIMER_MESSAGE_INTERVAL 30
@@ -160,6 +161,9 @@ static int dp_dpdk_layer_init_unsafe()
 	if (DP_FAILED(timers_init()))
 		return DP_ERROR;
 
+	if (DP_FAILED(dp_telemetry_init()))
+		return DP_ERROR;
+
 	force_quit = false;
 
 	return DP_OK;
@@ -173,6 +177,7 @@ int dp_dpdk_layer_init()
 		dp_dpdk_layer_free();
 		return DP_ERROR;
 	}
+
 	return DP_OK;
 }
 
@@ -185,6 +190,8 @@ void dp_dpdk_layer_free(void)
 	ring_free(dp_layer.grpc_rx_queue);
 	ring_free(dp_layer.grpc_tx_queue);
 	rte_mempool_free(dp_layer.rte_mempool);
+	// need to move this to graph delete after jay's refactoring
+	dp_telemetry_free();
 }
 
 void dp_force_quit()
@@ -492,7 +499,8 @@ int dp_graph_init(void)
 			return DP_ERROR;
 		}
 	}
-
+	if (DP_FAILED(dp_telemetry_graph_init()))
+		return DP_ERROR;
 	return DP_OK;
 }
 
