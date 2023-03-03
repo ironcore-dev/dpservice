@@ -12,15 +12,9 @@ def send_lb_pkt_to_pf(lb_ipv6):
 
 def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 
-	_, lb_ipv6 = grpc_client.assert_output(f"--createlb {mylb} --vni {vni} --ipv4 {virtual_ip} --port 80 --protocol tcp",
-		ul_short_src)
-
-	_, vm1_target_lb_pfx_underlay = grpc_client.assert_output(f"--addlbpfx {vm1_name} --ipv4 {virtual_ip} --length 32",
-		ul_short_src)
-
-	#vm1_target_lb_pfx_underlay = output.partition("\n")[0].partition(": ")[2]
-	grpc_client.assert_output(f"--addlbvip {mylb} --t_ipv6 {vm1_target_lb_pfx_underlay}",
-		"LB VIP added")
+	lb_ipv6 = grpc_client.createlb(mylb, vni, virtual_ip, 80, "tcp")
+	lbpfx_ipv6 = grpc_client.addlbpfx(vm1_name, virtual_ip)
+	grpc_client.addlbvip(mylb, lbpfx_ipv6)
 
 	threading.Thread(target=send_lb_pkt_to_pf, args=(lb_ipv6,)).start()
 
@@ -34,8 +28,6 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	assert dst_ip == virtual_ip and dport == 80, \
 		f"Wrong packet received (ip: {dst_ip}, dport: {dport})"
 
-	grpc_client.assert_output(f"--dellbpfx {vm1_name} --ipv4 {virtual_ip} --length 32",
-		"LB prefix deleted")
-
-	grpc_client.assert_output(f"--dellb {mylb}",
-		"LB deleted")
+	grpc_client.dellbvip(vm1_name, lbpfx_ipv6)
+	grpc_client.dellbpfx(vm1_name, virtual_ip)
+	grpc_client.dellb(mylb)

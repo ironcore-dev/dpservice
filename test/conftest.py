@@ -72,19 +72,19 @@ def dp_service(request, build_path, tun_opt, port_redundancy):
 
 # Most tests require interfaces to be up and routing established
 @pytest.fixture(scope="package")
-def prepare_ifaces(request, dp_service, tun_opt, port_redundancy, grpc_client):
+def prepare_ifaces(request, dp_service, tun_opt, grpc_client):
 	# TODO look into this when doing Geneve, is this the right way?
 	global t_vni
 	if tun_opt == tun_type_geneve:
 		t_vni = vni
 
 	if request.config.getoption("--attach"):
+		dp_service.attach(grpc_client)
 		return
 
 	print("---- Interfaces init -----")
-	vm1_ipv6 = dp_service.init_ifaces(grpc_client)
+	dp_service.init_ifaces(grpc_client)
 	print("--------------------------")
-	return vm1_ipv6
 
 
 # Some tests require IPv4 addresses assigned

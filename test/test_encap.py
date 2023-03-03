@@ -24,13 +24,12 @@ def ipv4_in_ipv6_icmp_responder(pf_name, vm1_ipv6):
 				 ICMP(type=0))
 	delayed_sendp(reply_pkt, pf_name)
 
-def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy):
+def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy, dp_service):
 
 	responder = geneve4_in_ipv6_icmp_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_icmp_responder
-	vm1_ipv6 = prepare_ipv4
-	threading.Thread(target=responder, args=(pf0_tap, vm1_ipv6)).start()
+	threading.Thread(target=responder, args=(pf0_tap, dp_service.vm1_ipv6)).start()
 	if port_redundancy:
-		threading.Thread(target=responder, args=(pf1_tap,)).start()
+		threading.Thread(target=responder, args=(pf1_tap, dp_service.vm1_ipv6)).start()
 
 	icmp_echo_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 					 IP(dst="192.168.129.5", src="172.32.10.5") /
@@ -68,14 +67,13 @@ def ipv6_in_ipv6_icmp6_responder(pf_name, vm1_ipv6):
 				 ICMPv6EchoReply(type=129))
 	delayed_sendp(reply_pkt, pf_name)
 
-def test_ipv6_in_ipv6(prepare_ifaces, tun_opt, port_redundancy):
+def test_ipv6_in_ipv6(prepare_ifaces, tun_opt, port_redundancy, dp_service):
 
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported for ipv6 in ipv6")
 
-	vm1_ipv6 = prepare_ifaces
 	responder = geneve6_in_ipv6_icmp6_responder if tun_opt == tun_type_geneve else ipv6_in_ipv6_icmp6_responder
-	threading.Thread(target=responder, args=(pf0_tap, vm1_ipv6)).start()
+	threading.Thread(target=responder, args=(pf0_tap, dp_service.vm1_ipv6)).start()
 
 	icmp_echo_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x86DD) /
 					 IPv6(dst="2002::123", src="2001::10", nh=58) /

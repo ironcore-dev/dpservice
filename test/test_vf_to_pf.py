@@ -22,8 +22,7 @@ def reply_icmp_pkt_from_vm1(nat_ipv6):
 
 def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 
-	_, nat_ipv6 = grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
-		"Received underlay route")
+	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 
 	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ipv6,)).start()
 
@@ -41,8 +40,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 	assert dst_ip == vf0_ip, \
 		f"Bad ECHO reply (dst ip: {dst_ip})"
 
-	grpc_client.assert_output(f"--delnat {vm1_name}",
-		"NAT deleted")
+	grpc_client.delnat(vm1_name)
 
 
 def reply_tcp_if_port_not(forbidden_port, nat_ipv6):
@@ -92,28 +90,18 @@ def send_tcp_through_port(port):
 
 
 def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client):
-
-	_, nat_ipv6 = grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
-		"Received underlay route")
-
+	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1_max_port, args=(nat_ipv6,)).start()
 	send_tcp_through_port(1240)
-	send_tcp_through_port(1241)
-
-	grpc_client.assert_output(f"--delnat {vm1_name}",
-		"NAT deleted")
+	send_tcp_through_port(1243)
+	grpc_client.delnat(vm1_name)
 
 
 def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
-
-	_, nat_ipv6 = grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
-		"Received underlay route")
-
+	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1, args=(nat_ipv6,)).start()
 	send_tcp_through_port(1240)
-
-	grpc_client.assert_output(f"--delnat {vm1_name}",
-		"NAT deleted")
+	grpc_client.delnat(vm1_name)
 
 # TODO: this can be done better with sniff(iface=[iface1, iface2], but there is a regression in scapy 2.4.5 that broke this
 def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ipv6):
@@ -129,8 +117,7 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ipv6):
 	delayed_sendp(reply_pkt, pf_name)
 
 def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
-	_, vip_ipv6 = grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {virtual_ip}",
-		f"Received underlay route : {ul_short_src}")
+	vip_ipv6 = grpc_client.addvip(vm2_name, virtual_ip)
 
 	threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf0_tap, vip_ipv6)).start()
 	if port_redundancy:
@@ -146,8 +133,7 @@ def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 	assert len(pkt_list) == 1, \
 		"No TCP reply via VIP (SNAT)"
 
-	grpc_client.assert_output(f"--delvip {vm2_name}",
-		"VIP deleted")
+	grpc_client.delvip(vm2_name)
 
 
 # TODO: this can be done better with sniff(iface=[iface1, iface2], but there is a regression in scapy 2.4.5 that broke this
@@ -175,8 +161,7 @@ def reply_with_icmp_err_fragment_needed(pf_name, nat_ipv6):
 
 def test_vm_nat_async_tcp_icmperr(prepare_ifaces, grpc_client, port_redundancy):
 
-	_, nat_ipv6 = grpc_client.assert_output(f"--addnat {vm1_name} --ipv4 {nat_vip} --min_port {nat_local_min_port} --max_port {nat_local_max_port}",
-		"Received underlay route")
+	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 
 	threading.Thread(target=reply_with_icmp_err_fragment_needed, args=(pf0_tap, nat_ipv6)).start();
 	if (port_redundancy):
@@ -196,5 +181,4 @@ def test_vm_nat_async_tcp_icmperr(prepare_ifaces, grpc_client, port_redundancy):
 	assert icmp_type == 3, \
 		f"Received wrong icmp packet type: {icmp_type}"
 
-	grpc_client.assert_output(f"--delnat {vm1_name}",
-		"NAT deleted")
+	grpc_client.delnat(vm1_name)

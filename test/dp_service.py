@@ -14,6 +14,8 @@ class DpService:
 	def __init__(self, build_path, tun_opt, port_redundancy, gdb=False, test_virtsvc=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
+		self.vm1_ipv6 = None
+		self.vm2_ipv6 = None
 
 		self.cmd = ""
 		if gdb:
@@ -60,13 +62,16 @@ class DpService:
 		interface_up(pf0_tap)
 		if self.port_redundancy:
 			interface_up(pf1_tap)
-		grpc_client.assert_output("--init", "Init called")
-		_, ipv6_vm1 = grpc_client.assert_output(f"--addmachine {vm1_name} --vm_pci net_tap2 --vni {vni} --ipv4 {vf0_ip} --ipv6 {vf0_ipv6}", "Allocated VF for you")
-		grpc_client.assert_output(f"--addmachine {vm2_name} --vm_pci net_tap3 --vni {vni} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}", "Allocated VF for you")
-		grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 {ov_target_pfx} --length 24 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", f"Route ip {ov_target_pfx}")
-		grpc_client.assert_output(f"--addroute --vni {vni} --ipv6 2002::123 --length 128 --t_vni {t_vni} --t_ipv6 {ul_actual_dst}", "target ipv6 2002::123")
-		grpc_client.assert_output(f"--addroute --vni {vni} --ipv4 0.0.0.0 --length 0 --t_vni {vni} --t_ipv6 {ul_actual_dst}", "Route ip 0.0.0.0")
-		return ipv6_vm1
+		grpc_client.init()
+		self.vm1_ipv6 = grpc_client.addmachine(vm1_name, "net_tap2", vni, vf0_ip, vf0_ipv6)
+		self.vm2_ipv6 = grpc_client.addmachine(vm2_name, "net_tap3", vni, vf1_ip, vf1_ipv6)
+		grpc_client.addroute_ipv4(vni, ov_target_pfx, 24, t_vni, ul_actual_dst)
+		grpc_client.addroute_ipv6(vni, "2002::123", 128, t_vni, ul_actual_dst)
+		grpc_client.addroute_ipv4(vni, "0.0.0.0", 0, vni, ul_actual_dst)
+
+	def attach(self, grpc_client):
+		self.vm1_ipv6 = grpc_client.get_ul_ipv6(vm1_name)
+		self.vm2_ipv6 = grpc_client.get_ul_ipv6(vm2_name)
 
 
 # If run manually:
