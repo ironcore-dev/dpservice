@@ -24,29 +24,21 @@ def ipv4_in_ipv6_icmp_responder(pf_name, vm1_ipv6):
 				 ICMP(type=0))
 	delayed_sendp(reply_pkt, pf_name)
 
-def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy, dp_service):
-
-	responder = geneve4_in_ipv6_icmp_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_icmp_responder
-	threading.Thread(target=responder, args=(pf0_tap, dp_service.vm1_ipv6)).start()
-	if port_redundancy:
-		threading.Thread(target=responder, args=(pf1_tap, dp_service.vm1_ipv6)).start()
-
+def send_ipv4_icmp(dst_ip, pf_name, responder, vm_ipv6):
+	threading.Thread(target=responder, args=(pf_name, vm_ipv6)).start()
 	icmp_echo_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
-					 IP(dst="192.168.129.5", src="172.32.10.5") /
+					 IP(dst=dst_ip, src=vf0_ip) /
 					 ICMP(type=8))
 	delayed_sendp(icmp_echo_pkt, vf0_tap)
 	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
 	assert len(pkt_list) == 1, \
-		"No ECHO reply"
+		"No ECHO reply on "+pf_name
 
+def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy, dp_service):
+	responder = geneve4_in_ipv6_icmp_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_icmp_responder
+	send_ipv4_icmp("192.168.129.5", pf0_tap, responder, dp_service.vm1_ipv6)
 	if port_redundancy:
-		icmp_echo_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
-						 IP(dst="192.168.129.6", src="172.32.10.5") /
-						 ICMP(type=8))
-		delayed_sendp(icmp_echo_pkt, vf0_tap)
-		pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
-		assert len(pkt_list) == 1, \
-			"No ECHO reply on second PF"
+		send_ipv4_icmp("192.168.129.6", pf1_tap, responder, dp_service.vm1_ipv6)
 
 
 def geneve6_in_ipv6_icmp6_responder(pf_name):
