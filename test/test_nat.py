@@ -9,7 +9,8 @@ def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
 			    IPv6(dst=nat_ipv6, src=ul_actual_src, nh=4) /
 			    IP(dst=nat_vip, src=public_ip) /
 			    ICMP(type=8, id=0x0040))
-	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=2)
+	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=sniff_timeout)
+	validate_checksums(answer)
 	assert answer and is_icmp_pkt(answer), \
 		"No ECHO reply"
 	grpc_client.delnat(vm1_name)
@@ -29,12 +30,8 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 
 	threading.Thread(target=send_bounce_pkt_to_pf,  args=(nat_ipv6,)).start()
 
-	# it seems that pkt_list[0] is the injected packet
-	pkt_list = sniff(count=2, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=5)
-	assert len(pkt_list) == 2, \
-		"No bounce packet received"
-
-	pkt = pkt_list[1]
+	# it seems that we also receive the injected packet, skip it
+	pkt = sniff_packet(pf0_tap, is_tcp_pkt, skip=1)
 	dst_ip = pkt[IPv6].dst
 	dport = pkt[TCP].dport
 	assert dst_ip == nat_neigh_ul_dst and dport == 510, \

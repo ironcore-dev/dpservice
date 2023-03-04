@@ -6,11 +6,7 @@ from helpers import *
 
 def reply_icmp_pkt_from_vm1(nat_ipv6):
 
-	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=pf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No network-natted ICMP packet received on PF"
-
-	pkt = pkt_list[0]
+	pkt = sniff_packet(pf0_tap, is_icmp_pkt)
 	src_ip = pkt[IP].src
 	assert src_ip == nat_vip, \
 		f"Bad ICMP request (src ip: {src_ip})"
@@ -32,11 +28,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 			    ICMP(type=8, id=0x0040))
 	delayed_sendp(icmp_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No ECHO reply"
-
-	pkt = pkt_list[0]
+	pkt = sniff_packet(vf0_tap, is_icmp_pkt)
 	dst_ip = pkt[IP].dst
 	assert dst_ip == vf0_ip, \
 		f"Bad ECHO reply (dst ip: {dst_ip})"
@@ -46,11 +38,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 
 def reply_tcp_if_port_not(forbidden_port, nat_ipv6):
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No network-natted TCP packet received on PF"
-
-	pkt = pkt_list[0]
+	pkt = sniff_packet(pf0_tap, is_tcp_pkt)
 	src_ip = pkt[IP].src
 	sport = pkt[TCP].sport
 	assert src_ip == nat_vip and sport >= nat_local_min_port and sport < nat_local_max_port, \
@@ -79,11 +67,7 @@ def send_tcp_through_port(port):
 			   TCP(sport=port))
 	delayed_sendp(tcp_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf0_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No network-natted TCP packet received on VF"
-
-	pkt = pkt_list[0]
+	pkt = sniff_packet(vf0_tap, is_tcp_pkt)
 	dst_ip = pkt[IP].dst
 	dport = pkt[TCP].dport
 	assert dst_ip == vf0_ip and dport == port, \
@@ -110,10 +94,7 @@ def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 
 
 def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ipv6):
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No VIP TCP packet received on PF"
-	pkt = pkt_list[0]
+	pkt = sniff_packet(pf_name, is_tcp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=vip_ipv6, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
@@ -121,18 +102,13 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ipv6):
 	delayed_sendp(reply_pkt, pf_name)
 
 def request_tcp(dport, pf_name, vip_ipv6):
-
 	threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf_name, vip_ipv6)).start()
-
 	# vm2 (vf1) -> PF0/PF1 (internet traffic), vm2 has VIP, check on PFs side, whether VIP is source (SNAT)
 	tcp_pkt = (Ether(dst=pf0_mac, src=vf1_mac, type=0x0800) /
 			   IP(dst=public_ip, src=vf1_ip) /
 			   TCP(sport=1240, dport=dport))
 	delayed_sendp(tcp_pkt, vf1_tap)
-
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=vf1_tap, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No TCP reply via VIP (SNAT)"
+	sniff_packet(vf1_tap, is_tcp_pkt)
 
 def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 	vip_ipv6 = grpc_client.addvip(vm2_name, virtual_ip)
@@ -143,10 +119,7 @@ def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 
 
 def reply_with_icmp_err_fragment_needed(pf_name, nat_ipv6):
-	pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=pf_name, timeout=2)
-	assert len(pkt_list) == 1, \
-		"No network-natted TCP packet received on PF"
-	pkt = pkt_list[0]
+	pkt = sniff_packet(pf_name, is_tcp_pkt)
 	orig_ip_pkt = pkt[IP]
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=nat_ipv6, src=pkt[IPv6].dst, nh=4) /
@@ -172,11 +145,7 @@ def request_icmperr(dport, pf_name, nat_ipv6):
 			   TCP(sport=1256, dport=dport))
 	delayed_sendp(tcp_pkt, vf0_tap)
 
-	pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=vf0_tap, timeout=5)
-	assert len(pkt_list) == 1, \
-		"Cannot receive asymmetric ICMP packet on VF"
-
-	pkt = pkt_list[0]
+	pkt = sniff_packet(vf0_tap, is_icmp_pkt)
 	icmp_type = pkt[ICMP].type
 	assert icmp_type == 3, \
 		f"Received wrong icmp packet type: {icmp_type}"

@@ -17,7 +17,8 @@ def test_dhcpv6(prepare_ifaces):
 
 	sol = DHCP6_Solicit(trid=random.randint(0, 16777215))
 	pkt = eth / ip6 / udp / sol / iana_op / rc_op / et_op / cid_op / opreq
-	answer = srp1(pkt, iface=vf0_tap, type=ETH_P_IPV6, timeout=2)
+	answer = srp1(pkt, iface=vf0_tap, type=ETH_P_IPV6, timeout=sniff_timeout)
+	validate_checksums(answer)
 	duid = bytes(answer[DHCP6OptClientId].duid)
 	assert duid == DUID, \
 		f"Bad duid in DHCPv6 Solicit ({duid})"
@@ -25,7 +26,8 @@ def test_dhcpv6(prepare_ifaces):
 	req = DHCP6_Request()
 	iana_op = answer[DHCP6OptIAAddress]
 	pkt = eth / ip6 / udp / req / iana_op / rc_op / et_op / cid_op / opreq
-	answer = srp1(pkt, iface=vf0_tap, type=ETH_P_IPV6, timeout=2)
+	answer = srp1(pkt, iface=vf0_tap, type=ETH_P_IPV6, timeout=sniff_timeout)
+	validate_checksums(answer)
 	duid == bytes(answer[DHCP6OptClientId].duid)
 	assert duid == DUID, \
 		f"Bad duid in DHCPv6 Request ({duid})"
