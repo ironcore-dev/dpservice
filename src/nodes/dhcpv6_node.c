@@ -99,7 +99,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,sizeof(req_ipv6_hdr->src_addr));
 	req_udp_hdr->src_port = htons(DHCPV6_SERVER_PORT);
 	req_udp_hdr->dst_port = htons(DHCPV6_CLIENT_PORT);
-	req_udp_hdr->dgram_cksum = 0;
 
 	switch(type) {
 		case DHCPV6_SOLICIT:
@@ -145,7 +144,13 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	req_ipv6_hdr->payload_len = htons(offset +  DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
 	req_udp_hdr->dgram_len = htons(offset + DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
-	req_udp_hdr->dgram_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_udp_hdr);
+	req_udp_hdr->dgram_cksum = 0;
+
+	m->ol_flags |= RTE_MBUF_F_TX_IPV6 | RTE_MBUF_F_TX_UDP_CKSUM;
+	m->tx_offload = 0;
+	m->l2_len = sizeof(struct rte_ether_hdr);
+	m->l3_len = sizeof(struct rte_ipv6_hdr);
+	m->l4_len = sizeof(struct rte_udp_hdr);
 
 	return dhcpv6_node.next_index[m->port];
 }

@@ -13,7 +13,6 @@ from config import *
 def request_ip(interface, macaddr, ipaddr):
 	scapy.config.conf.checkIPaddr = False
 	answer = dhcp_request(iface=interface, timeout=sniff_timeout)
-	answer.show()
 	validate_checksums(answer)
 	options = answer[DHCP].options
 	msg_type = next((opt[1] for opt in options if opt[0] == 'message-type'), None)
