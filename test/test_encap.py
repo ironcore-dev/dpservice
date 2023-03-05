@@ -38,7 +38,7 @@ def test_ipv4_in_ipv6(prepare_ipv4, tun_opt, port_redundancy, dp_service):
 	responder = geneve4_in_ipv6_icmp_responder if tun_opt == tun_type_geneve else ipv4_in_ipv6_icmp_responder
 	send_ipv4_icmp("192.168.129.5", pf0_tap, responder, dp_service.vm1_ipv6)
 	if port_redundancy:
-		send_ipv4_icmp("192.168.129.6", pf1_tap, responder, dp_service.vm1_ipv6)
+		send_ipv4_icmp("192.168.129.8", pf1_tap, responder, dp_service.vm1_ipv6)
 
 
 def geneve6_in_ipv6_icmp6_responder(pf_name):
