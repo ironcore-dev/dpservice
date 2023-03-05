@@ -464,7 +464,7 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_del_route(dp_port_get_pf0_id(), dp_get_vm_vni(port_id), 0,
+		if (dp_del_route(port_id, dp_get_vm_vni(port_id), 0,
 					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
 					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
 			ret = DP_ERROR_VM_DEL_PFX;

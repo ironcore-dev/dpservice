@@ -261,6 +261,7 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 {
 	struct rte_rib_node *node;
 	struct rte_rib *root;
+	uint64_t next_hop;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
@@ -270,10 +271,15 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 		return EXIT_FAILURE;
 
 	node = rte_rib_lookup_exact(root, ip, depth);
-	if (node)
+	if (node) {
+		if (!DP_FAILED(rte_rib_get_nh(node, &next_hop))) {
+			if (next_hop != portid)
+				return EXIT_FAILURE;
+		}
 		rte_rib_remove(root, ip, depth);
-	else
+	} else {
 		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }
