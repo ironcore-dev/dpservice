@@ -6,7 +6,7 @@ if get_option('enable_virtual_services')
 endif
 
 redundancy_tests = []
-redundancy_enabled_py = [ 'test_encap.py', 'test_virtsvc.py' ]
+redundancy_enabled_py = [ 'test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py' ]
 foreach py : redundancy_enabled_py
   redundancy_tests += join_paths(pytest_dir, py)
 endforeach

@@ -199,8 +199,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	/* rewrite the packet and send it back as a response */
 
 	m->ol_flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
+	m->tx_offload = 0;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = sizeof(struct rte_ipv4_hdr);
+	m->l4_len = sizeof(struct rte_udp_hdr);
 
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
 	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
@@ -256,7 +258,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 											+ sizeof(struct rte_udp_hdr)
 											+ header_size);
 	incoming_udp_hdr->dgram_len = htons(sizeof(struct rte_udp_hdr) + header_size);
-	incoming_udp_hdr->dgram_cksum = rte_ipv4_phdr_cksum(incoming_ipv4_hdr, m->ol_flags);
+	incoming_udp_hdr->dgram_cksum = 0;
 	m->pkt_len = sizeof(struct rte_ether_hdr)
 				 + sizeof(struct rte_ipv4_hdr)
 				 + sizeof(struct rte_udp_hdr)
