@@ -92,12 +92,14 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 
 	threading.Thread(target=router_nat_vip, args=(vip_ipv6, nat_vip)).start()
 
-	tcp_pkt = (Ether(dst=vf2_mac, src=vf0_mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 			   IP(dst=virtual_ip, src=vf0_ip) /
 			   TCP())
 	delayed_sendp(tcp_pkt, vf0_tap)
 
 	pkt = sniff_packet(vf2_tap, is_tcp_pkt)
+	assert pkt[IP].dst == vf2_ip, \
+		f"Invalid VIPped destination IP {pkt[IP].dst}"
 
 	threading.Thread(target=router_nat_vip, args=(nat_ipv6, virtual_ip)).start()
 
@@ -107,8 +109,10 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 	delayed_sendp(reply_pkt, vf2_tap)
 
 	pkt = sniff_packet(vf0_tap, is_tcp_pkt)
+	assert pkt[IP].dst == vf0_ip, \
+		f"Invalid NATted destination IP {pkt[IP].dst}"
 
 	grpc_client.delvip(vm3_name)
+	grpc_client.delnat(vm1_name)
 	grpc_client.delroute_ipv4(vni2, "0.0.0.0", 0)
 	grpc_client.delmachine(vm3_name)
-	grpc_client.delnat(vm1_name)

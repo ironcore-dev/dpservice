@@ -22,7 +22,7 @@ class DpService:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += (f'{self.build_path}/src/dp_service -l 0,1 --no-pci'
+		self.cmd += (f'{self.build_path}/src/dp_service -l 0,1 --no-pci --log-level=user*:8'
 					f' --vdev=net_tap0,iface={pf0_tap},mac="{pf0_mac}"'
 					f' --vdev=net_tap1,iface={pf1_tap},mac="{pf1_mac}"'
 					f' --vdev=net_tap2,iface={vf0_tap},mac="{vf0_mac}"'
