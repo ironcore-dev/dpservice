@@ -81,7 +81,8 @@ static __rte_always_inline rte_edge_t handle_geneve_tunnel_decap(struct rte_mbuf
 	
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_udp_hdr));
 
-	m->packet_type &= ~(RTE_PTYPE_L4_MASK | RTE_PTYPE_L3_MASK);
+	// this shift is non-standard as the actual values of PTYPE should be opaque
+	m->packet_type = (m->packet_type & RTE_PTYPE_INNER_L4_MASK) >> 16;
 	
 	geneve_hdr = rte_pktmbuf_mtod(m, struct rte_flow_item_geneve*);
 	rte_memcpy(&df->tun_info.dst_vni, geneve_hdr->vni, sizeof(geneve_hdr->vni));

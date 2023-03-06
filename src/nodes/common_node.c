@@ -56,8 +56,8 @@ static void dp_graphtrace_print_udp(void **p_pkt_data, size_t *p_pos, char *buf,
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"UDP %d -> %d",
-		ntohs(udp_hdr->src_port), ntohs(udp_hdr->dst_port));
+		"UDP %d -> %d len %d",
+		ntohs(udp_hdr->src_port), ntohs(udp_hdr->dst_port), ntohs(udp_hdr->dgram_len));
 
 	*p_pkt_data = udp_hdr + 1;
 }
@@ -67,8 +67,8 @@ static void dp_graphtrace_print_tcp(void **p_pkt_data, size_t *p_pos, char *buf,
 	struct rte_tcp_hdr *tcp_hdr = (struct rte_tcp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"TCP %d -> %d",
-		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port));
+		"TCP %d -> %d seq %d ack %d",
+		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port), ntohl(tcp_hdr->sent_seq), ntohl(tcp_hdr->recv_ack));
 
 	*p_pkt_data = tcp_hdr + 1;
 }
@@ -78,8 +78,8 @@ static void dp_graphtrace_print_icmp(void **p_pkt_data, size_t *p_pos, char *buf
 	struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"ICMP %d-%d",
-		icmp_hdr->icmp_type, icmp_hdr->icmp_code);
+		"ICMP %d-%d id %d seq %d",
+		icmp_hdr->icmp_type, icmp_hdr->icmp_code, ntohs(icmp_hdr->icmp_ident), ntohs(icmp_hdr->icmp_seq_nb));
 
 	*p_pkt_data = icmp_hdr + 1;
 }
@@ -112,6 +112,9 @@ static void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufs
 	size_t pos = 0;
 	int proto = 0;
 
+	// in case nothing gets printed
+	*buf = 0;
+
 	if (pkt->packet_type & RTE_PTYPE_L2_MASK)
 		dp_graphtrace_print_ether(&pkt_data, &pos, buf, bufsize);
 
@@ -130,19 +133,20 @@ static void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufs
 
 	dp_graphtrace_print_l4(proto, &pkt_data, &pos, buf, bufsize);
 
-	if (!(pkt->packet_type & RTE_PTYPE_TUNNEL_MASK))
-		return;
+	// the inner packet is sometimes not classified as a tunneled packet,
+	// so need to look at IPPROTO_IPIP in the header too
 
 	if (pkt->packet_type & RTE_PTYPE_INNER_L2_MASK)
 		dp_graphtrace_print_ether(&pkt_data, &pos, buf, bufsize);
 
 	if ((pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) == RTE_PTYPE_TUNNEL_GENEVE)
 		dp_graphtrace_print_geneve(&pkt_data, &pos, buf, bufsize);
-	else if ((pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) != RTE_PTYPE_TUNNEL_IP)
+	else if (proto != IPPROTO_IPIP && (pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) != RTE_PTYPE_TUNNEL_IP)
 		return;
 
-	// for bitwise reason there is no macro for inner types
-	if (inner_l3_type == RTE_PTYPE_INNER_L3_IPV4
+	// there is no direct macro for inner types (no shared bit)
+	if (proto == IPPROTO_IPIP
+		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4
 		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4_EXT
 		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4_EXT_UNKNOWN
 	) {
