@@ -1,3 +1,4 @@
+import pytest
 import threading
 
 from helpers import *
@@ -54,6 +55,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	grpc_client.assert_output(f"--delnat {vm1_name}",
 		"error 451")
 
+
 def test_network_nat_vip_co_existence_on_same_vm(prepare_ifaces, grpc_client):
 	vip_ipv6 = grpc_client.addvip(vm1_name, virtual_ip)
 	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
@@ -63,3 +65,50 @@ def test_network_nat_vip_co_existence_on_same_vm(prepare_ifaces, grpc_client):
 		f"Received VIP {virtual_ip} underlayroute {vip_ipv6}")
 	grpc_client.delnat(vm1_name)
 	grpc_client.delvip(vm1_name)
+
+
+def router_nat_vip(dst_ipv6, check_ipv4):
+	pkt = sniff_packet(pf0_tap, is_tcp_pkt)
+	assert pkt[IP].src == check_ipv4, \
+		f"Bad request (src ip: {pkt[IP].src})"
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=dst_ipv6, src=pkt[IPv6].dst, nh=4) /
+				 IP(src=pkt[IP].src, dst=pkt[IP].dst) /
+				 TCP(dport=pkt[TCP].dport, sport=pkt[TCP].sport))
+	delayed_sendp(reply_pkt, pf0_tap)
+
+def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redundancy):
+
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported for NAT(vni1) <-> VIP(vni2) test")
+
+	# establish a VM in another VNI on the same host
+	vm3_ipv6 = grpc_client.addmachine(vm3_name, "net_tap4", vni2, vf2_ip, vf2_ipv6)
+	grpc_client.addroute_ipv4(vni2, "0.0.0.0", 0, vni2, ul_actual_dst)
+	request_ip(vf2_tap, vf2_mac, vf2_ip)
+
+	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
+	vip_ipv6 = grpc_client.addvip(vm3_name, virtual_ip)
+
+	threading.Thread(target=router_nat_vip, args=(vip_ipv6, nat_vip)).start()
+
+	tcp_pkt = (Ether(dst=vf2_mac, src=vf0_mac, type=0x0800) /
+			   IP(dst=virtual_ip, src=vf0_ip) /
+			   TCP())
+	delayed_sendp(tcp_pkt, vf0_tap)
+
+	pkt = sniff_packet(vf2_tap, is_tcp_pkt)
+
+	threading.Thread(target=router_nat_vip, args=(nat_ipv6, virtual_ip)).start()
+
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
+	delayed_sendp(reply_pkt, vf2_tap)
+
+	pkt = sniff_packet(vf0_tap, is_tcp_pkt)
+
+	grpc_client.delvip(vm3_name)
+	grpc_client.delroute_ipv4(vni2, "0.0.0.0", 0)
+	grpc_client.delmachine(vm3_name)
+	grpc_client.delnat(vm1_name)

@@ -55,7 +55,7 @@ struct flow_key {
 		uint16_t port_src;
 		uint16_t type_src; /* ICMP */
 	} src;
-	/*TODO Add vni also to the key */
+	uint32_t vni;
 	uint8_t  proto;
 } __rte_packed;
 

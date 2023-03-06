@@ -13,6 +13,7 @@ vm1_name = "vm1"
 vm2_name = "vm2"
 vm3_name = "vm3"
 vni = "100"
+vni2 = "101"
 # t_vni needs to be set, when we use geneve
 t_vni = "0"
 ul_ipv6 = "2a10:afc0:e01f:f403::1"

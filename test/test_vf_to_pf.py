@@ -114,7 +114,7 @@ def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 	vip_ipv6 = grpc_client.addvip(vm2_name, virtual_ip)
 	request_tcp(80, pf0_tap, vip_ipv6)
 	if port_redundancy:
-		request_tcp(81, pf1_tap, vip_ipv6)
+		request_tcp(83, pf1_tap, vip_ipv6)
 	grpc_client.delvip(vm2_name)
 
 
@@ -152,7 +152,7 @@ def request_icmperr(dport, pf_name, nat_ipv6):
 
 def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
-	request_icmperr(502, pf0_tap, nat_ipv6)
+	request_icmperr(500, pf0_tap, nat_ipv6)
 	if port_redundancy:
-		request_icmperr(501, pf1_tap, nat_ipv6)
+		request_icmperr(502, pf1_tap, nat_ipv6)
 	grpc_client.delnat(vm1_name)

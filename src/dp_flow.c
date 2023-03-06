@@ -82,6 +82,11 @@ int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* i
 
 	key->proto = df_ptr->l4_type;
 
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		key->vni = df_ptr->tun_info.dst_vni;
+	else
+		key->vni = dp_get_vm_vni(m->port);
+
 	switch (df_ptr->l4_type) {
 	case IPPROTO_TCP:
 		key->port_dst = rte_be_to_cpu_16(df_ptr->l4_info.trans_port.dst_port);
