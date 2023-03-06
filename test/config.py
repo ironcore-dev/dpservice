@@ -53,8 +53,8 @@ nat_neigh_min_port = 500
 nat_neigh_max_port = 520
 nat_neigh_ul_dst="2a10:afc0:e01f:f406:0:64::"
 pfx_ip = "174.23.4.0"
-mylb = "my_lb"
-lb_tcp_dst_port = 80
+lb_name = "my_lb"
+lb_ip = "174.12.3.4"
 
 MAX_LINES_ROUTE_REPLY = 36
 

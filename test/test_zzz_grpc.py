@@ -67,23 +67,23 @@ def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 
 def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 	# Try to add LB VIP, list, test error cases, delete vip and list again
-	ul_ipv6 = grpc_client.createlb(mylb, vni, virtual_ip, 80, "tcp")
-	grpc_client.addlbvip(mylb, back_ip1)
-	grpc_client.assert_output(f"--listbackips {mylb}",
+	ul_ipv6 = grpc_client.createlb(lb_name, vni, lb_ip, 80, "tcp")
+	grpc_client.addlbvip(lb_name, back_ip1)
+	grpc_client.assert_output(f"--listbackips {lb_name}",
 		back_ip1)
-	grpc_client.addlbvip(mylb, back_ip2)
-	grpc_client.assert_output(f"--listbackips {mylb}",
+	grpc_client.addlbvip(lb_name, back_ip2)
+	grpc_client.assert_output(f"--listbackips {lb_name}",
 		back_ip2)
-	grpc_client.dellbvip(mylb, back_ip1)
-	grpc_client.assert_output(f"--listbackips {mylb}",
+	grpc_client.dellbvip(lb_name, back_ip1)
+	grpc_client.assert_output(f"--listbackips {lb_name}",
 		back_ip1, negate=True)
-	grpc_client.dellbvip(mylb, back_ip2)
-	grpc_client.assert_output(f"--listbackips {mylb}",
+	grpc_client.dellbvip(lb_name, back_ip2)
+	grpc_client.assert_output(f"--listbackips {lb_name}",
 		back_ip2, negate=True)
-	grpc_client.assert_output(f"--getlb {mylb}",
+	grpc_client.assert_output(f"--getlb {lb_name}",
 		ul_ipv6)
-	grpc_client.dellb(mylb)
-	grpc_client.assert_output(f"--getlb {mylb}",
+	grpc_client.dellb(lb_name)
+	grpc_client.assert_output(f"--getlb {lb_name}",
 		ul_ipv6, negate=True)
 
 def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
