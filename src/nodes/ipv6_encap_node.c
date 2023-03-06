@@ -53,7 +53,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
 	ipv6_hdr->proto = df->tun_info.proto_id;
 
-	if (RTE_ETH_IS_IPV4_HDR(m->packet_type))
+	if (ipv6_hdr->proto == IPPROTO_IPIP)
 		m->packet_type = RTE_PTYPE_L3_IPV6 | tunnel_type | RTE_PTYPE_INNER_L3_IPV4;
 	else
 		m->packet_type = RTE_PTYPE_L3_IPV6 | tunnel_type | RTE_PTYPE_INNER_L3_IPV6;
