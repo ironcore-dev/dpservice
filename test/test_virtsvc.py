@@ -24,7 +24,7 @@ def reply_udp(pf_name):
 	udp_used_port = pkt[UDP].sport
 
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=17) /
+				 IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=17) /
 				 UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport))
 	delayed_sendp(reply_pkt, pf_name)
 
@@ -89,7 +89,7 @@ def reply_tcp(pf_name):
 		flags += "S"
 
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=6) /
+				 IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=6) /
 				 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags=flags, ack=pkt[TCP].seq+1, options=[("NOP", None)]))
 	delayed_sendp(reply_pkt, pf_name)
 
@@ -99,7 +99,7 @@ def reply_tcp(pf_name):
 	# FIN -> ACK+FINACK (ACK done above already)
 	if "F" in pkt[TCP].flags:
 		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-					 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=6) /
+					 IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=6) /
 					 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags="FA", ack=pkt[TCP].seq+1))
 		delayed_sendp(reply_pkt, pf_name)
 		return
@@ -108,13 +108,13 @@ def reply_tcp(pf_name):
 	if pkt[TCP].payload != None and len(pkt[TCP].payload) > 0:
 		if pkt[TCP].payload == Raw(TCP_RESET_REQUEST):
 			reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-						 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=6) /
+						 IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=6) /
 						 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags="R"))
 			delayed_sendp(reply_pkt, pf_name)
 			return
 
 		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-					 IPv6(dst=ul_actual_src, src=pkt[IPv6].dst, nh=6) /
+					 IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=6) /
 					 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags="") /
 					 Raw(TCP_NORMAL_RESPONSE))
 		delayed_sendp(reply_pkt, pf_name)

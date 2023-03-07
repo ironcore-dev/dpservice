@@ -2,8 +2,8 @@ from helpers import *
 
 
 def test_l2_arp(prepare_ifaces):
-	arp_packet = (Ether(dst=bcast_mac) /
-				  ARP(pdst=gw_ip4, hwdst=vf0_mac, psrc=null_ip))
+	arp_packet = (Ether(dst="ff:ff:ff:ff:ff:ff") /
+				  ARP(pdst=gateway_ip, hwdst=vf0_mac, psrc="0.0.0.0"))
 	answer, unanswered = srp(arp_packet, iface=vf0_tap, type=ETH_P_ARP, timeout=sniff_timeout)
 	assert len(answer) == 1, \
 		"No ARP response"

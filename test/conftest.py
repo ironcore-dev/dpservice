@@ -76,7 +76,7 @@ def prepare_ifaces(request, dp_service, tun_opt, grpc_client):
 	# TODO look into this when doing Geneve, is this the right way?
 	global t_vni
 	if tun_opt == tun_type_geneve:
-		t_vni = vni
+		t_vni = vni1
 
 	if request.config.getoption("--attach"):
 		dp_service.attach(grpc_client)

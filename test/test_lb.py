@@ -5,10 +5,10 @@ from helpers import *
 
 def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 
-	ipv6_lb = grpc_client.createlb(lb_name, vni, lb_ip, 80, "tcp")
+	lb_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, 80, "tcp")
 
-	icmp_pkt = (Ether(dst=mc_mac, src=pf0_mac, type=0x86DD) /
-				IPv6(dst=ipv6_lb, src=ul_actual_src, nh=4) /
+	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=pf0_mac, type=0x86DD) /
+				IPv6(dst=lb_ipv6, src=router_ul_ipv6, nh=4) /
 				IP(dst=lb_ip, src=public_ip) /
 				ICMP(type=8, id=0x0040))
 	answer = srp1(icmp_pkt, iface=pf0_tap, timeout=sniff_timeout)
@@ -64,24 +64,24 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 		pytest.skip("Port redundancy is not supported for LB(vni1) <-> VIP/NAT(vni2) test")
 
 	# establish a VM in another VNI on the same host
-	vm3_ipv6 = grpc_client.addmachine(vm3_name, "net_tap4", vni2, vf2_ip, vf2_ipv6)
-	grpc_client.addroute_ipv4(vni2, "0.0.0.0", 0, vni2, ul_actual_dst)
+	vm3_ipv6 = grpc_client.addmachine(vm3_name, vf2_pci, vni2, vf2_ip, vf2_ipv6)
+	grpc_client.addroute_ipv4(vni2, "0.0.0.0", 0, vni2, router_ul_ipv6)
 	request_ip(vf2_tap, vf2_mac, vf2_ip)
 
-	lb_ipv6 = grpc_client.createlb(lb_name, vni, lb_ip, 80, "tcp")
+	lb_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, 80, "tcp")
 	lb_vm1_ipv6 = grpc_client.addlbpfx(vm1_name, lb_ip)
 	grpc_client.addlbvip(lb_name, lb_vm1_ipv6)
 	lb_vm2_ipv6 = grpc_client.addlbpfx(vm2_name, lb_ip)
 	grpc_client.addlbvip(lb_name, lb_vm2_ipv6)
 
-	vip_ipv6 = grpc_client.addvip(vm3_name, virtual_ip)
+	vip_ipv6 = grpc_client.addvip(vm3_name, vip_vip)
 	# Also test round-robin
-	communicate_vip_lb(lb_ipv6, vip_ipv6, virtual_ip, vf1_tap, 1234)
-	communicate_vip_lb(lb_ipv6, vip_ipv6, virtual_ip, vf1_tap, 1234)
-	communicate_vip_lb(lb_ipv6, vip_ipv6, virtual_ip, vf0_tap, 1235)
-	communicate_vip_lb(lb_ipv6, vip_ipv6, virtual_ip, vf1_tap, 1236)
-	communicate_vip_lb(lb_ipv6, vip_ipv6, virtual_ip, vf0_tap, 1237)
-	communicate_vip_lb(lb_ipv6, vip_ipv6, virtual_ip, vf0_tap, 1237)
+	communicate_vip_lb(lb_ipv6, vip_ipv6, vip_vip, vf1_tap, 1234)
+	communicate_vip_lb(lb_ipv6, vip_ipv6, vip_vip, vf1_tap, 1234)
+	communicate_vip_lb(lb_ipv6, vip_ipv6, vip_vip, vf0_tap, 1235)
+	communicate_vip_lb(lb_ipv6, vip_ipv6, vip_vip, vf1_tap, 1236)
+	communicate_vip_lb(lb_ipv6, vip_ipv6, vip_vip, vf0_tap, 1237)
+	communicate_vip_lb(lb_ipv6, vip_ipv6, vip_vip, vf0_tap, 1237)
 	grpc_client.delvip(vm3_name)
 
 	# NAT should behave the same, just test once (watch out for round-robin from before)

@@ -23,14 +23,15 @@ class DpService:
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
 		self.cmd += (f'{self.build_path}/src/dp_service -l 0,1 --no-pci --log-level=user*:8'
-					f' --vdev=net_tap0,iface={pf0_tap},mac="{pf0_mac}"'
-					f' --vdev=net_tap1,iface={pf1_tap},mac="{pf1_mac}"'
-					f' --vdev=net_tap2,iface={vf0_tap},mac="{vf0_mac}"'
-					f' --vdev=net_tap3,iface={vf1_tap},mac="{vf1_mac}"'
-					f' --vdev=net_tap4,iface={vf2_tap},mac="{vf2_mac}"'
+					f' --vdev={pf0_pci},iface={pf0_tap},mac="{pf0_mac}"'
+					f' --vdev={pf1_pci},iface={pf1_tap},mac="{pf1_mac}"'
+					f' --vdev={vf0_pci},iface={vf0_tap},mac="{vf0_mac}"'
+					f' --vdev={vf1_pci},iface={vf1_tap},mac="{vf1_mac}"'
+					f' --vdev={vf2_pci},iface={vf2_tap},mac="{vf2_mac}"'
+					f' --vdev={vf3_pci},iface={vf3_tap},mac="{vf3_mac}"'
 					 ' --'
 					f' --pf0={pf0_tap} --pf1={pf1_tap} --vf-pattern={vf_patt}'
-					f' --ipv6={ul_ipv6} --enable-ipv6-overlay'
+					f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
 					f' --dhcp-mtu={dhcp_mtu}'
 					f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 ' --no-offload --no-stats'
@@ -63,11 +64,13 @@ class DpService:
 		if self.port_redundancy:
 			interface_up(pf1_tap)
 		grpc_client.init()
-		self.vm1_ipv6 = grpc_client.addmachine(vm1_name, "net_tap2", vni, vf0_ip, vf0_ipv6)
-		self.vm2_ipv6 = grpc_client.addmachine(vm2_name, "net_tap3", vni, vf1_ip, vf1_ipv6)
-		grpc_client.addroute_ipv4(vni, ov_target_pfx, 24, t_vni, ul_actual_dst)
-		grpc_client.addroute_ipv6(vni, "2002::123", 128, t_vni, ul_actual_dst)
-		grpc_client.addroute_ipv4(vni, "0.0.0.0", 0, vni, ul_actual_dst)
+		# TODO add 'ul_' prefix, but look all oever for others like lb, nat, etc.
+		self.vm1_ipv6 = grpc_client.addmachine(vm1_name, vf0_pci, vni1, vf0_ip, vf0_ipv6) # TODO name?
+		self.vm2_ipv6 = grpc_client.addmachine(vm2_name, vf1_pci, vni1, vf1_ip, vf1_ipv6)
+		# TODO confused about the t_vni
+		grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, t_vni, neigh_vni1_ul_ipv6)
+		grpc_client.addroute_ipv6(vni1, neigh_vni1_ov_ipv6_range, neigh_vni1_ov_ipv6_range_len, t_vni, neigh_vni1_ul_ipv6)
+		grpc_client.addroute_ipv4(vni1, "0.0.0.0", 0, vni1, router_ul_ipv6)  # TODO nul
 
 	def attach(self, grpc_client):
 		self.vm1_ipv6 = grpc_client.get_ul_ipv6(vm1_name)

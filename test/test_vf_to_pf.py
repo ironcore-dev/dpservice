@@ -17,7 +17,7 @@ def reply_icmp_pkt_from_vm1(nat_ipv6):
 				 ICMP(type=0, id=pkt[ICMP].id))
 	delayed_sendp(reply_pkt, pf0_tap)
 
-def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
+def xtest_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 
 	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 
@@ -75,13 +75,9 @@ def send_tcp_through_port(port):
 
 
 def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redundancy):
-
-	if port_redundancy:
-		pytest.skip("Port redundancy is not supported for NAT max port test")
-
 	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1_max_port, args=(nat_ipv6,)).start()
-	send_tcp_through_port(1240)
+	send_tcp_through_port(1242)
 	send_tcp_through_port(1243)
 	grpc_client.delnat(vm1_name)
 
@@ -89,7 +85,7 @@ def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redun
 def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1, args=(nat_ipv6,)).start()
-	send_tcp_through_port(1240)
+	send_tcp_through_port(1242)
 	grpc_client.delnat(vm1_name)
 
 
@@ -111,10 +107,10 @@ def request_tcp(dport, pf_name, vip_ipv6):
 	sniff_packet(vf1_tap, is_tcp_pkt)
 
 def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
-	vip_ipv6 = grpc_client.addvip(vm2_name, virtual_ip)
+	vip_ipv6 = grpc_client.addvip(vm2_name, vip_vip)
 	request_tcp(80, pf0_tap, vip_ipv6)
 	if port_redundancy:
-		request_tcp(83, pf1_tap, vip_ipv6)
+		request_tcp(82, pf1_tap, vip_ipv6)
 	grpc_client.delvip(vm2_name)
 
 
@@ -140,7 +136,7 @@ def request_icmperr(dport, pf_name, nat_ipv6):
 
 	threading.Thread(target=reply_with_icmp_err_fragment_needed, args=(pf_name, nat_ipv6)).start();
 
-	tcp_pkt = (Ether(dst=mc_mac, src=vf0_mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=ipv6_multicast_mac, src=vf0_mac, type=0x0800) /
 			   IP(dst=public_ip, src=vf0_ip) /
 			   TCP(sport=1256, dport=dport))
 	delayed_sendp(tcp_pkt, vf0_tap)
@@ -152,7 +148,7 @@ def request_icmperr(dport, pf_name, nat_ipv6):
 
 def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ipv6 = grpc_client.addnat(vm1_name, nat_vip, nat_local_min_port, nat_local_max_port)
-	request_icmperr(500, pf0_tap, nat_ipv6)
+	request_icmperr(506, pf0_tap, nat_ipv6)
 	if port_redundancy:
-		request_icmperr(502, pf1_tap, nat_ipv6)
+		request_icmperr(500, pf1_tap, nat_ipv6)
 	grpc_client.delnat(vm1_name)

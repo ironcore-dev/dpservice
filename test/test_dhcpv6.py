@@ -5,8 +5,8 @@ def test_dhcpv6(prepare_ifaces):
 
 	DUID = b"00020000ab11b7d4e0eed266171d"
 
-	eth = Ether(dst=mc_mac)
-	ip6 = IPv6(dst=gw_ip6)
+	eth = Ether(dst=ipv6_multicast_mac)
+	ip6 = IPv6(dst=gateway_ipv6)
 	udp = UDP(sport=546, dport=547)
 
 	rc_op = DHCP6OptRapidCommit(optlen=0)
