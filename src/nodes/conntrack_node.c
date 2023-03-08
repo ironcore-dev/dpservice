@@ -61,9 +61,9 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		// successful closed (last ack is in pending).
 		case DP_FLOW_TCP_STATE_ESTABLISHED:
 			if ((tcp_hdr->tcp_flags & (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG))
-				*tcp_flow_state = DP_FLOW_TCP_STATE_FIN_ACK;
+				*tcp_flow_state = DP_FLOW_TCP_STATE_FINACK;
 			break;
-		case DP_FLOW_TCP_STATE_FIN_ACK:
+		case DP_FLOW_TCP_STATE_FINACK:
 			if ((tcp_hdr->tcp_flags & (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG))
 				*tcp_flow_state = DP_FLOW_TCP_STATE_RST_FIN;
 			break;
