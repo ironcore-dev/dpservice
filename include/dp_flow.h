@@ -1,6 +1,5 @@
 #ifndef __INCLUDE_DP_FLOW_PRIV_H__
 #define __INCLUDE_DP_FLOW_PRIV_H__
-
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_flow.h>
@@ -23,6 +22,8 @@ extern "C" {
 #endif
 
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24 / TIMER_MESSAGE_INTERVAL)
+
+
 
 enum {
 	DP_FLOW_DIR_ORG,
@@ -56,7 +57,6 @@ enum {
 };
 
 enum {
-	DP_FLOW_TCP_STATE_NONE,
 	DP_FLOW_TCP_STATE_NEW,
 	DP_FLOW_TCP_STATE_NEW_SYN,
 	DP_FLOW_TCP_STATE_NEW_SYNACK,

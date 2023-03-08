@@ -46,25 +46,25 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		switch (*tcp_flow_state) {
 		case DP_FLOW_TCP_STATE_NEW:
 		case DP_FLOW_TCP_STATE_RST_FIN:
-			if (tcp_hdr->tcp_flags & RTE_TCP_SYN_FLAG)
+			if (DP_TCP_PKT_FLAG_SYN(tcp_hdr->tcp_flags))
 				*tcp_flow_state = DP_FLOW_TCP_STATE_NEW_SYN;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
-			if ((tcp_hdr->tcp_flags & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
+			if (DP_TCP_PKT_FLAG_SYNACK(tcp_hdr->tcp_flags))
 				*tcp_flow_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
-			if (tcp_hdr->tcp_flags & RTE_TCP_ACK_FLAG)
+			if (DP_TCP_PKT_FLAG_ACK(tcp_hdr->tcp_flags))
 				*tcp_flow_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
 		// this is not entirely 1:1 mapping to fin sequence, but sufficient to determine if a tcp conn is almost
 		// successful closed (last ack is in pending).
 		case DP_FLOW_TCP_STATE_ESTABLISHED:
-			if ((tcp_hdr->tcp_flags & (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG))
+			if (DP_TCP_PKT_FLAG_FINACK(tcp_hdr->tcp_flags))
 				*tcp_flow_state = DP_FLOW_TCP_STATE_FINACK;
 			break;
 		case DP_FLOW_TCP_STATE_FINACK:
-			if ((tcp_hdr->tcp_flags & (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG))
+			if (DP_TCP_PKT_FLAG_FINACK(tcp_hdr->tcp_flags))
 				*tcp_flow_state = DP_FLOW_TCP_STATE_RST_FIN;
 			break;
 		}
@@ -78,6 +78,7 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 	else if (*(uint8_t *)(flow_val->extra_state) == DP_FLOW_TCP_STATE_RST_FIN)
 		flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
+		
 }
 
 
