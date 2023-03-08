@@ -37,6 +37,8 @@ enum {
 //tcp hdr flag check
 #define DP_TCP_PKT_FLAG_SYN(flag) ((flag) & RTE_TCP_SYN_FLAG)
 
+#define DP_TCP_PKT_FLAG_RST(flag) ((flag) & RTE_TCP_RST_FLAG)
+
 #define DP_TCP_PKT_FLAG_SYNACK(flag) \
 	(((flag) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
 

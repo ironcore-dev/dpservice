@@ -23,7 +23,7 @@ extern "C" {
 
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24 / TIMER_MESSAGE_INTERVAL)
 
-
+#define DP_FLOW_L4_STATE_INVALID UINT32_MAX
 
 enum {
 	DP_FLOW_DIR_ORG,
@@ -56,8 +56,8 @@ enum {
 	DP_FLOW_ACTION_DROP,
 };
 
-enum {
-	DP_FLOW_TCP_STATE_NEW,
+enum DP_FLOW_TCP_STATE{
+	DP_FLOW_TCP_STATE_NONE,
 	DP_FLOW_TCP_STATE_NEW_SYN,
 	DP_FLOW_TCP_STATE_NEW_SYNACK,
 	DP_FLOW_TCP_STATE_ESTABLISHED,
@@ -99,7 +99,7 @@ struct flow_value {
 	uint8_t			lb_dst_addr6[16];
 	uint8_t			action[DP_FLOW_DIR_MAX];
 	struct dp_ref	ref_count;
-	void			*extra_state;
+	uint32_t		tcp_state;
 };
 
 struct flow_age_ctx {

@@ -38,34 +38,33 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
 {
-	uint8_t *tcp_flow_state = (uint8_t *)flow_val->extra_state;
 
-	if (tcp_hdr->tcp_flags & RTE_TCP_RST_FLAG) {
-		*tcp_flow_state = DP_FLOW_TCP_STATE_RST_FIN;
+	if (DP_TCP_PKT_FLAG_RST(tcp_hdr->tcp_flags)) {
+		flow_val->tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else {
-		switch (*tcp_flow_state) {
-		case DP_FLOW_TCP_STATE_NEW:
+		switch ((enum DP_FLOW_TCP_STATE)flow_val->tcp_state) {
+		case DP_FLOW_TCP_STATE_NONE:
 		case DP_FLOW_TCP_STATE_RST_FIN:
 			if (DP_TCP_PKT_FLAG_SYN(tcp_hdr->tcp_flags))
-				*tcp_flow_state = DP_FLOW_TCP_STATE_NEW_SYN;
+				flow_val->tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
 			if (DP_TCP_PKT_FLAG_SYNACK(tcp_hdr->tcp_flags))
-				*tcp_flow_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
+				flow_val->tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
 			if (DP_TCP_PKT_FLAG_ACK(tcp_hdr->tcp_flags))
-				*tcp_flow_state = DP_FLOW_TCP_STATE_ESTABLISHED;
+				flow_val->tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
 		// this is not entirely 1:1 mapping to fin sequence, but sufficient to determine if a tcp conn is almost
 		// successful closed (last ack is in pending).
 		case DP_FLOW_TCP_STATE_ESTABLISHED:
 			if (DP_TCP_PKT_FLAG_FINACK(tcp_hdr->tcp_flags))
-				*tcp_flow_state = DP_FLOW_TCP_STATE_FINACK;
+				flow_val->tcp_state = DP_FLOW_TCP_STATE_FINACK;
 			break;
 		case DP_FLOW_TCP_STATE_FINACK:
 			if (DP_TCP_PKT_FLAG_FINACK(tcp_hdr->tcp_flags))
-				*tcp_flow_state = DP_FLOW_TCP_STATE_RST_FIN;
+				flow_val->tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 			break;
 		}
 	}
@@ -74,18 +73,17 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val)
 {
 
-	if (*(uint8_t *)(flow_val->extra_state) == DP_FLOW_TCP_STATE_ESTABLISHED)
+	if (flow_val->tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
-	else if (*(uint8_t *)(flow_val->extra_state) == DP_FLOW_TCP_STATE_RST_FIN)
+	else if (flow_val->tcp_state == DP_FLOW_TCP_STATE_RST_FIN)
 		flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
-		
+
 }
 
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df_ptr, struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
-	uint8_t *tcp_extra_state = NULL;
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val)
@@ -100,19 +98,10 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
 
-	if (df_ptr->l4_type == IPPROTO_TCP) {
-		tcp_extra_state = rte_zmalloc("tcp_extra_state", sizeof(uint8_t), RTE_CACHE_LINE_SIZE);
-		if (!tcp_extra_state) {
-			DPS_LOG_ERR("failed to allocate tcp extra state");
-			rte_free(flow_val);
-			flow_val = NULL;
-			return flow_val;
-		}
-		*tcp_extra_state = DP_FLOW_TCP_STATE_NEW;
-		flow_val->extra_state = (void *)tcp_extra_state;
-	} else {
-		flow_val->extra_state = NULL;
-	}
+	if (df_ptr->l4_type == IPPROTO_TCP)
+		flow_val->tcp_state = DP_FLOW_TCP_STATE_NONE;
+	else
+		flow_val->tcp_state = DP_FLOW_L4_STATE_INVALID;
 
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
 	dp_add_flow_data(key, flow_val);

@@ -206,9 +206,6 @@ void dp_free_flow(struct dp_ref *ref)
 	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
 
-	if (cntrack->extra_state)
-		rte_free(cntrack->extra_state);
-
 	rte_free(cntrack);
 }
 

@@ -45,16 +45,10 @@ def get_server_packet(pf_name):
 
 def reply_tcp(pf_name):
 
-	file = open(str(os.getpid()) + ".out", "w")
-	stdout = sys.stdout
-	sys.stdout = file
-
 	global tcp_receiver_seq
 	global nat_ipv6_src
 
 	pkt = get_server_packet(pf_name)
-
-	pkt.show()
 
 	# Received ACK only, just end
 	if pkt[TCP].flags == "A":
@@ -74,9 +68,6 @@ def reply_tcp(pf_name):
 	time.sleep(0.5)
 	delayed_sendp(reply_pkt, pf_name)
 
-	reply_pkt.show()
-	sys.stdout = stdout
-	file.close()
 
 	if flags != "A":
 		tcp_receiver_seq += 1
