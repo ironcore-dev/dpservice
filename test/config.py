@@ -1,75 +1,50 @@
-# TODO comments for documenting
-# fc00:: - underlay, 2000:: overlay
-# 10.0.0.0 overlay
-# 172.2x.0.0 virtual
-# (mention 192.168.0.0 is free to be used down in tests)
-# talk about how vni is mapped into overlay for clarity
-# document pf/vf macs
+# Address range convenstion for bettr trace/dump readablity
+# (see docs/testing/pytest_schema.drawio.png for overview)
+#
+# Underlay addresses:
+#   fc00::
+# Overlay addresses change based on VNI and dp-service instance (host machine)
+#   2000:vni:machine:: for VM IPv6
+#   10.vni.machine.0/24 for VM IPv4
+# Virtual addresses:
+#   172.2x.x.0/24 per category (vip, nat, lb, ...)
+# Private addresses for individual tests:
+#   192.168.0.0/16 per test requirements
+# Network addresses:
+#   22:22:22:22:22:xx for PFs
+#   66:66:66:66:66:xx for VFs
 
-# Virtual network identifiers (ahred among dp-service instances)
+# Virtual network identifiers (shared among dp-service instances)
 vni1 = 100
 vni2 = 200
 
 # Networking layer
-pf0_tap = "dtap0"
-pf1_tap = "dtap1"
-vf_patt = "dtapvf_"
-vf0_tap = f"{vf_patt}0"
-vf1_tap = f"{vf_patt}1"
-vf2_tap = f"{vf_patt}2"
-vf3_tap = f"{vf_patt}3"
-# TODO patterns!
-pf0_pci = "net_tap0"
-pf1_pci = "net_tap1"
-vf0_pci = "net_tap2"
-vf1_pci = "net_tap3"
-vf2_pci = "net_tap4"
-vf3_pci = "net_tap5"
-pf0_mac = "22:22:22:22:22:00"
-pf1_mac = "22:22:22:22:22:01"
-vf0_mac = "66:66:66:66:66:00"
-vf1_mac = "66:66:66:66:66:01"
-vf2_mac = "66:66:66:66:66:02"
-vf3_mac = "66:66:66:66:66:03"
+pf_tap_pattern = "dtap"
+vf_tap_pattern = "dtapvf_"
+pci_pattern = "net_tap"
+pf_mac_pattern = "22:22:22:22:22:"
+vf_mac_pattern = "66:66:66:66:66:"
 ipv6_multicast_mac = "33:33:00:00:00:01"
-
-# VMs
-# TODO maybe make these into objects VM1, VM2, VM3 with fields like VM1.tap, VM1.mac, VM1.ip, etc.
-vm1_name = "vm1"
-vm2_name = "vm2"
-vm3_name = "vm3"
-vm4_name = "vm4"  # TODO other name or at least comment to indicate it's for local tests
 
 # Overlay IPv4 addresses
 gateway_ip = "169.254.0.1"
-ov_ip_prefix = "10"
-vni1_ov_ip_prefix = f"{ov_ip_prefix}.{vni1}"
-local_vni1_ov_ip_prefix = f"{vni1_ov_ip_prefix}.1"
+ov_ip_prefix = "10."
 
 # Overlay IPv6 addresses
 gateway_ipv6 = "fe80::1"
-ov_ipv6_prefix = "2000"
-vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}:{vni1}"
-local_vni1_ov_ipv6_prefix = f"{vni1_ov_ipv6_prefix}:1"
-vf0_ip = f"{local_vni1_ov_ip_prefix}.1"
-vf0_ipv6 = f"{local_vni1_ov_ipv6_prefix}::1"
-vf1_ip = f"{local_vni1_ov_ip_prefix}.2"
-vf1_ipv6 = f"{local_vni1_ov_ipv6_prefix}::2"
-vf2_ip = f"{local_vni1_ov_ip_prefix}.3"
-vf2_ipv6 = f"{local_vni1_ov_ipv6_prefix}::3"
-vf3_ip = f"{local_vni1_ov_ip_prefix}.4"
-vf3_ipv6 = f"{local_vni1_ov_ipv6_prefix}::4"
+ov_ipv6_prefix = "2000:"
 
 # Underlay IPv6 addresses
 router_ul_ipv6 = "fc00::ffff"
 local_ul_ipv6 = "fc00:1::1"
 neigh_ul_ipv6 = "fc00:2::1"
 
+# Neighboring dp-service instance info (normally provided by metalnet)
 neigh_vni1_ul_ipv6 = "fc00:2::64:0:1"  # Hardcoded VNI, this would need to correspond to the other instance's config
-neigh_vni1_ov_ip_prefix = f"{vni1_ov_ip_prefix}.2"
+neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
 neigh_vni1_ov_ip_range = f"{neigh_vni1_ov_ip_prefix}.0"
 neigh_vni1_ov_ip_range_len = 24
-neigh_vni1_ov_ipv6_prefix = f"{vni1_ov_ipv6_prefix}:2"
+neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
 neigh_vni1_ov_ipv6_range = f"{neigh_vni1_ov_ipv6_prefix}::"
 neigh_vni1_ov_ipv6_range_len = 104
 
@@ -119,3 +94,44 @@ virtsvc_tcp_virtual_port = 4443
 
 # Helper functions config
 sniff_timeout = 2
+
+class PFSpec:
+	_idx = 0
+	@staticmethod
+	def create():
+		pf = PFSpec()
+		pf.tap = f"{pf_tap_pattern}{PFSpec._idx}"
+		pf.pci = f"{pci_pattern}{PFSpec._idx}"
+		pf.mac = f"{pf_mac_pattern}{PFSpec._idx:02}"
+		PFSpec._idx += 1
+		return pf
+	def get_count():
+		return PFSpec._idx
+
+class VMSpec:
+	_idx = 0
+	@staticmethod
+	def create(vni):
+		vm = VMSpec()
+		vm.vni = vni
+		vm.name = f"vm{VMSpec._idx+1}"
+		vm.tap = f"{vf_tap_pattern}{VMSpec._idx}"
+		vm.pci = f"{pci_pattern}{VMSpec._idx+PFSpec.get_count()}"
+		vm.mac = f"{vf_mac_pattern}{VMSpec._idx:02}"
+		vm.ip = f"{ov_ip_prefix}{vni}.1.{VMSpec._idx+1}"
+		vm.ipv6 = f"{ov_ipv6_prefix}{vni}:1::{VMSpec._idx+1}"
+		vm.ul_ipv6 = None  # will be assigned dynamically
+		VMSpec._idx += 1
+		return vm
+
+PF0 = PFSpec.create()
+PF1 = PFSpec.create()
+# VM1 and VM2 are on the same VNI
+VM1 = VMSpec.create(vni1)
+VM2 = VMSpec.create(vni1)
+# VM3 is on the second VNI
+VM3 = VMSpec.create(vni2)
+# VM4 is for local use
+# it is not added anywere, the interface is not up
+# add it and delete manually, note that it is configured for VNI1
+VM4 = VMSpec.create(vni1)

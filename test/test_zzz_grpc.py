@@ -3,25 +3,24 @@ from helpers import *
 
 def test_grpc_addmachine_error_109(prepare_ifaces, grpc_client):
 	# Try to add using an existing vm identifier
-	grpc_client.assert_output(f"--addmachine {vm2_name} --vm_pci {vf1_pci} --vni {vni1} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+	grpc_client.assert_output(f"--addmachine {VM2.name} --vm_pci {VM2.pci} --vni {VM2.vni} --ipv4 {VM2.ip} --ipv6 {VM2.ipv6}",
 		"error 109")
 
 def test_grpc_addmachine_error_110(prepare_ifaces, grpc_client):
 	# Try to add without specifying PCI address or using a bad one
-	grpc_client.assert_output(f"--addmachine new_vm --vni {vni1} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+	grpc_client.assert_output(f"--addmachine new_vm --vni {VM2.vni} --ipv4 {VM2.ip} --ipv6 {VM2.ipv6}",
 		"error 110")
-	grpc_client.assert_output(f"--addmachine new_vm --vm_pci invalid --vni {vni1} --ipv4 {vf1_ip} --ipv6 {vf1_ipv6}",
+	grpc_client.assert_output(f"--addmachine new_vm --vm_pci invalid --vni {VM2.vni} --ipv4 {VM2.ip} --ipv6 {VM2.ipv6}",
 		"error 110")
 
 def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
-	grpc_client.assert_output(f"--getmachine {vm2_name}",
-		vf1_ip)
+	grpc_client.assert_output(f"--getmachine {VM2.name}",
+		VM2.ip)
 
 def test_grpc_addmachine_error_106(prepare_ifaces, grpc_client):
 	# Try to add with new machine identifer but already given IPv4
-	# TODO create interface I guess... or add a special one for tests?
-	grpc_client.assert_output(f"--addmachine {vm4_name} --vm_pci {vf3_pci} --vni {vni1} --ipv4 {vf0_ip} --ipv6 {vf0_ipv6}",
+	grpc_client.assert_output(f"--addmachine {VM4.name} --vm_pci {VM4.pci} --vni {VM4.vni} --ipv4 {VM1.ip} --ipv6 {VM1.ipv6}",
 		"error 106")
 
 def test_grpc_delmachine_error_151(prepare_ifaces, grpc_client):
@@ -31,12 +30,12 @@ def test_grpc_delmachine_error_151(prepare_ifaces, grpc_client):
 
 def test_grpc_add_list_delmachine(prepare_ifaces, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
-	grpc_client.addmachine(vm4_name, vf3_pci, vni1, vf3_ip, vf3_ipv6)
+	grpc_client.addmachine(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
 	grpc_client.assert_output(f"--getmachines",
-		vm4_name)
-	grpc_client.delmachine(vm4_name)
+		VM4.name)
+	grpc_client.delmachine(VM4.name)
 	grpc_client.assert_output(f"--getmachines",
-		vm4_name, negate=True)
+		VM4.name, negate=True)
 
 def test_grpc_addroute_error_251(prepare_ifaces, grpc_client):
 	# Try to add a route which is already added
@@ -57,17 +56,17 @@ def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
-	ul_ipv6 = grpc_client.addvip(vm2_name, vip_vip)
-	grpc_client.assert_output(f"--getvip {vm2_name}",
+	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
+	grpc_client.assert_output(f"--getvip {VM2.name}",
 		f"Received VIP {vip_vip} underlayroute {ul_ipv6}")
 	# Try to add the same vip again
-	grpc_client.assert_output(f"--addvip {vm2_name} --ipv4 {vip_vip}",
+	grpc_client.assert_output(f"--addvip {VM2.name} --ipv4 {vip_vip}",
 		"error 351")
 	# Try to add to a machine which doesnt exist
 	grpc_client.assert_output(f"--addvip invalid_name --ipv4 {vip_vip}",
 		"error 350")
-	grpc_client.delvip(vm2_name)
-	grpc_client.assert_output(f"--getvip {vm2_name}",
+	grpc_client.delvip(VM2.name)
+	grpc_client.assert_output(f"--getvip {VM2.name}",
 		vip_vip, negate=True)
 
 def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
@@ -95,33 +94,33 @@ def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 
 def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	ul_ipv6 = grpc_client.addpfx(vm2_name, pfx_ip, 24)
-	grpc_client.assert_output(f"--listpfx {vm2_name}",
+	ul_ipv6 = grpc_client.addpfx(VM2.name, pfx_ip, 24)
+	grpc_client.assert_output(f"--listpfx {VM2.name}",
 		f"Route prefix {pfx_ip} len 24 underlayroute {ul_ipv6}")
 	# Try to add the same pfx again
-	grpc_client.assert_output(f"--addpfx {vm2_name} --ipv4 {pfx_ip} --length 24",
+	grpc_client.assert_output(f"--addpfx {VM2.name} --ipv4 {pfx_ip} --length 24",
 		"error 652")
 	# Try to add/delete to/from a machine which doesnt exist
 	grpc_client.assert_output(f"--addpfx invalid_name --ipv4 {pfx_ip} --length 24",
 		"error 651")
 	grpc_client.assert_output(f"--delpfx invalid_name --ipv4 {pfx_ip} --length 24",
 		"error 701")
-	grpc_client.delpfx(vm2_name, pfx_ip, 24)
-	grpc_client.assert_output(f"--listpfx {vm2_name}",
+	grpc_client.delpfx(VM2.name, pfx_ip, 24)
+	grpc_client.assert_output(f"--listpfx {VM2.name}",
 		pfx_ip, negate=True)
 
 def test_grpc_add_list_delLoadBalancerTargets(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	ul_ipv6 = grpc_client.addlbpfx(vm2_name, pfx_ip)
-	grpc_client.assert_output(f"--listlbpfx {vm2_name}",
+	ul_ipv6 = grpc_client.addlbpfx(VM2.name, pfx_ip)
+	grpc_client.assert_output(f"--listlbpfx {VM2.name}",
 		f"LB Route prefix {pfx_ip} len 32 underlayroute {ul_ipv6}")
 	# Try to add/delete to/from a machine which doesnt exist
 	grpc_client.assert_output(f"--addlbpfx invalid_name --ipv4 {pfx_ip} --length 32",
 		"error 651")
 	grpc_client.assert_output(f"--dellbpfx invalid_name --ipv4 {pfx_ip} --length 32",
 		"error 701")
-	grpc_client.dellbpfx(vm2_name, pfx_ip)
-	grpc_client.assert_output(f"--listpfx {vm2_name}",
+	grpc_client.dellbpfx(VM2.name, pfx_ip)
+	grpc_client.assert_output(f"--listpfx {VM2.name}",
 		pfx_ip, negate=True)
 
 def test_grpc_add_list_del_routes_big_reply(prepare_ifaces, grpc_client):
