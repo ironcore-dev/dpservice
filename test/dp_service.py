@@ -91,12 +91,13 @@ if __name__ == '__main__':
 	parser.add_argument("--build-path", action="store", default=f"{script_path}/../build", help="Path to the root build directory")
 	parser.add_argument("--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Underlay tunnel type")
 	parser.add_argument("--port-redundancy", action="store_true", help="Set up two physical ports")
+	parser.add_argument("--virtsvc", action="store_true", help="Enable virtual service tests")
 	parser.add_argument("--no-init", action="store_true", help="Do not set interfaces up automatically")
 	parser.add_argument("--init-only", action="store_true", help="Only init interfaces of a running service")
 	parser.add_argument("--gdb", action="store_true", help="Run service under gdb")
 	args = parser.parse_args()
 
-	dp_service = DpService(args.build_path, args.tun_opt, args.port_redundancy, args.gdb)
+	dp_service = DpService(args.build_path, args.tun_opt, args.port_redundancy, args.gdb, test_virtsvc=args.virtsvc)
 
 	if args.init_only:
 		dp_service.init_ifaces(GrpcClient(args.build_path))

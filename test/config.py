@@ -1,4 +1,4 @@
-# Address range convenstion for bettr trace/dump readablity
+# Address range convenstion for better trace/dump readablity
 # (see docs/testing/pytest_schema.drawio.png for overview)
 #
 # Underlay addresses:
@@ -61,8 +61,6 @@ dhcp_dns2 = "8.8.8.8"
 
 # Some "random" IP on the internet
 public_ip = "45.86.6.6"
-public_server_ip = public_ip
-public_server_port = 443
 
 # Virtual IP functionality
 vip_vip = "172.20.0.1"
@@ -73,9 +71,6 @@ nat_local_min_port = 100
 nat_local_max_port = 102
 nat_neigh_min_port = 500
 nat_neigh_max_port = 520
-# TODO this changed
-nat_local_single_min_port = 100
-nat_local_single_max_port = 101
 
 # Loadbalancer functionality
 lb_name = "my_lb"
