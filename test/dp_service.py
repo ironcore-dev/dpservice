@@ -33,6 +33,7 @@ class DpService:
 					f' --dhcp-mtu={dhcp_mtu}'
 					f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 ' --no-offload --no-stats'
+					f' --grpc-port={grpc_port}'
 					f' --nic-type=tap --overlay-type={tun_opt}')
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-fraction=0.5'
@@ -65,7 +66,7 @@ class DpService:
 		VM1.ul_ipv6 = grpc_client.addmachine(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
 		VM2.ul_ipv6 = grpc_client.addmachine(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
 		VM3.ul_ipv6 = grpc_client.addmachine(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6)
-		# TODO confused about the t_vni
+		# TODO confused about the t_vni (is that geneve-only?)
 		grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, t_vni, neigh_vni1_ul_ipv6)
 		grpc_client.addroute_ipv6(vni1, neigh_vni1_ov_ipv6_range, neigh_vni1_ov_ipv6_range_len, t_vni, neigh_vni1_ul_ipv6)
 		grpc_client.addroute_ipv4(vni1, "0.0.0.0", 0, vni1, router_ul_ipv6)

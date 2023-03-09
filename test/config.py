@@ -94,6 +94,7 @@ virtsvc_tcp_virtual_port = 4443
 
 # Helper functions config
 sniff_timeout = 2
+grpc_port = 1337
 
 class PFSpec:
 	_idx = 0

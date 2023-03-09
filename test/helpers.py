@@ -52,16 +52,16 @@ def is_icmpv6echo_pkt(pkt):
 	return ICMPv6EchoReply in pkt
 
 def is_geneve_encaped_icmpv6_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == neigh_vni1_ul_ipv6 and pkt[IPv6].nh == 17
+	return IPv6 in pkt and pkt[IPv6].nh == 17 and ICMPv6EchoRequest in pkt
 
 def is_encaped_icmpv6_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == neigh_vni1_ul_ipv6 and pkt[IPv6].nh == 0x29
+	return IPv6 in pkt and pkt[IPv6].nh == 0x29 and ICMPv6EchoRequest in pkt
 
 def is_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == neigh_vni1_ul_ipv6 and pkt[IPv6].nh == 4 and ICMP in pkt
+	return IPv6 in pkt and pkt[IPv6].nh == 4 and ICMP in pkt
 
 def is_geneve_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == neigh_vni1_ul_ipv6 and pkt[IPv6].nh == 17 and ICMP in pkt
+	return IPv6 in pkt and pkt[IPv6].nh == 17 and ICMP in pkt
 
 
 def delayed_sendp(packet, interface):
