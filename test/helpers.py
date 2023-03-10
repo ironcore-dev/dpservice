@@ -10,9 +10,9 @@ from scapy.contrib.geneve import GENEVE
 from config import *
 
 
-def request_ip(interface, macaddr, ipaddr):
+def request_ip(vm):
 	scapy.config.conf.checkIPaddr = False
-	answer = dhcp_request(iface=interface, timeout=sniff_timeout)
+	answer = dhcp_request(iface=vm.tap, timeout=sniff_timeout)
 	validate_checksums(answer)
 	options = answer[DHCP].options
 	msg_type = next((opt[1] for opt in options if opt[0] == 'message-type'), None)
@@ -25,14 +25,14 @@ def request_ip(interface, macaddr, ipaddr):
 	if not dns_servers or dhcp_dns1 not in dns_servers or dhcp_dns2 not in dns_servers:
 		raise AssertionError(f"DHCP message does not specify the right DNS servers: {dns_servers} instead of {dhcp_dns1} and {dhcp_dns2}")
 	pkt = (Ether(dst=answer[Ether].src) /
-		   IP(src=ipaddr, dst=answer[IP].src) /
+		   IP(src=vm.ip, dst=answer[IP].src) /
 		   UDP(sport=68, dport=67) /
-		   BOOTP(chaddr=macaddr) /
+		   BOOTP(chaddr=vm.mac) /
 		   DHCP(options=[("message-type", "request"), "end"]))
-	answer = srp1(pkt, iface=interface, timeout=sniff_timeout)
+	answer = srp1(pkt, iface=vm.tap, timeout=sniff_timeout)
 	validate_checksums(answer)
 	assigned_ip = answer[BOOTP].yiaddr
-	if assigned_ip != ipaddr:
+	if assigned_ip != vm.ip:
 		raise AssertionError(f"Wrong address assigned ({assigned_ip})")
 
 
@@ -46,22 +46,22 @@ def is_tcp_pkt(pkt):
 	return TCP in pkt
 
 def is_tcp_vip_src_pkt(pkt):
-	return TCP in pkt and pkt[IP].src == virtual_ip
+	return TCP in pkt and pkt[IP].src == vip_vip
 
 def is_icmpv6echo_pkt(pkt):
 	return ICMPv6EchoReply in pkt
 
 def is_geneve_encaped_icmpv6_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 17
+	return IPv6 in pkt and pkt[IPv6].nh == 17 and ICMPv6EchoRequest in pkt
 
 def is_encaped_icmpv6_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 0x29
+	return IPv6 in pkt and pkt[IPv6].nh == 0x29 and ICMPv6EchoRequest in pkt
 
 def is_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 4 and ICMP in pkt
+	return IPv6 in pkt and pkt[IPv6].nh == 4 and ICMP in pkt
 
 def is_geneve_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 17 and ICMP in pkt
+	return IPv6 in pkt and pkt[IPv6].nh == 17 and ICMP in pkt
 
 
 def delayed_sendp(packet, interface):

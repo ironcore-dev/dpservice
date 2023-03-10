@@ -76,7 +76,7 @@ def prepare_ifaces(request, dp_service, tun_opt, grpc_client):
 	# TODO look into this when doing Geneve, is this the right way?
 	global t_vni
 	if tun_opt == tun_type_geneve:
-		t_vni = vni
+		t_vni = vni1
 
 	if request.config.getoption("--attach"):
 		dp_service.attach(grpc_client)
@@ -91,7 +91,8 @@ def prepare_ifaces(request, dp_service, tun_opt, grpc_client):
 @pytest.fixture(scope="package")
 def prepare_ipv4(prepare_ifaces):
 	print("-------- IPs init --------")
-	request_ip(vf0_tap, vf0_mac, vf0_ip)
-	request_ip(vf1_tap, vf1_mac, vf1_ip)
+	request_ip(VM1)
+	request_ip(VM2)
+	request_ip(VM3)
 	print("--------------------------")
 	return prepare_ifaces

@@ -3,6 +3,7 @@ import socket
 import subprocess
 import time
 import re
+from config import grpc_port
 
 
 class GrpcClient:
@@ -119,7 +120,7 @@ class GrpcClient:
 	def port_open():
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			try:
-				s.connect(("localhost", 1337))  # TODO add to arguments once dp_service supports one too
+				s.connect(("localhost", grpc_port))
 				s.close()
 				return True
 			except ConnectionRefusedError:
