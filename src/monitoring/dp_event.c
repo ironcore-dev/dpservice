@@ -59,18 +59,18 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 	dp_port_set_link_status(port_id, status);
 }
 
-int dp_send_event_timer_msg()
+int dp_send_event_flow_aging_msg()
 {
-	dp_event_msg timer_msg = {0};
+	dp_event_msg flow_aging_msg = {0};
 	int ret;
 
-	timer_msg.msg_head.type = DP_STATUS_TYPE_TIMER;
-	timer_msg.msg_head.scope = DP_STATUS_SCOPE_LOCAL;
+	flow_aging_msg.msg_head.type = DP_STATUS_TYPE_FLOW_AGING;
+	flow_aging_msg.msg_head.scope = DP_STATUS_SCOPE_LOCAL;
 
 	struct rte_mbuf *m = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
 	dp_event_msg *event_msg = rte_pktmbuf_mtod(m, dp_event_msg*);
 
-	memcpy(event_msg, &timer_msg, sizeof(dp_event_msg));
+	memcpy(event_msg, &flow_aging_msg, sizeof(dp_event_msg));
 
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->monitoring_rx_queue, m);
 	if (ret < 0)
@@ -79,7 +79,7 @@ int dp_send_event_timer_msg()
 	return 0;
 }
 
-void dp_process_event_timer_msg(struct rte_mbuf *m)
+void dp_process_event_flow_aging_msg(struct rte_mbuf *m)
 {
 	if (dp_conf_is_offload_enabled()) {
 		dp_process_aged_flows(dp_port_get_pf0_id());

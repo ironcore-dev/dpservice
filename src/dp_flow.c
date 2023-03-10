@@ -266,13 +266,11 @@ void dp_process_aged_flows_non_offload(void)
 	struct flow_value *flow_val = NULL;
 	const void *next_key;
 	uint32_t iter = 0;
-	uint64_t cur;
+	uint64_t current_timestamp = rte_rdtsc();
+	uint64_t timer_hz = rte_get_timer_hz();
 
-	cur = rte_rdtsc();
-	/* iterate through the hash table */
-	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
-						    (void **)&flow_val, &iter) >= 0) {
-		if (unlikely((cur - flow_val->timestamp) > dp_get_rte_timer_resolution() * flow_val->timeout_value)) {
+	while (rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter) >= 0) {
+		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value)) {
 			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
 		}

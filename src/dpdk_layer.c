@@ -194,7 +194,7 @@ static int main_core_loop(void)
 {
 	uint64_t cur_tsc;
 	uint64_t prev_tsc = 0;
-	uint64_t periodicity = dp_get_timer_manage_interval();
+	uint64_t periodicity = dp_timers_get_manage_interval();
 	int ret = DP_OK;
 	struct rte_graph_cluster_stats *stats = NULL;
 
@@ -214,7 +214,8 @@ static int main_core_loop(void)
 			}
 			prev_tsc = cur_tsc;
 		}
-
+		// TODO maybe create ta timer for stats instead
+		// (and then call dp_timers_manage() instead of all of this?
 		if (stats) {
 			print_stats(stats);
 			sleep(STATS_SLEEP);

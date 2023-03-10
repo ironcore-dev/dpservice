@@ -3,20 +3,15 @@
 
 #include <stdint.h>
 #include <rte_mbuf.h>
-#include <net/if.h>
-#include "dp_util.h"
-
-#include "dp_event.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
 typedef enum {
 	DP_STATUS_TYPE_UNKNOWN,
 	DP_STATUS_TYPE_LINK,
-	DP_STATUS_TYPE_TIMER,
+	DP_STATUS_TYPE_FLOW_AGING,
 } dp_status_type;
 
 typedef enum {
