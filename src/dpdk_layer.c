@@ -26,7 +26,7 @@
 #include "dp_port.h"
 #include "dp_error.h"
 #include "dp_log.h"
-#include "dp_timer.h"
+#include "dp_timers.h"
 
 #define STATS_SLEEP 1
 
@@ -69,10 +69,6 @@ static struct underlay_conf gen_conf = {
 };
 
 
-
-
-
-
 static inline int ring_init(const char *name, struct rte_ring **p_ring)
 {
 	*p_ring = rte_ring_create(name, DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
@@ -111,7 +107,7 @@ static int dp_dpdk_layer_init_unsafe()
 		|| DP_FAILED(ring_init("monitoring_rx_queue", &dp_layer.monitoring_rx_queue)))
 		return DP_ERROR;
 
-	if (DP_FAILED(timers_init()))
+	if (DP_FAILED(dp_timers_init()))
 		return DP_ERROR;
 
 	force_quit = false;
@@ -133,7 +129,7 @@ int dp_dpdk_layer_init()
 void dp_dpdk_layer_free(void)
 {
 	// all functions are safe to call before init
-	timers_free();
+	dp_timers_free();
 	ring_free(dp_layer.monitoring_rx_queue);
 	ring_free(dp_layer.periodic_msg_queue);
 	ring_free(dp_layer.grpc_rx_queue);
@@ -198,6 +194,7 @@ static int main_core_loop(void)
 {
 	uint64_t cur_tsc;
 	uint64_t prev_tsc = 0;
+	uint64_t periodicity = dp_get_timer_manage_interval();
 	int ret = DP_OK;
 	struct rte_graph_cluster_stats *stats = NULL;
 
@@ -209,7 +206,7 @@ static int main_core_loop(void)
 
 	while (!force_quit) {
 		cur_tsc = rte_get_timer_cycles();
-		if ((cur_tsc - prev_tsc) > dp_get_timer_manage_interval()) {
+		if ((cur_tsc - prev_tsc) > periodicity) {
 			ret = rte_timer_manage();
 			if (DP_FAILED(ret)) {
 				DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));

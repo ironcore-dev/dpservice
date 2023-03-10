@@ -10,7 +10,7 @@
 #include "dp_util.h"
 #include "node_api.h"
 #include "rte_flow/dp_rte_flow.h"
-#include "dp_timer.h"
+#include "dp_timers.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
 
@@ -272,7 +272,7 @@ void dp_process_aged_flows_non_offload(void)
 	/* iterate through the hash table */
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
 						    (void **)&flow_val, &iter) >= 0) {
-		if (unlikely((cur - flow_val->timestamp) > dp_get_rte_timer_resolution() * TIMER_MESSAGE_INTERVAL * flow_val->timeout_value)) {
+		if (unlikely((cur - flow_val->timestamp) > dp_get_rte_timer_resolution() * flow_val->timeout_value)) {
 			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
 		}

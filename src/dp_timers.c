@@ -1,5 +1,5 @@
 #include <unistd.h>
-#include "dp_timer.h"
+#include "dp_timers.h"
 #include "monitoring/dp_event.h"
 #include "dp_log.h"
 #include "dp_periodic_msg.h"
@@ -35,7 +35,7 @@ uint64_t dp_get_timer_manage_interval()
 	return dp_timer_manage_interval;
 }
 
-int timers_init()
+int dp_timers_init()
 {
 	int ret;
 	unsigned int lcore_id;
@@ -79,7 +79,7 @@ int timers_init()
 	return DP_OK;
 }
 
-void timers_free()
+void dp_timers_free()
 {
 	rte_timer_subsystem_finalize();
 }

@@ -7,7 +7,7 @@
 #include "dpdk_layer.h"
 #include "node_api.h"
 #include "dp_refcount.h"
-#include "dp_timer.h"
+#include "dp_timers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,12 +16,12 @@ extern "C" {
 #define FLOW_MAX				(1*1024*1024UL)
 
 #ifdef ENABLE_PYTEST
-	#define DP_FLOW_DEFAULT_TIMEOUT	(5 / TIMER_MESSAGE_INTERVAL)  /* In seconds */
+	#define DP_FLOW_DEFAULT_TIMEOUT	5  /* In seconds */
 #else
-	#define DP_FLOW_DEFAULT_TIMEOUT	(30 / TIMER_MESSAGE_INTERVAL)  /* In seconds */
+	#define DP_FLOW_DEFAULT_TIMEOUT	30  /* In seconds */
 #endif
 
-#define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24 / TIMER_MESSAGE_INTERVAL)
+#define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)
 
 
 enum {
@@ -55,7 +55,7 @@ enum {
 	DP_FLOW_ACTION_DROP,
 };
 
-enum DP_FLOW_TCP_STATE{
+enum dp_flow_tcp_state {
 	DP_FLOW_TCP_STATE_NONE,
 	DP_FLOW_TCP_STATE_NEW_SYN,
 	DP_FLOW_TCP_STATE_NEW_SYNACK,
@@ -99,7 +99,7 @@ struct flow_value {
 	uint8_t			action[DP_FLOW_DIR_MAX];
 	struct dp_ref	ref_count;
 	union {
-		enum DP_FLOW_TCP_STATE		tcp_state;
+		enum dp_flow_tcp_state		tcp_state;
 	} l4_state;
 };
 

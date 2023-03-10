@@ -9,4 +9,4 @@ install_headers('dp_service.h', 'node_api.h', 'dp_port.h', 'dpdk_layer.h', 'dp_n
 				'nodes/snat_node.h', 'nodes/geneve_tunnel_node.h', 'nodes/packet_relay_node.h','dp_util.h', 'dp_error.h',
 				'grpc/dp_grpc_service.h', 'dp_flow.h', 'dp_refcount.h', 'grpc/dp_async_grpc.h',
 				'grpc/dp_grpc_impl.h', 'dp_netlink.h','rte_flow/dp_rte_flow.h','rte_flow/dp_rte_flow_init.h','rte_flow/dp_rte_flow_traffic_forward.h',
-				'monitoring/dp_monitoring.h','monitoring/dp_event.h', 'dp_timer.h')
+				'monitoring/dp_monitoring.h','monitoring/dp_event.h', 'dp_timers.h')

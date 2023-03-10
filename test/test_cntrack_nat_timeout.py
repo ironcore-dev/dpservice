@@ -149,7 +149,7 @@ def request_tcp(l4_port, flags, pf_name, payload=None):
 		assert pkt[TCP].flags == "FA", \
 			"No FINACK from server"
 		reply_seq = pkt.seq;
-		
+
 		# send ACK
 		tcp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
 			   IP(dst=public_server_ip, src=vf0_ip) /
