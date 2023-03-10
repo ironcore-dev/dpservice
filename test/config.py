@@ -42,6 +42,8 @@ mc_mac = "33:33:00:00:00:01"
 back_ip1 = "2a10:abc0:d015:4027:0:c8::"
 back_ip2 = "2a10:abc0:d015:4027:0:7b::"
 public_ip = "45.86.6.6"
+public_server_ip = public_ip
+public_server_port = 443
 
 ov_target_ip = "192.168.129.5"
 ov_target_pfx = "192.168.129.0"
@@ -51,6 +53,11 @@ nat_local_min_port = 100
 nat_local_max_port = 102
 nat_neigh_min_port = 500
 nat_neigh_max_port = 520
+
+nat_local_single_min_port = 100
+nat_local_single_max_port = 101
+
+
 nat_neigh_ul_dst="2a10:afc0:e01f:f406:0:64::"
 pfx_ip = "174.23.4.0"
 lb_name = "my_lb"

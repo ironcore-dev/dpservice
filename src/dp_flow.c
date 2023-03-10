@@ -10,9 +10,9 @@
 #include "dp_util.h"
 #include "node_api.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_timers.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
-static uint64_t timeout = 0;
 
 int dp_flow_init(int socket_id)
 {
@@ -20,8 +20,6 @@ int dp_flow_init(int socket_id)
 										  "ipv4_flow_table", socket_id);
 	if (!ipv4_flow_tbl)
 		return DP_ERROR;
-
-	timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT;
 
 	return DP_OK;
 }
@@ -207,6 +205,7 @@ void dp_free_flow(struct dp_ref *ref)
 	dp_free_network_nat_port(cntrack);
 	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
+
 	rte_free(cntrack);
 }
 
@@ -273,7 +272,7 @@ void dp_process_aged_flows_non_offload(void)
 	/* iterate through the hash table */
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
 						    (void **)&flow_val, &iter) >= 0) {
-		if (unlikely((cur - flow_val->timestamp) > timeout)) {
+		if (unlikely((cur - flow_val->timestamp) > dp_get_rte_timer_resolution() * flow_val->timeout_value)) {
 			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
 		}
