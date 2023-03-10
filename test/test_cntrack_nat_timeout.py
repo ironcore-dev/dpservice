@@ -61,6 +61,20 @@ def reply_tcp(pf_name):
 	if pkt[TCP].flags == "S":
 		flags += "S"
 
+	# FIN -> FINACK (ACK done above already)
+	if "F" in pkt[TCP].flags:
+		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+					 IPv6(dst=nat_ipv6_src, src=pkt[IPv6].dst, nh=4) /
+					 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+					 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags="FA", ack=pkt[TCP].seq+1))
+		delayed_sendp(reply_pkt, pf_name)
+		# Await ACK
+		pkt = get_server_packet(pf_name)
+		assert pkt[TCP].flags == "A", \
+			"Expected an final ACK for fin packet"
+		return
+
+
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=nat_ipv6_src, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
@@ -72,20 +86,6 @@ def reply_tcp(pf_name):
 	if flags != "A":
 		tcp_receiver_seq += 1
 
-	# FIN -> ACK+FINACK (ACK done above already)
-	if "F" in pkt[TCP].flags:
-		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-					 IPv6(dst=nat_ipv6_src, src=pkt[IPv6].dst, nh=4) /
-					 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
-					 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags="FA", ack=pkt[TCP].seq+1))
-		delayed_sendp(reply_pkt, pf_name)
-
-		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-					 IPv6(dst=nat_ipv6_src, src=pkt[IPv6].dst, nh=4) /
-					 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
-					 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=tcp_receiver_seq, flags="F", ack=pkt[TCP].seq+1))
-		delayed_sendp(reply_pkt, pf_name)
-		return
 
 	# Application-level reply
 	if pkt[TCP].payload != None and len(pkt[TCP].payload) > 0:
@@ -135,6 +135,7 @@ def request_tcp(l4_port, flags, pf_name, payload=None):
 		tcp_pkt /= Raw(payload)
 	delayed_sendp(tcp_pkt, vf0_tap)
 
+
 	# No reaction to ACK
 	if flags == "A":
 		return
@@ -142,26 +143,26 @@ def request_tcp(l4_port, flags, pf_name, payload=None):
 	# React to the packet
 	tcp_sender_seq += 1 if payload is None else len(payload)
 
+	# check server's FINACK
+	if "FA" in flags:
+		pkt = get_client_packet(l4_port)
+		assert pkt[TCP].flags == "FA", \
+			"No FINACK from server"
+		reply_seq = pkt.seq;
+		
+		# send ACK
+		tcp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
+			   IP(dst=public_server_ip, src=vf0_ip) /
+			   TCP(dport=public_server_port, sport=l4_port, flags="A", ack=reply_seq))
+		delayed_sendp(tcp_pkt, vf0_tap)
+		return
+
+
 	pkt = get_client_packet(l4_port)
 	reply_seq = pkt.seq;
 
 	assert "A" in pkt[TCP].flags, \
 		"No ACK from server"
-
-	# FIN_WAIT
-	if "F" in flags:
-		pkt = get_client_packet(l4_port)
-		assert pkt[TCP].flags == "FA", \
-			"No FINACK from server"
-
-		pkt = get_client_packet(l4_port)
-		assert pkt[TCP].flags == "F", \
-			"No FIN init from server"
-		if "F" in pkt[TCP].flags:
-			tcp_pkt = (Ether(dst=pf0_mac, src=vf0_mac, type=0x0800) /
-					IP(dst=public_server_ip, src=vf0_ip) /
-					TCP(dport=public_server_port, sport=l4_port, seq=tcp_sender_seq, flags="FA", options=[("NOP", None)]))
-			delayed_sendp(tcp_pkt, vf0_tap)
 
 	# When sending payload, ACK is first, then separate reply
 	if payload is None:
@@ -188,8 +189,9 @@ def communicate_tcp(port, pf_name):
 	tcp_reset()
 	# 3-way handshake
 	request_tcp(port, "S", pf_name)
+	request_tcp(port, "", pf_name, payload=TCP_NORMAL_REQUEST)
 	# close connection
-	request_tcp(port, "F", pf_name)
+	request_tcp(port, "FA", pf_name)
 
 def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client):
 	global nat_ipv6_src

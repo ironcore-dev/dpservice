@@ -44,8 +44,8 @@ enum {
 
 #define DP_TCP_PKT_FLAG_ACK(flag) ((flag) & RTE_TCP_ACK_FLAG)
 
-#define DP_TCP_PKT_FLAG_FINACK(flag) \
-	(((flag) & (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG))
+#define DP_TCP_PKT_FLAG_FIN(flag) ((flag) & RTE_TCP_FIN_FLAG) 
+
 
 
 

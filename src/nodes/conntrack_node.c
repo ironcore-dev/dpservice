@@ -59,11 +59,11 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		// this is not entirely 1:1 mapping to fin sequence, but sufficient to determine if a tcp conn is almost
 		// successful closed (last ack is in pending).
 		case DP_FLOW_TCP_STATE_ESTABLISHED:
-			if (DP_TCP_PKT_FLAG_FINACK(tcp_hdr->tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINACK;
+			if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
+				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
 			break;
-		case DP_FLOW_TCP_STATE_FINACK:
-			if (DP_TCP_PKT_FLAG_FINACK(tcp_hdr->tcp_flags))
+		case DP_FLOW_TCP_STATE_FINWAIT:
+			if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 			break;
 		}
