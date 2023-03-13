@@ -43,32 +43,33 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
 {
+	uint8_t tcp_flags = tcp_hdr->tcp_flags;
 
-	if (DP_TCP_PKT_FLAG_RST(tcp_hdr->tcp_flags)) {
+	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else {
 		switch (flow_val->l4_state.tcp_state) {
 		case DP_FLOW_TCP_STATE_NONE:
 		case DP_FLOW_TCP_STATE_RST_FIN:
-			if (DP_TCP_PKT_FLAG_SYN(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
-			if (DP_TCP_PKT_FLAG_SYNACK(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
-			if (DP_TCP_PKT_FLAG_ACK(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
 		// this is not entirely 1:1 mapping to fin sequence, but sufficient to determine if a tcp conn is almost
 		// successful closed (last ack is in pending).
 		case DP_FLOW_TCP_STATE_ESTABLISHED:
-			if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_FIN(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
 			break;
 		case DP_FLOW_TCP_STATE_FINWAIT:
-			if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_FIN(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 			break;
 		}

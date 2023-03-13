@@ -40,6 +40,9 @@ static struct dp_virtsvc *dp_virtservices_end;
 
 static uint64_t port_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 static uint64_t established_port_timeout = DP_FLOW_TCP_EXTENDED_TIMEOUT;
+#ifdef ENABLE_PYTEST
+static bool fast_timeout = false;
+#endif
 
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv4_tree = NULL;
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv6_tree = NULL;
@@ -179,6 +182,7 @@ int dp_virtsvc_init(int socket_id)
 
 #ifdef ENABLE_PYTEST
 	port_timeout = dp_conf_get_flow_timeout();
+	fast_timeout = port_timeout != DP_FLOW_DEFAULT_TIMEOUT;
 #endif
 	port_timeout *= rte_get_timer_hz();
 	established_port_timeout *= rte_get_timer_hz();
@@ -237,6 +241,12 @@ static __rte_always_inline bool dp_virtsvc_is_connection_old(struct dp_virtsvc_c
 static __rte_always_inline int dp_virtsvc_get_free_port(struct dp_virtsvc *virtsvc)
 {
 	uint64_t current_tsc = rte_get_timer_cycles();
+
+#ifdef ENABLE_PYTEST
+	// flow timeout is being tested, try to revisit already used ports
+	if (fast_timeout)
+		virtsvc->last_assigned_port = 0;
+#endif
 
 	for (int port = virtsvc->last_assigned_port+1; port < DP_VIRTSVC_PORTCOUNT; ++port)
 		if (dp_virtsvc_is_connection_old(&virtsvc->connections[port], current_tsc))

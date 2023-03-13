@@ -93,7 +93,6 @@ grpc_port = 1337
 
 # Extra testing options
 flow_timeout = 1
-# TODO sampling rate separate?
 
 
 class PFSpec:

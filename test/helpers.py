@@ -119,5 +119,6 @@ def sniff_packet(iface, lfilter, skip=0):
 	return pkt
 
 def age_out_flows():
-	print("Waiting for flows to age-out...")
-	time.sleep(2*flow_timeout)
+	delay = flow_timeout+1  # timers run every 1s, this should always work
+	print(f"Waiting {delay}s for flows to age-out...")
+	time.sleep(delay)

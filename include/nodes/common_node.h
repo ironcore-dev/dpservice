@@ -33,22 +33,6 @@ enum {
 
 #define DP_GRAPH_NO_SPECULATED_NODE -1
 
-
-//tcp hdr flag check
-#define DP_TCP_PKT_FLAG_SYN(flag) ((flag) & RTE_TCP_SYN_FLAG)
-
-#define DP_TCP_PKT_FLAG_RST(flag) ((flag) & RTE_TCP_RST_FLAG)
-
-#define DP_TCP_PKT_FLAG_SYNACK(flag) \
-	(((flag) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
-
-#define DP_TCP_PKT_FLAG_ACK(flag) ((flag) & RTE_TCP_ACK_FLAG)
-
-#define DP_TCP_PKT_FLAG_FIN(flag) ((flag) & RTE_TCP_FIN_FLAG)
-
-
-
-
 static __rte_always_inline
 void dp_foreach_graph_packet(struct rte_graph *graph,
 							 struct rte_node *node,

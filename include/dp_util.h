@@ -30,6 +30,13 @@ extern "C" {
 
 #define DP_TCP_HDR_LEN(TCP_HDR) (((TCP_HDR)->data_off & 0xf0) >> 2)
 
+#define DP_TCP_PKT_FLAG_SYN(FLAGS) ((FLAGS) & RTE_TCP_SYN_FLAG)
+#define DP_TCP_PKT_FLAG_RST(FLAGS) ((FLAGS) & RTE_TCP_RST_FLAG)
+#define DP_TCP_PKT_FLAG_ACK(FLAGS) ((FLAGS) & RTE_TCP_ACK_FLAG)
+#define DP_TCP_PKT_FLAG_FIN(FLAGS) ((FLAGS) & RTE_TCP_FIN_FLAG)
+#define DP_TCP_PKT_FLAG_SYNACK(FLAGS) \
+	(((FLAGS) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
+
 static inline bool dp_is_mellanox_opt_set()
 {
 	return dp_conf_get_eal_a_pf0()[0] != '\0'

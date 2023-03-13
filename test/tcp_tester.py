@@ -170,3 +170,8 @@ class TCPTester:
 		self.reset()
 		self.request_tcp("S")
 		self.request_tcp("", payload=TCPTester.TCP_RESET_REQUEST)
+
+	# Helper function to create a dangling connection
+	def leave_open(self):
+		self.reset()
+		self.request_tcp("S")
