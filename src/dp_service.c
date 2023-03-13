@@ -144,7 +144,7 @@ static void free_interfaces()
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_free();
 #endif
-	// TODO(plague): free graph once that code is refactored
+	dp_graph_free();
 	dp_ports_free();
 }
 
