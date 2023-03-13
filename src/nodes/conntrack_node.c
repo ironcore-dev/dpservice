@@ -21,6 +21,7 @@ static struct flow_key first_key = {0};
 static struct flow_key second_key = {0};
 static struct flow_key *prev_key, *curr_key;
 static struct flow_value *prev_flow_val = NULL;
+static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -33,38 +34,44 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 	prev_key = NULL;
 	curr_key = &first_key;
 
+#ifdef ENABLE_PYTEST
+	flow_timeout = dp_conf_get_flow_timeout();
+#endif
+
 	return 0;
 }
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
 {
+	uint8_t tcp_flags = tcp_hdr->tcp_flags;
 
-	if (DP_TCP_PKT_FLAG_RST(tcp_hdr->tcp_flags)) {
+	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+	} else if (DP_TCP_PKT_FLAG_FIN(tcp_flags)) {
+		// this is not entirely 1:1 mapping to fin sequence,
+		// but sufficient to determine if a tcp connection is almost successfuly closed
+		// (last ack is still pending)
+		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
+			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
+		else
+			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else {
 		switch (flow_val->l4_state.tcp_state) {
 		case DP_FLOW_TCP_STATE_NONE:
 		case DP_FLOW_TCP_STATE_RST_FIN:
-			if (DP_TCP_PKT_FLAG_SYN(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
-			if (DP_TCP_PKT_FLAG_SYNACK(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
-			if (DP_TCP_PKT_FLAG_ACK(tcp_hdr->tcp_flags))
+			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
-		// this is not entirely 1:1 mapping to fin sequence, but sufficient to determine if a tcp conn is almost
-		// successful closed (last ack is in pending).
-		case DP_FLOW_TCP_STATE_ESTABLISHED:
-			if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
-			break;
-		case DP_FLOW_TCP_STATE_FINWAIT:
-			if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+		default:
+			// FIN-states already handled above
 			break;
 		}
 
@@ -77,7 +84,7 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 	else if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN)
-		flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
+		flow_val->timeout_value = flow_timeout;
 
 }
 
@@ -97,7 +104,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
-	flow_val->timeout_value = DP_FLOW_DEFAULT_TIMEOUT;
+	flow_val->timeout_value = flow_timeout;
 
 	if (df_ptr->l4_type == IPPROTO_TCP)
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NONE;

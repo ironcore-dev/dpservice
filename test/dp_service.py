@@ -11,7 +11,7 @@ from helpers import interface_up
 
 class DpService:
 
-	def __init__(self, build_path, tun_opt, port_redundancy, gdb=False, test_virtsvc=False):
+	def __init__(self, build_path, tun_opt, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 
@@ -37,9 +37,11 @@ class DpService:
 					f' --nic-type=tap --overlay-type={tun_opt}')
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-fraction=0.5'
+		if fast_flow_timeout:
+			self.cmd += f' --flow-timeout={flow_timeout}'
 		if test_virtsvc:
 			self.cmd += (f' --udp-virtsvc="{virtsvc_udp_virtual_ip},{virtsvc_udp_virtual_port},{virtsvc_udp_svc_ipv6},{virtsvc_udp_svc_port}"'
-						f' --tcp-virtsvc="{virtsvc_tcp_virtual_ip},{virtsvc_tcp_virtual_port},{virtsvc_tcp_svc_ipv6},{virtsvc_tcp_svc_port}"')
+						 f' --tcp-virtsvc="{virtsvc_tcp_virtual_ip},{virtsvc_tcp_virtual_port},{virtsvc_tcp_svc_ipv6},{virtsvc_tcp_svc_port}"')
 
 	def get_cmd(self):
 		return self.cmd
@@ -91,13 +93,14 @@ if __name__ == '__main__':
 	parser.add_argument("--build-path", action="store", default=f"{script_path}/../build", help="Path to the root build directory")
 	parser.add_argument("--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Underlay tunnel type")
 	parser.add_argument("--port-redundancy", action="store_true", help="Set up two physical ports")
+	parser.add_argument("--fast-flow-timeout", action="store_true", help="Test with fast flow timeout value")
 	parser.add_argument("--virtsvc", action="store_true", help="Enable virtual service tests")
 	parser.add_argument("--no-init", action="store_true", help="Do not set interfaces up automatically")
 	parser.add_argument("--init-only", action="store_true", help="Only init interfaces of a running service")
 	parser.add_argument("--gdb", action="store_true", help="Run service under gdb")
 	args = parser.parse_args()
 
-	dp_service = DpService(args.build_path, args.tun_opt, args.port_redundancy, args.gdb, test_virtsvc=args.virtsvc)
+	dp_service = DpService(args.build_path, args.tun_opt, args.port_redundancy, args.fast_flow_timeout, gdb=args.gdb, test_virtsvc=args.virtsvc)
 
 	if args.init_only:
 		dp_service.init_ifaces(GrpcClient(args.build_path))

@@ -19,6 +19,9 @@ def pytest_addoption(parser):
 		"--port-redundancy", action="store_true", help="Test with port redundancy"
 	)
 	parser.addoption(
+		"--fast-flow-timeout", action="store_true", help="Test with fast flow timeout"
+	)
+	parser.addoption(
 		"--virtsvc", action="store_true", help="Include virtual services tests"
 	)
 	parser.addoption(
@@ -38,16 +41,20 @@ def port_redundancy(request):
 	return request.config.getoption("--port-redundancy")
 
 @pytest.fixture(scope="package")
+def fast_flow_timeout(request):
+	return request.config.getoption("--fast-flow-timeout")
+
+@pytest.fixture(scope="package")
 def grpc_client(build_path):
 	return GrpcClient(build_path)
 
 
 # All tests require dp_service to be running
 @pytest.fixture(scope="package")
-def dp_service(request, build_path, tun_opt, port_redundancy):
+def dp_service(request, build_path, tun_opt, port_redundancy, fast_flow_timeout):
 
 	test_virtsvc = request.config.getoption("--virtsvc")
-	dp_service = DpService(build_path, tun_opt, port_redundancy, test_virtsvc=test_virtsvc)
+	dp_service = DpService(build_path, tun_opt, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc)
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")

@@ -1,4 +1,6 @@
 #include "monitoring/dp_monitoring.h"
+#include "dp_log.h"
+#include "monitoring/dp_event.h"
 
 
 void dp_process_event_msg(struct rte_mbuf *m)
@@ -9,11 +11,11 @@ void dp_process_event_msg(struct rte_mbuf *m)
 	case DP_STATUS_TYPE_LINK:
 		dp_process_event_link_msg(m);
 		break;
-	case DP_STATUS_TYPE_TIMER:
-		dp_process_event_timer_msg(m);
+	case DP_STATUS_TYPE_FLOW_AGING:
+		dp_process_event_flow_aging_msg(m);
 		break;
 	default:
-			printf("Unknown dp status msg type \n");
+		DPS_LOG_WARNING("Unknown monitoring status message type %d", event_msg->msg_head.type);
 	}
 
 	rte_pktmbuf_free(m);

@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 
 #include "dp_error.h"
+#include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_util.h"
 #include "dp_version.h"
@@ -303,6 +304,10 @@ static int parse_opt(int opt, const char *arg)
 		return opt_str_to_enum((int *)&color, arg, color_choices, RTE_DIM(color_choices));
 	case OPT_GRPC_PORT:
 		return opt_str_to_int(&grpc_port, arg, 1024, 65535);
+#ifdef ENABLE_PYTEST
+	case OPT_FLOW_TIMEOUT:
+		return opt_str_to_int((int *)&flow_timeout, arg, 1, 300);
+#endif
 	default:
 		DP_EARLY_ERR("Unimplemented option %d", opt);
 		return DP_ERROR;

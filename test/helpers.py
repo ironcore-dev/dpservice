@@ -117,3 +117,8 @@ def sniff_packet(iface, lfilter, skip=0):
 	pkt = pkt_list[skip]
 	validate_checksums(pkt)
 	return pkt
+
+def age_out_flows():
+	delay = flow_timeout+1  # timers run every 1s, this should always work
+	print(f"Waiting {delay}s for flows to age-out...")
+	time.sleep(delay)

@@ -142,5 +142,14 @@
     "var": "grpc_port",
     "type": "int",
     "default": 1337
+  },
+  {
+    "lgopt": "flow-timeout",
+    "arg": "SECONDS",
+    "help": "inactive flow timeout (except TCP established flows)",
+    "var": "flow_timeout",
+    "type": "int",
+    "default": "DP_FLOW_DEFAULT_TIMEOUT",
+    "ifdef": "ENABLE_PYTEST"
   }
 ]

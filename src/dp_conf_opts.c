@@ -33,6 +33,9 @@ _OPT_SHOPT_MAX = 255,
 #endif
 	OPT_COLOR,
 	OPT_GRPC_PORT,
+#ifdef ENABLE_PYTEST
+	OPT_FLOW_TIMEOUT,
+#endif
 };
 
 #define OPTSTRING \
@@ -66,6 +69,9 @@ static const struct option longopts[] = {
 #endif
 	{ "color", 1, 0, OPT_COLOR },
 	{ "grpc-port", 1, 0, OPT_GRPC_PORT },
+#ifdef ENABLE_PYTEST
+	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
+#endif
 	{ NULL, }
 };
 
@@ -114,6 +120,9 @@ static void print_help_args(FILE *outfile)
 #endif
 		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
 		"     --grpc-port=PORT                   listen for gRPC clients on this port\n"
+#ifdef ENABLE_PYTEST
+		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
+#endif
 	);
 }
 
@@ -133,6 +142,9 @@ static int graphtrace_level = 0;
 #endif
 static enum dp_conf_color color = DP_CONF_COLOR_NEVER;
 static int grpc_port = 1337;
+#ifdef ENABLE_PYTEST
+static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+#endif
 
 const char *dp_conf_get_pf0_name()
 {
@@ -206,3 +218,10 @@ const int dp_conf_get_grpc_port()
 	return grpc_port;
 }
 
+#ifdef ENABLE_PYTEST
+const int dp_conf_get_flow_timeout()
+{
+	return flow_timeout;
+}
+
+#endif

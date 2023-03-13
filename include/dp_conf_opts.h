@@ -37,3 +37,6 @@ const int dp_conf_get_graphtrace_level();
 #endif
 const enum dp_conf_color dp_conf_get_color();
 const int dp_conf_get_grpc_port();
+#ifdef ENABLE_PYTEST
+const int dp_conf_get_flow_timeout();
+#endif

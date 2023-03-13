@@ -29,6 +29,7 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --graphtrace | LEVEL | verbosity level of packet traversing the graph framework |  |
 | --color | MODE | output colorization mode | 'never' (default), 'always' or 'auto' |
 | --grpc-port | PORT | listen for gRPC clients on this port |  |
+| --flow-timeout | SECONDS | inactive flow timeout (except TCP established flows) |  |
 
 ## Configuration file
 Unless an environment variable `DP_CONF` is set to override the path, `dp_service` uses `/tmp/dp_service.conf` to read configuration before processing any arguments.

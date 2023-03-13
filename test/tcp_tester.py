@@ -165,4 +165,13 @@ class TCPTester:
 		# close connection
 		self.request_tcp("F")
 
-	# TODO RST tester
+	# Helper function to start, send data, and make the server send RST
+	def request_rst(self):
+		self.reset()
+		self.request_tcp("S")
+		self.request_tcp("", payload=TCPTester.TCP_RESET_REQUEST)
+
+	# Helper function to create a dangling connection
+	def leave_open(self):
+		self.reset()
+		self.request_tcp("S")

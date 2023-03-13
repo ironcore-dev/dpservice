@@ -32,22 +32,22 @@ static int virtsvc_node_init(const struct rte_graph *graph, struct rte_node *nod
 
 static __rte_always_inline void virtsvc_tcp_state_change(struct dp_virtsvc_conn *conn, uint8_t tcp_flags)
 {
-	if (tcp_flags & RTE_TCP_RST_FLAG) {
+	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
 		conn->state = DP_VIRTSVC_CONN_TRANSIENT;
-	} else if (tcp_flags & RTE_TCP_FIN_FLAG) {
+	} else if (DP_TCP_PKT_FLAG_FIN(tcp_flags)) {
 		conn->state = DP_VIRTSVC_CONN_TRANSIENT;
 	} else {
 		switch (conn->state) {
 		case DP_VIRTSVC_CONN_TRANSIENT:
-			if (tcp_flags & RTE_TCP_SYN_FLAG)
+			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
 				conn->state = DP_VIRTSVC_CONN_TRANSIENT_SYN;
 			break;
 		case DP_VIRTSVC_CONN_TRANSIENT_SYN:
-			if ((tcp_flags & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
+			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
 				conn->state = DP_VIRTSVC_CONN_TRANSIENT_SYNACK;
 			break;
 		case DP_VIRTSVC_CONN_TRANSIENT_SYNACK:
-			if (tcp_flags & RTE_TCP_ACK_FLAG)
+			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
 				conn->state = DP_VIRTSVC_CONN_ESTABLISHED;
 			break;
 		case DP_VIRTSVC_CONN_ESTABLISHED:
