@@ -72,9 +72,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!df_ptr->flags.flow_type)
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
-	if (dp_conf_is_offload_enabled())
-		df_ptr->flags.valid = 1;
-
 	return IPV6_LOOKUP_NEXT_L2_DECAP;
 }
 

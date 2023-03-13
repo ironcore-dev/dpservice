@@ -81,7 +81,9 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 				DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
 			// since this is done in burst, just send out a bad packet..
 		}
-		if (df->flags.valid && df->conntrack)
+
+		// tao: make this offload flag as a compilation variable to avoid this function call
+		if (dp_conf_is_offload_enabled() && df->conntrack)
 			dp_handle_traffic_forward_offloading(pkt, df);
 	}
 
