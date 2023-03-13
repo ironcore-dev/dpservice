@@ -117,3 +117,7 @@ def sniff_packet(iface, lfilter, skip=0):
 	pkt = pkt_list[skip]
 	validate_checksums(pkt)
 	return pkt
+
+def age_out_flows():
+	print("Waiting for flows to age-out...")
+	time.sleep(2*flow_timeout)

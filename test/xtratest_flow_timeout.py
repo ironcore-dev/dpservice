@@ -22,7 +22,7 @@ def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client, fast_flow_t
 	if not fast_flow_timeout:
 		pytest.skip("Fast flow timeout needs to be enabled")
 
-	# only allow one port for this test, so the next call would normally fail (NAT runs out of free ports)
+	# Only allow one port for this test, so the next call would normally fail (NAT runs out of free ports)
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_min_port+1)
 
 	tester = TCPTester(client_vm=VM1, client_port=12344, client_ul_ipv6=nat_ul_ipv6, pf_name=PF0.tap,
@@ -30,13 +30,15 @@ def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client, fast_flow_t
 					   server_pkt_check=tcp_server_nat_pkt_check)
 	tester.communicate()
 
-	print("Waiting for flows to age-out...")
-	time.sleep(2*flow_timeout)
+	age_out_flows()
 
 	# (the only) NAT port should once again be free now
 	tester.client_port = 54321
-	tester.communicate()
+	tester.request_rst()
+
+	# Same test, but after RST, not FIN-FINACK
+	age_out_flows()
+	tester.client_port = 54320
+	tester.request_rst()
 
 	grpc_client.delnat(VM1.name)
-
-# TODO maybe another one for reset (only when this is separate from the rest of the tests)
