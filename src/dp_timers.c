@@ -54,7 +54,6 @@ int dp_timers_init()
 	int flow_aging_interval = TIMER_FLOW_AGING_INTERVAL;
 
 #ifdef ENABLE_PYTEST
-	// TODO test this, should to make the timeout smaller for fast test anyway
 	if (flow_aging_interval > dp_conf_get_flow_timeout())
 		flow_aging_interval = dp_conf_get_flow_timeout();
 #endif

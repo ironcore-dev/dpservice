@@ -47,6 +47,14 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 
 	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+	} else if (DP_TCP_PKT_FLAG_FIN(tcp_flags)) {
+		// this is not entirely 1:1 mapping to fin sequence,
+		// but sufficient to determine if a tcp connection is almost successfuly closed
+		// (last ack is still pending)
+		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
+			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
+		else
+			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else {
 		switch (flow_val->l4_state.tcp_state) {
 		case DP_FLOW_TCP_STATE_NONE:
@@ -62,15 +70,8 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
-		// this is not entirely 1:1 mapping to fin sequence, but sufficient to determine if a tcp conn is almost
-		// successful closed (last ack is in pending).
-		case DP_FLOW_TCP_STATE_ESTABLISHED:
-			if (DP_TCP_PKT_FLAG_FIN(tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
-			break;
-		case DP_FLOW_TCP_STATE_FINWAIT:
-			if (DP_TCP_PKT_FLAG_FIN(tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+		default:
+			// FIN-states already handled above
 			break;
 		}
 

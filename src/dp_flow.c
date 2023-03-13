@@ -270,6 +270,8 @@ void dp_process_aged_flows_non_offload(void)
 	uint64_t timer_hz = rte_get_timer_hz();
 
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter) >= 0) {
+		// NOTE: possible optimization in moving a runtime constant 'timer_hz *' into 'timeout_value' directly
+		// But it would require enlarging the flow_val member, thus this needs performance analysis first
 		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value)) {
 			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
