@@ -6,6 +6,7 @@
 
 #include "dp_conf.h"
 #include "dp_error.h"
+#include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_multi_path.h"
 #include "dp_util.h"
@@ -37,8 +38,8 @@ static struct dp_virtsvc *dp_virtservices_end;
 		 (VARNAME) < dp_virtservices_end; \
 		 ++VARNAME)
 
-static uint64_t port_timeout = 30;
-static uint64_t established_port_timeout = 86400;
+static uint64_t port_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+static uint64_t established_port_timeout = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv4_tree = NULL;
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv6_tree = NULL;
@@ -176,6 +177,9 @@ int dp_virtsvc_init(int socket_id)
 		return DP_ERROR;
 	}
 
+#ifdef ENABLE_PYTEST
+	port_timeout = dp_conf_get_flow_timeout();
+#endif
 	port_timeout *= rte_get_timer_hz();
 	established_port_timeout *= rte_get_timer_hz();
 

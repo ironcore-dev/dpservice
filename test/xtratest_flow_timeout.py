@@ -1,3 +1,5 @@
+import pytest
+
 from config import *
 from helpers import *
 from tcp_tester import TCPTester
@@ -15,7 +17,10 @@ def tcp_server_nat_pkt_check(pkt):
 	assert pkt[TCP].sport == nat_local_min_port, \
 		"Failed to use NAT's only single port"
 
-def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client):
+def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client, fast_flow_timeout):
+
+	if not fast_flow_timeout:
+		pytest.skip("Fast flow timeout needs to be enabled")
 
 	# only allow one port for this test, so the next call would normally fail (NAT runs out of free ports)
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_min_port+1)
@@ -26,7 +31,7 @@ def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client):
 	tester.communicate()
 
 	print("Waiting for flows to age-out...")
-	time.sleep(10)  # TODO rework the pytest compilation to include acmdline/env variable for seconds and use it here
+	time.sleep(2*flow_timeout)
 
 	# (the only) NAT port should once again be free now
 	tester.client_port = 54321

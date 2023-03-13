@@ -11,6 +11,8 @@ foreach py : redundancy_enabled_py
   redundancy_tests += join_paths(pytest_dir, py)
 endforeach
 
+flow_timeout_test = join_paths(pytest_dir, 'xtratest_flow_timeout.py')
+
 # Geneve currently not supported
 #tunnels = [ 'ipip', 'geneve' ]
 tunnels = [ 'ipip' ]
@@ -19,4 +21,6 @@ foreach tunnel : tunnels
     args: [ common_args, '--tun-opt='+tunnel, pytest_dir ])
   test('Port redundancy', pytest, suite: tunnel, is_parallel: false, timeout: 15,
     args: [ common_args, '--tun-opt='+tunnel, '--port-redundancy', redundancy_tests ])
+  test('Flow timeout', pytest, suite: tunnel, is_parallel: false, timeout: 30,
+	args: [ common_args, '--tun-opt='+tunnel, '--fast-flow-timeout', flow_timeout_test ])
 endforeach

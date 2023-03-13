@@ -13,15 +13,10 @@
 extern "C" {
 #endif
 
-#define FLOW_MAX				(1*1024*1024UL)
+#define FLOW_MAX						(1*1024*1024UL)
 
-#ifdef ENABLE_PYTEST
-	#define DP_FLOW_DEFAULT_TIMEOUT	5  /* In seconds */
-#else
-	#define DP_FLOW_DEFAULT_TIMEOUT	30  /* In seconds */
-#endif
-
-#define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)
+#define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
+#define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
 
 
 enum {

@@ -91,6 +91,11 @@ virtsvc_tcp_virtual_port = 4443
 sniff_timeout = 2
 grpc_port = 1337
 
+# Extra testing options
+flow_timeout = 5
+# TODO sampling rate separate?
+
+
 class PFSpec:
 	_idx = 0
 	@staticmethod
