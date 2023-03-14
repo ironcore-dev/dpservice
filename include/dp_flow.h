@@ -27,7 +27,7 @@ enum {
 
 enum {
 	DP_FLOW_STATE_NEW,
-	DP_FLOW_STATE_REPLIED,
+	DP_FLOW_STATE_ESTABLISHED,
 };
 
 enum {
@@ -97,7 +97,7 @@ struct flow_value {
 	uint16_t		port;
 	uint8_t			lb_dst_addr6[16];
 	uint8_t			action[DP_FLOW_DIR_MAX];
-	enum dp_flow_offload_state		offload_flag;
+	enum dp_flow_offload_state		offload_flags[DP_FLOW_DIR_MAX];
 	struct dp_ref	ref_count;
 	union {
 		enum dp_flow_tcp_state		tcp_state;

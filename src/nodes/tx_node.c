@@ -82,8 +82,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			// since this is done in burst, just send out a bad packet..
 		}
 
-		// tao: make this offload flag as a compilation variable to avoid this function call
-		if (df->conntrack && df->conntrack->offload_flag == DP_FLOW_OFFLOAD_INSTALL)
+		if (df->conntrack && df->conntrack->offload_flags[df->conntrack->dir] == DP_FLOW_OFFLOAD_INSTALL)
 			dp_handle_traffic_forward_offloading(pkt, df);
 	}
 
