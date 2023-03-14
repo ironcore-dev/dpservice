@@ -1,7 +1,7 @@
 #ifndef __INCLUDE_DHCPV6_NODE_PRIV_H__
 #define __INCLUDE_DHCPV6_NODE_PRIV_H__
 
-#include "dpdk_layer.h"
+#include <rte_ether.h>
 
 #ifdef __cplusplus
 extern "C" {

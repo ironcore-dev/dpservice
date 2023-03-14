@@ -17,23 +17,19 @@
 static struct rx_periodic_node_main rx_periodic_node;
 static struct rx_periodic_node_receive_queues rx_periodic_node_recv_queues;
 
-int config_rx_periodic_node(struct rx_periodic_node_config *cfg)
-{
-	rx_periodic_node_recv_queues.periodic_msg_queue = cfg->periodic_msg_queue;
-	rx_periodic_node_recv_queues.grpc_tx = cfg->grpc_tx;
-	rx_periodic_node_recv_queues.grpc_rx = cfg->grpc_rx;
-	rx_periodic_node_recv_queues.monitoring_rx = cfg->monitoring_rx;
-	
-	return 0;
-}
-
 static int rx_periodic_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_periodic_node_ctx *ctx = (struct rx_periodic_node_ctx *)node->ctx;
+	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 
 	ctx->next = RX_PERIODIC_NEXT_CLS;
 
 	RTE_SET_USED(graph);
+
+	rx_periodic_node_recv_queues.periodic_msg_queue = dp_layer->periodic_msg_queue;
+	rx_periodic_node_recv_queues.grpc_tx = dp_layer->grpc_tx_queue;
+	rx_periodic_node_recv_queues.grpc_rx = dp_layer->grpc_rx_queue;
+	rx_periodic_node_recv_queues.monitoring_rx = dp_layer->monitoring_rx_queue;
 
 	return 0;
 }
