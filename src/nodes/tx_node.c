@@ -83,7 +83,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		}
 
 		// tao: make this offload flag as a compilation variable to avoid this function call
-		if (dp_conf_is_offload_enabled() && df->conntrack)
+		if (df->conntrack && df->conntrack->offload_flag == DP_FLOW_OFFLOAD_INSTALL)
 			dp_handle_traffic_forward_offloading(pkt, df);
 	}
 
