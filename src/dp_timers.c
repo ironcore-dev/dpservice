@@ -8,7 +8,7 @@
 #include "dpdk_layer.h"
 #include "monitoring/dp_event.h"
 
-// All timer intervale are in seconds:
+// All timer intervals are in seconds:
 
 // how often flow table is checked for timed-out flows
 // (as a sampling rate it should be smaller than the actual timeout value)
@@ -19,10 +19,6 @@
 
 // timer for stats printing
 #define TIMER_STATS_INTERVAL 1
-
-// NOTE: this needs to be the smallest value of all timer intervals to work properly
-// The "sampling rate" for timers
-#define TIMER_MANAGE_INTERVAL 1
 
 
 static struct rte_timer dp_flow_aging_timer;
@@ -52,11 +48,23 @@ uint64_t dp_timers_get_manage_interval_cycles()
 	return dp_timer_manage_interval_cycles;
 }
 
+static inline int dp_timers_add(struct rte_timer *timer, int period, rte_timer_cb_t callback)
+{
+	uint64_t cycles = period * rte_get_timer_hz();
+
+	// make sure we manage timers often enough
+	if (!dp_timer_manage_interval_cycles || cycles < dp_timer_manage_interval_cycles)
+		dp_timer_manage_interval_cycles = cycles;
+
+	rte_timer_init(timer);
+
+	// there is no errno for this call, so log the failure in caller for better call stack
+	return rte_timer_reset(timer, cycles, PERIODICAL, rte_lcore_id(), callback, NULL);
+}
+
 int dp_timers_init()
 {
 	int ret;
-	unsigned int lcore_id;
-	uint64_t timer_hz;
 	int flow_aging_interval = TIMER_FLOW_AGING_INTERVAL;
 
 #ifdef ENABLE_PYTEST
@@ -64,39 +72,19 @@ int dp_timers_init()
 		flow_aging_interval = dp_conf_get_flow_timeout();
 #endif
 
-	timer_hz = rte_get_timer_hz();
-	dp_timer_manage_interval_cycles = timer_hz * TIMER_MANAGE_INTERVAL;
-
 	ret = rte_timer_subsystem_init();
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot init timer subsystem %s", dp_strerror(ret));
 		return ret;
 	}
 
-	rte_timer_init(&dp_flow_aging_timer);
-	rte_timer_init(&dp_maintenance_timer);
-
-	lcore_id = rte_lcore_id();
-	ret = rte_timer_reset(&dp_flow_aging_timer,
-						  timer_hz * flow_aging_interval,
-						  PERIODICAL,
-						  lcore_id,
-						  dp_flow_aging_timer_cb,
-						  NULL);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start message timer");  // there is no errno for this
+	if (DP_FAILED(dp_timers_add(&dp_flow_aging_timer, flow_aging_interval, dp_flow_aging_timer_cb))) {
+		DPS_LOG_ERR("Cannot start flow aging timer");
 		return DP_ERROR;
 	}
 
-	ret = rte_timer_reset(&dp_maintenance_timer,
-						  timer_hz * TIMER_DP_MAINTENANCE_INTERVAL,
-						  PERIODICAL,
-						  lcore_id,
-						  dp_maintenance_timer_cb,
-						  NULL);
-
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start maintenance timer");  // there is no errno for this
+	if (DP_FAILED(dp_timers_add(&dp_maintenance_timer, TIMER_DP_MAINTENANCE_INTERVAL, dp_maintenance_timer_cb))) {
+		DPS_LOG_ERR("Cannot start maintenance timer");
 		return DP_ERROR;
 	}
 
@@ -110,18 +98,9 @@ void dp_timers_free()
 
 int dp_timers_add_stats(rte_timer_cb_t stats_cb)
 {
-	int ret;
-
-	ret = rte_timer_reset(&dp_stats_timer,
-						  rte_get_timer_hz() * TIMER_STATS_INTERVAL,
-						  PERIODICAL,
-						  rte_lcore_id(),
-						  stats_cb,
-						  NULL);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start stats timer");  // there is no errno for this
+	if (DP_FAILED(dp_timers_add(&dp_stats_timer, TIMER_STATS_INTERVAL, stats_cb))) {
+		DPS_LOG_ERR("Cannot start stats timer");
 		return DP_ERROR;
 	}
-
 	return DP_OK;
 }
