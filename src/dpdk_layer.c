@@ -27,6 +27,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_timers.h"
+#include "grpc/dp_grpc_thread.h"
 
 #define STATS_SLEEP 1
 
@@ -144,6 +145,7 @@ void dp_force_quit()
 {
 	DPS_LOG_INFO("Stopping service...");
 	force_quit = true;
+	dp_grpc_thread_cancel();
 }
 
 
@@ -197,25 +199,46 @@ static inline void dp_graph_stats_print(__rte_unused struct rte_timer *timer, __
 }
 
 
+static __rte_always_inline int dp_nanosleep(uint64_t ns)
+{
+	struct timespec delay;
+
+	if (ns > NS_PER_S) {
+		delay.tv_sec = ns / NS_PER_S;
+		ns -= delay.tv_sec * NS_PER_S;
+	} else
+		delay.tv_sec = 0;
+	delay.tv_nsec = ns;
+	return nanosleep(&delay, NULL);
+}
+
 static int main_core_loop(void)
 {
-	uint64_t cur_tsc;
-	uint64_t prev_tsc = 0;
-	uint64_t periodicity = dp_timers_get_manage_interval();
+	uint64_t cur_cycles;
+	uint64_t prev_cycles = 0;
+	uint64_t elapsed_cycles;
+	uint64_t period_cycles = dp_timers_get_manage_interval_cycles();
+	double cycles_per_ns = rte_get_timer_hz() / (double)NS_PER_S;
 	int ret = DP_OK;
 
 	while (!force_quit) {
-		// TODO move this into timers
-		cur_tsc = rte_get_timer_cycles();
-		if ((cur_tsc - prev_tsc) > periodicity) {
-			ret = rte_timer_manage();
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));
-				break;
-			}
-			prev_tsc = cur_tsc;
+		cur_cycles = rte_get_timer_cycles();
+		elapsed_cycles = cur_cycles - prev_cycles;
+		if (elapsed_cycles < period_cycles) {
+			// rte_delay_us_sleep() is not interruptible by signals
+			// (and signal is something that should stop this loop)
+			dp_nanosleep((period_cycles - elapsed_cycles) / cycles_per_ns);
+			// if wait fails, this effectively becomes busy-wait, which is fine
+			continue;
 		}
-		// TODO add sleep
+		ret = rte_timer_manage();
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));
+			// separate thread, need to stop others
+			dp_force_quit();
+			break;
+		}
+		prev_cycles = cur_cycles;
 	}
 
 	return ret;

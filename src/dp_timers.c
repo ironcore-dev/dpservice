@@ -28,8 +28,7 @@
 static struct rte_timer dp_flow_aging_timer;
 static struct rte_timer dp_maintenance_timer;
 static struct rte_timer dp_stats_timer;
-// TODO move inside?
-static uint64_t dp_timer_manage_interval;
+static uint64_t dp_timer_manage_interval_cycles;
 
 static void dp_flow_aging_timer_cb(__rte_unused struct rte_timer *timer, __rte_unused void *arg)
 {
@@ -48,9 +47,9 @@ static void dp_maintenance_timer_cb(__rte_unused struct rte_timer *timer, __rte_
 	trigger_garp();
 }
 
-uint64_t dp_timers_get_manage_interval()
+uint64_t dp_timers_get_manage_interval_cycles()
 {
-	return dp_timer_manage_interval;
+	return dp_timer_manage_interval_cycles;
 }
 
 int dp_timers_init()
@@ -66,7 +65,7 @@ int dp_timers_init()
 #endif
 
 	timer_hz = rte_get_timer_hz();
-	dp_timer_manage_interval = timer_hz * TIMER_MANAGE_INTERVAL;
+	dp_timer_manage_interval_cycles = timer_hz * TIMER_MANAGE_INTERVAL;
 
 	ret = rte_timer_subsystem_init();
 	if (DP_FAILED(ret)) {

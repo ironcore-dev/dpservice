@@ -101,7 +101,6 @@ static void signal_handler(int signum)
 		// this is specifically printf() to communicate with the sender
 		printf("\n\nSignal %d received, preparing to exit...\n", signum);
 		dp_force_quit();
-		dp_grpc_thread_cancel();
 	}
 }
 
