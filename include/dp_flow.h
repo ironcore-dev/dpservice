@@ -91,13 +91,15 @@ struct flow_value {
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
-	uint16_t		flow_status;
-	uint16_t		flow_state;
-	uint16_t		dir;
 	uint16_t		port;
 	uint8_t			lb_dst_addr6[16];
-	uint8_t			action[DP_FLOW_DIR_MAX];
-	enum dp_flow_offload_state		offload_flags[DP_FLOW_DIR_MAX];
+	uint8_t			flow_status; // record if a flow is natted in any means
+	uint8_t			flow_state; // track if a flow has been seen in one or both directions
+	uint8_t			dir;
+	struct {
+		uint8_t orig : 4;
+		uint8_t reply : 4;
+	} offload_flags;
 	struct dp_ref	ref_count;
 	union {
 		enum dp_flow_tcp_state		tcp_state;

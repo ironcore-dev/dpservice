@@ -107,11 +107,11 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 
 	if (dp_conf_is_offload_enabled()) {
-		flow_val->offload_flags[DP_FLOW_DIR_ORG] = DP_FLOW_OFFLOAD_INSTALL;
-		flow_val->offload_flags[DP_FLOW_DIR_REPLY] = DP_FLOW_OFFLOAD_INSTALL;
+		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 	} else {
-		flow_val->offload_flags[DP_FLOW_DIR_ORG] = DP_FLOW_NON_OFFLOAD;
-		flow_val->offload_flags[DP_FLOW_DIR_REPLY] = DP_FLOW_NON_OFFLOAD;
+		flow_val->offload_flags.orig = DP_FLOW_NON_OFFLOAD;
+		flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
 	}
 
 	if (df_ptr->l4_type == IPPROTO_TCP)
@@ -143,9 +143,9 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
 
-			if ((flow_val->offload_flags[DP_FLOW_DIR_REPLY] == DP_FLOW_OFFLOAD_INSTALL)
+			if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL
 				&& (flow_val->flow_state == DP_FLOW_STATE_ESTABLISHED))
-				flow_val->offload_flags[DP_FLOW_DIR_REPLY] = DP_FLOW_OFFLOADED;
+				flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
 
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
@@ -156,8 +156,8 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 
-			if (flow_val->offload_flags[DP_FLOW_DIR_ORG] == DP_FLOW_OFFLOAD_INSTALL)
-				flow_val->offload_flags[DP_FLOW_DIR_ORG] = DP_FLOW_OFFLOADED;
+			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 
 			// UDP traffic could be only one direction, thus from the second UDP packet in the same direction,
 			// one UDP flow cannot be treated as a new one, otherwise it will always trigger the operations in snat or dnat
