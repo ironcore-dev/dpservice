@@ -101,7 +101,6 @@ static void signal_handler(int signum)
 		// this is specifically printf() to communicate with the sender
 		printf("\n\nSignal %d received, preparing to exit...\n", signum);
 		dp_force_quit();
-		dp_grpc_thread_cancel();
 	}
 }
 
@@ -144,7 +143,7 @@ static void free_interfaces()
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_free();
 #endif
-	// TODO(plague): free graph once that code is refactored
+	dp_graph_free();
 	dp_ports_free();
 }
 

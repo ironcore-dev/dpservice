@@ -58,6 +58,7 @@ struct underlay_conf {
 
 int dp_dpdk_layer_init(void);
 int dp_graph_init(void);
+void dp_graph_free(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_layer_free(void);
 

@@ -27,6 +27,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_timers.h"
+#include "grpc/dp_grpc_thread.h"
 
 #define STATS_SLEEP 1
 
@@ -67,6 +68,9 @@ static struct underlay_conf gen_conf = {
 	.src_ip6 = {0},
 	.default_port = 443,
 };
+
+// TODO(plague): move graph into separate file
+static struct rte_graph_cluster_stats *dp_graph_stats;
 
 
 static inline int ring_init(const char *name, struct rte_ring **p_ring)
@@ -141,6 +145,7 @@ void dp_force_quit()
 {
 	DPS_LOG_INFO("Stopping service...");
 	force_quit = true;
+	dp_grpc_thread_cancel();
 }
 
 
@@ -156,8 +161,9 @@ static int graph_main_loop()
 	return 0;
 }
 
-static inline struct rte_graph_cluster_stats *create_stats()
+static inline int dp_graph_stats_create()
 {
+	// TODO(plague) define this pattern in future dp_graph.h
 	static const char *patterns[] = { "worker_*" };
 	struct rte_graph_cluster_stats_param s_param = {
 		.socket_id = SOCKET_ID_ANY,
@@ -166,64 +172,74 @@ static inline struct rte_graph_cluster_stats *create_stats()
 		.nb_graph_patterns = 1,
 		.graph_patterns = patterns,
 	};
-	struct rte_graph_cluster_stats *stats;
 
-	stats = rte_graph_cluster_stats_create(&s_param);
-	if (!stats)
+	dp_graph_stats = rte_graph_cluster_stats_create(&s_param);
+	if (!dp_graph_stats) {
 		DPS_LOG_ERR("Unable to create cluster stats %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 
-	return stats;
+	return DP_OK;
 }
 
-static inline void print_stats(struct rte_graph_cluster_stats *stats)
+static inline void dp_graph_stats_free(void)
+{
+	if (dp_graph_stats)
+		rte_graph_cluster_stats_destroy(dp_graph_stats);
+}
+
+static inline void dp_graph_stats_print(__rte_unused struct rte_timer *timer, __rte_unused void *arg)
 {
 	static const char caret_top_left[] = {27, '[', '1', ';', '1', 'H', '\0'};
 	static const char clear_screen[] = {27, '[', '2', 'J', '\0'};
 
 	printf("%s%s", clear_screen, caret_top_left);
-	// this actually prints using a function specified in create_stats()
-	rte_graph_cluster_stats_get(stats, 0);
+	// this actually prints using a function specified in dp_graph_stats_create()
+	rte_graph_cluster_stats_get(dp_graph_stats, 0);
 }
 
-static inline void free_stats(struct rte_graph_cluster_stats *stats)
+
+static __rte_always_inline int dp_nanosleep(uint64_t ns)
 {
-	rte_graph_cluster_stats_destroy(stats);
+	struct timespec delay;
+
+	if (ns > NS_PER_S) {
+		delay.tv_sec = ns / NS_PER_S;
+		ns -= delay.tv_sec * NS_PER_S;
+	} else
+		delay.tv_sec = 0;
+	delay.tv_nsec = ns;
+	return nanosleep(&delay, NULL);
 }
 
 static int main_core_loop(void)
 {
-	uint64_t cur_tsc;
-	uint64_t prev_tsc = 0;
-	uint64_t periodicity = dp_timers_get_manage_interval();
+	uint64_t cur_cycles;
+	uint64_t prev_cycles = 0;
+	uint64_t elapsed_cycles;
+	uint64_t period_cycles = dp_timers_get_manage_interval_cycles();
+	double cycles_per_ns = rte_get_timer_hz() / (double)NS_PER_S;
 	int ret = DP_OK;
-	struct rte_graph_cluster_stats *stats = NULL;
-
-	if (dp_conf_is_stats_enabled() && rte_graph_has_stats_feature()) {
-		stats = create_stats();
-		if (!stats)
-			return DP_ERROR;
-	}
 
 	while (!force_quit) {
-		cur_tsc = rte_get_timer_cycles();
-		if ((cur_tsc - prev_tsc) > periodicity) {
-			ret = rte_timer_manage();
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));
-				break;
-			}
-			prev_tsc = cur_tsc;
+		cur_cycles = rte_get_timer_cycles();
+		elapsed_cycles = cur_cycles - prev_cycles;
+		if (elapsed_cycles < period_cycles) {
+			// rte_delay_us_sleep() is not interruptible by signals
+			// (and signal is something that should stop this loop)
+			dp_nanosleep((period_cycles - elapsed_cycles) / cycles_per_ns);
+			// if wait fails, this effectively becomes busy-wait, which is fine
+			continue;
 		}
-		// TODO maybe create ta timer for stats instead
-		// (and then call dp_timers_manage() instead of all of this?
-		if (stats) {
-			print_stats(stats);
-			sleep(STATS_SLEEP);
+		ret = rte_timer_manage();
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));
+			// separate thread, need to stop others
+			dp_force_quit();
+			break;
 		}
+		prev_cycles = cur_cycles;
 	}
-
-	if (stats)
-		free_stats(stats);
 
 	return ret;
 }
@@ -445,7 +461,22 @@ int dp_graph_init(void)
 		}
 	}
 
+	if (dp_conf_is_stats_enabled()) {
+		if (!rte_graph_has_stats_feature()) {
+			DPS_LOG_WARNING("Graph statistics are not available");
+		} else if (DP_FAILED(dp_graph_stats_create())
+			|| DP_FAILED(dp_timers_add_stats(dp_graph_stats_print))
+		) {
+			return DP_ERROR;
+		}
+	}
+
 	return DP_OK;
+}
+
+void dp_graph_free(void)
+{
+	dp_graph_stats_free();
 }
 
 __rte_always_inline struct underlay_conf *get_underlay_conf()
