@@ -19,6 +19,7 @@ struct dp_flow {
 		uint8_t public_flow : 1;    
 		uint8_t	overlay_type: 1;	// supported overlay type
 		uint8_t	nat : 3;
+		uint8_t offload_ipv6 : 1;	// tmp solution to set if we should offload ipv6 pkts
 	} flags;
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	union {

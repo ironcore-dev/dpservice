@@ -89,7 +89,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			else
 				offload_flag = df->conntrack->offload_flags.reply;
 
-			if (offload_flag == DP_FLOW_OFFLOAD_INSTALL)
+			if (offload_flag == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
 				dp_handle_traffic_forward_offloading(pkt, df);
 		}
 	}

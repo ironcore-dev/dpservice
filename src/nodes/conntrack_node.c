@@ -22,6 +22,7 @@ static struct flow_key second_key = {0};
 static struct flow_key *prev_key, *curr_key;
 static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+static bool offload_mode_enabled = 0;
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -33,6 +34,8 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 
 	prev_key = NULL;
 	curr_key = &first_key;
+
+	offload_mode_enabled = dp_conf_is_offload_enabled();
 
 #ifdef ENABLE_PYTEST
 	flow_timeout = dp_conf_get_flow_timeout();
@@ -106,7 +109,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = flow_timeout;
 
-	if (dp_conf_is_offload_enabled()) {
+	if (offload_mode_enabled) {
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 	} else {
