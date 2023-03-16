@@ -59,6 +59,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	uint16_t new_eth_type;
 	struct rte_mbuf *pkt;
 	uint i;
+	uint8_t offload_flag = 0;
 
 	// since this node is emitting packets, dp_forward_* wrapper functions cannot be used
 	// this code should colely resemble the one inside those functions
@@ -81,8 +82,16 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 				DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
 			// since this is done in burst, just send out a bad packet..
 		}
-		if (df->flags.valid && df->conntrack)
-			dp_handle_traffic_forward_offloading(pkt, df);
+
+		if (df->conntrack) {
+			if (df->conntrack->dir == DP_FLOW_DIR_ORG)
+				offload_flag = df->conntrack->offload_flags.orig;
+			else
+				offload_flag = df->conntrack->offload_flags.reply;
+
+			if (offload_flag == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
+				dp_handle_traffic_forward_offloading(pkt, df);
+		}
 	}
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);

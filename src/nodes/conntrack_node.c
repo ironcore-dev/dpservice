@@ -22,6 +22,7 @@ static struct flow_key second_key = {0};
 static struct flow_key *prev_key, *curr_key;
 static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+static bool offload_mode_enabled = 0;
 
 static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
@@ -33,6 +34,8 @@ static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *n
 
 	prev_key = NULL;
 	curr_key = &first_key;
+
+	offload_mode_enabled = dp_conf_is_offload_enabled();
 
 #ifdef ENABLE_PYTEST
 	flow_timeout = dp_conf_get_flow_timeout();
@@ -106,6 +109,14 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = flow_timeout;
 
+	if (offload_mode_enabled) {
+		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+	} else {
+		flow_val->offload_flags.orig = DP_FLOW_NON_OFFLOAD;
+		flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
+	}
+
 	if (df_ptr->l4_type == IPPROTO_TCP)
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NONE;
 
@@ -129,25 +140,39 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
+				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
+
+			if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL
+				&& (flow_val->flow_state == DP_FLOW_STATE_ESTABLISHED))
+				flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
+
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_REPLY;
+				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
+
 			
 			flow_val->dir = DP_FLOW_DIR_REPLY;
 		}
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-			if (flow_val->flow_state == DP_FLOW_STATE_REPLY)
-				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
-			
+
+			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
+
+			// UDP traffic could be only one direction, thus from the second UDP packet in the same direction,
+			// one UDP flow cannot be treated as a new one, otherwise it will always trigger the operations in snat or dnat
+			// for new flows.
+			if (df_ptr->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
+				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
+
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	}
 	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
+
 }
 
 static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned char *first_val, const unsigned char *second_val, uint8_t nr_bytes)
@@ -259,7 +284,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			dp_cntrack_tcp_state(flow_val, tcp_hdr);
 			dp_cntrack_set_timeout_tcp_flow(flow_val);
 		}
-
 		df_ptr->conntrack = flow_val;
 	} else {
 		return CONNTRACK_NEXT_DROP;
