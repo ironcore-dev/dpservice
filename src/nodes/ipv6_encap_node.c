@@ -1,30 +1,23 @@
+#include "nodes/ipv6_encap_node.h"
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
-#include "nodes/ipv6_encap_node.h"
 #include "dp_error.h"
-#include "dp_mbuf_dyn.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
-#include "dp_debug.h"
+#include "node_api.h"
+#include "nodes/common_node.h"
 
-struct ipv6_encap_node_main ipv6_encap_node;
+enum {
+	IPV6_ENCAP_NEXT_DROP,
+	IPV6_ENCAP_NEXT_CLS,
+	IPV6_ENCAP_NEXT_MAX
+};
 
-static int ipv6_encap_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct ipv6_encap_node_ctx *ctx = (struct ipv6_encap_node_ctx *)node->ctx;
-
-	ctx->next = IPV6_ENCAP_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+static uint16_t next_tx_index[DP_MAX_PORTS];
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -69,7 +62,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return IPV6_ENCAP_NEXT_CLS;
 	}
 
-	return ipv6_encap_node.next_index[df->nxt_hop];
+	return next_tx_index[df->nxt_hop];
 } 
 
 static uint16_t ipv6_encap_node_process(struct rte_graph *graph,
@@ -81,28 +74,19 @@ static uint16_t ipv6_encap_node_process(struct rte_graph *graph,
 	return nb_objs;
 }
 
-int ipv6_encap_set_next(uint16_t port_id, uint16_t next_index)
-{
-	ipv6_encap_node.next_index[port_id] = next_index;
-	return 0;
-}
-
 static struct rte_node_register ipv6_encap_node_base = {
 	.name = "ipv6_encap",
-	.init = ipv6_encap_node_init,
+	.init = NULL,
 	.process = ipv6_encap_node_process,
-
 	.nb_edges = IPV6_ENCAP_NEXT_MAX,
-	.next_nodes =
-		{
-			[IPV6_ENCAP_NEXT_DROP] = "drop",
-			[IPV6_ENCAP_NEXT_CLS] = "cls",
-		},
+	.next_nodes = {
+		[IPV6_ENCAP_NEXT_DROP] = "drop",
+		[IPV6_ENCAP_NEXT_CLS] = "cls",
+	},
 };
-
-struct rte_node_register *ipv6_encap_node_get(void)
-{
-	return &ipv6_encap_node_base;
-}
-
 RTE_NODE_REGISTER(ipv6_encap_node_base);
+
+int ipv6_encap_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_pf_tx(&ipv6_encap_node_base, next_tx_index, port_id, tx_node_name);
+}

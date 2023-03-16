@@ -5,10 +5,12 @@
 extern "C" {
 #endif
 
+#include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 
 #include "dp_conf.h"
+#include "dp_port.h"
 
 #ifndef ENABLE_GRAPHTRACE
 #	define dp_graphtrace_burst(node, objs, nb_objs)
@@ -108,6 +110,19 @@ void dp_forward_graph_packets(struct rte_graph *graph,
 	dp_graphtrace_burst_next(node, objs, nb_objs, next_index);
 	rte_node_next_stream_move(graph, node, next_index);
 }
+
+int dp_node_append_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name);
+int dp_node_append_vf_tx(struct rte_node_register *node,
+						 uint16_t next_tx_indices[DP_MAX_PORTS],
+						 uint16_t port_id,
+						 const char *tx_node_name);
+int dp_node_append_pf_tx(struct rte_node_register *node,
+						 uint16_t next_tx_indices[DP_MAX_PORTS],
+						 uint16_t port_id,
+						 const char *tx_node_name);
 
 #ifdef __cplusplus
 }

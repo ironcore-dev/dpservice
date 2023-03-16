@@ -1,17 +1,21 @@
+#include "nodes/dhcpv6_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
-#include "nodes/dhcpv6_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
+#include "dp_error.h"
 #include "dp_log.h"
+#include "dp_lpm.h"
+#include "nodes/common_node.h"
 
+enum {
+	DHCPV6_NEXT_DROP,
+	DHCPV6_NEXT_MAX
+};
 
-struct dhcpv6_node_main dhcpv6_node;
+static uint16_t next_tx_index[DP_MAX_PORTS];
+
 static struct client_id cid;
 static struct server_id  sid;
 static struct ia_option recv_ia;
@@ -58,17 +62,6 @@ void prepare_ia_option(uint16_t port_id)
 	recv_ia.val.addrv6.addr.code.len = htons(2);
 	recv_ia.val.addrv6.addr.code.status = STATUS_Success;
 	return;
-}
-
-static int dhcpv6_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct dhcpv6_node_ctx *ctx = (struct dhcpv6_node_ctx *)node->ctx;
-
-	ctx->next = DHCPV6_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
 }
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
@@ -152,7 +145,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	m->l3_len = sizeof(struct rte_ipv6_hdr);
 	m->l4_len = sizeof(struct rte_udp_hdr);
 
-	return dhcpv6_node.next_index[m->port];
+	return next_tx_index[m->port];
 }
 
 static uint16_t dhcpv6_node_process(struct rte_graph *graph,
@@ -164,27 +157,18 @@ static uint16_t dhcpv6_node_process(struct rte_graph *graph,
 	return nb_objs;
 }
 
-int dhcpv6_set_next(uint16_t port_id, uint16_t next_index)
-{
-	dhcpv6_node.next_index[port_id] = next_index;
-	return 0;
-}
-
 static struct rte_node_register dhcpv6_node_base = {
 	.name = "dhcpv6",
-	.init = dhcpv6_node_init,
+	.init = NULL,
 	.process = dhcpv6_node_process,
-
 	.nb_edges = DHCPV6_NEXT_MAX,
-	.next_nodes =
-		{
-			[DHCPV6_NEXT_DROP] = "drop",
-		},
+	.next_nodes = {
+		[DHCPV6_NEXT_DROP] = "drop",
+	},
 };
-
-struct rte_node_register *dhcpv6_node_get(void)
-{
-	return &dhcpv6_node_base;
-}
-
 RTE_NODE_REGISTER(dhcpv6_node_base);
+
+int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(&dhcpv6_node_base, next_tx_index, port_id, tx_node_name);
+}

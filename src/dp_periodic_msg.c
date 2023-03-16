@@ -3,7 +3,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
-#include "nodes/arp_node_priv.h"
+#include "nodes/arp_node.h"
 #include "nodes/ipv6_nd_node.h"
 
 static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};

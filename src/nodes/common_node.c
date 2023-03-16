@@ -1,9 +1,10 @@
-#ifdef ENABLE_GRAPHTRACE
-
 #include "nodes/common_node.h"
+#include "dp_error.h"
+#include "dp_log.h"
+
+#ifdef ENABLE_GRAPHTRACE
 #include <rte_ethdev.h>
 #include <rte_ip.h>
-#include "dp_log.h"
 #include "dp_mbuf_dyn.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_util.h"
@@ -225,4 +226,58 @@ void dp_graphtrace_next(struct rte_node *node, void *obj, rte_edge_t next_index)
 					 node->name, GRAPHTRACE_PKT_ID(obj), node->nodes[next_index]->name);
 }
 
-#endif
+#endif /* ENABLE_GRAPHTRACE */
+
+
+int dp_node_append_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name)
+{
+	const char *append_array[] = { tx_node_name };
+	rte_edge_t count;
+
+	if (port_id >= DP_MAX_PORTS) {
+		DPNODE_LOG_ERR(node, "Port id %u too big, max %u", port_id, DP_MAX_PORTS);
+		return DP_ERROR;
+	}
+
+	if (rte_node_edge_update(node->id, RTE_EDGE_ID_INVALID, append_array, 1) != 1) {
+		DPNODE_LOG_ERR(node, "Cannot add Tx edge to %s", tx_node_name);
+		return DP_ERROR;
+	}
+
+	count = rte_node_edge_count(node->id);
+	if (count <= 0) {
+		DPNODE_LOG_ERR(node, "No Tx edge added to %s", tx_node_name);
+		return DP_ERROR;
+	}
+
+	next_tx_indices[port_id] = count - 1;
+	return DP_OK;
+}
+
+int dp_node_append_vf_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name)
+{
+	if (dp_port_is_pf(port_id)) {
+		DPNODE_LOG_ERR(node, "Node not designed to be connected to physical ports");
+		return DP_ERROR;
+	}
+	return dp_node_append_tx(node, next_tx_indices, port_id, tx_node_name);
+}
+
+
+int dp_node_append_pf_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name)
+{
+	if (!dp_port_is_pf(port_id)) {
+		DPNODE_LOG_ERR(node, "Node not designed to be connected to virtual ports");
+		return DP_ERROR;
+	}
+	return dp_node_append_tx(node, next_tx_indices, port_id, tx_node_name);
+}

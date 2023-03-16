@@ -1,32 +1,29 @@
 #include "nodes/virtsvc_node.h"
-
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_arp.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
-
 #include "rte_flow/dp_rte_flow.h"
 
-struct virtsvc_node_main virtsvc_node;
+enum {
+	VIRTSVC_NEXT_DROP,
+	VIRTSVC_NEXT_MAX
+};
 
+static uint16_t next_tx_index[DP_MAX_PORTS];
 static struct underlay_conf *underlay_conf;
 
-static int virtsvc_node_init(const struct rte_graph *graph, struct rte_node *node)
+static int virtsvc_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-	RTE_SET_USED(node);
-	RTE_SET_USED(graph);
-
 	underlay_conf = get_underlay_conf();
-
 	return 0;
 }
 
@@ -137,7 +134,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 		m->l4_len = sizeof(struct rte_udp_hdr);
 	}
 
-	return virtsvc_node.next_index[pf_port_id];
+	return next_tx_index[pf_port_id];
 }
 
 static __rte_always_inline struct dp_virtsvc_conn *virtsvc_get_conn_on_port(struct dp_virtsvc *virtsvc, rte_be16_t l4_port)
@@ -222,7 +219,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	if (dp_port_get_vf_attach_status(vf_port_id) == DP_VF_PORT_DETACHED)
 		return VIRTSVC_NEXT_DROP;
 
-	return virtsvc_node.next_index[vf_port_id];
+	return next_tx_index[vf_port_id];
 }
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
@@ -249,12 +246,6 @@ static uint16_t virtsvc_node_process(struct rte_graph *graph,
 	return nb_objs;
 }
 
-int virtsvc_set_next(uint16_t port_id, uint16_t next_index)
-{
-	virtsvc_node.next_index[port_id] = next_index;
-	return 0;
-}
-
 static struct rte_node_register virtsvc_node_base = {
 	.name = "virtsvc",
 	.init = virtsvc_node_init,
@@ -262,13 +253,12 @@ static struct rte_node_register virtsvc_node_base = {
 
 	.nb_edges = VIRTSVC_NEXT_MAX,
 	.next_nodes = {
-			[VIRTSVC_NEXT_DROP] = "drop",
-		},
+		[VIRTSVC_NEXT_DROP] = "drop",
+	},
 };
-
-struct rte_node_register *virtsvc_node_get(void)
-{
-	return &virtsvc_node_base;
-}
-
 RTE_NODE_REGISTER(virtsvc_node_base);
+
+int virtsvc_node_append_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_tx(&virtsvc_node_base, next_tx_index, port_id, tx_node_name);
+}

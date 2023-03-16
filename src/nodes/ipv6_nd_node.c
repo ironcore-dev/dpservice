@@ -1,30 +1,21 @@
-#include <rte_common.h>
-#include <rte_ethdev.h>
-#include <rte_graph.h>
-#include <rte_graph_worker.h>
-#include <rte_mbuf.h>
-#include <rte_ether.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
+#include <rte_common.h>
+#include <rte_ether.h>
+#include <rte_graph.h>
+#include <rte_mbuf.h>
 #include "dp_lpm.h"
-#include "dp_mbuf_dyn.h"
+#include "dp_port.h"
+#include "nodes/common_node.h"
 
+enum {
+	IPV6_ND_NEXT_DROP,
+	IPV6_ND_NEXT_MAX
+};
 
-struct ipv6_nd_node_main ipv6_nd_node;
-static uint8_t dp_unspec_ipv6[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
- 
-static int ipv6_nd_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct ipv6_nd_node_ctx *ctx = (struct ipv6_nd_node_ctx *)node->ctx;
+static uint16_t next_tx_index[DP_MAX_PORTS];
 
-	ctx->next = IPV6_ND_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+static const uint8_t dp_unspecified_ipv6[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const uint8_t dp_multicast_ipv6[16] = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 };
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -39,8 +30,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_memcpy(req_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), sizeof(req_eth_hdr->src_addr.addr_bytes));
 
-	if (!memcmp(req_ipv6_hdr->src_addr, dp_unspec_ipv6, sizeof(req_ipv6_hdr->src_addr)))
-		rte_memcpy(req_ipv6_hdr->dst_addr, dp_mc_ipv6, sizeof(req_ipv6_hdr->dst_addr));
+	if (!memcmp(req_ipv6_hdr->src_addr, dp_unspecified_ipv6, sizeof(req_ipv6_hdr->src_addr)))
+		rte_memcpy(req_ipv6_hdr->dst_addr, dp_multicast_ipv6, sizeof(req_ipv6_hdr->dst_addr));
 	else
 		rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr, sizeof(req_ipv6_hdr->dst_addr));
 
@@ -77,7 +68,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	req_icmp6_hdr->icmp6_cksum = 0;
 	req_icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_icmp6_hdr);
 
-	return ipv6_nd_node.next_index[m->port];
+	return next_tx_index[m->port];
 } 
 
 
@@ -94,27 +85,18 @@ static uint16_t ipv6_nd_node_process(struct rte_graph *graph,
 	return nb_objs;
 }
 
-int ipv6_nd_set_next(uint16_t port_id, uint16_t next_index)
-{
-	ipv6_nd_node.next_index[port_id] = next_index;
-	return 0;
-}
-
 static struct rte_node_register ipv6_nd_node_base = {
 	.name = "ipv6_nd",
-	.init = ipv6_nd_node_init,
+	.init = NULL,
 	.process = ipv6_nd_node_process,
-
 	.nb_edges = IPV6_ND_NEXT_MAX,
-	.next_nodes =
-		{
-			[IPV6_ND_NEXT_DROP] = "drop",
-		},
+	.next_nodes = {
+		[IPV6_ND_NEXT_DROP] = "drop",
+	},
 };
-
-struct rte_node_register *ipv6_nd_node_get(void)
-{
-	return &ipv6_nd_node_base;
-}
-
 RTE_NODE_REGISTER(ipv6_nd_node_base);
+
+int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(&ipv6_nd_node_base, next_tx_index, port_id, tx_node_name);
+}

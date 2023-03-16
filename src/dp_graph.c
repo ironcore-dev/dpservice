@@ -2,7 +2,7 @@
 
 #include "dp_error.h"
 #include "dp_log.h"
-#include "nodes/arp_node_priv.h"
+#include "nodes/arp_node.h"
 #include "nodes/dhcp_node.h"
 #include "nodes/dhcpv6_node.h"
 #include "nodes/ipip_tunnel_node.h"
@@ -119,38 +119,24 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 static int dp_graph_init_nodes()
 {
 	// TODO cleanup
-	struct rte_node_register *rx_node, *tx_node, *arp_node, *ipv6_encap_node;
-	struct rte_node_register *dhcp_node, *l2_decap_node, *ipv6_nd_node;
-	struct rte_node_register *dhcpv6_node, *rx_periodic_node;
-#ifdef ENABLE_VIRTSVC
-	struct rte_node_register *virtsvc_node;
-#endif
+	struct rte_node_register *rx_node, *tx_node;
 	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
-	const char *next_nodes = name;
 	struct rx_node_config rx_cfg;
 	int ret, id;
 	struct dp_ports *ports = get_dp_ports();
+	uint16_t port_id;
 
 	/* Graph Configuration */
 	tx_node_data = tx_node_data_get();
 	tx_node = tx_node_get();
 	rx_node = rx_node_get();
-	arp_node = arp_node_get();
-	ipv6_nd_node = ipv6_nd_node_get();
-	l2_decap_node = l2_decap_node_get();
-	ipv6_encap_node = ipv6_encap_node_get();
-	dhcp_node = dhcp_node_get();
-	dhcpv6_node = dhcpv6_node_get();
-	rx_periodic_node = rx_periodic_node_get();
-#ifdef ENABLE_VIRTSVC
-	virtsvc_node = virtsvc_node_get();
-#endif
 
 	// TODO(plague): the whole DP node api needs work, either this will be void or properly check
 	// (this will apply on many places below)
 
 	DP_FOREACH_PORT(ports, port) {
+		port_id = port->port_id;  // TODO ;)
 		// TODO(plague): just create a function for the loop?
 		snprintf(name, sizeof(name), "%u-%u", port->port_id, 0);
 		/* Clone a new rx node with same edges as parent */
@@ -164,6 +150,10 @@ static int dp_graph_init_nodes()
 		rx_cfg.node_id = id;
 		// TODO(plague): DP node api
 		ret = config_rx_node(&rx_cfg);
+		if (ret < 0) {
+			DPS_LOG_ERR("Rx config failed %s", dp_strerror(ret));
+			return ret;
+		}
 
 		snprintf(name, sizeof(name), "%u", port->port_id);
 		id = rte_node_clone(tx_node->id, name);
@@ -174,76 +164,30 @@ static int dp_graph_init_nodes()
 		tx_node_data->nodes[port->port_id] = id;
 		tx_node_data->port_ids[port->port_id] = port->port_id;
 
+		// some nodes need a direct connection to all PF/VF ports, add them dynamically
 		snprintf(name, sizeof(name), "tx-%u", port->port_id);
-		if (port->port_type == DP_PORT_VF) {
-			// TODO(plague): no check for index overflow?! DP_MAX_PORTS!
-			// TODO(plague): all these can fail with RTE_EDGE_ID_INVALID and set rte_errno
-			rte_node_edge_update(arp_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			// TODO(plague): maybe rework DP node api to do each in one call
-			// TODO(plague): update retval checks
-			ret = arp_set_next(port->port_id, rte_node_edge_count(arp_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-			rte_node_edge_update(rx_periodic_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = rx_periodic_set_next(port->port_id, rte_node_edge_count(rx_periodic_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-			rte_node_edge_update(ipv6_nd_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = ipv6_nd_set_next(port->port_id, rte_node_edge_count(ipv6_nd_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-			rte_node_edge_update(dhcp_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = dhcp_set_next(port->port_id, rte_node_edge_count(dhcp_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-			rte_node_edge_update(dhcpv6_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = dhcpv6_set_next(port->port_id, rte_node_edge_count(dhcpv6_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-			rte_node_edge_update(l2_decap_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = l2_decap_set_next(port->port_id, rte_node_edge_count(l2_decap_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-#ifdef ENABLE_VIRTSVC
-			rte_node_edge_update(virtsvc_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = virtsvc_set_next(port->port_id, rte_node_edge_count(virtsvc_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
-#endif
+		switch (port->port_type) {
+		case DP_PORT_VF:
+			if (DP_FAILED(arp_node_append_vf_tx(port_id, name))
+				|| DP_FAILED(dhcp_node_append_vf_tx(port_id, name))
+				|| DP_FAILED(dhcpv6_node_append_vf_tx(port_id, name))
+				|| DP_FAILED(ipv6_nd_node_append_vf_tx(port_id, name))
+				|| DP_FAILED(l2_decap_node_append_vf_tx(port_id, name))
+				|| DP_FAILED(rx_periodic_node_append_vf_tx(port_id, name))
+			)
+				return DP_ERROR;
+			break;
+		case DP_PORT_PF:
+			if (DP_FAILED(ipv6_encap_node_append_pf_tx(port_id, name)))
+				return DP_ERROR;
+			break;
 		}
-
-		if (port->port_type == DP_PORT_PF) {
-			rte_node_edge_update(ipv6_encap_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = ipv6_encap_set_next(port->port_id, rte_node_edge_count(ipv6_encap_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
 #ifdef ENABLE_VIRTSVC
-			rte_node_edge_update(virtsvc_node->id, RTE_EDGE_ID_INVALID, &next_nodes, 1);
-			ret = virtsvc_set_next(port->port_id, rte_node_edge_count(virtsvc_node->id) - 1);
-			if (ret < 0) {
-				DPS_LOG_ERR("Node set next failed %s", dp_strerror(ret));
-				return ret;
-			}
+		// virtual services node is bi-directional
+		if (DP_FAILED(virtsvc_node_append_tx(port_id, name)))
+			return DP_ERROR;
 #endif
-		}
 	}
-	// TODO the whole func
 	return DP_OK;
 }
 
