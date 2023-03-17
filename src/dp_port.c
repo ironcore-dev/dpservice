@@ -8,7 +8,7 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "monitoring/dp_event.h"
-#include "nodes/rx_node_priv.h"
+#include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 
 const struct rte_eth_conf port_conf_default = {
@@ -427,7 +427,8 @@ int dp_port_start(uint16_t port_id)
 		if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
 			return DP_ERROR;
 
-	enable_rx_node(port_id);
+	if (DP_FAILED(rx_node_set_enabled(port_id, true)))
+		return DP_ERROR;
 
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
@@ -451,7 +452,8 @@ int dp_port_stop(uint16_t port_id)
 
 	// TODO(plague): research - no need to tear down hairpins?
 
-	disable_rx_node(port_id);
+	if (DP_FAILED(rx_node_set_enabled(port_id, false)))
+		return DP_ERROR;
 
 	/* Tap interfaces in test environment can not be stopped */
 	/* due to a bug in dpdk tap device library. */

@@ -1,50 +1,55 @@
+#include "nodes/tx_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
+#include <rte_ether.h>
 #include <rte_graph.h>
-#include <rte_malloc.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_error.h"
+#include "dp_log.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
+#include "dp_port.h"
+#include "dp_util.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
-#include "nodes/tx_node_priv.h"
-#include "nodes/ipv6_nd_node.h"
-#include "dp_error.h"
-#include "dp_flow.h"
-#include "dp_lpm.h"
-#include "dp_util.h"
-#include "dp_nat.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_log.h"
-
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
-#define DP_MAX_PATT_ACT 7
+enum {
+	TX_NEXT_DROP,
+	TX_NEXT_MAX
+};
 
-static struct ethdev_tx_node_main ethdev_tx_main;
-static struct dp_flow *df;
+// there are multiple Tx nodes, one per port, node context is needed
+struct tx_node_ctx {
+	uint16_t port_id;
+	uint16_t queue_id;
+};
+_Static_assert(sizeof(struct tx_node_ctx) <= RTE_NODE_CTX_SZ);
+
+// also some way to map ports to nodes is needed
+static rte_node_t tx_node_ids[DP_MAX_PORTS];
+
 
 static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct tx_node_ctx *ctx = (struct tx_node_ctx *)node->ctx;
-	uint64_t port_id = DP_MAX_PORTS;
-	uint16_t i;
+	uint16_t port_id;
 
-	/* Find our port id */
-	for (i = 0; i < DP_MAX_PORTS; i++) {
-		if (ethdev_tx_main.nodes[i] == node->id) {
-			port_id = ethdev_tx_main.port_ids[i];
+	// Find this node's dedicated port to be used in processing
+	for (port_id = 0; port_id < RTE_DIM(tx_node_ids); ++port_id)
+		if (tx_node_ids[port_id] == node->id)
 			break;
-		}
+
+	if (port_id >= RTE_DIM(tx_node_ids)) {
+		DPNODE_LOG_ERR(node, "No port_id available for this node");
+		return DP_ERROR;
 	}
 
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-
-	/* Update port and queue */
 	ctx->port_id = port_id;
 	ctx->queue_id = graph->id;
-
-	return 0;
+	return DP_OK;
 }
 
 static uint16_t tx_node_process(struct rte_graph *graph,
@@ -58,6 +63,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	uint16_t sent_count;
 	uint16_t new_eth_type;
 	struct rte_mbuf *pkt;
+	struct dp_flow *df;
 	uint i;
 	uint8_t offload_flag = 0;
 
@@ -107,25 +113,34 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	return nb_objs;
 }
 
-struct ethdev_tx_node_main *tx_node_data_get(void)
-{
-	return &ethdev_tx_main;
-}
-
 static struct rte_node_register tx_node_base = {
 	.name = "tx",
 	.init = tx_node_init,
 	.process = tx_node_process,
-
 	.nb_edges = TX_NEXT_MAX,
 	.next_nodes = {
-			[TX_NEXT_DROP] = "drop"
-		},
+		[TX_NEXT_DROP] = "drop"
+	},
 };
-
-struct rte_node_register *tx_node_get(void)
-{
-	return &tx_node_base;
-}
-
 RTE_NODE_REGISTER(tx_node_base);
+
+int tx_node_create(uint16_t port_id)
+{
+	char name[RTE_NODE_NAMESIZE];
+	rte_node_t node_id;
+
+	if (port_id >= RTE_DIM(tx_node_ids)) {
+		DPS_LOG_ERR("Port id %u too high for Tx nodes, max %lu", port_id, RTE_DIM(tx_node_ids));
+		return DP_ERROR;
+	}
+
+	snprintf(name, sizeof(name), "%u", port_id);
+	node_id = rte_node_clone(tx_node_base.id, name);
+	if (node_id == RTE_NODE_ID_INVALID) {
+		DPS_LOG_ERR("Cannot clone Tx node %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
+
+	tx_node_ids[port_id] = node_id;
+	return DP_OK;
+}

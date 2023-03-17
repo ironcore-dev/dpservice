@@ -1,5 +1,4 @@
 #include "dp_graph.h"
-
 #include "dp_error.h"
 #include "dp_log.h"
 #include "nodes/arp_node.h"
@@ -11,9 +10,9 @@
 #include "nodes/ipv6_nd_node.h"
 #include "nodes/l2_decap_node.h"
 #include "nodes/packet_relay_node.h"
-#include "nodes/rx_node_priv.h"
+#include "nodes/rx_node.h"
 #include "nodes/rx_periodic_node.h"
-#include "nodes/tx_node_priv.h"
+#include "nodes/tx_node.h"
 #ifdef ENABLE_VIRTSVC
 #	include "nodes/virtsvc_node.h"
 #endif
@@ -32,7 +31,7 @@ static inline int dp_graph_stats_create()
 	static const char *patterns[] = { DP_GRAPH_NAME_PREFIX"*" };
 	struct rte_graph_cluster_stats_param s_param = {
 		.socket_id = SOCKET_ID_ANY,
-		.fn = NULL,
+		.fn = NULL,  // use the default one that prints to file handle
 		.f = stdout,
 		.nb_graph_patterns = 1,
 		.graph_patterns = patterns,
@@ -118,53 +117,19 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 
 static int dp_graph_init_nodes()
 {
-	// TODO cleanup
-	struct rte_node_register *rx_node, *tx_node;
-	struct ethdev_tx_node_main *tx_node_data;
 	char name[RTE_NODE_NAMESIZE];
-	struct rx_node_config rx_cfg;
-	int ret, id;
 	struct dp_ports *ports = get_dp_ports();
 	uint16_t port_id;
 
-	/* Graph Configuration */
-	tx_node_data = tx_node_data_get();
-	tx_node = tx_node_get();
-	rx_node = rx_node_get();
-
-	// TODO(plague): the whole DP node api needs work, either this will be void or properly check
-	// (this will apply on many places below)
-
 	DP_FOREACH_PORT(ports, port) {
-		port_id = port->port_id;  // TODO ;)
-		// TODO(plague): just create a function for the loop?
-		snprintf(name, sizeof(name), "%u-%u", port->port_id, 0);
-		/* Clone a new rx node with same edges as parent */
-		id = rte_node_clone(rx_node->id, name);
-		if (id == RTE_NODE_ID_INVALID) {
-			DPS_LOG_ERR("Cannot clone rx node %s", dp_strerror(rte_errno));
-			return DP_ERROR;
-		}
-		rx_cfg.port_id = port->port_id;
-		rx_cfg.queue_id = 0;
-		rx_cfg.node_id = id;
-		// TODO(plague): DP node api
-		ret = config_rx_node(&rx_cfg);
-		if (ret < 0) {
-			DPS_LOG_ERR("Rx config failed %s", dp_strerror(ret));
-			return ret;
-		}
+		port_id = port->port_id;
 
-		snprintf(name, sizeof(name), "%u", port->port_id);
-		id = rte_node_clone(tx_node->id, name);
-		if (id == RTE_NODE_ID_INVALID) {
-			DPS_LOG_ERR("Cannot clone rx node %s", dp_strerror(rte_errno));
+		// need to have one Rx and one Tx node per port
+		if (DP_FAILED(rx_node_create(port_id, 0))
+			|| DP_FAILED(tx_node_create(port_id)))
 			return DP_ERROR;
-		}
-		tx_node_data->nodes[port->port_id] = id;
-		tx_node_data->port_ids[port->port_id] = port->port_id;
 
-		// some nodes need a direct connection to all PF/VF ports, add them dynamically
+		// some nodes need a direct Tx connection to all PF/VF ports, add them dynamically
 		snprintf(name, sizeof(name), "tx-%u", port->port_id);
 		switch (port->port_type) {
 		case DP_PORT_VF:
@@ -173,8 +138,7 @@ static int dp_graph_init_nodes()
 				|| DP_FAILED(dhcpv6_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(ipv6_nd_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(l2_decap_node_append_vf_tx(port_id, name))
-				|| DP_FAILED(rx_periodic_node_append_vf_tx(port_id, name))
-			)
+				|| DP_FAILED(rx_periodic_node_append_vf_tx(port_id, name)))
 				return DP_ERROR;
 			break;
 		case DP_PORT_PF:
