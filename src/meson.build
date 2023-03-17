@@ -33,6 +33,7 @@ dp_sources = [
   'rte_flow/dp_rte_flow_traffic_forward.c',
   'dp_conf.c',
   'dp_error.c',
+  'dp_firewall.c',
   'dp_flow.c',
   'dp_graph.c',
   'dp_hairpin.c',

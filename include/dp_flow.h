@@ -96,6 +96,7 @@ struct flow_value {
 	uint8_t			flow_status; // record if a flow is natted in any means
 	uint8_t			flow_state; // track if a flow has been seen in one or both directions
 	uint8_t			dir;
+	uint8_t			fwall_action[DP_FLOW_DIR_MAX];
 	struct {
 		uint8_t orig : 4;
 		uint8_t reply : 4;

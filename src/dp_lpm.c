@@ -655,3 +655,15 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
 	dp_set_mac(portid);
 }
+
+struct dp_fwall_head *dp_get_fwall_head(int port_id)
+{
+	RTE_VERIFY(port_id < DP_MAX_PORTS);
+	return &vm_table[port_id].fwall_head;
+}
+
+void dp_set_fwall_head(int port_id, struct dp_fwall_head *fwall_head)
+{
+	RTE_VERIFY(port_id < DP_MAX_PORTS);
+	vm_table[port_id].fwall_head = *fwall_head;
+}
