@@ -1,4 +1,3 @@
-# TODO mention this: https://mesonbuild.com/Style-guide.html#sorting-source-paths
 dp_sources = [
   'grpc/dp_async_grpc.cpp',
   'grpc/dp_grpc_impl.c',
@@ -62,7 +61,7 @@ endif
 
 exe = executable('dp_service',
   sources: [ dp_sources, grpc_generated ],
-  include_directories: [ inc ],
+  include_directories: [ includes ],
   dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep ]
 )
 
