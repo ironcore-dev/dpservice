@@ -9,18 +9,22 @@
 #include "dp_lpm.h"
 #include "nodes/common_node.h"
 
-enum {
-	ARP_NEXT_DROP,
-	ARP_NEXT_MAX
-};
+DP_NODE_REGISTER(ARP, arp, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int arp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(arp), next_tx_index, port_id, tx_node_name);
+}
+
+// constant after init, precompute
 static rte_be32_t gateway_ipv4_nl;
 
 static int arp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 	gateway_ipv4_nl = htonl(dp_get_gw_ip4());
-	return 0;
+	return DP_OK;
 }
 
 static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
@@ -75,20 +79,4 @@ static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,
 {
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
-}
-
-static struct rte_node_register arp_node_base = {
-	.name = "arp",
-	.init = arp_node_init,
-	.process = arp_node_process,
-	.nb_edges = ARP_NEXT_MAX,
-	.next_nodes = {
-		[ARP_NEXT_DROP] = "drop",
-	},
-};
-RTE_NODE_REGISTER(arp_node_base);
-
-int arp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_vf_tx(&arp_node_base, next_tx_index, port_id, tx_node_name);
 }

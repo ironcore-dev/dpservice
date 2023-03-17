@@ -12,12 +12,14 @@
 #include "dp_lpm.h"
 #include "nodes/common_node.h"
 
-enum {
-	DHCP_NEXT_DROP,
-	DHCP_NEXT_MAX
-};
+DP_NODE_REGISTER(DHCP, dhcp, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int dhcp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(dhcp), next_tx_index, port_id, tx_node_name);
+}
 
 // constant after init, precompute them
 static uint32_t dhcp_lease = DP_DHCP_INFINITE;
@@ -48,7 +50,7 @@ static int dhcp_node_init(__rte_unused const struct rte_graph *graph, __rte_unus
 	rte_memcpy(classless_route, classless_route_prefix, sizeof(classless_route_prefix));
 	rte_memcpy(classless_route+sizeof(classless_route_prefix), &server_ip, sizeof(server_ip));
 
-	return 0;
+	return DP_OK;
 }
 
 static __rte_always_inline int add_dhcp_option(uint8_t **pos_ptr, uint8_t *end, uint8_t opt, const void *value, uint8_t size)
@@ -273,20 +275,4 @@ static uint16_t dhcp_node_process(struct rte_graph *graph,
 {
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
-}
-
-static struct rte_node_register dhcp_node_base = {
-	.name = "dhcp",
-	.init = dhcp_node_init,
-	.process = dhcp_node_process,
-	.nb_edges = DHCP_NEXT_MAX,
-	.next_nodes = {
-		[DHCP_NEXT_DROP] = "drop",
-	},
-};
-RTE_NODE_REGISTER(dhcp_node_base);
-
-int dhcp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_vf_tx(&dhcp_node_base, next_tx_index, port_id, tx_node_name);
 }

@@ -110,8 +110,6 @@ static int graph_main_loop()
 }
 
 
-
-
 static __rte_always_inline int dp_nanosleep(uint64_t ns)
 {
 	struct timespec delay;

@@ -1,30 +1,19 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
-#include "dp_mbuf_dyn.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
-#include "dpdk_layer.h"
+#include "dp_mbuf_dyn.h"
+#include "node_api.h"
 #include "nodes/common_node.h"
-#include "nodes/geneve_tunnel_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
-struct geneve_tunnel_node_main geneve_tunnel_node;
-
-static int geneve_tunnel_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct geneve_tunnel_node_ctx *ctx = (struct geneve_tunnel_node_ctx *)node->ctx;
-
-	ctx->next = GENEVE_TUNNEL_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
-
+#define NEXT_NODES(NEXT) \
+	NEXT(GENEVE_TUNNEL_NEXT_IPV6_ENCAP, "ipv6_encap") \
+	NEXT(GENEVE_TUNNEL_NEXT_IPV4_LOOKUP, "conntrack") \
+	NEXT(GENEVE_TUNNEL_NEXT_IPV6_LOOKUP, "ipv6_lookup")
+DP_NODE_REGISTER_NOINIT(GENEVE_TUNNEL, geneve_tunnel, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t handle_geneve_tunnel_encap(struct rte_node *node,
 																 struct rte_mbuf *m,
@@ -122,33 +111,3 @@ static uint16_t geneve_tunnel_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
 }
-
-
-
-int geneve_tunnel_set_next(uint16_t port_id, uint16_t next_index)
-{
-	geneve_tunnel_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register geneve_tunnel_node_base = {
-	.name = "geneve_tunnel",
-	.init = geneve_tunnel_node_init,
-	.process = geneve_tunnel_node_process,
-
-	.nb_edges = GENEVE_TUNNEL_NEXT_MAX,
-	.next_nodes =
-		{
-			[GENEVE_TUNNEL_NEXT_DROP] = "drop",
-			[GENEVE_TUNNEL_NEXT_IPV6_ENCAP] = "ipv6_encap",
-			[GENEVE_TUNNEL_NEXT_IPV4_LOOKUP] = "conntrack",
-			[GENEVE_TUNNEL_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
-		},
-};
-
-struct rte_node_register *geneve_tunnel_node_get(void)
-{
-	return &geneve_tunnel_node_base;
-}
-
-RTE_NODE_REGISTER(geneve_tunnel_node_base);

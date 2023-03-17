@@ -10,10 +10,9 @@
 #include "node_api.h"
 #include "nodes/common_node.h"
 
-enum {
-	RX_NEXT_CLS,
-	RX_NEXT_MAX
-};
+#define NEXT_NODES(NEXT) \
+	NEXT(RX_NEXT_CLS, "cls")
+DP_NODE_REGISTER_SOURCE(RX, rx, NEXT_NODES);
 
 // there are multiple Tx nodes, one per port, node context is needed
 struct rx_node_ctx {
@@ -23,12 +22,32 @@ struct rx_node_ctx {
 };
 _Static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ);
 
+// need to access nodes' context to enable/disable them
+static struct rx_node_ctx *node_contexts[DP_MAX_PORTS];
+
 // also some way to map ports to nodes is needed
 static rte_node_t rx_node_ids[DP_MAX_PORTS];
 
+int rx_node_create(uint16_t port_id, uint16_t queue_id)
+{
+	char name[RTE_NODE_NAMESIZE];
+	rte_node_t node_id;
 
-// need to access nodes' context to enable/disable them
-static struct rx_node_ctx *node_contexts[DP_MAX_PORTS];
+	if (port_id >= RTE_DIM(rx_node_ids)) {
+		DPS_LOG_ERR("Port id %u too high for Rx nodes, max %lu", port_id, RTE_DIM(rx_node_ids));
+		return DP_ERROR;
+	}
+
+	snprintf(name, sizeof(name), "%u-%u", port_id, queue_id);
+	node_id = rte_node_clone(DP_NODE_GET_SELF(rx)->id, name);
+	if (node_id == RTE_NODE_ID_INVALID) {
+		DPS_LOG_ERR("Cannot clone Rx node %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
+
+	rx_node_ids[port_id] = node_id;
+	return DP_OK;
+}
 
 int rx_node_set_enabled(uint16_t port_id, bool enabled)
 {
@@ -90,37 +109,4 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	dp_forward_graph_packets(graph, node, objs, n_pkts, RX_NEXT_CLS);
 
 	return n_pkts;
-}
-
-static struct rte_node_register rx_node_base = {
-	.name = "rx",
-	.flags = RTE_NODE_SOURCE_F,
-	.init = rx_node_init,
-	.process = rx_node_process,
-	.nb_edges = RX_NEXT_MAX,
-	.next_nodes = {
-		[RX_NEXT_CLS] = "cls",
-	},
-};
-RTE_NODE_REGISTER(rx_node_base);
-
-int rx_node_create(uint16_t port_id, uint16_t queue_id)
-{
-	char name[RTE_NODE_NAMESIZE];
-	rte_node_t node_id;
-
-	if (port_id >= RTE_DIM(rx_node_ids)) {
-		DPS_LOG_ERR("Port id %u too high for Rx nodes, max %lu", port_id, RTE_DIM(rx_node_ids));
-		return DP_ERROR;
-	}
-
-	snprintf(name, sizeof(name), "%u-%u", port_id, queue_id);
-	node_id = rte_node_clone(rx_node_base.id, name);
-	if (node_id == RTE_NODE_ID_INVALID) {
-		DPS_LOG_ERR("Cannot clone Rx node %s", dp_strerror(rte_errno));
-		return DP_ERROR;
-	}
-
-	rx_node_ids[port_id] = node_id;
-	return DP_OK;
 }

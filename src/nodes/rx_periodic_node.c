@@ -1,21 +1,27 @@
 #include "nodes/rx_periodic_node.h"
+#include <rte_common.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_mbuf_dyn.h"
-#include "dp_port.h"
-#include "dpdk_layer.h"
 #include "grpc/dp_grpc_impl.h"
 #include "monitoring/dp_monitoring.h"
 #include "nodes/common_node.h"
 
-enum {
-	RX_PERIODIC_NEXT_CLS,
-	RX_PERIODIC_NEXT_MAX
-};
+#define NEXT_NODES(NEXT) \
+	NEXT(RX_PERIODIC_NEXT_CLS, "cls")
+DP_NODE_REGISTER_SOURCE(RX_PERIODIC, rx_periodic, NEXT_NODES);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int rx_periodic_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(rx_periodic), next_tx_index, port_id, tx_node_name);
+}
+
+// dereference for speed of access
 static struct rte_ring *periodic_msg_queue;
 static struct rte_ring *grpc_tx_queue;
 static struct rte_ring *monitoring_rx_queue;
@@ -28,7 +34,7 @@ static int rx_periodic_node_init(__rte_unused const struct rte_graph *graph, __r
 	grpc_tx_queue = dp_layer->grpc_tx_queue;
 	monitoring_rx_queue = dp_layer->monitoring_rx_queue;
 
-	return 0;
+	return DP_OK;
 }
 
 static __rte_always_inline void handle_nongraph_queues()
@@ -85,21 +91,4 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 	node->idx = n_pkts;
 	dp_foreach_graph_packet(graph, node, objs, n_pkts, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return n_pkts;
-}
-
-static struct rte_node_register rx_periodic_node_base = {
-	.name = "rx-periodic",
-	.flags = RTE_NODE_SOURCE_F,
-	.init = rx_periodic_node_init,
-	.process = rx_periodic_node_process,
-	.nb_edges = RX_PERIODIC_NEXT_MAX,
-	.next_nodes = {
-		[RX_PERIODIC_NEXT_CLS] = "cls",
-	},
-};
-RTE_NODE_REGISTER(rx_periodic_node_base);
-
-int rx_periodic_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_vf_tx(&rx_periodic_node_base, next_tx_index, port_id, tx_node_name);
 }

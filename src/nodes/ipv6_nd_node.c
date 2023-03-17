@@ -7,12 +7,14 @@
 #include "dp_port.h"
 #include "nodes/common_node.h"
 
-enum {
-	IPV6_ND_NEXT_DROP,
-	IPV6_ND_NEXT_MAX
-};
+DP_NODE_REGISTER_NOINIT(IPV6_ND, ipv6_nd, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(ipv6_nd), next_tx_index, port_id, tx_node_name);
+}
 
 static const uint8_t dp_unspecified_ipv6[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const uint8_t dp_multicast_ipv6[16] = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 };
@@ -71,7 +73,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	return next_tx_index[m->port];
 } 
 
-
 static uint16_t ipv6_nd_node_process(struct rte_graph *graph,
 									 struct rte_node *node,
 									 void **objs,
@@ -83,20 +84,4 @@ static uint16_t ipv6_nd_node_process(struct rte_graph *graph,
 		dp_forward_graph_packets(graph, node, objs, nb_objs, IPV6_ND_NEXT_DROP);
 
 	return nb_objs;
-}
-
-static struct rte_node_register ipv6_nd_node_base = {
-	.name = "ipv6_nd",
-	.init = NULL,
-	.process = ipv6_nd_node_process,
-	.nb_edges = IPV6_ND_NEXT_MAX,
-	.next_nodes = {
-		[IPV6_ND_NEXT_DROP] = "drop",
-	},
-};
-RTE_NODE_REGISTER(ipv6_nd_node_base);
-
-int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_vf_tx(&ipv6_nd_node_base, next_tx_index, port_id, tx_node_name);
 }

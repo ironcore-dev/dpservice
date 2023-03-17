@@ -9,15 +9,17 @@
 #include "dp_lpm.h"
 #include "nodes/common_node.h"
 
-enum {
-	DHCPV6_NEXT_DROP,
-	DHCPV6_NEXT_MAX
-};
+DP_NODE_REGISTER_NOINIT(DHCPV6, dhcpv6, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
 
+int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(dhcpv6), next_tx_index, port_id, tx_node_name);
+}
+
 static struct client_id cid;
-static struct server_id  sid;
+static struct server_id sid;
 static struct ia_option recv_ia;
 static struct rapid_commit rapid;
 uint8_t client_id_len;
@@ -155,20 +157,4 @@ static uint16_t dhcpv6_node_process(struct rte_graph *graph,
 {
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
-}
-
-static struct rte_node_register dhcpv6_node_base = {
-	.name = "dhcpv6",
-	.init = NULL,
-	.process = dhcpv6_node_process,
-	.nb_edges = DHCPV6_NEXT_MAX,
-	.next_nodes = {
-		[DHCPV6_NEXT_DROP] = "drop",
-	},
-};
-RTE_NODE_REGISTER(dhcpv6_node_base);
-
-int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_vf_tx(&dhcpv6_node_base, next_tx_index, port_id, tx_node_name);
 }

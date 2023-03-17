@@ -16,10 +16,7 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
-enum {
-	TX_NEXT_DROP,
-	TX_NEXT_MAX
-};
+DP_NODE_REGISTER(TX, tx, DP_NODE_DEFAULT_NEXT_ONLY);
 
 // there are multiple Tx nodes, one per port, node context is needed
 struct tx_node_ctx {
@@ -30,6 +27,27 @@ _Static_assert(sizeof(struct tx_node_ctx) <= RTE_NODE_CTX_SZ);
 
 // also some way to map ports to nodes is needed
 static rte_node_t tx_node_ids[DP_MAX_PORTS];
+
+int tx_node_create(uint16_t port_id)
+{
+	char name[RTE_NODE_NAMESIZE];
+	rte_node_t node_id;
+
+	if (port_id >= RTE_DIM(tx_node_ids)) {
+		DPS_LOG_ERR("Port id %u too high for Tx nodes, max %lu", port_id, RTE_DIM(tx_node_ids));
+		return DP_ERROR;
+	}
+
+	snprintf(name, sizeof(name), "%u", port_id);
+	node_id = rte_node_clone(DP_NODE_GET_SELF(tx)->id, name);
+	if (node_id == RTE_NODE_ID_INVALID) {
+		DPS_LOG_ERR("Cannot clone Tx node %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
+
+	tx_node_ids[port_id] = node_id;
+	return DP_OK;
+}
 
 
 static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
@@ -111,36 +129,4 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 
 	// maybe sent_count makes more sense, but cnt is the real number of processed packets by this node
 	return nb_objs;
-}
-
-static struct rte_node_register tx_node_base = {
-	.name = "tx",
-	.init = tx_node_init,
-	.process = tx_node_process,
-	.nb_edges = TX_NEXT_MAX,
-	.next_nodes = {
-		[TX_NEXT_DROP] = "drop"
-	},
-};
-RTE_NODE_REGISTER(tx_node_base);
-
-int tx_node_create(uint16_t port_id)
-{
-	char name[RTE_NODE_NAMESIZE];
-	rte_node_t node_id;
-
-	if (port_id >= RTE_DIM(tx_node_ids)) {
-		DPS_LOG_ERR("Port id %u too high for Tx nodes, max %lu", port_id, RTE_DIM(tx_node_ids));
-		return DP_ERROR;
-	}
-
-	snprintf(name, sizeof(name), "%u", port_id);
-	node_id = rte_node_clone(tx_node_base.id, name);
-	if (node_id == RTE_NODE_ID_INVALID) {
-		DPS_LOG_ERR("Cannot clone Tx node %s", dp_strerror(rte_errno));
-		return DP_ERROR;
-	}
-
-	tx_node_ids[port_id] = node_id;
-	return DP_OK;
 }

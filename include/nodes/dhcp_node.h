@@ -1,8 +1,7 @@
-#ifndef __INCLUDE_DHCP_NODE_PRIV_H__
-#define __INCLUDE_DHCP_NODE_PRIV_H__
+#ifndef __INCLUDE_DHCP_NODE_H__
+#define __INCLUDE_DHCP_NODE_H__
 
 #include <stdint.h>
-#include "dpdk_layer.h"
 
 #ifdef __cplusplus
 extern "C" {

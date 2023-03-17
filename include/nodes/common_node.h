@@ -111,6 +111,9 @@ void dp_forward_graph_packets(struct rte_graph *graph,
 	rte_node_next_stream_move(graph, node, next_index);
 }
 
+//
+// Functions for creating dynamic graph edges based on connectet PF/VF ports
+//
 int dp_node_append_tx(struct rte_node_register *node,
 					  uint16_t next_tx_indices[DP_MAX_PORTS],
 					  uint16_t port_id,
@@ -123,6 +126,62 @@ int dp_node_append_pf_tx(struct rte_node_register *node,
 						 uint16_t next_tx_indices[DP_MAX_PORTS],
 						 uint16_t port_id,
 						 const char *tx_node_name);
+
+//
+// Preprocessor metaprogramming to make the node registration code simpler and more secure.
+// This ensures NODE_NEXT_MAX is properly set and NODE_NEXT_DROP is always zero.
+// Compiler fails if init/process callbacks are not present.
+// Next nodes are DP_NODE_DEFAULT_NEXT_ONLY or extended by using a list generator macro:
+//     MY_NEXT_NODES(NEXT) /
+//         NEXT(MYNODE_NEXT_XXX, "xxx") /
+//         NEXT(MYNODE_NEXT_YYY, "yyy") /
+//     DP_NODE_REGISTER(MYNODE, mynode, MY_NEXT_NODES)
+//
+// The resulting `struct rte_node_register` is then accessible
+// via DP_NODE_GET_SELF(mynode)
+//
+#define _DP_NODE_REGISTER_GENERATE_ENUM(NODE_NEXT_ENUM, NODE_NEXT_NAME) \
+	NODE_NEXT_ENUM,
+
+#define _DP_NODE_REGISTER_GENERATE_NEXT_NODES(NODE_NEXT_ENUM, NODE_NEXT_NAME) \
+	[NODE_NEXT_ENUM] = NODE_NEXT_NAME,
+
+#define _DP_NODE_REGISTER(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES, INIT, FLAGS) \
+	static uint16_t LOWER_NODE_NAME ## _node_process(struct rte_graph *graph, struct rte_node *node, void **objs, uint16_t nb_objs); \
+	enum LOWER_NODE_NAME ## _next_node { \
+		UPPER_NODE_NAME ## _NEXT_DROP, \
+		EXTRA_NEXT_NODES(_DP_NODE_REGISTER_GENERATE_ENUM) \
+		UPPER_NODE_NAME ## _NEXT_MAX \
+	}; \
+	static struct rte_node_register LOWER_NODE_NAME ## _node_register = { \
+		.name = #LOWER_NODE_NAME, \
+		.flags = FLAGS, \
+		.init = INIT, \
+		.process = LOWER_NODE_NAME ## _node_process, \
+		.nb_edges = UPPER_NODE_NAME ## _NEXT_MAX, \
+		.next_nodes = { \
+			[UPPER_NODE_NAME ## _NEXT_DROP] = "drop", \
+			EXTRA_NEXT_NODES(_DP_NODE_REGISTER_GENERATE_NEXT_NODES) \
+		}, \
+	}; \
+	RTE_NODE_REGISTER(LOWER_NODE_NAME ## _node_register)
+
+#define _DP_NODE_REGISTER_INIT(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES, FLAGS) \
+	static int LOWER_NODE_NAME ## _node_init(const struct rte_graph *graph, struct rte_node *node); \
+	_DP_NODE_REGISTER(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES, LOWER_NODE_NAME ## _node_init, FLAGS)
+
+#define DP_NODE_REGISTER_NOINIT(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES) \
+	_DP_NODE_REGISTER(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES, NULL, 0)
+
+#define DP_NODE_REGISTER_SOURCE(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES) \
+	_DP_NODE_REGISTER_INIT(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES, RTE_NODE_SOURCE_F)
+
+#define DP_NODE_REGISTER(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES) \
+	_DP_NODE_REGISTER_INIT(UPPER_NODE_NAME, LOWER_NODE_NAME, EXTRA_NEXT_NODES, 0)
+
+#define DP_NODE_GET_SELF(LOWER_NODE_NAME) (&LOWER_NODE_NAME ## _node_register)
+
+#define DP_NODE_DEFAULT_NEXT_ONLY(NEXT)
 
 #ifdef __cplusplus
 }

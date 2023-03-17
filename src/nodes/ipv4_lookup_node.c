@@ -3,32 +3,22 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include <rte_malloc.h>
+#include "dp_conf.h"
+#include "dp_flow.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_multi_path.h"
+#include "dp_port.h"
+#include "dp_vnf.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
-#include "nodes/ipv4_lookup_priv.h"
 #include "nodes/dhcp_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_util.h"
-#include "dp_lpm.h"
-#include "dp_flow.h"
-#include "dp_vnf.h"
-#include "dp_multi_path.h"
-
 #include "rte_flow/dp_rte_flow.h"
 
-struct ipv4_lookup_node_main ipv4_lookup_node;
-
-static int ipv4_lookup_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct ipv4_lookup_node_ctx *ctx = (struct ipv4_lookup_node_ctx *)node->ctx;
-
-	ctx->next = IPV4_LOOKUP_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+#define NEXT_NODES(NEXT) \
+	NEXT(IPV4_LOOKUP_NEXT_DHCP, "dhcp") \
+	NEXT(IPV4_LOOKUP_NEXT_NAT, "snat")
+DP_NODE_REGISTER_NOINIT(IPV4_LOOKUP, ipv4_lookup, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -81,30 +71,3 @@ static uint16_t ipv4_lookup_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV4_LOOKUP_NEXT_NAT, get_next_index);
 	return nb_objs;
 }
-
-int ipv4_lookup_set_next(uint16_t port_id, uint16_t next_index)
-{
-	ipv4_lookup_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register ipv4_lookup_node_base = {
-	.name = "ipv4_lookup",
-	.init = ipv4_lookup_node_init,
-	.process = ipv4_lookup_node_process,
-
-	.nb_edges = IPV4_LOOKUP_NEXT_MAX,
-	.next_nodes = {
-
-			[IPV4_LOOKUP_NEXT_DROP] = "drop",
-			[IPV4_LOOKUP_NEXT_DHCP] = "dhcp",
-			[IPV4_LOOKUP_NEXT_NAT] = "snat",
-		},
-};
-
-struct rte_node_register *ipv4_lookup_node_get(void)
-{
-	return &ipv4_lookup_node_base;
-}
-
-RTE_NODE_REGISTER(ipv4_lookup_node_base);

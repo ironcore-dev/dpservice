@@ -1,6 +1,7 @@
-#ifndef __INCLUDE_DHCPV6_NODE_PRIV_H__
-#define __INCLUDE_DHCPV6_NODE_PRIV_H__
+#ifndef __INCLUDE_DHCPV6_NODE_H__
+#define __INCLUDE_DHCPV6_NODE_H__
 
+#include <stdint.h>
 #include <rte_ether.h>
 
 #ifdef __cplusplus

@@ -1,15 +1,15 @@
 #include "dp_graph.h"
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_port.h"
+#include "dp_timers.h"
 #include "nodes/arp_node.h"
 #include "nodes/dhcp_node.h"
 #include "nodes/dhcpv6_node.h"
-#include "nodes/ipip_tunnel_node.h"
 #include "nodes/ipv6_encap_node.h"
-#include "nodes/ipv6_lookup_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "nodes/l2_decap_node.h"
-#include "nodes/packet_relay_node.h"
 #include "nodes/rx_node.h"
 #include "nodes/rx_periodic_node.h"
 #include "nodes/tx_node.h"
@@ -89,7 +89,7 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 	rte_graph_t graph_id;
 	char graph_name[RTE_GRAPH_NAMESIZE];
 	// seems that we only need to provide the source-nodes, the rest is added via connected edges
-	static const char *source_node_patterns[] = { "rx-*" };
+	static const char *source_node_patterns[] = { "rx-*", "rx_periodic" };
 	struct rte_graph_param graph_conf = {
 		.node_patterns = source_node_patterns,
 		.nb_node_patterns = RTE_DIM(source_node_patterns),

@@ -13,18 +13,22 @@
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
-enum {
-	VIRTSVC_NEXT_DROP,
-	VIRTSVC_NEXT_MAX
-};
+DP_NODE_REGISTER(VIRTSVC, virtsvc, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int virtsvc_node_append_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_tx(DP_NODE_GET_SELF(virtsvc), next_tx_index, port_id, tx_node_name);
+}
+
+// runtime constant, precompute
 static struct underlay_conf *underlay_conf;
 
 static int virtsvc_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 	underlay_conf = get_underlay_conf();
-	return 0;
+	return DP_OK;
 }
 
 static __rte_always_inline void virtsvc_tcp_state_change(struct dp_virtsvc_conn *conn, uint8_t tcp_flags)
@@ -244,21 +248,4 @@ static uint16_t virtsvc_node_process(struct rte_graph *graph,
 {
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
-}
-
-static struct rte_node_register virtsvc_node_base = {
-	.name = "virtsvc",
-	.init = virtsvc_node_init,
-	.process = virtsvc_node_process,
-
-	.nb_edges = VIRTSVC_NEXT_MAX,
-	.next_nodes = {
-		[VIRTSVC_NEXT_DROP] = "drop",
-	},
-};
-RTE_NODE_REGISTER(virtsvc_node_base);
-
-int virtsvc_node_append_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_tx(&virtsvc_node_base, next_tx_index, port_id, tx_node_name);
 }

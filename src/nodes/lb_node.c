@@ -1,31 +1,21 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dp_nat.h"
-#include "dp_flow.h"
-#include "dp_util.h"
-#include "dp_lb.h"
-#include "dp_vnf.h"
 #include "dp_error.h"
-#include "rte_flow/dp_rte_flow.h"
+#include "dp_flow.h"
+#include "dp_lb.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
+#include "dp_vnf.h"
 #include "nodes/common_node.h"
-#include "nodes/lb_node.h"
+#include "rte_flow/dp_rte_flow.h"
 
-
-static int lb_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct lb_node_ctx *ctx = (struct lb_node_ctx *)node->ctx;
-
-	ctx->next = LB_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+#define NEXT_NODES(NEXT) \
+	NEXT(LB_NEXT_OVERLAY_SWITCH, "overlay_switch") \
+	NEXT(LB_NEXT_PACKET_RELAY, "packet_relay") \
+	NEXT(LB_NEXT_DNAT, "dnat")
+DP_NODE_REGISTER_NOINIT(LB, lb, NEXT_NODES);
 
 static __rte_always_inline void dp_lb_pfx_vnf_check(struct dp_flow *df_ptr, uint16_t port)
 {
@@ -92,25 +82,3 @@ static uint16_t lb_node_process(struct rte_graph *graph,
 
 	return nb_objs;
 }
-
-static struct rte_node_register lb_node_base = {
-	.name = "lb",
-	.init = lb_node_init,
-	.process = lb_node_process,
-
-	.nb_edges = LB_NEXT_MAX,
-	.next_nodes =
-		{
-			[LB_NEXT_OVERLAY_SWITCH] = "overlay_switch",
-			[LB_NEXT_PACKET_RELAY] = "packet_relay",
-			[LB_NEXT_DNAT] = "dnat",
-			[LB_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *lb_node_get(void)
-{
-	return &lb_node_base;
-}
-
-RTE_NODE_REGISTER(lb_node_base);
