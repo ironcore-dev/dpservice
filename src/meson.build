@@ -15,7 +15,6 @@ dp_sources = [
   'nodes/dnat_node.c',
   'nodes/drop_node.c',
   'nodes/firewall_node.c',
-  'nodes/geneve_tunnel_node.c',
   'nodes/ipip_tunnel_node.c',
   'nodes/ipv4_lookup_node.c',
   'nodes/ipv6_encap_node.c',

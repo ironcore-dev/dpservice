@@ -15,7 +15,6 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --pf1 | IFNAME | second physical interface (e.g. eth1) |  |
 | --ipv6 | ADDR6 | IPv6 underlay address |  |
 | --vf-pattern | PATTERN | virtual interface name pattern (e.g. 'eth1vf') |  |
-| --overlay-type | TYPE | overlay tunnel type to use | 'ipip' (default) or 'geneve' |
 | --dhcp-mtu | SIZE | set the mtu field in DHCP responses (68 - 1500) |  |
 | --dhcp-dns | IPv4 | set the domain name server field in DHCP responses (can be used multiple times) |  |
 | --udp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service |  |

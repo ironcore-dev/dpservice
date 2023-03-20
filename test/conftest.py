@@ -13,9 +13,6 @@ def pytest_addoption(parser):
 		"--build-path", action="store", default=f"{script_dir}/../build", help="Path to the root build directory"
 	)
 	parser.addoption(
-		"--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Tunnel type"
-	)
-	parser.addoption(
 		"--port-redundancy", action="store_true", help="Test with port redundancy"
 	)
 	parser.addoption(
@@ -33,10 +30,6 @@ def build_path(request):
 	return request.config.getoption("--build-path")
 
 @pytest.fixture(scope="package")
-def tun_opt(request):
-	return request.config.getoption("--tun-opt")
-
-@pytest.fixture(scope="package")
 def port_redundancy(request):
 	return request.config.getoption("--port-redundancy")
 
@@ -51,10 +44,10 @@ def grpc_client(build_path):
 
 # All tests require dp_service to be running
 @pytest.fixture(scope="package")
-def dp_service(request, build_path, tun_opt, port_redundancy, fast_flow_timeout):
+def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
 	test_virtsvc = request.config.getoption("--virtsvc")
-	dp_service = DpService(build_path, tun_opt, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc)
+	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc)
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
@@ -79,16 +72,10 @@ def dp_service(request, build_path, tun_opt, port_redundancy, fast_flow_timeout)
 
 # Most tests require interfaces to be up and routing established
 @pytest.fixture(scope="package")
-def prepare_ifaces(request, dp_service, tun_opt, grpc_client):
-	# TODO look into this when doing Geneve, is this the right way?
-	global t_vni
-	if tun_opt == tun_type_geneve:
-		t_vni = vni1
-
+def prepare_ifaces(request, dp_service, grpc_client):
 	if request.config.getoption("--attach"):
 		dp_service.attach(grpc_client)
 		return
-
 	print("---- Interfaces init -----")
 	dp_service.init_ifaces(grpc_client)
 	print("--------------------------")
