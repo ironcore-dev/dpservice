@@ -1,48 +1,49 @@
-#include <rte_common.h>
-#include <rte_ethdev.h>
-#include <rte_graph.h>
+#include "nodes/arp_node.h"
+#include <netinet/in.h>
 #include <rte_arp.h>
-#include <rte_graph_worker.h>
+#include <rte_common.h>
+#include <rte_graph.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
-#include "nodes/arp_node_priv.h"
 #include "dp_error.h"
-#include "dp_mbuf_dyn.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
+#include "nodes/common_node.h"
 
+DP_NODE_REGISTER(ARP, arp, DP_NODE_DEFAULT_NEXT_ONLY);
 
-struct arp_node_main arp_node;
+static uint16_t next_tx_index[DP_MAX_PORTS];
 
-static int arp_node_init(const struct rte_graph *graph, struct rte_node *node)
+int arp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 {
-	struct arp_node_ctx *ctx = (struct arp_node_ctx *)node->ctx;
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(arp), next_tx_index, port_id, tx_node_name);
+}
 
-	ctx->next = ARP_NEXT_DROP;
+// constant after init, precompute
+static rte_be32_t gateway_ipv4_nl;
 
-	RTE_SET_USED(graph);
-
-	return 0;
+static int arp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
+{
+	gateway_ipv4_nl = htonl(dp_get_gw_ip4());
+	return DP_OK;
 }
 
 static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_arp_hdr *incoming_arp_hdr = (struct rte_arp_hdr *)(incoming_eth_hdr + 1);
-	uint32_t requested_ip = ntohl(incoming_arp_hdr->arp_data.arp_tip);
-	uint32_t sender_ip = ntohl(incoming_arp_hdr->arp_data.arp_sip);
+	rte_be32_t requested_ip = incoming_arp_hdr->arp_data.arp_tip;
+	rte_be32_t sender_ip = incoming_arp_hdr->arp_data.arp_sip;
 	struct rte_ether_addr tmp_addr;
 	uint32_t temp_ip;
 
 	// ARP reply from VM
-	if (dp_arp_cycle_needed(m->port) && (sender_ip == dp_get_dhcp_range_ip4(m->port))) {
+	if (dp_arp_cycle_needed(m->port) && sender_ip == htonl(dp_get_dhcp_range_ip4(m->port))) {
 		dp_set_neigh_mac(m->port, &incoming_eth_hdr->src_addr);
 		return true;
 	}
 
 	// unless ARP request for gateway, ignore
-	if (ntohs(incoming_arp_hdr->arp_opcode) != DP_ARP_REQUEST || requested_ip != dp_get_gw_ip4())
+	if (ntohs(incoming_arp_hdr->arp_opcode) != DP_ARP_REQUEST || requested_ip != gateway_ipv4_nl)
 		return false;
 
 	// respond back to origin address from this address (reuse the packet)
@@ -68,7 +69,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return ARP_NEXT_DROP;
 	}
 
-	return arp_node.next_index[pkt->port];
+	return next_tx_index[pkt->port];
 }
 
 static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,
@@ -79,28 +80,3 @@ static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
 }
-
-int arp_set_next(uint16_t port_id, uint16_t next_index)
-{
-	arp_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register arp_node_base = {
-	.name = "arp",
-	.init = arp_node_init,
-	.process = arp_node_process,
-
-	.nb_edges = ARP_NEXT_MAX,
-	.next_nodes = {
-		
-			[ARP_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *arp_node_get(void)
-{
-	return &arp_node_base;
-}
-
-RTE_NODE_REGISTER(arp_node_base);

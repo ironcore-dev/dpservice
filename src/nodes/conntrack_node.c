@@ -1,21 +1,16 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
+#include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "rte_flow/dp_rte_flow.h"
-#include "nodes/common_node.h"
-#include "nodes/conntrack_node.h"
-#include "nodes/dhcp_node.h"
-#include "dp_nat.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_vnf.h"
-#include "dp_refcount.h"
-#include <stdio.h>
-#include <unistd.h>
+#include "nodes/common_node.h"
+#include "nodes/dhcp_node.h"
+#include "rte_flow/dp_rte_flow.h"
 
 static struct flow_key first_key = {0};
 static struct flow_key second_key = {0};
@@ -24,24 +19,21 @@ static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 static bool offload_mode_enabled = 0;
 
-static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
+#define NEXT_NODES(NEXT) \
+	NEXT(CONNTRACK_NEXT_LB, "lb") \
+	NEXT(CONNTRACK_NEXT_DNAT, "dnat") \
+	NEXT(CONNTRACK_NEXT_FIREWALL, "firewall")
+DP_NODE_REGISTER(CONNTRACK, conntrack, NEXT_NODES);
+
+static int conntrack_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-	struct conntrack_node_ctx *ctx = (struct conntrack_node_ctx *)node->ctx;
-
-	ctx->next = CONNTRACK_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
 	prev_key = NULL;
 	curr_key = &first_key;
-
 	offload_mode_enabled = dp_conf_is_offload_enabled();
-
 #ifdef ENABLE_PYTEST
 	flow_timeout = dp_conf_get_flow_timeout();
 #endif
-
-	return 0;
+	return DP_OK;
 }
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
@@ -300,24 +292,3 @@ static uint16_t conntrack_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, CONNTRACK_NEXT_DNAT, get_next_index);
 	return nb_objs;
 }
-
-static struct rte_node_register conntrack_node_base = {
-	.name = "conntrack",
-	.init = conntrack_node_init,
-	.process = conntrack_node_process,
-
-	.nb_edges = CONNTRACK_NEXT_MAX,
-	.next_nodes = {
-			[CONNTRACK_NEXT_LB] = "lb",
-			[CONNTRACK_NEXT_DNAT] = "dnat",
-			[CONNTRACK_NEXT_FIREWALL] = "firewall",
-			[CONNTRACK_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *conntrack_node_get(void)
-{
-	return &conntrack_node_base;
-}
-
-RTE_NODE_REGISTER(conntrack_node_base);

@@ -1,30 +1,14 @@
-#ifndef __INCLUDE_IPV6_ENCAP_NODE_PRIV_H__
-#define __INCLUDE_IPV6_ENCAP_NODE_PRIV_H__
+#ifndef __INCLUDE_IPV6_ENCAP_NODE_H__
+#define __INCLUDE_IPV6_ENCAP_NODE_H__
 
-#include "dpdk_layer.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-enum
-{
-	IPV6_ENCAP_NEXT_DROP,
-	IPV6_ENCAP_NEXT_CLS,
-	IPV6_ENCAP_NEXT_MAX
-};
+int ipv6_encap_node_append_pf_tx(uint16_t port_id, const char *tx_node_name);
 
-struct ipv6_encap_node_ctx
-{
-	uint16_t next;
-};
-
-struct ipv6_encap_node_main {
-	uint16_t next_index[DP_MAX_PORTS];
-};
-
-struct rte_node_register *ipv6_encap_node_get(void);
-int ipv6_encap_set_next(uint16_t port_id, uint16_t next_index);
 #ifdef __cplusplus
 }
 #endif

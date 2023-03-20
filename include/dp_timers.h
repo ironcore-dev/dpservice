@@ -1,6 +1,8 @@
 #ifndef _DP_TIMERS_H_
 #define _DP_TIMERS_H_
 
+#include <rte_timer.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

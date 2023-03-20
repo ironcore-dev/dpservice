@@ -4,55 +4,43 @@
 #include <rte_arp.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_error.h"
 #include "dp_mbuf_dyn.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
-
 #include "rte_flow/dp_rte_flow.h"
 
 #ifdef ENABLE_VIRTSVC
-#include "dp_virtsvc.h"
-static bool virtsvc_present = false;
-const struct dp_virtsvc_lookup_entry *virtsvc_ipv4_tree;
-const struct dp_virtsvc_lookup_entry *virtsvc_ipv6_tree;
+#	include "dp_virtsvc.h"
+	static bool virtsvc_present = false;
+	const struct dp_virtsvc_lookup_entry *virtsvc_ipv4_tree;
+	const struct dp_virtsvc_lookup_entry *virtsvc_ipv6_tree;
+#	define VIRTSVC_NEXT(NEXT) NEXT(CLS_NEXT_VIRTSVC, "virtsvc")
+#else
+#	define VIRTSVC_NEXT(NEXT)
 #endif
 
-enum
-{
-	CLS_NEXT_ARP,
-	CLS_NEXT_IPV6_ND,
-	CLS_NEXT_CONNTRACK,
-	CLS_NEXT_IPV6_LOOKUP,
-	CLS_NEXT_OVERLAY_SWITCH,
-#ifdef ENABLE_VIRTSVC
-	CLS_NEXT_VIRTSVC,
-#endif
-	CLS_NEXT_DROP,
-	CLS_NEXT_MAX
-};
-
-struct cls_node_ctx
-{
-	uint16_t next;
-};
-
-static int cls_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct cls_node_ctx *ctx = (struct cls_node_ctx *)node->ctx;
+#define NEXT_NODES(NEXT) \
+	NEXT(CLS_NEXT_ARP, "arp") \
+	NEXT(CLS_NEXT_IPV6_ND, "ipv6_nd") \
+	NEXT(CLS_NEXT_CONNTRACK, "conntrack") \
+	NEXT(CLS_NEXT_IPV6_LOOKUP, "ipv6_lookup") \
+	NEXT(CLS_NEXT_OVERLAY_SWITCH, "overlay_switch") \
+	VIRTSVC_NEXT(NEXT)
 
 #ifdef ENABLE_VIRTSVC
+DP_NODE_REGISTER(CLS, cls, NEXT_NODES);
+static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
+{
 	virtsvc_present = dp_virtsvc_get_count() > 0;
 	virtsvc_ipv4_tree = dp_virtsvc_get_ipv4_tree();
 	virtsvc_ipv6_tree = dp_virtsvc_get_ipv6_tree();
-#endif
-
-	ctx->next = CLS_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
+	return DP_OK;
 }
+#else
+DP_NODE_REGISTER_NOINIT(CLS, cls, NEXT_NODES);
+#endif
 
 static __rte_always_inline int is_arp(struct rte_mbuf *m)
 {
@@ -209,30 +197,3 @@ static uint16_t cls_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, CLS_NEXT_CONNTRACK, get_next_index);
 	return nb_objs;
 }
-
-static struct rte_node_register cls_node_base = {
-	.name = "cls",
-	.init = cls_node_init,
-	.process = cls_node_process,
-
-	.nb_edges = CLS_NEXT_MAX,
-	.next_nodes =
-		{
-			[CLS_NEXT_ARP] = "arp",
-			[CLS_NEXT_IPV6_ND] = "ipv6_nd",
-			[CLS_NEXT_CONNTRACK] = "conntrack",
-			[CLS_NEXT_IPV6_LOOKUP] = "ipv6_lookup",
-			[CLS_NEXT_OVERLAY_SWITCH] = "overlay_switch",
-#ifdef ENABLE_VIRTSVC
-			[CLS_NEXT_VIRTSVC] = "virtsvc",
-#endif
-			[CLS_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *cls_node_get(void)
-{
-	return &cls_node_base;
-}
-
-RTE_NODE_REGISTER(cls_node_base);

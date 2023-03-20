@@ -1,40 +1,45 @@
+#include "nodes/ipv6_encap_node.h"
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
-#include "nodes/ipv6_encap_node.h"
+#include "dp_conf.h"
 #include "dp_error.h"
-#include "dp_mbuf_dyn.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
-#include "dp_debug.h"
+#include "dpdk_layer.h"
+#include "node_api.h"
+#include "nodes/common_node.h"
 
-struct ipv6_encap_node_main ipv6_encap_node;
+#define NEXT_NODES(NEXT) \
+	NEXT(IPV6_ENCAP_NEXT_CLS, "cls")
+DP_NODE_REGISTER(IPV6_ENCAP, ipv6_encap, NEXT_NODES);
 
-static int ipv6_encap_node_init(const struct rte_graph *graph, struct rte_node *node)
+static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int ipv6_encap_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
 {
-	struct ipv6_encap_node_ctx *ctx = (struct ipv6_encap_node_ctx *)node->ctx;
+	return dp_node_append_pf_tx(DP_NODE_GET_SELF(ipv6_encap), next_tx_index, port_id, tx_node_name);
+}
 
-	ctx->next = IPV6_ENCAP_NEXT_DROP;
+// runtime constant, precompute
+struct underlay_conf *u_conf;
 
-	RTE_SET_USED(graph);
-
-	return 0;
+static int ipv6_encap_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
+{
+	u_conf = get_underlay_conf();
+	return DP_OK;
 }
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = get_dp_flow_ptr(m);
-	struct underlay_conf *u_conf = get_underlay_conf();
 	struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t tunnel_type = dp_conf_get_overlay_type() == DP_CONF_OVERLAY_TYPE_GENEVE
 		? RTE_PTYPE_TUNNEL_GENEVE
 		: RTE_PTYPE_TUNNEL_IP;
-	// TODO(plague): optimization PR - u_conf and tunnel_type can be prepared in init()
 
 	m->outer_l2_len = sizeof(struct rte_ether_hdr);
 	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
@@ -69,7 +74,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return IPV6_ENCAP_NEXT_CLS;
 	}
 
-	return ipv6_encap_node.next_index[df->nxt_hop];
+	return next_tx_index[df->nxt_hop];
 } 
 
 static uint16_t ipv6_encap_node_process(struct rte_graph *graph,
@@ -80,29 +85,3 @@ static uint16_t ipv6_encap_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
 }
-
-int ipv6_encap_set_next(uint16_t port_id, uint16_t next_index)
-{
-	ipv6_encap_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register ipv6_encap_node_base = {
-	.name = "ipv6_encap",
-	.init = ipv6_encap_node_init,
-	.process = ipv6_encap_node_process,
-
-	.nb_edges = IPV6_ENCAP_NEXT_MAX,
-	.next_nodes =
-		{
-			[IPV6_ENCAP_NEXT_DROP] = "drop",
-			[IPV6_ENCAP_NEXT_CLS] = "cls",
-		},
-};
-
-struct rte_node_register *ipv6_encap_node_get(void)
-{
-	return &ipv6_encap_node_base;
-}
-
-RTE_NODE_REGISTER(ipv6_encap_node_base);

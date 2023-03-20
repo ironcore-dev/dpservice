@@ -1,29 +1,18 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dp_nat.h"
+#include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "rte_flow/dp_rte_flow.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
 #include "nodes/common_node.h"
-#include "nodes/snat_node.h"
-#include "dp_error.h"
+#include "rte_flow/dp_rte_flow.h"
 
-
-static int snat_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct snat_node_ctx *ctx = (struct snat_node_ctx *)node->ctx;
-
-	ctx->next = SNAT_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+#define NEXT_NODES(NEXT) \
+	NEXT(SNAT_NEXT_FIREWALL, "firewall")
+DP_NODE_REGISTER_NOINIT(SNAT, snat, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
@@ -155,23 +144,3 @@ static uint16_t snat_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, SNAT_NEXT_FIREWALL, get_next_index);
 	return nb_objs;
 }
-
-static struct rte_node_register snat_node_base = {
-	.name = "snat",
-	.init = snat_node_init,
-	.process = snat_node_process,
-
-	.nb_edges = SNAT_NEXT_MAX,
-	.next_nodes = {
-
-			[SNAT_NEXT_FIREWALL] = "firewall",
-			[SNAT_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *snat_node_get(void)
-{
-	return &snat_node_base;
-}
-
-RTE_NODE_REGISTER(snat_node_base);

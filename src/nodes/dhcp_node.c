@@ -2,23 +2,24 @@
 #include <string.h>  // need memmem()
 
 #include "nodes/dhcp_node.h"
-
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
-#include "dp_mbuf_dyn.h"
-#include "dpdk_layer.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
-#include "nodes/dhcp_node.h"
 
-struct dhcp_node_main dhcp_node;
+DP_NODE_REGISTER(DHCP, dhcp, DP_NODE_DEFAULT_NEXT_ONLY);
+
+static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int dhcp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(dhcp), next_tx_index, port_id, tx_node_name);
+}
 
 // constant after init, precompute them
 static uint32_t dhcp_lease = DP_DHCP_INFINITE;
@@ -32,18 +33,12 @@ static uint32_t dhcp_hdr_magic;
 // list of (mask/address -> address):
 //   169.254.0.0/16 -> 0.0.0.0
 //   0.0.0.0/0 -> server_ip
-static uint8_t classless_route_prefix[] = { 16, 169, 254, 0, 0, 0, 0, 0 };
+static const uint8_t classless_route_prefix[] = { 16, 169, 254, 0, 0, 0, 0, 0 };
 static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip)];
 
 
-static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
+static int dhcp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-	struct dhcp_node_ctx *ctx = (struct dhcp_node_ctx *)node->ctx;
-
-	ctx->next = DHCP_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
 	server_ip = htonl(dp_get_gw_ip4());
 	iface_mtu = htons(dp_conf_get_dhcp_mtu());
 
@@ -55,7 +50,7 @@ static int dhcp_node_init(const struct rte_graph *graph, struct rte_node *node)
 	rte_memcpy(classless_route, classless_route_prefix, sizeof(classless_route_prefix));
 	rte_memcpy(classless_route+sizeof(classless_route_prefix), &server_ip, sizeof(server_ip));
 
-	return 0;
+	return DP_OK;
 }
 
 static __rte_always_inline int add_dhcp_option(uint8_t **pos_ptr, uint8_t *end, uint8_t opt, const void *value, uint8_t size)
@@ -270,7 +265,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return DHCP_NEXT_DROP;
 	}
 
-	return dhcp_node.next_index[m->port];
+	return next_tx_index[m->port];
 }
 
 static uint16_t dhcp_node_process(struct rte_graph *graph,
@@ -281,28 +276,3 @@ static uint16_t dhcp_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
 }
-
-int dhcp_set_next(uint16_t port_id, uint16_t next_index)
-{
-	dhcp_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register dhcp_node_base = {
-	.name = "dhcp",
-	.init = dhcp_node_init,
-	.process = dhcp_node_process,
-
-	.nb_edges = DHCP_NEXT_MAX,
-	.next_nodes = {
-
-			[DHCP_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *dhcp_node_get(void)
-{
-	return &dhcp_node_base;
-}
-
-RTE_NODE_REGISTER(dhcp_node_base);

@@ -33,10 +33,9 @@ if get_option('enable_usermode')
   setcap = find_program('setcap', '/usr/sbin/setcap')
 endif
 
-inc = include_directories('include')
+includes = include_directories('include')
 
 subdir('proto')
-subdir('include')
 subdir('src')
 subdir('tools')
 if get_option('enable_tests')

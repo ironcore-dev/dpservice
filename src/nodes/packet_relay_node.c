@@ -1,31 +1,16 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
-#include "nodes/packet_relay_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dpdk_layer.h"
 #include "rte_flow/dp_rte_flow.h"
-#include "dp_util.h"
-#include "dp_nat.h"
 
-
-struct packet_relay_node_main packet_relay_node;
-
-static int packet_relay_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct packet_relay_node_ctx *ctx = (struct packet_relay_node_ctx *)node->ctx;
-
-	ctx->next = PACKET_RELAY_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+#define NEXT_NODES(NEXT) \
+	NEXT(PACKET_RELAY_NEXT_OVERLAY_SWITCH, "overlay_switch")
+DP_NODE_REGISTER_NOINIT(PACKET_RELAY, packet_relay, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df_ptr, struct rte_mbuf *m)
 {
@@ -90,29 +75,3 @@ static uint16_t packet_relay_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, PACKET_RELAY_NEXT_OVERLAY_SWITCH, get_next_index);
 	return nb_objs;
 }
-
-int packet_relay_set_next(uint16_t port_id, uint16_t next_index)
-{
-	packet_relay_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register packet_relay_node_base = {
-	.name = "packet_relay",
-	.init = packet_relay_node_init,
-	.process = packet_relay_node_process,
-
-	.nb_edges = PACKET_RELAY_NEXT_MAX,
-	.next_nodes = {
-
-			[PACKET_RELAY_NEXT_DROP] = "drop",
-			[PACKET_RELAY_NEXT_OVERLAY_SWITCH] = "overlay_switch",
-		},
-};
-
-struct rte_node_register *packet_relay_node_get(void)
-{
-	return &packet_relay_node_base;
-}
-
-RTE_NODE_REGISTER(packet_relay_node_base);

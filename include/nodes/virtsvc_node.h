@@ -1,23 +1,13 @@
-#ifndef __INCLUDE_VIRTSVC_NODE_PRIV_H__
-#define __INCLUDE_VIRTSVC_NODE_PRIV_H__
+#ifndef __INCLUDE_VIRTSVC_NODE_H__
+#define __INCLUDE_VIRTSVC_NODE_H__
 
-#include "dp_port.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-enum {
-	VIRTSVC_NEXT_DROP,
-	VIRTSVC_NEXT_MAX
-};
-
-struct virtsvc_node_main {
-	uint16_t next_index[DP_MAX_PORTS];
-};
-
-struct rte_node_register *virtsvc_node_get(void);
-int virtsvc_set_next(uint16_t port_id, uint16_t next_index);
+int virtsvc_node_append_tx(uint16_t port_id, const char *tx_node_name);
 
 #ifdef __cplusplus
 }
