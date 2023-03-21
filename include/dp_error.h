@@ -99,7 +99,13 @@ const char *dp_strerror(int error);
 #define DP_ERROR_DEL_LB_BACK_IP_ERR					756
 #define DP_ERROR_GET_LB_ID_ERR						760
 #define DP_ERROR_GET_LB_BACK_IP_ERR					761
-
+#define DP_ERROR_VM_ADD_FWALL_ERR					800
+#define DP_ERROR_VM_ADD_FWALL_RULE_ERR				801
+#define DP_ERROR_VM_ADD_FWALL_NO_DROP_SUPPORT		802
+#define DP_ERROR_VM_GET_FWALL_ERR					810
+#define DP_ERROR_VM_GET_NO_FWALL_RULE_ERR			811
+#define DP_ERROR_VM_DEL_FWALL_ERR					820
+#define DP_ERROR_VM_DEL_NO_FWALL_RULE_ERR			821
 
 #ifdef __cplusplus
 }

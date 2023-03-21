@@ -10,6 +10,7 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include "dp_grpc_impl.h"
+#include "dp_firewall.h"
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -37,6 +38,8 @@ public:
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
 		}
 	int InitCheck();
+	void ConvertDPFWallRuleToGRPCFwallRule(dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
+	void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, dp_fwall_rule *dp_rule);
 	virtual int Proceed() = 0;
 	virtual ~BaseCall() = default;
 };
@@ -491,5 +494,63 @@ public:
 	int Proceed() override;
 };
 
+class AddFirewallRuleCall final : BaseCall {
+	ServerContext ctx_;
+	AddFirewallRuleRequest request_;
+	AddFirewallRuleResponse reply_;
+	ServerAsyncResponseWriter<AddFirewallRuleResponse> responder_;
 
+public:
+	AddFirewallRuleCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_ADD_FWALL_RULE), responder_(&ctx_) {
+		service_->RequestaddFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
+class DelFirewallRuleCall final : BaseCall {
+	ServerContext ctx_;
+	DeleteFirewallRuleRequest request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	DelFirewallRuleCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_DEL_FWALL_RULE), responder_(&ctx_) {
+		service_->RequestdeleteFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
+											this);
+	}
+	int Proceed() override;
+};
+
+class GetFirewallRuleCall final : BaseCall {
+	ServerContext ctx_;
+	GetFirewallRuleRequest request_;
+	GetFirewallRuleResponse reply_;
+	ServerAsyncResponseWriter<GetFirewallRuleResponse> responder_;
+
+public:
+	GetFirewallRuleCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_GET_FWALL_RULE), responder_(&ctx_) {
+		service_->RequestgetFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
+
+class ListFirewallRulesCall final : BaseCall {
+	ServerContext ctx_;
+	ListFirewallRulesRequest request_;
+	ListFirewallRulesResponse reply_;
+	ServerAsyncResponseWriter<ListFirewallRulesResponse> responder_;
+
+public:
+	ListFirewallRulesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_LIST_FWALL_RULES), responder_(&ctx_) {
+		service_->RequestlistFirewallRules(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int Proceed() override;
+};
 #endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H

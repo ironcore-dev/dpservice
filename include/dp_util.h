@@ -17,6 +17,7 @@ extern "C" {
 #include "dp_conf.h"
 
 #define VM_MACHINE_ID_STR_LEN	64
+#define DP_FIREWALL_ID_STR_LEN	64
 #define VM_MACHINE_PXE_STR_LEN	32
 #define DP_LB_ID_SIZE			64
 #define DP_LB_PORT_SIZE			16

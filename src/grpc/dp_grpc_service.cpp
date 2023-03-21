@@ -87,6 +87,10 @@ void GRPCService::HandleRpcs()
 	new ListLBTargetPfxCall(this, cq_.get());
 	new DelLBTargetPfxCall(this, cq_.get());
 	new CreateLBTargetPfxCall(this, cq_.get());
+	new AddFirewallRuleCall(this, cq_.get());
+	new GetFirewallRuleCall(this, cq_.get());
+	new DelFirewallRuleCall(this, cq_.get());
+	new ListFirewallRulesCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

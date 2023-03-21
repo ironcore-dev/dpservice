@@ -53,24 +53,42 @@ typedef enum {
 	DP_CMD_CREATE_LB,
 	DP_CMD_DEL_LB,
 	DP_CMD_GET_LB,
+	DP_CMD_ADD_FWALL_RULE,
+	DP_CMD_GET_FWALL_RULE,
+	DP_CMD_DEL_FWALL_RULE,
+	DP_CMD_LIST_FWALL_RULE,
 } cmd_type;
 
 static char ip6_str[40] = {0};
 static char t_ip6_str[40] = {0};
 static char vni_str[30] = {0};
 static char len_str[30] = {0};
+static char src_len_str[30] = {0};
+static char dst_len_str[30] = {0};
 static char t_vni_str[30] = {0};
 static char machine_str[64] = {0};
 static char lb_id_str[64] = {0};
+static char fwall_id_str[64] = {0};
 static char ip_str[30] = {0};
+static char src_ip_str[30] = {0};
+static char dst_ip_str[30] = {0};
 static char back_ip_str[30] = {0};
 static char pxe_ip_str[30] = {0};
 static char vm_pci_str[30] = {0};
 static char pxe_path_str[30] = {0};
 static char port_str[30] = {0};
 static char proto_str[30] = {0};
+static char action_str[30] = {0};
+static char dir_str[30] = {0};
+static char prio_str[30] = {0};
 static char min_port_str[30]={0};
 static char max_port_str[30]={0};
+static char src_port_min_str[30]={0};
+static char src_port_max_str[30]={0};
+static char dst_port_min_str[30]={0};
+static char dst_port_max_str[30]={0};
+static char icmp_code_str[30]={0};
+static char icmp_type_str[30]={0};
 static IPVersion version;
 static char get_nat_info_type_str[10]={0};
 
@@ -78,10 +96,11 @@ static int command;
 static int debug_mode;
 static int vni;
 static int t_vni;
-static int length;
+static int length, src_length, dst_length;
 static bool pfx_lb_enabled = false;
-static uint32_t min_port;
-static uint32_t max_port;
+static int min_port, src_port_min, dst_port_min, icmp_code;
+static int max_port, src_port_max, dst_port_max, icmp_type;
+static uint32_t priority = 1000;
 
 #define CMD_LINE_OPT_INIT			"init"
 #define CMD_LINE_OPT_INITIALIZED	"is_initialized"
@@ -128,7 +147,24 @@ static uint32_t max_port;
 #define CMD_LINE_OPT_GET_NAT_INFO	"getnatinfo"
 #define CMD_LINE_OPT_NAT_MIN_PORT	"min_port"
 #define CMD_LINE_OPT_NAT_MAX_PORT	"max_port"
-
+#define CMD_LINE_OPT_FWALL_RULE_ID	"fw_ruleid"
+#define CMD_LINE_OPT_DEL_FWALL_RULE	"delfwrule"
+#define CMD_LINE_OPT_GET_FWALL_RULE	"getfwrule"
+#define CMD_LINE_OPT_ADD_FWALL_RULE	"addfwrule"
+#define CMD_LINE_OPT_LST_FWALL_RULE	"listfwrules"
+#define CMD_LINE_OPT_FWALL_SRC_IP	"src_ip"
+#define CMD_LINE_OPT_FWALL_SRC_LEN	"src_length"
+#define CMD_LINE_OPT_FWALL_DST_IP	"dst_ip"
+#define CMD_LINE_OPT_FWALL_DST_LEN	"dst_length"
+#define CMD_LINE_OPT_FWALL_SRC_MIN	"src_port_min"
+#define CMD_LINE_OPT_FWALL_SRC_MAX	"src_port_max"
+#define CMD_LINE_OPT_FWALL_ICMP_COD	"icmp_code"
+#define CMD_LINE_OPT_FWALL_ICMP_TYP	"icmp_type"
+#define CMD_LINE_OPT_FWALL_DST_MIN	"dst_port_min"
+#define CMD_LINE_OPT_FWALL_DST_MAX	"dst_port_max"
+#define CMD_LINE_OPT_FWALL_DIR		"direction"
+#define CMD_LINE_OPT_FWALL_ACTION	"action"
+#define CMD_LINE_OPT_FWALL_PRIO		"priority"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -177,6 +213,24 @@ enum {
 	CMD_LINE_OPT_DEL_LB_NUM,
 	CMD_LINE_OPT_GET_LB_NUM,
 	CMD_LINE_OPT_PFX_LB_NUM,
+	CMD_LINE_OPT_GET_FWALL_RULE_NUM,
+	CMD_LINE_OPT_DEL_FWALL_RULE_NUM,
+	CMD_LINE_OPT_ADD_FWALL_RULE_NUM,
+	CMD_LINE_OPT_LST_FWALL_RULE_NUM,
+	CMD_LINE_OPT_FWALL_SRC_IP_NUM,
+	CMD_LINE_OPT_FWALL_SRC_LEN_NUM,
+	CMD_LINE_OPT_FWALL_DST_IP_NUM,
+	CMD_LINE_OPT_FWALL_DST_LEN_NUM,
+	CMD_LINE_OPT_FWALL_SRC_MIN_NUM,
+	CMD_LINE_OPT_FWALL_SRC_MAX_NUM,
+	CMD_LINE_OPT_FWALL_DST_MIN_NUM,
+	CMD_LINE_OPT_FWALL_DST_MAX_NUM,
+	CMD_LINE_OPT_FWALL_ICMP_COD_NUM,
+	CMD_LINE_OPT_FWALL_ICMP_TYP_NUM,
+	CMD_LINE_OPT_FWALL_DIR_NUM,
+	CMD_LINE_OPT_FWALL_ACTION_NUM,
+	CMD_LINE_OPT_FWALL_PRIO_NUM,
+	CMD_LINE_OPT_FWALL_RULE_ID_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -228,6 +282,24 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_DEL_LB, 1, 0, CMD_LINE_OPT_DEL_LB_NUM},
 	{CMD_LINE_OPT_GET_LB, 1, 0, CMD_LINE_OPT_GET_LB_NUM},
 	{CMD_LINE_OPT_PFX_LB, 0, 0, CMD_LINE_OPT_PFX_LB_NUM},
+	{CMD_LINE_OPT_ADD_FWALL_RULE, 1, 0, CMD_LINE_OPT_ADD_FWALL_RULE_NUM},
+	{CMD_LINE_OPT_DEL_FWALL_RULE, 1, 0, CMD_LINE_OPT_DEL_FWALL_RULE_NUM},
+	{CMD_LINE_OPT_GET_FWALL_RULE, 1, 0, CMD_LINE_OPT_GET_FWALL_RULE_NUM},
+	{CMD_LINE_OPT_LST_FWALL_RULE, 1, 0, CMD_LINE_OPT_LST_FWALL_RULE_NUM},
+	{CMD_LINE_OPT_FWALL_ACTION, 1, 0, CMD_LINE_OPT_FWALL_ACTION_NUM},
+	{CMD_LINE_OPT_FWALL_DIR, 1, 0, CMD_LINE_OPT_FWALL_DIR_NUM},
+	{CMD_LINE_OPT_FWALL_DST_IP, 1, 0, CMD_LINE_OPT_FWALL_DST_IP_NUM},
+	{CMD_LINE_OPT_FWALL_DST_LEN, 1, 0, CMD_LINE_OPT_FWALL_DST_LEN_NUM},
+	{CMD_LINE_OPT_FWALL_DST_MAX, 1, 0, CMD_LINE_OPT_FWALL_DST_MAX_NUM},
+	{CMD_LINE_OPT_FWALL_DST_MIN, 1, 0, CMD_LINE_OPT_FWALL_DST_MIN_NUM},
+	{CMD_LINE_OPT_FWALL_PRIO, 1, 0, CMD_LINE_OPT_FWALL_PRIO_NUM},
+	{CMD_LINE_OPT_FWALL_SRC_IP, 1, 0, CMD_LINE_OPT_FWALL_SRC_IP_NUM},
+	{CMD_LINE_OPT_FWALL_SRC_LEN, 1, 0, CMD_LINE_OPT_FWALL_SRC_LEN_NUM},
+	{CMD_LINE_OPT_FWALL_SRC_MAX, 1, 0, CMD_LINE_OPT_FWALL_SRC_MAX_NUM},
+	{CMD_LINE_OPT_FWALL_SRC_MIN, 1, 0, CMD_LINE_OPT_FWALL_SRC_MIN_NUM},
+	{CMD_LINE_OPT_FWALL_ICMP_COD, 1, 0, CMD_LINE_OPT_FWALL_ICMP_COD_NUM},
+	{CMD_LINE_OPT_FWALL_ICMP_TYP, 1, 0, CMD_LINE_OPT_FWALL_ICMP_TYP_NUM},
+	{CMD_LINE_OPT_FWALL_RULE_ID, 1, 0, CMD_LINE_OPT_FWALL_RULE_ID_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -427,6 +499,74 @@ int parse_args(int argc, char **argv)
 			command = DP_CMD_GET_NAT_INFO;
 			strncpy(get_nat_info_type_str, optarg, 9);
 			break;
+		case CMD_LINE_OPT_GET_FWALL_RULE_NUM:
+			strncpy(machine_str, optarg, 63);
+			command = DP_CMD_GET_FWALL_RULE;
+			break;
+		case CMD_LINE_OPT_LST_FWALL_RULE_NUM:
+			strncpy(machine_str, optarg, 63);
+			command = DP_CMD_LIST_FWALL_RULE;
+			break;
+		case CMD_LINE_OPT_DEL_FWALL_RULE_NUM:
+			strncpy(machine_str, optarg, 63);
+			command = DP_CMD_DEL_FWALL_RULE;
+			break;
+		case CMD_LINE_OPT_ADD_FWALL_RULE_NUM:
+			strncpy(machine_str, optarg, 63);
+			version = dpdkonmetal::IPVersion::IPv4;
+			command = DP_CMD_ADD_FWALL_RULE;
+			break;
+		case CMD_LINE_OPT_FWALL_SRC_IP_NUM:
+			strncpy(src_ip_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_FWALL_SRC_LEN_NUM:
+			strncpy(src_len_str, optarg, 29);
+			src_length = atoi(src_len_str);
+			break;
+		case CMD_LINE_OPT_FWALL_SRC_MAX_NUM:
+			strncpy(src_port_max_str, optarg, 29);
+			src_port_max = atoi(src_port_max_str);
+			break;
+		case CMD_LINE_OPT_FWALL_SRC_MIN_NUM:
+			strncpy(src_port_min_str, optarg, 29);
+			src_port_min = atoi(src_port_min_str);
+			break;
+		case CMD_LINE_OPT_FWALL_ICMP_COD_NUM:
+			strncpy(icmp_code_str, optarg, 29);
+			icmp_code = atoi(icmp_code_str);
+			break;
+		case CMD_LINE_OPT_FWALL_ICMP_TYP_NUM:
+			strncpy(icmp_type_str, optarg, 29);
+			icmp_type = atoi(icmp_type_str);
+			break;
+		case CMD_LINE_OPT_FWALL_DST_IP_NUM:
+			strncpy(dst_ip_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_FWALL_DST_LEN_NUM:
+			strncpy(dst_len_str, optarg, 29);
+			dst_length = atoi(dst_len_str);
+			break;
+		case CMD_LINE_OPT_FWALL_DST_MAX_NUM:
+			strncpy(dst_port_max_str, optarg, 29);
+			dst_port_max = atoi(dst_port_max_str);
+			break;
+		case CMD_LINE_OPT_FWALL_DST_MIN_NUM:
+			strncpy(dst_port_min_str, optarg, 29);
+			dst_port_min = atoi(dst_port_min_str);
+			break;
+		case CMD_LINE_OPT_FWALL_ACTION_NUM:
+			strncpy(action_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_FWALL_DIR_NUM:
+			strncpy(dir_str, optarg, 29);
+			break;
+		case CMD_LINE_OPT_FWALL_PRIO_NUM:
+			strncpy(prio_str, optarg, 29);
+			priority = atoi(prio_str);
+			break;
+		case CMD_LINE_OPT_FWALL_RULE_ID_NUM:
+			strncpy(fwall_id_str, optarg, 63);
+			break;
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -598,6 +738,205 @@ public:
 			stub_->getLoadBalancerTargets(&context, request, &reply);
 			for (i = 0; i < reply.targetips_size(); i++)
 				printf("Backend ip %s\n", reply.targetips(i).address().c_str());
+	}
+
+	void AddFirewallRule() {
+			AddFirewallRuleRequest request;
+			AddFirewallRuleResponse reply;
+			ClientContext context;
+			Prefix *src_ip = new Prefix();
+			Prefix *dst_ip = new Prefix();
+			ProtocolFilter *filter = new ProtocolFilter();
+			FirewallRule *rule = new FirewallRule();
+			ICMPFilter *icmp_filter;
+			TCPFilter *tcp_filter;
+			UDPFilter *udp_filter;
+
+			request.set_interfaceid(machine_str);
+			rule->set_ruleid(fwall_id_str);
+			rule->set_ipversion(version);
+			rule->set_priority(priority);
+			if (strncasecmp("ingress", dir_str, 29) == 0)
+				rule->set_direction(dpdkonmetal::Ingress);
+			else
+				rule->set_direction(dpdkonmetal::Egress);
+
+			if (strncasecmp("accept", action_str, 29) == 0)
+				rule->set_action(dpdkonmetal::Accept);
+			else
+				rule->set_action(dpdkonmetal::Drop);
+
+			src_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				src_ip->set_address(src_ip_str);
+			src_ip->set_prefixlength(src_length);
+			rule->set_allocated_sourceprefix(src_ip);
+
+			dst_ip->set_ipversion(version);
+			if(version == dpdkonmetal::IPVersion::IPv4)
+				dst_ip->set_address(dst_ip_str);
+			dst_ip->set_prefixlength(dst_length);
+			rule->set_allocated_destinationprefix(dst_ip);
+
+			if (strncasecmp("tcp", proto_str, 29) == 0) {
+				tcp_filter = new TCPFilter();
+				tcp_filter->set_dstportlower(dst_port_min);
+				tcp_filter->set_dstportupper(dst_port_max);
+				tcp_filter->set_srcportlower(src_port_min);
+				tcp_filter->set_srcportupper(src_port_max);
+				filter->set_allocated_tcp(tcp_filter);
+				rule->set_allocated_protocolfilter(filter);
+			}
+			if (strncasecmp("udp", proto_str, 29) == 0) {
+				udp_filter = new UDPFilter();
+				udp_filter->set_dstportlower(dst_port_min);
+				udp_filter->set_dstportupper(dst_port_max);
+				udp_filter->set_srcportlower(src_port_min);
+				udp_filter->set_srcportupper(src_port_max);
+				filter->set_allocated_udp(udp_filter);
+				rule->set_allocated_protocolfilter(filter);
+			}
+			if (strncasecmp("icmp", proto_str, 29) == 0) {
+				icmp_filter = new ICMPFilter();
+				icmp_filter->set_icmpcode(icmp_code);
+				icmp_filter->set_icmptype(icmp_type);
+				filter->set_allocated_icmp(icmp_filter);
+				rule->set_allocated_protocolfilter(filter);
+			}
+
+			request.set_allocated_rule(rule);
+			stub_->addFirewallRule(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+	}
+
+	void DelFirewallRule() {
+			DeleteFirewallRuleRequest request;
+			Status reply;
+			ClientContext context;
+
+			request.set_interfaceid(machine_str);
+			request.set_ruleid(fwall_id_str);
+			stub_->deleteFirewallRule(&context, request, &reply);
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("Firewall Rule Deleted\n");
+	}
+
+	void ListFirewallRules() {
+			ListFirewallRulesRequest request;
+			ListFirewallRulesResponse reply;
+			ClientContext context;
+			int i;
+
+			request.set_interfaceid(machine_str);
+			stub_->listFirewallRules(&context, request, &reply);
+			for (i = 0; i < reply.rules_size(); i++) {
+				printf("%s / ", reply.rules(i).ruleid().c_str());
+				if (reply.rules(i).sourceprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+					printf("src_ip: %s / ", reply.rules(i).sourceprefix().address().c_str());
+					printf("src_ip pfx length: %d / ", reply.rules(i).sourceprefix().prefixlength());
+				}
+
+				if (reply.rules(i).destinationprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+					printf("dst_ip: %s / ", reply.rules(i).destinationprefix().address().c_str());
+					printf("dst_ip pfx length: %d \n", reply.rules(i).destinationprefix().prefixlength());
+				}
+
+				switch (reply.rules(i).protocolfilter().filter_case()) {
+					case dpdkonmetal::ProtocolFilter::kTcpFieldNumber:
+						printf("protocol: tcp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
+						reply.rules(i).protocolfilter().tcp().srcportlower(),
+						reply.rules(i).protocolfilter().tcp().srcportupper(),
+						reply.rules(i).protocolfilter().tcp().dstportlower(),
+						reply.rules(i).protocolfilter().tcp().dstportupper());
+					break;
+					case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
+						printf("protocol: udp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
+						reply.rules(i).protocolfilter().tcp().srcportlower(),
+						reply.rules(i).protocolfilter().tcp().srcportupper(),
+						reply.rules(i).protocolfilter().tcp().dstportlower(),
+						reply.rules(i).protocolfilter().tcp().dstportupper());
+					break;
+					case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
+						printf("protocol: icmp / icmp_type: %d / icmp_code: %d \n",
+						reply.rules(i).protocolfilter().icmp().icmptype(),
+						reply.rules(i).protocolfilter().icmp().icmpcode());
+					break;
+					case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
+						printf("protocol: any / src_port_min: any / dst_port_min: any\n");
+					break;
+				}
+				if (reply.rules(i).direction() == dpdkonmetal::Ingress)
+					printf("direction: ingress / ");
+				else
+					printf("direction: egress / ");
+
+				if (reply.rules(i).action() == dpdkonmetal::Accept)
+					printf("action: accept \n");
+				else
+					printf("direction: drop \n");
+			}
+
+	}
+
+	void GetFirewallRule() {
+			GetFirewallRuleRequest request;
+			GetFirewallRuleResponse reply;
+			ClientContext context;
+
+			request.set_interfaceid(machine_str);
+			request.set_ruleid(fwall_id_str);
+			stub_->getFirewallRule(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+			else {
+				printf("%s / ", reply.rule().ruleid().c_str());
+				if (reply.rule().sourceprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+					printf("src_ip: %s / ", reply.rule().sourceprefix().address().c_str());
+					printf("src_ip pfx length: %d / ", reply.rule().sourceprefix().prefixlength());
+				}
+
+				if (reply.rule().destinationprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+					printf("dst_ip: %s / ", reply.rule().destinationprefix().address().c_str());
+					printf("dst_ip pfx length: %d \n", reply.rule().destinationprefix().prefixlength());
+				}
+
+				switch (reply.rule().protocolfilter().filter_case()) {
+					case dpdkonmetal::ProtocolFilter::kTcpFieldNumber:
+						printf("protocol: tcp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
+						reply.rule().protocolfilter().tcp().srcportlower(),
+						reply.rule().protocolfilter().tcp().srcportupper(),
+						reply.rule().protocolfilter().tcp().dstportlower(),
+						reply.rule().protocolfilter().tcp().dstportupper());
+					break;
+					case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
+						printf("protocol: udp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
+						reply.rule().protocolfilter().tcp().srcportlower(),
+						reply.rule().protocolfilter().tcp().srcportupper(),
+						reply.rule().protocolfilter().tcp().dstportlower(),
+						reply.rule().protocolfilter().tcp().dstportupper());
+					break;
+					case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
+						printf("protocol: icmp / icmp_type: %d / icmp_code: %d \n",
+						reply.rule().protocolfilter().icmp().icmptype(),
+						reply.rule().protocolfilter().icmp().icmpcode());
+					break;
+					case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
+						printf("protocol: any / src_port_min: any / dst_port_min: any\n");
+					break;
+				}
+				if (reply.rule().direction() == dpdkonmetal::Ingress)
+					printf("direction: ingress / ");
+				else
+					printf("direction: egress / ");
+
+				if (reply.rule().action() == dpdkonmetal::Accept)
+					printf("action: accept \n");
+				else
+					printf("direction: drop \n");
+			}
 	}
 
 	void AddVIP() {
@@ -1206,6 +1545,22 @@ int main(int argc, char** argv)
 	case DP_CMD_DEL_LB:
 		std::cout << "Delete Loadbalancer called " << std::endl;
 		dpdk_client.DelLB();
+		break;
+	case DP_CMD_ADD_FWALL_RULE:
+		std::cout << "Add FirewallRule called " << std::endl;
+		dpdk_client.AddFirewallRule();
+		break;
+	case DP_CMD_GET_FWALL_RULE:
+		std::cout << "Get FirewallRule called " << std::endl;
+		dpdk_client.GetFirewallRule();
+		break;
+	case DP_CMD_LIST_FWALL_RULE:
+		std::cout << "List FirewallRules called " << std::endl;
+		dpdk_client.ListFirewallRules();
+		break;
+	case DP_CMD_DEL_FWALL_RULE:
+		std::cout << "Del FirewallRule called " << std::endl;
+		dpdk_client.DelFirewallRule();
 		break;
 	default:
 		break;

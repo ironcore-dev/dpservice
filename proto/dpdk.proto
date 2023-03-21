@@ -107,22 +107,22 @@ message ProtocolFilter {
 }
 
 message ICMPFilter {
-	uint32 icmpType = 1;
-	uint32 icmpCode = 2;
+	int32 icmpType = 1;
+	int32 icmpCode = 2;
 }
 
 message TCPFilter {
-	uint32 srcPortLower = 1;
-	uint32 srcPortUpper = 2;
-	uint32 dstPortLower = 3;
-	uint32 dstPortUpper = 4;
+	int32 srcPortLower = 1;
+	int32 srcPortUpper = 2;
+	int32 dstPortLower = 3;
+	int32 dstPortUpper = 4;
 }
 
 message UDPFilter {
-	uint32 srcPortLower = 1;
-	uint32 srcPortUpper = 2;
-	uint32 dstPortLower = 3;
-	uint32 dstPortUpper = 4;
+	int32 srcPortLower = 1;
+	int32 srcPortUpper = 2;
+	int32 dstPortLower = 3;
+	int32 dstPortUpper = 4;
 }
 
 // Firewall Rules can be inserted and removed while the interface is running. In the C code probably it makes sense to use linked lists.
@@ -389,8 +389,8 @@ message GetFirewallRuleRequest {
 }
 
 message GetFirewallRuleResponse {
-	FirewallRule rule = 1;
-	bytes ruleID = 2;
+	Status status = 1;
+	FirewallRule rule = 2;
 }
 
 message DeleteFirewallRuleRequest {
