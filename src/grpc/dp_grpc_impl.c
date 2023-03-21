@@ -529,13 +529,13 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
 			goto err_vnf;
 		}
-		if (setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
+		if (setup_vm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM4;
 			goto handle_err;
 		}
 		if (setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM6;
-			goto lpm_err;
+			goto vm_err;
 		}
 		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), DP_LPM_DHCP_IP_DEPTH,
 							  rte_eth_dev_socket_id(port_id));
@@ -547,7 +547,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
 					 NULL, 32, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT4;
-			goto lpm_err;
+			goto vm_err;
 		}
 		if (dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
 					  NULL, 128, rte_eth_dev_socket_id(port_id))) {
@@ -574,7 +574,7 @@ route_err:
 	dp_del_route(port_id, req->add_machine.vni, 0,
 				ntohl(req->route.pfx_ip.addr), NULL,
 				32, rte_eth_dev_socket_id(port_id));
-lpm_err:
+vm_err:
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), DP_LPM_ROLLBACK);
 handle_err:
 	dp_del_portid_with_vm_handle(req->add_machine.machine_id);

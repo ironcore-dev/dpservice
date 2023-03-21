@@ -3,11 +3,44 @@
 #include "dp_firewall.h"
 #include "dp_lpm.h"
 
+#ifdef ENABLE_PYTEST
+dp_fwall_rule enable_all_egress = {
+	.src_ip = 0,
+	.src_ip_mask = 0,
+	.filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT,
+	.filter.tcp_udp.src_port.upper = 0,
+	.filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT,
+	.filter.tcp_udp.dst_port.upper = 0,
+	.dest_ip = 0,
+	.dest_ip_mask = 0,
+	.dir = DP_FWALL_EGRESS,
+	.protocol = DP_FWALL_MATCH_ANY_PROTOCOL,
+	.action = DP_FWALL_ACCEPT
+};
+dp_fwall_rule enable_all_ingress = {
+	.src_ip = 0,
+	.src_ip_mask = 0,
+	.filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT,
+	.filter.tcp_udp.src_port.upper = 0,
+	.filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT,
+	.filter.tcp_udp.dst_port.upper = 0,
+	.dest_ip = 0,
+	.dest_ip_mask = 0,
+	.dir = DP_FWALL_INGRESS,
+	.protocol = DP_FWALL_MATCH_ANY_PROTOCOL,
+	.action = DP_FWALL_ACCEPT
+};
+#endif
+
 static int32_t rule_id_counter = 1;
 
 void dp_init_firewall_rules_list(int port_id)
 {
 	TAILQ_INIT(dp_get_fwall_head(port_id));
+	#ifdef ENABLE_PYTEST
+	dp_add_firewall_rule(&enable_all_egress, port_id);
+	dp_add_firewall_rule(&enable_all_ingress, port_id);
+	#endif
 }
 
 static int32_t __rte_always_inline dp_generate_rule_id() {
@@ -181,6 +214,9 @@ enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df_ptr, struct rte_i
 void dp_del_all_firewall_rules(int port_id)
 {
 	dp_fwall_rule *rule;
+
+	if (!dp_get_fwall_head(port_id))
+		return;
 
 	while ((rule = TAILQ_FIRST(dp_get_fwall_head(port_id))) != NULL) {
 		TAILQ_REMOVE(dp_get_fwall_head(port_id), rule, next_rule);
