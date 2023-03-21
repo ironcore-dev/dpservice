@@ -36,8 +36,6 @@ extern "C" {
 #define IPV4_DP_RIB_MAX_RULES	1024
 #define IPV6_DP_RIB_MAX_RULES	1024
 
-#define DP_ENCAP_TYPE_GENEVE 1
-
 #define DP_LPM_ROLLBACK	true
 #define DP_LPM_DHCP_IP_DEPTH	32
 #define DP_LPM_DHCP_IP6_DEPTH	128

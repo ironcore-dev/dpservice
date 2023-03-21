@@ -1,7 +1,7 @@
 build/*
 builddir/*
 .vscode/*
-worker_*.dot
+*.dot
 src/*.swp
 src/*.swo
 src/nodes/*.swp
@@ -14,3 +14,4 @@ __*
 *.pl
 scapy-script/*
 code_check/_checkpatch.pl
+.out

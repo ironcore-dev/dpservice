@@ -1,28 +1,25 @@
+#include "nodes/l2_decap_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_util.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
-#include "nodes/l2_decap_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dp_util.h"
 #include "rte_flow/dp_rte_flow.h"
 
+#define NEXT_NODES(NEXT) \
+	NEXT(L2_DECAP_OVERLAY_SWITCH, "overlay_switch")
+DP_NODE_REGISTER_NOINIT(L2_DECAP, l2_decap, NEXT_NODES);
 
-struct l2_decap_node_main l2_decap_node;
+static uint16_t next_tx_index[DP_MAX_PORTS];
 
-static int l2_decap_node_init(const struct rte_graph *graph, struct rte_node *node)
+int l2_decap_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 {
-	struct l2_decap_node_ctx *ctx = (struct l2_decap_node_ctx *)node->ctx;
-
-	ctx->next = L2_DECAP_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(l2_decap), next_tx_index, port_id, tx_node_name);
 }
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
@@ -38,7 +35,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (dp_port_is_pf(df->nxt_hop))
 		return L2_DECAP_OVERLAY_SWITCH;
 
-	return l2_decap_node.next_index[df->nxt_hop];
+	return next_tx_index[df->nxt_hop];
 } 
 
 static uint16_t l2_decap_node_process(struct rte_graph *graph,
@@ -49,29 +46,3 @@ static uint16_t l2_decap_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, L2_DECAP_OVERLAY_SWITCH, get_next_index);
 	return nb_objs;
 }
-
-int l2_decap_set_next(uint16_t port_id, uint16_t next_index)
-{
-	l2_decap_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register l2_decap_node_base = {
-	.name = "l2_decap",
-	.init = l2_decap_node_init,
-	.process = l2_decap_node_process,
-
-	.nb_edges = L2_DECAP_NEXT_MAX,
-	.next_nodes =
-		{
-			[L2_DECAP_NEXT_DROP] = "drop",
-			[L2_DECAP_OVERLAY_SWITCH] = "overlay_switch",
-		},
-};
-
-struct rte_node_register *l2_decap_node_get(void)
-{
-	return &l2_decap_node_base;
-}
-
-RTE_NODE_REGISTER(l2_decap_node_base);

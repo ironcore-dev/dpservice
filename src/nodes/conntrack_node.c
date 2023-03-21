@@ -1,40 +1,88 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
+#include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "rte_flow/dp_rte_flow.h"
-#include "nodes/common_node.h"
-#include "nodes/conntrack_node.h"
-#include "nodes/dhcp_node.h"
-#include "dp_nat.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_vnf.h"
-#include "dp_refcount.h"
-#include <stdio.h>
-#include <unistd.h>
+#include "nodes/common_node.h"
+#include "nodes/dhcp_node.h"
+#include "rte_flow/dp_rte_flow.h"
 
 static struct flow_key first_key = {0};
 static struct flow_key second_key = {0};
 static struct flow_key *prev_key, *curr_key;
 static struct flow_value *prev_flow_val = NULL;
+static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+static bool offload_mode_enabled = 0;
 
-static int conntrack_node_init(const struct rte_graph *graph, struct rte_node *node)
+#define NEXT_NODES(NEXT) \
+	NEXT(CONNTRACK_NEXT_LB, "lb") \
+	NEXT(CONNTRACK_NEXT_DNAT, "dnat") \
+	NEXT(CONNTRACK_NEXT_FIREWALL, "firewall")
+DP_NODE_REGISTER(CONNTRACK, conntrack, NEXT_NODES);
+
+static int conntrack_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-	struct conntrack_node_ctx *ctx = (struct conntrack_node_ctx *)node->ctx;
-
-	ctx->next = CONNTRACK_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
 	prev_key = NULL;
 	curr_key = &first_key;
-
-	return 0;
+	offload_mode_enabled = dp_conf_is_offload_enabled();
+#ifdef ENABLE_PYTEST
+	flow_timeout = dp_conf_get_flow_timeout();
+#endif
+	return DP_OK;
 }
+
+static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
+{
+	uint8_t tcp_flags = tcp_hdr->tcp_flags;
+
+	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
+		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+	} else if (DP_TCP_PKT_FLAG_FIN(tcp_flags)) {
+		// this is not entirely 1:1 mapping to fin sequence,
+		// but sufficient to determine if a tcp connection is almost successfuly closed
+		// (last ack is still pending)
+		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
+			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
+		else
+			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+	} else {
+		switch (flow_val->l4_state.tcp_state) {
+		case DP_FLOW_TCP_STATE_NONE:
+		case DP_FLOW_TCP_STATE_RST_FIN:
+			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
+				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
+			break;
+		case DP_FLOW_TCP_STATE_NEW_SYN:
+			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
+				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
+			break;
+		case DP_FLOW_TCP_STATE_NEW_SYNACK:
+			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
+				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
+			break;
+		default:
+			// FIN-states already handled above
+			break;
+		}
+
+	}
+}
+
+static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val)
+{
+
+	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
+		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
+	else if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN)
+		flow_val->timeout_value = flow_timeout;
+
+}
+
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df_ptr, struct rte_mbuf *m)
 {
@@ -51,6 +99,19 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
 	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+	flow_val->timeout_value = flow_timeout;
+
+	if (offload_mode_enabled) {
+		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+	} else {
+		flow_val->offload_flags.orig = DP_FLOW_NON_OFFLOAD;
+		flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
+	}
+
+	if (df_ptr->l4_type == IPPROTO_TCP)
+		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NONE;
+
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
 	dp_add_flow_data(key, flow_val);
 
@@ -71,25 +132,39 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
+				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
+
+			if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL
+				&& (flow_val->flow_state == DP_FLOW_STATE_ESTABLISHED))
+				flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
+
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_REPLY;
+				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
+
 			
 			flow_val->dir = DP_FLOW_DIR_REPLY;
 		}
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-			if (flow_val->flow_state == DP_FLOW_STATE_REPLY)
-				flow_val->flow_state = DP_FLOW_STATE_ESTAB;
-			
+
+			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
+
+			// UDP traffic could be only one direction, thus from the second UDP packet in the same direction,
+			// one UDP flow cannot be treated as a new one, otherwise it will always trigger the operations in snat or dnat
+			// for new flows.
+			if (df_ptr->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
+				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
+
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	}
 	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
+
 }
 
 static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned char *first_val, const unsigned char *second_val, uint8_t nr_bytes)
@@ -131,6 +206,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 {
 	struct flow_value *flow_val = NULL;
 	struct rte_ipv4_hdr *ipv4_hdr;
+	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key *key;
 	int key_search_result;
@@ -194,6 +270,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		}
 
 		flow_val->timestamp = rte_rdtsc();
+
+		if (df_ptr->l4_type == IPPROTO_TCP) {
+			tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
+			dp_cntrack_tcp_state(flow_val, tcp_hdr);
+			dp_cntrack_set_timeout_tcp_flow(flow_val);
+		}
 		df_ptr->conntrack = flow_val;
 	} else {
 		return CONNTRACK_NEXT_DROP;
@@ -210,24 +292,3 @@ static uint16_t conntrack_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, CONNTRACK_NEXT_DNAT, get_next_index);
 	return nb_objs;
 }
-
-static struct rte_node_register conntrack_node_base = {
-	.name = "conntrack",
-	.init = conntrack_node_init,
-	.process = conntrack_node_process,
-
-	.nb_edges = CONNTRACK_NEXT_MAX,
-	.next_nodes = {
-			[CONNTRACK_NEXT_LB] = "lb",
-			[CONNTRACK_NEXT_DNAT] = "dnat",
-			[CONNTRACK_NEXT_FIREWALL] = "firewall",
-			[CONNTRACK_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *conntrack_node_get(void)
-{
-	return &conntrack_node_base;
-}
-
-RTE_NODE_REGISTER(conntrack_node_base);

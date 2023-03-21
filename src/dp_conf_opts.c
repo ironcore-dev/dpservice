@@ -13,7 +13,6 @@ _OPT_SHOPT_MAX = 255,
 	OPT_PF1,
 	OPT_IPV6,
 	OPT_VF_PATTERN,
-	OPT_OVERLAY_TYPE,
 	OPT_DHCP_MTU,
 	OPT_DHCP_DNS,
 #ifdef ENABLE_VIRTSVC
@@ -33,6 +32,9 @@ _OPT_SHOPT_MAX = 255,
 #endif
 	OPT_COLOR,
 	OPT_GRPC_PORT,
+#ifdef ENABLE_PYTEST
+	OPT_FLOW_TIMEOUT,
+#endif
 };
 
 #define OPTSTRING \
@@ -46,7 +48,6 @@ static const struct option longopts[] = {
 	{ "pf1", 1, 0, OPT_PF1 },
 	{ "ipv6", 1, 0, OPT_IPV6 },
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
-	{ "overlay-type", 1, 0, OPT_OVERLAY_TYPE },
 	{ "dhcp-mtu", 1, 0, OPT_DHCP_MTU },
 	{ "dhcp-dns", 1, 0, OPT_DHCP_DNS },
 #ifdef ENABLE_VIRTSVC
@@ -66,12 +67,10 @@ static const struct option longopts[] = {
 #endif
 	{ "color", 1, 0, OPT_COLOR },
 	{ "grpc-port", 1, 0, OPT_GRPC_PORT },
+#ifdef ENABLE_PYTEST
+	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
+#endif
 	{ NULL, }
-};
-
-static const char *overlay_type_choices[] = {
-	"ipip",
-	"geneve",
 };
 
 static const char *nic_type_choices[] = {
@@ -94,7 +93,6 @@ static void print_help_args(FILE *outfile)
 		"     --pf1=IFNAME                       second physical interface (e.g. eth1)\n"
 		"     --ipv6=ADDR6                       IPv6 underlay address\n"
 		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
-		"     --overlay-type=TYPE                overlay tunnel type to use: 'ipip' (default) or 'geneve'\n"
 		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
 		"     --dhcp-dns=IPv4                    set the domain name server field in DHCP responses (can be used multiple times)\n"
 #ifdef ENABLE_VIRTSVC
@@ -114,13 +112,15 @@ static void print_help_args(FILE *outfile)
 #endif
 		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
 		"     --grpc-port=PORT                   listen for gRPC clients on this port\n"
+#ifdef ENABLE_PYTEST
+		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
+#endif
 	);
 }
 
 static char pf0_name[IFNAMSIZ];
 static char pf1_name[IFNAMSIZ];
 static char vf_pattern[IFNAMSIZ];
-static enum dp_conf_overlay_type overlay_type = DP_CONF_OVERLAY_TYPE_IPIP;
 static int dhcp_mtu = 1500;
 static double wcmp_frac = 1.0;
 static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_HW;
@@ -133,6 +133,9 @@ static int graphtrace_level = 0;
 #endif
 static enum dp_conf_color color = DP_CONF_COLOR_NEVER;
 static int grpc_port = 1337;
+#ifdef ENABLE_PYTEST
+static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+#endif
 
 const char *dp_conf_get_pf0_name()
 {
@@ -147,11 +150,6 @@ const char *dp_conf_get_pf1_name()
 const char *dp_conf_get_vf_pattern()
 {
 	return vf_pattern;
-}
-
-const enum dp_conf_overlay_type dp_conf_get_overlay_type()
-{
-	return overlay_type;
 }
 
 const int dp_conf_get_dhcp_mtu()
@@ -206,3 +204,10 @@ const int dp_conf_get_grpc_port()
 	return grpc_port;
 }
 
+#ifdef ENABLE_PYTEST
+const int dp_conf_get_flow_timeout()
+{
+	return flow_timeout;
+}
+
+#endif

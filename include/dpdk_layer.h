@@ -28,9 +28,6 @@ extern "C" {
 
 struct dp_dpdk_layer {
 	struct rte_mempool	*rte_mempool;
-	char				graph_name[RTE_GRAPH_NAMESIZE];
-	struct				rte_graph *graph;
-	rte_graph_t			graph_id;
 	struct rte_ring		*grpc_tx_queue;
 	struct rte_ring		*grpc_rx_queue;
 	struct rte_ring		*periodic_msg_queue;
@@ -57,7 +54,6 @@ struct underlay_conf {
 };
 
 int dp_dpdk_layer_init(void);
-int dp_graph_init(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_layer_free(void);
 

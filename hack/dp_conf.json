@@ -39,15 +39,6 @@
     "array_size": "IFNAMSIZ"
   },
   {
-    "lgopt": "overlay-type",
-    "arg": "TYPE",
-    "help": "overlay tunnel type to use",
-    "var": "overlay_type",
-    "type": "enum",
-    "choices": [ "ipip", "geneve" ],
-    "default": "ipip"
-  },
-  {
     "lgopt": "dhcp-mtu",
     "arg": "SIZE",
     "help": "set the mtu field in DHCP responses (68 - 1500)",
@@ -142,5 +133,14 @@
     "var": "grpc_port",
     "type": "int",
     "default": 1337
+  },
+  {
+    "lgopt": "flow-timeout",
+    "arg": "SECONDS",
+    "help": "inactive flow timeout (except TCP established flows)",
+    "var": "flow_timeout",
+    "type": "int",
+    "default": "DP_FLOW_DEFAULT_TIMEOUT",
+    "ifdef": "ENABLE_PYTEST"
   }
 ]

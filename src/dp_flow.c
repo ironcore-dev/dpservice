@@ -10,9 +10,9 @@
 #include "dp_util.h"
 #include "node_api.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_timers.h"
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
-static uint64_t timeout = 0;
 
 int dp_flow_init(int socket_id)
 {
@@ -20,8 +20,6 @@ int dp_flow_init(int socket_id)
 										  "ipv4_flow_table", socket_id);
 	if (!ipv4_flow_tbl)
 		return DP_ERROR;
-
-	timeout = rte_get_timer_hz() * DP_FLOW_DEFAULT_TIMEOUT;
 
 	return DP_OK;
 }
@@ -81,6 +79,11 @@ int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* i
 	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
 
 	key->proto = df_ptr->l4_type;
+
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		key->vni = df_ptr->tun_info.dst_vni;
+	else
+		key->vni = dp_get_vm_vni(m->port);
 
 	switch (df_ptr->l4_type) {
 	case IPPROTO_TCP:
@@ -202,6 +205,7 @@ void dp_free_flow(struct dp_ref *ref)
 	dp_free_network_nat_port(cntrack);
 	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
+
 	rte_free(cntrack);
 }
 
@@ -262,13 +266,13 @@ void dp_process_aged_flows_non_offload(void)
 	struct flow_value *flow_val = NULL;
 	const void *next_key;
 	uint32_t iter = 0;
-	uint64_t cur;
+	uint64_t current_timestamp = rte_rdtsc();
+	uint64_t timer_hz = rte_get_timer_hz();
 
-	cur = rte_rdtsc();
-	/* iterate through the hash table */
-	while (rte_hash_iterate(ipv4_flow_tbl, &next_key,
-						    (void **)&flow_val, &iter) >= 0) {
-		if (unlikely((cur - flow_val->timestamp) > timeout)) {
+	while (rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter) >= 0) {
+		// NOTE: possible optimization in moving a runtime constant 'timer_hz *' into 'timeout_value' directly
+		// But it would require enlarging the flow_val member, thus this needs performance analysis first
+		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value)) {
 			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
 			dp_ref_dec(&flow_val->ref_count);
 		}

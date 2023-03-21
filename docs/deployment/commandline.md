@@ -15,7 +15,6 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --pf1 | IFNAME | second physical interface (e.g. eth1) |  |
 | --ipv6 | ADDR6 | IPv6 underlay address |  |
 | --vf-pattern | PATTERN | virtual interface name pattern (e.g. 'eth1vf') |  |
-| --overlay-type | TYPE | overlay tunnel type to use | 'ipip' (default) or 'geneve' |
 | --dhcp-mtu | SIZE | set the mtu field in DHCP responses (68 - 1500) |  |
 | --dhcp-dns | IPv4 | set the domain name server field in DHCP responses (can be used multiple times) |  |
 | --udp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service |  |
@@ -29,6 +28,7 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --graphtrace | LEVEL | verbosity level of packet traversing the graph framework |  |
 | --color | MODE | output colorization mode | 'never' (default), 'always' or 'auto' |
 | --grpc-port | PORT | listen for gRPC clients on this port |  |
+| --flow-timeout | SECONDS | inactive flow timeout (except TCP established flows) |  |
 
 ## Configuration file
 Unless an environment variable `DP_CONF` is set to override the path, `dp_service` uses `/tmp/dp_service.conf` to read configuration before processing any arguments.

@@ -1,25 +1,76 @@
-dp_sources = ['dp_service.c', 'dp_port.c', 'dpdk_layer.c', 'dp_nat.c', 'dp_lb.c', 'dp_vnf.c', 'dp_multi_path.c','nodes/arp_node.c',
-			  'nodes/drop_node.c', 'nodes/rx_node.c','nodes/rx_periodic_node.c', 'nodes/cls_node.c','nodes/dhcp_node.c','nodes/dhcpv6_node.c',
-			  'nodes/arp_node.c','nodes/ipv6_nd_node.c', 'nodes/tx_node.c', 'nodes/ipv4_lookup_node.c', 'nodes/l2_decap_node.c',
-			  'dp_mbuf_dyn.c', 'dp_lpm.c', 'nodes/ipv6_encap_node.c', 'nodes/firewall_node.c',
-			  'nodes/ipv6_lookup_node.c', 'nodes/geneve_tunnel_node.c', 'nodes/common_node.c',
-			  'nodes/overlay_switch_node.c','nodes/ipip_tunnel_node.c','dp_util.c','dp_conf.c','dp_periodic_msg.c',
-			  'nodes/conntrack_node.c', 'nodes/dnat_node.c', 'nodes/packet_relay_node.c','nodes/lb_node.c',
-			  'nodes/snat_node.c', 'grpc/dp_grpc_service.cpp', 'grpc/dp_async_grpc.cpp', 'grpc/dp_grpc_impl.c', 'dp_flow.c',
-			  'dp_netlink.c','rte_flow/dp_rte_flow.c','rte_flow/dp_rte_flow_init.c','rte_flow/dp_rte_flow_traffic_forward.c',
-			  'monitoring/dp_monitoring.c','monitoring/dp_event.c',
-			  'dp_log.c', 'dp_error.c', 'dp_hairpin.c', 'dp_telemetry.c', 'grpc/dp_grpc_thread.cpp'
- 			]
 # TODO(plague) look into autogereration of such dependencies (source file list)
+dp_sources = [
+  'grpc/dp_async_grpc.cpp',
+  'grpc/dp_grpc_impl.c',
+  'grpc/dp_grpc_service.cpp',
+  'grpc/dp_grpc_thread.cpp',
+  'monitoring/dp_event.c',
+  'monitoring/dp_monitoring.c',
+  'nodes/arp_node.c',
+  'nodes/arp_node.c',
+  'nodes/cls_node.c',
+  'nodes/common_node.c',
+  'nodes/conntrack_node.c',
+  'nodes/dhcp_node.c',
+  'nodes/dhcpv6_node.c',
+  'nodes/dnat_node.c',
+  'nodes/drop_node.c',
+  'nodes/firewall_node.c',
+  'nodes/ipip_tunnel_node.c',
+  'nodes/ipv4_lookup_node.c',
+  'nodes/ipv6_encap_node.c',
+  'nodes/ipv6_lookup_node.c',
+  'nodes/ipv6_nd_node.c',
+  'nodes/l2_decap_node.c',
+  'nodes/lb_node.c',
+  'nodes/overlay_switch_node.c',
+  'nodes/packet_relay_node.c',
+  'nodes/rx_node.c',
+  'nodes/rx_periodic_node.c',
+  'nodes/snat_node.c',
+  'nodes/tx_node.c',
+  'rte_flow/dp_rte_flow.c',
+  'rte_flow/dp_rte_flow_init.c',
+  'rte_flow/dp_rte_flow_traffic_forward.c',
+  'dp_conf.c',
+  'dp_error.c',
+  'dp_flow.c',
+  'dp_graph.c',
+  'dp_hairpin.c',
+  'dp_lb.c',
+  'dp_log.c',
+  'dp_lpm.c',
+  'dp_mbuf_dyn.c',
+  'dp_multi_path.c',
+  'dp_nat.c',
+  'dp_netlink.c',
+  'dp_periodic_msg.c',
+  'dp_port.c',
+  'dp_service.c',
+  'dp_timers.c',
+  'dp_util.c',
+  'dp_vnf.c',
+  'dp_telemetry.c',
+  'dpdk_layer.c',
+]
 if get_option('enable_virtual_services')
-	dp_sources += [ 'nodes/virtsvc_node.c', 'dp_virtsvc.c' ]
+  dp_sources += [
+    'nodes/virtsvc_node.c',
+    'dp_virtsvc.c',
+  ]
 endif
 
-exe = executable('dp_service', [dp_sources, grpc_generated], include_directories : [inc],
-			dependencies : [dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep] )
+exe = executable('dp_service',
+  sources: [ dp_sources, grpc_generated ],
+  include_directories: [ includes ],
+  dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep ]
+)
 
 if get_option('enable_usermode')
-custom_target('dp_service_user', depends: exe, input: exe, output: 'dp_service_user',
+custom_target('dp_service_user',
+  depends: exe,
+  input: exe,
+  output: 'dp_service_user',
   command: [ '../hack/set_cap.sh', '@INPUT@', '@OUTPUT@' ],
   build_by_default: true,
   console: true

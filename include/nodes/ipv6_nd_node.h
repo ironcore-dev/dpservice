@@ -1,7 +1,8 @@
 #ifndef __INCLUDE_IPV6_ND_NODE_H__
 #define __INCLUDE_IPV6_ND_NODE_H__
 
-#include "dpdk_layer.h"
+#include <stdint.h>
+#include <netinet/in.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,23 +88,8 @@ struct ra_msg {
 };
 
 
-enum
-{
-	IPV6_ND_NEXT_DROP,
-	IPV6_ND_NEXT_MAX
-};
+int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name);
 
-struct ipv6_nd_node_ctx
-{
-	uint16_t next;
-};
-
-struct ipv6_nd_node_main {
-	uint16_t next_index[DP_MAX_PORTS];
-};
-
-struct rte_node_register *ipv6_nd_node_get(void);
-int ipv6_nd_set_next(uint16_t port_id, uint16_t next_index);
 #ifdef __cplusplus
 }
 #endif

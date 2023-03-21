@@ -1,8 +1,7 @@
-#ifndef __INCLUDE_DHCP_NODE_PRIV_H__
-#define __INCLUDE_DHCP_NODE_PRIV_H__
+#ifndef __INCLUDE_DHCP_NODE_H__
+#define __INCLUDE_DHCP_NODE_H__
 
 #include <stdint.h>
-#include "dpdk_layer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,27 +73,13 @@ struct dp_dhcp_header {
 	uint8_t		options[1];
 };
 
-enum {
-	DHCP_NEXT_DROP,
-	DHCP_NEXT_MAX
-};
-
-struct dhcp_node_ctx {
-	uint16_t next;
-};
-
-struct dhcp_node_main {
-	uint16_t next_index[DP_MAX_PORTS];
-};
-
 enum dp_pxe_mode {
 	DP_PXE_MODE_NONE,
 	DP_PXE_MODE_TFTP,
 	DP_PXE_MODE_HTTP,
 };
 
-struct rte_node_register *dhcp_node_get(void);
-int dhcp_set_next(uint16_t port_id, uint16_t next_index);
+int dhcp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name);
 
 #ifdef __cplusplus
 }

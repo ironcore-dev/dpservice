@@ -1,28 +1,19 @@
 #include <rte_common.h>
-#include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
-#include "dp_nat.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "rte_flow/dp_rte_flow.h"
-#include "nodes/dnat_node.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
 #include "nodes/common_node.h"
+#include "rte_flow/dp_rte_flow.h"
 
-
-static int dnat_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct dnat_node_ctx *ctx = (struct dnat_node_ctx *)node->ctx;
-
-	ctx->next = DNAT_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+#define NEXT_NODES(NEXT) \
+	NEXT(DNAT_NEXT_IPV4_LOOKUP, "ipv4_lookup") \
+	NEXT(DNAT_NEXT_PACKET_RELAY, "packet_relay")
+DP_NODE_REGISTER_NOINIT(DNAT, dnat, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
@@ -154,24 +145,3 @@ static uint16_t dnat_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DNAT_NEXT_IPV4_LOOKUP, get_next_index);
 	return nb_objs;
 }
-
-static struct rte_node_register dnat_node_base = {
-	.name = "dnat",
-	.init = dnat_node_init,
-	.process = dnat_node_process,
-
-	.nb_edges = DNAT_NEXT_MAX,
-	.next_nodes = {
-
-			[DNAT_NEXT_IPV4_LOOKUP] = "ipv4_lookup",
-			[DNAT_NEXT_PACKET_RELAY] = "packet_relay",
-			[DNAT_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *dnat_node_get(void)
-{
-	return &dnat_node_base;
-}
-
-RTE_NODE_REGISTER(dnat_node_base);

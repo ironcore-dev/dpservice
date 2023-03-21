@@ -13,10 +13,10 @@ def pytest_addoption(parser):
 		"--build-path", action="store", default=f"{script_dir}/../build", help="Path to the root build directory"
 	)
 	parser.addoption(
-		"--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Tunnel type"
+		"--port-redundancy", action="store_true", help="Test with port redundancy"
 	)
 	parser.addoption(
-		"--port-redundancy", action="store_true", help="Test with port redundancy"
+		"--fast-flow-timeout", action="store_true", help="Test with fast flow timeout"
 	)
 	parser.addoption(
 		"--virtsvc", action="store_true", help="Include virtual services tests"
@@ -30,12 +30,12 @@ def build_path(request):
 	return request.config.getoption("--build-path")
 
 @pytest.fixture(scope="package")
-def tun_opt(request):
-	return request.config.getoption("--tun-opt")
-
-@pytest.fixture(scope="package")
 def port_redundancy(request):
 	return request.config.getoption("--port-redundancy")
+
+@pytest.fixture(scope="package")
+def fast_flow_timeout(request):
+	return request.config.getoption("--fast-flow-timeout")
 
 @pytest.fixture(scope="package")
 def grpc_client(build_path):
@@ -44,10 +44,10 @@ def grpc_client(build_path):
 
 # All tests require dp_service to be running
 @pytest.fixture(scope="package")
-def dp_service(request, build_path, tun_opt, port_redundancy):
+def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
 	test_virtsvc = request.config.getoption("--virtsvc")
-	dp_service = DpService(build_path, tun_opt, port_redundancy, test_virtsvc=test_virtsvc)
+	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc)
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
@@ -72,26 +72,21 @@ def dp_service(request, build_path, tun_opt, port_redundancy):
 
 # Most tests require interfaces to be up and routing established
 @pytest.fixture(scope="package")
-def prepare_ifaces(request, dp_service, tun_opt, port_redundancy, grpc_client):
-	# TODO look into this when doing Geneve, is this the right way?
-	global t_vni
-	if tun_opt == tun_type_geneve:
-		t_vni = vni
-
+def prepare_ifaces(request, dp_service, grpc_client):
 	if request.config.getoption("--attach"):
+		dp_service.attach(grpc_client)
 		return
-
 	print("---- Interfaces init -----")
-	vm1_ipv6 = dp_service.init_ifaces(grpc_client)
+	dp_service.init_ifaces(grpc_client)
 	print("--------------------------")
-	return vm1_ipv6
 
 
 # Some tests require IPv4 addresses assigned
 @pytest.fixture(scope="package")
 def prepare_ipv4(prepare_ifaces):
 	print("-------- IPs init --------")
-	request_ip(vf0_tap, vf0_mac, vf0_ip)
-	request_ip(vf1_tap, vf1_mac, vf1_ip)
+	request_ip(VM1)
+	request_ip(VM2)
+	request_ip(VM3)
 	print("--------------------------")
 	return prepare_ifaces

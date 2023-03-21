@@ -1,6 +1,5 @@
 #ifndef __INCLUDE_DP_FLOW_PRIV_H__
 #define __INCLUDE_DP_FLOW_PRIV_H__
-
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_flow.h>
@@ -8,13 +7,17 @@
 #include "dpdk_layer.h"
 #include "node_api.h"
 #include "dp_refcount.h"
+#include "dp_timers.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define FLOW_MAX				(1*1024*1024UL)
-#define DP_FLOW_DEFAULT_TIMEOUT	30 /* In seconds */
+#define FLOW_MAX						(1*1024*1024UL)
+
+#define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
+#define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
+
 
 enum {
 	DP_FLOW_DIR_ORG,
@@ -24,8 +27,7 @@ enum {
 
 enum {
 	DP_FLOW_STATE_NEW,
-	DP_FLOW_STATE_REPLY,
-	DP_FLOW_STATE_ESTAB,
+	DP_FLOW_STATE_ESTABLISHED,
 };
 
 enum {
@@ -47,6 +49,21 @@ enum {
 	DP_FLOW_ACTION_DROP,
 };
 
+enum dp_flow_tcp_state {
+	DP_FLOW_TCP_STATE_NONE,
+	DP_FLOW_TCP_STATE_NEW_SYN,
+	DP_FLOW_TCP_STATE_NEW_SYNACK,
+	DP_FLOW_TCP_STATE_ESTABLISHED,
+	DP_FLOW_TCP_STATE_FINWAIT,
+	DP_FLOW_TCP_STATE_RST_FIN,
+};
+
+enum dp_flow_offload_state {
+	DP_FLOW_NON_OFFLOAD,
+	DP_FLOW_OFFLOAD_INSTALL,
+	DP_FLOW_OFFLOADED,
+};
+
 struct flow_key {
 	uint32_t ip_dst;
 	uint32_t ip_src;
@@ -55,7 +72,7 @@ struct flow_key {
 		uint16_t port_src;
 		uint16_t type_src; /* ICMP */
 	} src;
-	/*TODO Add vni also to the key */
+	uint32_t vni;
 	uint8_t  proto;
 } __rte_packed;
 
@@ -73,13 +90,20 @@ struct flow_value {
 	struct flow_nat_info	nat_info;
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
-	uint16_t		flow_status;
-	uint16_t		flow_state;
-	uint16_t		dir;
+	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		port;
 	uint8_t			lb_dst_addr6[16];
-	uint8_t			action[DP_FLOW_DIR_MAX];
+	uint8_t			flow_status; // record if a flow is natted in any means
+	uint8_t			flow_state; // track if a flow has been seen in one or both directions
+	uint8_t			dir;
+	struct {
+		uint8_t orig : 4;
+		uint8_t reply : 4;
+	} offload_flags;
 	struct dp_ref	ref_count;
+	union {
+		enum dp_flow_tcp_state		tcp_state;
+	} l4_state;
 };
 
 struct flow_age_ctx {

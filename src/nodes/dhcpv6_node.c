@@ -1,19 +1,25 @@
+#include "nodes/dhcpv6_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
-#include "nodes/dhcpv6_node.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_lpm.h"
+#include "dp_error.h"
 #include "dp_log.h"
+#include "dp_lpm.h"
+#include "nodes/common_node.h"
 
+DP_NODE_REGISTER_NOINIT(DHCPV6, dhcpv6, DP_NODE_DEFAULT_NEXT_ONLY);
 
-struct dhcpv6_node_main dhcpv6_node;
+static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(dhcpv6), next_tx_index, port_id, tx_node_name);
+}
+
 static struct client_id cid;
-static struct server_id  sid;
+static struct server_id sid;
 static struct ia_option recv_ia;
 static struct rapid_commit rapid;
 uint8_t client_id_len;
@@ -60,17 +66,6 @@ void prepare_ia_option(uint16_t port_id)
 	return;
 }
 
-static int dhcpv6_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct dhcpv6_node_ctx *ctx = (struct dhcpv6_node_ctx *)node->ctx;
-
-	ctx->next = DHCPV6_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
-
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr;
@@ -99,7 +94,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,sizeof(req_ipv6_hdr->src_addr));
 	req_udp_hdr->src_port = htons(DHCPV6_SERVER_PORT);
 	req_udp_hdr->dst_port = htons(DHCPV6_CLIENT_PORT);
-	req_udp_hdr->dgram_cksum = 0;
 
 	switch(type) {
 		case DHCPV6_SOLICIT:
@@ -145,9 +139,15 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	req_ipv6_hdr->payload_len = htons(offset +  DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
 	req_udp_hdr->dgram_len = htons(offset + DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
-	req_udp_hdr->dgram_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_udp_hdr);
+	req_udp_hdr->dgram_cksum = 0;
 
-	return dhcpv6_node.next_index[m->port];
+	m->ol_flags |= RTE_MBUF_F_TX_IPV6 | RTE_MBUF_F_TX_UDP_CKSUM;
+	m->tx_offload = 0;
+	m->l2_len = sizeof(struct rte_ether_hdr);
+	m->l3_len = sizeof(struct rte_ipv6_hdr);
+	m->l4_len = sizeof(struct rte_udp_hdr);
+
+	return next_tx_index[m->port];
 }
 
 static uint16_t dhcpv6_node_process(struct rte_graph *graph,
@@ -158,28 +158,3 @@ static uint16_t dhcpv6_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
 }
-
-int dhcpv6_set_next(uint16_t port_id, uint16_t next_index)
-{
-	dhcpv6_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register dhcpv6_node_base = {
-	.name = "dhcpv6",
-	.init = dhcpv6_node_init,
-	.process = dhcpv6_node_process,
-
-	.nb_edges = DHCPV6_NEXT_MAX,
-	.next_nodes =
-		{
-			[DHCPV6_NEXT_DROP] = "drop",
-		},
-};
-
-struct rte_node_register *dhcpv6_node_get(void)
-{
-	return &dhcpv6_node_base;
-}
-
-RTE_NODE_REGISTER(dhcpv6_node_base);

@@ -17,8 +17,8 @@ int dp_link_status_change_event_callback(uint16_t port_id,
 												void *param,
 												void *ret_param);
 void dp_process_event_link_msg(struct rte_mbuf *m);
-int dp_send_event_timer_msg();
-void dp_process_event_timer_msg(struct rte_mbuf *m);
+int dp_send_event_flow_aging_msg();
+void dp_process_event_flow_aging_msg(struct rte_mbuf *m);
 
 
 #ifdef __cplusplus

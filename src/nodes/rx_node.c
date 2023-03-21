@@ -1,64 +1,88 @@
+#include "nodes/rx_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_error.h"
 #include "dp_log.h"
-#include "nodes/common_node.h"
-#include "nodes/rx_node_priv.h"
+#include "dp_port.h"
 #include "node_api.h"
-#include "dp_debug.h"
+#include "nodes/common_node.h"
 
-static struct ethdev_rx_node_main ethdev_rx_main;
+#define NEXT_NODES(NEXT) \
+	NEXT(RX_NEXT_CLS, "cls")
+DP_NODE_REGISTER_SOURCE(RX, rx, NEXT_NODES);
 
-int config_rx_node(struct rx_node_config *cfg)
+// there are multiple Tx nodes, one per port, node context is needed
+struct rx_node_ctx {
+	uint16_t	port_id;
+	uint16_t	queue_id;
+	bool		enabled;
+};
+_Static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ);
+
+// need to access nodes' context to enable/disable them
+static struct rx_node_ctx *node_contexts[DP_MAX_PORTS];
+
+// also some way to map ports to nodes is needed
+static rte_node_t rx_node_ids[DP_MAX_PORTS];
+
+int rx_node_create(uint16_t port_id, uint16_t queue_id)
 {
-	int idx = cfg->port_id;
+	char name[RTE_NODE_NAMESIZE];
+	rte_node_t node_id;
 
-	RTE_VERIFY(idx < DP_MAX_PORTS);
+	if (port_id >= RTE_DIM(rx_node_ids)) {
+		DPS_LOG_ERR("Port id %u too high for Rx nodes, max %lu", port_id, RTE_DIM(rx_node_ids));
+		return DP_ERROR;
+	}
 
-	ethdev_rx_main.node_ctx[idx].port_id  = cfg->port_id;
-	ethdev_rx_main.node_ctx[idx].queue_id  = cfg->queue_id;
-	ethdev_rx_main.node_ctx[idx].node_id  = cfg->node_id;
-	ethdev_rx_main.node_ctx[idx].enabled = false;
+	snprintf(name, sizeof(name), "%u-%u", port_id, queue_id);
+	node_id = rte_node_clone(DP_NODE_GET_SELF(rx)->id, name);
+	if (node_id == RTE_NODE_ID_INVALID) {
+		DPS_LOG_ERR("Cannot clone Rx node %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
 
-	return 0;
+	rx_node_ids[port_id] = node_id;
+	return DP_OK;
 }
 
-void enable_rx_node(uint16_t portid)
+int rx_node_set_enabled(uint16_t port_id, bool enabled)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	ethdev_rx_main.node_ctx[portid].enabled = true;
+	if (port_id >= RTE_DIM(node_contexts)) {
+		DPS_LOG_ERR("Port id %u too high for Rx nodes, max %lu", port_id, RTE_DIM(node_contexts));
+		return DP_ERROR;
+	}
+	node_contexts[port_id]->enabled = enabled;
+	return DP_OK;
 }
 
-void disable_rx_node(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	ethdev_rx_main.node_ctx[portid].enabled = false;
-}
 
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
-	int i, port_id = 0;
+	uint16_t port_id;
 
-	for (i = 0; i < DP_MAX_PORTS; i++) {
-		if (ethdev_rx_main.node_ctx[i].node_id == node->id) {
-			port_id = ethdev_rx_main.node_ctx[i].port_id;
+	// Find this node's dedicated port to be used in processing
+	for (port_id = 0; port_id < RTE_DIM(rx_node_ids); ++port_id)
+		if (rx_node_ids[port_id] == node->id)
 			break;
-		}
+
+	if (port_id >= RTE_DIM(rx_node_ids)) {
+		DPNODE_LOG_ERR(node, "No port_id available for this node");
+		return DP_ERROR;
 	}
-	ctx->port_id = ethdev_rx_main.node_ctx[port_id].port_id;
-	ctx->queue_id = ethdev_rx_main.node_ctx[port_id].queue_id;
-	ctx->next = RX_NEXT_CLS;
 
+	// save pointer to this node's context for enabling/disabling
+	node_contexts[port_id] = ctx;
+
+	ctx->port_id = port_id;
+	ctx->queue_id = graph->id;
+	ctx->enabled = false;
 	DPNODE_LOG_INFO(node, "Initialized, port_id: %u, queue_id: %u", ctx->port_id, ctx->queue_id);
-
-	RTE_SET_USED(graph);
-
-	return 0;
+	return DP_OK;
 }
 
 static uint16_t rx_node_process(struct rte_graph *graph,
@@ -71,7 +95,7 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 
 	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
-	if (unlikely(!ethdev_rx_main.node_ctx[ctx->port_id].enabled))
+	if (unlikely(!ctx->enabled))
 		return 0;
 
 	n_pkts = rte_eth_rx_burst(ctx->port_id,
@@ -82,28 +106,7 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 		return 0;
 
 	node->idx = n_pkts;
-	dp_forward_graph_packets(graph, node, objs, n_pkts, ctx->next);
+	dp_forward_graph_packets(graph, node, objs, n_pkts, RX_NEXT_CLS);
 
 	return n_pkts;
 }
-
-static struct rte_node_register rx_node_base = {
-	.name = "rx",
-	.flags = RTE_NODE_SOURCE_F,
-
-	.init = rx_node_init,
-	.process = rx_node_process,
-
-	.nb_edges = RX_NEXT_MAX,
-	.next_nodes =
-		{
-			[RX_NEXT_CLS] = "cls",
-		},
-};
-
-struct rte_node_register *rx_node_get(void)
-{
-	return &rx_node_base;
-}
-
-RTE_NODE_REGISTER(rx_node_base);

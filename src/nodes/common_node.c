@@ -1,9 +1,10 @@
-#ifdef ENABLE_GRAPHTRACE
-
 #include "nodes/common_node.h"
+#include "dp_error.h"
+#include "dp_log.h"
+
+#ifdef ENABLE_GRAPHTRACE
 #include <rte_ethdev.h>
 #include <rte_ip.h>
-#include "dp_log.h"
 #include "dp_mbuf_dyn.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_util.h"
@@ -56,8 +57,8 @@ static void dp_graphtrace_print_udp(void **p_pkt_data, size_t *p_pos, char *buf,
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"UDP %d -> %d",
-		ntohs(udp_hdr->src_port), ntohs(udp_hdr->dst_port));
+		"UDP %d -> %d len %d",
+		ntohs(udp_hdr->src_port), ntohs(udp_hdr->dst_port), ntohs(udp_hdr->dgram_len));
 
 	*p_pkt_data = udp_hdr + 1;
 }
@@ -67,8 +68,8 @@ static void dp_graphtrace_print_tcp(void **p_pkt_data, size_t *p_pos, char *buf,
 	struct rte_tcp_hdr *tcp_hdr = (struct rte_tcp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"TCP %d -> %d",
-		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port));
+		"TCP %d -> %d seq %d ack %d",
+		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port), ntohl(tcp_hdr->sent_seq), ntohl(tcp_hdr->recv_ack));
 
 	*p_pkt_data = tcp_hdr + 1;
 }
@@ -78,21 +79,10 @@ static void dp_graphtrace_print_icmp(void **p_pkt_data, size_t *p_pos, char *buf
 	struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"ICMP %d-%d",
-		icmp_hdr->icmp_type, icmp_hdr->icmp_code);
+		"ICMP %d-%d id %d seq %d",
+		icmp_hdr->icmp_type, icmp_hdr->icmp_code, ntohs(icmp_hdr->icmp_ident), ntohs(icmp_hdr->icmp_seq_nb));
 
 	*p_pkt_data = icmp_hdr + 1;
-}
-
-static void dp_graphtrace_print_geneve(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
-{
-	struct rte_flow_item_geneve *geneve_hdr = (struct rte_flow_item_geneve *)*p_pkt_data;
-
-	PRINT_LAYER(p_pos, buf, bufsize,
-		"GNV %02x%02x%02x",
-		geneve_hdr->vni[0], geneve_hdr->vni[1], geneve_hdr->vni[2]);
-
-	*p_pkt_data = geneve_hdr + 1;
 }
 
 static inline void dp_graphtrace_print_l4(int proto, void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
@@ -112,6 +102,9 @@ static void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufs
 	size_t pos = 0;
 	int proto = 0;
 
+	// in case nothing gets printed
+	*buf = 0;
+
 	if (pkt->packet_type & RTE_PTYPE_L2_MASK)
 		dp_graphtrace_print_ether(&pkt_data, &pos, buf, bufsize);
 
@@ -130,19 +123,18 @@ static void dp_graphtrace_print_pkt(struct rte_mbuf *pkt, char *buf, size_t bufs
 
 	dp_graphtrace_print_l4(proto, &pkt_data, &pos, buf, bufsize);
 
-	if (!(pkt->packet_type & RTE_PTYPE_TUNNEL_MASK))
-		return;
+	// the inner packet is sometimes not classified as a tunneled packet,
+	// so need to look at IPPROTO_IPIP in the header too
 
 	if (pkt->packet_type & RTE_PTYPE_INNER_L2_MASK)
 		dp_graphtrace_print_ether(&pkt_data, &pos, buf, bufsize);
 
-	if ((pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) == RTE_PTYPE_TUNNEL_GENEVE)
-		dp_graphtrace_print_geneve(&pkt_data, &pos, buf, bufsize);
-	else if ((pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) != RTE_PTYPE_TUNNEL_IP)
+	if (proto != IPPROTO_IPIP && (pkt->packet_type & RTE_PTYPE_TUNNEL_MASK) != RTE_PTYPE_TUNNEL_IP)
 		return;
 
-	// for bitwise reason there is no macro for inner types
-	if (inner_l3_type == RTE_PTYPE_INNER_L3_IPV4
+	// there is no direct macro for inner types (no shared bit)
+	if (proto == IPPROTO_IPIP
+		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4
 		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4_EXT
 		|| inner_l3_type == RTE_PTYPE_INNER_L3_IPV4_EXT_UNKNOWN
 	) {
@@ -221,4 +213,58 @@ void dp_graphtrace_next(struct rte_node *node, void *obj, rte_edge_t next_index)
 					 node->name, GRAPHTRACE_PKT_ID(obj), node->nodes[next_index]->name);
 }
 
-#endif
+#endif /* ENABLE_GRAPHTRACE */
+
+
+int dp_node_append_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name)
+{
+	const char *append_array[] = { tx_node_name };
+	rte_edge_t count;
+
+	if (port_id >= DP_MAX_PORTS) {
+		DPNODE_LOG_ERR(node, "Port id %u too big, max %u", port_id, DP_MAX_PORTS);
+		return DP_ERROR;
+	}
+
+	if (rte_node_edge_update(node->id, RTE_EDGE_ID_INVALID, append_array, 1) != 1) {
+		DPNODE_LOG_ERR(node, "Cannot add Tx edge to %s", tx_node_name);
+		return DP_ERROR;
+	}
+
+	count = rte_node_edge_count(node->id);
+	if (count <= 0) {
+		DPNODE_LOG_ERR(node, "No Tx edge added to %s", tx_node_name);
+		return DP_ERROR;
+	}
+
+	next_tx_indices[port_id] = count - 1;
+	return DP_OK;
+}
+
+int dp_node_append_vf_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name)
+{
+	if (dp_port_is_pf(port_id)) {
+		DPNODE_LOG_ERR(node, "Node not designed to be connected to physical ports");
+		return DP_ERROR;
+	}
+	return dp_node_append_tx(node, next_tx_indices, port_id, tx_node_name);
+}
+
+
+int dp_node_append_pf_tx(struct rte_node_register *node,
+					  uint16_t next_tx_indices[DP_MAX_PORTS],
+					  uint16_t port_id,
+					  const char *tx_node_name)
+{
+	if (!dp_port_is_pf(port_id)) {
+		DPNODE_LOG_ERR(node, "Node not designed to be connected to virtual ports");
+		return DP_ERROR;
+	}
+	return dp_node_append_tx(node, next_tx_indices, port_id, tx_node_name);
+}

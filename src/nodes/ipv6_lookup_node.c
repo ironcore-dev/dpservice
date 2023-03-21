@@ -3,30 +3,17 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include <rte_malloc.h>
-#include "node_api.h"
-#include "nodes/common_node.h"
-#include "nodes/ipv6_lookup_node.h"
-#include "nodes/ipv6_nd_node.h"
-#include "nodes/dhcp_node.h"
-#include "nodes/dhcpv6_node.h"
-#include "dp_mbuf_dyn.h"
 #include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_util.h"
+#include "nodes/common_node.h"
+#include "nodes/dhcpv6_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
-struct ipv6_lookup_node_main ipv6_lookup_node;
-
-static int ipv6_lookup_node_init(const struct rte_graph *graph, struct rte_node *node)
-{
-	struct ipv6_lookup_node_ctx *ctx = (struct ipv6_lookup_node_ctx *)node->ctx;
-
-	ctx->next = IPV6_LOOKUP_NEXT_DROP;
-
-	RTE_SET_USED(graph);
-
-	return 0;
-}
+#define NEXT_NODES(NEXT) \
+	NEXT(IPV6_LOOKUP_NEXT_DHCPV6, "dhcpv6") \
+	NEXT(IPV6_LOOKUP_NEXT_L2_DECAP, "l2_decap")
+DP_NODE_REGISTER_NOINIT(IPV6_LOOKUP, ipv6_lookup, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -73,7 +60,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
 	if (dp_conf_is_offload_enabled())
-		df_ptr->flags.valid = 1;
+		df_ptr->flags.offload_ipv6 = 1;
 
 	return IPV6_LOOKUP_NEXT_L2_DECAP;
 }
@@ -86,30 +73,3 @@ static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV6_LOOKUP_NEXT_L2_DECAP, get_next_index);
 	return nb_objs;
 }
-
-int ipv6_lookup_set_next(uint16_t port_id, uint16_t next_index)
-{
-	ipv6_lookup_node.next_index[port_id] = next_index;
-	return 0;
-}
-
-static struct rte_node_register ipv6_lookup_node_base = {
-	.name = "ipv6_lookup",
-	.init = ipv6_lookup_node_init,
-	.process = ipv6_lookup_node_process,
-
-	.nb_edges = IPV6_LOOKUP_NEXT_MAX,
-	.next_nodes =
-		{
-			[IPV6_LOOKUP_NEXT_DROP] = "drop",
-			[IPV6_LOOKUP_NEXT_DHCPV6] = "dhcpv6",
-			[IPV6_LOOKUP_NEXT_L2_DECAP] = "l2_decap",
-		},
-};
-
-struct rte_node_register *ipv6_lookup_node_get(void)
-{
-	return &ipv6_lookup_node_base;
-}
-
-RTE_NODE_REGISTER(ipv6_lookup_node_base);

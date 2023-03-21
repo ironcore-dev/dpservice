@@ -26,16 +26,16 @@ grpc_cpp = find_program('grpc_cpp_plugin')
 if get_option('enable_tests')
   pytest = find_program('pytest', 'pytest-3')
   scapy = find_program('scapy')
+  add_global_arguments('-DENABLE_PYTEST', language: 'c')
 endif
 if get_option('enable_usermode')
   sudo = find_program('sudo')
   setcap = find_program('setcap', '/usr/sbin/setcap')
 endif
 
-inc = include_directories('include')
+includes = include_directories('include')
 
 subdir('proto')
-subdir('include')
 subdir('src')
 subdir('tools')
 if get_option('enable_tests')

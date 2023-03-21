@@ -1,7 +1,8 @@
-#ifndef __INCLUDE_DHCPV6_NODE_PRIV_H__
-#define __INCLUDE_DHCPV6_NODE_PRIV_H__
+#ifndef __INCLUDE_DHCPV6_NODE_H__
+#define __INCLUDE_DHCPV6_NODE_H__
 
-#include "dpdk_layer.h"
+#include <stdint.h>
+#include <rte_ether.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -127,23 +128,8 @@ struct dhcpv6_option {
 	uint8_t data[];
 };
 
-enum
-{
-	DHCPV6_NEXT_DROP,
-	DHCPV6_NEXT_MAX
-};
+int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name);
 
-struct dhcpv6_node_ctx
-{
-	uint16_t next;
-};
-
-struct dhcpv6_node_main {
-	uint16_t next_index[DP_MAX_PORTS];
-};
-
-struct rte_node_register *dhcpv6_node_get(void);
-int dhcpv6_set_next(uint16_t port_id, uint16_t next_index);
 #ifdef __cplusplus
 }
 #endif

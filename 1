@@ -1,0 +1,99 @@
+#include "rte_telemetry.h"
+#include "stdbool.h"
+#include "dp_telemetry.h"
+#include "string.h"
+#include "rte_memory.h"
+#include "dp_log.h"
+#include "dp_error.h"
+#include "dpdk_layer.h"
+
+
+static struct rte_graph_cluster_stats *telemetry_stats;
+static int32_t node_index = 0;
+static struct rte_tel_data *tele_data = NULL;
+static struct rte_tel_data *data1 =  NULL;
+static char dict_name[RTE_NODE_NAMESIZE];
+#define MAX_DICTIONARY_SIZE 256
+
+
+int create_telemetry_stats()
+{
+	const char *pattern = "worker_*";
+	struct rte_graph_cluster_stats_param s_param = {
+		.socket_id = SOCKET_ID_ANY,
+		.fn = dp_stats_cb,
+		.nb_graph_patterns = 1,
+		.graph_patterns = &pattern,
+	};
+
+	telemetry_stats = rte_graph_cluster_stats_create(&s_param);
+	if (!telemetry_stats) {
+		DPS_LOG_ERR("Unable to create cluster stats %s", dp_strerror(rte_errno));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+int dp_stats_cb(bool is_first, bool is_last, void *cookie,
+		const struct rte_graph_cluster_node_stats *st)
+{
+	node_index++;
+	RTE_SET_USED(is_first);
+	RTE_SET_USED(is_last);
+	RTE_SET_USED(cookie);
+	if (st) {
+		if( node_index % MAX_DICTIONARY_SIZE ) {
+			rte_tel_data_add_dict_u64(data1, st->name, st->objs);
+		}
+		else {
+			snprintf(dict_name, RTE_NODE_NAMESIZE, "Node_%d_to_%d", 
+				node_index-MAX_DICTIONARY_SIZE < 0 ? 0 : node_index-MAX_DICTIONARY_SIZE, node_index-1);
+			rte_tel_data_add_dict_container(tele_data, dict_name, data1, 0);
+			rte_tel_data_start_dict(data1);
+			rte_tel_data_add_dict_u64(data1, st->name, st->objs);
+		}
+	}
+	return 0;
+}
+
+
+static int dp_handle_telemetry_command(const char *cmd __rte_unused,
+		const char *params, struct rte_tel_data *data)
+{
+	int rc = 0;
+
+	//le_data = rte_tel_data_alloc();
+	tele_data = data;
+	rte_tel_data_start_dict(tele_data);
+	data1 = rte_tel_data_alloc();
+	rte_tel_data_start_dict(data1);
+
+	rte_graph_cluster_stats_get(telemetry_stats, 0);
+	if (node_index % MAX_DICTIONARY_SIZE) {
+		if (node_index-MAX_DICTIONARY_SIZE < 0)
+			DPS_LOG_ERR("chandu 1");
+		snprintf(dict_name, RTE_NODE_NAMESIZE, "Node_%d_to_%d", 
+			node_index-MAX_DICTIONARY_SIZE < 0 ? 0 : node_index-MAX_DICTIONARY_SIZE, node_index-1);
+		rte_tel_data_add_dict_container(tele_data, dict_name, data1, 0);
+	}
+	node_index = 0;
+	return rc;
+}
+
+int dp_telemetry_init(void)
+{
+	if (DP_FAILED(rte_telemetry_register_cmd("/dp_service/graph/obj_count",
+		dp_handle_telemetry_command,
+		"Returns objs count stat for a graph node."))) {
+			DPS_LOG_ERR("Failed to register telemetry command");
+			return DP_ERROR;
+	}
+	return DP_OK;
+}
+
+void dp_telemetry_free(void)
+{
+	rte_graph_cluster_stats_destroy(telemetry_stats);
+}
+

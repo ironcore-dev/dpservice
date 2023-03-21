@@ -5,14 +5,14 @@ from scapy.all import *
 from scapy.layers.dhcp import *
 from scapy.layers.inet import Ether, ICMP, TCP
 from scapy.layers.inet6 import IPv6
-from scapy.contrib.geneve import GENEVE
 
 from config import *
 
 
-def request_ip(interface, macaddr, ipaddr):
+def request_ip(vm):
 	scapy.config.conf.checkIPaddr = False
-	answer = dhcp_request(iface=interface, timeout=3)
+	answer = dhcp_request(iface=vm.tap, timeout=sniff_timeout)
+	validate_checksums(answer)
 	options = answer[DHCP].options
 	msg_type = next((opt[1] for opt in options if opt[0] == 'message-type'), None)
 	if msg_type != 2:
@@ -24,13 +24,14 @@ def request_ip(interface, macaddr, ipaddr):
 	if not dns_servers or dhcp_dns1 not in dns_servers or dhcp_dns2 not in dns_servers:
 		raise AssertionError(f"DHCP message does not specify the right DNS servers: {dns_servers} instead of {dhcp_dns1} and {dhcp_dns2}")
 	pkt = (Ether(dst=answer[Ether].src) /
-		   IP(src=ipaddr, dst=answer[IP].src) /
+		   IP(src=vm.ip, dst=answer[IP].src) /
 		   UDP(sport=68, dport=67) /
-		   BOOTP(chaddr=macaddr) /
+		   BOOTP(chaddr=vm.mac) /
 		   DHCP(options=[("message-type", "request"), "end"]))
-	answer = srp1(pkt, iface=interface)
+	answer = srp1(pkt, iface=vm.tap, timeout=sniff_timeout)
+	validate_checksums(answer)
 	assigned_ip = answer[BOOTP].yiaddr
-	if assigned_ip != ipaddr:
+	if assigned_ip != vm.ip:
 		raise AssertionError(f"Wrong address assigned ({assigned_ip})")
 
 
@@ -44,22 +45,16 @@ def is_tcp_pkt(pkt):
 	return TCP in pkt
 
 def is_tcp_vip_src_pkt(pkt):
-	return TCP in pkt and pkt[IP].src == virtual_ip
+	return TCP in pkt and pkt[IP].src == vip_vip
 
 def is_icmpv6echo_pkt(pkt):
 	return ICMPv6EchoReply in pkt
 
-def is_geneve_encaped_icmpv6_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 17
-
 def is_encaped_icmpv6_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 0x29
+	return IPv6 in pkt and pkt[IPv6].nh == 0x29 and ICMPv6EchoRequest in pkt
 
 def is_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 4 and ICMP in pkt
-
-def is_geneve_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].dst == ul_actual_dst and pkt[IPv6].nh == 17 and ICMP in pkt
+	return IPv6 in pkt and pkt[IPv6].nh == 4 and ICMP in pkt
 
 
 def delayed_sendp(packet, interface):
@@ -74,31 +69,49 @@ def interface_up(interface):
 	subprocess.check_output(shlex.split(cmd))
 
 
-# TODO(plague): PR to use this everywhere
 def validate_checksums(pkt):
+	# NOTE: As checksums are offloaded, tunneled checksums are not computed
+	tunneled = type(pkt.getlayer(1)) == IPv6 and IP in pkt
 	if IPv6 in pkt:
-		assert pkt[IPv6].plen == len(pkt)-54, \
+		assert pkt[IPv6].plen == len(pkt[IPv6])-40, \
 			"Invalid IPv6 packet length"
 	if IP in pkt:
-		assert pkt[IP].len == len(pkt) - 14, \
+		assert pkt[IP].len == len(pkt[IP]), \
 			"Invalid IPv4 packet length"
 		ipv4 = pkt[IP].copy()
 		chksum = ipv4.chksum
-		del ipv4.chksum
-		ipv4 = IP(raw(ipv4))
-		assert ipv4.chksum == chksum, \
-			"Invalid IPv4 checksum"
+		if not tunneled or chksum != 0:
+			del ipv4.chksum
+			ipv4 = IP(raw(ipv4))
+			assert ipv4.chksum == chksum, \
+				"Invalid IPv4 checksum"
 	if TCP in pkt:
 		tcp = pkt[TCP].copy()
 		chksum = tcp.chksum
-		del tcp.chksum
-		tcp = TCP(raw(tcp))
-		assert tcp.chksum == chksum, \
-			"Invalid TCP checksum"
+		if not tunneled or chksum != 0:
+			del tcp.chksum
+			tcp = TCP(raw(tcp))
+			assert tcp.chksum == chksum, \
+				"Invalid TCP checksum"
 	if UDP in pkt:
 		udp = pkt[UDP].copy()
 		chksum = udp.chksum
-		del udp.chksum
-		udp = UDP(raw(udp))
-		assert udp.chksum == chksum, \
-			"Invalid UDP checksum"
+		if not tunneled or chksum != 0:
+			del udp.chksum
+			udp = UDP(raw(udp))
+			assert udp.chksum == chksum, \
+				"Invalid UDP checksum"
+
+def sniff_packet(iface, lfilter, skip=0):
+	count = skip+1
+	pkt_list = sniff(count=count, lfilter=lfilter, iface=iface, timeout=count*sniff_timeout)
+	assert len(pkt_list) == count, \
+		f"No reply on {iface}"
+	pkt = pkt_list[skip]
+	validate_checksums(pkt)
+	return pkt
+
+def age_out_flows():
+	delay = flow_timeout+1  # timers run every 1s, this should always work
+	print(f"Waiting {delay}s for flows to age-out...")
+	time.sleep(delay)
