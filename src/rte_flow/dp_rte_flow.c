@@ -1,4 +1,5 @@
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
@@ -129,28 +130,24 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 {
 
-	struct dp_flow *df;
+	struct dp_flow *df = get_dp_flow_ptr(pkt);
 	struct rte_ipv6_hdr *ipv6_hdr = NULL;
-
-	df = get_dp_flow_ptr(pkt);
 
 	if (hdr != NULL)
 		ipv6_hdr = (struct rte_ipv6_hdr *)hdr;
 	else
 		ipv6_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv6_hdr *, offset);
 
+	if (!ipv6_hdr)
+		return DP_ERROR;
 
-	if (ipv6_hdr != NULL) {
-		rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
-		rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
-		df->tun_info.proto_id = ipv6_hdr->proto;
-		// printf("ipv6->proto %#x\n",ipv6_hdr->proto);
-		// printf("ipv6->hop_limits %#x\n",ipv6_hdr->hop_limits);
-		// printf("payload length in arriving ipv6 hdr %#x\n",ipv6_hdr->payload_len);
-		return ipv6_hdr->proto;
-	}
-
-	return -1;
+	rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
+	rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
+	df->tun_info.proto_id = ipv6_hdr->proto;
+	// printf("ipv6->proto %#x\n",ipv6_hdr->proto);
+	// printf("ipv6->hop_limits %#x\n",ipv6_hdr->hop_limits);
+	// printf("payload length in arriving ipv6 hdr %#x\n",ipv6_hdr->payload_len);
+	return ipv6_hdr->proto;
 }
 
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m)
@@ -524,30 +521,6 @@ int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP6;
 	pattern[pattern_cnt].spec = icmp6_spec;
 	pattern[pattern_cnt].mask = icmp6_mask;
-
-	return ++pattern_cnt;
-}
-
-int insert_geneve_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								struct rte_flow_item_geneve *geneve_spec,
-								struct rte_flow_item_geneve *geneve_mask,
-								uint16_t type, uint32_t *vni)
-{
-
-	memset(geneve_spec, 0, sizeof(struct rte_flow_item_geneve));
-	memset(geneve_mask, 0, sizeof(struct rte_flow_item_geneve));
-
-	geneve_spec->protocol = htons(type);
-	geneve_mask->protocol = 0xFFFF;
-
-	uint8_t vni_mask[3] = {0xFF, 0xFF, 0xFF};
-
-	rte_memcpy(geneve_spec->vni, vni, sizeof(geneve_spec->vni));
-	rte_memcpy(geneve_mask->vni, vni_mask, sizeof(geneve_spec->vni));
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_GENEVE;
-	pattern[pattern_cnt].spec = geneve_spec;
-	pattern[pattern_cnt].mask = geneve_mask;
 
 	return ++pattern_cnt;
 }

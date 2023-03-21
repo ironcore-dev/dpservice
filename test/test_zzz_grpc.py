@@ -52,7 +52,7 @@ def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 	grpc_client.assert_output(f"--listroutes --vni {vni1}",
 		neigh_vni1_ov_ip_range, negate=True)
 	# NOTE this has to be the same as the one in DpService::init_ifaces()
-	grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, t_vni, neigh_vni1_ul_ipv6)
+	grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, 0, neigh_vni1_ul_ipv6)
 
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
@@ -127,7 +127,7 @@ def test_grpc_add_list_del_routes_big_reply(prepare_ifaces, grpc_client):
 	MAX_LINES_ROUTE_REPLY = 36
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
 		ov_target_pfx = f"192.168.{subnet}.0"
-		grpc_client.addroute_ipv4(vni1, ov_target_pfx, 32, t_vni, neigh_vni1_ul_ipv6)
+		grpc_client.addroute_ipv4(vni1, ov_target_pfx, 32, 0, neigh_vni1_ul_ipv6)
 
 	listing = grpc_client.assert_output(f"--listroutes --vni {vni1}",
 		"Listroute called")

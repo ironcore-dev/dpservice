@@ -11,7 +11,7 @@ from helpers import interface_up
 
 class DpService:
 
-	def __init__(self, build_path, tun_opt, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False):
+	def __init__(self, build_path, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 
@@ -34,7 +34,7 @@ class DpService:
 					f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 ' --no-offload --no-stats'
 					f' --grpc-port={grpc_port}'
-					f' --nic-type=tap --overlay-type={tun_opt}')
+					f' --nic-type=tap')
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-fraction=0.5'
 		if fast_flow_timeout:
@@ -68,9 +68,8 @@ class DpService:
 		VM1.ul_ipv6 = grpc_client.addmachine(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
 		VM2.ul_ipv6 = grpc_client.addmachine(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
 		VM3.ul_ipv6 = grpc_client.addmachine(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6)
-		# TODO confused about the t_vni (is that geneve-only?)
-		grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, t_vni, neigh_vni1_ul_ipv6)
-		grpc_client.addroute_ipv6(vni1, neigh_vni1_ov_ipv6_range, neigh_vni1_ov_ipv6_range_len, t_vni, neigh_vni1_ul_ipv6)
+		grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, 0, neigh_vni1_ul_ipv6)
+		grpc_client.addroute_ipv6(vni1, neigh_vni1_ov_ipv6_range, neigh_vni1_ov_ipv6_range_len, 0, neigh_vni1_ul_ipv6)
 		grpc_client.addroute_ipv4(vni1, "0.0.0.0", 0, vni1, router_ul_ipv6)
 		grpc_client.addroute_ipv4(vni2, "0.0.0.0", 0, vni2, router_ul_ipv6)
 
@@ -91,7 +90,6 @@ if __name__ == '__main__':
 	script_path = os.path.dirname(os.path.abspath(__file__))
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--build-path", action="store", default=f"{script_path}/../build", help="Path to the root build directory")
-	parser.add_argument("--tun-opt", action="store", choices=["ipip", "geneve"], default="ipip", help="Underlay tunnel type")
 	parser.add_argument("--port-redundancy", action="store_true", help="Set up two physical ports")
 	parser.add_argument("--fast-flow-timeout", action="store_true", help="Test with fast flow timeout value")
 	parser.add_argument("--virtsvc", action="store_true", help="Enable virtual service tests")
@@ -100,7 +98,7 @@ if __name__ == '__main__':
 	parser.add_argument("--gdb", action="store_true", help="Run service under gdb")
 	args = parser.parse_args()
 
-	dp_service = DpService(args.build_path, args.tun_opt, args.port_redundancy, args.fast_flow_timeout, gdb=args.gdb, test_virtsvc=args.virtsvc)
+	dp_service = DpService(args.build_path, args.port_redundancy, args.fast_flow_timeout, gdb=args.gdb, test_virtsvc=args.virtsvc)
 
 	if args.init_only:
 		dp_service.init_ifaces(GrpcClient(args.build_path))

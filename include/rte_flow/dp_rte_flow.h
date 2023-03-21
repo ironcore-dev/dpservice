@@ -103,11 +103,6 @@ int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp6 *icmp6_mask,
 								uint8_t type);
 
-int insert_geneve_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								struct rte_flow_item_geneve *geneve_spec,
-								struct rte_flow_item_geneve *geneve_mask,
-								uint16_t type, uint32_t *vni);
-
 int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_mark *mark_spec,
 									struct rte_flow_item_mark *mark_mask,

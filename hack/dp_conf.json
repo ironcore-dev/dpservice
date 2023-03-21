@@ -39,15 +39,6 @@
     "array_size": "IFNAMSIZ"
   },
   {
-    "lgopt": "overlay-type",
-    "arg": "TYPE",
-    "help": "overlay tunnel type to use",
-    "var": "overlay_type",
-    "type": "enum",
-    "choices": [ "ipip", "geneve" ],
-    "default": "ipip"
-  },
-  {
     "lgopt": "dhcp-mtu",
     "arg": "SIZE",
     "help": "set the mtu field in DHCP responses (68 - 1500)",

@@ -388,19 +388,10 @@ void dp_ports_free()
 
 static int dp_port_install_isolated_mode(int port_id)
 {
-	switch (dp_conf_get_overlay_type()) {
-	case DP_CONF_OVERLAY_TYPE_IPIP:
-		DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
-		if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP))
-			|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP)))
-			return DP_ERROR;
-		break;
-	case DP_CONF_OVERLAY_TYPE_GENEVE:
-		DPS_LOG_INFO("Init isolation flow rule for GENEVE tunnels");
-		if (DP_FAILED(dp_install_isolated_mode_geneve(port_id)))
-			return DP_ERROR;
-		break;
-	}
+	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
+	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP))
+		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP)))
+		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC
 	return dp_virtsvc_install_isolation_rules(port_id);
 #else

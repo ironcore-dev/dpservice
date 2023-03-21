@@ -48,12 +48,6 @@ neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
 neigh_vni1_ov_ipv6_range = f"{neigh_vni1_ov_ipv6_prefix}::"
 neigh_vni1_ov_ipv6_range_len = 104
 
-# TODO geneve support may be dropped later
-tun_type_geneve="geneve"
-geneve_vni1 = 0x640000  # 100 in hex, shifted
-# t_vni needs to be set programmatically, when we use geneve
-t_vni = 0
-
 # DHCP response config
 dhcp_mtu = 1337
 dhcp_dns1 = "8.8.4.4"

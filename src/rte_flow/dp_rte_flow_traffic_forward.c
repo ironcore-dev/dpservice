@@ -210,27 +210,9 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 
 	// create flow action -- raw encap
-	uint8_t ipip_encap_hdr[DP_TUNN_IPIP_ENCAP_SIZE];
+	uint8_t encap_hdr[DP_TUNN_IPIP_ENCAP_SIZE];
 
-	memset(ipip_encap_hdr, 0, DP_TUNN_IPIP_ENCAP_SIZE);
-
-	uint8_t geneve_encap_hdr[DP_TUNN_GENEVE_ENCAP_SIZE];
-
-	memset(geneve_encap_hdr, 0, DP_TUNN_GENEVE_ENCAP_SIZE);
-
-	uint8_t *encap_hdr = NULL;
-	size_t raw_encap_size = 0;
-
-	switch (dp_conf_get_overlay_type()) {
-	case DP_CONF_OVERLAY_TYPE_GENEVE:
-		encap_hdr = geneve_encap_hdr;
-		raw_encap_size = DP_TUNN_GENEVE_ENCAP_SIZE;
-		break;
-	case DP_CONF_OVERLAY_TYPE_IPIP:
-		encap_hdr = ipip_encap_hdr;
-		raw_encap_size = DP_TUNN_IPIP_ENCAP_SIZE;
-		break;
-	}
+	memset(encap_hdr, 0, DP_TUNN_IPIP_ENCAP_SIZE);
 
 	struct rte_flow_action_raw_encap raw_encap;
 
@@ -248,21 +230,8 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
 	rte_memcpy(new_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
 
-	if (dp_conf_get_overlay_type() == DP_CONF_OVERLAY_TYPE_GENEVE) {
-		struct rte_udp_hdr *new_udp_hdr = (struct rte_udp_hdr *)(new_ipv6_hdr + 1);
-
-		new_udp_hdr->src_port = df->tun_info.src_port;
-		new_udp_hdr->dst_port = df->tun_info.dst_port;
-
-		struct rte_flow_item_geneve *new_geneve_hdr = (struct rte_flow_item_geneve *)(new_udp_hdr + 1);
-
-		rte_memcpy(new_geneve_hdr->vni, &df->tun_info.dst_vni, sizeof(new_geneve_hdr->vni));
-		new_geneve_hdr->ver_opt_len_o_c_rsvd0 = 0;
-		new_geneve_hdr->protocol = htons(df->l3_type);
-	}
-
 	action_cnt = create_raw_encap_action(action, action_cnt,
-										 &raw_encap, encap_hdr, raw_encap_size);
+										 &raw_encap, encap_hdr, DP_TUNN_IPIP_ENCAP_SIZE);
 
 
 	// create flow action -- age
@@ -316,8 +285,6 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
-
-	struct underlay_conf *u_conf = get_underlay_conf();
 	bool cross_pf_port = m->port == dp_port_get_pf0_id() ? false : true;
 
 	struct rte_flow_attr attr;
@@ -377,25 +344,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 											NULL, 0,
 											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
 											df->tun_info.proto_id);
-
-	if (dp_conf_get_overlay_type() == DP_CONF_OVERLAY_TYPE_GENEVE) {
-
-		// create flow match patterns -- udp
-		struct rte_flow_item_udp udp_spec;
-		struct rte_flow_item_udp udp_mask;
-
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   0, htons(u_conf->dst_port));
-
-		// create flow match patterns -- geneve
-		struct rte_flow_item_geneve gen_spec;
-		struct rte_flow_item_geneve gen_mask;
-
-		pattern_cnt = insert_geneve_match_pattern(pattern, pattern_cnt,
-												  &gen_spec, &gen_mask,
-												  df->l3_type, &df->tun_info.dst_vni);
-	}
 
 	// create flow match patterns -- inner packet, ipv6 or ipv4
 	struct rte_flow_item_ipv6 ol_ipv6_spec;
@@ -499,15 +447,8 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
-	size_t encap_size;
 
-	switch (dp_conf_get_overlay_type()) {
-	case DP_CONF_OVERLAY_TYPE_GENEVE:
-		encap_size = DP_TUNN_GENEVE_ENCAP_SIZE;
-	case DP_CONF_OVERLAY_TYPE_IPIP:
-		encap_size = DP_TUNN_IPIP_ENCAP_SIZE;
-	}
-	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, encap_size);
+	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
 
 	// create flow action -- raw encap
 	struct rte_flow_action_raw_encap raw_encap;
