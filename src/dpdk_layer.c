@@ -3,6 +3,7 @@
 #include "dp_graph.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_telemetry.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_thread.h"
 
@@ -60,6 +61,8 @@ static int dp_dpdk_layer_init_unsafe()
 		return DP_ERROR;
 
 	if (DP_FAILED(dp_timers_init()))
+		return DP_ERROR;
+	if (DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
 
 	force_quit = false;
