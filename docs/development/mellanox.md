@@ -25,7 +25,7 @@ Of course, for AMD processors, use `amd_iommu=on` instead.
 The other way is enabling IOMMU by default directly in [the kernel](kernel.md#iommu).
 
 ### Enable unsafe interrupts
-In some configurations, additional kernel command-line option is needed: `vfio_iommu_type1.allow_unsafe_interrupts=1`, [see above](#enabling-iommu) for the actual commands to use.
+In some older configurations, additional kernel command-line option is needed: `vfio_iommu_type1.allow_unsafe_interrupts=1`, [see above](#enabling-iommu) for the actual commands to use.
 
 Alternatively you can do this in module configuration (`/etc/modprobe.d/onmetal.conf`):
 ```
@@ -45,12 +45,21 @@ In some hardware however, `pci=realloc` kernel command-line parameter is require
 
 
 ## Firmware configuration
-For reading and writing Mellanox firmware options, `mstflint` command-line tool can be used (should be part of your distro's package tree). You can also use the offical [nVidia OFED counterpart](#nvidia-ofed).
+For reading and writing Mellanox firmware options, `mlxconfig` command-line tool is needed. This is part of the offical [nVidia OFED package](#nvidia-ofed), which can be hard to install and overrides your kernel mainline NIC drivers, which is not the way dp-service is deployed. An open-source tool (should be part of your distro's package tree) `mstflint` can be used to varying degree of success (on most configurations it only successfully lists the firmware version). Some motherbords support setting Mellanox values in BIOS though.
 
-To query firmware values use `mstflint -d <pci-device-address> q`, to write values use `mstflint -d <pci-device-address> set KEY1=value KEY2=value ...` or the appropriate `mlxconfig` equivalent.
+To query firmware values use `mlxconfig -d <pci-device-address> q`, to write values use `mlxconfig -d <pci-device-address> set KEY1=value KEY2=value ...`.
 
 ### Enabling SR-IOV
-Firmware value `SRIOV_EN` needs to be `True` and `NUM_OF_VFS` needs to be non-zero. Some cards may also require `UCTX_EN` to be `False` (ConnectX-4 Lx), otherwise DPDK will fail to establish default flows.
+For dp-service to properly function as a virtual router for VMs running on a host, firmware value `SRIOV_EN` needs to be `True` and `NUM_OF_VFS` needs to be non-zero (set to the number of VMs that will be run).
+
+### Setting UCTX (Nvidia DevX)
+Having User Context Objects (DevX) enabled seems to impact I/O privileges on the NIC, especially for non-root users. If you find any specific documentation to explain this, please add the info here.
+
+Running dp-service on ConnectX-4 Lx requires `UCTX_EN` to be `False`, otherwise DPDK will fail to establish default flows.
+
+Running dp-service on ConnectX-6 Lx with offloading requires `UCTX_EN` to be `True`, otherwise hairpins to PF1 will fail to initialize.
+
+Running dp-service on ConnectX-6 Lx in user-mode (non-root) requires `UCTX_EN` to be `False`, otherwise PF to VF traffic is not working at all. Offloading is not possible then.
 
 
 ## Building DPDK
@@ -62,7 +71,7 @@ Don't forget to rebuild and reinstall DPDK after installing these.
 
 
 ## Running dp-service
-For convenience, there is a `prepare.sh` shell script in `hack/` that prepares the interfaces and memory, and generates a config file that the service can use, removing the necessity to provide the right command-line options for running the service with Mellanox NICs (and their virtual interfaces).
+For convenience, there is a `prepare.sh` shell script in `hack/` that prepares the interfaces and memory, and generates a config file that the service can use, removing the necessity to provide the right command-line options for running the service with Mellanox NICs (and their virtual interfaces). The is also a [systemd unit file](running.md#mellanox-cards) you can use.
 
 This script uses the IPv6 address assigned to your loopback interface as the underlay address for uplink traffic of dp-service.
 
