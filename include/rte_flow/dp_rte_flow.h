@@ -37,6 +37,9 @@ extern "C"
 #define DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE 3
 #define DP_IP_ICMP_CODE_FRAGMENT_NEEDED 4
 
+#define DP_RTE_TCP_CNTL_FLAGS \
+	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
+
 typedef struct dp_icmp_err_ip_info {
 	struct rte_ipv4_hdr *err_ipv4_hdr;
 	uint16_t	l4_src_port;
@@ -91,7 +94,8 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
 								struct rte_flow_item_tcp *tcp_mask,
-								uint16_t src_port, uint16_t dst_port);
+								uint16_t src_port, uint16_t dst_port,
+								uint8_t tcp_flags, uint8_t tcp_flags_mask);
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp *icmp_spec,

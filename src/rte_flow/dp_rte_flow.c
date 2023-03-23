@@ -463,7 +463,8 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_tcp *tcp_spec,
 							 struct rte_flow_item_tcp *tcp_mask,
-							 uint16_t src_port, uint16_t dst_port)
+							 uint16_t src_port, uint16_t dst_port,
+							 uint8_t tcp_flags, uint8_t tcp_flags_mask)
 {
 
 	memset(tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
@@ -478,6 +479,11 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	if (dst_port) {
 		tcp_spec->hdr.dst_port = dst_port;
 		tcp_mask->hdr.dst_port = 0xffff;
+	}
+
+	if (tcp_flags) {
+		tcp_spec->hdr.tcp_flags = tcp_flags;
+		tcp_mask->hdr.tcp_flags = tcp_flags_mask;
 	}
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
@@ -769,7 +775,8 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 	agectx->cntrack = df->conntrack;
 	agectx->dir = agectx->cntrack->dir;
 	agectx->rte_flow = flow;
-	rte_atomic32_inc(&agectx->cntrack->flow_cnt);
+	// rte_atomic32_inc(&agectx->cntrack->flow_cnt);
+	dp_ref_inc(&agectx->cntrack->ref_count);
 }
 
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
@@ -796,6 +803,7 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 			printf("Flow can't be created on port %d message: %s\n", port_id, error.message ? error.message : "(no stated reason)");
 			return NULL;
 		}
+		printf("installed a flow rule on port %d \n", port_id);
 		return flow;
 	}
 }

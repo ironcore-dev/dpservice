@@ -40,6 +40,9 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 {
 	uint8_t tcp_flags = tcp_hdr->tcp_flags;
 
+	if (DP_TCP_PKT_FLAG_FIN(tcp_hdr->tcp_flags))
+		printf("get a fin packet \n");
+
 	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else if (DP_TCP_PKT_FLAG_FIN(tcp_flags)) {
@@ -75,9 +78,13 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 
 static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val)
 {
-	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
+
+	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
-	else
+		
+		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+	} else
 		flow_val->timeout_value = flow_timeout;
 }
 
@@ -91,7 +98,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 		return flow_val;
 	/* Add original direction to conntrack table */
 	dp_add_flow(key);
-	rte_atomic32_clear(&flow_val->flow_cnt);
+	// rte_atomic32_clear(&flow_val->flow_cnt);
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_state = DP_FLOW_STATE_NEW;
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
@@ -100,7 +107,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = m->port;
 
-	if (offload_mode_enabled) {
+	if (offload_mode_enabled && df_ptr->l4_type != IPPROTO_TCP) {
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 	} else {

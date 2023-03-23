@@ -98,9 +98,10 @@ void dp_process_event_flow_aging_msg(struct rte_mbuf *m)
 	if (dp_conf_is_offload_enabled()) {
 		dp_process_aged_flows(dp_port_get_pf0_id());
 		dp_process_aged_flows(dp_port_get_pf1_id());
-	} else
+	}
+	// } else
 		// tao: this seems to need to be called for both non-offload and offload mode, since cntrack pointer shall be
 		// protected by refcount. but due to the case that refcount is not correctly increased when a flow is offloaded
 		// null pointer could exist, and for now it is only called for non-offloading mode. need to double check.
-		dp_process_aged_flows_non_offload();
+	dp_process_aged_flows_non_offload();
 }

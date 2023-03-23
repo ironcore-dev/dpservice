@@ -11,6 +11,7 @@
 #include "node_api.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_timers.h"
+#include "rte_flow/dp_rte_flow_traffic_forward.h"
 
 #define DP_FLOW_LOG_KEY(MSG, KEY) do { \
 	if (rte_log_get_level(RTE_LOGTYPE_DPSERVICE) >= RTE_LOG_DEBUG) { \
@@ -254,6 +255,10 @@ void dp_process_aged_flows(int port_id)
 	void **contexts;
 
 	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
+	printf("before total aged flows %d \n", total);
+
+	// query_age(1);
+	// query_age(2);
 
 	if (total <= 0)
 		return;
@@ -272,13 +277,60 @@ void dp_process_aged_flows(int port_id)
 		agectx = (struct flow_age_ctx *)contexts[idx];
 		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, agectx->rte_flow, &error);
-		DPS_LOG_DEBUG("Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d",
-			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
-		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+		
+		if (agectx->handle) {
+			printf("need to remove a indirect action\n");
+
+			memset(&error, 0x22, sizeof(error));
+			int ret = rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
+			if (DP_FAILED(ret))
+				printf("failed to remove a indirect action from agectx, %d \n", ret);
+			else
+				printf("removed a indirect action\n");
+		}
+
+		if (agectx->rte_flow) {
+			rte_flow_destroy(port_id, agectx->rte_flow, &error);
+
+			printf("Aged flowto sw table agectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
+			 agectx->rte_flow, rte_atomic32_read(&(agectx->cntrack->ref_count.refcount)), port_id);
+			// if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
 			dp_ref_dec(&agectx->cntrack->ref_count);
-		rte_free(agectx);
+		
+			rte_free(agectx);
+		}
 	}
+
+	// for (idx = 0; idx < nb_context; idx++) {
+	// 	agectx = (struct flow_age_ctx *)contexts[idx];
+	// 	if (!agectx)
+	// 		continue;
+		
+	// 	printf("Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt   rte_flow inserted on port %d \n",
+	// 		 agectx->rte_flow, port_id);
+
+	// 	printf("removed a rte flow 1\n");
+	// 	rte_flow_destroy(port_id, agectx->rte_flow, &error);
+	// 	printf("removed a rte flow 2\n");
+		
+	// 	if (agectx->handle) {
+	// 		printf("need to remove a indirect action\n");
+
+	// 		memset(&error, 0x22, sizeof(error));
+	// 		int ret = rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
+	// 		if (DP_FAILED(ret))
+	// 			printf("failed to remove a indirect action from agectx, %d \n", ret);
+	// 		else
+	// 			printf("removed a indirect action\n");
+	// 	}
+	// // printf("removed a rte flow 5\n");
+	// 	printf("Aged flowto sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d",
+	// 		 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
+	// 	if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+	// 		dp_ref_dec(&agectx->cntrack->ref_count);
+		
+	// 	rte_free(agectx);
+	// }
 free:
 	rte_free(contexts);
 }
