@@ -642,12 +642,14 @@ int AddVIPCall::Proceed()
 		new AddVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("add VIP called for id: %s", request_.interfaceid().c_str());
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		if (request_.interfacevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
+			DPGRPC_LOG_INFO("add VIP called for id: %s, with IPv4 addr: %s",
+							request_.interfaceid().c_str(),
+							request_.interfacevipip().address().c_str());
 			ret_val = inet_aton(request_.interfacevipip().address().c_str(),
 					  (in_addr*)&request.add_vip.vip.vip_addr);
 			if (ret_val == 0)
@@ -681,6 +683,7 @@ int DelVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
+	struct in_addr addr;
 
 	if (status_ == REQUEST) {
 		new DelVIPCall(service_, cq_);
@@ -700,6 +703,12 @@ int DelVIPCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
+
+		if (!reply.com_head.err_code) {
+			addr.s_addr = htonl(reply.get_vip.vip.vip_addr);
+			DPGRPC_LOG_INFO("Successfully deleted an associated VIP IPv4 addr: %s", inet_ntoa(addr));
+		}
+
 		status_ = FINISH;
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
@@ -1197,6 +1206,7 @@ int DeleteNATVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
+	struct in_addr addr;
 
 	if (status_ == REQUEST) {
 		new DeleteNATVIPCall(service_, cq_);
@@ -1219,6 +1229,12 @@ int DeleteNATVIPCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
+
+		if (!reply.com_head.err_code) {
+			addr.s_addr = htonl(reply.get_vip.vip.vip_addr);
+			DPGRPC_LOG_INFO("Successfully deleted from an associated NATVIP IPv4: %s", inet_ntoa(addr));
+		}
+
 		status_ = FINISH;
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
