@@ -322,6 +322,9 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 		goto err;
 	}
 	dp_remove_vnf_with_key(s_data->ul_ip6);
+
+	rep->get_vip.vip.vip_addr = s_data->vip_ip;
+
 	dp_del_vm_dnat_ip(s_data->vip_ip, dp_get_vm_vni(port_id));
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 
@@ -736,19 +739,27 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
 	struct snat_data *s_data;
+	uint32_t vm_vni;
 
 	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
 	if (port_id < 0) {
 		ret = DP_ERROR_VM_GET_VM_NOT_FND;
 		goto err;
 	}
+
+	vm_vni = dp_get_vm_vni(port_id);
+
 	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
 										 dp_get_vm_vni(port_id));
 	if (!s_data) {
 		ret = DP_ERROR_VM_DEL_NAT_NO_SNAT;
 		goto err;
 	}
+
 	dp_remove_vnf_with_key(s_data->ul_nat_ip6);
+
+	rep->get_vip.vip.vip_addr = s_data->network_nat_ip;
+	dp_del_vm_dnat_ip(s_data->network_nat_ip, vm_vni);
 
 	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (ret)
@@ -832,6 +843,8 @@ static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
 								(uint16_t)req->del_nat_vip.port_range[0], (uint16_t)req->del_nat_vip.port_range[1]);
 		if (ret)
 			goto err;
+
+		dp_del_vm_dnat_ip(ntohl(req->del_nat_vip.vip.vip_addr), req->del_nat_vip.vni);
 	}
 	return ret;
 err:

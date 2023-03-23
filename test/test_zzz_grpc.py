@@ -54,6 +54,22 @@ def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 	# NOTE this has to be the same as the one in DpService::init_ifaces()
 	grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, 0, neigh_vni1_ul_ipv6)
 
+def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
+	# Try to add NAT, delete and add VIP with same IP
+	grpc_client.addnat(VM2.name, vip_vip, nat_local_min_port, nat_local_max_port)
+	grpc_client.assert_output(f"--getnat {VM2.name}",
+		f"Received NAT IP {vip_vip}")
+	grpc_client.delnat(VM2.name)
+
+	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
+	grpc_client.assert_output(f"--getvip {VM2.name}",
+		f"Received VIP {vip_vip} underlayroute {ul_ipv6}")
+	grpc_client.delvip(VM2.name)
+	grpc_client.assert_output(f"--getvip {VM2.name}",
+		vip_vip, negate=True)
+	grpc_client.assert_output(f"--getnat {VM2.name}",
+		vip_vip, negate=True)
+
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
