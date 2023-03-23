@@ -96,8 +96,16 @@ int dp_send_event_flow_aging_msg()
 void dp_process_event_flow_aging_msg(struct rte_mbuf *m)
 {
 	if (dp_conf_is_offload_enabled()) {
+		struct dp_ports *ports = get_dp_ports();
+		
 		dp_process_aged_flows(dp_port_get_pf0_id());
 		dp_process_aged_flows(dp_port_get_pf1_id());
+
+		DP_FOREACH_PORT(ports, port) {
+			if (port->port_type == DP_PORT_VF && port->allocated)
+				dp_process_aged_flows(port->port_id);
+
+		}
 	}
 	// } else
 		// tao: this seems to need to be called for both non-offload and offload mode, since cntrack pointer shall be

@@ -80,7 +80,7 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 {
 
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
-		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
+		flow_val->timeout_value = 60;
 		
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;

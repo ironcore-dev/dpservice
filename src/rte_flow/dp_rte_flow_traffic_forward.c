@@ -3,9 +3,6 @@
 #include "dp_log.h"
 #include "dp_error.h"
 
-// static struct rte_flow_action_handle *test_handler[10]={0};
-// static int test_cnt = 0;
-
 static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m, struct dp_flow *df)
 {
 
@@ -22,6 +19,8 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	int action_cnt = 0;
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int hairpin_action_cnt = 0;
+
+	int age_action_index;
 
 	memset(pattern, 0, sizeof(pattern));
 	memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
@@ -247,8 +246,8 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	if (!agectx)
 		return 0;
 	action_cnt = create_flow_age_action(action, action_cnt,
-										&flow_age, 30, agectx);
-
+										&flow_age, df->conntrack->timeout_value, agectx);
+	age_action_index = action_cnt - 1;
 
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
@@ -274,8 +273,20 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		#endif
 	}
 
+
 	// uint16_t peer_pf_port_id =  dp_port_get_pf1_id();
 	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
+
+	if (df->l4_type == IPPROTO_TCP) {
+
+		agectx->handle = dp_create_age_indirect_action(&attr, t_port_id, df, &action[age_action_index], agectx);
+
+		if (!agectx->handle) {
+			rte_free(agectx);
+			DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+			return 0;
+		}
+	}
 
 	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action, df);
 	if (!flow) {
@@ -300,6 +311,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
+	int age_action_index;
 
 	#if !defined(ENABLE_DPDK_22_11)
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
@@ -479,7 +491,9 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		return 0;
 
 	action_cnt = create_flow_age_action(action, action_cnt,
-											&flow_age, 30, agectx);
+											&flow_age, df->conntrack->timeout_value, agectx);
+	age_action_index = action_cnt - 1;
+	
 
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 	struct rte_flow_action_queue queue_action;
@@ -523,6 +537,17 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		#else
 			create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
 		#endif
+
+		if (df->l4_type == IPPROTO_TCP) {
+
+			agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &action[age_action_index], agectx);
+	
+			if (!agectx->handle) {
+				rte_free(agectx);
+				DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+				return 0;
+			}
+		}
 
 		struct rte_flow *flow = NULL;
 
@@ -692,40 +717,28 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 										    &set_ipv4, df->nat_addr, DP_IS_SRC);
 
 	// create flow action -- age
-	// int ret =  dp_init_rte_age_handler(m->port, df, &attr);
-	// if (DP_FAILED(ret))
-	// 	printf("failed to init rte age handler on port id %d \n", m->port);
-
-	// action[action_cnt].type = RTE_FLOW_ACTION_TYPE_INDIRECT;
-	// action[action_cnt].conf = df->conntrack->rte_age_handler;
-	// action_cnt++;
-
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
 	struct rte_flow_action_age flow_age;
 
 	if (!agectx)
 		return 0;
-	action_cnt = create_flow_age_action(action, action_cnt,
-										&flow_age, 5, agectx);
-
-
-	struct rte_flow_indir_action_conf age_indirect_conf;
-	struct rte_flow_error error;
-
-	age_indirect_conf.ingress = attr.ingress;
-	age_indirect_conf.egress = attr.egress;
-	age_indirect_conf.transfer = attr.transfer;
-
-	agectx->handle = rte_flow_action_handle_create(m->port, &age_indirect_conf, &action[action_cnt-1], &error);
-	// test_handler[m->port] = agectx->handle;
 	
-	if (!agectx->handle) {
-		rte_free(agectx);
-		printf("Flow's age cannot be configured as indirect due to error message: %s\n", error.message ? error.message : "(no stated reason)");
-		return 0;
-	}
+	printf("installed timeout value is %d \n", df->conntrack->timeout_value);
+	action_cnt = create_flow_age_action(action, action_cnt,
+										&flow_age, df->conntrack->timeout_value, agectx);
 
-	df->conntrack->age_ctxs.rte_age_ctxs[df->conntrack->age_ctxs.rte_age_ctx_cnt++] = agectx;
+	if (df->l4_type == IPPROTO_TCP) {
+
+		agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &action[action_cnt-1], agectx);
+	
+		if (!agectx->handle) {
+			rte_free(agectx);
+			DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+			return 0;
+		}
+
+	}
+	
 										
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
@@ -740,7 +753,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 	if (!flow) {
-		// free_allocated_agectx(agectx);
+		free_allocated_agectx(agectx);
 		printf("failed to validate and install rte flow rules \n");
 		return 0;
 	}
@@ -748,64 +761,9 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
 
-
-	// struct rte_flow_action_age flow_age_new;
-	// flow_age_new.reserved = flow_age.reserved;
-	// flow_age_new.timeout = 20;
-	// flow_age_new.context = flow_age.context;
-
-	// struct rte_flow_action tmp_action;
-	// tmp_action.type = RTE_FLOW_ACTION_TYPE_AGE;
-	// tmp_action.conf = &flow_age_new;
-
-	// int ret = rte_flow_action_handle_update(m->port, agectx->handle, (void *)&tmp_action, &error);
-	// if (DP_FAILED(ret)) {
-
-	// 	printf("update failed %d, %s \n", ret, error.message ? error.message : "(no stated reason)");
-	// }
-
 	return 1;
 }
 
-
-// static int dp_init_rte_age_handler(int port_id, struct dp_flow *df, struct rte_flow_attr *attr)
-// {
-
-// 	if (!df->conntrack->rte_age_handler) {
-// 		// create flow action -- age
-// 		struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-// 		struct rte_flow_action_age flow_age;
-
-// 		if (!agectx)
-// 			return 0;
-
-// 		flow_age.timeout = DP_FLOW_DEFAULT_TIMEOUT;
-// 		flow_age.reserved = 0;
-// 		flow_age.context = agectx;
-
-// 		struct rte_flow_indir_action_conf age_indirect_conf;
-// 		struct rte_flow_error error;
-
-// 		age_indirect_conf.ingress = attr->ingress;
-// 		age_indirect_conf.egress = attr->egress;
-// 		age_indirect_conf.transfer = attr->transfer;
-
-// 		agectx->handle = rte_flow_action_handle_create(port_id, &age_indirect_conf, &flow_age, &error);
-// 		// test_handler[m->port] = agectx->handle;
-// 		df->conntrack->rte_age_handler = agectx->handle;
-
-// 		if (!agectx->handle) {
-// 			rte_free(agectx);
-// 			printf("Flow's age cannot be configured as indirect due to error message: %s\n", error.message ? error.message : "(no stated reason)");
-// 			return DP_ERROR;
-// 		}
-
-
-// 	}
-	
-// 	return DP_OK;
-
-// }
 
 // TODO maybe pass node for better logging
 int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
@@ -822,50 +780,3 @@ int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
 
 	return 0;
 }
-
-// void free_test_handlers(int port_id)
-// {
-// 		struct rte_flow_error error;
-// 		printf("need to remove a indirect action\n");
-
-// 		memset(&error, 0x22, sizeof(error));
-// 		int ret = rte_flow_action_handle_destroy(port_id, test_handler[port_id], &error);
-// 		if (ret < 0)
-// 			printf("failed to remove a indirect action from agectx, %d \n", ret);
-// 		else
-// 			printf("removed a indirect action\n");
-// }
-
-
-// void query_age(int port_id)
-// {
-	
-// 	if (!test_handler[port_id])
-// 		return;
-
-	
-// 	printf("query port %d \n", port_id);
-
-// 	struct rte_flow_error error;
-// 	union {
-// 		struct rte_flow_query_count count;
-// 		struct rte_flow_query_age age;
-// 		struct rte_flow_action_conntrack ct;
-// 	} query;
-
-// 	memset(&error, 0x55, sizeof(error));
-// 	memset(&query, 0, sizeof(query));
-
-
-// 	if (rte_flow_action_handle_query(port_id, test_handler[port_id], &query, &error))
-// 		printf("query failed \n");
-// 	else
-// 		printf("Indirect AGE action:\n"
-// 		" aged: %u\n"
-// 		" sec_since_last_hit_valid: %u\n"
-// 		" sec_since_last_hit: %" PRIu32 "\n",
-// 		query.age.aged,
-// 		query.age.sec_since_last_hit_valid,
-// 		query.age.sec_since_last_hit);
-
-// }

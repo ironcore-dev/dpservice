@@ -765,17 +765,26 @@ int create_end_action(struct rte_flow_action *action, int action_cnt)
 // to be configured
 void free_allocated_agectx(struct flow_age_ctx *agectx)
 {
-	if (agectx)
+	struct rte_flow_error error;
+	if (agectx) {
+		if (agectx->handle) {
+			memset(&error, 0x22, sizeof(error));
+			int ret = rte_flow_action_handle_destroy(agectx->port_id, agectx->handle, &error);
+			if (DP_FAILED(ret))
+				DPS_LOG_ERR("failed to remove flow's age indirect action during agectx free ops, due to code: %d, with error msg: %s",
+								ret, error.message ? error.message : "(no stated reason)");
+			
+		}
 		rte_free(agectx);
+	}
 }
 
 void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 							struct dp_flow *df, struct rte_flow *flow)
 {
 	agectx->cntrack = df->conntrack;
-	agectx->dir = agectx->cntrack->dir;
 	agectx->rte_flow = flow;
-	// rte_atomic32_inc(&agectx->cntrack->flow_cnt);
+	agectx->port_id = port_id;
 	dp_ref_inc(&agectx->cntrack->ref_count);
 }
 
@@ -806,4 +815,34 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 		printf("installed a flow rule on port %d \n", port_id);
 		return flow;
 	}
+}
+
+struct rte_flow_action_handle *dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
+							struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx)
+{
+	struct rte_flow_indir_action_conf age_indirect_conf;
+	struct rte_flow_error error;
+	struct rte_flow_action_handle *result = NULL;
+
+	age_indirect_conf.ingress = attr->ingress;
+	age_indirect_conf.egress = attr->egress;
+	age_indirect_conf.transfer = attr->transfer;
+
+	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
+
+	if (!result) {
+		DPS_LOG_ERR("Flow's age cannot be configured as indirect due to error message: %s", error.message ? error.message : "(no stated reason)");
+		return result;
+	}
+
+	if (DP_FAILED(dp_add_rte_age_ctx(df->conntrack, agectx))) {
+		memset(&error, 0x22, sizeof(error));
+		int ret = rte_flow_action_handle_destroy(port_id, result, &error);
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("failed to remove a indirect action from agectx, code: %d, with error message %s ", ret, error.message ? error.message : "(no stated reason)");
+
+		DPS_LOG_ERR("failed to store agectx in cntrack obj");
+		result = NULL;
+	}
+	return result;
 }
