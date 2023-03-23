@@ -46,6 +46,7 @@ dp_sources = [
   'dp_periodic_msg.c',
   'dp_port.c',
   'dp_service.c',
+  'dp_telemetry.c',
   'dp_timers.c',
   'dp_util.c',
   'dp_vnf.c',
