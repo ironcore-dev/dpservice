@@ -7,7 +7,6 @@ extern "C" {
 
 int dp_telemetry_init();
 void dp_telemetry_free();
-int dp_telemetry_graph_init();
 
 #ifdef __cplusplus
 }

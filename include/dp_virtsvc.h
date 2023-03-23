@@ -7,6 +7,7 @@ extern "C" {
 
 #include <rte_byteorder.h>
 #include <rte_hash.h>
+#include <rte_telemetry.h>
 
 #define DP_NB_SYSTEM_PORTS 1024
 #define DP_VIRTSVC_PORTCOUNT (UINT16_MAX+1 - DP_NB_SYSTEM_PORTS)
@@ -98,6 +99,8 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 							 int *conn_idx);
 
 void dp_virtsvc_del_vm(uint16_t port_id);
+
+int dp_virtsvc_get_free_ports_telemetry(struct rte_tel_data *dict);
 
 #ifdef __cplusplus
 }
