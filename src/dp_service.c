@@ -142,31 +142,36 @@ static int init_interfaces()
 
 static void free_interfaces()
 {
+	dp_vnf_free();
+	dp_lpm_free();
+	dp_lb_free();
+	dp_nat_free();
+	dp_flow_free();
+	// ports seem to be stopped by DPDK at the end
 	dp_telemetry_free();
 	dp_graph_free();
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_free();
 #endif
 	dp_ports_free();
+	// dp_multipath has no free
 }
 
 static inline int run_dpdk_service()
 {
-	int result;
+	int result = DP_ERROR;
 
-	if (DP_FAILED(init_interfaces()))
-		return DP_ERROR;
-
-	if (DP_FAILED(dp_grpc_thread_start()))
-		return DP_ERROR;
+	if (DP_FAILED(init_interfaces())
+		|| DP_FAILED(dp_grpc_thread_start()))
+		goto end;
 
 	result = dp_dpdk_main_loop();
 
 	if (DP_FAILED(dp_grpc_thread_join()))
 		result = DP_ERROR;
 
+end:
 	free_interfaces();
-
 	return result;
 }
 

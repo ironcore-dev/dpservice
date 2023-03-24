@@ -71,6 +71,7 @@ struct nat_check_result {
 };
 
 int dp_nat_init(int socket_id);
+void dp_nat_free();
 void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_ipv6);

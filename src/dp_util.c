@@ -137,7 +137,6 @@ static uint32_t dp_jhash_nwords(const void *key, uint32_t length, uint32_t initv
 	return rte_jhash_32b(key, length / 4, initval);
 }
 
-// TODO(plague): free() is rarely used
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id)
 {
 	struct rte_hash *result;

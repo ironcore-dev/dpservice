@@ -30,7 +30,6 @@ static int create_flow(int port_id,
 }
 
 // TODO(plague): retval checking is not finished here, just bare minimum done
-// TODO(plague): these two look too similar, maybe it can be refactored
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
 

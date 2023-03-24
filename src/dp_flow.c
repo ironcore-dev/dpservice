@@ -24,6 +24,11 @@ int dp_flow_init(int socket_id)
 	return DP_OK;
 }
 
+void dp_flow_free()
+{
+	dp_free_jhash_table(ipv4_flow_tbl);
+}
+
 static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};

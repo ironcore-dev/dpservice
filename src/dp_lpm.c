@@ -33,6 +33,11 @@ int dp_lpm_init(int socket_id)
 	return DP_OK;
 }
 
+void dp_lpm_free()
+{
+	dp_free_jhash_table(vm_handle_tbl);
+}
+
 int dp_map_vm_handle(void *key, uint16_t portid)
 {
 	uint16_t *p_port_id;

@@ -29,6 +29,12 @@ int dp_lb_init(int socket_id)
 	return DP_OK;
 }
 
+void dp_lb_free()
+{
+	dp_free_jhash_table(id_map_lb_tbl);
+	dp_free_jhash_table(ipv4_lb_tbl);
+}
+
 static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value *l_val)
 {
 	struct lb_key *lb_k;
