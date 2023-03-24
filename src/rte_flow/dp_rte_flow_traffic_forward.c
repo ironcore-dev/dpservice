@@ -159,7 +159,6 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 
 	/*Firstly install a flow rule to modify mac addr to embed vni info and move packet to hairpin rxq*/
-
 	if (cross_pf_port) {
 		struct rte_flow_action_set_mac set_mac_action;
 		struct rte_flow_action_queue queue_action;
@@ -180,14 +179,23 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		if (!hairpin_agectx)
 			return 0;
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
-										&flow_age, 30, hairpin_agectx);
-
+										&flow_age, df->conntrack->timeout_value, hairpin_agectx);
+		age_action_index = hairpin_action_cnt - 1;
 		// create flow action -- end
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
 
 		// validate and install rte flow
 		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 		struct rte_flow *hairpin_flow = NULL;
+		
+		if (df->l4_type == IPPROTO_TCP) {
+			hairpin_agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
+			if (!hairpin_agectx->handle) {
+				rte_free(hairpin_agectx);
+				DPS_LOG_ERR("Flow's age cannot be configured as indirect action on port %d", m->port);
+				return 0;
+			}
+		}
 
 		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, hairpin_pattern, hairpin_action, df);
 		if (!hairpin_flow) {
@@ -278,9 +286,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
 
 	if (df->l4_type == IPPROTO_TCP) {
-
 		agectx->handle = dp_create_age_indirect_action(&attr, t_port_id, df, &action[age_action_index], agectx);
-
 		if (!agectx->handle) {
 			rte_free(agectx);
 			DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
@@ -538,17 +544,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 			create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
 		#endif
 
-		if (df->l4_type == IPPROTO_TCP) {
-
-			agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &action[age_action_index], agectx);
-	
-			if (!agectx->handle) {
-				rte_free(agectx);
-				DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
-				return 0;
-			}
-		}
-
 		struct rte_flow *flow = NULL;
 
 		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
@@ -559,6 +554,17 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		}
 		// config the content of agectx
 		config_allocated_agectx(agectx, m->port, df, flow);
+	}
+
+	if (df->l4_type == IPPROTO_TCP) {
+
+		agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &action[age_action_index], agectx);
+
+		if (!agectx->handle) {
+			rte_free(agectx);
+			DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+			return 0;
+		}
 	}
 
 	#if !defined(ENABLE_DPDK_22_11)
@@ -576,13 +582,28 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		if (!hairpin_agectx)
 			return 0;
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
-											&hairpin_flow_age, 30, hairpin_agectx);
+											&hairpin_flow_age, df->conntrack->timeout_value, hairpin_agectx);
+		
+
+		age_action_index = hairpin_action_cnt - 1;
 		// create flow action -- end
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
 		// validate and install rte flow
 		struct rte_flow *hairpin_flow_P2 = NULL;
 
 		create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
+
+		if (df->l4_type == IPPROTO_TCP) {
+
+			hairpin_agectx->handle = dp_create_age_indirect_action(&attr, (uint16_t)df->nxt_hop, df, &hairpin_action[age_action_index], hairpin_agectx);
+
+			if (!hairpin_agectx->handle) {
+				rte_free(hairpin_agectx);
+				DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+				return 0;
+			}
+		}
+
 		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action, df);
 		if (!hairpin_flow_P2) {
 			free_allocated_agectx(hairpin_agectx);

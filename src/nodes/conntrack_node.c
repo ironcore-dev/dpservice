@@ -50,9 +50,10 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		// but sufficient to determine if a tcp connection is almost successfuly closed
 		// (last ack is still pending)
 		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
-			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
-		else
 			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+			// flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
+		// else
+			// flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else {
 		switch (flow_val->l4_state.tcp_state) {
 		case DP_FLOW_TCP_STATE_NONE:
@@ -82,8 +83,10 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = 60;
 		
-		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
-		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+		if (offload_mode_enabled) {
+			flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+		}
 	} else
 		flow_val->timeout_value = flow_timeout;
 }

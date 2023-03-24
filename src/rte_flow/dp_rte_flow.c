@@ -786,6 +786,7 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 	agectx->rte_flow = flow;
 	agectx->port_id = port_id;
 	dp_ref_inc(&agectx->cntrack->ref_count);
+	printf("added new rte flow %d \n", rte_atomic32_read(&(agectx->cntrack->ref_count.refcount)));
 }
 
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,

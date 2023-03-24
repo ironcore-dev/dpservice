@@ -89,6 +89,7 @@ struct flow_nat_info {
 
 struct flow_value {
 	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
+	struct flow_age_ctx *rte_age_ctxs[DP_FLOW_VAL_MAX_AGE_STORE];
 	struct flow_nat_info	nat_info;
 	uint64_t		timestamp;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
@@ -107,7 +108,8 @@ struct flow_value {
 		enum dp_flow_tcp_state		tcp_state;
 	} l4_state;
 
-	struct flow_age_ctx *rte_age_ctxs[DP_FLOW_VAL_MAX_AGE_STORE];
+	uint8_t			aged : 2;
+
 };
 
 struct flow_age_ctx {

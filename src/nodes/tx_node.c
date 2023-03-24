@@ -70,6 +70,17 @@ static int tx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return DP_OK;
 }
 
+static void print_ip_direct(unsigned int ip)
+{
+    unsigned char bytes[4];
+    bytes[0] = ip & 0xFF;
+    bytes[1] = (ip >> 8) & 0xFF;
+    bytes[2] = (ip >> 16) & 0xFF;
+    bytes[3] = (ip >> 24) & 0xFF;   
+    printf("%d.%d.%d.%d\n", bytes[3], bytes[2], bytes[1], bytes[0]);        
+}
+
+
 static uint16_t tx_node_process(struct rte_graph *graph,
 								struct rte_node *node,
 								void **objs,
@@ -108,13 +119,16 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		}
 
 		if (df->conntrack) {
+			printf("dst port is %d \n", df->nxt_hop);
 			if (df->conntrack->dir == DP_FLOW_DIR_ORG)
 				offload_flag = df->conntrack->offload_flags.orig;
 			else
 				offload_flag = df->conntrack->offload_flags.reply;
 
-			if (offload_flag == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
+			if (offload_flag == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6) {
+				print_ip_direct(df->dst.dst_addr);
 				dp_handle_traffic_forward_offloading(pkt, df);
+			}
 		}
 	}
 
