@@ -165,6 +165,8 @@ int dp_dpdk_main_loop(void)
 	ret = rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot launch lcores %s", dp_strerror(ret));
+		// custom threads are already running, stop them
+		dp_force_quit();
 		return ret;
 	}
 

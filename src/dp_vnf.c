@@ -15,6 +15,11 @@ int dp_vnf_init(int socket_id)
 	return DP_OK;
 }
 
+void dp_vnf_free()
+{
+	dp_free_jhash_table(vnf_handle_tbl);
+}
+
 int dp_set_vnf_value(void *key, struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val;

@@ -50,6 +50,14 @@ int dp_nat_init(int socket_id)
 	return DP_OK;
 }
 
+void dp_nat_free()
+{
+	dp_free_jhash_table(ipv4_netnat_portoverload_tbl);
+	dp_free_jhash_table(ipv4_netnat_portmap_tbl);
+	dp_free_jhash_table(ipv4_dnat_tbl);
+	dp_free_jhash_table(ipv4_snat_tbl);
+}
+
 int dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result)
 {
 	struct nat_key nkey;
