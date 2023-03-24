@@ -41,6 +41,7 @@ static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip
 //   169.254.1.0/24 -> server_ip
 static const uint8_t virtsvc_route_prefix[] = { 24, 169, 254, 1 };
 static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip) + sizeof(virtsvc_route_prefix) + sizeof(server_ip)];
+_Static_assert(DP_VIRTSVC_MAX <= UINT8_MAX+1, "Number of virtual services can be higher than supported link-local subnet size");
 #endif
 
 
