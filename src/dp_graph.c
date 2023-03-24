@@ -3,7 +3,6 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_port.h"
-#include "dp_telemetry.h"
 #include "dp_timers.h"
 #include "nodes/arp_node.h"
 #include "nodes/dhcp_node.h"
@@ -191,16 +190,12 @@ int dp_graph_init(void)
 		}
 	}
 
-	if (DP_FAILED(dp_telemetry_graph_init()))
-		return DP_ERROR;
-
 	return DP_OK;
 }
 
 void dp_graph_free(void)
 {
 	dp_graph_stats_free();
-	dp_telemetry_free();
 	if (dp_graph_id != RTE_GRAPH_ID_INVALID)
 		rte_graph_destroy(dp_graph_id);
 }

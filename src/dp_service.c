@@ -15,6 +15,7 @@
 #include "dp_multi_path.h"
 #include "dp_nat.h"
 #include "dp_port.h"
+#include "dp_telemetry.h"
 #include "dp_version.h"
 #include "dp_vnf.h"
 #ifdef ENABLE_VIRTSVC
@@ -120,7 +121,8 @@ static int init_interfaces()
 #ifdef ENABLE_VIRTSVC
 		|| DP_FAILED(dp_virtsvc_init(pf0_socket))
 #endif
-		|| DP_FAILED(dp_graph_init()))
+		|| DP_FAILED(dp_graph_init())
+		|| DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
 
 	// VFs are started by GRPC later
@@ -140,10 +142,11 @@ static int init_interfaces()
 
 static void free_interfaces()
 {
+	dp_telemetry_free();
+	dp_graph_free();
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_free();
 #endif
-	dp_graph_free();
 	dp_ports_free();
 }
 

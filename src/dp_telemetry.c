@@ -7,6 +7,9 @@
 #include "dp_error.h"
 #include "dp_graph.h"
 #include "dp_log.h"
+#ifdef ENABLE_VIRTSVC
+#	include "dp_virtsvc.h"
+#endif
 #include "dpdk_layer.h"
 
 static struct rte_graph_cluster_stats *tel_stats;
@@ -16,27 +19,28 @@ static struct rte_tel_data *tel_curr_block =  NULL;
 static int tel_callback_ret = 0;
 static int tel_stat_value_offset = 0;
 
-static void dp_telemetry_handle_graph_command(struct rte_tel_data *data);
-
 // as a dictionary only supports 256 entries, two-levels can only contain 65536 entries total
 #define DP_NODE_BLOCK_NAME_MAX sizeof("Node_65279_to_65535")
 
-#define DP_TELEMETRY_PREFIX "/dp_service/"
-#define DP_TELEMETRY_GRAPH_PREFIX DP_TELEMETRY_PREFIX "graph/"
+#define DP_TELEMETRY_PREFIX "/dp_service"
 
-#define DP_TEL_GRAPH_COMMAND(NAME, DESCRIPTION) { DP_TELEMETRY_GRAPH_PREFIX #NAME, DESCRIPTION, dp_telemetry_handle_graph_##NAME }
+// Since telemetry has no argument for the callback, macros to generate separate callbacks are used instead
+#define DP_TELEMETRY_REGISTER_COMMAND(GROUP, NAME, DESCRIPTION) \
+	{ DP_TELEMETRY_PREFIX "/" #GROUP "/" #NAME, DESCRIPTION, dp_telemetry_handle_ ## GROUP ## _ ## NAME }
 
 // All graph callbacks are the same, just need a different stats structure member
-#define DP_TEL_GRAPH_COMMAND_HANDLER(NAME, MEMBER) \
+#define DP_TELEMETRY_CREATE_GRAPH_HANDLER(NAME, MEMBER) \
 	static int dp_telemetry_handle_graph_##NAME(__rte_unused const char *cmd, \
-												const char *params, \
+												__rte_unused const char *params, \
 												struct rte_tel_data *data) \
 	{ \
 		tel_stat_value_offset = offsetof(struct rte_graph_cluster_node_stats, MEMBER); \
-		dp_telemetry_handle_graph_command(data); \
-		return DP_OK; \
+		return dp_telemetry_handle_graph_command(data); \
 	}
 
+//
+// Graph introduces another layer of callbacks due to DPDK stats API
+//
 static __rte_always_inline int get_stat_value(const struct rte_graph_cluster_node_stats *st)
 {
 	return (*(uint64_t *)((uint8_t *)(st) + tel_stat_value_offset));
@@ -63,7 +67,9 @@ static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,
 			tel_callback_ret = -ENOMEM;
 			return tel_callback_ret;
 		}
-		rte_tel_data_start_dict(tel_curr_block);
+		tel_callback_ret = rte_tel_data_start_dict(tel_curr_block);
+		if (DP_FAILED(tel_callback_ret))
+			return tel_callback_ret;
 		snprintf(dict_name, sizeof(dict_name), "Node_%d_to_%d",
 				tel_graph_node_index-1, tel_graph_node_index + (RTE_TEL_MAX_DICT_ENTRIES-2));
 		tel_callback_ret = rte_tel_data_add_dict_container(tel_data, dict_name, tel_curr_block, 0);
@@ -101,31 +107,57 @@ static void dp_telemetry_graph_stats_destroy()
 	rte_graph_cluster_stats_destroy(tel_stats);
 }
 
-int dp_telemetry_graph_init()
+//
+// Command handler callbacks
+//
+static inline int dp_telemetry_start_dict(struct rte_tel_data *data, const char *cmd)
 {
-	if (!rte_graph_has_stats_feature()) {
-		DPS_LOG_WARNING("DPDK graph stats not enabled, telemetry will not work.");
-		return DP_OK;
-	}
-	return dp_telemetry_graph_stats_create();
+	int ret;
+
+	ret = rte_tel_data_start_dict(data);
+	if (DP_FAILED(ret))
+		DPS_LOG_WARNING("Creating telemetry dictionary for %s failed %s", cmd, dp_strerror(ret));
+
+	return ret;
 }
 
-static void dp_telemetry_handle_graph_command(struct rte_tel_data *data)
+static int dp_telemetry_handle_graph_command(struct rte_tel_data *data)
 {
+	if (DP_FAILED(dp_telemetry_start_dict(data, "graph statistics")))
+		return DP_ERROR;
+
+	// no graph stats feature?
+	if (tel_stats)
+		return DP_OK;
+
 	tel_data = data;
 	tel_callback_ret = 0;
 	tel_graph_node_index = 0;
-	rte_tel_data_start_dict(tel_data);
 	rte_graph_cluster_stats_get(tel_stats, 0);
 	if (DP_FAILED(tel_callback_ret))
 		DPS_LOG_WARNING("Graph telemetry failed %s", dp_strerror(tel_callback_ret));
+	return tel_callback_ret;
 }
+DP_TELEMETRY_CREATE_GRAPH_HANDLER(obj_count, objs)
+DP_TELEMETRY_CREATE_GRAPH_HANDLER(call_count, calls)
+DP_TELEMETRY_CREATE_GRAPH_HANDLER(cycle_count, cycles)
+DP_TELEMETRY_CREATE_GRAPH_HANDLER(realloc_count, realloc_count)
 
-DP_TEL_GRAPH_COMMAND_HANDLER(obj_count, objs);
-DP_TEL_GRAPH_COMMAND_HANDLER(call_count, calls);
-DP_TEL_GRAPH_COMMAND_HANDLER(cycle_count, cycles);
-DP_TEL_GRAPH_COMMAND_HANDLER(realloc_count, realloc_count);
+#ifdef ENABLE_VIRTSVC
+static int dp_telemetry_handle_virtsvc_free_ports(const char *cmd,
+												  __rte_unused const char *params,
+												  struct rte_tel_data *data)
+{
+	if (DP_FAILED(dp_telemetry_start_dict(data, cmd))
+		|| DP_FAILED(dp_virtsvc_get_free_ports_telemetry(data)))
+		return DP_ERROR;
+	return DP_OK;
+}
+#endif
 
+//
+// Entrypoints
+//
 int dp_telemetry_init(void)
 {
 	int ret;
@@ -135,11 +167,28 @@ int dp_telemetry_init(void)
 		const char *description;
 		telemetry_cb callback;
 	} commands[] = {
-		DP_TEL_GRAPH_COMMAND(obj_count, "Returns total number of objects processed by each graph node."),
-		DP_TEL_GRAPH_COMMAND(call_count, "Returns total number of calls made by each graph node."),
-		DP_TEL_GRAPH_COMMAND(cycle_count, "Returns total number of cycles used by each graph node."),
-		DP_TEL_GRAPH_COMMAND(realloc_count, "Returns total number of reallocations done by each graph node."),
+		DP_TELEMETRY_REGISTER_COMMAND(graph, obj_count, "Returns total number of objects processed by each graph node."),
+		DP_TELEMETRY_REGISTER_COMMAND(graph, call_count, "Returns total number of calls made by each graph node."),
+		DP_TELEMETRY_REGISTER_COMMAND(graph, cycle_count, "Returns total number of cycles used by each graph node."),
+		DP_TELEMETRY_REGISTER_COMMAND(graph, realloc_count, "Returns total number of reallocations done by each graph node."),
+#ifdef ENABLE_VIRTSVC
+		DP_TELEMETRY_REGISTER_COMMAND(virtsvc, free_ports, "Returns number of free ports remaining in each virtual service."),
+#endif
 	};
+
+	if (!rte_graph_has_stats_feature())
+		DPS_LOG_WARNING("DPDK graph stats not enabled, graph telemetry will not work.");
+	else if (DP_FAILED(dp_telemetry_graph_stats_create()))
+		return DP_ERROR;
+
+#ifdef ENABLE_VIRTSVC
+	// make sure one dictionary is enough
+	// (the number should be limited already for other reasons anyway)
+	if (dp_virtsvc_get_count() > RTE_TEL_MAX_DICT_ENTRIES) {
+		DPS_LOG_ERR("Too many virtual services for telemetry to work");
+		return DP_ERROR;
+	}
+#endif
 
 	for (int i = 0; i < RTE_DIM(commands); ++i) {
 		ret = rte_telemetry_register_cmd(commands[i].command, commands[i].callback, commands[i].description);
@@ -153,5 +202,6 @@ int dp_telemetry_init(void)
 
 void dp_telemetry_free(void)
 {
-	dp_telemetry_graph_stats_destroy();
+	if (rte_graph_has_stats_feature())
+		dp_telemetry_graph_stats_destroy();
 }
