@@ -26,7 +26,7 @@ def send_ipv4_icmp(dst_ip, pf_name, responder, vm_ipv6):
 	assert pkt[ICMP].type == 0, \
 		"Wrong ICMP reply"
 
-def test_ipv4_in_ipv6(prepare_ipv4, port_redundancy):
+def test_ipv4_in_ipv6(prepare_ipv4, port_redundancy, grpc_client):
 	send_ipv4_icmp(f"{neigh_vni1_ov_ip_prefix}.5", PF0.tap, ipv4_in_ipv6_icmp_responder, VM1.ul_ipv6)
 	if port_redundancy:
 		send_ipv4_icmp(f"{neigh_vni1_ov_ip_prefix}.8", PF1.tap, ipv4_in_ipv6_icmp_responder, VM1.ul_ipv6)

@@ -17,7 +17,7 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	grpc_client.addlbvip(lb_name, lbpfx_ul_ipv6)
 
 	threading.Thread(target=send_lb_pkt_to_pf, args=(lb_ul_ipv6,)).start()
-
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", "0.0.0.0", "0", "0.0.0.0", "0", "-1", "-1", "80", "80", "tcp", "accept", "ingress")
 	pkt = sniff_packet(VM1.tap, is_tcp_pkt)
 	dst_ip = pkt[IP].dst
 	dport = pkt[TCP].dport
@@ -27,7 +27,7 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	grpc_client.dellbvip(VM1.name, lbpfx_ul_ipv6)
 	grpc_client.dellbpfx(VM1.name, lb_ip)
 	grpc_client.dellb(lb_name)
-
+	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
 	# TODO: Currently, to use this test again with the same port(s)
 	# you need to wait for the used flow to be aged-out (done every 30s)
 	# If TCP RST is implemented down the line, this can be overcome

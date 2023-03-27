@@ -139,6 +139,33 @@ def test_grpc_add_list_delLoadBalancerTargets(prepare_ifaces, grpc_client):
 	grpc_client.assert_output(f"--listpfx {VM2.name}",
 		pfx_ip, negate=True)
 
+def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
+	# Try to add FirewallRule, get, list, delete and test error cases
+
+	# We do not support "deny" rules (yet)
+	grpc_client.assert_output(f"--addfwrule  {VM3.name} --fw_ruleid fw0-vm3 --src_ip 1.2.3.4 --src_length 16 --dst_ip 0.0.0.0 --dst_length 0 "
+							f"--src_port_min -1 --src_port_max -1 --dst_port_min -1 --dst_port_max -1 --protocol tcp "
+							f"--action deny --direction ingress",
+							"error 802")
+	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "1.2.3.4", "16", "0.0.0.0", "0", "-1", "-1", "-1", "-1", "tcp", "accept", "ingress")
+	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw0-vm3",
+		f"1.2.3.4")
+	grpc_client.addfwallrule(VM3.name, "fw1-vm3", "8.8.8.8", "16", "0.0.0.0", "0", "-1", "-1", "-1", "-1", "udp", "accept", "egress")
+	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw1-vm3",
+		f"egress")
+	grpc_client.assert_output(f"--listfwrules  {VM3.name}",
+		f"8.8.8.8")
+	grpc_client.delfwallrule(VM3.name, "fw0-vm3")
+	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw0-vm3",
+		f"error 811")
+	grpc_client.assert_output(f"--listfwrules  {VM3.name}",
+		f"8.8.8.8")
+	grpc_client.delfwallrule(VM3.name, "fw1-vm3")
+	grpc_client.assert_output(f"--listfwrules  {VM3.name}",
+		f"8.8.8.8", negate=True)
+	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw1-vm3",
+		f"error 811")
+
 def test_grpc_add_list_del_routes_big_reply(prepare_ifaces, grpc_client):
 	MAX_LINES_ROUTE_REPLY = 36
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):

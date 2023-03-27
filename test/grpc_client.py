@@ -116,6 +116,24 @@ class GrpcClient:
 		self.assert_output(f"--delneighnat --ipv4 {nat_vip} --vni {vni} --min_port {min_port} --max_port {max_port}",
 			"Neighbor NAT deleted")
 
+	def addfwallrule(self, vm_name, rule_id, src_ip, src_ip_len, dst_ip, dst_ip_len, src_port_min, src_port_max, dst_port_min, dst_port_max, proto, action, direction):
+		self.assert_output(f"--addfwrule  {vm_name} --fw_ruleid {rule_id} --src_ip {src_ip} --src_length {src_ip_len}  --dst_ip {dst_ip} --dst_length {dst_ip_len} "
+							f"--src_port_min {src_port_min} --src_port_max {src_port_max} --dst_port_min {dst_port_min} --dst_port_max {dst_port_max} --protocol {proto} "
+							f"--action {action} --direction {direction}",
+							"Add FirewallRule called")
+
+	def delfwallrule(self, vm_name, rule_id):
+		self.assert_output(f"--delfwrule  {vm_name} --fw_ruleid {rule_id}",
+							"Firewall Rule Deleted")
+
+	def getfwallrule(self, vm_name, rule_id):
+		self.assert_output(f"--getfwrule  {vm_name} --fw_ruleid {rule_id}",
+							"Get FirewallRule")
+
+	def listfwallrules(self, vm_name, rule_id):
+		self.assert_output(f"--listfwrules  {vm_name}",
+							"List FirewallRules called")
+
 	@staticmethod
 	def port_open():
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
