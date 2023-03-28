@@ -104,11 +104,11 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 													&tcp_spec, &tcp_mask,
-													df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 
+													df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
 													~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
 											   ~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
 	}
 
@@ -187,7 +187,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 		// validate and install rte flow
 		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 		struct rte_flow *hairpin_flow = NULL;
-		
+
 		if (df->l4_type == IPPROTO_TCP) {
 			hairpin_agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
 			if (!hairpin_agectx->handle) {
@@ -282,7 +282,6 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	}
 
 
-	// uint16_t peer_pf_port_id =  dp_port_get_pf1_id();
 	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
 
 	if (df->l4_type == IPPROTO_TCP) {
@@ -416,12 +415,12 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	if (df->l4_type == DP_IP_PROTO_TCP) {
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
 											   ~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 												&tcp_spec, &tcp_mask,
-												df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 
+												df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
 												~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
 
 	}
@@ -499,7 +498,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	action_cnt = create_flow_age_action(action, action_cnt,
 											&flow_age, df->conntrack->timeout_value, agectx);
 	age_action_index = action_cnt - 1;
-	
 
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 	struct rte_flow_action_queue queue_action;
@@ -583,7 +581,6 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 			return 0;
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
 											&hairpin_flow_age, df->conntrack->timeout_value, hairpin_agectx);
-		
 
 		age_action_index = hairpin_action_cnt - 1;
 		// create flow action -- end
@@ -680,7 +677,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	if (df->l4_type == DP_IP_PROTO_TCP) {
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
 											   ~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
 	}
 
@@ -743,15 +740,14 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 
 	if (!agectx)
 		return 0;
-	
-	printf("installed timeout value is %d \n", df->conntrack->timeout_value);
+
 	action_cnt = create_flow_age_action(action, action_cnt,
 										&flow_age, df->conntrack->timeout_value, agectx);
 
 	if (df->l4_type == IPPROTO_TCP) {
 
 		agectx->handle = dp_create_age_indirect_action(&attr, m->port, df, &action[action_cnt-1], agectx);
-	
+
 		if (!agectx->handle) {
 			rte_free(agectx);
 			DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
@@ -759,8 +755,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 		}
 
 	}
-	
-										
+
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
 
@@ -775,7 +770,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		printf("failed to validate and install rte flow rules \n");
+		DPS_LOG_ERR("failed to validate and install rte flow rules \n");
 		return 0;
 	}
 

@@ -22,7 +22,7 @@
 } while (0)
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
-static bool offload_mode_enabled = 0; 
+static bool offload_mode_enabled = 0;
 
 static void dp_log_flow_key_info(const char *msg, struct flow_key *key)
 {
@@ -226,23 +226,10 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 		&& key1->src.port_src == key2->src.port_src;
 }
 
-static void print_ip_direct(unsigned int ip)
-{
-    unsigned char bytes[4];
-    bytes[0] = ip & 0xFF;
-    bytes[1] = (ip >> 8) & 0xFF;
-    bytes[2] = (ip >> 16) & 0xFF;
-    bytes[3] = (ip >> 24) & 0xFF;   
-    printf("%d.%d.%d.%d\n", bytes[3], bytes[2], bytes[1], bytes[0]);        
-}
-
 void dp_free_flow(struct dp_ref *ref)
 {
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
 
-	printf("free this dst flow: \n");
-	print_ip_direct(cntrack->flow_key[cntrack->dir].ip_dst);
-	print_ip_direct(cntrack->flow_key[!cntrack->dir].ip_dst);
 	dp_free_network_nat_port(cntrack);
 	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
 	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
@@ -274,7 +261,6 @@ void dp_process_aged_flows(int port_id)
 	int ret;
 
 	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
-	printf("total aged flows %d on port %d \n", total, port_id);
 
 	if (total <= 0)
 		return;
@@ -293,16 +279,14 @@ void dp_process_aged_flows(int port_id)
 		agectx = (struct flow_age_ctx *)contexts[idx];
 		if (!agectx)
 			continue;
-		
+
 		if (agectx->handle) {
-			printf("need to remove a indirect action\n");
 
 			memset(&error, 0x22, sizeof(error));
-			int ret = rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
+			ret = rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
 			if (DP_FAILED(ret))
-				printf("failed to remove a indirect action from agectx, %d \n", ret);
-			else
-				printf("removed a indirect action\n");
+				DPS_LOG_ERR("failed to remove a indirect action from agectx, error code:%d, reason %s", ret,
+								error.message ? error.message : "(no stated reason)");
 
 			agectx->handle = NULL;
 
@@ -310,18 +294,17 @@ void dp_process_aged_flows(int port_id)
 
 		if (agectx->rte_flow) {
 
-			printf("Remove an aged rte flow due to timeout, agectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
-									(void *)agectx->rte_flow, rte_atomic32_read(&(agectx->cntrack->ref_count.refcount)), port_id);
-			
 			rte_flow_destroy(port_id, agectx->rte_flow, &error);
-			// if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+
+			DPS_LOG_DEBUG("Removed an aged rte flow due to timeout, agectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
+									(void *)agectx->rte_flow, rte_atomic32_read(&(agectx->cntrack->ref_count.refcount)), port_id);
 			agectx->rte_flow = NULL;
 			ret = dp_del_rte_age_ctx(agectx->cntrack, agectx);
 			if (DP_FAILED(ret))
 				DPS_LOG_ERR("failed to remove age ctx from its associated cntrack obj");
-			
+
 			dp_ref_dec(&agectx->cntrack->ref_count);
-			
+
 			rte_free(agectx);
 		}
 	}
@@ -340,8 +323,8 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 
 
 	if (flow_key->proto == IPPROTO_TCP) {
-		
-		for (age_ctx_index = 0; age_ctx_index < DP_FLOW_VAL_MAX_AGE_STORE; age_ctx_index ++) {
+
+		for (age_ctx_index = 0; age_ctx_index < DP_FLOW_VAL_MAX_AGE_STORE; age_ctx_index++) {
 			curr_age_ctx = flow_val->rte_age_ctxs[age_ctx_index];
 			if (curr_age_ctx && curr_age_ctx->handle) {
 
@@ -349,9 +332,9 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 				memset(&age_query, 0, sizeof(age_query));
 
 				ret = rte_flow_action_handle_query(curr_age_ctx->port_id, curr_age_ctx->handle, &age_query, &error);
-			
+
 				if (DP_FAILED(ret)) {
-					DPS_LOG_ERR("failed to query tcp flow's age action due to code: %d, with error msg: %s", ret, 
+					DPS_LOG_ERR("failed to query tcp flow's age action due to code: %d, with error msg: %s", ret,
 									error.message ? error.message : "(no stated reason)");
 					return DP_ERROR;
 				}
@@ -362,26 +345,28 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 					memset(&error, 0x22, sizeof(error));
 					ret = rte_flow_action_handle_destroy(curr_age_ctx->port_id, curr_age_ctx->handle, &error);
 					if (DP_FAILED(ret)) {
-						DPS_LOG_ERR("failed to delete tcp flow's age indirect action due to code: %d, with error msg: %s", ret, 
+						DPS_LOG_ERR("failed to delete tcp flow's age indirect action due to code: %d, with error msg: %s", ret,
 									error.message ? error.message : "(no stated reason)");
 						return DP_ERROR;
-					} 
-					
+					}
+
 					curr_age_ctx->handle =  NULL;
-					DPS_LOG_DEBUG("Remove an aged rte flow from sw table via query, agectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
-									(void *)curr_age_ctx->rte_flow, rte_atomic32_read(&(curr_age_ctx->cntrack->ref_count.refcount)), curr_age_ctx->port_id);
-			
+					DPS_LOG_DEBUG("Remove an aged rte flow from sw table via query \n				\
+									gectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
+									(void *)curr_age_ctx->rte_flow, rte_atomic32_read(&(curr_age_ctx->cntrack->ref_count.refcount)),
+									curr_age_ctx->port_id);
+
 					rte_flow_destroy(curr_age_ctx->port_id, curr_age_ctx->rte_flow, &error);
 					curr_age_ctx->rte_flow = NULL;
-		
+
 					ret = dp_del_rte_age_ctx(flow_val, curr_age_ctx);
 					if (DP_FAILED(ret)) {
 						DPS_LOG_ERR("failed to remove age ctx from its associated cntrack obj");
 						return DP_ERROR;
 					}
-					
+
 					dp_ref_dec(&(flow_val->ref_count));
-					
+
 					rte_free(curr_age_ctx);
 				}
 			}
@@ -408,7 +393,7 @@ void dp_process_aged_flows_non_offload(void)
 			if (DP_FAILED(ret))
 				DPS_LOG_ERR("failed to query and remove rte flows");
 		}
-		
+
 		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value) && (!flow_val->aged)) {
 			flow_val->aged = 1;
 			dp_ref_dec(&flow_val->ref_count);
@@ -452,7 +437,7 @@ int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 {
 	uint8_t index;
 
-	for (index = 0; index < DP_FLOW_VAL_MAX_AGE_STORE; index ++) {
+	for (index = 0; index < DP_FLOW_VAL_MAX_AGE_STORE; index++) {
 		if (!cntrack->rte_age_ctxs[index]) {
 			cntrack->rte_age_ctxs[index] = ctx;
 			ctx->ref_index_in_cntrack = index;
@@ -464,7 +449,7 @@ int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 		DPS_LOG_ERR("try to add age ctx to cntrack storage but exceed its capacity");
 		return DP_ERROR;
 	}
-	
+
 	return DP_OK;
 }
 
