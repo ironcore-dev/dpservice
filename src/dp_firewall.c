@@ -9,20 +9,9 @@ void dp_init_firewall_rules_list(int port_id)
 	TAILQ_INIT(dp_get_fwall_head(port_id));
 }
 
-int dp_firewall_mask_to_pfx_length(uint32_t mask)
+int dp_add_firewall_rule(struct dp_fwall_rule *new_rule, int port_id)
 {
-	int count = 0;
-
-	while (mask) {
-		count += mask & 1;
-		mask >>= 1;
-	}
-	return count;
-}
-
-int dp_add_firewall_rule(dp_fwall_rule *new_rule, int port_id)
-{
-	dp_fwall_rule *rule = rte_zmalloc("firewall_rule", sizeof(struct dp_fwall_rule), RTE_CACHE_LINE_SIZE);
+	struct dp_fwall_rule *rule = rte_zmalloc("firewall_rule", sizeof(struct dp_fwall_rule), RTE_CACHE_LINE_SIZE);
 
 	if (!rule)
 		return DP_ERROR;
@@ -36,12 +25,13 @@ int dp_add_firewall_rule(dp_fwall_rule *new_rule, int port_id)
 
 int dp_delete_firewall_rule(char *rule_id, int port_id)
 {
-	dp_fwall_rule *rule, *next_rule;
+	struct dp_fwall_head *fwall_head = dp_get_fwall_head(port_id);
+	struct dp_fwall_rule *rule, *next_rule;
 
-	for (rule = TAILQ_FIRST(dp_get_fwall_head(port_id)); rule != NULL; rule = next_rule) {
+	for (rule = TAILQ_FIRST(fwall_head); rule != NULL; rule = next_rule) {
 		next_rule = TAILQ_NEXT(rule, next_rule);
 		if (memcmp(rule->rule_id, rule_id, DP_FIREWALL_ID_STR_LEN) == 0) {
-			TAILQ_REMOVE(dp_get_fwall_head(port_id), rule, next_rule);
+			TAILQ_REMOVE(fwall_head, rule, next_rule);
 			rte_free(rule);
 			return DP_OK;
 		}
@@ -50,9 +40,9 @@ int dp_delete_firewall_rule(char *rule_id, int port_id)
 	return DP_ERROR;
 }
 
-dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
+struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
 {
-	dp_fwall_rule *rule;
+	struct dp_fwall_rule *rule;
 
 	TAILQ_FOREACH(rule, dp_get_fwall_head(port_id), next_rule)
 		if (memcmp(rule->rule_id, rule_id, DP_FIREWALL_ID_STR_LEN) == 0)
@@ -65,7 +55,7 @@ int dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
-	dp_fwall_rule *t_rule, *rule;
+	struct dp_fwall_rule *t_rule, *rule;
 	uint16_t msg_per_buf;
 	dp_reply *rep;
 
@@ -101,7 +91,7 @@ out:
 	return DP_OK;
 }
 
-static bool __rte_always_inline dp_is_rule_matching(const dp_fwall_rule *rule, struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr)
+static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *rule, struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr)
 {
 	uint32_t dest_ip = ntohl(df_ptr->dst.dst_addr);
 	uint32_t src_ip = ntohl(df_ptr->src.src_addr);
@@ -147,26 +137,22 @@ static bool __rte_always_inline dp_is_rule_matching(const dp_fwall_rule *rule, s
 	dst_port_lower = rule->filter.tcp_udp.dst_port.lower;
 	dst_port_upper = rule->filter.tcp_udp.dst_port.upper;
 
-	if ((src_ip & rule->src_ip_mask) == (r_src_ip & rule->src_ip_mask) &&
+	return ((src_ip & rule->src_ip_mask) == (r_src_ip & rule->src_ip_mask) &&
 		(dest_ip & rule->dest_ip_mask) == (r_dest_ip & rule->dest_ip_mask) &&
 		((src_port_lower == DP_FWALL_MATCH_ANY_PORT) ||
 		 (src_port >= src_port_lower && src_port <= src_port_upper)) &&
 		((dst_port_lower == DP_FWALL_MATCH_ANY_PORT) ||
 		(dest_port >= dst_port_lower && dest_port <= dst_port_upper)) &&
-		((rule->protocol == DP_FWALL_MATCH_ANY_PROTOCOL) || (rule->protocol == protocol))) {
-		return true;
-	}
-
-	return false;
+		((rule->protocol == DP_FWALL_MATCH_ANY_PROTOCOL) || (rule->protocol == protocol)));
 }
 
-static dp_fwall_rule __rte_always_inline *dp_is_matched_in_fwall_list(struct dp_flow *df_ptr,
+static struct dp_fwall_rule __rte_always_inline *dp_is_matched_in_fwall_list(struct dp_flow *df_ptr,
 																	  struct rte_ipv4_hdr *ipv4_hdr,
 																	  struct dp_fwall_head *fwall_head,
 																	  enum dp_fwall_direction dir,
 																	  uint32_t *egress_rule_count)
 {
-	dp_fwall_rule *rule = NULL;
+	struct dp_fwall_rule *rule = NULL;
 
 	TAILQ_FOREACH(rule, fwall_head, next_rule) {
 		if (rule->dir == DP_FWALL_EGRESS)
@@ -185,7 +171,7 @@ static enum dp_fwall_action __rte_always_inline dp_get_egress_action(struct dp_f
 																	 struct dp_fwall_head *fwall_head)
 {
 	uint32_t egress_rule_count = 0;
-	dp_fwall_rule *rule;
+	struct dp_fwall_rule *rule;
 
 	rule = dp_is_matched_in_fwall_list(df_ptr, ipv4_hdr, fwall_head, DP_FWALL_EGRESS, &egress_rule_count);
 
@@ -200,19 +186,18 @@ static enum dp_fwall_action __rte_always_inline dp_get_egress_action(struct dp_f
 enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr, int sender_port_id)
 {
 	enum dp_fwall_action egress_action = DP_FWALL_DROP, ingress_action = DP_FWALL_DROP;
-	struct dp_fwall_head *fwall_head = dp_get_fwall_head(df_ptr->nxt_hop);
-	bool is_pf = dp_port_is_pf(df_ptr->nxt_hop);
-	dp_fwall_rule *rule;
+	struct dp_fwall_head *fwall_head_sender = dp_get_fwall_head(sender_port_id);
+	struct dp_fwall_rule *rule;
 
-	if (is_pf) { /* Outgoing traffic to PF (VF Egress, PF Ingress), PF has no Ingress rules */
-		return dp_get_egress_action(df_ptr, ipv4_hdr, fwall_head);
+	if (dp_port_is_pf(df_ptr->nxt_hop)) { /* Outgoing traffic to PF (VF Egress, PF Ingress), PF has no Ingress rules */
+		return dp_get_egress_action(df_ptr, ipv4_hdr, fwall_head_sender);
 	} else { /* Incoming traffic */
-		if (is_pf)/* Incoming from PF, PF has no Egress rules */
+		if (dp_port_is_pf(sender_port_id))/* Incoming from PF, PF has no Egress rules */
 			egress_action = DP_FWALL_ACCEPT;
 		else/* Incoming from VF. Check originating VF's Egress rules */
-			egress_action = dp_get_egress_action(df_ptr, ipv4_hdr, fwall_head);
+			egress_action = dp_get_egress_action(df_ptr, ipv4_hdr, fwall_head_sender);
 
-		rule = dp_is_matched_in_fwall_list(df_ptr, ipv4_hdr, fwall_head, DP_FWALL_INGRESS, NULL);
+		rule = dp_is_matched_in_fwall_list(df_ptr, ipv4_hdr, dp_get_fwall_head(df_ptr->nxt_hop), DP_FWALL_INGRESS, NULL);
 		if (rule)
 			ingress_action = rule->action;
 
@@ -226,7 +211,7 @@ enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df_ptr, struct rte_i
 void dp_del_all_firewall_rules(int port_id)
 {
 	struct dp_fwall_head *fwall_head = dp_get_fwall_head(port_id);
-	dp_fwall_rule *rule;
+	struct dp_fwall_rule *rule;
 
 	if (!fwall_head)
 		return;

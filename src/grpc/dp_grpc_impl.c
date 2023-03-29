@@ -267,8 +267,13 @@ static int dp_process_add_fwall_rule(dp_request *req, dp_reply *rep)
 	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0) {
+	if (DP_FAILED(port_id)) {
 		ret = DP_ERROR_VM_ADD_FWALL_ERR;
+		goto err;
+	}
+
+	if (dp_get_firewall_rule(req->fw_rule.rule.rule_id, port_id)) {
+		ret = DP_ERROR_VM_ADD_FWALL_ID_EXISTS;
 		goto err;
 	}
 
@@ -292,12 +297,12 @@ err:
 static int dp_process_get_fwall_rule(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
-	dp_fwall_rule *rule;
+	struct dp_fwall_rule *rule;
 
 	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0) {
+	if (DP_FAILED(port_id)) {
 		ret = DP_ERROR_VM_GET_FWALL_ERR;
 		goto err;
 	}
@@ -323,7 +328,7 @@ static int dp_process_del_fwall_rule(dp_request *req, dp_reply *rep)
 	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0) {
+	if (DP_FAILED(port_id)) {
 		ret = DP_ERROR_VM_DEL_FWALL_ERR;
 		goto err;
 	}
@@ -1005,7 +1010,7 @@ static int dp_process_listfwall_rules(dp_request *req, struct rte_mbuf *m, struc
 	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
 
 	/* This machine ID doesnt exist */
-	if (port_id < 0) {
+	if (DP_FAILED(port_id)) {
 		rep_arr[DP_MBUF_ARR_SIZE - 1] = m;
 		goto out;
 	}

@@ -147,10 +147,14 @@ def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 							f"--src_port_min -1 --src_port_max -1 --dst_port_min -1 --dst_port_max -1 --protocol tcp "
 							f"--action deny --direction ingress",
 							"error 802")
-	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "1.2.3.4", "16", "0.0.0.0", "0", "-1", "-1", "-1", "-1", "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "1.2.3.4", 16, "0.0.0.0", 0, -1, -1, -1, -1, "tcp", "accept", "ingress")
+	grpc_client.assert_output(f"--addfwrule  {VM3.name} --fw_ruleid fw0-vm3 --src_ip 1.2.3.4 --src_length 16 --dst_ip 0.0.0.0 --dst_length 0 "
+							f"--src_port_min -1 --src_port_max -1 --dst_port_min -1 --dst_port_max -1 --protocol tcp "
+							f"--action deny --direction ingress",
+							"error 803")
 	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw0-vm3",
 		f"1.2.3.4")
-	grpc_client.addfwallrule(VM3.name, "fw1-vm3", "8.8.8.8", "16", "0.0.0.0", "0", "-1", "-1", "-1", "-1", "udp", "accept", "egress")
+	grpc_client.addfwallrule(VM3.name, "fw1-vm3", "8.8.8.8", 16, "0.0.0.0", 0, -1, -1, -1, -1, "udp", "accept", "egress")
 	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw1-vm3",
 		f"egress")
 	grpc_client.assert_output(f"--listfwrules  {VM3.name}",

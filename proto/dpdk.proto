@@ -107,38 +107,42 @@ message ProtocolFilter {
 }
 
 message ICMPFilter {
-	int32 icmpType = 1;
-	int32 icmpCode = 2;
+	int32 icmpType = 1; // -1 matches all ICMP Codes
+	int32 icmpCode = 2; // -1 matches all ICMP Types
 }
 
 message TCPFilter {
-	int32 srcPortLower = 1;
+	int32 srcPortLower = 1; // -1 matches all source ports
 	int32 srcPortUpper = 2;
-	int32 dstPortLower = 3;
+	int32 dstPortLower = 3; // -1 matches all destination ports
 	int32 dstPortUpper = 4;
 }
 
 message UDPFilter {
-	int32 srcPortLower = 1;
+	int32 srcPortLower = 1; // -1 matches all source ports
 	int32 srcPortUpper = 2;
-	int32 dstPortLower = 3;
+	int32 dstPortLower = 3; // -1 matches all destination ports
 	int32 dstPortUpper = 4;
 }
 
-// Firewall Rules can be inserted and removed while the interface is running. In the C code probably it makes sense to use linked lists.
-// Firewall rules have an order and may result in accepting or dropping a packet.
+// Firewall Rules can be inserted and removed while the interface is running. Linked list is used despite O(n) nature, as the list
+// needs to be traversed only once for each packet. (Stateful Firewall and each pass after that is O(1))
+// Firewall rules have a priority. "0" being the highest and "65536" being the lowest. Default is "1000".
+// Current implementation supports only "allow" rules. The priority doesnt have any influence when we have only "allow" rules.
+// Without any installed rule, egress default is "allow" everything and ingress default is "deny" everything. With first installed
+// egress rule, egress default changes to "deny" everything except the installed rule(s).
 // When a packet matches a firewall rule, the defined action is taken. No further firewall rules will be evaluated thereafter.
 message FirewallRule {
 	bytes ruleID = 1;
 	TrafficDirection direction = 2;
-	FirewallAction action = 3;
-	uint32 priority = 4;
+	FirewallAction action = 3; // Can be only "accept" at the moment.
+	uint32 priority = 4; // For future use. No effect at the moment.
 
 	IPVersion ipVersion = 5;
-	Prefix sourcePrefix = 6;
-	Prefix destinationPrefix = 7;
+	Prefix sourcePrefix = 6; // 0.0.0.0 with prefix length 0 matches all source ips
+	Prefix destinationPrefix = 7; // 0.0.0.0 with prefix length 0 matches all destination ips
 
-	ProtocolFilter protocolFilter = 8;
+	ProtocolFilter protocolFilter = 8; // Not defining a protocol filter matches all protocols
 }
 
 message IPConfig {

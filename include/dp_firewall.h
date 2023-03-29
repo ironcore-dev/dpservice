@@ -36,7 +36,7 @@ struct dp_port_filter {
 };
 
 /* This needs to be a typedef because of the TAILQ macros used on it */
-typedef struct dp_fwall_rule {
+struct dp_fwall_rule {
 	char		rule_id[DP_FIREWALL_ID_STR_LEN];
 	uint32_t	src_ip;
 	uint32_t	src_ip_mask;
@@ -51,16 +51,15 @@ typedef struct dp_fwall_rule {
 	enum dp_fwall_action action;
 	enum dp_fwall_direction dir;
 	TAILQ_ENTRY(dp_fwall_rule) next_rule;
-} dp_fwall_rule;
+};
 
 void dp_init_firewall_rules_list(int port_id);
-int dp_add_firewall_rule(dp_fwall_rule *new_rule, int port_id);
+int dp_add_firewall_rule(struct dp_fwall_rule *new_rule, int port_id);
 int dp_delete_firewall_rule(char *rule_id, int port_id);
-dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id);
+struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id);
 enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr, int sender_port_id);
 int dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep_arr[]);
 void dp_del_all_firewall_rules(int port_id);
-int dp_firewall_mask_to_pfx_length(uint32_t mask);
 
 #ifdef __cplusplus
 }

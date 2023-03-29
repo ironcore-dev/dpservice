@@ -82,7 +82,7 @@ typedef struct dp_vip {
 
 typedef struct dp_fw_rule {
 	char			machine_id[VM_MACHINE_ID_STR_LEN];
-	dp_fwall_rule	rule;
+	struct dp_fwall_rule	rule;
 } dp_fw_rule;
 
 typedef struct dp_lb {

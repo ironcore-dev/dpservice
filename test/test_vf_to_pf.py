@@ -156,10 +156,10 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 def test_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
 	sniff_tcp_data = {}
 	negated=True
-	resp_thread = threading.Thread(target=sniff_tcp_firewall, args=(PF0.tap, sniff_tcp_data, negated))
+	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data, negated))
 	resp_thread.start()
 	#Allow only tcp packets to leave the VM with destination port 453
-	grpc_client.addfwallrule(VM1.name, "fw0-vm1", "0", "0", "0.0.0.0", "0", "-1", "-1", "453", "453", "tcp", "accept", "egress")
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", 0, 0, "0.0.0.0", 0, -1, -1, 453, 453, "tcp", "accept", "egress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(dport=1024))
@@ -170,18 +170,20 @@ def test_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
 	assert sniff_tcp_data["pkt"] == None
 	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
 
-def test2_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
+def test2_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client, port_redundancy):
+	if port_redundancy:
+		pytest.skip()
 	sniff_tcp_data = {}
-	resp_thread = threading.Thread(target=sniff_tcp_firewall, args=(PF0.tap, sniff_tcp_data,))
+	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data,))
 	resp_thread.start()
 	#Allow only tcp packets to leave the VM with destination port 453
-	grpc_client.addfwallrule(VM1.name, "fw1-vm1", "0", "0", "0.0.0.0", "0", "-1", "-1", "453", "453", "tcp", "accept", "egress")
+	grpc_client.addfwallrule(VM1.name, "fw1-vm1", 0, 0, "0.0.0.0", 0, -1, -1, 453, 453, "tcp", "accept", "egress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(dport=453))
 	delayed_sendp(tcp_pkt, VM1.tap)
 
 	resp_thread.join()
-	#It should arrive at the PF0, as firewall allows it
+	#It should arrive at the PF0 or PF1, as firewall allows it
 	assert sniff_tcp_data["pkt"] != None
 	grpc_client.delfwallrule(VM1.name, "fw1-vm1")

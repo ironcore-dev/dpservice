@@ -102,25 +102,25 @@ def validate_checksums(pkt):
 			assert udp.chksum == chksum, \
 				"Invalid UDP checksum"
 
-def sniff_packet(iface, lfilter, skip=0, negate=False):
+def sniff_packet(iface, lfilter, skip=0):
 	count = skip+1
-	s_timeout = sniff_timeout
-
-	# When we know that we dont expect a packet, then dont wait that long
-	if negate:
-		s_timeout = sniff_timeout - 1
-	pkt_list = sniff(count=count, lfilter=lfilter, iface=iface, timeout=count*s_timeout)
-	if negate:
-		return None
-	else:
-		assert len(pkt_list) == count, \
-			f"No reply on {iface}"
+	pkt_list = sniff(count=count, lfilter=lfilter, iface=iface, timeout=count*sniff_timeout)
+	assert len(pkt_list) == count, \
+		f"No reply on {iface}"
 	pkt = pkt_list[skip]
 	validate_checksums(pkt)
 	return pkt
 
-def sniff_tcp_firewall(tap, sniff_tcp_data, negated=False):
-	sniff_tcp_data["pkt"] = sniff_packet(tap, is_tcp_pkt, negate=negated)
+def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
+	if negated:
+		s_timeout = sniff_timeout - 1
+		pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=tap, timeout=s_timeout)
+		if len(pkt_list) == 0:
+			sniff_tcp_data["pkt"] = None
+		else:
+			sniff_tcp_data["pkt"] = pkt_list[0]
+	else:
+		sniff_tcp_data["pkt"] = sniff_packet(tap, is_tcp_pkt)
 
 def age_out_flows():
 	delay = flow_timeout+1  # timers run every 1s, this should always work

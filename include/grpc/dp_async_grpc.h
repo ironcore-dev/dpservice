@@ -38,8 +38,8 @@ public:
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
 		}
 	int InitCheck();
-	void ConvertDPFWallRuleToGRPCFwallRule(dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
-	void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, dp_fwall_rule *dp_rule);
+	void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
+	void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule);
 	virtual int Proceed() = 0;
 	virtual ~BaseCall() = default;
 };

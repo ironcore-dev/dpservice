@@ -86,7 +86,7 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 	vip_ul_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
 
 	threading.Thread(target=router_nat_vip, args=(vip_ul_ipv6, nat_vip)).start()
-	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "0.0.0.0", "0", "0.0.0.0", "0", "-1", "-1", "1024", "1024", "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 1024, 1024, "tcp", "accept", "ingress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=vip_vip, src=VM1.ip) /
 			   TCP(dport=1024))

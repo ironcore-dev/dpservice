@@ -126,14 +126,6 @@ class GrpcClient:
 		self.assert_output(f"--delfwrule  {vm_name} --fw_ruleid {rule_id}",
 							"Firewall Rule Deleted")
 
-	def getfwallrule(self, vm_name, rule_id):
-		self.assert_output(f"--getfwrule  {vm_name} --fw_ruleid {rule_id}",
-							"Get FirewallRule")
-
-	def listfwallrules(self, vm_name, rule_id):
-		self.assert_output(f"--listfwrules  {vm_name}",
-							"List FirewallRules called")
-
 	@staticmethod
 	def port_open():
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

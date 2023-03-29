@@ -9,7 +9,7 @@
 #include "dp_lpm.h"
 #include "dp_log.h"
 
-void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, dp_fwall_rule *dp_rule)
+void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule)
 {
 	int ret_val;
 
@@ -78,7 +78,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 	}
 }
 
-void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(dp_fwall_rule	*dp_rule, FirewallRule *grpc_rule)
+void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, FirewallRule *grpc_rule)
 {
 	ICMPFilter *icmp_filter;
 	ProtocolFilter *filter;
@@ -105,14 +105,14 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(dp_fwall_rule	*dp_rule, Firewal
 	src_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 	addr.s_addr = dp_rule->src_ip;
 	src_ip->set_address(inet_ntoa(addr));
-	src_ip->set_prefixlength(dp_firewall_mask_to_pfx_length(dp_rule->src_ip_mask));
+	src_ip->set_prefixlength(__builtin_popcount(dp_rule->src_ip_mask));
 	grpc_rule->set_allocated_sourceprefix(src_ip);
 
 	dst_ip = new Prefix();
 	dst_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
 	addr.s_addr = dp_rule->dest_ip;
 	dst_ip->set_address(inet_ntoa(addr));
-	dst_ip->set_prefixlength(dp_firewall_mask_to_pfx_length(dp_rule->dest_ip_mask));
+	dst_ip->set_prefixlength(__builtin_popcount(dp_rule->dest_ip_mask));
 	grpc_rule->set_allocated_destinationprefix(dst_ip);
 
 	filter = new ProtocolFilter();
@@ -1744,9 +1744,9 @@ int GetFirewallRuleCall::Proceed()
 
 int ListFirewallRulesCall::Proceed()
 {
+	struct dp_fwall_rule *dp_rule;
 	struct rte_mbuf *mbuf = NULL;
 	dp_request request = {0};
-	dp_fwall_rule *dp_rule;
 	FirewallRule *rule;
 	dp_reply *reply;
 	int i;
