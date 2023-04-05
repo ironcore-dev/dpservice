@@ -70,6 +70,8 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	grpc_client.addlbvip(lb_name, lb_vm2_ul_ipv6)
 
 	vip_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 80, 80, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 80, 80, "tcp", "accept", "ingress")
 	# Also test round-robin
 	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
 	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
@@ -89,6 +91,9 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	grpc_client.dellbvip(VM1.name, lb_vm1_ul_ipv6)
 	grpc_client.dellbpfx(VM1.name, lb_ip)
 	grpc_client.dellb(lb_name)
+
+	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
+	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
 
 	# NOTE: this test, just like in test_pf_to_vf.py
 	# cannot be run twice in a row, since the flows need to age-out

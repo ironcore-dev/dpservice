@@ -111,6 +111,17 @@ def sniff_packet(iface, lfilter, skip=0):
 	validate_checksums(pkt)
 	return pkt
 
+def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
+	if negated:
+		s_timeout = sniff_timeout - 1
+		pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=tap, timeout=s_timeout)
+		if len(pkt_list) == 0:
+			sniff_tcp_data["pkt"] = None
+		else:
+			sniff_tcp_data["pkt"] = pkt_list[0]
+	else:
+		sniff_tcp_data["pkt"] = sniff_packet(tap, is_tcp_pkt)
+
 def age_out_flows():
 	delay = flow_timeout+1  # timers run every 1s, this should always work
 	print(f"Waiting {delay}s for flows to age-out...")

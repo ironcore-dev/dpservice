@@ -1,9 +1,10 @@
+#include <rte_errno.h>
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_error.h"
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
-#include <rte_errno.h>
+#include "dp_firewall.h"
 
 static struct vm_entry vm_table[DP_MAX_PORTS];
 static struct rte_hash *vm_handle_tbl = NULL;
@@ -507,7 +508,7 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 	return &vm_table[portid].info.neigh_mac;
 }
 
-int setup_lpm(int port_id, int vni, const int socketid)
+int setup_vm(int port_id, int vni, const int socketid)
 {
 	struct rte_rib_conf config_ipv4;
 	struct rte_rib *root;
@@ -531,6 +532,7 @@ int setup_lpm(int port_id, int vni, const int socketid)
 			return EXIT_FAILURE;
 		}
 	}
+	dp_init_firewall_rules_list(port_id);
 	vm_table[port_id].ipv4_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
@@ -637,7 +639,7 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	if (dp_is_more_vm_in_vni_avail(portid)) {
-		/* In case of rollback, just undo what setup_lpm did */
+		/* In case of rollback, just undo what setup_vm did */
 		if (!rollback) {
 			dp_del_route(portid, vm_table[portid].vni, 0,
 						vm_table[portid].info.own_ip, NULL, 32, socketid);
@@ -651,7 +653,20 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 		if (vm_table[portid].ipv4_rib[socketid])
 			rte_rib_free(vm_table[portid].ipv4_rib[socketid]);
 	}
+	dp_del_all_firewall_rules(portid);
 	memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
 	dp_set_mac(portid);
+}
+
+struct dp_fwall_head *dp_get_fwall_head(int port_id)
+{
+	RTE_VERIFY(port_id < DP_MAX_PORTS);
+	return &vm_table[port_id].fwall_head;
+}
+
+void dp_set_fwall_head(int port_id, struct dp_fwall_head *fwall_head)
+{
+	RTE_VERIFY(port_id < DP_MAX_PORTS);
+	vm_table[port_id].fwall_head = *fwall_head;
 }

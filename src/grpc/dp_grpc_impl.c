@@ -260,6 +260,90 @@ err:
 	return ret;
 }
 
+static int dp_process_add_fwall_rule(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+
+	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (DP_FAILED(port_id)) {
+		ret = DP_ERROR_VM_ADD_FWALL_ERR;
+		goto err;
+	}
+
+	if (dp_get_firewall_rule(req->fw_rule.rule.rule_id, port_id)) {
+		ret = DP_ERROR_VM_ADD_FWALL_ID_EXISTS;
+		goto err;
+	}
+
+	if (req->fw_rule.rule.action == DP_FWALL_DROP) {
+		ret = DP_ERROR_VM_ADD_FWALL_NO_DROP_SUPPORT;
+		goto err;
+	}
+
+	if (DP_FAILED(dp_add_firewall_rule(&req->fw_rule.rule, port_id))) {
+		ret = DP_ERROR_VM_ADD_FWALL_RULE_ERR;
+		goto err;
+	}
+
+	return EXIT_SUCCESS;
+
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
+static int dp_process_get_fwall_rule(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+	struct dp_fwall_rule *rule;
+
+	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (DP_FAILED(port_id)) {
+		ret = DP_ERROR_VM_GET_FWALL_ERR;
+		goto err;
+	}
+
+	rule = dp_get_firewall_rule(req->fw_rule.rule.rule_id, port_id);
+	if (!rule) {
+		ret = DP_ERROR_VM_GET_NO_FWALL_RULE_ERR;
+		goto err;
+	}
+	rep->fw_rule.rule = *rule;
+
+	return EXIT_SUCCESS;
+
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
+static int dp_process_del_fwall_rule(dp_request *req, dp_reply *rep)
+{
+	int port_id, ret = EXIT_SUCCESS;
+
+	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (DP_FAILED(port_id)) {
+		ret = DP_ERROR_VM_DEL_FWALL_ERR;
+		goto err;
+	}
+
+	if (DP_FAILED(dp_delete_firewall_rule(req->fw_rule.rule.rule_id, port_id))) {
+		ret = DP_ERROR_VM_DEL_NO_FWALL_RULE_ERR;
+		goto err;
+	}
+	return EXIT_SUCCESS;
+
+err:
+	rep->com_head.err_code = ret;
+	return ret;
+}
+
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
@@ -529,13 +613,13 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_NAME_ERR;
 			goto err_vnf;
 		}
-		if (setup_lpm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
+		if (setup_vm(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM4;
 			goto handle_err;
 		}
 		if (setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM6;
-			goto lpm_err;
+			goto vm_err;
 		}
 		dp_set_dhcp_range_ip4(port_id, ntohl(req->add_machine.ip4_addr), DP_LPM_DHCP_IP_DEPTH,
 							  rte_eth_dev_socket_id(port_id));
@@ -547,7 +631,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
 					 NULL, 32, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT4;
-			goto lpm_err;
+			goto vm_err;
 		}
 		if (dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
 					  NULL, 128, rte_eth_dev_socket_id(port_id))) {
@@ -574,7 +658,7 @@ route_err:
 	dp_del_route(port_id, req->add_machine.vni, 0,
 				ntohl(req->route.pfx_ip.addr), NULL,
 				32, rte_eth_dev_socket_id(port_id));
-lpm_err:
+vm_err:
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), DP_LPM_ROLLBACK);
 handle_err:
 	dp_del_portid_with_vm_handle(req->add_machine.machine_id);
@@ -919,6 +1003,24 @@ static int dp_process_listbackips(dp_request *req, struct rte_mbuf *req_mbuf, st
 	return EXIT_SUCCESS;
 }
 
+static int dp_process_listfwall_rules(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(req->fw_rule.machine_id);
+
+	/* This machine ID doesnt exist */
+	if (DP_FAILED(port_id)) {
+		rep_arr[DP_MBUF_ARR_SIZE - 1] = m;
+		goto out;
+	}
+
+	dp_list_firewall_rules(port_id, m, rep_arr);
+
+out:
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_listlb_pfxs(dp_request *req, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
 	int port_id;
@@ -1059,11 +1161,23 @@ int dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_LISTLBPREFIX:
 		ret = dp_process_listlb_pfxs(req, m, m_arr);
 		break;
+	case DP_REQ_TYPE_LIST_FWALL_RULES:
+		ret = dp_process_listfwall_rules(req, m, m_arr);
+		break;
 	case DP_REQ_TYPE_LISTLBBACKENDS:
 		ret = dp_process_listbackips(req, m, m_arr);
 		break;
 	case DP_REQ_TYPE_LISTMACHINE:
 		ret = dp_process_listmachine(NULL, m, m_arr);
+		break;
+	case DP_REQ_TYPE_ADD_FWALL_RULE:
+		ret = dp_process_add_fwall_rule(req, &rep);
+		break;
+	case DP_REQ_TYPE_DEL_FWALL_RULE:
+		ret = dp_process_del_fwall_rule(req, &rep);
+		break;
+	case DP_REQ_TYPE_GET_FWALL_RULE:
+		ret = dp_process_get_fwall_rule(req, &rep);
 		break;
 	default:
 		break;
@@ -1074,6 +1188,7 @@ int dp_process_request(struct rte_mbuf *m)
 		req->com_head.com_type != DP_REQ_TYPE_LISTROUTE &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTPREFIX &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTLBPREFIX &&
+		req->com_head.com_type != DP_REQ_TYPE_LIST_FWALL_RULES &&
 		req->com_head.com_type != DP_REQ_TYPE_LISTLBBACKENDS &&
 		req->com_head.com_type != DP_REQ_TYPE_GET_NATENTRY) {
 		rep.com_head.com_type = req->com_head.com_type;

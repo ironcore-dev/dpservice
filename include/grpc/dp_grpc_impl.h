@@ -6,6 +6,7 @@
 #include <rte_ethdev.h>
 #include <net/if.h>
 #include "dp_util.h"
+#include "dp_firewall.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,6 +22,10 @@ typedef enum {
 	DP_REQ_TYPE_ADDVIP,
 	DP_REQ_TYPE_DELVIP,
 	DP_REQ_TYPE_GETVIP,
+	DP_REQ_TYPE_ADD_FWALL_RULE,
+	DP_REQ_TYPE_DEL_FWALL_RULE,
+	DP_REQ_TYPE_GET_FWALL_RULE,
+	DP_REQ_TYPE_LIST_FWALL_RULES,
 	DP_REQ_TYPE_ADDMACHINE,
 	DP_REQ_TYPE_DELMACHINE,
 	DP_REQ_TYPE_GETMACHINE,
@@ -74,6 +79,11 @@ typedef struct dp_vip {
 	char		machine_id[VM_MACHINE_ID_STR_LEN];
 	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 } dp_vip;
+
+typedef struct dp_fw_rule {
+	char			machine_id[VM_MACHINE_ID_STR_LEN];
+	struct dp_fwall_rule	rule;
+} dp_fw_rule;
 
 typedef struct dp_lb {
 	uint32_t	ip_type;
@@ -212,6 +222,7 @@ typedef struct dp_request {
 		dp_getvip		get_vip;
 		dp_route		route;
 		dp_getpfx		get_pfx;
+		dp_fw_rule		fw_rule;
 	};
 } dp_request;
 
@@ -262,6 +273,7 @@ typedef struct dp_reply {
 		dp_lb_backip	back_ip;
 		dp_nat_entry	nat_entry;
 		uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+		dp_fw_rule		fw_rule;
 	};
 } dp_reply;
 

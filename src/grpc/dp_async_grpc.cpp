@@ -1,13 +1,147 @@
-#include "grpc/dp_async_grpc.h"
-#include "grpc/dp_grpc_service.h"
-#include "grpc/dp_grpc_impl.h"
 #include <arpa/inet.h>
 #include <rte_mbuf.h>
 #include <rte_ether.h>
+#include "grpc/dp_async_grpc.h"
+#include "grpc/dp_grpc_service.h"
+#include "grpc/dp_grpc_impl.h"
 #include "dp_error.h"
 #include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_log.h"
+
+void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule)
+{
+	int ret_val;
+
+	snprintf(dp_rule->rule_id, DP_FIREWALL_ID_STR_LEN,
+				"%s", grpc_rule->ruleid().c_str());
+	if (grpc_rule->sourceprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		ret_val = inet_aton(grpc_rule->sourceprefix().address().c_str(),
+					(in_addr*)&dp_rule->src_ip);
+		if (ret_val == 0)
+			DPGRPC_LOG_WARNING("ConvertGRPCFwallRuleToDPFWallRule: wrong source pfx address: %s\n", grpc_rule->sourceprefix().address().c_str());
+		if (grpc_rule->sourceprefix().prefixlength() != DP_FWALL_MATCH_ANY_LENGTH)
+			dp_rule->src_ip_mask = ~((1 << (32 - grpc_rule->sourceprefix().prefixlength())) - 1);
+		else
+			dp_rule->src_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
+	}
+
+	if (grpc_rule->destinationprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		ret_val = inet_aton(grpc_rule->destinationprefix().address().c_str(),
+					(in_addr*)&dp_rule->dest_ip);
+		if (ret_val == 0)
+			DPGRPC_LOG_WARNING("ConvertGRPCFwallRuleToDPFWallRule: wrong dest pfx address: %s\n", grpc_rule->destinationprefix().address().c_str());
+		if (grpc_rule->destinationprefix().prefixlength() != DP_FWALL_MATCH_ANY_LENGTH)
+			dp_rule->dest_ip_mask = ~((1 << (32 - grpc_rule->destinationprefix().prefixlength())) - 1);
+		else
+			dp_rule->dest_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
+	}
+
+	if (grpc_rule->direction() == dpdkonmetal::Ingress)
+		dp_rule->dir = DP_FWALL_INGRESS;
+	else
+		dp_rule->dir = DP_FWALL_EGRESS;
+
+	if (grpc_rule->action() == dpdkonmetal::Accept)
+		dp_rule->action = DP_FWALL_ACCEPT;
+	else
+		dp_rule->action = DP_FWALL_DROP;
+
+	dp_rule->priority = grpc_rule->priority();
+
+	switch (grpc_rule->protocolfilter().filter_case()) {
+		case dpdkonmetal::ProtocolFilter::kTcpFieldNumber:
+			dp_rule->protocol = IPPROTO_TCP;
+			dp_rule->filter.tcp_udp.src_port.lower = grpc_rule->protocolfilter().tcp().srcportlower();
+			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocolfilter().tcp().dstportlower();
+			dp_rule->filter.tcp_udp.src_port.upper = grpc_rule->protocolfilter().tcp().srcportupper();
+			dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule->protocolfilter().tcp().dstportupper();
+		break;
+		case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
+			dp_rule->protocol = IPPROTO_UDP;
+			dp_rule->filter.tcp_udp.src_port.lower = grpc_rule->protocolfilter().udp().srcportlower();
+			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocolfilter().udp().dstportlower();
+			dp_rule->filter.tcp_udp.src_port.upper = grpc_rule->protocolfilter().udp().srcportupper();
+			dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule->protocolfilter().udp().dstportupper();
+		break;
+		case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
+			dp_rule->protocol = IPPROTO_ICMP;
+			dp_rule->filter.icmp.icmp_type = grpc_rule->protocolfilter().icmp().icmptype();
+			dp_rule->filter.icmp.icmp_code = grpc_rule->protocolfilter().icmp().icmpcode();
+		break;
+		case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
+		default:
+			dp_rule->protocol = DP_FWALL_MATCH_ANY_PROTOCOL;
+			dp_rule->filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT;
+			dp_rule->filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT;
+		break;
+	}
+}
+
+void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, FirewallRule *grpc_rule)
+{
+	ICMPFilter *icmp_filter;
+	ProtocolFilter *filter;
+	TCPFilter *tcp_filter;
+	UDPFilter *udp_filter;
+	struct in_addr addr;
+	Prefix *src_ip;
+	Prefix *dst_ip;
+
+	grpc_rule->set_ruleid(dp_rule->rule_id);
+	grpc_rule->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	grpc_rule->set_priority(dp_rule->priority);
+	if (dp_rule->dir == DP_FWALL_INGRESS)
+		grpc_rule->set_direction(dpdkonmetal::Ingress);
+	else
+		grpc_rule->set_direction(dpdkonmetal::Egress);
+
+	if (dp_rule->action == DP_FWALL_ACCEPT)
+		grpc_rule->set_action(dpdkonmetal::Accept);
+	else
+		grpc_rule->set_action(dpdkonmetal::Drop);
+
+	src_ip = new Prefix();
+	src_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	addr.s_addr = dp_rule->src_ip;
+	src_ip->set_address(inet_ntoa(addr));
+	src_ip->set_prefixlength(__builtin_popcount(dp_rule->src_ip_mask));
+	grpc_rule->set_allocated_sourceprefix(src_ip);
+
+	dst_ip = new Prefix();
+	dst_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	addr.s_addr = dp_rule->dest_ip;
+	dst_ip->set_address(inet_ntoa(addr));
+	dst_ip->set_prefixlength(__builtin_popcount(dp_rule->dest_ip_mask));
+	grpc_rule->set_allocated_destinationprefix(dst_ip);
+
+	filter = new ProtocolFilter();
+	if (dp_rule->protocol == IPPROTO_TCP) {
+		tcp_filter = new TCPFilter();
+		tcp_filter->set_dstportlower(dp_rule->filter.tcp_udp.dst_port.lower);
+		tcp_filter->set_dstportupper(dp_rule->filter.tcp_udp.dst_port.upper);
+		tcp_filter->set_srcportlower(dp_rule->filter.tcp_udp.src_port.lower);
+		tcp_filter->set_srcportupper(dp_rule->filter.tcp_udp.src_port.upper);
+		filter->set_allocated_tcp(tcp_filter);
+		grpc_rule->set_allocated_protocolfilter(filter);
+	}
+	if (dp_rule->protocol == IPPROTO_UDP) {
+		udp_filter = new UDPFilter();
+		udp_filter->set_dstportlower(dp_rule->filter.tcp_udp.dst_port.lower);
+		udp_filter->set_dstportupper(dp_rule->filter.tcp_udp.dst_port.upper);
+		udp_filter->set_srcportlower(dp_rule->filter.tcp_udp.src_port.lower);
+		udp_filter->set_srcportupper(dp_rule->filter.tcp_udp.src_port.upper);
+		filter->set_allocated_udp(udp_filter);
+		grpc_rule->set_allocated_protocolfilter(filter);
+	}
+	if (dp_rule->protocol == IPPROTO_ICMP) {
+		icmp_filter = new ICMPFilter();
+		icmp_filter->set_icmpcode(dp_rule->filter.icmp.icmp_code);
+		icmp_filter->set_icmptype(dp_rule->filter.icmp.icmp_type);
+		filter->set_allocated_icmp(icmp_filter);
+		grpc_rule->set_allocated_protocolfilter(filter);
+	}
+}
 
 int BaseCall::InitCheck()
 {
@@ -1477,6 +1611,173 @@ int GetNATInfoCall::Proceed()
 			is_chained = reply->com_head.is_chained;
 			rte_pktmbuf_free(mbuf);
 		} while (is_chained);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+
+int AddFirewallRuleCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	Status *err_status;
+
+	if (status_ == REQUEST) {
+		new AddFirewallRuleCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPGRPC_LOG_INFO("add Firewall Rule called for interface id: %s and rule id: %s", request_.interfaceid().c_str(),
+						request_.rule().ruleid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		ConvertGRPCFwallRuleToDPFWallRule(&request_.rule(), &request.fw_rule.rule);
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		err_status = new Status();
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		reply_.set_ruleid(&reply.fw_rule.rule.rule_id, sizeof(reply.fw_rule.rule.rule_id));
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+
+int DelFirewallRuleCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+
+	if (status_ == REQUEST) {
+		new DelFirewallRuleCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPGRPC_LOG_INFO("delete Firewall Rule called for interface id: %s and rule id: %s", request_.interfaceid().c_str(),
+						request_.ruleid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		snprintf(request.fw_rule.rule.rule_id, DP_FIREWALL_ID_STR_LEN,
+				 "%s", request_.ruleid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		status_ = FINISH;
+		reply_.set_error(reply.com_head.err_code);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int GetFirewallRuleCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	Status *err_status;
+	FirewallRule *rule;
+
+	if (status_ == REQUEST) {
+		new GetFirewallRuleCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPGRPC_LOG_INFO("get Firewall Rule called for interface id: %s and rule id: %s",
+						request_.interfaceid().c_str(), request_.ruleid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		snprintf(request.fw_rule.rule.rule_id, DP_FIREWALL_ID_STR_LEN,
+				 "%s", request_.ruleid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+
+		rule = new FirewallRule();
+		ConvertDPFWallRuleToGRPCFwallRule(&reply.fw_rule.rule, rule);
+		reply_.set_allocated_rule(rule);
+
+		status_ = FINISH;
+		err_status = new Status();
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+int ListFirewallRulesCall::Proceed()
+{
+	struct dp_fwall_rule *dp_rule;
+	struct rte_mbuf *mbuf = NULL;
+	dp_request request = {0};
+	FirewallRule *rule;
+	dp_reply *reply;
+	int i;
+
+	if (status_ == REQUEST) {
+		new ListFirewallRulesCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPGRPC_LOG_INFO("list Firewall Rule called for interface id: %s",
+						request_.interfaceid().c_str());
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
+				 "%s", request_.interfaceid().c_str());
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		if (dp_recv_from_worker_with_mbuf(&mbuf))
+			return -1;
+
+		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
+		for (i = 0; i < reply->com_head.msg_count; i++) {
+			rule = reply_.add_rules();
+			dp_rule = &((&reply->fw_rule.rule)[i]);
+			ConvertDPFWallRuleToGRPCFwallRule(dp_rule, rule);
+		}
+		rte_pktmbuf_free(mbuf);
+
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

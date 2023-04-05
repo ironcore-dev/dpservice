@@ -10,6 +10,7 @@
 #include "node_api.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_impl.h"
+#include "dp_firewall.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,13 +54,14 @@ struct macip_entry {
 };
 
 struct vm_entry {
-	struct rte_rib		*ipv4_rib[DP_NB_SOCKETS];
-	struct rte_rib6		*ipv6_rib[DP_NB_SOCKETS];
-	struct macip_entry	info;
-	int					vni;
-	uint8_t				machineid[VM_MACHINE_ID_STR_LEN];
-	uint8_t				ul_ipv6[16];
-	uint8_t				vm_ready;
+	struct rte_rib			*ipv4_rib[DP_NB_SOCKETS];
+	struct rte_rib6			*ipv6_rib[DP_NB_SOCKETS];
+	struct dp_fwall_head	fwall_head;
+	struct macip_entry		info;
+	int						vni;
+	uint8_t					machineid[VM_MACHINE_ID_STR_LEN];
+	uint8_t					ul_ipv6[16];
+	uint8_t					vm_ready;
 };
 
 struct vm_route {
@@ -68,7 +70,7 @@ struct vm_route {
 
 };
 
-int setup_lpm(int port_id, int vni, const int socketid);
+int setup_vm(int port_id, int vni, const int socketid);
 int setup_lpm6(int port_id, int vni, const int socketid);
 int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, int socketid,
 						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id);
@@ -116,6 +118,8 @@ void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid);
 char* dp_get_vm_pxe_str(uint16_t portid);
 void dp_set_vm_pxe_str(uint16_t portid, char *p_str);
 bool dp_is_vni_available(int vni, const int socketid);
+struct dp_fwall_head *dp_get_fwall_head(int port_id);
+void dp_set_fwall_head(int port_id, struct dp_fwall_head *fwall_head);
 #ifdef __cplusplus
 }
 #endif
