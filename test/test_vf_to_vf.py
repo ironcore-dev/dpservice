@@ -1,5 +1,6 @@
 import threading
 
+import pytest
 from helpers import *
 
 
@@ -63,6 +64,7 @@ def test1_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	grpc_client.delfwallrule(VM2.name, "fw1-vm2")
 
 def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
+	pytest.skip("Skipping till firewall gets fully enabled")
 	sniff_tcp_data = {}
 	negated = True
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(VM2.tap, sniff_tcp_data, negated))

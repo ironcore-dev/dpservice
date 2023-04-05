@@ -26,8 +26,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (cntrack->flow_state == DP_FLOW_STATE_ESTABLISHED)
 		action = (enum dp_fwall_action)cntrack->fwall_action[cntrack->dir];
 
-	if (action == DP_FWALL_DROP)
-		return FIREWALL_NEXT_DROP;
+	/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */
+	/*if (action == DP_FWALL_DROP)
+		return FIREWALL_NEXT_DROP;*/
 
 	return FIREWALL_NEXT_L2_DECAP;
 }

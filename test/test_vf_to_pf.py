@@ -154,6 +154,7 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	grpc_client.delnat(VM1.name)
 
 def test_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
+	pytest.skip("Skipping till firewall gets fully enabled")
 	sniff_tcp_data = {}
 	negated=True
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data, negated))
