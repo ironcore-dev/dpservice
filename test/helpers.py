@@ -63,8 +63,12 @@ def delayed_sendp(packet, interface):
 	sendp(packet, iface=interface)
 
 
-def interface_up(interface):
-	cmd = f"ip link set dev {interface} up"
+def interface_init(interface, enabled=True):
+	if enabled:
+		cmd = f"ip link set dev {interface} up"
+		print(cmd)
+		subprocess.check_output(shlex.split(cmd))
+	cmd = f"ip addr flush dev {interface}"
 	print(cmd)
 	subprocess.check_output(shlex.split(cmd))
 
