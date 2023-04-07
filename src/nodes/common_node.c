@@ -57,7 +57,7 @@ static void dp_graphtrace_print_udp(void **p_pkt_data, size_t *p_pos, char *buf,
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"UDP %d -> %d len %d",
+		"UDP %u -> %u len %u",
 		ntohs(udp_hdr->src_port), ntohs(udp_hdr->dst_port), ntohs(udp_hdr->dgram_len));
 
 	*p_pkt_data = udp_hdr + 1;
@@ -68,7 +68,7 @@ static void dp_graphtrace_print_tcp(void **p_pkt_data, size_t *p_pos, char *buf,
 	struct rte_tcp_hdr *tcp_hdr = (struct rte_tcp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"TCP %d -> %d seq %d ack %d",
+		"TCP %u -> %u seq %u ack %u",
 		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port), ntohl(tcp_hdr->sent_seq), ntohl(tcp_hdr->recv_ack));
 
 	*p_pkt_data = tcp_hdr + 1;
@@ -79,7 +79,7 @@ static void dp_graphtrace_print_icmp(void **p_pkt_data, size_t *p_pos, char *buf
 	struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"ICMP %d-%d id %d seq %d",
+		"ICMP %u-%u id %u seq %u",
 		icmp_hdr->icmp_type, icmp_hdr->icmp_code, ntohs(icmp_hdr->icmp_ident), ntohs(icmp_hdr->icmp_seq_nb));
 
 	*p_pkt_data = icmp_hdr + 1;

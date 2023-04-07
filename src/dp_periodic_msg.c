@@ -74,7 +74,7 @@ void trigger_garp()
 
 	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_arp_hdr);
 	pkt->pkt_len = pkt->data_len;
-	pkt->packet_type = RTE_PTYPE_L2_ETHER;
+	pkt->packet_type = RTE_PTYPE_L2_ETHER_ARP;
 
 	send_to_all_vfs(pkt, DP_PER_TYPE_DIRECT_TX, RTE_ETHER_TYPE_ARP);
 	rte_pktmbuf_free(pkt);
@@ -97,6 +97,7 @@ void trigger_nd_unsol_adv()
 	if(pkt == NULL)
 		printf("rte_mbuf allocation failed\n");
 
+	pkt->packet_type = RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L4_ICMP;
 	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
 	ns_msg = (struct nd_msg*) (ipv6_hdr + 1);
@@ -149,6 +150,7 @@ void trigger_nd_ra()
 	if (!pkt_buf)
 		printf("rte_mbuf allocation failed\n");
 
+	pkt_buf->packet_type = RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L4_ICMP;
 	eth_hdr = rte_pktmbuf_mtod(pkt_buf, struct rte_ether_hdr *);
 	ipv6_hdr = (struct rte_ipv6_hdr*)(eth_hdr+1);
 	ra_msg = (struct ra_msg*) (ipv6_hdr + 1);
