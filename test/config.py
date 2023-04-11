@@ -1,4 +1,4 @@
-# Address range convenstion for better trace/dump readablity
+# Address range convention for better trace/dump readablity
 # (see docs/testing/pytest_schema.drawio.png for overview)
 #
 # Underlay addresses:
@@ -10,7 +10,7 @@
 #   172.2x.x.0/24 per category (vip, nat, lb, ...)
 # Private addresses for individual tests:
 #   192.168.0.0/16 per test requirements
-# Network addresses:
+# Network addresses (TAP devices only):
 #   22:22:22:22:22:xx for PFs
 #   66:66:66:66:66:xx for VFs
 
@@ -126,6 +126,6 @@ VM2 = VMSpec.create(vni1)
 # VM3 is on the second VNI
 VM3 = VMSpec.create(vni2)
 # VM4 is for local use
-# it is not added anywere, the interface is not up
+# it is not added anywhere, the interface is not up
 # add it and delete manually, note that it is configured for VNI1
 VM4 = VMSpec.create(vni1)

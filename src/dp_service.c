@@ -125,10 +125,18 @@ static int init_interfaces()
 		|| DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
 
-	// VFs are started by GRPC later
-	if (DP_FAILED(dp_port_start(dp_port_get_pf0_id()))
-		|| DP_FAILED(dp_port_start(dp_port_get_pf1_id())))
+	if (DP_FAILED(dp_port_start(dp_port_get_pf0_id())))
 		return DP_ERROR;
+
+	// PF1 is always started (can receive from outside) even when not used for Tx
+	// but test suite can use it for monitoring in some setups, so do not bind it then
+#ifdef ENABLE_PYTEST
+	if (dp_conf_is_wcmp_enabled())
+#endif
+	if (DP_FAILED(dp_port_start(dp_port_get_pf1_id())))
+		return DP_ERROR;
+
+	// VFs are started by GRPC later
 
 	if (DP_FAILED(dp_flow_init(pf0_socket))
 		|| DP_FAILED(dp_nat_init(pf0_socket))

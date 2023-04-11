@@ -3,6 +3,7 @@
 import os
 import shlex
 import subprocess
+from scapy.arch import get_if_hwaddr
 
 from config import *
 from grpc_client import GrpcClient
@@ -11,30 +12,40 @@ from helpers import interface_init
 
 class DpService:
 
-	def __init__(self, build_path, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False):
+	DP_SERVICE_CONF = "/tmp/dp_service.conf"
+
+	def __init__(self, build_path, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False, hardware=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
+		self.hardware = hardware
+
+		if self.hardware:
+			if self.port_redundancy:
+				raise ValueError("Port redundancy is not supported when testing on actual hardware")
+			self.reconfigure_tests(DpService.DP_SERVICE_CONF)
 
 		self.cmd = ""
 		if gdb:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += (f'{self.build_path}/src/dp_service -l 0,1 --no-pci --log-level=user*:8'
-					f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
-					f' --vdev={PF1.pci},iface={PF1.tap},mac="{PF1.mac}"'
-					f' --vdev={VM1.pci},iface={VM1.tap},mac="{VM1.mac}"'
-					f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
-					f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
-					f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"'
-					 ' --'
-					f' --pf0={PF0.tap} --pf1={PF1.tap} --vf-pattern={vf_tap_pattern}'
-					f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
-					f' --dhcp-mtu={dhcp_mtu}'
-					f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
-					 ' --no-offload --no-stats'
-					f' --grpc-port={grpc_port}'
-					f' --nic-type=tap')
+		self.cmd += f'{self.build_path}/src/dp_service -l 0,1 --log-level=user*:8'
+		if not self.hardware:
+			self.cmd += (f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
+						 f' --vdev={PF1.pci},iface={PF1.tap},mac="{PF1.mac}"'
+						 f' --vdev={VM1.pci},iface={VM1.tap},mac="{VM1.mac}"'
+						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
+						 f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
+						 f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"')
+		self.cmd += ' --'
+		if not self.hardware:
+			self.cmd +=  f' --pf0={PF0.tap} --pf1={PF1.tap} --vf-pattern={vf_tap_pattern} --nic-type=tap'
+		self.cmd +=	(f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
+					 f' --dhcp-mtu={dhcp_mtu}'
+					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
+					 f' --grpc-port={grpc_port}'
+					  ' --no-offload --no-stats --graphtrace=1')
+
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-fraction=0.5'
 		if fast_flow_timeout:
@@ -47,7 +58,9 @@ class DpService:
 		return self.cmd
 
 	def start(self):
-		self.process = subprocess.Popen(shlex.split(self.cmd), env={"DP_CONF": ""})
+		# for TAPs, command-line arguments are used instead (see above)
+		env = {"DP_CONF": ""} if not self.hardware else {}
+		self.process = subprocess.Popen(shlex.split(self.cmd), env=env)
 
 	def stop(self):
 		self.process.terminate()
@@ -62,7 +75,8 @@ class DpService:
 		interface_init(VM2.tap)
 		interface_init(VM3.tap)
 		interface_init(PF0.tap)
-		interface_init(PF1.tap, self.port_redundancy)
+		if not self.hardware:  # see above
+			interface_init(PF1.tap, self.port_redundancy)
 		grpc_client.init()
 		VM1.ul_ipv6 = grpc_client.addmachine(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
 		VM2.ul_ipv6 = grpc_client.addmachine(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
@@ -77,6 +91,44 @@ class DpService:
 		VM2.ul_ipv6 = grpc_client.get_ul_ipv6(VM2.name)
 		VM3.ul_ipv6 = grpc_client.get_ul_ipv6(VM3.name)
 
+	def get_vm_tap(self, idx):
+		iface = f"tap{idx}"
+		try:
+			get_if_hwaddr(iface)
+		except Exception as e:
+			raise RuntimeError(f"VM interface {iface} is not up and running") from e
+		return iface
+
+	def reconfigure_tests(self, cfgfile):
+		# Rewrite config values to actual hardware values
+		if not os.access(cfgfile, os.R_OK):
+			raise OSError(f"Cannot read {cfgfile} to bind to hardware NIC")
+		with open(cfgfile, 'r') as config:
+			for line in config:
+				options = line.split()
+				if len(options) != 2:
+					continue
+				key = options[0]
+				value = options[1]
+				match key:
+					case "pf1":
+						# in hardware, PF0 is actually PF1 as it is used as the monitoring interface connected to the real PF0
+						PF0.tap = value
+					case "vf-pattern":
+						# MACs cannot be changed for VFs, use actual values
+						VM1.mac = get_if_hwaddr(f"{value}0")
+						VM2.mac = get_if_hwaddr(f"{value}1")
+						VM3.mac = get_if_hwaddr(f"{value}2")
+					case "a-pf0":
+						# PCI addresses for VFs are defined by DPDK in this pattern
+						pci = value.split(',')[0]
+						VM1.pci = f"{pci}_representor_vf0"
+						VM2.pci = f"{pci}_representor_vf1"
+						VM3.pci = f"{pci}_representor_vf2"
+						VM4.pci = f"{pci}_representor_vf3"
+		VM1.tap = self.get_vm_tap(0)
+		VM2.tap = self.get_vm_tap(1)
+		VM3.tap = self.get_vm_tap(2)
 
 # If run manually:
 import argparse
@@ -95,9 +147,15 @@ if __name__ == '__main__':
 	parser.add_argument("--no-init", action="store_true", help="Do not set interfaces up automatically")
 	parser.add_argument("--init-only", action="store_true", help="Only init interfaces of a running service")
 	parser.add_argument("--gdb", action="store_true", help="Run service under gdb")
+	parser.add_argument("--hw", action="store_true", help="Run on actual hardware NIC instead of virtual TAP devices")
 	args = parser.parse_args()
 
-	dp_service = DpService(args.build_path, args.port_redundancy, args.fast_flow_timeout, gdb=args.gdb, test_virtsvc=args.virtsvc)
+	dp_service = DpService(args.build_path,
+						   args.port_redundancy,
+						   args.fast_flow_timeout,
+						   gdb=args.gdb,
+						   test_virtsvc=args.virtsvc,
+						   hardware=args.hw)
 
 	if args.init_only:
 		dp_service.init_ifaces(GrpcClient(args.build_path))

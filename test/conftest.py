@@ -24,6 +24,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--attach", action="store_true", help="Attach to a currently running service (for debugging)"
 	)
+	parser.addoption(
+		"--hw", action="store_true", help="Test on actual hardware NIC instead of virtual TAPs"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -47,7 +50,8 @@ def grpc_client(build_path):
 def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
 	test_virtsvc = request.config.getoption("--virtsvc")
-	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc)
+	hwtest = request.config.getoption("--hw")
+	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc, hardware=hwtest)
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
