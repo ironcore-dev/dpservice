@@ -7,7 +7,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "nodes/common_node.h"
-#include "nodes/dhcpv6_node.h"
+#include "protocols/dp_dhcpv6.h"
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \

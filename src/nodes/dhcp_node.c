@@ -115,7 +115,7 @@ static int parse_options(struct dp_dhcp_header *dhcp_pkt,
 			continue;
 		if (op_type == DHCP_OPT_END)
 			break;
-		if (i > options_len) {
+		if (i >= options_len) {
 			DPS_LOG_WARNING("Malformed DHCP option");
 			return DP_ERROR;
 		}

@@ -1,4 +1,5 @@
 #include "dp_graph.h"
+#include <rte_memory.h>
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"

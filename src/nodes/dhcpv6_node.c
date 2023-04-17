@@ -8,8 +8,25 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "nodes/common_node.h"
+#include "protocols/dp_dhcpv6.h"
 
-DP_NODE_REGISTER_NOINIT(DHCPV6, dhcpv6, DP_NODE_DEFAULT_NEXT_ONLY);
+#define DP_DHCPV6_HDR_FIXED_LEN offsetof(struct dhcpv6_packet, options)
+#define DP_DHCPV6_PKT_FIXED_LEN (sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + sizeof(struct rte_udp_hdr) + DP_DHCPV6_HDR_FIXED_LEN)
+
+// this can be anything, IANA defined values do exist, but are not applicable here
+#define DP_DHCPV6_HW_ID	0xabcd
+
+struct dp_dhcpv6_reply_options {
+	struct dhcpv6_opt_ia_na_single_addr_status opt_iana;
+	int opt_iana_len;
+	struct dhcpv6_option opt_rapid;
+	int opt_rapid_len;
+	struct dhcpv6_opt_client_id opt_cid;
+	int opt_cid_len;
+};
+
+
+DP_NODE_REGISTER(DHCPV6, dhcpv6, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
 
@@ -18,52 +35,155 @@ int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 	return dp_node_append_vf_tx(DP_NODE_GET_SELF(dhcpv6), next_tx_index, port_id, tx_node_name);
 }
 
-static struct client_id cid;
-static struct server_id sid;
-static struct ia_option recv_ia;
-static struct rapid_commit rapid;
-uint8_t client_id_len;
 
-void parse_options(struct dhcpv6_packet* dhcp_pkt, uint8_t len) {
-	uint16_t op_id;
-	uint16_t op_len;
-	//printf("op_0:%d, op_1:%d\n", dhcp_pkt->options[0], dhcp_pkt->options[1]);
-	for ( int i = 0; i < len; i += op_len) {
-		op_id = (dhcp_pkt->options[i]<<8) + (dhcp_pkt->options[i+1]&0x00ff);
-		i = i+2;
-		op_len = (dhcp_pkt->options[i]<<8) + (dhcp_pkt->options[i+1]&0x00ff);
-		i = i+2;
-		if(op_id == DP_CLIENTID) {
-			cid.op = htons(op_id);
-			cid.len = htons(op_len);
-			client_id_len = op_len+4;
-			rte_memcpy(&cid.id,&dhcp_pkt->options[i], op_len);
-		}	else if ( op_id == DP_IA_NA ) {
-				rte_memcpy(&recv_ia.val, &dhcp_pkt->options[i], op_len);
-		}	else if ( op_id == DP_RAPID_COMMIT) {
-				rapid.op = htons(op_id);
-				rapid.len = htons(op_len);
-		}
-	}
+// constant after init
+static const uint8_t *own_ip6;
+static struct dhcpv6_opt_server_id_ll opt_sid_template;
+static struct dhcpv6_opt_ia_na_single_addr_status opt_iana_template;
+
+static int dhcpv6_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
+{
+	own_ip6 = dp_get_gw_ip6();
+
+	opt_sid_template.op_code = htons(DHCPV6_OPT_SERVERID);
+	opt_sid_template.op_len = htons(sizeof(struct dhcpv6_duid_ll));
+	opt_sid_template.id.type = htons(DHCPV6_DUID_LL);
+	opt_sid_template.id.hw_type = htons(DP_DHCPV6_HW_ID);
+	// id.mac will be filled in later based on the used port
+
+	opt_iana_template.op_code = htons(DHCPV6_OPT_IA_NA);
+	opt_iana_template.op_len = htons(sizeof(struct dhcpv6_ia_na_single_addr_status));
+	// ia_na.iaid will be filled-in later based on the client request
+	opt_iana_template.ia_na.t1 = DHCPV6_INFINITY;
+	opt_iana_template.ia_na.t2 = DHCPV6_INFINITY;
+	opt_iana_template.ia_na.options[0].op_code = htons(DHCPV6_OPT_IAADDR);
+	opt_iana_template.ia_na.options[0].op_len = htons(sizeof(struct dhcpv6_ia_addr_status));
+	// addr.ipv6 will be filled in later based on the used port
+	opt_iana_template.ia_na.options[0].addr.preferred_lifetime = DHCPV6_INFINITY;
+	opt_iana_template.ia_na.options[0].addr.valid_lifetime = DHCPV6_INFINITY;
+	opt_iana_template.ia_na.options[0].addr.options[0].op_code = htons(DHCPV6_OPT_STATUS_CODE);
+	opt_iana_template.ia_na.options[0].addr.options[0].op_len = htons(sizeof(uint16_t));
+	opt_iana_template.ia_na.options[0].addr.options[0].status = DHCPV6_STATUS_SUCCESS;
+
+	return DP_OK;
 }
 
-void prepare_ia_option(uint16_t port_id)
+
+static __rte_always_inline int parse_options(struct rte_mbuf *m,
+											 const uint8_t *options,
+											 int options_len,
+											 struct dp_dhcpv6_reply_options *reply_options)
 {
-	recv_ia.op = htons(DP_IA_NA);
-	recv_ia.len = htons(sizeof(struct ia));
-	recv_ia.val.time_1 = INFINITY;
-	recv_ia.val.time_2 = INFINITY;
+	uint16_t op_code;
+	uint16_t op_len = 0;
+	struct dhcpv6_option *opt;
 
-	recv_ia.val.addrv6.op = htons(DP_IAADDR);
-	recv_ia.val.addrv6.len = htons(sizeof(struct ia_addr));
-	recv_ia.val.addrv6.addr.time_1 = INFINITY;
-	recv_ia.val.addrv6.addr.time_2 = INFINITY;
-	rte_memcpy(recv_ia.val.addrv6.addr.in6_addr, dp_get_dhcp_range_ip6(port_id), 16);
+	for (int i = 0;
+		 i + sizeof(struct dhcpv6_option) < options_len;
+		 i += sizeof(struct dhcpv6_option) + op_len
+	) {
+		opt = (struct dhcpv6_option *)&options[i];
+		op_len = ntohs(opt->op_len);
+		if (i + op_len > options_len) {
+			DPS_LOG_WARNING("Malformed DHCPv6 option %u", ntohs(opt->op_code));
+			return DP_ERROR;
+		}
+		op_code = ntohs(opt->op_code);
+		switch (op_code) {
+		case DHCPV6_OPT_CLIENTID:
+			if (op_len > sizeof(reply_options->opt_cid.id)) {
+				DPS_LOG_WARNING("Malformed DHCPv6 CLIENTID option");
+				return DP_ERROR;
+			}
+			reply_options->opt_cid.op_code = opt->op_code;
+			reply_options->opt_cid.op_len = opt->op_len;
+			rte_memcpy(&reply_options->opt_cid.id, &opt->data, op_len);
+			reply_options->opt_cid_len = op_len + 4;
+			break;
+		case DHCPV6_OPT_IA_NA:
+			// we only need the ID from this option, no need to iterate the sub-options for now
+			if (op_len < sizeof(struct dhcpv6_ia_na)) {
+				DPS_LOG_WARNING("Malformed DHCPv6 IA_NA option");
+				return DP_ERROR;
+			}
+			reply_options->opt_iana = opt_iana_template;
+			reply_options->opt_iana.ia_na.iaid = ((struct dhcpv6_ia_na *)&opt->data)->iaid;
+			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_dhcp_range_ip6(m->port), 16);
+			reply_options->opt_iana_len = sizeof(opt_iana_template);
+			break;
+		case DHCPV6_OPT_RAPID_COMMIT:
+			if (op_len != 0) {
+				DPS_LOG_WARNING("Invalid DHCPv6 rapid commit option");
+				return DP_ERROR;
+			}
+			reply_options->opt_rapid.op_code = opt->op_code;
+			reply_options->opt_rapid.op_len = 0;
+			reply_options->opt_rapid_len = sizeof(struct dhcpv6_option);
+			break;
+		default:
+			break;
+		}
+	}
+	return DP_OK;
+}
 
-	recv_ia.val.addrv6.addr.code.op = htons(DP_STATUS_CODE);
-	recv_ia.val.addrv6.addr.code.len = htons(2);
-	recv_ia.val.addrv6.addr.code.status = STATUS_Success;
-	return;
+static __rte_always_inline int resize_packet(struct rte_mbuf *m, int delta)
+{
+	if (delta > 0) {
+		if (!rte_pktmbuf_append(m, delta)) {
+			DPS_LOG_WARNING("Not enough space for DHCPv6 options in packet");
+			return DP_ERROR;
+		}
+	} else if (delta < 0) {
+		if (DP_FAILED(rte_pktmbuf_trim(m, -delta))) {
+			DPS_LOG_WARNING("Invalid trim of DHCPv6 packet");
+			return DP_ERROR;
+		}
+	}
+	return DP_OK;
+}
+
+static __rte_always_inline int strip_options(struct rte_mbuf *m, int options_len)
+{
+	if (DP_FAILED(resize_packet(m, -options_len)))
+		return DP_ERROR;
+	return 0;
+}
+
+/** @return size of generated options or error */
+static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int options_len)
+{
+	uint8_t reply_options_len;
+	struct dhcpv6_opt_server_id_ll opt_sid;
+	struct dp_dhcpv6_reply_options reply_options = {0};  // this makes *_len fields 0, needed later
+
+	if (DP_FAILED(parse_options(m, options, options_len, &reply_options))) {
+		DPS_LOG_WARNING("Invalid DHCPv6 options received");
+		return DP_ERROR;
+	}
+
+	opt_sid = opt_sid_template;
+	rte_ether_addr_copy(&rte_pktmbuf_mtod(m, struct rte_ether_hdr *)->dst_addr, &opt_sid.id.mac);
+
+	reply_options_len = sizeof(opt_sid) + reply_options.opt_cid_len + reply_options.opt_iana_len + reply_options.opt_rapid_len;
+
+	if (DP_FAILED(resize_packet(m, reply_options_len - options_len)))
+		return DP_ERROR;
+
+	rte_memcpy(options, &opt_sid, sizeof(opt_sid));
+	options += sizeof(opt_sid);
+	if (reply_options.opt_cid_len) {
+		rte_memcpy(options, &reply_options.opt_cid, reply_options.opt_cid_len);
+		options += reply_options.opt_cid_len;
+	}
+	if (reply_options.opt_iana_len) {
+		rte_memcpy(options, &reply_options.opt_iana, reply_options.opt_iana_len);
+		options += reply_options.opt_iana_len;
+	}
+	if (reply_options.opt_rapid_len)
+		rte_memcpy(options, &reply_options.opt_rapid, reply_options.opt_rapid_len);
+
+	return reply_options_len;
 }
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
@@ -72,73 +192,51 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv6_hdr *req_ipv6_hdr; 
 	struct rte_udp_hdr *req_udp_hdr;
 	struct dhcpv6_packet *dhcp_pkt;
-	uint8_t type, recv_len, options_len;
-	const uint8_t *own_ip6 = dp_get_gw_ip6();
-	uint8_t offset = 0;
-	uint8_t index = 0;
+	int req_options_len = rte_pktmbuf_data_len(m) - DP_DHCPV6_PKT_FIXED_LEN;
+	int reply_options_len;
+
+	// packet length is uint16_t, negative value means it's less than the required length
+	if (req_options_len < 0) {
+		DPNODE_LOG_WARNING(node, "Invalid DHCPv6 packet length");
+		return DHCPV6_NEXT_DROP;
+	}
 
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	req_ipv6_hdr = (struct rte_ipv6_hdr*) (req_eth_hdr + 1);
-	req_udp_hdr = (struct rte_udp_hdr*) (req_ipv6_hdr + 1);
-	dhcp_pkt = (struct dhcpv6_packet*) (req_udp_hdr + 1);
+	req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
+	req_udp_hdr = (struct rte_udp_hdr *)(req_ipv6_hdr + 1);
+	dhcp_pkt = (struct dhcpv6_packet *)(req_udp_hdr + 1);
 
-	type = dhcp_pkt->msg_type;
-	recv_len = rte_pktmbuf_data_len(m);
-	options_len = recv_len -  DHCPV6_FIXED_LEN - sizeof(struct rte_ether_hdr) - sizeof(struct rte_ipv6_hdr ) - sizeof(struct rte_udp_hdr);
-
-	parse_options(dhcp_pkt, options_len);
+	// switch the packet's direction
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_memcpy(req_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
 
-	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr,sizeof(req_ipv6_hdr->dst_addr));
-	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6,sizeof(req_ipv6_hdr->src_addr));
+	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr, sizeof(req_ipv6_hdr->dst_addr));
+	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6, sizeof(req_ipv6_hdr->src_addr));
 	req_udp_hdr->src_port = htons(DHCPV6_SERVER_PORT);
 	req_udp_hdr->dst_port = htons(DHCPV6_CLIENT_PORT);
 
-	switch(type) {
+	// create reply with options
+	switch (dhcp_pkt->msg_type) {
 		case DHCPV6_SOLICIT:
 			dhcp_pkt->msg_type = DHCPV6_ADVERTISE;
-			offset = client_id_len + sizeof(struct server_id) + sizeof(struct ia_option) +sizeof(struct rapid_commit);
+			reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
 			break;
-
 		case DHCPV6_REQUEST:
 			dhcp_pkt->msg_type = DHCPV6_REPLY;
-			offset = client_id_len + sizeof(struct server_id) + sizeof(struct ia_option) +sizeof(struct rapid_commit);
+			reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
 			break;
-
 		case DHCPV6_CONFIRM:
 			dhcp_pkt->msg_type = DHCPV6_REPLY;
+			reply_options_len = strip_options(m, req_options_len);
 			break;
-
 		default:
 			return DHCPV6_NEXT_DROP;
 	}
-	sid.op = htons(DP_SERVERID);
-	sid.len = htons(sizeof(struct duid_t));
-	sid.id.type = htons(DP_DUID_LL);
-	sid.id.hw_type = htons(DP_DUMMY_HW_ID);
-	rte_ether_addr_copy(&req_eth_hdr->dst_addr, &sid.id.mac);
+	if (DP_FAILED(reply_options_len))
+		return DHCPV6_NEXT_DROP;
 
-	prepare_ia_option(m->port);
-
-	if(offset >= options_len) {
-		if (!rte_pktmbuf_append(m, offset - options_len)) {
-			DPNODE_LOG_WARNING(node, "Not enough space for DHCPv6 options in packet");
-			return DHCPV6_NEXT_DROP;
-		}
-	} else {
-		rte_pktmbuf_trim(m, options_len-offset);
-	}	
-	rte_memcpy(&dhcp_pkt->options[index], &rapid, sizeof(struct rapid_commit));
-	index+=sizeof(struct rapid_commit);
-	rte_memcpy(&dhcp_pkt->options[index], &cid, client_id_len);
-	index += client_id_len;
-	rte_memcpy(&dhcp_pkt->options[index], &sid, sizeof(struct server_id));
-	index+=sizeof(struct server_id);
-	rte_memcpy(&dhcp_pkt->options[index], &recv_ia,sizeof(struct ia_option));
-
-	req_ipv6_hdr->payload_len = htons(offset +  DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
-	req_udp_hdr->dgram_len = htons(offset + DHCPV6_FIXED_LEN + DP_UDP_HDR_SZ);
+	// recompute checksums (offloaded)
+	req_ipv6_hdr->payload_len = req_udp_hdr->dgram_len = htons(sizeof(struct rte_udp_hdr) + DP_DHCPV6_HDR_FIXED_LEN + reply_options_len);
 	req_udp_hdr->dgram_cksum = 0;
 
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6 | RTE_MBUF_F_TX_UDP_CKSUM;
