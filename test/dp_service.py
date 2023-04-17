@@ -6,7 +6,7 @@ import subprocess
 
 from config import *
 from grpc_client import GrpcClient
-from helpers import interface_up
+from helpers import interface_init
 
 
 class DpService:
@@ -58,12 +58,11 @@ class DpService:
 			self.process.wait()
 
 	def init_ifaces(self, grpc_client):
-		interface_up(VM1.tap)
-		interface_up(VM2.tap)
-		interface_up(VM3.tap)
-		interface_up(PF0.tap)
-		if self.port_redundancy:
-			interface_up(PF1.tap)
+		interface_init(VM1.tap)
+		interface_init(VM2.tap)
+		interface_init(VM3.tap)
+		interface_init(PF0.tap)
+		interface_init(PF1.tap, self.port_redundancy)
 		grpc_client.init()
 		VM1.ul_ipv6 = grpc_client.addmachine(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
 		VM2.ul_ipv6 = grpc_client.addmachine(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)

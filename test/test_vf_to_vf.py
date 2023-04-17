@@ -4,12 +4,12 @@ import pytest
 from helpers import *
 
 
-def vf_to_vf_tcp_responder(vf_name):
-	pkt = sniff_packet(vf_name, is_tcp_pkt)
+def vf_to_vf_tcp_responder(vf_tap):
+	pkt = sniff_packet(vf_tap, is_tcp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
-	delayed_sendp(reply_pkt, vf_name)
+	delayed_sendp(reply_pkt, vf_tap)
 
 
 def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):

@@ -17,7 +17,7 @@ def reply_icmp_pkt_from_vm1(nat_ul_ipv6):
 				 ICMP(type=0, id=pkt[ICMP].id))
 	delayed_sendp(reply_pkt, PF0.tap)
 
-def xtest_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
+def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
