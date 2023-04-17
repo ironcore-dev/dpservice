@@ -1,7 +1,6 @@
 FROM debian:11-slim as builder
 
 ARG DPDK_VER=21.11
-ARG DPS_VER
 
 WORKDIR /workspace
 
@@ -17,6 +16,8 @@ wget \
 make \
 gcc \
 g++ \
+clang \
+git \
 ethtool \
 pciutils \
 procps \
@@ -42,6 +43,9 @@ RUN unzip dpdk-${DPDK_VER}.zip
 
 ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
+COPY . .
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
+
 RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
 common/cpt,common/iavf,\
 common/octeontx,common/octeontx2,common/cnxk,common/qat,regex/octeontx2,net/cnxk,dma/cnxk,\
@@ -58,10 +62,9 @@ vhost,gpudev build
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
 
-ARG DPS_VER
-COPY . .
-RUN meson build
-RUN cd ./build && ninja
+RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
+RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
+RUN rm -rf build && meson build && cd ./build && ninja
 
 FROM debian:11-slim
 

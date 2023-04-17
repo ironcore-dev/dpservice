@@ -4,7 +4,7 @@ project('dp_service', 'c', 'cpp',
 
 if meson.get_compiler('c').get_id() == 'clang'
 	# Set c_args and cpp_args specific to Clang/Clang++.
-	c_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Wno-c2x-extensions', '-Wno-gnu-variable-sized-type-not-at-end', '-Werror']
+	c_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Wno-c2x-extensions', '-Wno-gnu-variable-sized-type-not-at-end', '-Wno-c++17-extensions', '-Werror']
 	cpp_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Werror']
 else
 	# Set c_args and cpp_args specific to GCC/G++.
