@@ -72,13 +72,14 @@ class TCPTester:
 							 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=self.tcp_receiver_seq, flags="R"))
 				delayed_sendp(reply_pkt, self.pf_name)
 				return
-
-			reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-						 self.get_ip_layer_response(pkt) /
-						 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=self.tcp_receiver_seq, flags="") /
-						 Raw(TCPTester.TCP_NORMAL_RESPONSE))
-			delayed_sendp(reply_pkt, self.pf_name)
-			self.tcp_receiver_seq += len(TCPTester.TCP_NORMAL_RESPONSE)
+			elif pkt[TCP].payload == Raw(TCPTester.TCP_NORMAL_REQUEST):
+				reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+							self.get_ip_layer_response(pkt) /
+							TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=self.tcp_receiver_seq, flags="") /
+							Raw(TCPTester.TCP_NORMAL_RESPONSE))
+				delayed_sendp(reply_pkt, self.pf_name)
+				self.tcp_receiver_seq += len(TCPTester.TCP_NORMAL_RESPONSE)
+				# and continue with ACK
 
 		# Await ACK
 		pkt = self.get_server_packet()

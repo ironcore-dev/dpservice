@@ -74,17 +74,3 @@ def test_virtsvc_tcp(request, prepare_ipv4, port_redundancy):
 		tester.client_port = 54321
 		tester.pf_name = PF1.tap
 		tester.communicate()
-
-# TODO create a similar test for connection timeout, like NAT has
-# TODO move this into a separate file for such tests (require dp-service change)
-# This is a test for debugging TCP RST in virtual service implementation
-# Without crafted debug setup of the code, this cannot be tested automatically
-"""
-def disabled_test_virtsvc_tcp_reset(request, prepare_ipv4, port_redundancy):
-	if not request.config.getoption("--virtsvc"):
-		pytest.skip("Virtual services not enabled")
-	tcp_port = 43210
-	# tcp_reset()
-	request_tcp(tcp_port, "S", PF0.tap)
-	request_tcp(tcp_port, "", PF0.tap, payload=TCP_RESET_REQUEST)
-"""

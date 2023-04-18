@@ -31,7 +31,8 @@ class DpService:
 
 		self.cmd += f'{self.build_path}/src/dp_service -l 0,1 --log-level=user*:8'
 		if not self.hardware:
-			self.cmd += (f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
+			self.cmd += (f' --no-pci'
+						 f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
 						 f' --vdev={PF1.pci},iface={PF1.tap},mac="{PF1.mac}"'
 						 f' --vdev={VM1.pci},iface={VM1.tap},mac="{VM1.mac}"'
 						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'

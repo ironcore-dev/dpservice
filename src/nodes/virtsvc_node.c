@@ -67,6 +67,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 														 struct dp_flow *df)
 {
 	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	rte_be16_t payload_len = htons(ntohs(ipv4_hdr->total_length) - sizeof(struct rte_ipv4_hdr));
 	rte_be32_t original_ip = ipv4_hdr->src_addr;
 	uint8_t proto = ipv4_hdr->next_proto_id;
 	uint8_t ttl = ipv4_hdr->time_to_live;
@@ -89,7 +90,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 
 	// TODO(plague): discuss a PR for endian-dependent definitions
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
-	ipv6_hdr->payload_len = htons(m->pkt_len - sizeof(struct rte_ipv6_hdr));
+	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->proto = proto;
 	ipv6_hdr->hop_limits = ttl;
 	rte_memcpy(ipv6_hdr->src_addr, underlay_conf->src_ip6, sizeof(ipv6_hdr->src_addr));

@@ -73,7 +73,7 @@ def interface_init(interface, enabled=True):
 	run_command(f"ip addr flush dev {interface}")
 
 
-def _validate_length(pkt):
+def _validate_length(pkt, original_packet):
 	if type(pkt) is IPv6:
 		pkt_len = pkt.plen + 40  # ipv6 has payload length instead
 	elif type(pkt) in [ IP, UDP, IPerror ]:
@@ -83,12 +83,15 @@ def _validate_length(pkt):
 		# ICMP length is message-dependant
 		return
 	if pkt_len != len(pkt):
-		pkt.show()
+		original_packet.show()
 		name = pkt.__class__.__name__
-		print(f"{name} length {pkt_len} != {len(pkt)}")
+		if type(pkt) is IPv6:
+			print(f"{name} payload length {pkt_len-40} != {len(pkt)-40}")
+		else:
+			print(f"{name} length {pkt_len} != {len(pkt)}")
 		assert False, f"Invalid {name} length"
 
-def _validate_checksum(pkt):
+def _validate_checksum(pkt, original_packet):
 	# Some packets have checksum, other do not
 	if type(pkt) in [ IP, TCP, UDP, ICMP, IPerror ]:
 		# scapy has problems computing the right checksum for these
@@ -110,18 +113,19 @@ def _validate_checksum(pkt):
 	pkt_copy = pkt_type(raw(pkt_copy))
 	scapy_checksum = getattr(pkt_copy, checksum_field)
 	if pkt_checksum != scapy_checksum:
-		pkt.show()
+		original_packet.show()
 		name = pkt.__class__.__name__
 		print(f"{name} checksum {hex(pkt_checksum)} != {hex(scapy_checksum)}")
 		assert False, f"Invalid {name} checksum"
 
-def validate_checksums(pkt):
+def validate_checksums(packet):
+	pkt = packet
 	if Padding in pkt:
 		length = len(pkt) - len(pkt[Padding])
 		pkt = pkt.__class__(raw(pkt)[0:length])
 	while pkt:
-		_validate_length(pkt)
-		_validate_checksum(pkt)
+		_validate_length(pkt, packet)
+		_validate_checksum(pkt, packet)
 		pkt = pkt.payload
 
 def sniff_packet(iface, lfilter, skip=0):
