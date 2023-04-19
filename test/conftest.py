@@ -27,6 +27,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--hw", action="store_true", help="Test on actual hardware NIC instead of virtual TAPs"
 	)
+	parser.addoption(
+		"--offloading", action="store_true", help="Test with offloadin enabled (HW only)"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -49,9 +52,10 @@ def grpc_client(build_path):
 @pytest.fixture(scope="package")
 def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
-	test_virtsvc = request.config.getoption("--virtsvc")
-	hwtest = request.config.getoption("--hw")
-	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout, test_virtsvc=test_virtsvc, hardware=hwtest)
+	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout,
+						   test_virtsvc = request.config.getoption("--virtsvc"),
+						   hardware = request.config.getoption("--hw"),
+						   offloading = request.config.getoption("--offloading"))
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")

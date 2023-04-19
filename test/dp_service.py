@@ -14,7 +14,7 @@ class DpService:
 
 	DP_SERVICE_CONF = "/tmp/dp_service.conf"
 
-	def __init__(self, build_path, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False, hardware=False):
+	def __init__(self, build_path, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False, hardware=False, offloading=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
@@ -23,6 +23,9 @@ class DpService:
 			if self.port_redundancy:
 				raise ValueError("Port redundancy is not supported when testing on actual hardware")
 			self.reconfigure_tests(DpService.DP_SERVICE_CONF)
+		else:
+			if offloading:
+				raise ValueError("Offloading is only possible when testing on actual hardware")
 
 		self.cmd = ""
 		if gdb:
@@ -45,7 +48,9 @@ class DpService:
 					 f' --dhcp-mtu={dhcp_mtu}'
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 f' --grpc-port={grpc_port}'
-					  ' --no-offload --no-stats --graphtrace=1')
+					  ' --no-stats')
+		if not offloading:
+			self.cmd += ' --no-offload'
 
 		if self.port_redundancy:
 			self.cmd += ' --wcmp-fraction=0.5'
