@@ -45,9 +45,9 @@ In some hardware however, `pci=realloc` kernel command-line parameter is require
 
 
 ## Firmware configuration
-For reading and writing Mellanox firmware options, `mlxconfig` command-line tool is needed. This is part of the offical [nVidia OFED package](#nvidia-ofed), which can be hard to install and overrides your kernel mainline NIC drivers, which is not the way dp-service is deployed. An open-source tool (should be part of your distro's package tree) `mstflint` can be used to varying degree of success (on most configurations it only successfully lists the firmware version). Some motherbords support setting Mellanox values in BIOS though.
+For reading and writing Mellanox firmware options, `mlxconfig` command-line tool is needed. This is part of the offical [nVidia OFED package](#nvidia-ofed), which can be hard to install and overrides your kernel mainline NIC drivers, which is not the way dp-service is deployed. An open-source package `mstflint` can be used instead (should be part of your distro's package tree). Some motherboards support setting Mellanox values in BIOS too.
 
-To query firmware values use `mlxconfig -d <pci-device-address> q`, to write values use `mlxconfig -d <pci-device-address> set KEY1=value KEY2=value ...`.
+To query firmware values use `mstconfig -d <pci-device-address> q`, to write values use `mstconfig -d <pci-device-address> set KEY1=value KEY2=value ...`.
 
 ### Enabling SR-IOV
 For dp-service to properly function as a virtual router for VMs running on a host, firmware value `SRIOV_EN` needs to be `True` and `NUM_OF_VFS` needs to be non-zero (set to the number of VMs that will be run).
