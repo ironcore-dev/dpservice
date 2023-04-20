@@ -1,4 +1,5 @@
 #include <rte_errno.h>
+#include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_error.h"
@@ -45,7 +46,7 @@ int dp_map_vm_handle(void *key, uint16_t portid)
 
 	p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
 	if (!p_port_id) {
-		printf("vm handle for port %d malloc data failed\n", portid);
+		DPS_LOG_ERR("vm handle for port %d malloc data failed", portid);
 		return EXIT_FAILURE;
 	}
 
@@ -56,7 +57,7 @@ int dp_map_vm_handle(void *key, uint16_t portid)
 	rte_memcpy(vm_table[portid].machineid, key, sizeof(vm_table[portid].machineid));
 	*p_port_id = portid;
 	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0) {
-		printf("vm handle for port %d add data failed\n", portid);
+		DPS_LOG_ERR("vm handle for port %d add data failed", portid);
 		goto err;
 	}
 	return EXIT_SUCCESS;
@@ -257,8 +258,11 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 
 	return ret;
 err:
-	printf("Unable to add entry %u to the DP RIB table on socket %d\n",
-		portid, socketid);
+	// Addroute with 0.0.0.0 is used by metalnet as a periodic VNI-present query
+	if (ip == 0 && ret == DP_ERROR_VM_ADD_RT_NO_VM)
+		DPS_LOG_DEBUG("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
+	else
+		DPS_LOG_WARNING("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
 	return ret;
 }
 
@@ -416,8 +420,7 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	return ret;
 err:
 	ret = EXIT_FAILURE;
-	printf("Unable to add entry %u to the DP RIB6 table on socket %d\n",
-		portid, socketid);
+	DPS_LOG_WARNING("Unable to add entry %u to the DP RIB6 table on socket %d", portid, socketid);
 	return ret;
 }
 
@@ -527,8 +530,7 @@ int setup_vm(int port_id, int vni, const int socketid)
 		snprintf(s, sizeof(s), "IPV4_DP_RIB_%d_%d", vni, socketid);
 		root = rte_rib_create(s, socketid, &config_ipv4);
 		if (root == NULL) {
-			printf("Unable to create the DP RIB table on socket %d\n",
-				socketid);
+			DPS_LOG_ERR("Unable to create the DP RIB table on socket %d", socketid);
 			return EXIT_FAILURE;
 		}
 	}
@@ -559,8 +561,7 @@ int setup_lpm6(int port_id, int vni, const int socketid)
 		snprintf(s, sizeof(s), "IPV6_DP_RIB_%d_%d", vni, socketid);
 		root = rte_rib6_create(s, socketid, &config_ipv6);
 		if (root == NULL) {
-			printf("Unable to create the DP RIB6 table on socket %d\n",
-				socketid);
+			DPS_LOG_ERR("Unable to create the DP RIB6 table on socket %d", socketid);
 			return EXIT_FAILURE;
 		}
 	}
