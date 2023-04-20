@@ -55,6 +55,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				nat_port = htons((uint16_t)ret);
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
+				dp_nat_inc_used_port_cnt(m->port);
+
+
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == DP_IP_ICMP_ID_INVALID) {
 						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d", nat_port);
@@ -71,6 +74,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				cntrack->nat_info.vni = vni;
 				cntrack->nat_info.l4_type = df_ptr->l4_type;
 				cntrack->nat_info.icmp_err_ip_cksum = ipv4_hdr->hdr_checksum;
+				cntrack->nat_info.port_id = m->port;
 			}
 			df_ptr->flags.nat = DP_NAT_CHG_SRC_IP;
 			df_ptr->nat_addr = ipv4_hdr->src_addr; // nat_addr is the new src_addr in ipv4_hdr

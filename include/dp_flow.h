@@ -80,6 +80,7 @@ struct flow_nat_info {
 	uint32_t vni;
 	uint16_t icmp_err_ip_cksum;
 	uint8_t nat_type;
+	uint16_t port_id;
 	uint8_t underlay_dst[16];
 	uint8_t l4_type;
 } __rte_packed;

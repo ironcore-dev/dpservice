@@ -21,6 +21,8 @@ static struct rte_hash *ipv4_netnat_portmap_tbl = NULL;
 static struct rte_hash *ipv4_netnat_portoverload_tbl = NULL;
 static struct network_nat_head nat_headp;
 
+static uint16_t dp_stat_nat_used_port_cnt[DP_MAX_VF_PORTS + 2] = {0};
+
 int dp_nat_init(int socket_id)
 {
 	ipv4_snat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct nat_key),
@@ -695,6 +697,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 			if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key)))
 				return DP_ERROR;
 		}
+		dp_nat_dec_used_port_cnt(cntrack->nat_info.port_id);
 		return DP_OK;
 	} else if (ret == -ENOENT)
 		return DP_OK;
@@ -800,4 +803,35 @@ int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 	rep_arr[--rep_arr_size] = m_curr;
 
 	return EXIT_SUCCESS;
+}
+
+void dp_nat_inc_used_port_cnt(uint16_t port_id)
+{
+	dp_stat_nat_used_port_cnt[port_id]++;
+}
+
+void dp_nat_dec_used_port_cnt(uint16_t port_id)
+{
+	dp_stat_nat_used_port_cnt[port_id]--;
+}
+
+int dp_interface_get_used_nat_ports_telemetry(struct rte_tel_data *dict)
+{
+	int ret;
+	char interface_name[VM_MACHINE_ID_STR_LEN];
+
+	struct dp_ports *ports = get_dp_ports();
+
+	DP_FOREACH_PORT(ports, port) {
+		if (port->port_type == DP_PORT_VF && port->allocated) {
+			rte_memcpy(interface_name, dp_get_vm_machineid(port->port_id), sizeof(interface_name));
+			ret = rte_tel_data_add_dict_u64(dict, interface_name, dp_stat_nat_used_port_cnt[port->port_id]);
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Failed to add interface used nat port telemetry data %s", dp_strerror(ret));
+				return ret;
+			}
+		}
+	}
+
+	return DP_OK;
 }

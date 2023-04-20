@@ -1,11 +1,18 @@
 #ifndef __INCLUDE_DP_NAT_H__
 #define __INCLUDE_DP_NAT_H__
 
+
+#include <sys/queue.h>
+#include <rte_common.h>
+#include <rte_telemetry.h>
+#include <rte_ethdev.h>
+#include <rte_mbuf.h>
+#include <rte_flow.h>
+#include "dp_flow.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <sys/queue.h>
 
 #define DP_NAT_TABLE_MAX	100
 
@@ -104,6 +111,10 @@ int dp_remove_network_snat_port(struct flow_value *cntrack);
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni);
+void dp_nat_inc_used_port_cnt(uint16_t port_id);
+void dp_nat_dec_used_port_cnt(uint16_t port_id);
+int dp_interface_get_used_nat_ports_telemetry(struct rte_tel_data *dict);
+
 
 #ifdef __cplusplus
 }
