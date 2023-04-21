@@ -80,7 +80,6 @@ struct flow_nat_info {
 	uint32_t vni;
 	uint16_t icmp_err_ip_cksum;
 	uint8_t nat_type;
-	uint16_t port_id;
 	uint8_t underlay_dst[16];
 	uint8_t l4_type;
 } __rte_packed;
@@ -92,7 +91,7 @@ struct flow_value {
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
-	uint16_t		port;
+	uint16_t		port_id;
 	uint8_t			lb_dst_addr6[16];
 	uint8_t			flow_status; // record if a flow is natted in any means
 	uint8_t			flow_state; // track if a flow has been seen in one or both directions
