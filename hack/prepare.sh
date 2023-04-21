@@ -76,6 +76,8 @@ function get_pattern() {
 	pattern=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk '{print $5}' | sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | uniq)
 	if [ -z "$pattern" ]; then
 		err "can't determine the pattern for $dev"
+	elif [ $(wc -l <<< "$pattern") -ne 1 ]; then
+		err "multiple patterns found for $dev"
 	fi
 	echo "$pattern"
 }
