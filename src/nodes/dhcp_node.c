@@ -34,7 +34,15 @@ static uint32_t dhcp_hdr_magic;
 //   169.254.0.0/16 -> 0.0.0.0
 //   0.0.0.0/0 -> server_ip
 static const uint8_t classless_route_prefix[] = { 16, 169, 254, 0, 0, 0, 0, 0 };
+#ifndef ENABLE_VIRTSVC
 static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip)];
+#else
+// add route for virtual services residing in link-local space
+//   169.254.1.0/24 -> server_ip
+static const uint8_t virtsvc_route_prefix[] = { 24, 169, 254, 1 };
+static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip) + sizeof(virtsvc_route_prefix) + sizeof(server_ip)];
+_Static_assert(DP_VIRTSVC_MAX <= UINT8_MAX+1, "Number of virtual services can be higher than supported link-local subnet size");
+#endif
 
 
 static int dhcp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
@@ -49,6 +57,10 @@ static int dhcp_node_init(__rte_unused const struct rte_graph *graph, __rte_unus
 
 	rte_memcpy(classless_route, classless_route_prefix, sizeof(classless_route_prefix));
 	rte_memcpy(classless_route+sizeof(classless_route_prefix), &server_ip, sizeof(server_ip));
+#ifdef ENABLE_VIRTSVC
+	rte_memcpy(classless_route+sizeof(classless_route_prefix) + sizeof(server_ip), virtsvc_route_prefix, sizeof(virtsvc_route_prefix));
+	rte_memcpy(classless_route+sizeof(classless_route_prefix) + sizeof(server_ip) + sizeof(virtsvc_route_prefix), &server_ip, sizeof(server_ip));
+#endif
 
 	return DP_OK;
 }

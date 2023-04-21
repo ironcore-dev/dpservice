@@ -9,6 +9,9 @@ extern "C" {
 #include <rte_hash.h>
 #include <rte_telemetry.h>
 
+// limit number of services to one byte due to various implementation reasons
+#define DP_VIRTSVC_MAX 256
+
 #define DP_NB_SYSTEM_PORTS 1024
 #define DP_VIRTSVC_PORTCOUNT (UINT16_MAX+1 - DP_NB_SYSTEM_PORTS)
 

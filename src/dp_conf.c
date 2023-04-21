@@ -176,6 +176,11 @@ static int add_virtsvc(uint16_t proto, const char *str)
 	char *tok;
 	char *endptr;
 
+	if (virtual_services.nb_entries >= DP_VIRTSVC_MAX) {
+		DP_EARLY_ERR("Number of virtual services is limited to %u", DP_VIRTSVC_MAX);
+		return DP_ERROR;
+	}
+
 	// strtok() is destructive, make a copy
 	snprintf(parse_str, sizeof(parse_str), "%s", str);
 
