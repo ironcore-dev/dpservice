@@ -20,7 +20,6 @@ private:
 	std::unique_ptr<Server> server_;
 	uuid_t binuuid;
 	void *uuid;
-	uint16_t pfx_counter = 1;
 	bool initialized = false;
 
 	void HandleRpcs();

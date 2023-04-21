@@ -1,7 +1,19 @@
 project('dp_service', 'c', 'cpp',
-  default_options: ['c_args=-Wno-deprecated-declarations -Werror -Wno-format-truncation', 'cpp_args=-fpermissive'],
   version: run_command('cat', 'include/dp_version.h', check: true).stdout().strip().split(' ').get(2).split('"').get(1),
   license: 'MIT')
+
+if meson.get_compiler('c').get_id() == 'clang'
+	# Set c_args and cpp_args specific to Clang/Clang++.
+	c_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Wno-c2x-extensions', '-Wno-gnu-variable-sized-type-not-at-end', '-Wno-c++17-extensions', '-Werror']
+	cpp_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Werror']
+else
+	# Set c_args and cpp_args specific to GCC/G++.
+	c_args = ['-Wno-deprecated-declarations', '-Werror', '-Wno-format-truncation']
+	cpp_args = ['-fpermissive', '-Werror']
+endif
+
+add_project_arguments(c_args, language : 'c')
+add_project_arguments(cpp_args, language : 'cpp')
 
 add_global_arguments('-DDEBUG=true', language: ['c', 'cpp'])
 if get_option('enable_graphtrace')
