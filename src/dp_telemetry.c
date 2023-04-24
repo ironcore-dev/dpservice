@@ -11,6 +11,7 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "dpdk_layer.h"
+#include "dp_internal_stats.h"
 
 
 static struct rte_graph_cluster_stats *tel_stats;

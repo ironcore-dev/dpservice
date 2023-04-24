@@ -52,6 +52,7 @@ dp_sources = [
   'dp_util.c',
   'dp_vnf.c',
   'dpdk_layer.c',
+  'dp_internal_stats.c'
 ]
 if get_option('enable_virtual_services')
   dp_sources += [

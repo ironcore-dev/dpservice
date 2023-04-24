@@ -16,6 +16,7 @@
 #include "dp_nat.h"
 #include "dp_port.h"
 #include "dp_telemetry.h"
+#include "dp_internal_stats.h"
 #include "dp_version.h"
 #include "dp_vnf.h"
 #ifdef ENABLE_VIRTSVC
@@ -122,7 +123,8 @@ static int init_interfaces()
 		|| DP_FAILED(dp_virtsvc_init(pf0_socket))
 #endif
 		|| DP_FAILED(dp_graph_init())
-		|| DP_FAILED(dp_telemetry_init()))
+		|| DP_FAILED(dp_telemetry_init())
+		|| DP_FAILED(dp_internal_stats_init()))
 		return DP_ERROR;
 
 	// VFs are started by GRPC later
@@ -149,6 +151,7 @@ static void free_interfaces()
 	dp_flow_free();
 	// ports seem to be stopped by DPDK at the end
 	dp_telemetry_free();
+	dp_internal_stats_free();
 	dp_graph_free();
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_free();
