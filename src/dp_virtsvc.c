@@ -234,10 +234,11 @@ int dp_virtsvc_install_isolation_rules(uint16_t port_id)
 
 static __rte_always_inline bool dp_virtsvc_is_connection_old(struct dp_virtsvc_conn *conn, uint64_t current_tsc)
 {
-	uint64_t old_timestamp = current_tsc - (conn->state == DP_VIRTSVC_CONN_ESTABLISHED
-												? established_port_timeout : port_timeout);
+	uint64_t timeout = conn->last_pkt_timestamp + (conn->state == DP_VIRTSVC_CONN_ESTABLISHED
+														? established_port_timeout
+														: port_timeout);
 
-	return conn->last_pkt_timestamp < old_timestamp;
+	return current_tsc > timeout;
 }
 
 static __rte_always_inline int dp_virtsvc_get_free_port(struct dp_virtsvc *virtsvc)
