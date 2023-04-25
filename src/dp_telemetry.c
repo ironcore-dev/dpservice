@@ -129,7 +129,7 @@ static int dp_telemetry_handle_graph_command(struct rte_tel_data *data)
 		return DP_ERROR;
 
 	// no graph stats feature?
-	if (tel_stats)
+	if (!tel_stats)
 		return DP_OK;
 
 	tel_data = data;
