@@ -696,7 +696,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 			if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key)))
 				return DP_ERROR;
 		}
-		dp_stats_nat_dec_used_port_cnt(cntrack->created_port_id);
+		DP_STATS_NAT_DEC_USED_PORT_CNT(cntrack->created_port_id);
 		return DP_OK;
 	} else if (ret == -ENOENT)
 		return DP_OK;

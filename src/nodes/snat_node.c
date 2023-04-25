@@ -56,7 +56,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				nat_port = htons((uint16_t)ret);
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
 
-				dp_stats_nat_inc_used_port_cnt(m->port);
+				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);
 
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == DP_IP_ICMP_ID_INVALID) {
