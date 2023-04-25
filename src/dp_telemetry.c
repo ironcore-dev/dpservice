@@ -11,6 +11,8 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "dpdk_layer.h"
+#include "dp_internal_stats.h"
+
 
 static struct rte_graph_cluster_stats *tel_stats;
 static int32_t tel_graph_node_index = 0;
@@ -155,6 +157,29 @@ static int dp_telemetry_handle_virtsvc_free_ports(const char *cmd,
 }
 #endif
 
+static int dp_telemetry_handle_nat_used_port_count(const char *cmd,
+												  __rte_unused const char *params,
+												  struct rte_tel_data *data)
+{
+
+	int ret;
+
+	ret = dp_telemetry_start_dict(data, cmd);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("Failed to init telemetry data to get interface's used nat port cnt");
+		return DP_ERROR;
+	}
+
+	ret = dp_nat_get_used_ports_telemetry(data);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("Failed to get used nat ports' telemetry data");
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+
+}
+
 //
 // Entrypoints
 //
@@ -171,6 +196,7 @@ int dp_telemetry_init(void)
 		DP_TELEMETRY_REGISTER_COMMAND(graph, call_count, "Returns total number of calls made by each graph node."),
 		DP_TELEMETRY_REGISTER_COMMAND(graph, cycle_count, "Returns total number of cycles used by each graph node."),
 		DP_TELEMETRY_REGISTER_COMMAND(graph, realloc_count, "Returns total number of reallocations done by each graph node."),
+		DP_TELEMETRY_REGISTER_COMMAND(nat, used_port_count, "Return the number of nat ports in use by each VF interface (attached VM)."),
 #ifdef ENABLE_VIRTSVC
 		DP_TELEMETRY_REGISTER_COMMAND(virtsvc, free_ports, "Returns number of free ports remaining in each virtual service."),
 #endif

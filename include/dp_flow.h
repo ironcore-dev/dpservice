@@ -91,7 +91,7 @@ struct flow_value {
 	uint64_t		timestamp;
 	rte_atomic32_t	flow_cnt;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
-	uint16_t		port;
+	uint16_t		created_port_id;
 	uint8_t			lb_dst_addr6[16];
 	uint8_t			flow_status; // record if a flow is natted in any means
 	uint8_t			flow_state; // track if a flow has been seen in one or both directions

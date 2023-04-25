@@ -100,6 +100,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = flow_timeout;
+	flow_val->created_port_id = m->port;
 
 	if (offload_mode_enabled) {
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;

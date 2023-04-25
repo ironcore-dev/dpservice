@@ -11,6 +11,7 @@
 #include "dp_nat.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_log.h"
+#include "dp_internal_stats.h"
 
 TAILQ_HEAD(network_nat_head, network_nat_entry);
 
@@ -695,6 +696,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 			if (DP_FAILED(rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key)))
 				return DP_ERROR;
 		}
+		DP_STATS_NAT_DEC_USED_PORT_CNT(cntrack->created_port_id);
 		return DP_OK;
 	} else if (ret == -ENOENT)
 		return DP_OK;

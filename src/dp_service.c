@@ -16,6 +16,7 @@
 #include "dp_nat.h"
 #include "dp_port.h"
 #include "dp_telemetry.h"
+#include "dp_internal_stats.h"
 #include "dp_version.h"
 #include "dp_vnf.h"
 #ifdef ENABLE_VIRTSVC

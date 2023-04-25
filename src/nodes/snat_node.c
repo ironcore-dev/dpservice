@@ -9,6 +9,7 @@
 #include "dp_nat.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_internal_stats.h"
 
 #define NEXT_NODES(NEXT) \
 	NEXT(SNAT_NEXT_FIREWALL, "firewall")
@@ -54,6 +55,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				}
 				nat_port = htons((uint16_t)ret);
 				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
+
+				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);
 
 				if (df_ptr->l4_type == DP_IP_PROTO_ICMP) {
 					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == DP_IP_ICMP_ID_INVALID) {
