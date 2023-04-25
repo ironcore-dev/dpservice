@@ -672,6 +672,23 @@ int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
 	return ++action_cnt;
 }
 
+int create_trans_proto_set_action(struct rte_flow_action *action, int action_cnt,
+									struct rte_flow_action_set_tp *tp_action,
+									uint16_t port, bool dir)
+{
+
+	tp_action->port = htons(port);
+
+	if (dir == DP_IS_DST)
+		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TP_DST;
+	else
+		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TP_SRC;
+
+	action[action_cnt].conf = tp_action;
+
+	return ++action_cnt;
+}
+
 int create_send_to_port_action(struct rte_flow_action *action, int action_cnt,
 							   struct rte_flow_action_port_id *send_to_port_action,
 							   uint32_t port_id)
