@@ -21,6 +21,10 @@ For [automated testing](../testing/) (enabled via meson option `-Denable_tests=t
 sudo apt install python3-pytest python3-scapy
 ```
 
+#### Cross-compilation
+Dp-service currently only supports x86 architecture (amd64 instruction set actually). For cross-compilation, add `--cross-file config/arm/arm64_armv8_linux_gcc` to `meson setup` (see below).
+
+
 ### DPDK
 The dataplane service is built upon the [DPDK library](https://dpdk.org). Currently, the only supported version is 21.x, which most distros do not have in stable trees. Building from source also has the advantage of easier debugging later.
 ```bash
