@@ -76,7 +76,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			df->flags.nat = DP_NAT_CHG_SRC_IP;
 			df->nat_addr = ipv4_hdr->src_addr; // nat_addr is the new src_addr in ipv4_hdr
 			if (snat_data->network_nat_ip != 0)
-				df->nat_port = nat_port;
+				df->nat_port = ntohs(nat_port);
 			dp_nat_chg_ip(df, ipv4_hdr, m);
 
 			/* Expect the new destination in this conntrack object */
@@ -117,8 +117,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		}
 
 		df->flags.nat = DP_NAT_CHG_SRC_IP;
-		df->nat_addr = df->src.src_addr;
-		df->src.src_addr = ipv4_hdr->src_addr;
+		df->nat_addr = ipv4_hdr->src_addr;
 		dp_nat_chg_ip(df, ipv4_hdr, m);
 	}
 

@@ -205,13 +205,17 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	}
 
 
-	// replace source ip if vip-nat is enabled
+	// replace source ip if vip-nat/network-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
-
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->nat_addr, DP_IS_SRC);
 
+	// replace source port if network-nat is enabled
+	struct rte_flow_action_set_tp set_tp;
+	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
+		action_cnt = create_trans_proto_set_action(action, action_cnt,
+										    &set_tp, df->nat_port, DP_IS_SRC);
 
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
@@ -477,12 +481,16 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	action_cnt = create_raw_encap_action(action, action_cnt,
 										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
 
-	// replace dst ip if vip-nat is enabled
+	// replace dst ip if vip-nat/networ-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
-
 	if (df->flags.nat == DP_NAT_CHG_DST_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
+
+	struct rte_flow_action_set_tp set_tp;
+	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
+		action_cnt = create_trans_proto_set_action(action, action_cnt,
+										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
 
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
