@@ -372,19 +372,19 @@ void dp_virtsvc_del_vm(uint16_t port_id)
 	}
 }
 
-static inline uint64_t dp_virtsvc_get_free_port_count(struct dp_virtsvc *virtsvc)
+static inline uint64_t dp_virtsvc_get_used_port_count(struct dp_virtsvc *virtsvc)
 {
-	uint64_t free_ports = 0;
+	uint64_t used_ports = 0;
 	uint64_t current_tsc = rte_get_timer_cycles();
 
 	for (int port = 0; port < DP_VIRTSVC_PORTCOUNT; ++port) {
-		if (dp_virtsvc_is_connection_old(&virtsvc->connections[port], current_tsc))
-		++free_ports;
+		if (!dp_virtsvc_is_connection_old(&virtsvc->connections[port], current_tsc))
+			++used_ports;
 	}
-	return free_ports;
+	return used_ports;
 }
 
-int dp_virtsvc_get_free_ports_telemetry(struct rte_tel_data *dict)
+int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict)
 {
 	int ret;
 	char virtsvc_name[DP_VIRTSVC_TELEMETRY_MAX_NAME_SIZE];
@@ -395,7 +395,7 @@ int dp_virtsvc_get_free_ports_telemetry(struct rte_tel_data *dict)
 				 service->proto == IPPROTO_TCP ? "TCP" : "UDP",
 				 DP_IPV4_PRINT_BYTES(service->virtual_addr),
 				 ntohs(service->virtual_port));
-		ret = rte_tel_data_add_dict_u64(dict, virtsvc_name, dp_virtsvc_get_free_port_count(service));
+		ret = rte_tel_data_add_dict_u64(dict, virtsvc_name, dp_virtsvc_get_used_port_count(service));
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to add virtsvc telemetry data %s", dp_strerror(ret));
 			return ret;
