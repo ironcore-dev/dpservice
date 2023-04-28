@@ -11,7 +11,7 @@ class GrpcClient:
 	def __init__(self, build_path):
 		self.cmd = build_path + "/tools/dp_grpc_client"
 		self.re_ipv6 = re.compile(r'(?:^|[\n\r])Received underlay route : ([a-f0-9:]+)(?:$|[\n\r])')
-		self.re_machine_ipv6 = re.compile(r'(?:^|[\n\r])Interface with ipv4 [0-9\.]+ ipv6 [a-f0-9:]+ vni [0-9]+ pci \w+ underlayroute ([a-f0-9:]+)(?:$|[\n\r])')
+		self.re_machine_ipv6 = re.compile(r'(?:^|[\n\r])Interface with ipv4 [0-9\.]+ ipv6 [a-f0-9:]+ vni [0-9]+ pci [^ ]+ underlayroute ([a-f0-9:]+)(?:$|[\n\r])')
 
 	def assert_output(self, args, req_output, negate=False):
 		ipv6_address = ""

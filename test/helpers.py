@@ -4,7 +4,7 @@ import time
 from scapy.all import *
 from scapy.layers.dhcp import *
 from scapy.layers.inet import Ether, ICMP, TCP
-from scapy.layers.inet6 import IPv6
+from scapy.layers.inet6 import IPv6, _ICMPv6
 
 from config import *
 
@@ -63,48 +63,70 @@ def delayed_sendp(packet, interface):
 	sendp(packet, iface=interface)
 
 
-def interface_init(interface, enabled=True):
-	if enabled:
-		cmd = f"ip link set dev {interface} up"
-		print(cmd)
-		subprocess.check_output(shlex.split(cmd))
-	cmd = f"ip addr flush dev {interface}"
+def run_command(cmd):
 	print(cmd)
 	subprocess.check_output(shlex.split(cmd))
 
+def interface_init(interface, enabled=True):
+	if enabled:
+		run_command(f"ip link set dev {interface} up")
+	run_command(f"ip addr flush dev {interface}")
 
-def validate_checksums(pkt):
-	# NOTE: As checksums are offloaded, tunneled checksums are not computed
-	tunneled = type(pkt.getlayer(1)) == IPv6 and IP in pkt
-	if IPv6 in pkt:
-		assert pkt[IPv6].plen == len(pkt[IPv6])-40, \
-			"Invalid IPv6 packet length"
-	if IP in pkt:
-		assert pkt[IP].len == len(pkt[IP]), \
-			"Invalid IPv4 packet length"
-		ipv4 = pkt[IP].copy()
-		chksum = ipv4.chksum
-		if not tunneled or chksum != 0:
-			del ipv4.chksum
-			ipv4 = IP(raw(ipv4))
-			assert ipv4.chksum == chksum, \
-				"Invalid IPv4 checksum"
-	if TCP in pkt:
-		tcp = pkt[TCP].copy()
-		chksum = tcp.chksum
-		if not tunneled or chksum != 0:
-			del tcp.chksum
-			tcp = TCP(raw(tcp))
-			assert tcp.chksum == chksum, \
-				"Invalid TCP checksum"
-	if UDP in pkt:
-		udp = pkt[UDP].copy()
-		chksum = udp.chksum
-		if not tunneled or chksum != 0:
-			del udp.chksum
-			udp = UDP(raw(udp))
-			assert udp.chksum == chksum, \
-				"Invalid UDP checksum"
+
+def _validate_length(pkt, original_packet):
+	if type(pkt) is IPv6:
+		pkt_len = pkt.plen + 40  # ipv6 has payload length instead
+	elif type(pkt) in [ IP, UDP, IPerror ]:
+		pkt_len = pkt.len
+	else:
+		# TCP has only header length (data offset), needs IP header to compute it
+		# ICMP length is message-dependant
+		return
+	if pkt_len != len(pkt):
+		original_packet.show()
+		name = pkt.__class__.__name__
+		if type(pkt) is IPv6:
+			print(f"{name} payload length {pkt_len-40} != {len(pkt)-40}")
+		else:
+			print(f"{name} length {pkt_len} != {len(pkt)}")
+		assert False, f"Invalid {name} length"
+
+def _validate_checksum(pkt, original_packet):
+	# Some packets have checksum, other do not
+	if type(pkt) in [ IP, TCP, UDP, ICMP, IPerror ]:
+		# scapy has problems computing the right checksum for these
+		if type(pkt) is ICMP and pkt.length == 0:
+			return
+		checksum_field = 'chksum'
+	elif isinstance(pkt, _ICMPv6) and hasattr(pkt, 'cksum'):
+		checksum_field = 'cksum'
+	else:
+		return
+	# As per RFC, 0 means not present (0xFFFF is actually zero, one's complement hack)
+	pkt_checksum = getattr(pkt, checksum_field)
+	if pkt_checksum == 0:
+		return
+	# Force scapy to create a new packet and compute missing (deleted) checksum field
+	pkt_copy = pkt.copy()
+	delattr(pkt_copy, checksum_field)
+	pkt_type = type(pkt)
+	pkt_copy = pkt_type(raw(pkt_copy))
+	scapy_checksum = getattr(pkt_copy, checksum_field)
+	if pkt_checksum != scapy_checksum:
+		original_packet.show()
+		name = pkt.__class__.__name__
+		print(f"{name} checksum {hex(pkt_checksum)} != {hex(scapy_checksum)}")
+		assert False, f"Invalid {name} checksum"
+
+def validate_checksums(packet):
+	pkt = packet
+	if Padding in pkt:
+		length = len(pkt) - len(pkt[Padding])
+		pkt = pkt.__class__(raw(pkt)[0:length])
+	while pkt:
+		_validate_length(pkt, packet)
+		_validate_checksum(pkt, packet)
+		pkt = pkt.payload
 
 def sniff_packet(iface, lfilter, skip=0):
 	count = skip+1
@@ -114,6 +136,7 @@ def sniff_packet(iface, lfilter, skip=0):
 	pkt = pkt_list[skip]
 	validate_checksums(pkt)
 	return pkt
+
 
 def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
 	if negated:
@@ -125,6 +148,7 @@ def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
 			sniff_tcp_data["pkt"] = pkt_list[0]
 	else:
 		sniff_tcp_data["pkt"] = sniff_packet(tap, is_tcp_pkt)
+
 
 def age_out_flows():
 	delay = flow_timeout+1  # timers run every 1s, this should always work
