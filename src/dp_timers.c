@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <rte_timer.h>
 #include <rte_cycles.h>
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_periodic_msg.h"
