@@ -116,22 +116,21 @@ class DpService:
 					continue
 				key = options[0]
 				value = options[1]
-				match key:
-					case "pf1":
-						# in hardware, PF0 is actually PF1 as it is used as the monitoring interface connected to the real PF0
-						PF0.tap = value
-					case "vf-pattern":
-						# MACs cannot be changed for VFs, use actual values
-						VM1.mac = get_if_hwaddr(f"{value}0")
-						VM2.mac = get_if_hwaddr(f"{value}1")
-						VM3.mac = get_if_hwaddr(f"{value}2")
-					case "a-pf0":
-						# PCI addresses for VFs are defined by DPDK in this pattern
-						pci = value.split(',')[0]
-						VM1.pci = f"{pci}_representor_vf0"
-						VM2.pci = f"{pci}_representor_vf1"
-						VM3.pci = f"{pci}_representor_vf2"
-						VM4.pci = f"{pci}_representor_vf3"
+				if key == "pf1":
+					# in hardware, PF0 is actually PF1 as it is used as the monitoring interface connected to the real PF0
+					PF0.tap = value
+				elif key == "vf-pattern":
+					# MACs cannot be changed for VFs, use actual values
+					VM1.mac = get_if_hwaddr(f"{value}0")
+					VM2.mac = get_if_hwaddr(f"{value}1")
+					VM3.mac = get_if_hwaddr(f"{value}2")
+				elif key == "a-pf0":
+					# PCI addresses for VFs are defined by DPDK in this pattern
+					pci = value.split(',')[0]
+					VM1.pci = f"{pci}_representor_vf0"
+					VM2.pci = f"{pci}_representor_vf1"
+					VM3.pci = f"{pci}_representor_vf2"
+					VM4.pci = f"{pci}_representor_vf3"
 		VM1.tap = self.get_vm_tap(0)
 		VM2.tap = self.get_vm_tap(1)
 		VM3.tap = self.get_vm_tap(2)

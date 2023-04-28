@@ -51,7 +51,7 @@ The changing of MAC is important (the actual value is not) as without this chang
 ## Outside (host) connectivity
 Normally, to implement outside communication (not only VM-VM), you need to connect the physical ports of the Mellanox card to a switch that then connects to other computers.
 
-It is also possible however, to connect the switch back to another card on your machine. Even further, you can actually connect both ports of your Mellanox card using a dingle cable to achieve this without additional NICs (at the cost of not being able to use port redundancy).
+It is also possible however, to connect the switch back to another card on your machine. Even further, you can actually connect both ports of your Mellanox card using a cross-over cable to achieve this without additional NICs (at the cost of not being able to use port redundancy).
 
 ### Additional NICs and a bridge
 This setup uses a switch in bridge mode to simply connect one Mellanox port to another NIC inside the same machine.
