@@ -51,6 +51,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	} else if (df->tun_info.proto_id == DP_IP_PROTO_IPv4_ENCAP) {
 		payload_len = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *)->total_length;
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4;
+	} else {
+		DPNODE_LOG_WARNING(node, "Invalid tunnel type");
+		return IPV6_ENCAP_NEXT_DROP;
 	}
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
