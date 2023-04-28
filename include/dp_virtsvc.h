@@ -103,7 +103,7 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 
 void dp_virtsvc_del_vm(uint16_t port_id);
 
-int dp_virtsvc_get_free_ports_telemetry(struct rte_tel_data *dict);
+int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict);
 
 #ifdef __cplusplus
 }
