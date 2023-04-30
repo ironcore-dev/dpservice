@@ -31,6 +31,16 @@ static inline void dp_ref_dec(struct dp_ref *ref)
 		ref->release(ref);
 }
 
+static inline bool dp_ref_dec_and_chk_freed(struct dp_ref *ref)
+{
+	if (rte_atomic32_dec_and_test(&ref->refcount)) {
+		ref->release(ref);
+		return true;
+	} else {
+		return false;
+	}
+}
+
 #ifdef __cplusplus
 }
 #endif

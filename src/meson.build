@@ -51,6 +51,7 @@ dp_sources = [
   'dp_timers.c',
   'dp_util.c',
   'dp_vnf.c',
+  'dp_vni.c',
   'dpdk_layer.c',
   'dp_internal_stats.c'
 ]

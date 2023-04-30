@@ -19,6 +19,7 @@
 #include "dp_internal_stats.h"
 #include "dp_version.h"
 #include "dp_vnf.h"
+#include "dp_vni.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
@@ -142,6 +143,7 @@ static int init_interfaces()
 	if (DP_FAILED(dp_flow_init(pf0_socket))
 		|| DP_FAILED(dp_nat_init(pf0_socket))
 		|| DP_FAILED(dp_lb_init(pf0_socket))
+		|| DP_FAILED(dp_vni_init(pf0_socket))
 		|| DP_FAILED(dp_lpm_init(pf0_socket))
 		|| DP_FAILED(dp_vnf_init(pf0_socket)))
 		return DP_ERROR;
@@ -153,6 +155,7 @@ static void free_interfaces()
 {
 	dp_vnf_free();
 	dp_lpm_free();
+	dp_vni_free();
 	dp_lb_free();
 	dp_nat_free();
 	dp_flow_free();
