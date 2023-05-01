@@ -94,8 +94,8 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
-								uint32_t vni, uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6);
+const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+											   uint32_t vni, uint16_t min_port, uint16_t max_port);
 
 int dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result);
 uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
@@ -103,7 +103,7 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 							  uint8_t *ul_ipv6);
 int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni);
-int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6);
+const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df_ptr);
 int dp_remove_network_snat_port(struct flow_value *cntrack);
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
