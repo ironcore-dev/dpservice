@@ -29,6 +29,29 @@ void dp_lpm_free()
 	dp_free_jhash_table(vm_handle_tbl);
 }
 
+int dp_lpm_reset_all_route_tables(int socketid)
+{
+	int i;
+
+	if (DP_FAILED(dp_reset_vni_all_route_tables(socketid))) {
+		DPS_LOG_ERR("resetting vni route table failed for socketid: %d", socketid);
+		return DP_ERROR;
+	}
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready) {
+			if (dp_add_route(i, vm_table[i].vni, 0, vm_table[i].info.own_ip, NULL, 32, rte_eth_dev_socket_id(i))) {
+				DPS_LOG_ERR("dp_add_route failed during table reset");
+				return DP_ERROR;
+			}
+			if (dp_add_route6(i, vm_table[i].vni, 0, vm_table[i].info.dhcp_ipv6, NULL, 128, rte_eth_dev_socket_id(i))) {
+				DPS_LOG_ERR("dp_add_route6 failed during table reset");
+				return DP_ERROR;
+			}
+		}
+	return DP_OK;
+}
+
 int dp_map_vm_handle(void *key, uint16_t portid)
 {
 	uint16_t *p_port_id;

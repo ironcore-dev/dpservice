@@ -28,10 +28,8 @@ struct dp_vni_key {
 };
 
 struct dp_vni_value {
-	union {
-		struct rte_rib	*ipv4[DP_NB_SOCKETS];
-		struct rte_rib6	*ipv6[DP_NB_SOCKETS];
-	} rib;
+	struct rte_rib	*ipv4[DP_NB_SOCKETS];
+	struct rte_rib6	*ipv6[DP_NB_SOCKETS];
 	struct dp_ref	if_count;
 };
 
@@ -46,10 +44,10 @@ static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int 
 	if (DP_FAILED(rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val)))
 		return NULL;
 
-	if (!temp_val->rib.ipv4[socketid])
+	if (!temp_val->ipv4[socketid])
 		return NULL;
 
-	return temp_val->rib.ipv4[socketid];
+	return temp_val->ipv4[socketid];
 }
 
 static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int socketid)
@@ -57,16 +55,16 @@ static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int
 	struct dp_vni_value *temp_val = NULL;
 	struct dp_vni_key vni_key;
 
-	vni_key.type = DP_IP_PROTO_IPV4;
+	vni_key.type = DP_IP_PROTO_IPV6;
 	vni_key.vni = vni;
 
 	if (DP_FAILED(rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val)))
 		return NULL;
 
-	if (!temp_val->rib.ipv6[socketid])
+	if (!temp_val->ipv6[socketid])
 		return NULL;
 
-	return temp_val->rib.ipv6[socketid];
+	return temp_val->ipv6[socketid];
 }
 
 int dp_vni_init(int socket_id);
@@ -75,6 +73,7 @@ bool dp_is_vni_route_tbl_available(int vni, int type, int socketid);
 int dp_create_vni_route_table(int vni, int type, int socketid);
 int dp_delete_vni_route_table(int vni, int type);
 int dp_reset_vni_route_table(int vni, int type, int socketid);
+int dp_reset_vni_all_route_tables(int socketid);
 
 #ifdef __cplusplus
 }

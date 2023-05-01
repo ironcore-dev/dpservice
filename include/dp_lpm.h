@@ -115,6 +115,7 @@ uint32_t dp_get_vm_pxe_ip4(uint16_t portid);
 void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid);
 char* dp_get_vm_pxe_str(uint16_t portid);
 void dp_set_vm_pxe_str(uint16_t portid, char *p_str);
+int dp_lpm_reset_all_route_tables(int socketid);
 struct dp_fwall_head *dp_get_fwall_head(int port_id);
 void dp_set_fwall_head(int port_id, struct dp_fwall_head *fwall_head);
 #ifdef __cplusplus

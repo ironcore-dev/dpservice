@@ -205,14 +205,23 @@ int InitializedCall::Proceed()
 
 int InitCall::Proceed()
 {
+	dp_request request = {0};
+	dp_reply reply = {0};
+
 	if (status_ == REQUEST) {
 		new InitCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		DPGRPC_LOG_INFO("Initializing");
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 		grpc_service->SetInitStatus(true);
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		reply_.set_error(reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

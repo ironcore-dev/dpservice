@@ -262,6 +262,16 @@ err:
 	return ret;
 }
 
+static int dp_process_init(dp_request *req, dp_reply *rep)
+{
+	if (DP_FAILED(dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
+		rep->com_head.err_code = DP_ERROR_VM_INIT_RESET_ERR;
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_add_fwall_rule(dp_request *req, dp_reply *rep)
 {
 	int port_id, ret = EXIT_SUCCESS;
@@ -1087,6 +1097,9 @@ int dp_process_request(struct rte_mbuf *m)
 	memset(m_arr, 0, DP_MBUF_ARR_SIZE * sizeof(struct rte_mbuf *));
 
 	switch (req->com_head.com_type) {
+	case DP_REQ_TYPE_INIT:
+		ret = dp_process_init(req, &rep);
+		break;
 	case DP_REQ_TYPE_CREATELB:
 		ret = dp_process_add_lb(req, &rep);
 		break;
