@@ -115,10 +115,11 @@ struct flow_age_ctx {
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
 int dp_get_flow_data(struct flow_key *key, void **data);
-void dp_add_flow_data(struct flow_key *key, void *data);
-void dp_add_flow(struct flow_key *key);
+// TODO(plague): followup PR to actually check this value
+int dp_add_flow_data(struct flow_key *key, void *data);
+// TODO(plague): followup PR to actually check this value (and maybe rename to _key to match delete)
+int dp_add_flow(struct flow_key *key);
 void dp_delete_flow_key(struct flow_key *key);
-bool dp_flow_exists(struct flow_key *key);
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 void dp_invert_flow_key(struct flow_key *key /* in / out */);
 int dp_flow_init(int socket_id);
@@ -129,8 +130,6 @@ void dp_free_flow(struct dp_ref *ref);
 void dp_free_network_nat_port(struct flow_value *cntrack);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key);
-
-void dp_output_flow_key_info(struct flow_key *key);
 
 #ifdef __cplusplus
 }
