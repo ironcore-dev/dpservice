@@ -50,6 +50,7 @@ typedef enum {
 	DP_REQ_TYPE_DEL_NATVIP,
 	DP_REQ_TYPE_ADD_NEIGH_NAT,
 	DP_REQ_TYPE_DEL_NEIGH_NAT,
+	DP_REQ_TYPE_IS_VNI_IN_USE,
 } dp_req_type;
 
 typedef enum {
@@ -57,6 +58,15 @@ typedef enum {
 	DP_NETNAT_INFO_TYPE_LOCAL,
 	DP_NETNAT_INFO_TYPE_NEIGHBOR,
 } dp_netnat_info_type;
+
+typedef enum {
+	DP_VNI_USE_IPV4,
+	DP_VNI_USE_IPV6,
+	DP_VNI_USE_LB_IPV4,
+	DP_VNI_USE_LB_IPV6,
+	DP_VNI_USE_ALL_IPV4,
+	DP_VNI_USE_ALL_IPV6
+} dp_vni_use_type;
 
 typedef struct dp_com_head {
 	uint8_t com_type;
@@ -84,6 +94,12 @@ typedef struct dp_fw_rule {
 	char			machine_id[VM_MACHINE_ID_STR_LEN];
 	struct dp_fwall_rule	rule;
 } dp_fw_rule;
+
+typedef struct dp_vni_use {
+	uint32_t		vni;
+	dp_vni_use_type	type;
+	uint32_t		in_use;
+} dp_vni_use;
 
 typedef struct dp_lb {
 	uint32_t	ip_type;
@@ -223,6 +239,7 @@ typedef struct dp_request {
 		dp_route		route;
 		dp_getpfx		get_pfx;
 		dp_fw_rule		fw_rule;
+		dp_vni_use		vni_in_use;
 	};
 } dp_request;
 
@@ -274,6 +291,7 @@ typedef struct dp_reply {
 		dp_nat_entry	nat_entry;
 		uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 		dp_fw_rule		fw_rule;
+		dp_vni_use		vni_in_use;
 	};
 } dp_reply;
 

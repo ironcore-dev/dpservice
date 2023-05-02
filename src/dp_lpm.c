@@ -29,6 +29,13 @@ void dp_lpm_free()
 	dp_free_jhash_table(vm_handle_tbl);
 }
 
+int dp_lpm_is_vni_in_use(int vni, int type, int socketid)
+{
+	if (dp_is_vni_route_tbl_available(vni, type, socketid))
+		return true;
+	return false;
+}
+
 int dp_lpm_reset_all_route_tables(int socketid)
 {
 	int i;

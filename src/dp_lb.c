@@ -336,3 +336,24 @@ int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip)
 out:
 	return ret;
 }
+
+bool dp_is_vni_lb_available(int vni)
+{
+	struct lb_key *temp_val;
+	uint32_t iter = 0;
+	uint64_t *key;
+	int32_t ret;
+
+	if (rte_hash_count(id_map_lb_tbl) == 0)
+		return false;
+
+	while (true) {
+		ret = rte_hash_iterate(id_map_lb_tbl, (const void **)&key, (void **)&temp_val, &iter);
+		if (ret == -ENOENT)
+			break;
+		if (temp_val->vni == vni)
+			return true;
+	}
+
+	return false;
+}

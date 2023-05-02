@@ -41,6 +41,7 @@ void dp_get_lb_back_ips(void *id_key, struct dp_reply *rep);
 int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip);
 int dp_delete_lb(void *id_key);
 int dp_get_lb(void *id_key, dp_lb *list_lb /* out */);
+bool dp_is_vni_lb_available(int vni);
 
 
 #ifdef __cplusplus

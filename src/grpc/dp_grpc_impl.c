@@ -7,6 +7,7 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "dp_vnf.h"
+#include "dp_vni.h"
 #include "dp_log.h"
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_impl.h"
@@ -268,6 +269,21 @@ static int dp_process_init(dp_request *req, dp_reply *rep)
 		rep->com_head.err_code = DP_ERROR_VM_INIT_RESET_ERR;
 		return EXIT_FAILURE;
 	}
+
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_vni_in_use(dp_request *req, dp_reply *rep)
+{
+	if (req->vni_in_use.type == DP_VNI_USE_IPV4)
+		rep->vni_in_use.in_use = dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4, dp_port_get_pf0_id());
+
+	if (req->vni_in_use.type == DP_VNI_USE_LB_IPV4)
+		rep->vni_in_use.in_use = dp_is_vni_lb_available(req->vni_in_use.vni);
+
+	if (req->vni_in_use.type == DP_VNI_USE_ALL_IPV4)
+		rep->vni_in_use.in_use = (dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4, dp_port_get_pf0_id()) ||
+								  dp_is_vni_lb_available(req->vni_in_use.vni));
 
 	return EXIT_SUCCESS;
 }
@@ -1099,6 +1115,9 @@ int dp_process_request(struct rte_mbuf *m)
 	switch (req->com_head.com_type) {
 	case DP_REQ_TYPE_INIT:
 		ret = dp_process_init(req, &rep);
+		break;
+	case DP_REQ_TYPE_IS_VNI_IN_USE:
+		ret = dp_process_vni_in_use(req, &rep);
 		break;
 	case DP_REQ_TYPE_CREATELB:
 		ret = dp_process_add_lb(req, &rep);

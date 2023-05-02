@@ -59,6 +59,21 @@ public:
 	int Proceed() override;
 };
 
+class IsVniInUseCall final : BaseCall {
+	ServerContext ctx_;
+	IsVniInUseRequest request_;
+	IsVniInUseResponse reply_;
+	ServerAsyncResponseWriter<IsVniInUseResponse> responder_;
+
+public:
+	IsVniInUseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_IS_VNI_IN_USE), responder_(&ctx_) {
+		service_->RequestisVniInUse(&ctx_, &request_, &responder_, cq_, cq_,
+														   this);
+	}
+	int Proceed() override;
+};
+
 class DelLBTargetPfxCall final : BaseCall {
 	ServerContext ctx_;
 	DeleteInterfaceLoadBalancerPrefixRequest request_;
