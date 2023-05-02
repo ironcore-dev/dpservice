@@ -29,7 +29,7 @@ void dp_flow_free()
 	dp_free_jhash_table(ipv4_flow_tbl);
 }
 
-static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
+static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
 	char ip_src_buf[18] = {0};
@@ -38,7 +38,7 @@ static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *ke
 	if (df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY || df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
 		key->port_dst = rte_be_to_cpu_16(df_ptr->l4_info.icmp_field.icmp_identifier);
 		key->src.type_src = df_ptr->l4_info.icmp_field.icmp_type;
-		return 0;
+		return DP_OK;
 	}
 
 	if (df_ptr->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {
@@ -49,16 +49,16 @@ static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *ke
 
 				dp_fill_ipv4_print_buff(df_ptr->src.src_addr, ip_src_buf);
 				dp_fill_ipv4_print_buff(df_ptr->dst.dst_addr, ip_dst_buf);
-				DPS_LOG_DEBUG("received a ICMP error message with unsupported error code");
+				DPS_LOG_DEBUG("received an ICMP error message with unsupported error code");
 				DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, error code %d", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
-				return -1;
+				return DP_ERROR;
 			}
 
 		dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 
 		if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port) {
 			DPS_LOG_WARNING("failed to extract attached ip header in icmp error message during icmp flow key building");
-			return -1;
+			return DP_ERROR;
 		}
 
 		key->ip_dst = rte_be_to_cpu_32(icmp_err_ip_info.err_ipv4_hdr->src_addr);
@@ -69,16 +69,20 @@ static int8_t dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *ke
 		key->port_dst = rte_be_to_cpu_16(icmp_err_ip_info.l4_src_port);
 		key->src.port_src = rte_be_to_cpu_16(icmp_err_ip_info.l4_dst_port);
 
-		return 0;
+		return DP_OK;
 	}
 
-	return -1;
+	dp_fill_ipv4_print_buff(df_ptr->src.src_addr, ip_src_buf);
+	dp_fill_ipv4_print_buff(df_ptr->dst.dst_addr, ip_dst_buf);
+	DPS_LOG_DEBUG("received an ICMP message with unsupported type");
+	DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, error code %d", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
+	return DP_ERROR;
 }
 
-int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
+int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
-	int8_t result = 0;
+	int ret = DP_OK;
 
 	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
 	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
@@ -100,7 +104,7 @@ int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* i
 		key->src.port_src = rte_be_to_cpu_16(df_ptr->l4_info.trans_port.src_port);
 		break;
 	case IPPROTO_ICMP:
-		result = dp_build_icmp_flow_key(df_ptr, key, m);
+		ret = dp_build_icmp_flow_key(df_ptr, key, m);
 		break;
 	default:
 		key->port_dst = 0;
@@ -108,7 +112,7 @@ int8_t dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* i
 		break;
 	}
 
-	return result;
+	return ret;
 }
 
 void dp_invert_flow_key(struct flow_key *key /* in / out */)
