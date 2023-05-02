@@ -235,10 +235,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		key = curr_key;
 
 		memset(key, 0, sizeof(struct flow_key));
-		if (unlikely(dp_build_flow_key(key, m) < 0)) {
-			DPNODE_LOG_WARNING(node, "Failed to build a flow key\n");
+		if (unlikely(DP_FAILED(dp_build_flow_key(key, m))))
 			return CONNTRACK_NEXT_DROP;
-		}
 
 		if (prev_key)
 			key_cmp_result = dp_test_next_n_bytes_identical((const unsigned char *)prev_key,
@@ -249,11 +247,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			if (unlikely(key_search_result == -ENOENT)) {
 				flow_val = flow_table_insert_entry(key, df_ptr, m);
 				if (!flow_val) {
-					DPNODE_LOG_WARNING(node, "Failed to add a flow table entry due to NULL flow_val pointer\n");
+					DPNODE_LOG_WARNING(node, "Failed to add a flow table entry due to NULL flow_val pointer");
 					return CONNTRACK_NEXT_DROP;
 				}
 			} else if (key_search_result == -EINVAL) {
-				DPNODE_LOG_ERR(node, "Conntrack operation: hash key search failed due to invalid parameters\n");
+				DPNODE_LOG_WARNING(node, "Conntrack operation: hash key search failed due to invalid parameters");
 				return CONNTRACK_NEXT_DROP;
 			} else {
 				change_flow_state_dir(key, flow_val, df_ptr);
