@@ -520,40 +520,34 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	return DP_ERROR_VM_DEL_NEIGHNAT_ENTRY_NOFOUND;
 }
 
-int dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
-								uint32_t vni, uint16_t min_port, uint16_t max_port, uint8_t *underlay_ipv6)
+const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+											  uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *current;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_cmp_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
-			memcpy(underlay_ipv6, current->dst_ipv6, sizeof(current->dst_ipv6));
-			return EXIT_SUCCESS;
-		}
+		if (dp_cmp_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port))
+			return current->dst_ipv6;
 	}
-	return DP_ERROR_VM_GET_NEIGHNAT_UNDER_IPV6;
+	return NULL;
 }
 
-int dp_lookup_network_nat_underlay_ip(struct rte_mbuf *pkt, uint8_t *underlay_ipv6)
+const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df_ptr)
 {
 	struct network_nat_entry *current;
-	struct dp_flow *df_ptr;
 	uint16_t dst_port;
 	uint32_t dst_vni;
 	uint32_t dst_ip;
 
-	df_ptr = get_dp_flow_ptr(pkt);
 	dst_ip = ntohl(df_ptr->dst.dst_addr);
 	dst_port = ntohs(df_ptr->l4_info.trans_port.dst_port);
 	dst_vni = df_ptr->tun_info.dst_vni;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_check_port_network_nat_entry(current, dst_ip, NULL, dst_vni, dst_port)) {
-			memcpy(underlay_ipv6, current->dst_ipv6, sizeof(current->dst_ipv6));
-			return 1;
-		}
+		if (dp_check_port_network_nat_entry(current, dst_ip, NULL, dst_vni, dst_port))
+			return current->dst_ipv6;
 	}
-	return 0;
+	return NULL;
 }
 
 int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)

@@ -21,7 +21,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct flow_value *cntrack = df_ptr->conntrack;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	uint32_t dst_ip, vni, dnat_ip;
-	uint8_t underlay_dst[16];
+	const uint8_t *underlay_dst;
 	struct dp_icmp_err_ip_info icmp_err_ip_info;
 
 	if (!cntrack)
@@ -46,7 +46,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				}
 
 				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
-				if (dp_lookup_network_nat_underlay_ip(m, underlay_dst)) {
+				underlay_dst = dp_lookup_network_nat_underlay_ip(df_ptr);
+				if (underlay_dst) {
 					cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
 					cntrack->nat_info.l4_type = df_ptr->l4_type;
 					memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
