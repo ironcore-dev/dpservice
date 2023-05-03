@@ -38,13 +38,10 @@ enum NATInfoType {
 	NATInfoNeigh = 2;
 }
 
-enum VniUsageType {
+enum VniType {
 	VniIpv4 = 0;
 	VniIpv6 = 1;
-	VniLBIpv4 = 2;
-	VniLBIpv6 = 3;
-	VniAllIpv4 = 4;
-	VniAllIpv6 = 5;
+	VniIpv4AndIpv6 = 2;
 }
 
 message Status {
@@ -448,7 +445,7 @@ message Route {
 
 message IsVniInUseRequest {
 	uint32 vni = 1;
-	VniUsageType type = 2;
+	VniType type = 2;
 }
 
 message IsVniInUseResponse {
@@ -536,7 +533,7 @@ service DPDKonmetal {
 
 	// VNI internal state information
 	// VNI can be in use by interfaces and by loadbalancer. So get information
-	// whether one of them (or both) is/are using the VNI in question.
+	// whether the VNI in question is in use or not.
 	rpc isVniInUse(IsVniInUseRequest) returns (IsVniInUseResponse) {}
 
 	//// FIREWALL

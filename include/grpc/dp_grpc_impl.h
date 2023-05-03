@@ -60,12 +60,9 @@ typedef enum {
 } dp_netnat_info_type;
 
 typedef enum {
-	DP_VNI_USE_IPV4,
-	DP_VNI_USE_IPV6,
-	DP_VNI_USE_LB_IPV4,
-	DP_VNI_USE_LB_IPV6,
-	DP_VNI_USE_ALL_IPV4,
-	DP_VNI_USE_ALL_IPV6
+	DP_VNI_IPV4,
+	DP_VNI_IPV6,
+	DP_VNI_BOTH,
 } dp_vni_use_type;
 
 typedef struct dp_com_head {

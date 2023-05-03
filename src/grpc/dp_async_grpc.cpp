@@ -180,25 +180,13 @@ int IsVniInUseCall::Proceed()
 		switch (request_.type())
 		{
 		case VniIpv4:
-			request.vni_in_use.type = DP_VNI_USE_IPV4;
+			request.vni_in_use.type = DP_VNI_IPV4;
 			break;
 		case VniIpv6:
-			request.vni_in_use.type = DP_VNI_USE_IPV6;
-			break;
-		case VniLBIpv4:
-			request.vni_in_use.type = DP_VNI_USE_LB_IPV4;
-			break;
-		case VniLBIpv6:
-			request.vni_in_use.type = DP_VNI_USE_LB_IPV6;
-			break;
-		case VniAllIpv4:
-			request.vni_in_use.type = DP_VNI_USE_ALL_IPV4;
-			break;
-		case VniAllIpv6:
-			request.vni_in_use.type = DP_VNI_USE_ALL_IPV6;
+			request.vni_in_use.type = DP_VNI_IPV6;
 			break;
 		default:
-			request.vni_in_use.type = DP_VNI_USE_IPV4;
+			request.vni_in_use.type = DP_VNI_IPV4;
 			break;
 		}
 		request.vni_in_use.vni = request_.vni();

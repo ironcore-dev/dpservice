@@ -189,17 +189,6 @@ uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
 	return vm_table[portid].ul_ipv6;
 }
 
-static bool dp_is_more_vm_in_vni_avail(int portid)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if ((i != portid) && vm_table[i].vm_ready &&
-			(vm_table[i].vni == vm_table[portid].vni))
-			return true;
-	return false;
-}
-
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 				 uint32_t ip, uint8_t *ip6, uint8_t depth, int socketid)
 {
@@ -592,21 +581,16 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	if (dp_is_more_vm_in_vni_avail(portid)) {
-		/* In case of rollback, just undo what setup_vm did */
-		if (!rollback) {
-			dp_del_route(portid, vm_table[portid].vni, 0,
-						vm_table[portid].info.own_ip, NULL, 32, socketid);
-			dp_del_route6(portid, vm_table[portid].vni, 0,
-					vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
-		}
-	} else {
-		vm_table[portid].vm_ready = 0;
-		if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV4)))
-			DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV4);
-		if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV6)))
-			DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV6);
-	}
+	dp_del_route(portid, vm_table[portid].vni, 0,
+				vm_table[portid].info.own_ip, NULL, 32, socketid);
+	dp_del_route6(portid, vm_table[portid].vni, 0,
+			vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
+
+	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV4)))
+		DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV4);
+	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV6)))
+		DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV6);
+
 	dp_del_all_firewall_rules(portid);
 	memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process

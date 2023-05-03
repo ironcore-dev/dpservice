@@ -174,6 +174,11 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 			ret = DP_ERROR_CREATE_LB_ERR;
 			goto err_vnf;
 		}
+		if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4,
+					  rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
+						ret = DP_ERROR_CREATE_LB_ROUT_ERR;
+						goto err_lb;
+					  }
 	}  else {
 		ret = DP_ERROR_CREATE_LB_UNSUPP_IP;
 		goto err;
@@ -181,6 +186,9 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 	rte_memcpy(rep->get_lb.ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
 
+err_lb:
+	if (dp_delete_lb((void *)req->add_lb.lb_id))
+		DPGRPC_LOG_ERR("Error during lb deletion");
 err_vnf:
 	dp_remove_vnf_with_key(ul_addr6);
 err:
@@ -204,6 +212,11 @@ static int dp_process_del_lb(dp_request *req, dp_reply *rep)
 	if (ret) {
 		rep->com_head.err_code = ret;
 		return ret;
+	}
+
+	if (DP_FAILED(dp_delete_vni_route_table(rep->get_lb.vni, DP_IP_PROTO_IPV4))) {
+		rep->com_head.err_code = DP_ERROR_DEL_LB_ROUTE_ERR;
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
@@ -275,15 +288,9 @@ static int dp_process_init(dp_request *req, dp_reply *rep)
 
 static int dp_process_vni_in_use(dp_request *req, dp_reply *rep)
 {
-	if (req->vni_in_use.type == DP_VNI_USE_IPV4)
-		rep->vni_in_use.in_use = dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4, dp_port_get_pf0_id());
-
-	if (req->vni_in_use.type == DP_VNI_USE_LB_IPV4)
-		rep->vni_in_use.in_use = dp_is_vni_lb_available(req->vni_in_use.vni);
-
-	if (req->vni_in_use.type == DP_VNI_USE_ALL_IPV4)
-		rep->vni_in_use.in_use = (dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4, dp_port_get_pf0_id()) ||
-								  dp_is_vni_lb_available(req->vni_in_use.vni));
+	if (req->vni_in_use.type == DP_VNI_IPV4)
+		rep->vni_in_use.in_use = dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4, 
+													  rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 
 	return EXIT_SUCCESS;
 }

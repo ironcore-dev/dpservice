@@ -47,7 +47,14 @@ bool dp_is_vni_route_tbl_available(int vni, int type, int socketid)
 
 static void dp_free_vni_value(struct dp_ref *ref)
 {
-	struct dp_vni_value *vni_value = container_of(ref, struct dp_vni_value, if_count);
+	struct dp_vni_value *vni_value = container_of(ref, struct dp_vni_value, ref_count);
+
+	DPS_LOG_WARNING("Freeing route table");
+	if (vni_value->ipv4[vni_value->socketid])
+		rte_rib_free(vni_value->ipv4[vni_value->socketid]);
+
+	if (vni_value->ipv6[vni_value->socketid])
+		rte_rib6_free(vni_value->ipv6[vni_value->socketid]);
 
 	rte_free(vni_value);
 }
@@ -67,7 +74,7 @@ static __rte_always_inline int dp_create_rib6(struct dp_vni_key *key, int socket
 		DPS_LOG_ERR("Unable to create the DP RIB table on socket %d", socketid);
 		return DP_ERROR;
 	}
-
+	temp_val->socketid = socketid;
 	return DP_OK;
 }
 
@@ -86,7 +93,7 @@ static __rte_always_inline int dp_create_rib(struct dp_vni_key *key, int socketi
 		DPS_LOG_ERR("Unable to create the DP RIB table on socket %d", socketid);
 		return DP_ERROR;
 	}
-
+	temp_val->socketid = socketid;
 	return DP_OK;
 }
 
@@ -120,7 +127,7 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 			DPS_LOG_WARNING("vni %d route4 hashtable addition failed\n", vni);
 			return DP_ERROR;
 		}
-		dp_ref_init(&temp_val->if_count, dp_free_vni_value);
+		dp_ref_init(&temp_val->ref_count, dp_free_vni_value);
 	} else if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("vni %d creation error\n", vni);
 		return DP_ERROR;
@@ -133,7 +140,7 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 			if (DP_FAILED(dp_create_rib6(&vni_key, socketid, temp_val)))
 				goto err2;
 		}
-		dp_ref_inc(&temp_val->if_count);
+		dp_ref_inc(&temp_val->ref_count);
 	}
 
 	return DP_OK;
@@ -155,7 +162,7 @@ int dp_delete_vni_route_table(int vni, int type)
 	if (DP_FAILED(rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val)))
 		return DP_ERROR;
 
-	if (dp_ref_dec_and_chk_freed(&temp_val->if_count))
+	if (dp_ref_dec_and_chk_freed(&temp_val->ref_count))
 		if (DP_FAILED(rte_hash_del_key(vni_handle_tbl, &vni_key)))
 			return DP_ERROR;
 
