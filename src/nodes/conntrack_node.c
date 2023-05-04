@@ -75,12 +75,10 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 
 static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val)
 {
-
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
-	else if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN)
+	else
 		flow_val->timeout_value = flow_timeout;
-
 }
 
 
