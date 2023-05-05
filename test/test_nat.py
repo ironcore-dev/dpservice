@@ -28,6 +28,10 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
+	# Add another neighbor and remove it to check if that does not break the other entry
+	# (doing it here becaise a separate test would be a big Ctrl+C, Ctrl+V of this one)
+	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_max_port+1, nat_neigh_max_port+2, neigh_vni1_ul_ipv6)
+	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_max_port+1, nat_neigh_max_port+2)
 
 	threading.Thread(target=send_bounce_pkt_to_pf,  args=(nat_ul_ipv6,)).start()
 

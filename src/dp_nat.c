@@ -438,30 +438,31 @@ void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 }
 
 
-static int dp_cmp_network_nat_entry(struct network_nat_entry *entry, uint32_t nat_ipv4, uint8_t *nat_ipv6,
-								uint32_t vni, uint16_t min_port, uint16_t max_port)
+static __rte_always_inline bool dp_is_network_nat_ip(struct network_nat_entry *entry,
+													 uint32_t nat_ipv4, uint8_t *nat_ipv6, uint32_t vni)
 {
+	return entry->vni == vni
+			&& ((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
+				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0));
+}
 
-	if (((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
-				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0))
-				&& entry->vni == vni && entry->port_range[0] == min_port && entry->port_range[1] == max_port)
-		return 1;
-	else
-		return 0;
+static __rte_always_inline bool dp_is_network_nat_entry(struct network_nat_entry *entry,
+														uint32_t nat_ipv4, uint8_t *nat_ipv6, uint32_t vni,
+														uint16_t min_port, uint16_t max_port)
+{
+	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
+			&& entry->port_range[0] == min_port
+			&& entry->port_range[1] == max_port;
 }
 
 // check if a port falls into the range of external nat's port range
-static int dp_check_port_network_nat_entry(struct network_nat_entry *entry, uint32_t nat_ipv4, uint8_t *nat_ipv6,
-								uint32_t vni, uint16_t port)
+static __rte_always_inline bool dp_is_network_nat_port(struct network_nat_entry *entry,
+													   uint32_t nat_ipv4, uint8_t *nat_ipv6, uint32_t vni,
+													   uint16_t port)
 {
-	if (((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
-				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0))
-				&& entry->vni == vni && entry->port_range[0] <= port && entry->port_range[1] > port)
-		return 1;
-
-	else
-		return 0;
-
+	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
+			&& entry->port_range[0] <= port
+			&& entry->port_range[1] > port;
 }
 
 int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
@@ -472,7 +473,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	network_nat_entry *next, *new_entry;
 
 	TAILQ_FOREACH(next, &nat_headp, entries) {
-		if (dp_cmp_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
+		if (dp_is_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
 			DPS_LOG_ERR("cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d",
 					nat_ipv4, vni, min_port, max_port);
 			return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
@@ -510,9 +511,16 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
-		if (dp_cmp_network_nat_entry(item, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
+		if (dp_is_network_nat_entry(item, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
 			TAILQ_REMOVE(&nat_headp, item, entries);
 			rte_free(item);
+			// only delete the DNAT entry when this is the only range present for this IP+VNI
+			for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = TAILQ_NEXT(item, entries)) {
+				if (dp_is_network_nat_ip(item, nat_ipv4, nat_ipv6, vni))
+					break;
+			}
+			if (!item)
+				dp_del_vm_dnat_ip(nat_ipv4, vni);
 			return EXIT_SUCCESS;
 		}
 	}
@@ -526,7 +534,7 @@ const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ip
 	network_nat_entry *current;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_cmp_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port))
+		if (dp_is_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port))
 			return current->dst_ipv6;
 	}
 	return NULL;
@@ -544,7 +552,7 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df_ptr)
 	dst_vni = df_ptr->tun_info.dst_vni;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_check_port_network_nat_entry(current, dst_ip, NULL, dst_vni, dst_port))
+		if (dp_is_network_nat_port(current, dst_ip, NULL, dst_vni, dst_port))
 			return current->dst_ipv6;
 	}
 	return NULL;
