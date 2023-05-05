@@ -12,7 +12,34 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_timers.h"
 
+#define DP_FLOW_LOG_KEY(MSG, KEY) do { \
+	if (rte_log_get_level(RTE_LOGTYPE_DPSERVICE) >= RTE_LOG_DEBUG) { \
+		dp_log_flow_key_info((MSG), (KEY)); \
+	} \
+} while (0)
+
 static struct rte_hash *ipv4_flow_tbl = NULL;
+
+static void dp_log_flow_key_info(const char *msg, struct flow_key *key)
+{
+	uint32_t hash_value = dp_get_conntrack_flow_hash_value(key);
+	const char *protocol;
+
+	if (key->proto == IPPROTO_TCP)
+		protocol = "tcp";
+	else if (key->proto == IPPROTO_UDP)
+		protocol = "udp";
+	else if (key->proto == IPPROTO_ICMP)
+		protocol = "icmp";
+	else
+		protocol = "unknown";
+
+	DPS_LOG_DEBUG("%s: %u, %s, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT ", src_port: %d, port_dst: %d",
+		msg, hash_value, protocol,
+		DP_IPV4_PRINT_BYTES(ntohl(key->ip_src)), DP_IPV4_PRINT_BYTES(ntohl(key->ip_dst)),
+		key->src.port_src, key->port_dst);
+}
+
 
 int dp_flow_init(int socket_id)
 {
@@ -135,55 +162,43 @@ void dp_invert_flow_key(struct flow_key *key /* in / out */)
 	}
 }
 
-bool dp_flow_exists(struct flow_key *key)
+int dp_add_flow(struct flow_key *key)
 {
-	int ret;
+	int ret = rte_hash_add_key(ipv4_flow_tbl, key);
 
-	ret = rte_hash_lookup(ipv4_flow_tbl, key);
-	if (ret < 0)
-		return false;
-	return true;
-}
-
-void dp_add_flow(struct flow_key *key)
-{
-	uint32_t hash_v;
-
-	if (rte_hash_add_key(ipv4_flow_tbl, key) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port add key failed\n");
-	else {
-		hash_v = dp_get_conntrack_flow_hash_value(key);
-		DPS_LOG_DEBUG("Successfully added a hash key: %d", hash_v);
-		dp_output_flow_key_info(key);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot add key to flow table %s", dp_strerror(ret));
+		return ret;
 	}
+
+	DP_FLOW_LOG_KEY("Successfully added a hash key", key);
+	return DP_OK;
 }
 
 void dp_delete_flow_key(struct flow_key *key)
 {
-	int pos;
-	uint32_t hash_v;
+	int ret = rte_hash_del_key(ipv4_flow_tbl, key);
 	
-	if (dp_flow_exists(key)) {
-		hash_v = dp_get_conntrack_flow_hash_value(key);
-		pos = rte_hash_del_key(ipv4_flow_tbl, key);
-		if (pos < 0)
-			// Negative return value of rte_hash_del_key only appears when its parameters are invalid under this if condition
-			DPS_LOG_WARNING("Hash key deleting function's parameters are invalid");
-		else {
-			DPS_LOG_DEBUG("Successfully deleted an existing hash key: %d", hash_v);
-			dp_output_flow_key_info(key);
-		}
-	} else {
-		DPS_LOG_WARNING("Attempt to delete a non-existing hash key");
-		dp_output_flow_key_info(key);
+	if (DP_FAILED(ret)) {
+		if (ret == -ENOENT)
+			DP_FLOW_LOG_KEY("Attempt to delete a non-existing hash key", key);
+		else
+			DPS_LOG_ERR("Cannot delete key from flow table %s", dp_strerror(ret));
+		return;
 	}
 
+	DP_FLOW_LOG_KEY("Successfully deleted an existing hash key", key);
 }
 
-void dp_add_flow_data(struct flow_key *key, void *data)
+int dp_add_flow_data(struct flow_key *key, void *data)
 {
-	if (rte_hash_add_key_data(ipv4_flow_tbl, key, data) < 0)
-		rte_exit(EXIT_FAILURE, "flow table for port add data failed\n");
+	int ret = rte_hash_add_key_data(ipv4_flow_tbl, key, data);
+
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot add data to flow table %s", dp_strerror(ret));
+		return ret;
+	}
+	return DP_OK;
 }
 
 int dp_get_flow_data(struct flow_key *key, void **data)
@@ -198,13 +213,11 @@ int dp_get_flow_data(struct flow_key *key, void **data)
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 {
-
-	if ((key1->proto != key2->proto) || (key1->ip_src != key2->ip_src)
-		|| (key1->ip_dst != key2->ip_dst) || (key1->port_dst != key2->port_dst)
-		|| (key1->src.port_src != key2->src.port_src))
-		return false;
-
-	return true;
+	return key1->proto == key2->proto
+		&& key1->ip_src == key2->ip_src
+		&& key1->ip_dst == key2->ip_dst
+		&& key1->port_dst == key2->port_dst
+		&& key1->src.port_src == key2->src.port_src;
 }
 
 void dp_free_flow(struct dp_ref *ref)
@@ -295,26 +308,4 @@ hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
 	// is always called after either a flow is checked or added in the firewall node.
 	return rte_hash_hash(ipv4_flow_tbl, key);
 
-}
-
-void dp_output_flow_key_info(struct flow_key *key)
-{
-
-	char ip_src_buf[18]={0};
-	char ip_dst_buf[18]={0};
-
-	dp_fill_ipv4_print_buff(key->ip_src, ip_src_buf);
-	dp_fill_ipv4_print_buff(key->ip_dst, ip_dst_buf);
-
-	if (key->proto == IPPROTO_TCP)
-		DPS_LOG_DEBUG("tcp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
-				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
-	
-	if (key->proto == IPPROTO_UDP)
-		DPS_LOG_DEBUG("udp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
-				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
-
-	if (key->proto == IPPROTO_ICMP)
-		DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
-				ip_src_buf, ip_dst_buf, key->src.type_src, key->port_dst);
 }
