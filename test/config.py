@@ -83,6 +83,7 @@ virtsvc_tcp_virtual_port = 4443
 
 # Helper functions config
 sniff_timeout = 2
+sniff_short_timeout = 1
 grpc_port = 1337
 
 # Extra testing options
