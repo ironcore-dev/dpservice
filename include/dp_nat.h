@@ -110,6 +110,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack);
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni);
+void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 
 
 #ifdef __cplusplus

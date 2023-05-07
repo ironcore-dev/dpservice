@@ -32,6 +32,7 @@ struct dp_vni_value {
 	struct rte_rib6	*ipv6[DP_NB_SOCKETS];
 	struct dp_ref	ref_count;
 	int				socketid;
+	int				vni;
 };
 
 static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int socketid)

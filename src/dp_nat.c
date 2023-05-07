@@ -811,3 +811,16 @@ int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 
 	return EXIT_SUCCESS;
 }
+
+void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)
+{
+	network_nat_entry *item, *tmp_item;
+
+	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
+		tmp_item = TAILQ_NEXT(item, entries);
+		if (item->vni == vni) {
+			TAILQ_REMOVE(&nat_headp, item, entries);
+			rte_free(item);
+		}
+	}
+}

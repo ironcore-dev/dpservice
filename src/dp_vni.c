@@ -1,5 +1,6 @@
 #include <rte_malloc.h>
 #include "dp_vni.h"
+#include "dp_nat.h"
 
 struct rte_hash *vni_handle_tbl = NULL;
 
@@ -49,13 +50,14 @@ static void dp_free_vni_value(struct dp_ref *ref)
 {
 	struct dp_vni_value *vni_value = container_of(ref, struct dp_vni_value, ref_count);
 
-	DPS_LOG_WARNING("Freeing route table");
+	DPS_LOG_DEBUG("Freeing route table for VNI %d", vni_value->vni);
 	if (vni_value->ipv4[vni_value->socketid])
 		rte_rib_free(vni_value->ipv4[vni_value->socketid]);
 
 	if (vni_value->ipv6[vni_value->socketid])
 		rte_rib6_free(vni_value->ipv6[vni_value->socketid]);
 
+	dp_del_all_neigh_nat_entries_in_vni(vni_value->vni);
 	rte_free(vni_value);
 }
 
@@ -127,6 +129,7 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 			DPS_LOG_WARNING("vni %d route4 hashtable addition failed\n", vni);
 			return DP_ERROR;
 		}
+		temp_val->vni = vni;
 		dp_ref_init(&temp_val->ref_count, dp_free_vni_value);
 	} else if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("vni %d creation error\n", vni);
