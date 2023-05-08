@@ -927,8 +927,6 @@ static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
 								(uint16_t)req->del_nat_vip.port_range[0], (uint16_t)req->del_nat_vip.port_range[1]);
 		if (ret)
 			goto err;
-
-		dp_del_vm_dnat_ip(ntohl(req->del_nat_vip.vip.vip_addr), req->del_nat_vip.vni);
 	}
 	return ret;
 err:
