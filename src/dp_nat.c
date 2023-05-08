@@ -818,7 +818,7 @@ void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)
 
 	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
-		if (item->vni == vni) {
+		if ((item->vni == vni) || (vni == DP_NETWORK_NAT_ALL_VNI)) {
 			TAILQ_REMOVE(&nat_headp, item, entries);
 			rte_free(item);
 		}

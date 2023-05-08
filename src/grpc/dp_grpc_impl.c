@@ -278,6 +278,8 @@ err:
 
 static int dp_process_init(dp_request *req, dp_reply *rep)
 {
+	dp_del_all_neigh_nat_entries_in_vni(DP_NETWORK_NAT_ALL_VNI);
+
 	if (DP_FAILED(dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
 		rep->com_head.err_code = DP_ERROR_VM_INIT_RESET_ERR;
 		return EXIT_FAILURE;
@@ -289,7 +291,7 @@ static int dp_process_init(dp_request *req, dp_reply *rep)
 static int dp_process_vni_in_use(dp_request *req, dp_reply *rep)
 {
 	if (req->vni_in_use.type == DP_VNI_IPV4)
-		rep->vni_in_use.in_use = dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4, 
+		rep->vni_in_use.in_use = dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4,
 													  rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 
 	return EXIT_SUCCESS;

@@ -14,7 +14,8 @@ extern "C" {
 #define DP_NAT_TABLE_MAX	100
 
 // TODO: change this to a configurable value
-#define DP_NETWORK_NAT_MAX_ENTRY 256
+#define DP_NETWORK_NAT_MAX_ENTRY	256
+#define DP_NETWORK_NAT_ALL_VNI		0
 
 enum {
 	DP_NAT_CHG_NONE,
