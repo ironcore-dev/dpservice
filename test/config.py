@@ -17,6 +17,7 @@
 # Virtual network identifiers (shared among dp-service instances)
 vni1 = 100
 vni2 = 200
+vni3 = 300
 
 # Networking layer
 pf_tap_pattern = "dtap"
