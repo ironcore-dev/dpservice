@@ -26,6 +26,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct vm_route route;
 	uint32_t route_key = 0;
 	uint64_t dst_port_id;
+	bool nxt_hop_is_pf;
 
 	// TODO: add broadcast routes when machine is added
 	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->l4_info.trans_port.dst_port) == DP_BOOTP_SRV_PORT)
@@ -37,23 +38,28 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 							rte_eth_dev_socket_id(m->port),
 							&route, &route_key, &dst_port_id) < 0)
 		return IPV4_LOOKUP_NEXT_DROP;
+
 	df_ptr->nxt_hop = (uint8_t)dst_port_id;
+	nxt_hop_is_pf = dp_port_is_pf(df_ptr->nxt_hop);
+
+	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+		if (nxt_hop_is_pf)
+			return IPV4_LOOKUP_NEXT_DROP;
+	} else {
+		df_ptr->tun_info.dst_vni = route.vni;
+		if (nxt_hop_is_pf) {
+			rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
+			df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+		}
+	}
 
 	df_ptr->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
-
-	if (df_ptr->flags.flow_type != DP_FLOW_TYPE_INCOMING)
-		df_ptr->tun_info.dst_vni = route.vni;
-
-	if (dp_port_is_pf(df_ptr->nxt_hop)) {
-		rte_memcpy(df_ptr->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df_ptr->tun_info.ul_dst_addr6));
-		df_ptr->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
-	}
 
 	if (!df_ptr->flags.flow_type)
 		df_ptr->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_LOCAL || df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (!dp_port_is_pf(df_ptr->nxt_hop) && dp_port_get_vf_attach_status(df_ptr->nxt_hop) == DP_VF_PORT_DETACHED)
+		if (!nxt_hop_is_pf && dp_port_get_vf_attach_status(df_ptr->nxt_hop) == DP_VF_PORT_DETACHED)
 			return IPV4_LOOKUP_NEXT_DROP;
 	}
 

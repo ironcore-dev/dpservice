@@ -29,9 +29,9 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
 
-	threading.Thread(target=send_bounce_pkt_to_pf,  args=(nat_ul_ipv6,)).start()
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(nat_ul_ipv6,)).start()
 
-	# it seems that we also receive the injected packet, skip it
+	# PF0 receives both the incoming packet and the relayed one, skip the first
 	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
 	dst_ip = pkt[IPv6].dst
 	dport = pkt[TCP].dport
@@ -54,6 +54,29 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 		"error 374")
 	grpc_client.assert_output(f"--delnat {VM1.name}",
 		"error 451")
+
+def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):
+	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
+				 IPv6(dst=ipv6_nat, src=router_ul_ipv6, nh=4) /
+				 IP(dst="1.2.3.4", src=public_ip) /
+				 TCP(sport=8989, dport=510))
+	delayed_sendp(bouce_pkt, PF0.tap)
+
+def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
+
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+
+	threading.Thread(target=send_foreign_ip_nat_pkt_to_pf, args=(nat_ul_ipv6,)).start()
+
+	# PF0 receives both the incoming packet and the relayed one, skip the first
+	pkt_list = sniff(count=2, lfilter=is_ipip_pkt, iface=PF0.tap, timeout=sniff_short_timeout)
+	assert len(pkt_list) > 0, \
+		f"No reply on {iface}"
+	if len(pkt_list) > 1:
+		pkt_list[1].show()
+		assert False, "Packet was not dropped"
+
+	grpc_client.delnat(VM1.name)
 
 
 def test_network_nat_vip_co_existence_on_same_vm(prepare_ifaces, grpc_client):

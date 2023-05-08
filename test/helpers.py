@@ -53,8 +53,11 @@ def is_icmpv6echo_pkt(pkt):
 def is_encaped_icmpv6_pkt(pkt):
 	return IPv6 in pkt and pkt[IPv6].nh == 0x29 and ICMPv6EchoRequest in pkt
 
+def is_ipip_pkt(pkt):
+	return IPv6 in pkt and pkt[IPv6].nh == 4
+
 def is_encaped_icmp_pkt(pkt):
-	return IPv6 in pkt and pkt[IPv6].nh == 4 and ICMP in pkt
+	return is_ipip_pkt(pkt) and ICMP in pkt
 
 
 def delayed_sendp(packet, interface):
@@ -140,8 +143,7 @@ def sniff_packet(iface, lfilter, skip=0):
 
 def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
 	if negated:
-		s_timeout = sniff_timeout - 1
-		pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=tap, timeout=s_timeout)
+		pkt_list = sniff(count=1, lfilter=is_tcp_pkt, iface=tap, timeout=sniff_short_timeout)
 		if len(pkt_list) == 0:
 			sniff_tcp_data["pkt"] = None
 		else:
