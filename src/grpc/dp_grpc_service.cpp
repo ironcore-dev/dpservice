@@ -28,11 +28,11 @@ bool GRPCService::run(std::string listen_address)
 	this->cq_ = builder.AddCompletionQueue();
 	this->server_ = builder.BuildAndStart();
 	if (this->server_ == nullptr) {
-		DPGRPC_LOG_ERR("Server failed to start on %s", listen_address.c_str());
+		DPGRPC_LOG_ERR("Server failed to start", DP_LOG_LISTENADDR(listen_address.c_str()));
 		return false;
 	}
 
-	DPGRPC_LOG_INFO("Server initialized and listening on %s", listen_address.c_str());
+	DPGRPC_LOG_INFO("Server started and listening", DP_LOG_LISTENADDR(listen_address.c_str()));
 	HandleRpcs();
 	return true;
 }

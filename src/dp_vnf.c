@@ -75,13 +75,17 @@ struct dp_vnf_value *dp_get_vnf_value_with_key(void *key)
 int dp_del_vnf_with_vnf_key(void *key)
 {
 	struct dp_vnf_value *temp_val;
+	int ret;
 
-	if (DP_FAILED(rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val)))
-		return DP_ERROR;
+	ret = rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val);
+	if (DP_FAILED(ret))
+		return ret;
 
 	rte_free(temp_val);
-	if (DP_FAILED(rte_hash_del_key(vnf_handle_tbl, key)))
-		return DP_ERROR;
+
+	ret = rte_hash_del_key(vnf_handle_tbl, key);
+	if (DP_FAILED(ret))
+		return ret;
 
 	return DP_OK;
 }
