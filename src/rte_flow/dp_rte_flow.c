@@ -464,7 +464,7 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_tcp *tcp_spec,
 							 struct rte_flow_item_tcp *tcp_mask,
 							 uint16_t src_port, uint16_t dst_port,
-							 uint8_t tcp_flags, uint8_t tcp_flags_mask)
+							 uint8_t tcp_flags)
 {
 
 	memset(tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
@@ -482,8 +482,8 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	}
 
 	if (tcp_flags) {
-		tcp_spec->hdr.tcp_flags = tcp_flags;
-		tcp_mask->hdr.tcp_flags = tcp_flags_mask;
+		tcp_spec->hdr.tcp_flags = ~tcp_flags;
+		tcp_mask->hdr.tcp_flags = tcp_flags;
 	}
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
@@ -822,10 +822,10 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 							struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx)
 {
-	
+
 	if (df->l4_type != IPPROTO_TCP)
 		return DP_OK;
-	
+
 	struct rte_flow_indir_action_conf age_indirect_conf;
 	struct rte_flow_error error;
 	struct rte_flow_action_handle *result = NULL;

@@ -106,11 +106,11 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 													&tcp_spec, &tcp_mask,
 													df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-													~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
+													DP_RTE_TCP_CNTL_FLAGS);
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   ~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
+											   DP_RTE_TCP_CNTL_FLAGS);
 	}
 
 	struct rte_flow_item_udp udp_spec;
@@ -414,12 +414,12 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   ~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
+											   DP_RTE_TCP_CNTL_FLAGS);
 		if (cross_pf_port)
 			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 												&tcp_spec, &tcp_mask,
 												df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-												~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
+												DP_RTE_TCP_CNTL_FLAGS);
 
 	}
 
@@ -671,7 +671,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   ~DP_RTE_TCP_CNTL_FLAGS, DP_RTE_TCP_CNTL_FLAGS);
+											   DP_RTE_TCP_CNTL_FLAGS);
 	}
 
 	struct rte_flow_item_udp udp_spec;

@@ -139,7 +139,6 @@ void dp_free_network_nat_port(struct flow_value *cntrack);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key);
 
-void dp_output_flow_key_info(struct flow_key *key);
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
 int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
 

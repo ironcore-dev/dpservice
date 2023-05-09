@@ -96,7 +96,7 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
 								struct rte_flow_item_tcp *tcp_mask,
 								uint16_t src_port, uint16_t dst_port,
-								uint8_t tcp_flags, uint8_t tcp_flags_mask);
+								uint8_t tcp_flags);
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp *icmp_spec,

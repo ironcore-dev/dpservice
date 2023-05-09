@@ -410,29 +410,6 @@ hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
 
 }
 
-void dp_output_flow_key_info(struct flow_key *key)
-{
-
-	char ip_src_buf[18]={0};
-	char ip_dst_buf[18]={0};
-
-	dp_fill_ipv4_print_buff(key->ip_src, ip_src_buf);
-	dp_fill_ipv4_print_buff(key->ip_dst, ip_dst_buf);
-
-	if (key->proto == IPPROTO_TCP)
-		DPS_LOG_DEBUG("tcp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
-				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
-	
-	if (key->proto == IPPROTO_UDP)
-		DPS_LOG_DEBUG("udp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
-				ip_src_buf, ip_dst_buf, key->src.port_src, key->port_dst);
-
-	if (key->proto == IPPROTO_ICMP)
-		DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, src_port: %d, port_dst: %d",
-				ip_src_buf, ip_dst_buf, key->src.type_src, key->port_dst);
-}
-
-
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 {
 	uint8_t index;
