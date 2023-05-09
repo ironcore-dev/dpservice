@@ -282,7 +282,7 @@ void dp_process_aged_flows(int port_id)
 
 		if (agectx->handle) {
 
-			memset(&error, 0x22, sizeof(error));
+			memset(&error, 0, sizeof(error));
 			ret = rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
 			if (DP_FAILED(ret))
 				DPS_LOG_ERR("failed to remove a indirect action from agectx, error code:%d, reason %s", ret,
@@ -328,7 +328,7 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 			curr_age_ctx = flow_val->rte_age_ctxs[age_ctx_index];
 			if (curr_age_ctx && curr_age_ctx->handle) {
 
-				memset(&error, 0x22, sizeof(error));
+				memset(&error, 0, sizeof(error));
 				memset(&age_query, 0, sizeof(age_query));
 
 				ret = rte_flow_action_handle_query(curr_age_ctx->port_id, curr_age_ctx->handle, &age_query, &error);
@@ -342,7 +342,7 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 				// delete this rule regardless if it has expired in hw or not (age_query.aged)
 				if (age_query.sec_since_last_hit >= flow_val->timeout_value) {
 
-					memset(&error, 0x22, sizeof(error));
+					memset(&error, 0, sizeof(error));
 					ret = rte_flow_action_handle_destroy(curr_age_ctx->port_id, curr_age_ctx->handle, &error);
 					if (DP_FAILED(ret)) {
 						DPS_LOG_ERR("failed to delete tcp flow's age indirect action due to code: %d, with error msg: %s", ret,
