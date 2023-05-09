@@ -177,6 +177,8 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 
+int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error);
+
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
 												const struct rte_flow_item pattern[],

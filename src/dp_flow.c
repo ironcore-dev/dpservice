@@ -252,6 +252,20 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 	}
 }
 
+int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error)
+{
+	int ret;
+
+	memset(error, 0, sizeof(struct rte_flow_error));
+	ret = rte_flow_action_handle_destroy(port_id, handle, error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("failed to destroy a flow action handle, error code:%d, reason %s", ret,
+								error->message ? error->message : "(no stated reason)");
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
 void dp_process_aged_flows(int port_id)
 {
 	int nb_context, total = 0, idx;
@@ -282,11 +296,8 @@ void dp_process_aged_flows(int port_id)
 
 		if (agectx->handle) {
 
-			memset(&error, 0, sizeof(error));
-			ret = rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
-			if (DP_FAILED(ret))
-				DPS_LOG_ERR("failed to remove a indirect action from agectx, error code:%d, reason %s", ret,
-								error.message ? error.message : "(no stated reason)");
+			if (DP_FAILED(dp_destroy_rte_action_handle(port_id, agectx->handle, &error)))
+				DPS_LOG_ERR("failed to remove a indirect action from port %d", port_id);
 
 			agectx->handle = NULL;
 
@@ -342,11 +353,8 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 				// delete this rule regardless if it has expired in hw or not (age_query.aged)
 				if (age_query.sec_since_last_hit >= flow_val->timeout_value) {
 
-					memset(&error, 0, sizeof(error));
-					ret = rte_flow_action_handle_destroy(curr_age_ctx->port_id, curr_age_ctx->handle, &error);
-					if (DP_FAILED(ret)) {
-						DPS_LOG_ERR("failed to delete tcp flow's age indirect action due to code: %d, with error msg: %s", ret,
-									error.message ? error.message : "(no stated reason)");
+					if (DP_FAILED(dp_destroy_rte_action_handle(curr_age_ctx->port_id, curr_age_ctx->handle, &error))) {
+						DPS_LOG_ERR("failed to remove a indirect action from port %d", curr_age_ctx->port_id);
 						return DP_ERROR;
 					}
 

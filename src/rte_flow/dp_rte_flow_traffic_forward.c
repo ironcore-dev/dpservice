@@ -191,8 +191,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 		ret = dp_create_age_indirect_action(&attr, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
 		if (DP_FAILED(ret)) {
-			rte_free(hairpin_agectx);
-			DPS_LOG_ERR("Flow's age cannot be configured as indirect action on port %d", m->port);
+			free_allocated_agectx(hairpin_agectx);
 			return 0;
 		}
 
@@ -285,8 +284,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 
 	ret = dp_create_age_indirect_action(&attr, t_port_id, df, &action[age_action_index], agectx);
 	if (DP_FAILED(ret)) {
-		rte_free(agectx);
-		DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+		free_allocated_agectx(agectx);
 		return 0;
 	}
 
@@ -555,8 +553,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 	ret = dp_create_age_indirect_action(&attr, m->port, df, &action[age_action_index], agectx);
 	if (DP_FAILED(ret)) {
-		rte_free(agectx);
-		DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+		free_allocated_agectx(agectx);
 		return 0;
 	}
 
@@ -588,8 +585,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 
 		ret = dp_create_age_indirect_action(&attr, (uint16_t)df->nxt_hop, df, &hairpin_action[age_action_index], hairpin_agectx);
 		if (DP_FAILED(ret)) {
-			rte_free(hairpin_agectx);
-			DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+			free_allocated_agectx(hairpin_agectx);
 			return 0;
 		}
 
@@ -739,8 +735,7 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 
 	ret = dp_create_age_indirect_action(&attr, m->port, df, &action[action_cnt-1], agectx);
 	if (DP_FAILED(ret)) {
-		rte_free(agectx);
-		DPS_LOG_ERR("Flow's age cannot be configured as indirect action ");
+		free_allocated_agectx(agectx);
 		return 0;
 	}
 

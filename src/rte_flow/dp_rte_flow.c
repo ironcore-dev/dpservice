@@ -766,15 +766,12 @@ int create_end_action(struct rte_flow_action *action, int action_cnt)
 void free_allocated_agectx(struct flow_age_ctx *agectx)
 {
 	struct rte_flow_error error;
-	int ret;
 
 	if (agectx) {
 		if (agectx->handle) {
-			memset(&error, 0, sizeof(error));
-			ret = rte_flow_action_handle_destroy(agectx->port_id, agectx->handle, &error);
-			if (DP_FAILED(ret))
-				DPS_LOG_ERR("failed to remove flow's age indirect action during agectx free ops, due to code: %d, with error msg: %s",
-								ret, error.message ? error.message : "(no stated reason)");
+
+			if (DP_FAILED(dp_destroy_rte_action_handle(agectx->port_id, agectx->handle, &error)))
+				DPS_LOG_ERR("failed to remove a indirect action from port %d", agectx->port_id);
 
 		}
 		rte_free(agectx);
@@ -789,6 +786,8 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 	agectx->port_id = port_id;
 	dp_ref_inc(&agectx->cntrack->ref_count);
 }
+
+
 
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
@@ -829,7 +828,6 @@ int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 	struct rte_flow_indir_action_conf age_indirect_conf;
 	struct rte_flow_error error;
 	struct rte_flow_action_handle *result = NULL;
-	int ret;
 
 	age_indirect_conf.ingress = attr->ingress;
 	age_indirect_conf.egress = attr->egress;
@@ -843,10 +841,9 @@ int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 	}
 
 	if (DP_FAILED(dp_add_rte_age_ctx(df->conntrack, agectx))) {
-		memset(&error, 0, sizeof(error));
-		ret = rte_flow_action_handle_destroy(port_id, result, &error);
-		if (DP_FAILED(ret))
-			DPS_LOG_ERR("failed to remove a indirect action from agectx, code: %d, with error message %s ", ret, error.message ? error.message : "(no stated reason)");
+
+		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
+				DPS_LOG_ERR("failed to remove a indirect action from port %d", port_id);
 
 		DPS_LOG_ERR("failed to store agectx in cntrack obj");
 		result = NULL;
