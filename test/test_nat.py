@@ -29,9 +29,12 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
 	# Add another neighbor and remove it to check if that does not break the other entry
-	# (doing it here becaise a separate test would be a big Ctrl+C, Ctrl+V of this one)
+	# (cannot be done afterwards as the tables will have already been changed by this test)
+	# Also do the same with another NAT VIP on the same VNI
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_max_port+1, nat_neigh_max_port+2, neigh_vni1_ul_ipv6)
+	grpc_client.addnat(VM2.name, nat_vip, nat_local_max_port+10, nat_local_max_port+11)
 	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_max_port+1, nat_neigh_max_port+2)
+	grpc_client.delnat(VM2.name)
 
 	threading.Thread(target=send_bounce_pkt_to_pf, args=(nat_ul_ipv6,)).start()
 
@@ -59,6 +62,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	grpc_client.assert_output(f"--delnat {VM1.name}",
 		"error 451")
 
+
 def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):
 	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
 				 IPv6(dst=ipv6_nat, src=router_ul_ipv6, nh=4) /
@@ -66,7 +70,7 @@ def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):
 				 TCP(sport=8989, dport=510))
 	delayed_sendp(bouce_pkt, PF0.tap)
 
-def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
+def test_network_nat_foreign_ip(prepare_ifaces, grpc_client):
 
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
