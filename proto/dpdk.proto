@@ -453,6 +453,10 @@ message IsVniInUseResponse {
 	Status status = 2;
 }
 
+message ResetVniRequest {
+	uint32 vni = 1;
+	VniType type = 2;
+}
 
 service DPDKonmetal {
 	//// INITIALIZATION
@@ -535,6 +539,7 @@ service DPDKonmetal {
 	// VNI can be in use by interfaces and by loadbalancer. So get information
 	// whether the VNI in question is in use or not.
 	rpc isVniInUse(IsVniInUseRequest) returns (IsVniInUseResponse) {}
+	rpc resetVni(ResetVniRequest) returns (Status) {}
 
 	//// FIREWALL
 	rpc listFirewallRules(ListFirewallRulesRequest) returns (ListFirewallRulesResponse) {}

@@ -275,6 +275,12 @@ class GrpcClient:
 		match = re.search(r'(?:^|[\n\r])Vni: '+str(vni)+' is (.*in use)', output)
 		return match.group(1) == 'in use'
 
+	def resetvni(self, vni):
+		output = self._call(f"--reset_vni --vni {vni}", "")
+		match = re.search(r'(?:^|[\n\r])Vni: '+str(vni)+' (.*resetted)', output)
+		return match.group(1) == 'resetted'
+
+
 	@staticmethod
 	def port_open():
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

@@ -31,6 +31,7 @@ typedef enum {
 	DP_CMD_DEL_ROUTE,
 	DP_CMD_GET_ROUTE,
 	DP_CMD_GET_VNI,
+	DP_CMD_RESET_VNI,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
@@ -167,6 +168,7 @@ static uint32_t priority = 1000;
 #define CMD_LINE_OPT_FWALL_ACTION	"action"
 #define CMD_LINE_OPT_FWALL_PRIO		"priority"
 #define CMD_LINE_OPT_VNI_IN_USE		"vni_in_use"
+#define CMD_LINE_OPT_RESET_VNI		"reset_vni"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -178,6 +180,7 @@ enum {
 	CMD_LINE_OPT_DEL_ROUTE_NUM,
 	CMD_LINE_OPT_GET_ROUTE_NUM,
 	CMD_LINE_OPT_VNI_IN_USE_NUM,
+	CMD_LINE_OPT_RESET_VNI_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV4_NUM,
@@ -245,6 +248,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_DEL_ROUTE, 0, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
 	{CMD_LINE_OPT_GET_ROUTE, 0, 0, CMD_LINE_OPT_GET_ROUTE_NUM},
 	{CMD_LINE_OPT_VNI_IN_USE, 0, 0, CMD_LINE_OPT_VNI_IN_USE_NUM},
+	{CMD_LINE_OPT_RESET_VNI, 0, 0, CMD_LINE_OPT_RESET_VNI_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV4, 1, 0, CMD_LINE_OPT_PRIMARY_IPV4_NUM},
@@ -365,6 +369,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_VNI_IN_USE_NUM:
 			command = DP_CMD_GET_VNI;
+			break;
+		case CMD_LINE_OPT_RESET_VNI_NUM:
+			command = DP_CMD_RESET_VNI;
 			break;
 		case CMD_LINE_OPT_VNI_NUM:
 			strncpy(vni_str, optarg, 29);
@@ -714,6 +721,21 @@ public:
 				printf("Vni: %d is in use\n", vni);
 			else
 				printf("Vni: %d is not in use\n", vni);
+	}
+
+	void ResetVni() {
+			ResetVniRequest request;
+			Status reply;
+			ClientContext context;
+
+			request.set_vni(vni);
+			request.set_type(dpdkonmetal::VniIpv4AndIpv6);
+
+			stub_->resetVni(&context, request, &reply);
+			if (reply.error())
+				printf("Received an error %d\n", reply.error());
+			else
+				printf("Vni: %d resetted\n", vni);
 	}
 
 	void AddLBVIP() {
@@ -1476,6 +1498,10 @@ int main(int argc, char** argv)
 	case DP_CMD_GET_VNI:
 		std::cout << "IsVniInUse called " << std::endl;
 		dpdk_client.VniInUse();
+		break;
+	case DP_CMD_RESET_VNI:
+		std::cout << "ResetVni called " << std::endl;
+		dpdk_client.ResetVni();
 		break;
 	case DP_CMD_DEL_ROUTE:
 		dpdk_client.DelRoute();

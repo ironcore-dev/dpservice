@@ -224,6 +224,50 @@ int IsVniInUseCall::Proceed()
 	return 0;
 }
 
+int ResetVniCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+
+	if (status_ == REQUEST) {
+		new ResetVniCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		switch (request_.type())
+		{
+		case VniIpv4:
+			request.vni_in_use.type = DP_VNI_IPV4;
+			break;
+		case VniIpv6:
+			request.vni_in_use.type = DP_VNI_IPV6;
+			break;
+		case VniIpv4AndIpv6:
+			request.vni_in_use.type = DP_VNI_BOTH;
+			break;
+		default:
+			request.vni_in_use.type = DP_VNI_BOTH;
+			break;
+		}
+		request.vni_in_use.vni = request_.vni();
+		DPGRPC_LOG_INFO("Resetting VNI", DP_LOG_VNI(request.vni_in_use.vni),
+						DP_LOG_VNI_TYPE(request.vni_in_use.type));
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+
+		SetErrStatus(&reply_, reply.com_head.err_code);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 int BaseCall::InitCheck()
 {
 	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);

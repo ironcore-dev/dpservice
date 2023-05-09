@@ -77,6 +77,21 @@ public:
 	int Proceed() override;
 };
 
+class ResetVniCall final : BaseCall {
+	ServerContext ctx_;
+	ResetVniRequest request_;
+	Status reply_;
+	ServerAsyncResponseWriter<Status> responder_;
+
+public:
+	ResetVniCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	:BaseCall(service, cq, DP_REQ_TYPE_VNI_RESET), responder_(&ctx_) {
+		service_->RequestresetVni(&ctx_, &request_, &responder_, cq_, cq_,
+														   this);
+	}
+	int Proceed() override;
+};
+
 class DelLBTargetPfxCall final : BaseCall {
 	ServerContext ctx_;
 	DeleteInterfaceLoadBalancerPrefixRequest request_;
