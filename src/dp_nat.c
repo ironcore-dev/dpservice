@@ -465,6 +465,19 @@ static __rte_always_inline bool dp_is_network_nat_port(struct network_nat_entry 
 			&& entry->port_range[1] > port;
 }
 
+void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
+{
+	network_nat_entry *item;
+
+	// only delete the DNAT entry when this is the only range present for this IP
+	// (i.e. if there still is an entry in the list, do nothing!)
+	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = TAILQ_NEXT(item, entries))
+		if (dp_is_network_nat_ip(item, d_ip, NULL, vni))
+			return;
+
+	dp_del_vm_dnat_ip(d_ip, vni);
+}
+
 int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
 								uint8_t *underlay_ipv6)
@@ -514,13 +527,6 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 		if (dp_is_network_nat_entry(item, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
 			TAILQ_REMOVE(&nat_headp, item, entries);
 			rte_free(item);
-			// only delete the DNAT entry when this is the only range present for this IP+VNI
-			for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = TAILQ_NEXT(item, entries)) {
-				if (dp_is_network_nat_ip(item, nat_ipv4, nat_ipv6, vni))
-					break;
-			}
-			if (!item)
-				dp_del_vm_dnat_ip(nat_ipv4, vni);
 			return EXIT_SUCCESS;
 		}
 	}

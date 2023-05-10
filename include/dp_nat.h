@@ -87,6 +87,8 @@ int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni);
 void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
+void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
+
 int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
 								uint8_t *underlay_ipv6);

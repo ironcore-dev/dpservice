@@ -409,6 +409,8 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 
 	rep->get_vip.vip.vip_addr = s_data->vip_ip;
 
+	// always delete, i.e. do not use dp_del_vip_from_dnat(),
+	// because 1:1 VIP is not shared with anything
 	dp_del_vm_dnat_ip(s_data->vip_ip, dp_get_vm_vni(port_id));
 	dp_del_vm_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 
@@ -843,7 +845,7 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	dp_remove_vnf_with_key(s_data->ul_nat_ip6);
 
 	rep->get_vip.vip.vip_addr = s_data->network_nat_ip;
-	dp_del_vm_dnat_ip(s_data->network_nat_ip, vm_vni);
+	dp_del_vip_from_dnat(s_data->network_nat_ip, vm_vni);
 
 	ret = dp_del_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (ret)
@@ -927,6 +929,8 @@ static int dp_process_del_neigh_nat(dp_request *req, dp_reply *rep)
 								(uint16_t)req->del_nat_vip.port_range[0], (uint16_t)req->del_nat_vip.port_range[1]);
 		if (ret)
 			goto err;
+
+		dp_del_vip_from_dnat(ntohl(req->del_nat_vip.vip.vip_addr), req->del_nat_vip.vni);
 	}
 	return ret;
 err:
