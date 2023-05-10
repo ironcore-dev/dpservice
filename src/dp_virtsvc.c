@@ -285,7 +285,7 @@ static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *v
 		delete_key.vf_l4_port = conn->vf_l4_port;
 		ret = rte_hash_del_key(virtsvc->open_ports, &delete_key);
 		if (DP_FAILED(ret))
-			DPS_LOG_WARNING("Cannot delete virtual serice NAT entry %s", dp_strerror(ret));
+			DPS_LOG_WARNING("Cannot delete virtual service NAT entry %s", dp_strerror(ret));
 	}
 
 	ret = rte_hash_add_key_with_hash_data(virtsvc->open_ports, key, sig, (void *)(intptr_t)free_port);
@@ -360,13 +360,13 @@ void dp_virtsvc_del_vm(uint16_t port_id)
 		// (i.e. the table is constantly full after the first 64k connections)
 		for (int i = 0; i < RTE_DIM(service->connections); ++i) {
 			conn = &service->connections[i];
-			if (conn->vf_port_id == port_id) {
+			if (conn->vf_port_id == port_id && conn->last_pkt_timestamp) {
 				conn->last_pkt_timestamp = 0;
 				delete_key.vf_port_id = conn->vf_port_id;
 				delete_key.vf_l4_port = conn->vf_l4_port;
 				ret = rte_hash_del_key(service->open_ports, &delete_key);
 				if (DP_FAILED(ret))
-					DPS_LOG_WARNING("Cannot delete virtual serice NAT entry for port %u %s", port_id, dp_strerror(ret));
+					DPS_LOG_WARNING("Cannot delete virtual service NAT entry for port_id %u %s", port_id, dp_strerror(ret));
 			}
 		}
 	}
