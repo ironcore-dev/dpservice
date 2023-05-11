@@ -206,7 +206,7 @@ int dp_get_flow_data(struct flow_key *key, void **data)
 	int result = rte_hash_lookup_data(ipv4_flow_tbl, key, data);
 
 	if (DP_FAILED(result))
-		data = NULL;
+		*data = NULL;
 
 	return result;
 }
