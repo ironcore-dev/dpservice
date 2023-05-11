@@ -7,7 +7,6 @@
 #include <rte_ip.h>
 #include "dp_mbuf_dyn.h"
 #include "rte_flow/dp_rte_flow.h"
-#include "dp_util.h"
 
 #define PRINT_LAYER(PPOS, BUF, BUFSIZE, FORMAT, ...) do { \
 	if (*(PPOS) < (BUFSIZE)) \

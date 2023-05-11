@@ -11,7 +11,6 @@
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "dp_util.h"
 #include "dp_version.h"
 #include "nodes/common_node.h"  // graphtrace level limit
 #include "dpdk_layer.h"  // underlay conf struct

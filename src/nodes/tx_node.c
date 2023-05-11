@@ -10,7 +10,6 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "dp_port.h"
-#include "dp_util.h"
 #include "node_api.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
