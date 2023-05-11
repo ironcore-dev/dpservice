@@ -63,7 +63,7 @@ static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /
 	char ip_dst_buf[18] = {0};
 
 	if (df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY || df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
-		key->port_dst = rte_be_to_cpu_16(df_ptr->l4_info.icmp_field.icmp_identifier);
+		key->port_dst = ntohs(df_ptr->l4_info.icmp_field.icmp_identifier);
 		key->src.type_src = df_ptr->l4_info.icmp_field.icmp_type;
 		return DP_OK;
 	}
@@ -88,13 +88,13 @@ static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /
 			return DP_ERROR;
 		}
 
-		key->ip_dst = rte_be_to_cpu_32(icmp_err_ip_info.err_ipv4_hdr->src_addr);
-		key->ip_src = rte_be_to_cpu_32(icmp_err_ip_info.err_ipv4_hdr->dst_addr);
+		key->ip_dst = ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr);
+		key->ip_src = ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr);
 
 		key->proto = icmp_err_ip_info.err_ipv4_hdr->next_proto_id;
 
-		key->port_dst = rte_be_to_cpu_16(icmp_err_ip_info.l4_src_port);
-		key->src.port_src = rte_be_to_cpu_16(icmp_err_ip_info.l4_dst_port);
+		key->port_dst = ntohs(icmp_err_ip_info.l4_src_port);
+		key->src.port_src = ntohs(icmp_err_ip_info.l4_dst_port);
 
 		return DP_OK;
 	}
@@ -111,8 +111,8 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
 	int ret = DP_OK;
 
-	key->ip_dst = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
-	key->ip_src = rte_be_to_cpu_32(df_ptr->src.src_addr);
+	key->ip_dst = ntohl(df_ptr->dst.dst_addr);
+	key->ip_src = ntohl(df_ptr->src.src_addr);
 
 	key->proto = df_ptr->l4_type;
 
@@ -123,12 +123,12 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 	switch (df_ptr->l4_type) {
 	case IPPROTO_TCP:
-		key->port_dst = rte_be_to_cpu_16(df_ptr->l4_info.trans_port.dst_port);
-		key->src.port_src = rte_be_to_cpu_16(df_ptr->l4_info.trans_port.src_port);
+		key->port_dst = ntohs(df_ptr->l4_info.trans_port.dst_port);
+		key->src.port_src = ntohs(df_ptr->l4_info.trans_port.src_port);
 		break;
 	case IPPROTO_UDP:
-		key->port_dst = rte_be_to_cpu_16(df_ptr->l4_info.trans_port.dst_port);
-		key->src.port_src = rte_be_to_cpu_16(df_ptr->l4_info.trans_port.src_port);
+		key->port_dst = ntohs(df_ptr->l4_info.trans_port.dst_port);
+		key->src.port_src = ntohs(df_ptr->l4_info.trans_port.src_port);
 		break;
 	case IPPROTO_ICMP:
 		ret = dp_build_icmp_flow_key(df_ptr, key, m);
