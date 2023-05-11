@@ -13,9 +13,8 @@
 #include "dp_timers.h"
 
 #define DP_FLOW_LOG_KEY(MSG, KEY) do { \
-	if (rte_log_get_level(RTE_LOGTYPE_DPSERVICE) >= RTE_LOG_DEBUG) { \
+	if (rte_log_get_level(RTE_LOGTYPE_DPSERVICE) >= RTE_LOG_DEBUG) \
 		dp_log_flow_key_info((MSG), (KEY)); \
-	} \
 } while (0)
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
@@ -40,7 +39,6 @@ static void dp_log_flow_key_info(const char *msg, struct flow_key *key)
 		key->src.port_src, key->port_dst);
 }
 
-
 int dp_flow_init(int socket_id)
 {
 	ipv4_flow_tbl = dp_create_jhash_table(FLOW_MAX, sizeof(struct flow_key),
@@ -59,8 +57,6 @@ void dp_flow_free()
 static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
-	char ip_src_buf[18] = {0};
-	char ip_dst_buf[18] = {0};
 
 	if (df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY || df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
 		key->port_dst = ntohs(df_ptr->l4_info.icmp_field.icmp_identifier);
@@ -72,14 +68,13 @@ static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /
 
 		if (df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PROTO_UNREACHABLE
 			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE
-			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_FRAGMENT_NEEDED) {
-
-				dp_fill_ipv4_print_buff(df_ptr->src.src_addr, ip_src_buf);
-				dp_fill_ipv4_print_buff(df_ptr->dst.dst_addr, ip_dst_buf);
-				DPS_LOG_DEBUG("received an ICMP error message with unsupported error code");
-				DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, error code %d", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
-				return DP_ERROR;
-			}
+			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_FRAGMENT_NEEDED
+		) {
+			DPS_LOG_DEBUG("received an ICMP error message with unsupported error code %d, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT,
+						  df_ptr->l4_info.icmp_field.icmp_code,
+						  DP_IPV4_PRINT_BYTES(df_ptr->src.src_addr), DP_IPV4_PRINT_BYTES(df_ptr->dst.dst_addr));
+			return DP_ERROR;
+		}
 
 		dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 
@@ -99,10 +94,9 @@ static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /
 		return DP_OK;
 	}
 
-	dp_fill_ipv4_print_buff(df_ptr->src.src_addr, ip_src_buf);
-	dp_fill_ipv4_print_buff(df_ptr->dst.dst_addr, ip_dst_buf);
-	DPS_LOG_DEBUG("received an ICMP message with unsupported type");
-	DPS_LOG_DEBUG("icmp, src_ip: %s, dst_ip: %s, error code %d", ip_src_buf, ip_dst_buf, df_ptr->l4_info.icmp_field.icmp_code);
+	DPS_LOG_DEBUG("received an ICMP error message with unsupported type %d, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT,
+				  df_ptr->l4_info.icmp_field.icmp_type,
+				  DP_IPV4_PRINT_BYTES(df_ptr->src.src_addr), DP_IPV4_PRINT_BYTES(df_ptr->dst.dst_addr));
 	return DP_ERROR;
 }
 
@@ -233,16 +227,14 @@ void dp_free_flow(struct dp_ref *ref)
 
 void dp_free_network_nat_port(struct flow_value *cntrack)
 {
-	char printed_ip_buf[18] = {0};
 	int ret;
 
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 		ret = dp_remove_network_snat_port(cntrack);
-		if (DP_FAILED(ret)) {
-			dp_fill_ipv4_print_buff(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst, printed_ip_buf);
-			DPS_LOG_ERR("failed to remove an allocated network NAT port: %s::%d, code %d", printed_ip_buf,
-						cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst, ret);
-		}
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("failed to remove an allocated network NAT port: " DP_IPV4_PRINT_FMT "::%d %s",
+						DP_IPV4_PRINT_BYTES(htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst)),
+						cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst, dp_strerror(ret));
 	}
 }
 
@@ -303,9 +295,7 @@ void dp_process_aged_flows_non_offload(void)
 
 hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
 {
-
 	//It is not necessary to first test if this key exists, since for now, this function
 	// is always called after either a flow is checked or added in the firewall node.
 	return rte_hash_hash(ipv4_flow_tbl, key);
-
 }
