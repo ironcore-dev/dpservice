@@ -50,8 +50,6 @@ int dp_get_num_of_vfs();
 
 int rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type);
 
-void dp_fill_ipv4_print_buff(unsigned int ip, char *buf);
-
 
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id);
 
@@ -59,7 +57,6 @@ void dp_free_jhash_table(struct rte_hash *table);
 
 
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
-// TODO(plague): apply this to dp_fill_ipv4_print_buff()
 #define DP_IPV4_PRINT_FMT       "%u.%u.%u.%u"
 #define DP_IPV4_PRINT_BYTES(ip) (ip) & 0xFF, \
 								((ip) >> 8) & 0xFF, \

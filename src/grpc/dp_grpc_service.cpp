@@ -1,6 +1,5 @@
 #include "grpc/dp_grpc_service.h"
 #include "grpc/dp_async_grpc.h"
-#include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_port.h"
 #include "dpdk_layer.h"

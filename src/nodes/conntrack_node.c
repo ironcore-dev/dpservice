@@ -208,8 +208,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df_ptr;
 	struct flow_key *key;
-	int key_search_result;
 	bool key_cmp_result;
+	int ret;
 
 	df_ptr = get_dp_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -241,16 +241,18 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 													(const unsigned char *)curr_key,
 													sizeof(struct flow_key));
 		if (!prev_key || !key_cmp_result) {
-			key_search_result = dp_get_flow_data(key, (void **)&flow_val);
-			if (unlikely(key_search_result == -ENOENT)) {
-				flow_val = flow_table_insert_entry(key, df_ptr, m);
-				if (!flow_val) {
-					DPNODE_LOG_WARNING(node, "Failed to add a flow table entry due to NULL flow_val pointer");
+			ret = dp_get_flow_data(key, (void **)&flow_val);
+			if (unlikely(DP_FAILED(ret))) {
+				if (likely(ret == -ENOENT)) {
+					flow_val = flow_table_insert_entry(key, df_ptr, m);
+					if (unlikely(!flow_val)) {
+						DPNODE_LOG_WARNING(node, "Failed to allocate a new flow table entry");
+						return CONNTRACK_NEXT_DROP;
+					}
+				} else {
+					DPNODE_LOG_WARNING(node, "Flow table key search failed %s", dp_strerror(ret));
 					return CONNTRACK_NEXT_DROP;
 				}
-			} else if (key_search_result == -EINVAL) {
-				DPNODE_LOG_WARNING(node, "Conntrack operation: hash key search failed due to invalid parameters");
-				return CONNTRACK_NEXT_DROP;
 			} else {
 				change_flow_state_dir(key, flow_val, df_ptr);
 			}

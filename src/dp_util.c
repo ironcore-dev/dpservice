@@ -107,16 +107,6 @@ int rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 }
 
 
-void dp_fill_ipv4_print_buff(unsigned int ip, char *buf)
-{
-	snprintf(buf, 18, "%d.%d.%d.%d",
-		(ip >> 24) & 0xFF,
-		(ip >> 16) & 0xFF,
-		(ip >> 8) & 0xFF,
-		ip & 0xFF);
-}
-
-
 static uint32_t dp_jhash_1word(const void *key, uint32_t length, uint32_t initval)
 {
 	return rte_jhash_1word(((const uint32_t *)key)[0], initval);
