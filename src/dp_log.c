@@ -89,6 +89,7 @@ static inline int get_timestamp(char *buf)
 	return DP_OK;
 }
 
+// TODO(plague): remove this once completely phased-out
 void _dp_log(unsigned int level, unsigned int logtype,
 #ifdef DEBUG
 			 const char *file, unsigned int line, const char *function,
@@ -145,6 +146,69 @@ void _dp_log_early(FILE *f, const char *format, ...)
 	va_start(args, format);
 	vfprintf(f, format, args);
 	va_end(args);
+
+	fputc('\n', f);
+
+	fflush(f);
+
+	funlockfile(f);
+}
+
+
+void _dp_log_structured(unsigned int level, unsigned int logtype,
+#ifdef DEBUG
+						const char *file, unsigned int line, const char *function,
+#endif
+						const char *loglevel, const char *logger,
+						const char *message, ...)
+{
+	// TODO this is a copy of _dp_log(), but that will get phased-out, so no problem
+	char timestamp[TIMESTAMP_MAXSIZE];
+	va_list args;
+	FILE *f;
+	const char *key;
+	const char *format;
+	const void *value;
+
+	// TODO(plague): think about moving this check out, to prevent unnecessary calls?
+	if (!rte_log_can_log(logtype, level))
+		return;
+
+	if (DP_FAILED(get_timestamp(timestamp)))
+		memcpy(timestamp, TIMESTAMP_NUL, TIMESTAMP_MAXSIZE);  // including \0
+
+	// generate a new thread ID if this is the first log in a thread
+	if (!thread_id)
+		thread_id = __sync_add_and_fetch(&thread_id_generator, 1);
+
+	f = rte_log_get_stream();
+
+	flockfile(f);
+
+	if (log_colors)
+		set_color(f, level);
+
+	fprintf(f, "%s %u(%s) %s %s: %s", timestamp, thread_id, thread_name, loglevel, logger, message);
+
+	va_start(args, message);
+
+	while ((key = va_arg(args, const char *))) {
+		// as va_arg is a macro acting on a stack, there are no checks possible
+		format = va_arg(args, const char *);
+		value = va_arg(args, const void *);
+		// TODO(plague): I guess IPv4/IPv6 printing needs to be done here..
+		// The only way I can see is using custom format like "!4" and "!6"?
+		fprintf(f, ", %s: ", key);
+		fprintf(f, format, value);
+	}
+	va_end(args);
+
+#ifdef DEBUG
+	fprintf(f, " [%s:%u:%s()]", file, line, function);
+#endif
+
+	if (log_colors)
+		clear_color(f);
 
 	fputc('\n', f);
 

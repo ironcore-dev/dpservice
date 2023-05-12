@@ -80,8 +80,10 @@ static __rte_always_inline void dp_remove_vnf_entry(struct dp_vnf_value *val, en
 
 static __rte_always_inline void dp_remove_vnf_with_key(uint8_t *key)
 {
-	if (DP_FAILED(dp_del_vnf_with_vnf_key(key)))
-		DPGRPC_LOG_WARNING("VNF key does not exist");
+	int ret = dp_del_vnf_with_vnf_key(key);
+
+	if (DP_FAILED(ret))
+		DPGRPC_LOG_WARNING("Cannot remove VNF key", DP_LOG_RET(ret));
 }
 
 struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
@@ -91,7 +93,7 @@ struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbu
 
 	m_new = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
 	if (!m_new) {
-		printf("grpc rte_mbuf allocation failed\n");
+		DPGRPC_LOG_WARNING("grpc rte_mbuf allocation failed");
 		return NULL;
 	}
 	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);

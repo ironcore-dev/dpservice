@@ -19,7 +19,9 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 		ret_val = inet_aton(grpc_rule->sourceprefix().address().c_str(),
 					(in_addr*)&dp_rule->src_ip);
 		if (ret_val == 0)
-			DPGRPC_LOG_WARNING("ConvertGRPCFwallRuleToDPFWallRule: wrong source pfx address: %s\n", grpc_rule->sourceprefix().address().c_str());
+			DPGRPC_LOG_WARNING("Bad firewall rule, wrong source prefix address",
+							   DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+							   DP_LOG_FWSRC(grpc_rule->sourceprefix().address().c_str()));
 		if (grpc_rule->sourceprefix().prefixlength() != DP_FWALL_MATCH_ANY_LENGTH)
 			dp_rule->src_ip_mask = ~((1 << (32 - grpc_rule->sourceprefix().prefixlength())) - 1);
 		else
@@ -30,7 +32,9 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 		ret_val = inet_aton(grpc_rule->destinationprefix().address().c_str(),
 					(in_addr*)&dp_rule->dest_ip);
 		if (ret_val == 0)
-			DPGRPC_LOG_WARNING("ConvertGRPCFwallRuleToDPFWallRule: wrong dest pfx address: %s\n", grpc_rule->destinationprefix().address().c_str());
+			DPGRPC_LOG_WARNING("Bad firewall rule, wrong destination prefix address",
+							   DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+							   DP_LOG_FWSRC(grpc_rule->destinationprefix().address().c_str()));
 		if (grpc_rule->destinationprefix().prefixlength() != DP_FWALL_MATCH_ANY_LENGTH)
 			dp_rule->dest_ip_mask = ~((1 << (32 - grpc_rule->destinationprefix().prefixlength())) - 1);
 		else
@@ -56,6 +60,13 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocolfilter().tcp().dstportlower();
 			dp_rule->filter.tcp_udp.src_port.upper = grpc_rule->protocolfilter().tcp().srcportupper();
 			dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule->protocolfilter().tcp().dstportupper();
+			DPGRPC_LOG_INFO("Adding firewall rule filter",
+							DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+							DP_LOG_FWPROTO(dp_rule->protocol),
+							DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
+							DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
+							DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
+							DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
 		break;
 		case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
 			dp_rule->protocol = IPPROTO_UDP;
@@ -63,18 +74,32 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocolfilter().udp().dstportlower();
 			dp_rule->filter.tcp_udp.src_port.upper = grpc_rule->protocolfilter().udp().srcportupper();
 			dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule->protocolfilter().udp().dstportupper();
+			DPGRPC_LOG_INFO("Adding firewall rule filter",
+							DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+							DP_LOG_FWPROTO(dp_rule->protocol),
+							DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
+							DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
+							DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
+							DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
 		break;
 		case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
 			dp_rule->protocol = IPPROTO_ICMP;
 			dp_rule->filter.icmp.icmp_type = grpc_rule->protocolfilter().icmp().icmptype();
 			dp_rule->filter.icmp.icmp_code = grpc_rule->protocolfilter().icmp().icmpcode();
+			DPGRPC_LOG_INFO("Adding firewall rule filter",
+							DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+							DP_LOG_FWPROTO(dp_rule->protocol),
+							DP_LOG_FWICMPTYPE(dp_rule->filter.icmp.icmp_type),
+							DP_LOG_FWICMPCODE(dp_rule->filter.icmp.icmp_code));
 		break;
 		case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
 		default:
 			dp_rule->protocol = DP_FWALL_MATCH_ANY_PROTOCOL;
 			dp_rule->filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT;
 			dp_rule->filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT;
-		break;
+			DPGRPC_LOG_INFO("Adding firewall rule filter",
+							DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+							DP_LOG_FWPROTO(dp_rule->protocol));
 	}
 }
 
@@ -183,7 +208,7 @@ int InitCall::Proceed()
 	if (status_ == REQUEST) {
 		new InitCall(service_, cq_);
 		status_ = AWAIT_MSG;
-		DPGRPC_LOG_INFO("init called");
+		DPGRPC_LOG_INFO("Initializing");
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
@@ -210,7 +235,10 @@ int CreateLBCall::Proceed()
 		new CreateLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("create LoadBalancer called for id: %s", request_.loadbalancerid().c_str());
+		DPGRPC_LOG_INFO("Creating loadbalancer",
+						DP_LOG_LBID(request_.loadbalancerid().c_str()),
+						DP_LOG_VNI(request_.vni()),
+						DP_LOG_IPV4STR(request_.lbvipip().address().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -220,9 +248,14 @@ int CreateLBCall::Proceed()
 			ret_val = inet_aton(request_.lbvipip().address().c_str(),
 					  (in_addr*)&request.add_lb_vip.back.back_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("CreateLB: Wrong loadbalancer vip ip %s", request_.lbvipip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid loadbalancer VIP",
+								   DP_LOG_IPV4STR(request_.lbvipip().address().c_str()));
 			size = (request_.lbports_size() >= DP_LB_PORT_SIZE) ? DP_LB_PORT_SIZE : request_.lbports_size();
 			for (i = 0; i < size; i++) {
+				DPGRPC_LOG_INFO("Adding loadbalancer port",
+								DP_LOG_LBID(request_.loadbalancerid().c_str()),
+								DP_LOG_PORT(request_.lbports(i).port()),
+								DP_LOG_PROTO(request_.lbports(i).protocol()));
 				request.add_lb.lbports[i].port = request_.lbports(i).port();
 				if (request_.lbports(i).protocol() == TCP)
 					request.add_lb.lbports[i].protocol = DP_IP_PROTO_TCP;
@@ -231,6 +264,7 @@ int CreateLBCall::Proceed()
 			}
 		} else {
 			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
+			// FIXME: what happens here?
 		}
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -265,7 +299,8 @@ int DelLBCall::Proceed()
 		new DelLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete LoadBalancer called for id: %s", request_.loadbalancerid().c_str());
+		DPGRPC_LOG_INFO("Removing loadbalancer",
+						DP_LOG_LBID(request_.loadbalancerid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -304,7 +339,8 @@ int GetLBCall::Proceed()
 		new GetLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("get LoadBalancer called for id: %s", request_.loadbalancerid().c_str());
+		DPGRPC_LOG_INFO("Getting loadbalancer info",
+						DP_LOG_LBID(request_.loadbalancerid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -361,8 +397,9 @@ int AddLBVIPCall::Proceed()
 		new AddLBVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("add LoadBalancer target called for id: %s adding target %s",
-				request_.loadbalancerid().c_str(), request_.targetip().address().c_str());
+		DPGRPC_LOG_INFO("Adding loadbalancer target",
+						DP_LOG_LBID(request_.loadbalancerid().c_str()),
+						DP_LOG_IPV6STR(request_.targetip().address().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -371,7 +408,8 @@ int AddLBVIPCall::Proceed()
 			ret_val = inet_pton(AF_INET6, request_.targetip().address().c_str(),
 					  request.add_lb_vip.back.back_addr6);
 			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("AddLBVIP: wrong loadbalancer target ip: %s", request_.targetip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid loadbalancer target IP",
+								   DP_LOG_IPV6STR(request_.targetip().address().c_str()));
 		} else {
 			request.add_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
@@ -405,7 +443,9 @@ int DelLBVIPCall::Proceed()
 		new DelLBVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete LoadBalancer target called for id: %s", request_.loadbalancerid().c_str());
+		DPGRPC_LOG_INFO("Removing loadbalancer target",
+						DP_LOG_LBID(request_.loadbalancerid().c_str()),
+						DP_LOG_IPV6STR(request_.targetip().address().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -414,7 +454,8 @@ int DelLBVIPCall::Proceed()
 			ret_val = inet_pton(AF_INET6, request_.targetip().address().c_str(),
 					  request.del_lb_vip.back.back_addr6);
 			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("DelLBVIP: wrong loadbalancer target ip: %s", request_.targetip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid loadbalancer target IP",
+								   DP_LOG_IPV6STR(request_.targetip().address().c_str()));
 		} else {
 			request.del_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
@@ -452,7 +493,8 @@ int GetLBVIPBackendsCall::Proceed()
 		new GetLBVIPBackendsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("list LoadBalancer targets called for id: %s", request_.loadbalancerid().c_str());
+		DPGRPC_LOG_INFO("Listing loadbalancer targets",
+						DP_LOG_LBID(request_.loadbalancerid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.qry_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
@@ -496,7 +538,10 @@ int AddPfxCall::Proceed()
 		new AddPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("add AliasPrefix called for id: %s", request_.interfaceid().interfaceid().c_str());
+		DPGRPC_LOG_INFO("Adding alias prefix",
+						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
+						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -505,7 +550,8 @@ int AddPfxCall::Proceed()
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddPfx: wrong prefix ip %s", request_.prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid alias prefix IP",
+								   DP_LOG_IPV4STR(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
 		dp_send_to_worker(&request);
@@ -542,7 +588,10 @@ int DelPfxCall::Proceed()
 		new DelPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete AliasPrefix called for id: %s", request_.interfaceid().interfaceid().c_str());
+		DPGRPC_LOG_INFO("Removing alias prefix",
+						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
+						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -551,7 +600,8 @@ int DelPfxCall::Proceed()
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("DelPfx: wrong prefix ip %s", request_.prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid alias prefix IP",
+								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
 		dp_send_to_worker(&request);
@@ -588,7 +638,8 @@ int ListPfxCall::Proceed()
 		new ListPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("list AliasPrefix(es) called for id: %s", request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Listing alias prefixes",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -636,7 +687,10 @@ int CreateLBTargetPfxCall::Proceed()
 		new CreateLBTargetPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("CreateLBTargetPfx called for id: %s", request_.interfaceid().interfaceid().c_str());
+		DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
+						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
+						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -645,7 +699,8 @@ int CreateLBTargetPfxCall::Proceed()
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("CreateLBTargetPfx: wrong target pfx address: %s\n", request_.prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid target prefix IP",
+								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
 		dp_send_to_worker(&request);
@@ -682,7 +737,10 @@ int DelLBTargetPfxCall::Proceed()
 		new DelLBTargetPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("DelLBTargetPfx called for id: %s", request_.interfaceid().interfaceid().c_str());
+		DPGRPC_LOG_INFO("Removing loadbalancer target prefix",
+						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
+						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
@@ -691,7 +749,8 @@ int DelLBTargetPfxCall::Proceed()
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.pfx_ip.pfx_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("DelLBTargetPfx: wrong target prefix address: %s\n", request_.prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid target prefix IP",
+								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
 		dp_send_to_worker(&request);
@@ -728,7 +787,8 @@ int ListLBTargetPfxCall::Proceed()
 		new ListLBTargetPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("ListLBTargetPfxCall called for id: %s", request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Listing loadbalancer target prefixes",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -776,18 +836,19 @@ int AddVIPCall::Proceed()
 		new AddVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPGRPC_LOG_INFO("Setting virtual IP",
+						DP_LOG_IFACE(request_.interfaceid().c_str()),
+						DP_LOG_IPV4STR(request_.interfacevipip().address().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		if (request_.interfacevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			DPGRPC_LOG_INFO("add VIP called for id: %s, with IPv4 addr: %s",
-							request_.interfaceid().c_str(),
-							request_.interfacevipip().address().c_str());
 			ret_val = inet_aton(request_.interfacevipip().address().c_str(),
 					  (in_addr*)&request.add_vip.vip.vip_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddVIP: wrong ip: %s\n", request_.interfacevipip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid virtual IP",
+								   DP_LOG_IPV4STR(request_.interfacevipip().address().c_str()));
 		}
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -817,13 +878,13 @@ int DelVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	struct in_addr addr;
 
 	if (status_ == REQUEST) {
 		new DelVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete VIP called for id: %s", request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Removing virtual IP",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -837,12 +898,6 @@ int DelVIPCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
-
-		if (!reply.com_head.err_code) {
-			addr.s_addr = htonl(reply.get_vip.vip.vip_addr);
-			DPGRPC_LOG_INFO("Successfully deleted an associated VIP IPv4 addr: %s", inet_ntoa(addr));
-		}
-
 		status_ = FINISH;
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
@@ -865,7 +920,8 @@ int GetVIPCall::Proceed()
 		new GetVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("get VIP called for id: %s", request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Getting virtual IP",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -910,20 +966,29 @@ int AddInterfaceCall::Proceed()
 		new AddInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("add Interface called for id: %s IP: %s dpdk pci: %s",
-				request_.interfaceid().c_str(), request_.ipv4config().primaryaddress().c_str(),
-				request_.devicename().c_str());
+		DPGRPC_LOG_INFO("Adding interface",
+						DP_LOG_IFACE(request_.interfaceid().c_str()),
+						DP_LOG_VNI(request_.vni()),
+						DP_LOG_IPV4STR(request_.ipv4config().primaryaddress().c_str()),
+						DP_LOG_IPV6STR(request_.ipv6config().primaryaddress().c_str()),
+						DP_LOG_PCI(request_.devicename().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.add_machine.vni = request_.vni();
 		ret_val = inet_aton(request_.ipv4config().primaryaddress().c_str(),
 				(in_addr*)&request.add_machine.ip4_addr);
 		if (ret_val == 0)
-			DPGRPC_LOG_WARNING("AddInterface: wrong primary ip: %s\n", request_.ipv4config().primaryaddress().c_str());
+			DPGRPC_LOG_WARNING("AddInterface: wrong primary IP",
+							   DP_LOG_IPV4STR(request_.ipv4config().primaryaddress().c_str()));
 		if (!request_.ipv4config().pxeconfig().nextserver().empty()) {
+			DPGRPC_LOG_INFO("Setting PXE",
+							DP_LOG_IFACE(request_.interfaceid().c_str()),
+							DP_LOG_PXE_SRV(request_.ipv4config().pxeconfig().nextserver().c_str()),
+							DP_LOG_PXE_PATH(request_.ipv4config().pxeconfig().bootfilename().c_str()));
 			ret_val = inet_aton(request_.ipv4config().pxeconfig().nextserver().c_str(),
 					(in_addr*)&request.add_machine.ip4_pxe_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddInterface: wrong next server ip: %s\n", request_.ipv4config().pxeconfig().nextserver().c_str());
+				DPGRPC_LOG_WARNING("AddInterface: wrong PXE next server IP",
+								   DP_LOG_IPV4STR(request_.ipv4config().pxeconfig().nextserver().c_str()));
 		}
 		snprintf(request.add_machine.pxe_str, VM_MACHINE_PXE_STR_LEN, "%s",
 				 request_.ipv4config().pxeconfig().bootfilename().c_str());
@@ -932,7 +997,8 @@ int AddInterfaceCall::Proceed()
 		ret_val = inet_pton(AF_INET6, request_.ipv6config().primaryaddress().c_str(),
 								request.add_machine.ip6_addr6);
 		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("AddInterface: wrong ipv6 primary ip: %s\n", request_.ipv6config().primaryaddress().c_str());
+			DPGRPC_LOG_WARNING("AddInterface: wrong IPv6 primary IP",
+							   DP_LOG_IPV6STR(request_.ipv6config().primaryaddress().c_str()));
 		snprintf(request.add_machine.machine_id, VM_MACHINE_ID_STR_LEN, "%s",
 				 request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
@@ -977,8 +1043,8 @@ int DelInterfaceCall::Proceed()
 		new DelInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete Interface called for id: %s",
-				request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Removing interface",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -1016,8 +1082,8 @@ int GetInterfaceCall::Proceed()
 		new GetInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("get Interface called for id: %s",
-				request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Getting interface info",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -1067,9 +1133,12 @@ int AddRouteCall::Proceed()
 		new AddRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("add Route called with parameters vni: %d prefix: %s length %d target hop %s",
-				request_.vni().vni(), request_.route().prefix().address().c_str(), request_.route().prefix().prefixlength(),
-				request_.route().nexthopaddress().c_str());
+		DPGRPC_LOG_INFO("Adding route",
+						DP_LOG_VNI(request_.vni().vni()),
+						DP_LOG_PREFIX(request_.route().prefix().address().c_str()),
+						DP_LOG_PREFLEN(request_.route().prefix().prefixlength()),
+						DP_LOG_TVNI(request_.route().nexthopvni()),
+						DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
@@ -1077,20 +1146,23 @@ int AddRouteCall::Proceed()
 		ret_val = inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
 				  request.route.trgt_ip.addr6);
 		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("AddRoute: wrong nexthop ip: %s\n", request_.route().nexthopaddress().c_str());
+			DPGRPC_LOG_WARNING("Invalid nexthop IP",
+							   DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
 		request.route.pfx_length = request_.route().prefix().prefixlength();
-		if(request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.route().prefix().address().c_str(),
 					(in_addr*)&request.route.pfx_ip.addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddRoute: wrong Prefix addr: %s\n", request_.route().prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid prefix IP",
+								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
 		} else {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
 			ret_val = inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
 					request.route.pfx_ip.addr6);
 			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("AddRoute: wrong ipv6 prefix addr: %s\n", request_.route().prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid prefix IP",
+								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
 		}
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -1122,7 +1194,12 @@ int DelRouteCall::Proceed()
 		new DelRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete Route called");
+		DPGRPC_LOG_INFO("Removing route",
+						DP_LOG_VNI(request_.vni().vni()),
+						DP_LOG_PREFIX(request_.route().prefix().address().c_str()),
+						DP_LOG_PREFLEN(request_.route().prefix().prefixlength()),
+						DP_LOG_TVNI(request_.route().nexthopvni()), // TODO re-check for target vni everywhere
+						DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
@@ -1131,7 +1208,8 @@ int DelRouteCall::Proceed()
 			ret_val = inet_pton(AF_INET6, request_.route().nexthopaddress().c_str(),
 					request.route.trgt_ip.addr6);
 			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("DelRoute: wrong nexthop ip: %s\n", request_.route().nexthopaddress().c_str());
+				DPGRPC_LOG_WARNING("Invalid nexthop IP",
+								   DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
 		}
 		request.route.pfx_length = request_.route().prefix().prefixlength();
 		if (request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -1139,13 +1217,15 @@ int DelRouteCall::Proceed()
 			ret_val = inet_aton(request_.route().prefix().address().c_str(),
 					(in_addr*)&request.route.pfx_ip.addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("DelRoute: wrong prefix addr: %s\n", request_.route().prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid prefix IP",
+								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
 		} else {
 			request.route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
 			ret_val = inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
 					request.route.pfx_ip.addr6);
 			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("DelRoute: wrong ivv6 prefix addr: %s\n", request_.route().prefix().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid prefix IP",
+								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
 		}
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -1184,7 +1264,8 @@ int ListRoutesCall::Proceed()
 		new ListRoutesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("list Routes called");
+		DPGRPC_LOG_INFO("Listing routes",
+						DP_LOG_VNI(request_.vni()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni();
 		dp_send_to_worker(&request);
@@ -1246,6 +1327,11 @@ int AddNATVIPCall::Proceed()
 		new AddNATVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPGRPC_LOG_INFO("Setting NAT IP",
+						DP_LOG_IFACE(request_.interfaceid().c_str()),
+						DP_LOG_IPV4STR(request_.natvipip().address().c_str()),
+						DP_LOG_MINPORT(request_.minport()),
+						DP_LOG_MAXPORT(request_.maxport()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -1254,15 +1340,14 @@ int AddNATVIPCall::Proceed()
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_nat_vip.vip.vip_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddNATVIP: wrong nat vip addr: %s\n", request_.natvipip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid NAT IP",
+								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 		}
 
 		// maybe add a validity check here to ensure minport is not greater than 2^30
 		request.add_nat_vip.port_range[0] = request_.minport();
 		request.add_nat_vip.port_range[1] = request_.maxport();
 
-		DPGRPC_LOG_INFO("AddNATVIP is called to add a local NAT entry: interface %s -> NAT IP %s, with port range [%d, %d)",
-				 request_.interfaceid().c_str(), request_.natvipip().address().c_str(), request_.minport(), request_.maxport());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1300,7 +1385,8 @@ int GetNATVIPCall::Proceed()
 		new GetNATVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("get NAT VIP called for id: %s", request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Getting NAT IP",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -1340,18 +1426,16 @@ int DeleteNATVIPCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	grpc::Status ret = grpc::Status::OK;
-	struct in_addr addr;
 
 	if (status_ == REQUEST) {
 		new DeleteNATVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPGRPC_LOG_INFO("Removing NAT IP",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-
-		DPGRPC_LOG_INFO("DeleteNATVIP is called to delete a local NAT entry: interface %s",
-				 request_.interfaceid().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1363,12 +1447,6 @@ int DeleteNATVIPCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
-
-		if (!reply.com_head.err_code) {
-			addr.s_addr = htonl(reply.get_vip.vip.vip_addr);
-			DPGRPC_LOG_INFO("Successfully deleted from an associated NATVIP IPv4: %s", inet_ntoa(addr));
-		}
-
 		status_ = FINISH;
 		reply_.set_error(reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
@@ -1390,6 +1468,12 @@ int AddNeighborNATCall::Proceed()
 		new AddNeighborNATCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPGRPC_LOG_INFO("Adding neighboring NAT",
+						DP_LOG_VNI(request_.vni()),
+						DP_LOG_IPV4STR(request_.natvipip().address().c_str()),
+						DP_LOG_MINPORT(request_.minport()),
+						DP_LOG_MAXPORT(request_.maxport()),
+						DP_LOG_IPV6STR(request_.underlayroute().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.add_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -1397,8 +1481,10 @@ int AddNeighborNATCall::Proceed()
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_nat_neigh.vip.vip_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddNeighborNAT: wrong NAT IP %s\n", request_.natvipip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid NAT IP",
+								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 		}
+		// FIXME adding ipv6 will break this
 
 		// maybe add a validity check here to ensure minport is not greater than 2^30
 		request.add_nat_neigh.vni = request_.vni();
@@ -1407,9 +1493,8 @@ int AddNeighborNATCall::Proceed()
 		ret_val = inet_pton(AF_INET6, request_.underlayroute().c_str(),
 				request.add_nat_neigh.route);
 		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("AddNeighborNAT: wrong route IP %s\n", request_.underlayroute().c_str());
-		DPGRPC_LOG_INFO("AddNeighborNAT is called to add a neigh NAT entry: NAT IP %s, port range [%d, %d) for vni %d, with route %s \n",
-				request_.natvipip().address().c_str(), request_.minport(), request_.maxport(), request_.vni(), request_.underlayroute().c_str());
+			DPGRPC_LOG_WARNING("Invalid underlay IP",
+							   DP_LOG_IPV6STR(request_.underlayroute().c_str()));
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1442,6 +1527,11 @@ int DeleteNeighborNATCall::Proceed()
 		new DeleteNeighborNATCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
+		DPGRPC_LOG_INFO("Removing neighboring NAT",
+						DP_LOG_VNI(request_.vni()),
+						DP_LOG_IPV4STR(request_.natvipip().address().c_str()),
+						DP_LOG_MINPORT(request_.minport()),
+						DP_LOG_MAXPORT(request_.maxport()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.del_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 
@@ -1450,7 +1540,8 @@ int DeleteNeighborNATCall::Proceed()
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.del_nat_neigh.vip.vip_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("DeleteNeighborNAT: wrong NAT IP %s\n", request_.natvipip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid NAT IP",
+								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 		}
 
 		// maybe add a validity check here to ensure minport is not greater than 2^30
@@ -1458,8 +1549,6 @@ int DeleteNeighborNATCall::Proceed()
 		request.del_nat_neigh.port_range[0] = request_.minport();
 		request.del_nat_neigh.port_range[1] = request_.maxport();
 
-		DPGRPC_LOG_INFO("DeleteNeighborNAT is called to delete a neigh NAT entry: NAT IP %s, port range [%d, %d) for vni %d",
-				request_.natvipip().address().c_str(), request_.minport(), request_.maxport(), request_.vni());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1497,7 +1586,7 @@ int ListInterfacesCall::Proceed()
 		new ListInterfacesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("list Interfaces called");
+		DPGRPC_LOG_INFO("Listing interfaces");
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
@@ -1556,23 +1645,25 @@ int GetNATInfoCall::Proceed()
 		new GetNATInfoCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-
+		DPGRPC_LOG_INFO("Getting NAT info",
+						DP_LOG_NATINFOTYPE(request_.natinfotype()),
+						DP_LOG_IPV4STR(request_.natvipip().address().c_str())),
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 
 		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
 			request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_LOCAL;
 		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
 			request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+		// FIXME else enter infinite wait in caller
 
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.get_nat_entry.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.get_nat_entry.vip.vip_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("getNATInfo: wrong NAT addr%s", request_.natvipip().address().c_str());
+				DPGRPC_LOG_WARNING("Invalid NAT IP",
+								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 		}
-
-		DPGRPC_LOG_INFO("getNATInfo is called to get entries for NAT IP %s", request_.natvipip().address().c_str());
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1620,23 +1711,32 @@ int GetNATInfoCall::Proceed()
 	return 0;
 }
 
-
 int AddFirewallRuleCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
 	Status *err_status;
+	const FirewallRule *grpc_rule;
 
 	if (status_ == REQUEST) {
 		new AddFirewallRuleCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("add Firewall Rule called for interface id: %s and rule id: %s", request_.interfaceid().c_str(),
-						request_.rule().ruleid().c_str());
+		grpc_rule = &request_.rule();
+		DPGRPC_LOG_INFO("Adding firewall rule",
+						DP_LOG_IFACE(request_.interfaceid().c_str()),
+						DP_LOG_FWRULE(grpc_rule->ruleid().c_str()),
+						DP_LOG_FWPRIO(grpc_rule->priority()),
+						DP_LOG_FWDIR(grpc_rule->direction()),
+						DP_LOG_FWACTION(grpc_rule->action()),
+						DP_LOG_FWSRC(grpc_rule->sourceprefix().address().c_str()),
+						DP_LOG_FWSRCLEN(grpc_rule->sourceprefix().prefixlength()),
+						DP_LOG_FWDST(grpc_rule->destinationprefix().address().c_str()),
+						DP_LOG_FWDSTLEN(grpc_rule->destinationprefix().prefixlength()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		ConvertGRPCFwallRuleToDPFWallRule(&request_.rule(), &request.fw_rule.rule);
+		ConvertGRPCFwallRuleToDPFWallRule(grpc_rule, &request.fw_rule.rule);
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1660,7 +1760,6 @@ int AddFirewallRuleCall::Proceed()
 	return 0;
 }
 
-
 int DelFirewallRuleCall::Proceed()
 {
 	dp_request request = {0};
@@ -1670,8 +1769,9 @@ int DelFirewallRuleCall::Proceed()
 		new DelFirewallRuleCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("delete Firewall Rule called for interface id: %s and rule id: %s", request_.interfaceid().c_str(),
-						request_.ruleid().c_str());
+		DPGRPC_LOG_INFO("Removing firewall rule",
+						DP_LOG_IFACE(request_.interfaceid().c_str()),
+						DP_LOG_FWRULE(request_.ruleid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -1708,8 +1808,9 @@ int GetFirewallRuleCall::Proceed()
 		new GetFirewallRuleCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("get Firewall Rule called for interface id: %s and rule id: %s",
-						request_.interfaceid().c_str(), request_.ruleid().c_str());
+		DPGRPC_LOG_INFO("Getting firewall rule info",
+						DP_LOG_IFACE(request_.interfaceid().c_str()),
+						DP_LOG_FWRULE(request_.ruleid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
@@ -1755,8 +1856,8 @@ int ListFirewallRulesCall::Proceed()
 		new ListFirewallRulesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("list Firewall Rule called for interface id: %s",
-						request_.interfaceid().c_str());
+		DPGRPC_LOG_INFO("Listing firewall rules",
+						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
