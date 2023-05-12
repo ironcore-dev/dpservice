@@ -33,7 +33,7 @@ bool dp_is_vni_route_tbl_available(int vni, int type, int socketid)
 	if (ret == -ENOENT) {
 		return false;
 	} else if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("vni %d type %d lookup error\n", vni, type);
+		DPS_LOG_ERR("vni %d type %d lookup error", vni, type);
 		return false;
 	}
 
@@ -113,7 +113,7 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 	if (ret == -ENOENT) {
 		temp_val = rte_zmalloc("vni_handle_table", sizeof(struct dp_vni_value), RTE_CACHE_LINE_SIZE);
 		if (!temp_val) {
-			DPS_LOG_ERR("vni %d creation malloc failed\n", vni);
+			DPS_LOG_ERR("vni %d creation malloc failed", vni);
 			return DP_ERROR;
 		}
 		if (type == DP_IP_PROTO_IPV4) {
@@ -125,14 +125,15 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 		} else {
 			goto err;
 		}
-		if (DP_FAILED(rte_hash_add_key_data(vni_handle_tbl, &vni_key, temp_val))) {
-			DPS_LOG_WARNING("vni %d route4 hashtable addition failed\n", vni);
+		ret = rte_hash_add_key_data(vni_handle_tbl, &vni_key, temp_val);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_WARNING("vni %d route4 hashtable addition failed %s", vni, dp_strerror(ret));
 			return DP_ERROR;
 		}
 		temp_val->vni = vni;
 		dp_ref_init(&temp_val->ref_count, dp_free_vni_value);
 	} else if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("vni %d creation error\n", vni);
+		DPS_LOG_ERR("vni %d creation error", vni);
 		return DP_ERROR;
 	} else {
 		if ((type == DP_IP_PROTO_IPV4) && !temp_val->ipv4[socketid]) {
@@ -150,7 +151,7 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 err:
 	rte_free(temp_val);
 err2:
-	DPS_LOG_ERR("vni %d creation type %d failed\n", vni, type);
+	DPS_LOG_ERR("vni %d creation type %d failed", vni, type);
 	return DP_ERROR;
 }
 

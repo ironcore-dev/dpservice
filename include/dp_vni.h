@@ -39,12 +39,17 @@ static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int 
 {
 	struct dp_vni_value *temp_val = NULL;
 	struct dp_vni_key vni_key;
+	int ret;
 
 	vni_key.type = DP_IP_PROTO_IPV4;
 	vni_key.vni = vni;
 
-	if (DP_FAILED(rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val)))
+	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
+	if (DP_FAILED(ret)) {
+		if (ret != -ENOENT)
+			DPS_LOG_ERR("vni %d type %d lookup error\n", vni, DP_IP_PROTO_IPV4);
 		return NULL;
+	}
 
 	if (!temp_val->ipv4[socketid])
 		return NULL;
@@ -56,12 +61,17 @@ static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int
 {
 	struct dp_vni_value *temp_val = NULL;
 	struct dp_vni_key vni_key;
+	int ret;
 
 	vni_key.type = DP_IP_PROTO_IPV6;
 	vni_key.vni = vni;
 
-	if (DP_FAILED(rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val)))
+	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
+	if (DP_FAILED(ret)) {
+		if (ret != -ENOENT)
+			DPS_LOG_ERR("vni %d type %d lookup error\n", vni, DP_IP_PROTO_IPV6);
 		return NULL;
+	}
 
 	if (!temp_val->ipv6[socketid])
 		return NULL;

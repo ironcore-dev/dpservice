@@ -188,7 +188,7 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 
 err_lb:
 	if (dp_delete_lb((void *)req->add_lb.lb_id))
-		DPGRPC_LOG_ERR("Error during lb deletion");
+		DPGRPC_LOG_ERR("Error during lb rollback deletion");
 err_vnf:
 	dp_remove_vnf_with_key(ul_addr6);
 err:
@@ -291,7 +291,7 @@ static int dp_process_init(dp_request *req, dp_reply *rep)
 static int dp_process_vni_in_use(dp_request *req, dp_reply *rep)
 {
 	if (req->vni_in_use.type == DP_VNI_IPV4)
-		rep->vni_in_use.in_use = dp_lpm_is_vni_in_use(req->vni_in_use.vni, DP_IP_PROTO_IPV4,
+		rep->vni_in_use.in_use = dp_is_vni_route_tbl_available(req->vni_in_use.vni, DP_IP_PROTO_IPV4,
 													  rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 
 	return EXIT_SUCCESS;
