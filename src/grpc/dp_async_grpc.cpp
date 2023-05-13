@@ -190,7 +190,8 @@ int IsVniInUseCall::Proceed()
 			break;
 		}
 		request.vni_in_use.vni = request_.vni();
-		DPGRPC_LOG_INFO("IsVniInUse called for vni %d type %d", request.vni_in_use.vni, request.vni_in_use.type);
+		DPGRPC_LOG_INFO("Checking VNI usage", DP_LOG_VNI(request.vni_in_use.vni),
+						DP_LOG_VNI_TYPE(request.vni_in_use.type));
 		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		return -1;
