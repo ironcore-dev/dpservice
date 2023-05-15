@@ -672,6 +672,22 @@ int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
 	return ++action_cnt;
 }
 
+int create_ipv6_set_action(struct rte_flow_action *action, int action_cnt,
+						   struct rte_flow_action_set_ipv6 *ipv6_action,
+						   uint8_t *ipv6, bool dir)
+{
+	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
+
+	if (dir == DP_IS_DST)
+		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV6_DST;
+	else
+		action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV6_SRC;
+
+	action[action_cnt].conf = ipv6_action;
+
+	return ++action_cnt;
+}
+
 int create_trans_proto_set_action(struct rte_flow_action *action, int action_cnt,
 									struct rte_flow_action_set_tp *tp_action,
 									uint16_t port, bool dir)

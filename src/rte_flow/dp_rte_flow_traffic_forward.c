@@ -492,6 +492,12 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 		action_cnt = create_trans_proto_set_action(action, action_cnt,
 										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
 
+	// replace dst ipv6 ip if it is a relayed nat flow
+	struct rte_flow_action_set_ipv6 set_ipv6;
+	if (df->flags.nat == DP_NAT_CHG_UL_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH)
+		action_cnt = create_ipv6_set_action(action, action_cnt,
+										    &set_ipv6, df->conntrack->nat_info.underlay_dst, DP_IS_DST);
+
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
 	struct rte_flow_action_age flow_age;
