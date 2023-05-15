@@ -17,7 +17,7 @@ extern "C"
 
 #define DP_TUNN_IPIP_ENCAP_SIZE sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv6_hdr)
 
-int dp_handle_traffic_forward_offloading(struct rte_mbuf *m,struct dp_flow *df);
+int dp_offload_handler(struct rte_mbuf *m,struct dp_flow *df);
 
 #ifdef __cplusplus
 }
