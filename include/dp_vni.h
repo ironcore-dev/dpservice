@@ -47,7 +47,7 @@ static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int 
 	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
-			DPS_LOG_ERR("vni %d type %d lookup error\n", vni, DP_IP_PROTO_IPV4);
+			DPS_LOG_ERR("vni %d type %d lookup error", vni, DP_IP_PROTO_IPV4);
 		return NULL;
 	}
 
@@ -69,7 +69,7 @@ static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int
 	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
-			DPS_LOG_ERR("vni %d type %d lookup error\n", vni, DP_IP_PROTO_IPV6);
+			DPS_LOG_ERR("vni %d type %d lookup error", vni, DP_IP_PROTO_IPV6);
 		return NULL;
 	}
 
