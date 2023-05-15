@@ -3,7 +3,7 @@
 #include "dp_log.h"
 #include "dp_error.h"
 
-static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 
 	struct underlay_conf *u_conf = get_underlay_conf();
@@ -304,7 +304,7 @@ static __rte_always_inline int dp_handle_tunnel_encap_offload(struct rte_mbuf *m
 	return 1;
 }
 
-static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 	bool cross_pf_port = m->port == dp_port_get_pf0_id() ? false : true;
 
@@ -616,7 +616,7 @@ static __rte_always_inline int dp_handle_tunnel_decap_offload(struct rte_mbuf *m
 	return 1;
 }
 
-static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 
 	struct rte_flow_attr attr;
@@ -777,19 +777,192 @@ static __rte_always_inline int dp_handle_local_traffic_forward(struct rte_mbuf *
 	return 1;
 }
 
+int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
+{
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
+	int pattern_cnt = 0;
+	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
+	int action_cnt = 0;
+
+	struct underlay_conf *u_conf = get_underlay_conf();
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	// in network traffic has to be set via the other pf port via hairpin
+	df->nxt_hop = m->port == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
+
+
+	// create flow match patterns -- eth
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+
+	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
+												&eth_spec, &eth_mask,
+												NULL, 0, NULL, 0,
+												htons(df->tun_info.l3_type));
+
+	// create flow match patterns -- ipv6
+	struct rte_flow_item_ipv6 ipv6_spec;
+	struct rte_flow_item_ipv6 ipv6_mask;
+
+	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+											&ipv6_spec, &ipv6_mask,
+											NULL, 0,
+											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
+											df->tun_info.proto_id);
+
+	// create flow match patterns -- inner packet, ipv6 or ipv4
+	struct rte_flow_item_ipv6 ol_ipv6_spec;
+	struct rte_flow_item_ipv6 ol_ipv6_mask;
+
+	struct rte_flow_item_ipv4 ol_ipv4_spec;
+	struct rte_flow_item_ipv4 ol_ipv4_mask;
+	uint32_t actual_ol_ipv4_addr;
+
+	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
+		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+												&ol_ipv6_spec, &ol_ipv6_mask,
+												NULL, 0,
+												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
+												df->l4_type);
+	else
+		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
+												&ol_ipv4_spec, &ol_ipv4_mask,
+												NULL, 0,
+												&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
+												df->l4_type);
+
+	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
+	struct rte_flow_item_tcp tcp_spec;
+	struct rte_flow_item_tcp tcp_mask;
+
+	if (df->l4_type == DP_IP_PROTO_TCP) 
+		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
+											   &tcp_spec, &tcp_mask,
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
+
+	
+
+	struct rte_flow_item_udp udp_spec;
+	struct rte_flow_item_udp udp_mask;
+
+	if (df->l4_type == DP_IP_PROTO_UDP)
+		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
+											   &udp_spec, &udp_mask,
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
+		
+
+	struct rte_flow_item_icmp icmp_spec;
+	struct rte_flow_item_icmp icmp_mask;
+
+	if (df->l4_type == DP_IP_PROTO_ICMP)
+		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
+												&icmp_spec, &icmp_mask,
+												df->l4_info.icmp_field.icmp_type);
+		
+
+	struct rte_flow_item_icmp6 icmp6_spec;
+	struct rte_flow_item_icmp6 icmp6_mask;
+
+	if (df->l4_type == DP_IP_PROTO_ICMPV6)
+		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
+												  &icmp6_spec, &icmp6_mask,
+												  df->l4_info.icmp_field.icmp_type);
+		
+	// create flow match patterns -- end
+	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
+
+
+	// create flow action -- raw decap
+	struct rte_flow_action_raw_decap raw_decap;
+
+	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
+
+	// create flow action -- raw encap
+	uint8_t encap_hdr[DP_TUNN_IPIP_ENCAP_SIZE];
+
+	memset(encap_hdr, 0, DP_TUNN_IPIP_ENCAP_SIZE);
+
+	struct rte_flow_action_raw_encap raw_encap;
+
+	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)encap_hdr;
+
+	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
+	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
+	new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
+
+	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encap_hdr[sizeof(struct rte_ether_hdr)]);
+
+	new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
+	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
+	new_ipv6_hdr->proto = df->tun_info.proto_id;
+	rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
+	rte_memcpy(new_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
+
+	action_cnt = create_raw_encap_action(action, action_cnt,
+										 &raw_encap, encap_hdr, DP_TUNN_IPIP_ENCAP_SIZE);
+
+
+	// create flow action -- queue
+	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
+	struct rte_flow_action_queue queue_action;
+	// it is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
+	uint16_t hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES;
+
+	action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
+
+
+	// create flow action -- age
+	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
+	struct rte_flow_action_age flow_age;
+
+	if (!agectx)
+		return 0;
+
+	action_cnt = create_flow_age_action(action, action_cnt,
+											&flow_age, 30, agectx);
+
+
+	// create flow action -- end
+	action_cnt = create_end_action(action, action_cnt);
+
+	// validate and install rte flow
+	struct rte_flow *flow = NULL;
+	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
+
+	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+	if (!flow) {
+		free_allocated_agectx(agectx);
+		DPS_LOG_ERR("Failed to install normal decap flow rule on pf %d", m->port);
+		return 0;
+	}
+	// config the content of agectx
+	config_allocated_agectx(agectx, m->port, df, flow);
+	
+	return 1;
+}
 
 // TODO maybe pass node for better logging
-int dp_handle_traffic_forward_offloading(struct rte_mbuf *m, struct dp_flow *df)
+int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
-		return dp_handle_local_traffic_forward(m, df);
+		return dp_offload_handle_local_traffic(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		return dp_handle_tunnel_decap_offload(m, df);
+		return dp_offload_handle_tunnel_decap_traffic(m, df);
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-		return dp_handle_tunnel_encap_offload(m, df);
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
+
+		// df->flags.flow_type was changed to DP_FLOW_TYPE_OUTGOING in packet_relay_node
+		if (df->flags.nat == DP_NAT_CHG_UL_DST_IP 
+				&& df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH)
+			return dp_offload_handel_in_network_traffic(m, df);
+		else
+			return dp_offload_handle_tunnel_encap_traffic(m, df);
+	}
 
 	return 0;
 }
