@@ -42,7 +42,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				
 				// it is icmp request targeting scalable nat
 				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
-					df->flags.nat = DP_NAT_CHG_UL_DST_IP;
 					return DNAT_NEXT_PACKET_RELAY;
 				}
 
@@ -50,6 +49,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				underlay_dst = dp_lookup_network_nat_underlay_ip(df);
 				if (underlay_dst) {
 					cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
+					df->flags.nat = DP_NAT_CHG_UL_DST_IP;
 					cntrack->nat_info.l4_type = df->l4_type;
 					memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
 

@@ -142,6 +142,10 @@ int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_set_ipv4 *ipv4_action,
 						   uint32_t ipv4, bool dir);
 
+int create_ipv6_set_action(struct rte_flow_action *action, int action_cnt,
+						   struct rte_flow_action_set_ipv6 *ipv6_action,
+						   uint8_t *ipv6, bool dir);
+
 int create_trans_proto_set_action(struct rte_flow_action *action, int action_cnt,
 									struct rte_flow_action_set_tp *tp_action,
 									uint16_t port, bool dir);

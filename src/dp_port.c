@@ -175,7 +175,7 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 
 	nr_hairpin_queues = port_type == DP_PORT_VF
 		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
-		: DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs;
+		: (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs);
 	ret = rte_eth_dev_configure(port_id,
 								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
@@ -298,6 +298,45 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	return port;
 }
 
+// static int dp_port_config_pf0_pf1_hairpin(void)
+// {
+// 	struct dp_port *port;
+	
+// 	for (uint8_t index = 0; index < DP_MAX_PF_PORTS; index ++) {
+// 		port = dp_port_get_port_by_id(pf_ports[index]);
+// 		// pf ports also have hairpin queues to support NAT/LB
+// 		port->peer_pf_port_id = 
+// 			port->port_id == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
+		
+// 		port->peer_pf_hairpin_tx_rx_queue_offset = 1;
+
+// 		// if (DP_FAILED(dp_hairpin_setup(port))) {
+// 		// 	DPS_LOG_ERR("Cannot setup hairpin for pf port %d", port->port_id);
+// 		// 	return DP_ERROR;
+// 		// }
+// 	}
+
+// 	return DP_OK;
+// }
+
+static int dp_port_set_up_hairpin(void)
+{
+
+	DP_FOREACH_PORT(&dp_ports, port) {
+		if (port->port_type == DP_PORT_PF) {
+			port->peer_pf_port_id = \
+					port->port_id == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
+		
+			port->peer_pf_hairpin_tx_rx_queue_offset = 1;
+		}
+		
+		if (DP_FAILED(dp_hairpin_setup(port)))
+				return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
 static int dp_port_init_pf(const char *pf_name)
 {
 	uint16_t port_id;
@@ -371,11 +410,8 @@ int dp_ports_init()
 		return DP_ERROR;
 
 	if (dp_conf_is_offload_enabled()) {
-		DP_FOREACH_PORT(&dp_ports, port) {
-			if (port->port_type == DP_PORT_VF)
-				if (DP_FAILED(dp_hairpin_setup(port)))
-					return DP_ERROR;
-		}
+		if (DP_FAILED(dp_port_set_up_hairpin()))
+			return DP_ERROR;
 	}
 
 	return DP_OK;
@@ -400,6 +436,20 @@ static int dp_port_install_isolated_mode(int port_id)
 #endif
 }
 
+static int dp_port_bind_port_hairpins(struct dp_port *port)
+{
+	
+	// port's hairpin is already bound when processing pf0
+	if (port->port_id == dp_port_get_pf0_id()) {
+		return DP_OK;
+	}
+
+	if (DP_FAILED(dp_hairpin_bind(port)))
+		return DP_ERROR;
+
+	return DP_OK;
+}
+
 int dp_port_start(uint16_t port_id)
 {
 	struct dp_port *port;
@@ -415,10 +465,6 @@ int dp_port_start(uint16_t port_id)
 		return DP_ERROR;
 	}
 
-	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
-		if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
-			return DP_ERROR;
-
 	if (DP_FAILED(rx_node_set_enabled(port_id, true)))
 		return DP_ERROR;
 
@@ -426,8 +472,12 @@ int dp_port_start(uint16_t port_id)
 	port->allocated = true;
 
 	// TODO(plague): research - this ordering is due to previously being in GRPC, but it seems this should be done earlier?
-	if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled())
-		if (DP_FAILED(dp_hairpin_bind(port)))
+	if (dp_conf_is_offload_enabled())
+		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
+			return DP_ERROR;
+
+	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
+		if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
 			return DP_ERROR;
 
 	return DP_OK;
