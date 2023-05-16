@@ -96,11 +96,21 @@ int dp_send_event_flow_aging_msg()
 void dp_process_event_flow_aging_msg(struct rte_mbuf *m)
 {
 	if (dp_conf_is_offload_enabled()) {
+		struct dp_ports *ports = get_dp_ports();
+
 		dp_process_aged_flows(dp_port_get_pf0_id());
 		dp_process_aged_flows(dp_port_get_pf1_id());
-	} else
-		// tao: this seems to need to be called for both non-offload and offload mode, since cntrack pointer shall be
-		// protected by refcount. but due to the case that refcount is not correctly increased when a flow is offloaded
-		// null pointer could exist, and for now it is only called for non-offloading mode. need to double check.
-		dp_process_aged_flows_non_offload();
+
+		DP_FOREACH_PORT(ports, port) {
+			if (port->port_type == DP_PORT_VF && port->allocated)
+				dp_process_aged_flows(port->port_id);
+
+		}
+	}
+
+	// software aged flow and hardware aged flow are binded to a same cntrack obj via shared refcount
+	// this cntrack obj gets deleted when the last reference is removed
+	// dp_process_aged_flows_non_offload() also takes care of expired tcp hw rte flow rules via the query mechanism,
+	// which enables fully control of hw rules' lifecycle from the software path for tcp flows.
+	dp_process_aged_flows_non_offload();
 }

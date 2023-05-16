@@ -10,6 +10,9 @@
 #include "node_api.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_timers.h"
+#include "dp_error.h"
+
+#include "rte_flow/dp_rte_flow_traffic_forward.h"
 
 #define DP_FLOW_LOG_KEY(MSG, KEY) do { \
 	if (rte_log_get_level(RTE_LOGTYPE_DPSERVICE) >= RTE_LOG_DEBUG) \
@@ -17,6 +20,7 @@
 } while (0)
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
+static bool offload_mode_enabled = 0;
 
 static void dp_log_flow_key_info(const char *msg, struct flow_key *key)
 {
@@ -44,6 +48,8 @@ int dp_flow_init(int socket_id)
 										  "ipv4_flow_table", socket_id);
 	if (!ipv4_flow_tbl)
 		return DP_ERROR;
+
+	offload_mode_enabled = dp_conf_is_offload_enabled();
 
 	return DP_OK;
 }
@@ -237,12 +243,27 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 	}
 }
 
+int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error)
+{
+	int ret;
+
+	memset(error, 0, sizeof(struct rte_flow_error));
+	ret = rte_flow_action_handle_destroy(port_id, handle, error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("failed to destroy a flow action handle, error code:%d, reason %s", ret,
+								error->message ? error->message : "(no stated reason)");
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
 void dp_process_aged_flows(int port_id)
 {
 	int nb_context, total = 0, idx;
 	struct flow_age_ctx *agectx = NULL;
 	struct rte_flow_error error;
 	void **contexts;
+	int ret;
 
 	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
 
@@ -263,15 +284,95 @@ void dp_process_aged_flows(int port_id)
 		agectx = (struct flow_age_ctx *)contexts[idx];
 		if (!agectx)
 			continue;
-		rte_flow_destroy(port_id, agectx->rte_flow, &error);
-		DPS_LOG_DEBUG("Aged flow to sw table agectx: rteflow %p\n flowval: flowcnt %d  rte_flow inserted on port %d",
-			 agectx->rte_flow, rte_atomic32_read(&agectx->cntrack->flow_cnt), port_id);
-		if (rte_atomic32_dec_and_test(&agectx->cntrack->flow_cnt))
+
+		if (agectx->handle) {
+
+			if (DP_FAILED(dp_destroy_rte_action_handle(port_id, agectx->handle, &error)))
+				DPS_LOG_ERR("failed to remove a indirect action from port %d", port_id);
+
+			agectx->handle = NULL;
+
+		}
+
+		if (agectx->rte_flow) {
+
+			rte_flow_destroy(port_id, agectx->rte_flow, &error);
+
+			DPS_LOG_DEBUG("Removed an aged rte flow due to timeout, agectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
+									(void *)agectx->rte_flow, rte_atomic32_read(&(agectx->cntrack->ref_count.refcount)), port_id);
+			agectx->rte_flow = NULL;
+			ret = dp_del_rte_age_ctx(agectx->cntrack, agectx);
+			if (DP_FAILED(ret))
+				DPS_LOG_ERR("failed to remove age ctx from its associated cntrack obj");
+
 			dp_ref_dec(&agectx->cntrack->ref_count);
-		rte_free(agectx);
+
+			rte_free(agectx);
+		}
 	}
+
 free:
 	rte_free(contexts);
+}
+
+static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flow_key, struct flow_value *flow_val)
+{
+	uint8_t age_ctx_index;
+	struct flow_age_ctx *curr_age_ctx;
+	struct rte_flow_error error;
+	struct rte_flow_query_age age_query;
+	int ret;
+
+
+	if (flow_key->proto == IPPROTO_TCP) {
+
+		for (age_ctx_index = 0; age_ctx_index < DP_FLOW_VAL_MAX_AGE_STORE; age_ctx_index++) {
+			curr_age_ctx = flow_val->rte_age_ctxs[age_ctx_index];
+			if (curr_age_ctx && curr_age_ctx->handle) {
+
+				memset(&error, 0, sizeof(error));
+				memset(&age_query, 0, sizeof(age_query));
+
+				ret = rte_flow_action_handle_query(curr_age_ctx->port_id, curr_age_ctx->handle, &age_query, &error);
+
+				if (DP_FAILED(ret)) {
+					DPS_LOG_ERR("failed to query tcp flow's age action due to code: %d, with error msg: %s", ret,
+									error.message ? error.message : "(no stated reason)");
+					return DP_ERROR;
+				}
+
+				// delete this rule regardless if it has expired in hw or not (age_query.aged)
+				if (age_query.sec_since_last_hit >= flow_val->timeout_value) {
+
+					if (DP_FAILED(dp_destroy_rte_action_handle(curr_age_ctx->port_id, curr_age_ctx->handle, &error))) {
+						DPS_LOG_ERR("failed to remove a indirect action from port %d", curr_age_ctx->port_id);
+						return DP_ERROR;
+					}
+
+					curr_age_ctx->handle =  NULL;
+					DPS_LOG_DEBUG("Remove an aged rte flow from sw table via query \n				\
+									gectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
+									(void *)curr_age_ctx->rte_flow, rte_atomic32_read(&(curr_age_ctx->cntrack->ref_count.refcount)),
+									curr_age_ctx->port_id);
+
+					rte_flow_destroy(curr_age_ctx->port_id, curr_age_ctx->rte_flow, &error);
+					curr_age_ctx->rte_flow = NULL;
+
+					ret = dp_del_rte_age_ctx(flow_val, curr_age_ctx);
+					if (DP_FAILED(ret)) {
+						DPS_LOG_ERR("failed to remove age ctx from its associated cntrack obj");
+						return DP_ERROR;
+					}
+
+					dp_ref_dec(&(flow_val->ref_count));
+
+					rte_free(curr_age_ctx);
+				}
+			}
+		}
+	}
+	return DP_OK;
+
 }
 
 void dp_process_aged_flows_non_offload(void)
@@ -281,12 +382,19 @@ void dp_process_aged_flows_non_offload(void)
 	uint32_t iter = 0;
 	uint64_t current_timestamp = rte_rdtsc();
 	uint64_t timer_hz = rte_get_timer_hz();
+	int	ret;
 
 	while (rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter) >= 0) {
 		// NOTE: possible optimization in moving a runtime constant 'timer_hz *' into 'timeout_value' directly
 		// But it would require enlarging the flow_val member, thus this needs performance analysis first
-		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value)) {
-			DPS_LOG_DEBUG("Attempt to free aged non-offloading flow");
+		if (offload_mode_enabled) {
+			ret = dp_rte_flow_query_and_remove((struct flow_key *)next_key, flow_val);
+			if (DP_FAILED(ret))
+				DPS_LOG_ERR("failed to query and remove rte flows");
+		}
+
+		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value) && (!flow_val->aged)) {
+			flow_val->aged = 1;
 			dp_ref_dec(&flow_val->ref_count);
 		}
 	}
@@ -298,3 +406,35 @@ hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
 	// is always called after either a flow is checked or added in the firewall node.
 	return rte_hash_hash(ipv4_flow_tbl, key);
 }
+
+int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
+{
+	uint8_t index;
+
+	for (index = 0; index < DP_FLOW_VAL_MAX_AGE_STORE; index++) {
+		if (!cntrack->rte_age_ctxs[index]) {
+			cntrack->rte_age_ctxs[index] = ctx;
+			ctx->ref_index_in_cntrack = index;
+			break;
+		}
+	}
+
+	if (index >= DP_FLOW_VAL_MAX_AGE_STORE) {
+		DPS_LOG_ERR("try to add age ctx to cntrack storage but exceed its capacity");
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
+{
+	if (ctx->ref_index_in_cntrack >= DP_FLOW_VAL_MAX_AGE_STORE) {
+		DPS_LOG_ERR("try to delete age ctx from cntrack storage but it is not a valid index");
+		return DP_ERROR;
+	}
+
+	cntrack->rte_age_ctxs[ctx->ref_index_in_cntrack] = NULL;
+	return DP_OK;
+}
+

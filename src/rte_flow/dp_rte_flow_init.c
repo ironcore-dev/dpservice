@@ -123,7 +123,8 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 	if (proto_id == DP_IP_PROTO_TCP) {
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   svc_port, 0);
+											   svc_port, 0,
+											   0);
 	} else if (proto_id == DP_IP_PROTO_UDP) {
 		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,

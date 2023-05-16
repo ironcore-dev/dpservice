@@ -15,6 +15,8 @@ extern "C" {
 
 #define FLOW_MAX						(1*1024*1024UL)
 
+#define DP_FLOW_VAL_MAX_AGE_STORE		4
+
 #define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
 
@@ -87,9 +89,9 @@ struct flow_nat_info {
 
 struct flow_value {
 	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
+	struct flow_age_ctx *rte_age_ctxs[DP_FLOW_VAL_MAX_AGE_STORE];
 	struct flow_nat_info	nat_info;
 	uint64_t		timestamp;
-	rte_atomic32_t	flow_cnt;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
 	uint8_t			lb_dst_addr6[16];
@@ -105,12 +107,18 @@ struct flow_value {
 	union {
 		enum dp_flow_tcp_state		tcp_state;
 	} l4_state;
+
+	uint8_t			aged : 2;
+
 };
 
 struct flow_age_ctx {
 	struct flow_value	*cntrack;
 	struct rte_flow		*rte_flow;
-	uint16_t			dir;
+	uint8_t				ref_index_in_cntrack;
+	uint8_t				port_id;
+	struct rte_flow_action_handle *handle;
+
 };
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
@@ -130,6 +138,10 @@ void dp_free_flow(struct dp_ref *ref);
 void dp_free_network_nat_port(struct flow_value *cntrack);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key);
+
+int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
+int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
+
 
 #ifdef __cplusplus
 }

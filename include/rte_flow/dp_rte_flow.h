@@ -13,6 +13,7 @@ extern "C"
 #include "dp_mbuf_dyn.h"
 
 #include "dp_lpm.h"
+#include "dp_log.h"
 
 #include "node_api.h"
 // TODO remove this after done with refctoring overlay tpye!
@@ -36,6 +37,9 @@ extern "C"
 #define DP_IP_ICMP_CODE_DST_PROTO_UNREACHABLE 2
 #define DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE 3
 #define DP_IP_ICMP_CODE_FRAGMENT_NEEDED 4
+
+#define DP_RTE_TCP_CNTL_FLAGS \
+	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
 
 typedef struct dp_icmp_err_ip_info {
 	struct rte_ipv4_hdr *err_ipv4_hdr;
@@ -91,7 +95,8 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
 								struct rte_flow_item_tcp *tcp_mask,
-								uint16_t src_port, uint16_t dst_port);
+								uint16_t src_port, uint16_t dst_port,
+								uint8_t tcp_flags);
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp *icmp_spec,
@@ -172,11 +177,16 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 
+int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error);
+
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
 												const struct rte_flow_item pattern[],
 												const struct rte_flow_action action[],
 												struct dp_flow *df);
+
+int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
+							struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx);
 
 #ifdef __cplusplus
 }

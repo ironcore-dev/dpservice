@@ -19,7 +19,6 @@ extern "C"
 
 int dp_handle_traffic_forward_offloading(struct rte_mbuf *m,struct dp_flow *df);
 
-
 #ifdef __cplusplus
 }
 #endif

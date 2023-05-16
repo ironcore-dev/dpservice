@@ -55,11 +55,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df_ptr = alloc_dp_flow_ptr(m);
 
-	if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX) {
-		if (dp_conf_is_offload_enabled())
-			dp_process_aged_flows(m->port);
+	if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX)
 		return next_tx_index[m->port];
-	}
+
 	return RX_PERIODIC_NEXT_CLS;
 }
 
