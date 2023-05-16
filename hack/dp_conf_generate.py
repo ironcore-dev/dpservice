@@ -58,6 +58,11 @@ class Option:
 		if self.arg:
 			self.help_opts += f"={self.arg}"
 
+		if not self.ifdef:
+			self.ifdef = []
+		elif self.ifdef and isinstance(self.ifdef, str):
+			self.ifdef = [ self.ifdef ]
+
 		self.help_choices = ""
 		if self.choices:
 			for choice in self.choices:
@@ -68,10 +73,10 @@ class Option:
 
 	# Use this to make sure given line is under #ifdef
 	def print(self, string):
-		if self.ifdef:
-			print(f"#ifdef {self.ifdef}")
+		for ifdef in self.ifdef:
+			print(f"#ifdef {ifdef}")
 		print(string)
-		if self.ifdef:
+		for ifdef in self.ifdef:
 			print("#endif")
 
 

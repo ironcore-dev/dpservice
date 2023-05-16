@@ -5,6 +5,9 @@
 #include "dp_log.h"
 #include "dp_port.h"
 #include "dp_timers.h"
+#ifdef ENABLE_GRAPHTRACE
+#	include "monitoring/dp_graphtrace.h"
+#endif
 #include "nodes/arp_node.h"
 #include "nodes/dhcp_node.h"
 #include "nodes/dhcpv6_node.h"
@@ -163,7 +166,10 @@ int dp_graph_init(void)
 		DPS_LOG_ERR("Too many worker cores requested (%d), max 2", rte_lcore_count());
 		return DP_ERROR;
 	}
-
+#ifdef ENABLE_GRAPHTRACE
+	if (DP_FAILED(dp_graphtrace_init()))
+		return DP_ERROR;
+#endif
 	if (DP_FAILED(dp_graph_init_nodes()))
 		return DP_ERROR;
 
@@ -199,4 +205,7 @@ void dp_graph_free(void)
 	dp_graph_stats_free();
 	if (dp_graph_id != RTE_GRAPH_ID_INVALID)
 		rte_graph_destroy(dp_graph_id);
+#ifdef ENABLE_GRAPHTRACE
+	dp_graphtrace_free();
+#endif
 }
