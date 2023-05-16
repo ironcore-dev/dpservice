@@ -25,7 +25,7 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --no-conntrack | None | disable connection tracking |  |
 | --enable-ipv6-overlay | None | enable IPv6 overlay addresses |  |
 | --no-offload | None | disable traffic offloading |  |
-| --graphtrace | LEVEL | verbosity level of packet traversing the graph framework |  |
+| --graphtrace-loglevel | LEVEL | verbosity level of packet traversing the graph framework |  |
 | --color | MODE | output colorization mode | 'never' (default), 'always' or 'auto' |
 | --grpc-port | PORT | listen for gRPC clients on this port |  |
 | --flow-timeout | SECONDS | inactive flow timeout (except TCP established flows) |  |

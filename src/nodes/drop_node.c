@@ -11,7 +11,7 @@ static uint16_t drop_node_process(struct rte_graph *graph,
 	RTE_SET_USED(node);
 	RTE_SET_USED(graph);
 
-	dp_graphtrace_burst(node, objs, nb_objs);
+	dp_graphtrace_node_burst(node, objs, nb_objs);
 	rte_pktmbuf_free_bulk((struct rte_mbuf **)objs, nb_objs);
 	return nb_objs;
 }

@@ -27,7 +27,9 @@ const bool dp_conf_is_conntrack_enabled();
 const bool dp_conf_is_ipv6_overlay_enabled();
 const bool dp_conf_is_offload_enabled();
 #ifdef ENABLE_GRAPHTRACE
-const int dp_conf_get_graphtrace_level();
+#ifdef ENABLE_PYTEST
+const int dp_conf_get_graphtrace_loglevel();
+#endif
 #endif
 const enum dp_conf_color dp_conf_get_color();
 const int dp_conf_get_grpc_port();

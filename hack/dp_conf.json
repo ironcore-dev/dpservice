@@ -109,13 +109,13 @@
     "default": "true"
   },
   {
-    "lgopt": "graphtrace",
+    "lgopt": "graphtrace-loglevel",
     "arg": "LEVEL",
     "help": "verbosity level of packet traversing the graph framework",
-    "var": "graphtrace_level",
+    "var": "graphtrace_loglevel",
     "type": "int",
     "default": "0",
-    "ifdef": "ENABLE_GRAPHTRACE"
+    "ifdef": [ "ENABLE_GRAPHTRACE", "ENABLE_PYTEST" ]
   },
   {
     "lgopt": "color",
