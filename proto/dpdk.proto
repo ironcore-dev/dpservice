@@ -38,6 +38,12 @@ enum NATInfoType {
 	NATInfoNeigh = 2;
 }
 
+enum VniType {
+	VniIpv4 = 0;
+	VniIpv6 = 1;
+	VniIpv4AndIpv6 = 2;
+}
+
 message Status {
 	int32 error = 1;
 	string message = 2;
@@ -437,6 +443,16 @@ message Route {
 	uint32 weight = 5;
 }
 
+message IsVniInUseRequest {
+	uint32 vni = 1;
+	VniType type = 2;
+}
+
+message IsVniInUseResponse {
+	bool inUse = 1;
+	Status status = 2;
+}
+
 
 service DPDKonmetal {
 	//// INITIALIZATION
@@ -515,6 +531,10 @@ service DPDKonmetal {
 	// If the route does not exist, an error will be returned.
 	rpc deleteRoute(VNIRouteMsg) returns (Status) {}
 
+	// VNI internal state information
+	// VNI can be in use by interfaces and by loadbalancer. So get information
+	// whether the VNI in question is in use or not.
+	rpc isVniInUse(IsVniInUseRequest) returns (IsVniInUseResponse) {}
 
 	//// FIREWALL
 	rpc listFirewallRules(ListFirewallRulesRequest) returns (ListFirewallRulesResponse) {}

@@ -6,22 +6,13 @@
 #include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_firewall.h"
+#include "dp_vni.h"
 
 static struct vm_entry vm_table[DP_MAX_PORTS];
 static struct rte_hash *vm_handle_tbl = NULL;
 
 static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
-
-static inline void init_vm_table(void)
-{
-	for (uint8_t i = 0; i < DP_MAX_PORTS; i++) {
-		for (uint8_t rib_index = 0; rib_index < DP_NB_SOCKETS; rib_index++) {
-			vm_table[i].ipv4_rib[rib_index] = NULL;
-			vm_table[i].ipv6_rib[rib_index] = NULL;
-		}
-	}
-}
 
 int dp_lpm_init(int socket_id)
 {
@@ -30,14 +21,35 @@ int dp_lpm_init(int socket_id)
 	if (!vm_handle_tbl)
 		return DP_ERROR;
 
-	init_vm_table();
-
 	return DP_OK;
 }
 
 void dp_lpm_free()
 {
 	dp_free_jhash_table(vm_handle_tbl);
+}
+
+int dp_lpm_reset_all_route_tables(int socketid)
+{
+	int i;
+
+	if (DP_FAILED(dp_reset_vni_all_route_tables(socketid))) {
+		DPS_LOG_ERR("resetting vni route table failed for socketid: %d", socketid);
+		return DP_ERROR;
+	}
+
+	for (i = 0; i < DP_MAX_PORTS; i++)
+		if (vm_table[i].vm_ready) {
+			if (dp_add_route(i, vm_table[i].vni, 0, vm_table[i].info.own_ip, NULL, 32, rte_eth_dev_socket_id(i))) {
+				DPS_LOG_ERR("dp_add_route failed during table reset");
+				return DP_ERROR;
+			}
+			if (dp_add_route6(i, vm_table[i].vni, 0, vm_table[i].info.dhcp_ipv6, NULL, 128, rte_eth_dev_socket_id(i))) {
+				DPS_LOG_ERR("dp_add_route6 failed during table reset");
+				return DP_ERROR;
+			}
+		}
+	return DP_OK;
 }
 
 int dp_map_vm_handle(void *key, uint16_t portid)
@@ -158,17 +170,6 @@ int dp_get_vm_vni(uint16_t portid)
 	return vm_table[portid].vni;
 }
 
-bool dp_is_vni_available(int vni, const int socketid)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready && (vm_table[i].vni == vni))
-			return true;
-
-	return false;
-}
-
 uint8_t *dp_get_vm_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
@@ -179,40 +180,6 @@ uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].ul_ipv6;
-}
-
-static struct rte_rib *get_lpm(int vni, const int socketid)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready && (vm_table[i].vni == vni))
-			return vm_table[i].ipv4_rib[socketid];
-
-	return NULL;
-}
-
-static struct rte_rib6 *get_lpm6(int vni, const int socketid)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready && (vm_table[i].vni == vni) &&
-			vm_table[i].ipv6_rib[socketid])
-			return vm_table[i].ipv6_rib[socketid];
-
-	return NULL;
-}
-
-static bool dp_is_more_vm_in_vni_avail(int portid)
-{
-	int i;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if ((i != portid) && vm_table[i].vm_ready &&
-			(vm_table[i].vni == vm_table[portid].vni))
-			return true;
-	return false;
 }
 
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
@@ -226,7 +193,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	root = get_lpm(vni, socketid);
+	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root) {
 		ret = DP_ERROR_VM_ADD_RT_NO_VM;
 		goto err;
@@ -276,7 +243,7 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	root = get_lpm(vni, socketid);
+	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
 		return EXIT_FAILURE;
 
@@ -334,7 +301,7 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 
-	root = get_lpm(vni, socketid);
+	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
 		goto out;
 
@@ -394,7 +361,7 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	root = get_lpm6(vni, socketid);
+	root = dp_get_vni_route6_table(vni, socketid);
 	if (!root)
 		goto err;
 
@@ -433,7 +400,7 @@ int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	root = get_lpm6(vni, socketid);
+	root = dp_get_vni_route6_table(vni, socketid);
 	if (!root)
 		return EXIT_FAILURE;
 
@@ -513,59 +480,27 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 
 int setup_vm(int port_id, int vni, const int socketid)
 {
-	struct rte_rib_conf config_ipv4;
-	struct rte_rib *root;
-	char s[64];
-
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
-	root = get_lpm(vni, socketid);
+	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid)))
+		return EXIT_FAILURE;
 
-	if (!root) {
-		/* create the LPM table */
-		config_ipv4.max_nodes = IPV4_DP_RIB_MAX_RULES;
-		config_ipv4.ext_sz = sizeof(struct vm_route);
-
-		snprintf(s, sizeof(s), "IPV4_DP_RIB_%d_%d", vni, socketid);
-		root = rte_rib_create(s, socketid, &config_ipv4);
-		if (root == NULL) {
-			DPS_LOG_ERR("Unable to create the DP RIB table on socket %d", socketid);
-			return EXIT_FAILURE;
-		}
-	}
 	dp_init_firewall_rules_list(port_id);
-	vm_table[port_id].ipv4_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
 
 	return EXIT_SUCCESS;
 }
 
-int setup_lpm6(int port_id, int vni, const int socketid)
+int setup_vm6(int port_id, int vni, const int socketid)
 {
-	struct rte_rib6_conf config_ipv6;
-	struct rte_rib6 *root;
-	char s[64];
-
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
-	root = get_lpm6(vni, socketid);
+	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid)))
+		return EXIT_FAILURE;
 
-	if (!root) {
-		/* create the LPM table */
-		config_ipv6.max_nodes = IPV6_DP_RIB_MAX_RULES;
-		config_ipv6.ext_sz = sizeof(struct vm_route);
-
-		snprintf(s, sizeof(s), "IPV6_DP_RIB_%d_%d", vni, socketid);
-		root = rte_rib6_create(s, socketid, &config_ipv6);
-		if (root == NULL) {
-			DPS_LOG_ERR("Unable to create the DP RIB6 table on socket %d", socketid);
-			return EXIT_FAILURE;
-		}
-	}
-	vm_table[port_id].ipv6_rib[socketid] = root;
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
 	return EXIT_SUCCESS;
@@ -581,9 +516,9 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, i
 	int status;
 
 	if (t_vni)
-		root = get_lpm(t_vni, socketid);
+		root = dp_get_vni_route4_table(t_vni, socketid);
 	else
-		root = vm_table[port_id].ipv4_rib[socketid];
+		root = dp_get_vni_route4_table(vm_table[port_id].vni, socketid);
 
 	if (!root)
 		return DP_ROUTE_DROP;
@@ -614,9 +549,9 @@ int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6
 	uint64_t next_hop;
 
 	if (t_vni)
-		root = get_lpm6(t_vni, socketid);
+		root = dp_get_vni_route6_table(t_vni, socketid);
 	else
-		root = vm_table[port_id].ipv6_rib[socketid];
+		root = dp_get_vni_route6_table(vm_table[port_id].vni, socketid);
 
 	if (!root)
 		return DP_ROUTE_DROP;
@@ -639,21 +574,16 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	if (dp_is_more_vm_in_vni_avail(portid)) {
-		/* In case of rollback, just undo what setup_vm did */
-		if (!rollback) {
-			dp_del_route(portid, vm_table[portid].vni, 0,
-						vm_table[portid].info.own_ip, NULL, 32, socketid);
-			dp_del_route6(portid, vm_table[portid].vni, 0,
-					vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
-		}
-	} else {
-		vm_table[portid].vm_ready = 0;
-		if (vm_table[portid].ipv6_rib[socketid])
-			rte_rib6_free(vm_table[portid].ipv6_rib[socketid]);
-		if (vm_table[portid].ipv4_rib[socketid])
-			rte_rib_free(vm_table[portid].ipv4_rib[socketid]);
-	}
+	dp_del_route(portid, vm_table[portid].vni, 0,
+				vm_table[portid].info.own_ip, NULL, 32, socketid);
+	dp_del_route6(portid, vm_table[portid].vni, 0,
+			vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
+
+	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV4)))
+		DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV4);
+	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV6)))
+		DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV6);
+
 	dp_del_all_firewall_rules(portid);
 	memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process

@@ -45,6 +45,7 @@ extern "C" {
 
 #define DP_LOG_IFACE(VALUE) _DP_LOG_STR("interface_id", VALUE)
 #define DP_LOG_VNI(VALUE) _DP_LOG_UINT("vni", VALUE)
+#define DP_LOG_VNI_TYPE(VALUE) _DP_LOG_UINT("vni_type", VALUE)
 #define DP_LOG_TVNI(VALUE) _DP_LOG_UINT("t_vni", VALUE)
 #define DP_LOG_IPV4STR(VALUE) _DP_LOG_STR("ipv4", VALUE)
 #define DP_LOG_IPV6STR(VALUE) _DP_LOG_STR("ipv6", VALUE)

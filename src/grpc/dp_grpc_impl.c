@@ -7,6 +7,7 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "dp_vnf.h"
+#include "dp_vni.h"
 #include "dp_log.h"
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_impl.h"
@@ -173,6 +174,11 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 			ret = DP_ERROR_CREATE_LB_ERR;
 			goto err_vnf;
 		}
+		if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4,
+					  rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
+						ret = DP_ERROR_CREATE_LB_ROUT_ERR;
+						goto err_lb;
+					  }
 	}  else {
 		ret = DP_ERROR_CREATE_LB_UNSUPP_IP;
 		goto err;
@@ -180,6 +186,9 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 	rte_memcpy(rep->get_lb.ul_addr6, ul_addr6, sizeof(rep->get_lb.ul_addr6));
 	return EXIT_SUCCESS;
 
+err_lb:
+	if (dp_delete_lb((void *)req->add_lb.lb_id))
+		DPGRPC_LOG_ERR("Error during lb rollback deletion");
 err_vnf:
 	dp_remove_vnf_with_key(ul_addr6);
 err:
@@ -203,6 +212,11 @@ static int dp_process_del_lb(dp_request *req, dp_reply *rep)
 	if (ret) {
 		rep->com_head.err_code = ret;
 		return ret;
+	}
+
+	if (DP_FAILED(dp_delete_vni_route_table(rep->get_lb.vni, DP_IP_PROTO_IPV4))) {
+		rep->com_head.err_code = DP_ERROR_DEL_LB_ROUTE_ERR;
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
@@ -260,6 +274,27 @@ static int dp_process_del_lb_vip(dp_request *req, dp_reply *rep)
 err:
 	rep->com_head.err_code = ret;
 	return ret;
+}
+
+static int dp_process_init(dp_request *req, dp_reply *rep)
+{
+	dp_del_all_neigh_nat_entries_in_vni(DP_NETWORK_NAT_ALL_VNI);
+
+	if (DP_FAILED(dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
+		rep->com_head.err_code = DP_ERROR_VM_INIT_RESET_ERR;
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int dp_process_vni_in_use(dp_request *req, dp_reply *rep)
+{
+	if (req->vni_in_use.type == DP_VNI_IPV4)
+		rep->vni_in_use.in_use = dp_is_vni_route_tbl_available(req->vni_in_use.vni, DP_IP_PROTO_IPV4,
+													  rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+
+	return EXIT_SUCCESS;
 }
 
 static int dp_process_add_fwall_rule(dp_request *req, dp_reply *rep)
@@ -621,7 +656,7 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_LPM4;
 			goto handle_err;
 		}
-		if (setup_lpm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
+		if (setup_vm6(port_id, req->add_machine.vni, rte_eth_dev_socket_id(port_id))) {
 			err_code = DP_ERROR_VM_ADD_VM_LPM6;
 			goto vm_err;
 		}
@@ -1087,6 +1122,12 @@ int dp_process_request(struct rte_mbuf *m)
 	memset(m_arr, 0, DP_MBUF_ARR_SIZE * sizeof(struct rte_mbuf *));
 
 	switch (req->com_head.com_type) {
+	case DP_REQ_TYPE_INIT:
+		ret = dp_process_init(req, &rep);
+		break;
+	case DP_REQ_TYPE_IS_VNI_IN_USE:
+		ret = dp_process_vni_in_use(req, &rep);
+		break;
 	case DP_REQ_TYPE_CREATELB:
 		ret = dp_process_add_lb(req, &rep);
 		break;

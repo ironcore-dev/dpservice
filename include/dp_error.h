@@ -92,11 +92,14 @@ const char *dp_strerror(int error);
 #define DP_ERROR_VM_ADD_PFX_VNF_ERR					653
 #define DP_ERROR_VM_DEL_PFX							700
 #define DP_ERROR_VM_DEL_PFX_NO_VM					701
+#define DP_ERROR_VM_INIT_RESET_ERR					710
 #define DP_ERROR_CREATE_LB_UNSUPP_IP				750
 #define DP_ERROR_CREATE_LB_ERR						751
 #define DP_ERROR_CREATE_LB_VNF_ERR					752
+#define DP_ERROR_CREATE_LB_ROUT_ERR					753
 #define DP_ERROR_DEL_LB_ID_ERR						755
 #define DP_ERROR_DEL_LB_BACK_IP_ERR					756
+#define DP_ERROR_DEL_LB_ROUTE_ERR					757
 #define DP_ERROR_GET_LB_ID_ERR						760
 #define DP_ERROR_GET_LB_BACK_IP_ERR					761
 #define DP_ERROR_VM_ADD_FWALL_ERR					800

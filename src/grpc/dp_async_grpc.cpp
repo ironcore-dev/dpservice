@@ -168,6 +168,55 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 	}
 }
 
+int IsVniInUseCall::Proceed()
+{
+	dp_request request = {0};
+	dp_reply reply = {0};
+	Status *err_status;
+
+	if (status_ == REQUEST) {
+		new IsVniInUseCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		switch (request_.type())
+		{
+		case VniIpv4:
+			request.vni_in_use.type = DP_VNI_IPV4;
+			break;
+		case VniIpv6:
+			request.vni_in_use.type = DP_VNI_IPV6;
+			break;
+		default:
+			request.vni_in_use.type = DP_VNI_IPV4;
+			break;
+		}
+		request.vni_in_use.vni = request_.vni();
+		DPGRPC_LOG_INFO("Checking VNI usage", DP_LOG_VNI(request.vni_in_use.vni),
+						DP_LOG_VNI_TYPE(request.vni_in_use.type));
+		dp_send_to_worker(&request);
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == AWAIT_MSG) {
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+
+		if (reply.vni_in_use.in_use)
+			reply_.set_inuse(true);
+		else
+			reply_.set_inuse(false);
+
+		err_status = new Status();
+		err_status->set_error(reply.com_head.err_code);
+		reply_.set_allocated_status(err_status);
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
 int BaseCall::InitCheck()
 {
 	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
@@ -205,14 +254,23 @@ int InitializedCall::Proceed()
 
 int InitCall::Proceed()
 {
+	dp_request request = {0};
+	dp_reply reply = {0};
+
 	if (status_ == REQUEST) {
 		new InitCall(service_, cq_);
+		dp_fill_head(&request.com_head, call_type_, 0, 1);
+		dp_send_to_worker(&request);
 		status_ = AWAIT_MSG;
 		DPGRPC_LOG_INFO("Initializing");
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 		grpc_service->SetInitStatus(true);
+		dp_fill_head(&reply.com_head, call_type_, 0, 1);
+		if (dp_recv_from_worker(&reply))
+			return -1;
+		reply_.set_error(reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

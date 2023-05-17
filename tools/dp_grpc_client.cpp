@@ -30,6 +30,7 @@ typedef enum {
 	DP_CMD_ADD_ROUTE,
 	DP_CMD_DEL_ROUTE,
 	DP_CMD_GET_ROUTE,
+	DP_CMD_GET_VNI,
 	DP_CMD_ADD_VIP,
 	DP_CMD_DEL_VIP,
 	DP_CMD_GET_VIP,
@@ -165,6 +166,7 @@ static uint32_t priority = 1000;
 #define CMD_LINE_OPT_FWALL_DIR		"direction"
 #define CMD_LINE_OPT_FWALL_ACTION	"action"
 #define CMD_LINE_OPT_FWALL_PRIO		"priority"
+#define CMD_LINE_OPT_VNI_IN_USE		"vni_in_use"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -175,6 +177,7 @@ enum {
 	CMD_LINE_OPT_ADD_ROUTE_NUM,
 	CMD_LINE_OPT_DEL_ROUTE_NUM,
 	CMD_LINE_OPT_GET_ROUTE_NUM,
+	CMD_LINE_OPT_VNI_IN_USE_NUM,
 	CMD_LINE_OPT_VNI_NUM,
 	CMD_LINE_OPT_T_VNI_NUM,
 	CMD_LINE_OPT_PRIMARY_IPV4_NUM,
@@ -241,6 +244,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_ADD_ROUTE, 0, 0, CMD_LINE_OPT_ADD_ROUTE_NUM},
 	{CMD_LINE_OPT_DEL_ROUTE, 0, 0, CMD_LINE_OPT_DEL_ROUTE_NUM},
 	{CMD_LINE_OPT_GET_ROUTE, 0, 0, CMD_LINE_OPT_GET_ROUTE_NUM},
+	{CMD_LINE_OPT_VNI_IN_USE, 0, 0, CMD_LINE_OPT_VNI_IN_USE_NUM},
 	{CMD_LINE_OPT_VNI, 1, 0, CMD_LINE_OPT_VNI_NUM},
 	{CMD_LINE_OPT_T_VNI, 1, 0, CMD_LINE_OPT_T_VNI_NUM},
 	{CMD_LINE_OPT_PRIMARY_IPV4, 1, 0, CMD_LINE_OPT_PRIMARY_IPV4_NUM},
@@ -358,6 +362,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_GET_ROUTE_NUM:
 			command = DP_CMD_GET_ROUTE;
+			break;
+		case CMD_LINE_OPT_VNI_IN_USE_NUM:
+			command = DP_CMD_GET_VNI;
 			break;
 		case CMD_LINE_OPT_VNI_NUM:
 			strncpy(vni_str, optarg, 29);
@@ -690,6 +697,23 @@ public:
 					reply.routes(i).nexthopvni(),
 					reply.routes(i).nexthopaddress().c_str());
 			}
+	}
+
+	void VniInUse() {
+			IsVniInUseRequest request;
+			IsVniInUseResponse reply;
+			ClientContext context;
+
+			request.set_vni(vni);
+			request.set_type(dpdkonmetal::VniIpv4);
+
+			stub_->isVniInUse(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
+			else if (reply.inuse())
+				printf("Vni: %d is in use\n", vni);
+			else
+				printf("Vni: %d is not in use\n", vni);
 	}
 
 	void AddLBVIP() {
@@ -1448,6 +1472,10 @@ int main(int argc, char** argv)
 	case DP_CMD_GET_ROUTE:
 		std::cout << "Listroute called " << std::endl;
 		dpdk_client.ListRoutes();
+		break;
+	case DP_CMD_GET_VNI:
+		std::cout << "IsVniInUse called " << std::endl;
+		dpdk_client.VniInUse();
 		break;
 	case DP_CMD_DEL_ROUTE:
 		dpdk_client.DelRoute();
