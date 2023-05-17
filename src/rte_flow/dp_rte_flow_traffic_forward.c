@@ -330,7 +330,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	memset(action, 0, sizeof(action));
 
 
-
 	uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
 	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)eth_hdr;
 
@@ -475,6 +474,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
 
+	printf("first decap then encap\n");
 	// create flow action -- raw encap
 	struct rte_flow_action_raw_encap raw_encap;
 
@@ -524,6 +524,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
 		}
 		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
+		printf("hairpin_rx_queue_id = %d\n", hairpin_rx_queue_id);
 	} else {
 		// create flow action -- send to port
 		action_cnt = create_send_to_port_action(action, action_cnt,
@@ -785,14 +786,11 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
 
-	struct underlay_conf *u_conf = get_underlay_conf();
-
 	memset(pattern, 0, sizeof(pattern));
 	memset(action, 0, sizeof(action));
 
 	// in network traffic has to be set via the other pf port via hairpin
 	df->nxt_hop = m->port == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
-
 
 	// create flow match patterns -- eth
 	struct rte_flow_item_eth eth_spec;
@@ -810,8 +808,10 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
 											NULL, 0,
-											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
-											df->tun_info.proto_id);
+											df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_src_addr6),
+											df->tun_info.proto_id); // trick: ul_src_addr6 is actually the dst ipv6 of bouncing pkt 
+
+	// pattern_cnt_before_inner_hdr = pattern_cnt;
 
 	// create flow match patterns -- inner packet, ipv6 or ipv4
 	struct rte_flow_item_ipv6 ol_ipv6_spec;
@@ -819,7 +819,7 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
-	uint32_t actual_ol_ipv4_addr;
+	// uint32_t actual_ol_ipv4_addr;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
@@ -831,7 +831,7 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
 												NULL, 0,
-												&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
+												&df->dst.dst_addr, sizeof(df->dst.dst_addr),
 												df->l4_type);
 
 	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
@@ -874,45 +874,19 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	// create flow match patterns -- end
 	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
 
+	// create flow action -- set src mac
+	struct rte_flow_action_set_mac set_src_mac_action;
+	action_cnt = create_src_mac_set_action(action, action_cnt, &set_src_mac_action, dp_get_mac(df->nxt_hop));
 
-	// create flow action -- raw decap
-	struct rte_flow_action_raw_decap raw_decap;
-
-	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
-
-	// create flow action -- raw encap
-	uint8_t encap_hdr[DP_TUNN_IPIP_ENCAP_SIZE];
-
-	memset(encap_hdr, 0, DP_TUNN_IPIP_ENCAP_SIZE);
-
-	struct rte_flow_action_raw_encap raw_encap;
-
-	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)encap_hdr;
-
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
-	new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
-
-	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encap_hdr[sizeof(struct rte_ether_hdr)]);
-
-	new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
-	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	new_ipv6_hdr->proto = df->tun_info.proto_id;
-	rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
-	rte_memcpy(new_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
-
-	action_cnt = create_raw_encap_action(action, action_cnt,
-										 &raw_encap, encap_hdr, DP_TUNN_IPIP_ENCAP_SIZE);
+	// create flow action -- set dst mac
+	struct rte_flow_action_set_mac set_dst_mac_action;
+	action_cnt = create_dst_mac_set_action(action, action_cnt, &set_dst_mac_action, dp_get_neigh_mac(df->nxt_hop));
 
 
-	// create flow action -- queue
-	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
-	struct rte_flow_action_queue queue_action;
-	// it is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
-	uint16_t hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES;
-
-	action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
-
+	// create flow action -- set ipv6
+	struct rte_flow_action_set_ipv6 set_ipv6;
+	action_cnt = create_ipv6_set_action(action, action_cnt,
+									&set_ipv6, df->tun_info.ul_dst_addr6, DP_IS_DST);
 
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
@@ -925,6 +899,14 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 											&flow_age, 30, agectx);
 
 
+	// create flow action -- queue
+	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
+	struct rte_flow_action_queue queue_action;
+	// it is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
+	uint16_t hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES;
+
+	action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
+
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
@@ -935,12 +917,14 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install normal decap flow rule on pf %d", m->port);
+		DPS_LOG_ERR("Failed to install in-network decap flow rule on pf %d", m->port);
 		return 0;
 	}
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
-	
+
+	printf("installed in-network decap flow rule on pf %d\n", m->port);
+
 	return 1;
 }
 
