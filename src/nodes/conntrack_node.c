@@ -139,6 +139,8 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
+			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 			df->flags.dir = DP_FLOW_DIR_ORG;
 		}
 	} else {

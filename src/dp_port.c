@@ -472,13 +472,20 @@ int dp_port_start(uint16_t port_id)
 	port->allocated = true;
 
 	// TODO(plague): research - this ordering is due to previously being in GRPC, but it seems this should be done earlier?
-	if (dp_conf_is_offload_enabled())
-		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
-			return DP_ERROR;
 
-	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
-		if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
-			return DP_ERROR;
+
+	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
+
+		if (dp_conf_is_offload_enabled())
+			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
+				return DP_ERROR;
+		if (port_id !=0) {
+			if (DP_FAILED(dp_port_install_isolated_mode(0)))
+				return DP_ERROR;
+			if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
+				return DP_ERROR;
+		}
+	}
 
 	return DP_OK;
 }
