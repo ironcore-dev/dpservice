@@ -77,8 +77,20 @@ enum dp_periodic_type{
 	DP_PER_TYPE_DIRECT_TX,
 };
 
-struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m);
-struct dp_flow *init_dp_flow_ptr(struct rte_mbuf *m);
+
+static __rte_always_inline struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m)
+{
+	assert(m);
+	return (struct dp_flow *)(m + 1);
+}
+
+static __rte_always_inline struct dp_flow *init_dp_flow_ptr(struct rte_mbuf *m)
+{
+	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+
+	memset(df_ptr, 0, sizeof(*df_ptr));
+	return df_ptr;
+}
 
 #ifdef __cplusplus
 }
