@@ -7,7 +7,7 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 #include "dp_error.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_log.h"

@@ -10,7 +10,6 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "dpdk_layer.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 
 #define NEXT_NODES(NEXT) \

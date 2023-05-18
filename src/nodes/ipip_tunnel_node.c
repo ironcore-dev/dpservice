@@ -4,7 +4,6 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_vnf.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 

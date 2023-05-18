@@ -6,7 +6,6 @@
 #include <rte_mbuf.h>
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "rte_flow/dp_rte_flow.h"

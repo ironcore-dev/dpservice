@@ -10,7 +10,6 @@
 #include "dp_multi_path.h"
 #include "dp_port.h"
 #include "dp_vnf.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/dhcp_node.h"
 #include "rte_flow/dp_rte_flow.h"

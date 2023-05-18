@@ -7,7 +7,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_refcount.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_timers.h"
 #include "dp_error.h"

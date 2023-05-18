@@ -7,7 +7,7 @@
 #include <rte_jhash.h>
 #include <rte_flow.h>
 #include "dpdk_layer.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_impl.h"
 #include "dp_firewall.h"

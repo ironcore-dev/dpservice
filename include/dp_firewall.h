@@ -6,7 +6,7 @@ extern "C" {
 #endif
 #include <sys/queue.h>
 #include <rte_common.h>
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 
 #define DP_FWALL_MATCH_ANY_PORT			0xFFFFFFFF

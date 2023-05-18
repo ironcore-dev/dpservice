@@ -4,7 +4,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "nodes/dhcp_node.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "nodes/ipv6_nd_node.h"
 
 static const uint8_t ether_addr_mask[RTE_ETHER_ADDR_LEN] = "\xff\xff\xff\xff\xff\xff";

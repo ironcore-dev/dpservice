@@ -9,7 +9,7 @@ static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
 static uint8_t dp_mc_mac[6] = {0x33,0x33,0x00,0x00,0x00,0x01};
 
 
-void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t eth_type)
+void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type)
 {
 	struct dp_flow *df_ptr;
 	struct rte_ether_hdr *eth_hdr;

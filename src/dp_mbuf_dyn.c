@@ -1,6 +1,5 @@
 #include "dp_mbuf_dyn.h"
 #include <rte_malloc.h>
-#include "node_api.h"
 
 // TODO either move into headers or switch to -flto
 // TODO return value never checked, add assertion here

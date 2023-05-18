@@ -3,7 +3,6 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_error.h"
-#include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_firewall.h"
 #include "dp_vni.h"

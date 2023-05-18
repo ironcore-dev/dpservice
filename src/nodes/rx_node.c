@@ -7,7 +7,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_port.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "nodes/common_node.h"
 
 #define NEXT_NODES(NEXT) \
