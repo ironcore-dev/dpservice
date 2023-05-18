@@ -78,7 +78,6 @@ enum dp_periodic_type{
 };
 
 struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m);
-struct dp_flow *alloc_dp_flow_ptr(struct rte_mbuf *m);
 struct dp_flow *init_dp_flow_ptr(struct rte_mbuf *m);
 
 #ifdef __cplusplus

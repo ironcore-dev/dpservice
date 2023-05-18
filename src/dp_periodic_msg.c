@@ -31,12 +31,7 @@ void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint1
 					if (dp_arp_cycle_needed(clone_buf->port))
 						arp_hdr->arp_data.arp_tip = htonl(dp_get_dhcp_range_ip4(clone_buf->port));
 				}
-				df_ptr = alloc_dp_flow_ptr(clone_buf);
-				if (!df_ptr) {
-					printf("Can not get private pointer in periodic mbuf\n");
-					return;
-				}
-				memset(df_ptr, 0, sizeof(struct dp_flow));
+				df_ptr = init_dp_flow_ptr(clone_buf);
 				df_ptr->periodic_type = per_type;
 				df_ptr->l3_type = eth_type;
 				

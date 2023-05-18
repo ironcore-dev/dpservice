@@ -12,14 +12,6 @@ __rte_always_inline struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m)
 	return (struct dp_flow *)(m + 1);
 }
 
-__rte_always_inline struct dp_flow *alloc_dp_flow_ptr(struct rte_mbuf *m)
-{
-	if (!m)
-		return NULL;
-
-	return (struct dp_flow *)(m + 1);
-}
-
 __rte_always_inline struct dp_flow *init_dp_flow_ptr(struct rte_mbuf *m)
 {
 	if (!m)
