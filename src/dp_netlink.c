@@ -41,21 +41,21 @@ static int dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neig
 	return -1;
 }
 
-static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char* buf_ptr)
+static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf)
 {
 	struct nlmsghdr *nh;
 	int len, nll = 0;
 
 	while (1) {
-		len = recv(sock, buf_ptr, DP_NLINK_BUF_SIZE - nll, 0);
+		len = recv(sock, buf, DP_NLINK_BUF_SIZE - nll, 0);
 		if (len < 0)
 			return len;
 
-		nh = (struct nlmsghdr *)buf_ptr;
+		nh = (struct nlmsghdr *)buf;
 
 		if (nh->nlmsg_type == NLMSG_DONE)
 			break;
-		buf_ptr += len;
+		buf += len;
 		nll += len;
 		if ((sock_addr.nl_groups & RTMGRP_NEIGH) == RTMGRP_NEIGH)
 			break;

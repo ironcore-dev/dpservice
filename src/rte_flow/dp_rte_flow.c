@@ -153,11 +153,11 @@ int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m)
 {
 	struct rte_ipv4_hdr *ipv4_hdr;
-	struct dp_flow *df_ptr;
+	struct dp_flow *df;
 
-	df_ptr = dp_get_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
 	else
 		ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,

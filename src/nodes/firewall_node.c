@@ -13,12 +13,12 @@ DP_NODE_REGISTER_NOINIT(FIREWALL, firewall, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr = dp_get_flow_ptr(m);
-	struct flow_value *cntrack = df_ptr->conntrack;
+	struct dp_flow *df = dp_get_flow_ptr(m);
+	struct flow_value *cntrack = df->conntrack;
 	enum dp_fwall_action action;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
-		action = dp_get_firewall_action(df_ptr, dp_get_ipv4_hdr(m), m->port);
+		action = dp_get_firewall_action(df, dp_get_ipv4_hdr(m), m->port);
 		cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
 		cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
 	}

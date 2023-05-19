@@ -91,10 +91,10 @@ static __rte_always_inline struct dp_flow *dp_get_flow_ptr(struct rte_mbuf *m)
 
 static __rte_always_inline struct dp_flow *dp_init_flow_ptr(struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr = dp_get_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 
-	memset(df_ptr, 0, sizeof(*df_ptr));
-	return df_ptr;
+	memset(df, 0, sizeof(*df));
+	return df;
 }
 
 #ifdef __cplusplus
