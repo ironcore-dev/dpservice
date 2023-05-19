@@ -40,7 +40,7 @@ static inline void ring_free(struct rte_ring *ring)
 static int dp_dpdk_layer_init_unsafe()
 {
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS),
-												   MEMPOOL_CACHE_SIZE, RTE_CACHE_LINE_SIZE + 32,
+												   MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE,
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
 	if (!dp_layer.rte_mempool) {

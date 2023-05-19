@@ -1,17 +1,25 @@
 #ifndef __INCLUDE_DP_MBUF_DYN_H__
 #define __INCLUDE_DP_MBUF_DYN_H__
 
+#include <assert.h>
 #include <rte_common.h>
 #include <rte_flow.h>
 #include "dp_flow.h"
-
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
 
+#define DP_MBUF_PRIV_DATA_SIZE (RTE_CACHE_LINE_SIZE * 2)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+enum dp_periodic_type {
+	DP_PER_TYPE_ZERO,
+	DP_PER_TYPE_ND_RA,
+	DP_PER_TYPE_DIRECT_TX,
+} __rte_packed;
 
 struct dp_flow {
 	struct {
@@ -57,10 +65,9 @@ struct dp_flow {
 		uint16_t	dst_port;	//dst_port in outter udp header
 		uint32_t	dst_vni;
 	} tun_info;
-	uint8_t				vnf_type;
-	// TODO(plague): port_id is uint16_t though, theoretically this is too little
-	uint8_t				nxt_hop;
-	uint8_t				periodic_type;
+	uint8_t					vnf_type;
+	uint8_t					nxt_hop;
+	enum dp_periodic_type	periodic_type;
 	union {
 		struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC
@@ -68,14 +75,12 @@ struct dp_flow {
 #endif
 	};
 };
-
-// not used in dp_flow instead of uint8_t
-// due to enums being int-sized
-enum dp_periodic_type{
-	DP_PER_TYPE_ZERO,
-	DP_PER_TYPE_ND_RA,
-	DP_PER_TYPE_DIRECT_TX,
-};
+static_assert(sizeof(struct dp_flow) <= DP_MBUF_PRIV_DATA_SIZE,
+			  "struct dp_flow is too big to fit in packet");
+static_assert(sizeof(((struct dp_flow *)0)->periodic_type) == 1,
+			  "enum dp_periodic_type is unnecessarily big");
+static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORTS,
+			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
 
 
 static __rte_always_inline struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m)
