@@ -17,7 +17,7 @@ DP_NODE_REGISTER_NOINIT(DNAT, dnat, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct dp_flow *df_ptr = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df_ptr->conntrack;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	uint32_t dst_ip, vni, dnat_ip;

@@ -83,15 +83,15 @@ static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORT
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
 
 
-static __rte_always_inline struct dp_flow *get_dp_flow_ptr(struct rte_mbuf *m)
+static __rte_always_inline struct dp_flow *dp_get_flow_ptr(struct rte_mbuf *m)
 {
 	assert(m);
 	return (struct dp_flow *)(m + 1);
 }
 
-static __rte_always_inline struct dp_flow *init_dp_flow_ptr(struct rte_mbuf *m)
+static __rte_always_inline struct dp_flow *dp_init_flow_ptr(struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct dp_flow *df_ptr = dp_get_flow_ptr(m);
 
 	memset(df_ptr, 0, sizeof(*df_ptr));
 	return df_ptr;

@@ -31,7 +31,7 @@ void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint1
 					if (dp_arp_cycle_needed(clone_buf->port))
 						arp_hdr->arp_data.arp_tip = htonl(dp_get_dhcp_range_ip4(clone_buf->port));
 				}
-				df_ptr = init_dp_flow_ptr(clone_buf);
+				df_ptr = dp_init_flow_ptr(clone_buf);
 				df_ptr->periodic_type = per_type;
 				df_ptr->l3_type = eth_type;
 				

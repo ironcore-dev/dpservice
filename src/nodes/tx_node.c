@@ -88,7 +88,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < nb_objs; ++i) {
 		pkt = (struct rte_mbuf *)objs[i];
-		df = get_dp_flow_ptr(pkt);
+		df = dp_get_flow_ptr(pkt);
 		// Rewrite ethernet header for all packets except:
 		//  - packets created by rewriting a source packet (pkt->port == port)
 		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)

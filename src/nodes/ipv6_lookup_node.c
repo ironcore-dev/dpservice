@@ -16,7 +16,7 @@ DP_NODE_REGISTER_NOINIT(IPV6_LOOKUP, ipv6_lookup, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct dp_flow *df_ptr = dp_get_flow_ptr(m);
 	struct rte_ipv6_hdr *ipv6_hdr;
 	struct vm_route route;
 	int t_vni;

@@ -216,7 +216,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	bool key_cmp_result;
 	int ret;
 
-	df_ptr = get_dp_flow_ptr(m);
+	df_ptr = dp_get_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
 	if (extract_inner_l3_header(m, ipv4_hdr, 0) < 0)

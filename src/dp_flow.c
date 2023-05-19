@@ -107,7 +107,7 @@ static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /
 
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
-	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct dp_flow *df_ptr = dp_get_flow_ptr(m);
 	int ret = DP_OK;
 
 	key->ip_dst = ntohl(df_ptr->dst.dst_addr);

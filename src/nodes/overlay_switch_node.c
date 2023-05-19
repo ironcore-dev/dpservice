@@ -16,7 +16,7 @@ DP_NODE_REGISTER_NOINIT(OVERLAY_SWITCH, overlay_switch, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df = get_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 	int proto_id;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)

@@ -18,7 +18,7 @@ uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_flow *df;
 
-	df = get_dp_flow_ptr(pkt);
+	df = dp_get_flow_ptr(pkt);
 
 	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	df->l3_type = ntohs(eth_hdr->ether_type);
@@ -33,7 +33,7 @@ uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt)
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_flow *df;
 
-	df = get_dp_flow_ptr(pkt);
+	df = dp_get_flow_ptr(pkt);
 
 	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	df->tun_info.l3_type = ntohs(eth_hdr->ether_type);
@@ -49,7 +49,7 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
 
-	df = get_dp_flow_ptr(pkt);
+	df = dp_get_flow_ptr(pkt);
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		if (hdr)
 			ipv4_hdr = (struct rte_ipv4_hdr *)hdr;
@@ -85,7 +85,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	struct rte_icmp_hdr *icmp_hdr;
 	struct icmp6hdr *icmp6_hdr;
 
-	df = get_dp_flow_ptr(pkt);
+	df = dp_get_flow_ptr(pkt);
 	if (df->l4_type == DP_IP_PROTO_TCP) {
 		if (hdr != NULL)
 			tcp_hdr = (struct rte_tcp_hdr *)hdr;
@@ -130,7 +130,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 {
 
-	struct dp_flow *df = get_dp_flow_ptr(pkt);
+	struct dp_flow *df = dp_get_flow_ptr(pkt);
 	struct rte_ipv6_hdr *ipv6_hdr = NULL;
 
 	if (hdr != NULL)
@@ -155,7 +155,7 @@ struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m)
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df_ptr;
 
-	df_ptr = get_dp_flow_ptr(m);
+	df_ptr = dp_get_flow_ptr(m);
 
 	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
@@ -171,7 +171,7 @@ struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset)
 	struct dp_flow *df;
 	struct rte_tcp_hdr *tcp_hdr;
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 	if (df->l4_type == DP_IP_PROTO_TCP)
 		tcp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *, offset);
 	else
@@ -185,7 +185,7 @@ struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset)
 	struct dp_flow *df;
 	struct rte_udp_hdr *udp_hdr;
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 	if (df->l4_type == DP_IP_PROTO_UDP)
 		udp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *, offset);
 	else
@@ -199,7 +199,7 @@ struct rte_icmp_hdr *dp_get_icmp_hdr(struct rte_mbuf *m, uint16_t offset)
 	struct dp_flow *df;
 	struct rte_icmp_hdr *icmp_hdr;
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 	if (df->l4_type == DP_IP_PROTO_ICMP)
 		icmp_hdr = rte_pktmbuf_mtod_offset(m, struct rte_icmp_hdr *, offset);
 	else
@@ -216,7 +216,7 @@ void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 
 	if (df->l4_type == DP_IP_PROTO_ICMP) {
 		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
@@ -242,7 +242,7 @@ void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_in
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 
 	if (df->l4_type == DP_IP_PROTO_ICMP) {
 		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
@@ -267,7 +267,7 @@ uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t n
 	struct rte_ipv4_hdr *ipv4_hdr;
 	uint16_t old_val = 0;
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -304,7 +304,7 @@ uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
 	uint16_t old_identifier = DP_IP_ICMP_ID_INVALID;
 	uint32_t cksum;
 
-	df = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 	
 	if (df->l4_type == DP_IP_PROTO_ICMP) {

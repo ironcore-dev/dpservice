@@ -227,7 +227,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df = get_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 
 	if (dp_conf_is_offload_enabled())
 		DPNODE_LOG_WARNING(node, "Virtual services not supported while offloading");
