@@ -6,7 +6,6 @@
 #include <rte_mbuf.h>
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -23,7 +22,7 @@ int l2_decap_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df = get_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 
 	/* Pop the ethernet header */
 	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING) {

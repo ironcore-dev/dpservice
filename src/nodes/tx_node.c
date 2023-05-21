@@ -10,7 +10,6 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "dp_port.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
@@ -89,7 +88,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 
 	for (i = 0; i < nb_objs; ++i) {
 		pkt = (struct rte_mbuf *)objs[i];
-		df = get_dp_flow_ptr(pkt);
+		df = dp_get_flow_ptr(pkt);
 		// Rewrite ethernet header for all packets except:
 		//  - packets created by rewriting a source packet (pkt->port == port)
 		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)

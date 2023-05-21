@@ -7,7 +7,7 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 #include "dp_error.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_log.h"
@@ -401,7 +401,7 @@ void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni)
 		DPS_LOG_WARNING("DNAT hash key already deleted");
 }
 
-void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
+void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m)
 {
 	struct rte_udp_hdr *udp_hdr;
@@ -415,7 +415,7 @@ void dp_nat_chg_ip(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr,
 	m->l3_len = rte_ipv4_hdr_len(ipv4_hdr);
 	m->l4_len = 0;
 
-	switch (df_ptr->l4_type)
+	switch (df->l4_type)
 	{
 		case IPPROTO_TCP:
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
@@ -546,16 +546,16 @@ const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ip
 	return NULL;
 }
 
-const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df_ptr)
+const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 {
 	struct network_nat_entry *current;
 	uint16_t dst_port;
 	uint32_t dst_vni;
 	uint32_t dst_ip;
 
-	dst_ip = ntohl(df_ptr->dst.dst_addr);
-	dst_port = ntohs(df_ptr->l4_info.trans_port.dst_port);
-	dst_vni = df_ptr->tun_info.dst_vni;
+	dst_ip = ntohl(df->dst.dst_addr);
+	dst_port = ntohs(df->l4_info.trans_port.dst_port);
+	dst_vni = df->tun_info.dst_vni;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (dp_is_network_nat_port(current, dst_ip, NULL, dst_vni, dst_port))
@@ -564,7 +564,7 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df_ptr)
 	return NULL;
 }
 
-int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
+int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 {
 	struct nat_key nkey = {0};
 	struct snat_data *data;
@@ -576,8 +576,8 @@ int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 	int ret;
 	bool need_to_find_new_port = true;
 
-	uint32_t vm_ip = ntohl(df_ptr->src.src_addr);
-	uint16_t vm_port = ntohs(df_ptr->l4_info.trans_port.src_port);
+	uint32_t vm_ip = ntohl(df->src.src_addr);
+	uint16_t vm_port = ntohs(df->l4_info.trans_port.src_port);
 
 	nkey.ip = vm_ip;
 	nkey.vni = vni;
@@ -598,9 +598,9 @@ int dp_allocate_network_snat_port(struct dp_flow *df_ptr, uint32_t vni)
 	portmap_key.vm_src_port = vm_port;
 
 	portoverload_tbl_key.nat_ip = data->network_nat_ip;
-	portoverload_tbl_key.dst_ip = ntohl(df_ptr->dst.dst_addr);
-	portoverload_tbl_key.dst_port = ntohs(df_ptr->l4_info.trans_port.dst_port);
-	portoverload_tbl_key.l4_type = df_ptr->l4_type;
+	portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
+	portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
+	portoverload_tbl_key.l4_type = df->l4_type;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
 	if (ret != -ENOENT) {

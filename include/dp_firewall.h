@@ -6,7 +6,7 @@ extern "C" {
 #endif
 #include <sys/queue.h>
 #include <rte_common.h>
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 
 #define DP_FWALL_MATCH_ANY_PORT			0xFFFFFFFF
@@ -57,7 +57,7 @@ void dp_init_firewall_rules_list(int port_id);
 int dp_add_firewall_rule(struct dp_fwall_rule *new_rule, int port_id);
 int dp_delete_firewall_rule(char *rule_id, int port_id);
 struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id);
-enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df_ptr, struct rte_ipv4_hdr *ipv4_hdr, int sender_port_id);
+enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr, int sender_port_id);
 int dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep_arr[]);
 void dp_del_all_firewall_rules(int port_id);
 

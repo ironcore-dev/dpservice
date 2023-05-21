@@ -88,7 +88,7 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 }
 
 
-static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df_ptr, struct rte_mbuf *m)
+static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
 
@@ -105,7 +105,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = m->port;
 
-	if (offload_mode_enabled && df_ptr->l4_type != IPPROTO_TCP) {
+	if (offload_mode_enabled && df->l4_type != IPPROTO_TCP) {
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 	} else {
@@ -113,7 +113,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 		flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
 	}
 
-	if (df_ptr->l4_type == IPPROTO_TCP)
+	if (df->l4_type == IPPROTO_TCP)
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NONE;
 
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
@@ -121,7 +121,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 
 	// Only the original flow (outgoing)'s hash value is recorded
 	// Implicit casting from hash_sig_t to uint32_t!
-	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
+	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
 	dp_invert_flow_key(key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = *key;
@@ -130,7 +130,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	return flow_val;
 }
 
-static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df_ptr)
+static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
 
 	if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
@@ -161,13 +161,13 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			// UDP traffic could be only one direction, thus from the second UDP packet in the same direction,
 			// one UDP flow cannot be treated as a new one, otherwise it will always trigger the operations in snat or dnat
 			// for new flows.
-			if (df_ptr->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
+			if (df->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
 			flow_val->dir = DP_FLOW_DIR_ORG;
 		}
 	}
-	df_ptr->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
+	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
 }
 
@@ -182,10 +182,10 @@ static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned ch
 	return true;
 }
 
-static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df_ptr)
+static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
 {
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		switch (df_ptr->vnf_type) {
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+		switch (df->vnf_type) {
 		case DP_VNF_TYPE_LB:
 			return CONNTRACK_NEXT_LB;
 			break;
@@ -211,12 +211,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct flow_value *flow_val = NULL;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
-	struct dp_flow *df_ptr;
+	struct dp_flow *df;
 	struct flow_key *key;
 	bool key_cmp_result;
 	int ret;
 
-	df_ptr = get_dp_flow_ptr(m);
+	df = dp_get_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
 	if (extract_inner_l3_header(m, ipv4_hdr, 0) < 0)
@@ -225,15 +225,15 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (extract_inner_l4_header(m, ipv4_hdr + 1, 0) < 0)
 		return CONNTRACK_NEXT_DROP;
 
-	if (df_ptr->l4_type == DP_IP_PROTO_UDP && ntohs(df_ptr->l4_info.trans_port.dst_port) == DP_BOOTP_SRV_PORT)
+	if (df->l4_type == DP_IP_PROTO_UDP && ntohs(df->l4_info.trans_port.dst_port) == DP_BOOTP_SRV_PORT)
 		return CONNTRACK_NEXT_DNAT;
 
 	if (!dp_conf_is_conntrack_enabled())
 		return CONNTRACK_NEXT_DNAT;
 
-	if (df_ptr->l4_type == IPPROTO_TCP
-		|| df_ptr->l4_type == IPPROTO_UDP
-		|| df_ptr->l4_type == IPPROTO_ICMP
+	if (df->l4_type == IPPROTO_TCP
+		|| df->l4_type == IPPROTO_UDP
+		|| df->l4_type == IPPROTO_ICMP
 	) {
 		key = curr_key;
 
@@ -249,7 +249,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			ret = dp_get_flow_data(key, (void **)&flow_val);
 			if (unlikely(DP_FAILED(ret))) {
 				if (likely(ret == -ENOENT)) {
-					flow_val = flow_table_insert_entry(key, df_ptr, m);
+					flow_val = flow_table_insert_entry(key, df, m);
 					if (unlikely(!flow_val)) {
 						DPNODE_LOG_WARNING(node, "Failed to allocate a new flow table entry");
 						return CONNTRACK_NEXT_DROP;
@@ -259,7 +259,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					return CONNTRACK_NEXT_DROP;
 				}
 			} else {
-				change_flow_state_dir(key, flow_val, df_ptr);
+				change_flow_state_dir(key, flow_val, df);
 			}
 			prev_key = curr_key;
 			if (curr_key == &first_key)
@@ -270,22 +270,22 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			prev_flow_val = flow_val;
 		} else {
 			flow_val = prev_flow_val;
-			change_flow_state_dir(key, flow_val, df_ptr);
+			change_flow_state_dir(key, flow_val, df);
 		}
 
 		flow_val->timestamp = rte_rdtsc();
 
-		if (df_ptr->l4_type == IPPROTO_TCP) {
+		if (df->l4_type == IPPROTO_TCP) {
 			tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
 			dp_cntrack_tcp_state(flow_val, tcp_hdr);
 			dp_cntrack_set_timeout_tcp_flow(flow_val);
 		}
-		df_ptr->conntrack = flow_val;
+		df->conntrack = flow_val;
 	} else {
 		return CONNTRACK_NEXT_DROP;
 	}
 
-	return dp_find_nxt_graph_node(df_ptr);
+	return dp_find_nxt_graph_node(df);
 }
 
 static uint16_t conntrack_node_process(struct rte_graph *graph,

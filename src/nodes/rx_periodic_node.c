@@ -53,9 +53,9 @@ static __rte_always_inline void handle_nongraph_queues()
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df_ptr = alloc_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 
-	if (df_ptr->periodic_type == DP_PER_TYPE_DIRECT_TX)
+	if (df->periodic_type == DP_PER_TYPE_DIRECT_TX)
 		return next_tx_index[m->port];
 
 	return RX_PERIODIC_NEXT_CLS;

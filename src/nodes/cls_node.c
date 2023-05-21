@@ -6,7 +6,6 @@
 #include <rte_mbuf.h>
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -127,7 +126,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	uint32_t l2_type = m->packet_type & RTE_PTYPE_L2_MASK;
 	uint32_t l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
-	struct dp_flow *df = init_dp_flow_ptr(m);
+	struct dp_flow *df = dp_init_flow_ptr(m);
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
 #endif

@@ -340,7 +340,7 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 
 	*conn_idx = ret;
 
-	_Static_assert(sizeof(key_hash) == sizeof(uint32_t));
+	static_assert(sizeof(key_hash) == sizeof(uint32_t));
 	*pf_port_id = dp_multipath_get_pf(key_hash);
 
 	return DP_OK;

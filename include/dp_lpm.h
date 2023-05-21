@@ -7,7 +7,7 @@
 #include <rte_jhash.h>
 #include <rte_flow.h>
 #include "dpdk_layer.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_impl.h"
 #include "dp_firewall.h"
@@ -70,7 +70,7 @@ struct vm_route {
 
 int setup_vm(int port_id, int vni, const int socketid);
 int setup_vm6(int port_id, int vni, const int socketid);
-int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, int socketid,
+int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
 						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id);
 // TODO: adapt lpm_get_ip6_dst_port to lpm_lookup_ip4_route, to include necessary returned values.
 int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,

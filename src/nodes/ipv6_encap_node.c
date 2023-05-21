@@ -10,7 +10,6 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "dpdk_layer.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 
 #define NEXT_NODES(NEXT) \
@@ -35,7 +34,7 @@ static int ipv6_encap_node_init(__rte_unused const struct rte_graph *graph, __rt
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df = get_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ipv6_hdr *ipv6_hdr;
 	rte_be16_t payload_len;
 	uint32_t packet_type;

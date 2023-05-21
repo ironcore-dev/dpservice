@@ -9,9 +9,9 @@ static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
 static uint8_t dp_mc_mac[6] = {0x33,0x33,0x00,0x00,0x00,0x01};
 
 
-void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t eth_type)
+void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type)
 {
-	struct dp_flow *df_ptr;
+	struct dp_flow *df;
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	struct dp_ports *ports = get_dp_ports();
@@ -31,14 +31,9 @@ void send_to_all_vfs(struct rte_mbuf* pkt, dp_periodic_type per_type,uint16_t et
 					if (dp_arp_cycle_needed(clone_buf->port))
 						arp_hdr->arp_data.arp_tip = htonl(dp_get_dhcp_range_ip4(clone_buf->port));
 				}
-				df_ptr = alloc_dp_flow_ptr(clone_buf);
-				if (!df_ptr) {
-					printf("Can not get private pointer in periodic mbuf\n");
-					return;
-				}
-				memset(df_ptr, 0, sizeof(struct dp_flow));
-				df_ptr->periodic_type = per_type;
-				df_ptr->l3_type = eth_type;
+				df = dp_init_flow_ptr(clone_buf);
+				df->periodic_type = per_type;
+				df->l3_type = eth_type;
 				
 				rte_ring_sp_enqueue(dp_layer->periodic_msg_queue, clone_buf);
 			}

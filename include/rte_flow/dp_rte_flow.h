@@ -10,14 +10,10 @@ extern "C"
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_flow.h>
-#include "dp_mbuf_dyn.h"
 
-#include "dp_lpm.h"
 #include "dp_log.h"
-
-#include "node_api.h"
-// TODO remove this after done with refctoring overlay tpye!
-#include "dp_conf.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
 
 #define DP_FLOW_TYPE_LOCAL		1
 #define DP_FLOW_TYPE_OUTGOING	2

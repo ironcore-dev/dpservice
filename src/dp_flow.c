@@ -7,7 +7,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "dp_refcount.h"
-#include "node_api.h"
+#include "dp_mbuf_dyn.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_timers.h"
 #include "dp_error.h"
@@ -59,25 +59,25 @@ void dp_flow_free()
 	dp_free_jhash_table(ipv4_flow_tbl);
 }
 
-static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
+static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
 
-	if (df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY || df_ptr->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
-		key->port_dst = ntohs(df_ptr->l4_info.icmp_field.icmp_identifier);
-		key->src.type_src = df_ptr->l4_info.icmp_field.icmp_type;
+	if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY || df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+		key->port_dst = ntohs(df->l4_info.icmp_field.icmp_identifier);
+		key->src.type_src = df->l4_info.icmp_field.icmp_type;
 		return DP_OK;
 	}
 
-	if (df_ptr->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+	if (df->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {
 
-		if (df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PROTO_UNREACHABLE
-			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE
-			&& df_ptr->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_FRAGMENT_NEEDED
+		if (df->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PROTO_UNREACHABLE
+			&& df->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE
+			&& df->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_FRAGMENT_NEEDED
 		) {
 			DPS_LOG_DEBUG("received an ICMP error message with unsupported error code %d, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT,
-						  df_ptr->l4_info.icmp_field.icmp_code,
-						  DP_IPV4_PRINT_BYTES(df_ptr->src.src_addr), DP_IPV4_PRINT_BYTES(df_ptr->dst.dst_addr));
+						  df->l4_info.icmp_field.icmp_code,
+						  DP_IPV4_PRINT_BYTES(df->src.src_addr), DP_IPV4_PRINT_BYTES(df->dst.dst_addr));
 			return DP_ERROR;
 		}
 
@@ -100,37 +100,37 @@ static int dp_build_icmp_flow_key(struct dp_flow *df_ptr, struct flow_key *key /
 	}
 
 	DPS_LOG_DEBUG("received an ICMP error message with unsupported type %d, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT,
-				  df_ptr->l4_info.icmp_field.icmp_type,
-				  DP_IPV4_PRINT_BYTES(df_ptr->src.src_addr), DP_IPV4_PRINT_BYTES(df_ptr->dst.dst_addr));
+				  df->l4_info.icmp_field.icmp_type,
+				  DP_IPV4_PRINT_BYTES(df->src.src_addr), DP_IPV4_PRINT_BYTES(df->dst.dst_addr));
 	return DP_ERROR;
 }
 
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
-	struct dp_flow *df_ptr = get_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 	int ret = DP_OK;
 
-	key->ip_dst = ntohl(df_ptr->dst.dst_addr);
-	key->ip_src = ntohl(df_ptr->src.src_addr);
+	key->ip_dst = ntohl(df->dst.dst_addr);
+	key->ip_src = ntohl(df->src.src_addr);
 
-	key->proto = df_ptr->l4_type;
+	key->proto = df->l4_type;
 
-	if (df_ptr->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		key->vni = df_ptr->tun_info.dst_vni;
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		key->vni = df->tun_info.dst_vni;
 	else
 		key->vni = dp_get_vm_vni(m->port);
 
-	switch (df_ptr->l4_type) {
+	switch (df->l4_type) {
 	case IPPROTO_TCP:
-		key->port_dst = ntohs(df_ptr->l4_info.trans_port.dst_port);
-		key->src.port_src = ntohs(df_ptr->l4_info.trans_port.src_port);
+		key->port_dst = ntohs(df->l4_info.trans_port.dst_port);
+		key->src.port_src = ntohs(df->l4_info.trans_port.src_port);
 		break;
 	case IPPROTO_UDP:
-		key->port_dst = ntohs(df_ptr->l4_info.trans_port.dst_port);
-		key->src.port_src = ntohs(df_ptr->l4_info.trans_port.src_port);
+		key->port_dst = ntohs(df->l4_info.trans_port.dst_port);
+		key->src.port_src = ntohs(df->l4_info.trans_port.src_port);
 		break;
 	case IPPROTO_ICMP:
-		ret = dp_build_icmp_flow_key(df_ptr, key, m);
+		ret = dp_build_icmp_flow_key(df, key, m);
 		break;
 	default:
 		key->port_dst = 0;

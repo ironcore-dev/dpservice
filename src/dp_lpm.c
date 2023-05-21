@@ -3,7 +3,6 @@
 #include "dp_lpm.h"
 #include "dp_flow.h"
 #include "dp_error.h"
-#include "node_api.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_firewall.h"
 #include "dp_vni.h"
@@ -506,10 +505,10 @@ int setup_vm6(int port_id, int vni, const int socketid)
 	return EXIT_SUCCESS;
 }
 
-int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df_ptr, int socketid,
-						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id){
-
-	uint32_t dst_ip = rte_be_to_cpu_32(df_ptr->dst.dst_addr);
+int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
+						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id)
+{
+	uint32_t dst_ip = rte_be_to_cpu_32(df->dst.dst_addr);
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;

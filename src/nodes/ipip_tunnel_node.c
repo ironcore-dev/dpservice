@@ -4,7 +4,6 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_vnf.h"
-#include "node_api.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -58,7 +57,7 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(struct rte_mbuf *
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df = get_dp_flow_ptr(m);
+	struct dp_flow *df = dp_get_flow_ptr(m);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
 		return handle_ipip_tunnel_encap(m, df);
