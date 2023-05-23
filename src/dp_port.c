@@ -298,27 +298,6 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	return port;
 }
 
-// static int dp_port_config_pf0_pf1_hairpin(void)
-// {
-// 	struct dp_port *port;
-	
-// 	for (uint8_t index = 0; index < DP_MAX_PF_PORTS; index ++) {
-// 		port = dp_port_get_port_by_id(pf_ports[index]);
-// 		// pf ports also have hairpin queues to support NAT/LB
-// 		port->peer_pf_port_id = 
-// 			port->port_id == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
-		
-// 		port->peer_pf_hairpin_tx_rx_queue_offset = 1;
-
-// 		// if (DP_FAILED(dp_hairpin_setup(port))) {
-// 		// 	DPS_LOG_ERR("Cannot setup hairpin for pf port %d", port->port_id);
-// 		// 	return DP_ERROR;
-// 		// }
-// 	}
-
-// 	return DP_OK;
-// }
-
 static int dp_port_set_up_hairpin(void)
 {
 
