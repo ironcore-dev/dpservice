@@ -93,10 +93,10 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		//  - packets created by rewriting a source packet (pkt->port == port)
 		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)
 		// Always rewrite regardless the above for:
-		//  - packets coming from loadbalancer node (DP_LB_*)
+		//  - packets coming from loadbalancer node (DP_LB_*) 
 		//  - packets already encapsulated for outgoing traffic (DP_FLOW_TYPE_OUTGOING)
 		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
-			|| df->flags.nat >= DP_LB_CHG_UL_DST_IP
+			|| df->flags.nat >= DP_CHG_UL_DST_IP // is this condition necessary?
 			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
 		) {
 			new_eth_type = dp_port_is_pf(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;

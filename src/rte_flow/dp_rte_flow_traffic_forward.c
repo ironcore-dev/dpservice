@@ -474,7 +474,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
 
-	printf("first decap then encap\n");
 	// create flow action -- raw encap
 	struct rte_flow_action_raw_encap raw_encap;
 
@@ -487,16 +486,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		action_cnt = create_ipv4_set_action(action, action_cnt,
 										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
 
+	// replace dst port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
 	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
 		action_cnt = create_trans_proto_set_action(action, action_cnt,
 										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
 
-	// replace dst ipv6 ip if it is a relayed nat flow
-	struct rte_flow_action_set_ipv6 set_ipv6;
-	if (df->flags.nat == DP_NAT_CHG_UL_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH)
-		action_cnt = create_ipv6_set_action(action, action_cnt,
-										    &set_ipv6, df->conntrack->nat_info.underlay_dst, DP_IS_DST);
 
 	// create flow action -- age
 	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
@@ -521,7 +516,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			DPS_LOG_WARNING("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
 			hairpin_rx_queue_id = 0;
 		} else {
-			hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
+			// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
+			hairpin_rx_queue_id = DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
 		}
 		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
 		printf("hairpin_rx_queue_id = %d\n", hairpin_rx_queue_id);
@@ -805,11 +801,12 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
 
+	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt 
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
 											NULL, 0,
 											df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_src_addr6),
-											df->tun_info.proto_id); // trick: ul_src_addr6 is actually the dst ipv6 of bouncing pkt 
+											df->tun_info.proto_id); 
 
 	// pattern_cnt_before_inner_hdr = pattern_cnt;
 
@@ -939,10 +936,8 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 		return dp_offload_handle_tunnel_decap_traffic(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-
-		// df->flags.flow_type was changed to DP_FLOW_TYPE_OUTGOING in packet_relay_node
-		if (df->flags.nat == DP_NAT_CHG_UL_DST_IP 
-				&& df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH)
+		if (df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
+				|| df->conntrack->nat_info.nat_type == DP_FLOW_LB_TYPE_FORWARD)
 			return dp_offload_handel_in_network_traffic(m, df);
 		else
 			return dp_offload_handle_tunnel_encap_traffic(m, df);
