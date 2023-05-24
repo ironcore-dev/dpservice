@@ -361,6 +361,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
 
+	// restore the actual incoming pkt's ipv6 dst addr
+	if (DP_PTYPE_IS_RECIRC(m->packet_type))
+		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
+
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
 											NULL, 0,
@@ -919,8 +923,6 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	}
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
-
-	printf("installed in-network decap flow rule on pf %d\n", m->port);
 
 	return 1;
 }

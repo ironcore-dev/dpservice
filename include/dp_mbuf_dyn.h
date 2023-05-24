@@ -15,6 +15,14 @@
 extern "C" {
 #endif
 
+
+#define	RTE_PTYPE_CUSTOMIZED_DP_RECIRC 0x10000000
+#define	RTE_PTYPE_CUSTOMIZED_DP_INTERNAL_MASK 0xf0000000
+
+#define DP_PTYPE_IS_RECIRC(ptype) \
+	((ptype & RTE_PTYPE_CUSTOMIZED_DP_INTERNAL_MASK) == RTE_PTYPE_CUSTOMIZED_DP_RECIRC)
+
+
 enum dp_periodic_type {
 	DP_PER_TYPE_ZERO,
 	DP_PER_TYPE_ND_RA,
@@ -93,6 +101,7 @@ static __rte_always_inline struct dp_flow *dp_init_flow_ptr(struct rte_mbuf *m)
 	struct dp_flow *df = dp_get_flow_ptr(m);
 
 	memset(df, 0, sizeof(*df));
+	
 	return df;
 }
 
