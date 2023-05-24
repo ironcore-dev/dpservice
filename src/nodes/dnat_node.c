@@ -48,10 +48,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
 				underlay_dst = dp_lookup_network_nat_underlay_ip(df);
 				if (underlay_dst) {
-					cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
+					cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
 					df->flags.nat = DP_CHG_UL_DST_IP;
-					cntrack->nat_info.l4_type = df->l4_type;
-					memcpy(cntrack->nat_info.underlay_dst, underlay_dst, sizeof(cntrack->nat_info.underlay_dst));
+					cntrack->nf_info.l4_type = df->l4_type;
+					memcpy(cntrack->nf_info.underlay_dst, underlay_dst, sizeof(cntrack->nf_info.underlay_dst));
 
 					dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
 					return DNAT_NEXT_PACKET_RELAY;
@@ -82,7 +82,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return DNAT_NEXT_IPV4_LOOKUP;
 	}
 
-	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
+	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df->flags.nat = DP_CHG_UL_DST_IP;
 		return DNAT_NEXT_PACKET_RELAY;
 	}
@@ -102,7 +102,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		df->flags.dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
-		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == DP_IP_PROTO_ICMP) {
 				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
 					if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst) == DP_IP_ICMP_ID_INVALID) {
@@ -117,7 +117,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 						return DNAT_NEXT_DROP;
 
 					icmp_err_ip_info.err_ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
-					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nat_info.icmp_err_ip_cksum;
+					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nf_info.icmp_err_ip_cksum;
 					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
 				}
 				

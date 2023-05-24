@@ -100,7 +100,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_state = DP_FLOW_STATE_NEW;
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
-	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+	flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = m->port;
 
@@ -134,8 +134,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
 
-	if (flow_val->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH 
-			|| flow_val->nat_info.nat_type == DP_FLOW_LB_TYPE_FORWARD) {
+	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH 
+			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;

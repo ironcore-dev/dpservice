@@ -42,7 +42,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			// TODO(tao?): in case of both VIP and NAT set, VIP gets written here and immediately overwritten by NAT
 			if (snat_data->vip_ip != 0) {
 				ipv4_hdr->src_addr = htonl(snat_data->vip_ip);
-				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
+				cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 			}
 			if (snat_data->network_nat_ip != 0) {
 				ret = dp_allocate_network_snat_port(df, vni);
@@ -68,10 +68,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					}
 				}
 
-				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
-				cntrack->nat_info.vni = vni;
-				cntrack->nat_info.l4_type = df->l4_type;
-				cntrack->nat_info.icmp_err_ip_cksum = ipv4_hdr->hdr_checksum;
+				cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
+				cntrack->nf_info.vni = vni;
+				cntrack->nf_info.l4_type = df->l4_type;
+				cntrack->nf_info.icmp_err_ip_cksum = ipv4_hdr->hdr_checksum;
 			}
 			df->flags.nat = DP_NAT_CHG_SRC_IP;
 			df->nat_addr = ipv4_hdr->src_addr; // nat_addr is the new src_addr in ipv4_hdr
@@ -100,7 +100,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 
-		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == DP_IP_PROTO_ICMP) {
 				if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst) == DP_IP_ICMP_ID_INVALID) {
 					DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");

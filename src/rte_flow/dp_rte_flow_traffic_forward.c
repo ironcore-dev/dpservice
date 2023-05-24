@@ -213,7 +213,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// replace source port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
-	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
+	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
 		action_cnt = create_trans_proto_set_action(action, action_cnt,
 										    &set_tp, df->nat_port, DP_IS_SRC);
 
@@ -488,7 +488,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	// replace dst port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
-	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
+	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
 		action_cnt = create_trans_proto_set_action(action, action_cnt,
 										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
 
@@ -838,7 +838,7 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	if (df->l4_type == DP_IP_PROTO_TCP) 
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 0);
 
 	
 
@@ -936,8 +936,8 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 		return dp_offload_handle_tunnel_decap_traffic(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-		if (df->conntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
-				|| df->conntrack->nat_info.nat_type == DP_FLOW_LB_TYPE_FORWARD)
+		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
+				|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD)
 			return dp_offload_handel_in_network_traffic(m, df);
 		else
 			return dp_offload_handle_tunnel_encap_traffic(m, df);
