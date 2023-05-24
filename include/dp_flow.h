@@ -20,7 +20,6 @@ extern "C" {
 #define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
 
-
 enum {
 	DP_FLOW_DIR_ORG,
 	DP_FLOW_DIR_REPLY,
@@ -97,7 +96,6 @@ struct flow_value {
 	uint64_t		timestamp;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
-	uint8_t			lb_dst_addr6[16];
 	uint8_t			flow_status; // record if a flow is natted in any means
 	uint8_t			flow_state; // track if a flow has been seen in one or both directions
 	uint8_t			fwall_action[DP_FLOW_DIR_MAX];

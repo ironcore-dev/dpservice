@@ -65,7 +65,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
-	rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
+
+	if (df->flags.nat == DP_LB_RECIRC)
+		// store the original ipv6 dst address in the packet
+		rte_memcpy(ipv6_hdr->src_addr, df->tun_info.ul_src_addr6, sizeof(ipv6_hdr->src_addr));
+	else
+		rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
+
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
 	ipv6_hdr->proto = proto_id;
 
