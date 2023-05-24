@@ -241,7 +241,7 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 {
 	int ret;
 
-	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 		ret = dp_remove_network_snat_port(cntrack);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to remove an allocated NAT port",

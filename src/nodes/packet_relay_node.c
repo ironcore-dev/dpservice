@@ -51,12 +51,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!cntrack)
 		return PACKET_RELAY_NEXT_DROP;
 
-	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
+	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		df->nxt_hop = m->port;
 		//trick: use src place to store old dst address for offloading
 		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));
-		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nat_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
+		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
 		return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
 	}
 

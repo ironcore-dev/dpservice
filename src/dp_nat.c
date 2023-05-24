@@ -536,7 +536,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 
 	portmap_key.vm_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
 	portmap_key.vm_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
-	portmap_key.vni = cntrack->nat_info.vni;
+	portmap_key.vni = cntrack->nf_info.vni;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void **)&portmap_data);
 

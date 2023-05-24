@@ -81,7 +81,7 @@ struct flow_key {
 	uint8_t  vnf;
 } __rte_packed;
 
-struct flow_nat_info {
+struct flow_nf_info {
 	uint32_t vni;
 	uint16_t icmp_err_ip_cksum;
 	uint8_t nat_type;
@@ -93,7 +93,7 @@ struct flow_nat_info {
 struct flow_value {
 	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
 	struct flow_age_ctx *rte_age_ctxs[DP_FLOW_VAL_MAX_AGE_STORE];
-	struct flow_nat_info	nat_info;
+	struct flow_nf_info	nf_info;
 	uint64_t		timestamp;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
