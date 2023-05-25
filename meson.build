@@ -25,6 +25,9 @@ endif
 if get_option('enable_dpdk_22_11_support')
   add_global_arguments('-DENABLE_DPDK_22_11', language: 'c')
 endif
+if get_option('enable_static_underlay_ip')
+  add_global_arguments('-DENABLE_STATIC_UNDERLAY_IP', language: 'c')
+endif
 
 dpdk_dep = dependency('libdpdk', version: '>=21.11.0')
 proto_dep = dependency('protobuf')
