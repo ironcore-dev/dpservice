@@ -687,8 +687,10 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 			err_code = DP_ERROR_VM_ADD_VM_ADD_ROUT6;
 			goto route_err;
 		}
-		// TODO(chandra?): call can fail!
-		dp_port_start(port_id);
+		if (DP_FAILED(dp_port_start(port_id))) {
+			err_code = DP_ERROR_VM_ADD_VM_PORT_START;
+			goto route6_err;
+		}
 		/* TODO get the pci info of this port and fill it accordingly */
 		// NOTE: this should be part of dp_port structure so no rte_ call should be needed at this point
 		rep->vf_pci.bus = 2;
@@ -703,9 +705,13 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 	rte_memcpy(rep->vf_pci.ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(rep->vf_pci.ul_addr6));
 	return EXIT_SUCCESS;
 /* Rollback the changes, in case of an error */
+route6_err:
+	dp_del_route6(port_id, req->add_machine.vni, 0,
+				req->add_machine.ip6_addr6, NULL,
+				128, rte_eth_dev_socket_id(port_id));
 route_err:
 	dp_del_route(port_id, req->add_machine.vni, 0,
-				ntohl(req->route.pfx_ip.addr), NULL,
+				ntohl(req->add_machine.ip4_addr), NULL,
 				32, rte_eth_dev_socket_id(port_id));
 vm_err:
 	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), DP_LPM_ROLLBACK);
