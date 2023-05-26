@@ -27,7 +27,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (!cntrack)
 		return SNAT_NEXT_FIREWALL;
 
-	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
+	if (cntrack->flow_state == DP_FLOW_STATE_NEW && df->flags.dir == DP_FLOW_DIR_ORG) {
 		uint16_t nat_port;
 		uint32_t vni =  dp_get_vm_vni(m->port);
 		src_ip = ntohl(df->src.src_addr);
@@ -96,7 +96,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	/* We already know what to do */
 	if (cntrack->flow_status == DP_FLOW_STATUS_SRC_NAT &&
-		cntrack->dir == DP_FLOW_DIR_ORG) {
+		df->flags.dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 
@@ -125,7 +125,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	}
 
 	if (((cntrack->flow_status == DP_FLOW_STATUS_DST_NAT) || (cntrack->flow_status == DP_FLOW_STATUS_DST_LB))
-		&& (cntrack->dir == DP_FLOW_DIR_REPLY)) {
+		&& (df->flags.dir == DP_FLOW_DIR_REPLY)) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		df->src.src_addr = ipv4_hdr->src_addr;
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst);

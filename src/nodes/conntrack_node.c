@@ -100,10 +100,11 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_state = DP_FLOW_STATE_NEW;
 	flow_val->flow_status = DP_FLOW_STATUS_NONE;
-	flow_val->dir = DP_FLOW_DIR_ORG;
 	flow_val->nat_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = m->port;
+
+	df->flags.dir = DP_FLOW_DIR_ORG;
 
 	if (offload_mode_enabled && df->l4_type != IPPROTO_TCP) {
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
@@ -137,7 +138,8 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
-			flow_val->dir = DP_FLOW_DIR_ORG;
+
+			df->flags.dir = DP_FLOW_DIR_ORG;
 		}
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
@@ -149,8 +151,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
-			
-			flow_val->dir = DP_FLOW_DIR_REPLY;
+			df->flags.dir = DP_FLOW_DIR_REPLY;
 		}
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
@@ -164,7 +165,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			if (df->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
-			flow_val->dir = DP_FLOW_DIR_ORG;
+			df->flags.dir = DP_FLOW_DIR_ORG;
 		}
 	}
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
