@@ -29,7 +29,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
 	# Add another neighbor and remove it to check if that does not break the other entry
-	# (cannot be done afterwards as the tables will have already been changed by this test)
+	# (cannot be done afterwards as the DNAT table will have already been changed by this test)
 	# Also do the same with another NAT VIP on the same VNI
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_max_port+1, nat_neigh_max_port+2, neigh_vni1_ul_ipv6)
 	grpc_client.addnat(VM2.name, nat_vip, nat_local_max_port+10, nat_local_max_port+11)
@@ -45,22 +45,27 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	assert dst_ip == neigh_vni1_ul_ipv6 and dport == 510, \
 		f"Wrong network-nat relayed packet (outer dst ipv6: {dst_ip}, dport: {dport})"
 
-	grpc_client.assert_output(f"--getnat {VM1.name}",
-		f"Received NAT IP {nat_vip} with min port: {nat_local_min_port} and max port: {nat_local_max_port} underlay {nat_ul_ipv6}")
-	grpc_client.assert_output(f"--getnatinfo neigh --ipv4 {nat_vip}",
-		neigh_vni1_ul_ipv6)
+	localspec = { 'natVIPIP': nat_vip, 'underlayRoute': nat_ul_ipv6, 'minPort': nat_local_min_port, 'maxPort': nat_local_max_port }
+	spec = grpc_client.getnat(VM1.name)
+	assert spec == localspec, \
+		"Failed to add NAT properly"
+
+	neighspec = { 'natVIPIP': nat_vip, 'underlayRoute': neigh_vni1_ul_ipv6, 'minPort': nat_neigh_min_port, 'maxPort': nat_neigh_max_port }
+	specs = grpc_client.getnatinfo(nat_vip, "neigh")
+	assert specs == [neighspec], \
+		"Invalid neighboring NAT list"
 
 	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
 	grpc_client.delnat(VM1.name)
-	grpc_client.assert_output(f"--getnat {VM1.name}",
-		nat_vip, negate=True)
-	grpc_client.assert_output(f"--getnatinfo neigh --ipv4 {nat_vip}",
-		neigh_vni1_ul_ipv6, negate=True)
 
-	grpc_client.assert_output(f"--delneighnat --ipv4 {nat_vip} --vni {vni1} --min_port {nat_neigh_min_port} --max_port {nat_neigh_max_port}",
-		"error 374")
-	grpc_client.assert_output(f"--delnat {VM1.name}",
-		"error 451")
+	grpc_client.expect_error(501).getnat(VM1.name)
+
+	specs = grpc_client.getnatinfo(nat_vip, "neigh")
+	assert len(specs) == 0, \
+		"Failed to delete neighboring NAT entries properly"
+
+	grpc_client.expect_error(374).delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
+	grpc_client.expect_error(451).delnat(VM1.name)
 
 
 def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):
@@ -90,10 +95,17 @@ def test_network_nat_foreign_ip(prepare_ifaces, grpc_client):
 def test_network_nat_vip_co_existence_on_same_vm(prepare_ifaces, grpc_client):
 	vip_ul_ipv6 = grpc_client.addvip(VM1.name, vip_vip)
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	grpc_client.assert_output(f"--getnat {VM1.name}",
-		f"Received NAT IP {nat_vip} with min port: {nat_local_min_port} and max port: {nat_local_max_port} underlay {nat_ul_ipv6}")
-	grpc_client.assert_output(f"--getvip {VM1.name}",
-		f"Received VIP {vip_vip} underlayroute {vip_ul_ipv6}")
+
+	natspec = { 'natVIPIP': nat_vip, 'underlayRoute': nat_ul_ipv6, 'minPort': nat_local_min_port, 'maxPort': nat_local_max_port }
+	spec = grpc_client.getnat(VM1.name)
+	assert spec == natspec, \
+		"Failed to add NAT properly"
+
+	vipspec = { 'vipIP': vip_vip, 'underlayRoute': vip_ul_ipv6 }
+	spec = grpc_client.getvip(VM1.name)
+	assert spec == vipspec, \
+		"Failed to add VIP properly"
+
 	grpc_client.delnat(VM1.name)
 	grpc_client.delvip(VM1.name)
 
@@ -117,7 +129,7 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 	vip_ul_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
 
 	threading.Thread(target=router_nat_vip, args=(vip_ul_ipv6, nat_vip)).start()
-	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 1024, 1024, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM3.name, "fw0-vm3", proto="tcp", dst_port_min=1024, dst_port_max=1024)
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=vip_vip, src=VM1.ip) /
 			   TCP(dport=1024))

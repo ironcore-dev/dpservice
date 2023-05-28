@@ -2,18 +2,18 @@ from helpers import *
 
 
 def test_vni_existence(prepare_ipv4, grpc_client):
-	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni3, lb_ip, 80, "tcp")
-	grpc_client.assert_output(f"--vni_in_use  --vni {vni3}",
-		f"not in use", negate=True)
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni3, lb_ip, "tcp/80")
+	assert grpc_client.vniinuse(vni3), \
+		f"VNI {vni3} should be in use"
 
-	grpc_client.addmachine(VM4.name, VM4.pci, vni3, VM4.ip, VM4.ipv6)
-	grpc_client.assert_output(f"--vni_in_use  --vni {vni3}",
-		f"not in use", negate=True)
+	grpc_client.addinterface(VM4.name, VM4.pci, vni3, VM4.ip, VM4.ipv6)
+	assert grpc_client.vniinuse(vni3), \
+		f"VNI {vni3} should be in use"
 
-	grpc_client.delmachine(VM4.name)
-	grpc_client.assert_output(f"--vni_in_use  --vni {vni3}",
-		f"not in use", negate=True)
+	grpc_client.delinterface(VM4.name)
+	assert grpc_client.vniinuse(vni3), \
+		f"VNI {vni3} should be in use"
 
 	grpc_client.dellb(lb_name)
-	grpc_client.assert_output(f"--vni_in_use  --vni {vni3}",
-		f"not in use")
+	assert not grpc_client.vniinuse(vni3), \
+		f"VNI {vni3} should not be in use anymore"

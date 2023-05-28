@@ -5,7 +5,7 @@ from helpers import *
 
 def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 
-	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, 80, "tcp")
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
 
 	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
 				IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6, nh=4) /
@@ -63,15 +63,15 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported for LB(vni1) <-> VIP/NAT(vni2) test")
 
-	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, 80, "tcp")
-	lb_vm1_ul_ipv6 = grpc_client.addlbpfx(VM1.name, lb_ip)
-	grpc_client.addlbvip(lb_name, lb_vm1_ul_ipv6)
-	lb_vm2_ul_ipv6 = grpc_client.addlbpfx(VM2.name, lb_ip)
-	grpc_client.addlbvip(lb_name, lb_vm2_ul_ipv6)
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_ip)
+	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
+	lb_vm2_ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_ip)
+	grpc_client.addlbtarget(lb_name, lb_vm2_ul_ipv6)
 
 	vip_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
-	grpc_client.addfwallrule(VM2.name, "fw0-vm2", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 80, 80, "tcp", "accept", "ingress")
-	grpc_client.addfwallrule(VM1.name, "fw0-vm1", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 80, 80, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=80, dst_port_max=80)
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
 	# Also test round-robin
 	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
 	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
@@ -86,10 +86,10 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	communicate_vip_lb(lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1240)
 	grpc_client.delnat(VM3.name)
 
-	grpc_client.dellbvip(VM2.name, lb_vm2_ul_ipv6)
-	grpc_client.dellbpfx(VM2.name, lb_ip)
-	grpc_client.dellbvip(VM1.name, lb_vm1_ul_ipv6)
-	grpc_client.dellbpfx(VM1.name, lb_ip)
+	grpc_client.dellbtarget(VM2.name, lb_vm2_ul_ipv6)
+	grpc_client.dellbprefix(VM2.name, lb_ip)
+	grpc_client.dellbtarget(VM1.name, lb_vm1_ul_ipv6)
+	grpc_client.dellbprefix(VM1.name, lb_ip)
 	grpc_client.dellb(lb_name)
 
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")

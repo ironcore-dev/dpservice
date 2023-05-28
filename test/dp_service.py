@@ -84,18 +84,18 @@ class DpService:
 		if not self.hardware:  # see above
 			interface_init(PF1.tap, self.port_redundancy)
 		grpc_client.init()
-		VM1.ul_ipv6 = grpc_client.addmachine(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
-		VM2.ul_ipv6 = grpc_client.addmachine(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
-		VM3.ul_ipv6 = grpc_client.addmachine(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6)
-		grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, 0, neigh_vni1_ul_ipv6)
-		grpc_client.addroute_ipv6(vni1, neigh_vni1_ov_ipv6_range, neigh_vni1_ov_ipv6_range_len, 0, neigh_vni1_ul_ipv6)
-		grpc_client.addroute_ipv4(vni1, "0.0.0.0", 0, vni1, router_ul_ipv6)
-		grpc_client.addroute_ipv4(vni2, "0.0.0.0", 0, vni2, router_ul_ipv6)
+		VM1.ul_ipv6 = grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
+		VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
+		VM3.ul_ipv6 = grpc_client.addinterface(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6)
+		grpc_client.addroute(vni1, neigh_vni1_ov_ip_route, 0, neigh_vni1_ul_ipv6)
+		grpc_client.addroute(vni1, neigh_vni1_ov_ipv6_route, 0, neigh_vni1_ul_ipv6)
+		grpc_client.addroute(vni1, "0.0.0.0/0", vni1, router_ul_ipv6)
+		grpc_client.addroute(vni2, "0.0.0.0/0", vni2, router_ul_ipv6)
 
 	def attach(self, grpc_client):
-		VM1.ul_ipv6 = grpc_client.get_ul_ipv6(VM1.name)
-		VM2.ul_ipv6 = grpc_client.get_ul_ipv6(VM2.name)
-		VM3.ul_ipv6 = grpc_client.get_ul_ipv6(VM3.name)
+		VM1.ul_ipv6 = grpc_client.getinterface(VM1.name)['underlayRoute']
+		VM2.ul_ipv6 = grpc_client.getinterface(VM2.name)['underlayRoute']
+		VM3.ul_ipv6 = grpc_client.getinterface(VM3.name)['underlayRoute']
 
 	def get_vm_tap(self, idx):
 		iface = f"tap{idx}"

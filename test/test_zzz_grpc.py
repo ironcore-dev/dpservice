@@ -1,188 +1,212 @@
 from helpers import *
 
 
-def test_grpc_addmachine_error_109(prepare_ifaces, grpc_client):
+def test_grpc_addinterface_error_109(prepare_ifaces, grpc_client):
 	# Try to add using an existing vm identifier
-	grpc_client.assert_output(f"--addmachine {VM2.name} --vm_pci {VM2.pci} --vni {VM2.vni} --ipv4 {VM2.ip} --ipv6 {VM2.ipv6}",
-		"error 109")
+	grpc_client.expect_error(109).addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
 
-def test_grpc_addmachine_error_110(prepare_ifaces, grpc_client):
+def test_grpc_addinterface_error_110(prepare_ifaces, grpc_client):
 	# Try to add without specifying PCI address or using a bad one
-	grpc_client.assert_output(f"--addmachine new_vm --vni {VM2.vni} --ipv4 {VM2.ip} --ipv6 {VM2.ipv6}",
-		"error 110")
-	grpc_client.assert_output(f"--addmachine new_vm --vm_pci invalid --vni {VM2.vni} --ipv4 {VM2.ip} --ipv6 {VM2.ipv6}",
-		"error 110")
+	grpc_client.expect_error(110).addinterface("new_vm", "invalid", VM2.vni, VM2.ip, VM2.ipv6)
 
 def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
-	grpc_client.assert_output(f"--getmachine {VM2.name}",
-		VM2.ip)
+	myspec = { 'vni': VM2.vni, 'device': VM2.pci, 'ips': [ VM2.ip, VM2.ipv6 ], 'underlayRoute': VM2.ul_ipv6 }
+	spec = grpc_client.getinterface(VM2.name)
+	assert spec == myspec, \
+		f"Invalid getmachine output for {VM2.name}"
 
-def test_grpc_addmachine_error_106(prepare_ifaces, grpc_client):
+def test_grpc_addinterface_error_106(prepare_ifaces, grpc_client):
 	# Try to add with new machine identifer but already given IPv4
-	grpc_client.assert_output(f"--addmachine {VM4.name} --vm_pci {VM4.pci} --vni {VM4.vni} --ipv4 {VM1.ip} --ipv6 {VM1.ipv6}",
-		"error 106")
+	grpc_client.expect_error(106).addinterface(VM4.name, VM4.pci, VM4.vni, VM1.ip, VM1.ipv6)
 
-def test_grpc_delmachine_error_151(prepare_ifaces, grpc_client):
+def test_grpc_delinterface_error_151(prepare_ifaces, grpc_client):
 	# Try to delete with machine identifer which doesnt exist
-	grpc_client.assert_output(f"--delmachine invalid_name",
-		"error 151")
+	grpc_client.expect_error(151).delinterface("invalid_name")
 
-def test_grpc_add_list_delmachine(prepare_ifaces, grpc_client):
+def test_grpc_add_list_delinterface(prepare_ifaces, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
-	grpc_client.addmachine(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
-	grpc_client.assert_output(f"--getmachines",
-		VM4.name)
-	grpc_client.delmachine(VM4.name)
-	grpc_client.assert_output(f"--getmachines",
-		VM4.name, negate=True)
+	vm4_ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+	myspec = { "vni": VM4.vni, "device": VM4.pci, "ips": [ VM4.ip, VM4.ipv6 ], "underlayRoute": vm4_ul_ipv6 }
+	specs = grpc_client.listinterfaces()
+	assert myspec in specs, \
+		f"Interface {VM4.name} not properly added"
+	grpc_client.delinterface(VM4.name)
+	specs = grpc_client.listinterfaces()
+	assert myspec not in specs, \
+		f"Interface {VM4.name} not properly deleted"
 
 def test_grpc_addroute_error_251(prepare_ifaces, grpc_client):
 	# Try to add a route which is already added
 	# NOTE this has to be based on the one in DpService::init_ifaces()
-	grpc_client.assert_output(f"--addroute --vni {vni1} --ipv4 {neigh_vni1_ov_ip_range} --length {neigh_vni1_ov_ip_range_len} --t_vni {vni1} --t_ipv6 {neigh_vni1_ul_ipv6}",
-		"error 251")
+	grpc_client.expect_error(251).addroute(vni1, neigh_vni1_ov_ip_route, vni1, neigh_vni1_ul_ipv6)
 
 def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 	# Try to list routes, delete one of them, list and add again
-	grpc_client.assert_output(f"--listroutes --vni {vni1}",
-		neigh_vni1_ov_ip_range)
-	# NOTE this has to be the one in DpService::init_ifaces()
-	grpc_client.delroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len)
-	grpc_client.assert_output(f"--listroutes --vni {vni1}",
-		neigh_vni1_ov_ip_range, negate=True)
-	# NOTE this has to be the same as the one in DpService::init_ifaces()
-	grpc_client.addroute_ipv4(vni1, neigh_vni1_ov_ip_range, neigh_vni1_ov_ip_range_len, 0, neigh_vni1_ul_ipv6)
+	# NOTE this route has to be the one in DpService::init_ifaces()
+	routespec = { "vni": vni1, "prefix": neigh_vni1_ov_ip_route, "nextHop": { "vni": 0, "ip": neigh_vni1_ul_ipv6 } }
+	routes = grpc_client.listroutes(vni1)
+	assert routespec in routes, \
+		"List of routes does not contain an initial route"
+	grpc_client.delroute(vni1, neigh_vni1_ov_ip_route)
+	routes = grpc_client.listroutes(vni1)
+	assert routespec not in routes, \
+		"List of routes does not contain an initial route"
+	grpc_client.addroute(vni1, neigh_vni1_ov_ip_route, 0, neigh_vni1_ul_ipv6)
 
 def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
 	# Try to add NAT, delete and add VIP with same IP
-	grpc_client.addnat(VM2.name, vip_vip, nat_local_min_port, nat_local_max_port)
-	grpc_client.assert_output(f"--getnat {VM2.name}",
-		f"Received NAT IP {vip_vip}")
+	nat_ul_ipv6 = grpc_client.addnat(VM2.name, vip_vip, nat_local_min_port, nat_local_max_port)
+	natspec = { "natVIPIP": vip_vip, "minPort": nat_local_min_port, "maxPort": nat_local_max_port, "underlayRoute": nat_ul_ipv6 }
+	spec = grpc_client.getnat(VM2.name)
+	assert spec == natspec, \
+		"NAT not added properly"
 	grpc_client.delnat(VM2.name)
 
-	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	grpc_client.assert_output(f"--getvip {VM2.name}",
-		f"Received VIP {vip_vip} underlayroute {ul_ipv6}")
+	vip_ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
+	vipspec = { "vipIP": vip_vip, "underlayRoute": vip_ul_ipv6}
+	spec = grpc_client.getvip(VM2.name)
+	assert spec == vipspec, \
+		"VIP not set properly"
 	grpc_client.delvip(VM2.name)
-	grpc_client.assert_output(f"--getvip {VM2.name}",
-		vip_vip, negate=True)
-	grpc_client.assert_output(f"--getnat {VM2.name}",
-		vip_vip, negate=True)
+	# TODO guvenc? get_vip has no errors!
+	grpc_client.expect_error(501).getvip(VM2.name)
+	grpc_client.expect_error(501).getnat(VM2.name)
 
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	grpc_client.assert_output(f"--getvip {VM2.name}",
-		f"Received VIP {vip_vip} underlayroute {ul_ipv6}")
+	vipspec = { "vipIP": vip_vip, "underlayRoute": ul_ipv6}
+	spec = grpc_client.getvip(VM2.name)
+	assert spec == vipspec, \
+		"VIP not set properly"
 	# Try to add the same vip again
-	grpc_client.assert_output(f"--addvip {VM2.name} --ipv4 {vip_vip}",
-		"error 351")
+	grpc_client.expect_error(351).addvip(VM2.name, vip_vip)
 	# Try to add to a machine which doesnt exist
-	grpc_client.assert_output(f"--addvip invalid_name --ipv4 {vip_vip}",
-		"error 350")
+	grpc_client.expect_error(350).addvip("invalid_name", vip_vip)
 	grpc_client.delvip(VM2.name)
-	grpc_client.assert_output(f"--getvip {VM2.name}",
-		vip_vip, negate=True)
+	grpc_client.expect_error(501).getvip(VM2.name)
 
 def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
-	# Try to add LB VIP, list, test error cases, delete vip and list again
 	back_ip1 = "2a10:abc0:d015:4027:0:c8::"
 	back_ip2 = "2a10:abc0:d015:4027:0:7b::"
-	ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, 80, "tcp")
-	grpc_client.addlbvip(lb_name, back_ip1)
-	grpc_client.assert_output(f"--listbackips {lb_name}",
-		back_ip1)
-	grpc_client.addlbvip(lb_name, back_ip2)
-	grpc_client.assert_output(f"--listbackips {lb_name}",
-		back_ip2)
-	grpc_client.dellbvip(lb_name, back_ip1)
-	grpc_client.assert_output(f"--listbackips {lb_name}",
-		back_ip1, negate=True)
-	grpc_client.dellbvip(lb_name, back_ip2)
-	grpc_client.assert_output(f"--listbackips {lb_name}",
-		back_ip2, negate=True)
-	grpc_client.assert_output(f"--getlb {lb_name}",
-		ul_ipv6)
+	# Try to add LB VIP, list, test error cases, delete vip and list again
+	ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+	lbspec = { "vni": vni1, "lbVipIP": lb_ip, "lbports": [ { "protocol": 6, "port": 80 } ], "underlayRoute": ul_ipv6 }
+	spec = grpc_client.getlb(lb_name)
+	assert spec == lbspec, \
+		"Loadbalancer not created properly"
+
+	spec1 = { "targetIP": back_ip1 }
+	spec2 = { "targetIP": back_ip2 }
+	grpc_client.addlbtarget(lb_name, back_ip1)
+	specs = grpc_client.listlbtargets(lb_name)
+	assert spec1 in specs, \
+		f"Target {back_ip1} not added properly"
+	grpc_client.addlbtarget(lb_name, back_ip2)
+	specs = grpc_client.listlbtargets(lb_name)
+	assert spec2 in specs, \
+		f"Target {back_ip2} not added properly"
+	grpc_client.dellbtarget(lb_name, back_ip1)
+	specs = grpc_client.listlbtargets(lb_name)
+	assert spec1 not in specs and spec2 in specs, \
+		f"Target {back_ip1} not removed properly"
+	grpc_client.dellbtarget(lb_name, back_ip2)
+	specs = grpc_client.listlbtargets(lb_name)
+	assert spec2 not in specs, \
+		f"Target {back_ip2} not removed properly"
+
 	grpc_client.dellb(lb_name)
-	grpc_client.assert_output(f"--getlb {lb_name}",
-		ul_ipv6, negate=True)
+	grpc_client.expect_error(760).getlb(lb_name)
 
 def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	ul_ipv6 = grpc_client.addpfx(VM2.name, pfx_ip, 24)
-	grpc_client.assert_output(f"--listpfx {VM2.name}",
-		f"Route prefix {pfx_ip} len 24 underlayroute {ul_ipv6}")
+	prefix = f"{pfx_ip}/24"
+	ul_ipv6 = grpc_client.addprefix(VM2.name, prefix)
+	myspec = { "prefix": prefix, "underlayRoute": ul_ipv6 }
+	specs = grpc_client.listprefixes(VM2.name)
+	assert myspec in specs, \
+		f"Prefix {prefix} not added properly"
 	# Try to add the same pfx again
-	grpc_client.assert_output(f"--addpfx {VM2.name} --ipv4 {pfx_ip} --length 24",
-		"error 652")
+	grpc_client.expect_error(652).addprefix(VM2.name, prefix)
 	# Try to add/delete to/from a machine which doesnt exist
-	grpc_client.assert_output(f"--addpfx invalid_name --ipv4 {pfx_ip} --length 24",
-		"error 651")
-	grpc_client.assert_output(f"--delpfx invalid_name --ipv4 {pfx_ip} --length 24",
-		"error 701")
-	grpc_client.delpfx(VM2.name, pfx_ip, 24)
-	grpc_client.assert_output(f"--listpfx {VM2.name}",
-		pfx_ip, negate=True)
+	grpc_client.expect_error(651).addprefix("invalid_name", prefix)
+	grpc_client.expect_error(701).delprefix("invalid_name", prefix)
+	grpc_client.delprefix(VM2.name, prefix)
+	specs = grpc_client.listprefixes(VM2.name)
+	assert myspec not in specs, \
+		f"Prefix {prefix} not deleted properly"
 
 def test_grpc_add_list_delLoadBalancerTargets(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
-	ul_ipv6 = grpc_client.addlbpfx(VM2.name, pfx_ip)
-	grpc_client.assert_output(f"--listlbpfx {VM2.name}",
-		f"LB Route prefix {pfx_ip} len 32 underlayroute {ul_ipv6}")
+	lb_prefix = f"{lb_ip}/32"
+	ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_ip)
+	myspec = { "prefix": lb_prefix, "underlayRoute": ul_ipv6 }
+	specs = grpc_client.listlbprefixes(VM2.name)
+	assert myspec in specs, \
+		f"Loadbalancer prefix {lb_prefix} not added properly"
 	# Try to add/delete to/from a machine which doesnt exist
-	grpc_client.assert_output(f"--addlbpfx invalid_name --ipv4 {pfx_ip} --length 32",
-		"error 651")
-	grpc_client.assert_output(f"--dellbpfx invalid_name --ipv4 {pfx_ip} --length 32",
-		"error 701")
-	grpc_client.dellbpfx(VM2.name, pfx_ip)
-	grpc_client.assert_output(f"--listpfx {VM2.name}",
-		pfx_ip, negate=True)
+	grpc_client.expect_error(651).addlbprefix("invalid_name", lb_ip)
+	grpc_client.expect_error(701).dellbprefix("invalid_name", lb_ip)
+	grpc_client.dellbprefix(VM2.name, lb_ip)
+	specs = grpc_client.listlbprefixes(VM2.name)
+	assert myspec not in specs, \
+		f"Loadbalancer prefix {lb_prefix} not deleted properly"
+
 
 def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 	# Try to add FirewallRule, get, list, delete and test error cases
 
-	# We do not support "deny" rules (yet)
-	grpc_client.assert_output(f"--addfwrule  {VM3.name} --fw_ruleid fw0-vm3 --src_ip 1.2.3.4 --src_length 16 --dst_ip 0.0.0.0 --dst_length 0 "
-							f"--src_port_min -1 --src_port_max -1 --dst_port_min -1 --dst_port_max -1 --protocol tcp "
-							f"--action deny --direction ingress",
-							"error 802")
-	grpc_client.addfwallrule(VM3.name, "fw0-vm3", "1.2.3.4", 16, "0.0.0.0", 0, -1, -1, -1, -1, "tcp", "accept", "ingress")
-	grpc_client.assert_output(f"--addfwrule  {VM3.name} --fw_ruleid fw0-vm3 --src_ip 1.2.3.4 --src_length 16 --dst_ip 0.0.0.0 --dst_length 0 "
-							f"--src_port_min -1 --src_port_max -1 --dst_port_min -1 --dst_port_max -1 --protocol tcp "
-							f"--action deny --direction ingress",
-							"error 803")
-	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw0-vm3",
-		f"1.2.3.4")
-	grpc_client.addfwallrule(VM3.name, "fw1-vm3", "8.8.8.8", 16, "0.0.0.0", 0, -1, -1, -1, -1, "udp", "accept", "egress")
-	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw1-vm3",
-		f"egress")
-	grpc_client.assert_output(f"--listfwrules  {VM3.name}",
-		f"8.8.8.8")
+	# We do not support "drop" rules (yet)
+	grpc_client.expect_error(802).addfwallrule(VM3.name, "fw0-vm3", src_prefix="1.2.3.4/16", proto="tcp", action="drop")
+	grpc_client.addfwallrule(VM3.name, "fw0-vm3", src_prefix="1.2.3.4/16", proto="tcp")
+	# Used rule-id
+	grpc_client.expect_error(803).addfwallrule(VM3.name, "fw0-vm3", src_prefix="1.2.3.4/16", proto="tcp", action="drop")
+
+	rulespec = { "trafficDirection": "Ingress", "firewallAction": "Accept", "priority": 1000, "ipVersion": "IPv4",
+				 "sourcePrefix": "1.2.3.4/16", "destinationPrefix": "0.0.0.0/0",
+				 "protocolFilter": { "Filter": { "Tcp": {
+					 "srcPortLower": -1, "srcPortUpper": -1, "dstPortLower": -1, "dstPortUpper": -1
+				 } } } }
+	spec = grpc_client.getfwallrule(VM3.name, "fw0-vm3")
+	assert spec == rulespec, \
+		"Firewall rule corruption"
+
+	grpc_client.addfwallrule(VM3.name, "fw1-vm3", src_prefix="8.8.8.8/16", proto="udp", direction="egress")
+	spec = grpc_client.getfwallrule(VM3.name, "fw1-vm3")
+	assert spec['trafficDirection'] == "Egress", \
+		"Failed to add egress rule"
+
+	specs = grpc_client.listfwallrules(VM3.name)
+	assert rulespec in specs, \
+		"Firewall rule list corruption"
 	grpc_client.delfwallrule(VM3.name, "fw0-vm3")
-	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw0-vm3",
-		f"error 811")
-	grpc_client.assert_output(f"--listfwrules  {VM3.name}",
-		f"8.8.8.8")
+	grpc_client.expect_error(811).getfwallrule(VM3.name, "fw0-vm3")
+	specs = grpc_client.listfwallrules(VM3.name)
+	assert rulespec not in specs, \
+		"Firewall rule deletion failed corruption"
+	# The other must still remain
+	assert len(specs) == 1 and specs[0]['sourcePrefix'] == '8.8.8.8/16', \
+		"Firewall rule list corruption"
+
 	grpc_client.delfwallrule(VM3.name, "fw1-vm3")
-	grpc_client.assert_output(f"--listfwrules  {VM3.name}",
-		f"8.8.8.8", negate=True)
-	grpc_client.assert_output(f"--getfwrule  {VM3.name} --fw_ruleid fw1-vm3",
-		f"error 811")
+	grpc_client.expect_error(811).getfwallrule(VM3.name, "fw1-vm3")
+	specs = grpc_client.listfwallrules(VM3.name)
+	assert len(specs) == 0, \
+		"Firewall rules not properly deleted"
+
 
 def test_grpc_add_list_del_routes_big_reply(prepare_ifaces, grpc_client):
 	MAX_LINES_ROUTE_REPLY = 36
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
-		ov_target_pfx = f"192.168.{subnet}.0"
-		grpc_client.addroute_ipv4(vni1, ov_target_pfx, 32, 0, neigh_vni1_ul_ipv6)
+		ov_target_pfx = f"192.168.{subnet}.0/32"
+		grpc_client.addroute(vni1, ov_target_pfx, 0, neigh_vni1_ul_ipv6)
 
-	listing = grpc_client.assert_output(f"--listroutes --vni {vni1}",
-		"Listroute called")
-	route_count = listing.count("Route prefix")
+	specs = grpc_client.listroutes(vni1)
 	# +1 for the one already there (from env setup)
-	assert route_count == MAX_LINES_ROUTE_REPLY + 1, \
-		f"Not all routes have been added ({route_count}/{MAX_LINES_ROUTE_REPLY+1})"
+	assert len(specs) == MAX_LINES_ROUTE_REPLY + 1, \
+		f"Not all routes have been added ({len(specs)}/{MAX_LINES_ROUTE_REPLY+1})"
 
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
-		ov_target_pfx = f"192.168.{subnet}.0"
-		grpc_client.delroute_ipv4(vni1, ov_target_pfx, 32)
+		ov_target_pfx = f"192.168.{subnet}.0/32"
+		grpc_client.delroute(vni1, ov_target_pfx)
