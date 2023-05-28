@@ -50,7 +50,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	assert spec == localspec, \
 		"Failed to add NAT properly"
 
-	neighspec = { 'natVIPIP': nat_vip, 'underlayRoute': neigh_vni1_ul_ipv6, 'minPort': nat_neigh_min_port, 'maxPort': nat_neigh_max_port }
+	neighspec = { 'underlayRoute': neigh_vni1_ul_ipv6, 'minPort': nat_neigh_min_port, 'maxPort': nat_neigh_max_port, 'vni': vni1 }
 	specs = grpc_client.getnatinfo(nat_vip, "neigh")
 	assert specs == [neighspec], \
 		"Invalid neighboring NAT list"
@@ -101,7 +101,7 @@ def test_network_nat_vip_co_existence_on_same_vm(prepare_ifaces, grpc_client):
 	assert spec == natspec, \
 		"Failed to add NAT properly"
 
-	vipspec = { 'vipIP': vip_vip, 'underlayRoute': vip_ul_ipv6 }
+	vipspec = { 'ip': vip_vip, 'underlayRoute': vip_ul_ipv6 }
 	spec = grpc_client.getvip(VM1.name)
 	assert spec == vipspec, \
 		"Failed to add VIP properly"

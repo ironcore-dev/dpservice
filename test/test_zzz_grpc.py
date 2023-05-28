@@ -44,7 +44,7 @@ def test_grpc_addroute_route_exists(prepare_ifaces, grpc_client):
 def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 	# Try to list routes, delete one of them, list and add again
 	# NOTE this route has to be the one in DpService::init_ifaces()
-	routespec = { "vni": vni1, "prefix": neigh_vni1_ov_ip_route, "nextHop": { "vni": 0, "ip": neigh_vni1_ul_ipv6 } }
+	routespec = { "prefix": neigh_vni1_ov_ip_route, "nextHop": { "ip": neigh_vni1_ul_ipv6, "vni": 0 } }
 	routes = grpc_client.listroutes(vni1)
 	assert routespec in routes, \
 		"List of routes does not contain an initial route"
@@ -64,7 +64,7 @@ def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
 	grpc_client.delnat(VM2.name)
 
 	vip_ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	vipspec = { "vipIP": vip_vip, "underlayRoute": vip_ul_ipv6}
+	vipspec = { "ip": vip_vip, "underlayRoute": vip_ul_ipv6}
 	spec = grpc_client.getvip(VM2.name)
 	assert spec == vipspec, \
 		"VIP not set properly"
@@ -75,7 +75,7 @@ def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	vipspec = { "vipIP": vip_vip, "underlayRoute": ul_ipv6}
+	vipspec = { "ip": vip_vip, "underlayRoute": ul_ipv6}
 	spec = grpc_client.getvip(VM2.name)
 	assert spec == vipspec, \
 		"VIP not set properly"
@@ -162,7 +162,8 @@ def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 	# Used rule-id
 	grpc_client.expect_error(202).addfwallrule(VM3.name, "fw0-vm3", src_prefix="1.2.3.4/16", proto="tcp", action="drop")
 
-	rulespec = { "trafficDirection": "Ingress", "firewallAction": "Accept", "priority": 1000, "ipVersion": "IPv4",
+	rulespec = { "ruleID": "fw0-vm3",
+				 "trafficDirection": "Ingress", "firewallAction": "Accept", "priority": 1000, "ipVersion": "IPv4",
 				 "sourcePrefix": "1.2.3.4/16", "destinationPrefix": "0.0.0.0/0",
 				 "protocolFilter": { "Filter": { "Tcp": {
 					 "srcPortLower": -1, "srcPortUpper": -1, "dstPortLower": -1, "dstPortUpper": -1
