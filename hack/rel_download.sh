@@ -9,6 +9,7 @@
 # Example usage:
 # ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=MY_PAT
 
+set -e
 
 if [ "$#" -lt 4 ]; then
 	echo "Usage: $0 -dir=<Destination Directory> -owner=<Repository Owner> -repo=<Repository Name> -pat=<Personal Access Token> [-release=<Release Tag>]"

@@ -41,21 +41,17 @@ libgrpc++-dev \
 linux-headers-${OSARCH} \
 && rm -rf /var/lib/apt/lists/*
 
-# Download and compile DPDK
+# Download DPDK
 RUN wget http://git.dpdk.org/dpdk/snapshot/dpdk-${DPDK_VER}.zip
 RUN unzip dpdk-${DPDK_VER}.zip
 
 ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
-# Copy hack/ first as it contains the patch needed
+# Copy DPDK patch
 COPY hack/dpdk_21_11_clang.patch hack/dpdk_21_11_clang.patch
-COPY hack/rel_download.sh hack/rel_download.sh
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
-RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
-sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; \
-else echo ""; fi) && ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter \
--pat=$GITHUB_TOKEN'
 
+# Compile DPDK
 RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
 common/cpt,common/iavf,\
 common/octeontx,common/octeontx2,common/cnxk,common/qat,regex/octeontx2,net/cnxk,dma/cnxk,\
@@ -71,6 +67,13 @@ crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddi
 vhost,gpudev build
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
+
+# Copy additional repo's tools
+COPY hack/rel_download.sh hack/rel_download.sh
+RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
+sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; else echo ""; fi) \
+&& ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=$GITHUB_TOKEN \
+&& ./hack/rel_download.sh -dir=client -owner=onmetal -repo=dpservice-cli -pat=$GITHUB_TOKEN \'
 
 # Now copy the rest to enable DPDK layer caching
 COPY meson.build meson.build
@@ -108,7 +111,7 @@ COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
-COPY --from=builder /workspace/exporter/* .
+COPY --from=builder /workspace/exporter/* /workspace/client/github.com/onmetal/* .
 RUN ldconfig
 
 ENTRYPOINT ["/dp_service"]
