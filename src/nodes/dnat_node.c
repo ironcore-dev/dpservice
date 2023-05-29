@@ -27,7 +27,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (!cntrack)
 		return DNAT_NEXT_IPV4_LOOKUP;
 
-	if (cntrack->flow_state == DP_FLOW_STATE_NEW && cntrack->dir == DP_FLOW_DIR_ORG) {
+	if (cntrack->flow_state == DP_FLOW_STATE_NEW && df->flags.dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df->tun_info.dst_vni;
 
@@ -87,7 +87,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	}
 
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_NAT &&
-		cntrack->dir == DP_FLOW_DIR_ORG) {
+		df->flags.dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src);
 		df->flags.nat = DP_NAT_CHG_DST_IP;
@@ -98,7 +98,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	/* We already know what to do */
 	if (cntrack->flow_status == DP_FLOW_STATUS_SRC_NAT &&
-		cntrack->dir == DP_FLOW_DIR_REPLY) {
+		df->flags.dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {

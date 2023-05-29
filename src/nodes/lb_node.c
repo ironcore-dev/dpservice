@@ -41,7 +41,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	vni = df->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df->tun_info.dst_vni;
 
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW
-		&& cntrack->dir == DP_FLOW_DIR_ORG
+		&& df->flags.dir == DP_FLOW_DIR_ORG
 		&& dp_is_ip_lb(dst_ip, vni)
 		&& cntrack->flow_status == DP_FLOW_STATUS_NONE
 	) {
@@ -61,7 +61,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return LB_NEXT_OVERLAY_SWITCH;
 	}
 
-	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB && cntrack->dir == DP_FLOW_DIR_ORG) {
+	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB && df->flags.dir == DP_FLOW_DIR_ORG) {
 		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df->tun_info.ul_dst_addr6));
 		dp_lb_pfx_vnf_check(df, m->port);
 		return LB_NEXT_OVERLAY_SWITCH;

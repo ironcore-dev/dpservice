@@ -224,8 +224,8 @@ void dp_free_flow(struct dp_ref *ref)
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
 
 	dp_free_network_nat_port(cntrack);
-	dp_delete_flow_key(&cntrack->flow_key[cntrack->dir]);
-	dp_delete_flow_key(&cntrack->flow_key[!cntrack->dir]);
+	dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_ORG]);
+	dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 
 	rte_free(cntrack);
 }

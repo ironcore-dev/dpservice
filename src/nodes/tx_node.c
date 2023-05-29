@@ -106,7 +106,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		}
 
 		if (df->conntrack) {
-			if (df->conntrack->dir == DP_FLOW_DIR_ORG)
+			if (df->flags.dir == DP_FLOW_DIR_ORG)
 				offload_flag = df->conntrack->offload_flags.orig;
 			else
 				offload_flag = df->conntrack->offload_flags.reply;
