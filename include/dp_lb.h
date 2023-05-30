@@ -7,8 +7,8 @@ extern "C" {
 
 #include "grpc/dp_grpc_responder.h"
 
-#define DP_LB_TABLE_MAX			100
-#define DP_LB_MAX_IPS_PER_VIP	20
+#define DP_LB_TABLE_MAX			256
+#define DP_LB_MAX_IPS_PER_VIP	64
 
 #define DP_LB_OFF	0
 #define DP_LB_ON	1
