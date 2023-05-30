@@ -24,8 +24,8 @@ static __rte_always_inline void dp_lb_pfx_vnf_check(struct dp_flow *df, struct r
 		df->nxt_hop = m->port;
 		df->flags.nat = DP_CHG_UL_DST_IP;
 	} else {
-		m->packet_type |= RTE_PTYPE_CUSTOMIZED_DP_RECIRC;
 		df->flags.nat = DP_LB_RECIRC;
+		printf("recirc pkt\n");
 	}
 }
 
@@ -73,6 +73,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB && df->flags.dir == DP_FLOW_DIR_ORG) {
+		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));
 		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
 		dp_lb_pfx_vnf_check(df, m);
 		return LB_NEXT_OVERLAY_SWITCH;

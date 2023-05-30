@@ -46,6 +46,7 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		// this is not entirely 1:1 mapping to fin sequence,
 		// but sufficient to determine if a tcp connection is almost successfuly closed
 		// (last ack is still pending)
+		printf("FIN pkt \n");
 		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
 			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
 		else
@@ -73,20 +74,29 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 	}
 }
 
-static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val)
+static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val, struct dp_flow *df)
 {
 
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 
 		if (offload_mode_enabled) {
-			flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
-			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+			if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD && df->flags.dir == DP_FLOW_DIR_ORG)
+				flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+			if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD && df->flags.dir == DP_FLOW_DIR_REPLY)
+				flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 		}
 	} else
 		flow_val->timeout_value = flow_timeout;
 }
 
+static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_flow *df)
+{
+	if (df->flags.dir == DP_FLOW_DIR_ORG)
+		df->flags.offload_decision = df->conntrack->offload_flags.orig;
+	else
+		df->flags.offload_decision = df->conntrack->offload_flags.reply;
+}
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
 {
@@ -106,7 +116,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 
 	df->flags.dir = DP_FLOW_DIR_ORG;
 
-	if (offload_mode_enabled && df->l4_type != IPPROTO_TCP) {
+	if (offload_mode_enabled && df->l4_type != IPPROTO_TCP) {  // offload tcp traffic until it is established
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 	} else {
@@ -131,22 +141,37 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	return flow_val;
 }
 
-static __rte_always_inline void change_flow_state_dir(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
+static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
 
 	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH 
 			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
+			
+			df->flags.dir = DP_FLOW_DIR_ORG;
+			
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
-			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
-				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
-			df->flags.dir = DP_FLOW_DIR_ORG;
+			if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD)
+				flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+			else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+					flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
+			
+			
 		}
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
+			
+			df->flags.dir = DP_FLOW_DIR_REPLY;
 
+			// recirc pkt shall not change flow's state
+			if (DP_PTYPE_IS_RECIRC(m->packet_type))
+				return;
+
+			// flow's offload flags of reply direction can be only changed after the first packet
+			// is configured as to be offloaded,
+			// otherwise it will be never offloaded (too early to change to DP_FLOW_OFFLOADED)
 			if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL
 				&& (flow_val->flow_state == DP_FLOW_STATE_ESTABLISHED))
 				flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
@@ -154,13 +179,23 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
-			df->flags.dir = DP_FLOW_DIR_REPLY;
 		}
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
+			printf("flow_val->flow_state %d\n", flow_val->flow_state);
+			printf("flow_val->offload_flags.orig in cntrack %d\n", flow_val->offload_flags.orig);
+			df->flags.dir = DP_FLOW_DIR_ORG;
+			
+			// recirc pkt shall not change flow's state
+			if (DP_PTYPE_IS_RECIRC(m->packet_type)) {
+				printf("it is a recirc pkt in cntrack\n");
+				return;
+			}
 
-			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL) {
 				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
+				printf("flow_val->offload_flags.orig in cntrack after changing %d\n", flow_val->offload_flags.orig);
+			}
 
 			// UDP traffic could be only one direction, thus from the second UDP packet in the same direction,
 			// one UDP flow cannot be treated as a new one, otherwise it will always trigger the operations in snat or dnat
@@ -168,7 +203,6 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 			if (df->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
 				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
-			df->flags.dir = DP_FLOW_DIR_ORG;
 		}
 	}
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
@@ -263,7 +297,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					return CONNTRACK_NEXT_DROP;
 				}
 			} else {
-				change_flow_state_dir(key, flow_val, df);
+				change_flow_state_dir(m, key, flow_val, df);
 			}
 			prev_key = curr_key;
 			if (curr_key == &first_key)
@@ -274,7 +308,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			prev_flow_val = flow_val;
 		} else {
 			flow_val = prev_flow_val;
-			change_flow_state_dir(key, flow_val, df);
+			change_flow_state_dir(m, key, flow_val, df);
 		}
 
 		flow_val->timestamp = rte_rdtsc();
@@ -282,9 +316,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		if (df->l4_type == IPPROTO_TCP) {
 			tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
 			dp_cntrack_tcp_state(flow_val, tcp_hdr);
-			dp_cntrack_set_timeout_tcp_flow(flow_val);
+			dp_cntrack_set_timeout_tcp_flow(flow_val, df);
 		}
 		df->conntrack = flow_val;
+		dp_cntrack_set_pkt_offload_decision(df);
 	} else {
 		return CONNTRACK_NEXT_DROP;
 	}

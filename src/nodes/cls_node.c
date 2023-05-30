@@ -167,6 +167,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			extract_outter_ethernet_header(m);
 			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
 			m->packet_type &= ~RTE_PTYPE_L2_MASK;
+			if (DP_PTYPE_IS_RECIRC(m->packet_type)) {
+				printf("it is a recycled pkt in cls\n");
+			}
 #ifdef ENABLE_VIRTSVC
 			if (virtsvc_present) {
 				virtsvc = get_incoming_virtsvc(m);

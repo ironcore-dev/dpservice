@@ -81,7 +81,6 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	struct rte_mbuf *pkt;
 	struct dp_flow *df;
 	uint i;
-	uint8_t offload_flag = 0;
 
 	// since this node is emitting packets, dp_forward_* wrapper functions cannot be used
 	// this code should colely resemble the one inside those functions
@@ -105,14 +104,9 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			// since this is done in burst, just send out a bad packet..
 		}
 
-		if (df->conntrack) {
-			if (df->flags.dir == DP_FLOW_DIR_ORG)
-				offload_flag = df->conntrack->offload_flags.orig;
-			else
-				offload_flag = df->conntrack->offload_flags.reply;
-
-			if (offload_flag == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
-				dp_offload_handler(pkt, df);
+		printf("tx_node_process: df->flags.offload_decision = %d\n", df->flags.offload_decision);
+		if (df->conntrack && (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)) {
+			dp_offload_handler(pkt, df);
 		}
 	}
 
