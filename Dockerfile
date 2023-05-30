@@ -43,7 +43,8 @@ RUN unzip dpdk-${DPDK_VER}.zip
 
 ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
-COPY . .
+# Copy hack/ first as it contains the patch needed
+COPY hack/dpdk_21_11_clang.patch hack/dpdk_21_11_clang.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
 
 RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
@@ -61,6 +62,16 @@ crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddi
 vhost,gpudev build
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
+
+# Now copy the rest to enable DPDK layer caching
+COPY meson.build meson.build
+COPY meson_options.txt meson_options.txt
+COPY src/ src/
+COPY include/ include/
+COPY test/ test/
+COPY hack/* hack/
+COPY proto/ proto/
+COPY tools/ tools/
 
 RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
 RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
