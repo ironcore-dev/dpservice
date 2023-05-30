@@ -85,9 +85,9 @@ COPY hack/* hack/
 COPY proto/ proto/
 COPY tools/ tools/
 
-RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
-RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
-RUN rm -rf build && meson build -Denable_graphtrace=true && cd ./build && ninja
+#RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
+#RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
+RUN rm -rf build && meson build -Denable_graphtrace=true -Denable_virtual_services=true && cd ./build && ninja
 
 FROM debian:11-slim
 
