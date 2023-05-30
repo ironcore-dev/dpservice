@@ -362,8 +362,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item_ipv6 ipv6_mask;
 
 	// restore the actual incoming pkt's ipv6 dst addr
-	if (DP_PTYPE_IS_RECIRC(m->packet_type))
+	if (DP_PTYPE_IS_RECIRC(m->packet_type)) {
+		printf("it is a recycled pkt in rte_offloading\n");
 		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
+	}
 
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
@@ -931,6 +933,7 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
 
+	printf("dp_offload_handler\n");
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
 		return dp_offload_handle_local_traffic(m, df);
 
