@@ -69,12 +69,10 @@ struct dp_flow {
 	uint8_t					vnf_type;
 	uint8_t					nxt_hop;
 	enum dp_periodic_type	periodic_type;
-	union {
-		struct flow_value	*conntrack;
+	struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC
-		struct dp_virtsvc	*virtsvc;
+	struct dp_virtsvc	*virtsvc;
 #endif
-	};
 };
 static_assert(sizeof(struct dp_flow) <= DP_MBUF_PRIV_DATA_SIZE,
 			  "struct dp_flow is too big to fit in packet");
