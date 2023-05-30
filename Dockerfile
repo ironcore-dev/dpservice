@@ -89,9 +89,9 @@ COPY tools/ tools/
 # Needed for version extraction by meson
 COPY .git/ .git/
 
-RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
-RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
-RUN rm -rf build && meson build && cd ./build && ninja
+#RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
+#RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
+RUN rm -rf build && meson build -Denable_virtual_services=true && cd ./build && ninja
 
 FROM debian:11-slim
 
