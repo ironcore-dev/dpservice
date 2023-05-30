@@ -29,6 +29,8 @@ libuuid1 \
 uuid-dev \
 net-tools \
 xz-utils \
+tar \
+findutils \
 build-essential \
 pkg-config \
 protobuf-compiler-grpc \
@@ -62,6 +64,9 @@ crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddi
 vhost,gpudev build
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
+
+COPY exporter/*.tar.gz exporter/
+RUN find exporter -name "*.tar.gz" -exec tar -xzvf {} \;
 
 # Now copy the rest to enable DPDK layer caching
 COPY meson.build meson.build
@@ -98,6 +103,7 @@ COPY --from=builder /workspace/build/tools/dp_grpc_client .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
+COPY --from=builder /workspace/prometheus-dpdk-exporter .
 RUN ldconfig
 
 ENTRYPOINT ["/dp_service"]
