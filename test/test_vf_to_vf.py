@@ -16,7 +16,7 @@ def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):
 
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
 
-	grpc_client.addfwallrule(VM2.name, "fw0-vm2", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 1234, 1234, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=1234, dst_port_max=1234)
 	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=VM2.ip, src=VM1.ip) /
 			   TCP(dport=1234))
@@ -31,7 +31,7 @@ def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
 
 	grpc_client.addvip(VM2.name, vip_vip)
-	grpc_client.addfwallrule(VM2.name, "fw0-vm2", "0.0.0.0", 0, "0.0.0.0", 0, -1, -1, 1235, 1235, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=1235, dst_port_max=1235)
 
 	# vm1 (vf0) -> vm2 (vf2), vm2 has VIP, send packet to VIP from vm1 side, whether the packet is received
 	# and sent back by vm2 (DNAT)
@@ -52,7 +52,7 @@ def test1_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	resp_thread.start()
 
 	#Accept only tcp packets from the source ip VM1.ip / 32, do not care about the rest
-	grpc_client.addfwallrule(VM2.name, "fw1-vm2", f"{VM1.ip}", 32, "0.0.0.0", 0, -1, -1, -1, -1, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM2.name, "fw1-vm2", src_prefix=f"{VM1.ip}/32", proto="tcp")
 	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=VM2.ip, src=VM1.ip) /
 			   TCP(sport=1001, dport=1234))
@@ -71,7 +71,7 @@ def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	resp_thread.start()
 
 	#Accept only tcp packets from the source ip 1.2.3.4 / 16 range, do not care about the rest
-	grpc_client.addfwallrule(VM2.name, "fw0-vm2", "1.2.3.4", 16, "0.0.0.0", 0, -1, -1, -1, -1, "tcp", "accept", "ingress")
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", src_prefix="1.2.3.4/16", proto="tcp")
 	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=VM2.ip, src=VM1.ip) /
 			   TCP(sport=1002, dport=1234))

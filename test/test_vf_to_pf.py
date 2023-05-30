@@ -160,7 +160,7 @@ def test_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data, negated))
 	resp_thread.start()
 	#Allow only tcp packets to leave the VM with destination port 453
-	grpc_client.addfwallrule(VM1.name, "fw0-vm1", 0, 0, "0.0.0.0", 0, -1, -1, 453, 453, "tcp", "accept", "egress")
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=453, dst_port_max=453, direction="egress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(dport=1024))
@@ -178,7 +178,7 @@ def test2_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client, port_redundancy):
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data,))
 	resp_thread.start()
 	#Allow only tcp packets to leave the VM with destination port 453
-	grpc_client.addfwallrule(VM1.name, "fw1-vm1", 0, 0, "0.0.0.0", 0, -1, -1, 453, 453, "tcp", "accept", "egress")
+	grpc_client.addfwallrule(VM1.name, "fw1-vm1", proto="tcp", dst_port_min=453, dst_port_max=453, direction="egress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(dport=453))

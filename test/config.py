@@ -43,11 +43,9 @@ neigh_ul_ipv6 = "fc00:2::1"
 # Neighboring dp-service instance info (normally provided by metalnet)
 neigh_vni1_ul_ipv6 = "fc00:2::64:0:1"  # Hardcoded VNI, this would need to correspond to the other instance's config
 neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
-neigh_vni1_ov_ip_range = f"{neigh_vni1_ov_ip_prefix}.0"
-neigh_vni1_ov_ip_range_len = 24
+neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
-neigh_vni1_ov_ipv6_range = f"{neigh_vni1_ov_ipv6_prefix}::"
-neigh_vni1_ov_ipv6_range_len = 104
+neigh_vni1_ov_ipv6_route = f"{neigh_vni1_ov_ipv6_prefix}::/104"
 
 # DHCP response config
 dhcp_mtu = 1337
