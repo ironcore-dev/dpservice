@@ -76,6 +76,7 @@ struct flow_key {
 	} src;
 	uint32_t vni;
 	uint8_t  proto;
+	uint8_t  vnf;
 } __rte_packed;
 
 struct flow_nat_info {
