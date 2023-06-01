@@ -147,12 +147,12 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_i
 	if (rte_hash_lookup(ipv4_snat_tbl, &nkey) >= 0) {
 		/* Behind the same key, we can have NAT IP and VIP */
 		if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
-			ret = DP_ERROR_VM_ADD_NAT;
+			ret = DP_GRPC_ERR_ADD_VIP_NO_SNAT_DATA;
 			goto err;
 		}
 
 		if (data->vip_ip != 0) {
-			ret = DP_ERROR_VM_ADD_NAT_IP_EXISTS;
+			ret = DP_GRPC_ERR_ADD_VIP_IP_EXISTS;
 			goto err;
 		} else {
 			rte_memcpy(data->ul_ip6, ul_ipv6, sizeof(data->ul_ip6));
@@ -163,13 +163,13 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_i
 
 
 	if (rte_hash_add_key(ipv4_snat_tbl, &nkey) < 0) {
-		ret = DP_ERROR_VM_ADD_NAT_ALLOC;
+		ret = DP_GRPC_ERR_ADD_VIP_SNAT_KEY_ERR;
 		goto err;
 	}
 
 	data = rte_zmalloc("snat_val", sizeof(struct snat_data), RTE_CACHE_LINE_SIZE);
 	if (!data) {
-		ret = DP_ERROR_VM_ADD_NAT_ADD_KEY;
+		ret = DP_GRPC_ERR_ADD_VIP_SNAT_ALLOC;
 		goto err_key;
 	}
 	rte_memcpy(data->ul_ip6, ul_ipv6, sizeof(data->ul_ip6));
@@ -177,7 +177,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_i
 	data->network_nat_ip = 0;
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
-		ret = DP_ERROR_VM_ADD_NET_NAT_DATA;
+		ret = DP_GRPC_ERR_ADD_VIP_SNAT_DATA_ERR;
 		goto out;
 	}
 	return ret;
@@ -205,12 +205,12 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 
 	if (rte_hash_lookup(ipv4_snat_tbl, &nkey) >= 0) {
 		if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0) {
-			ret = DP_ERROR_VM_ADD_NETNAT_DATA_NOT_FOUND;
+			ret = DP_GRPC_ERR_ADD_NAT_NO_SNAT_DATA;
 			goto err;
 		}
 
 		if (data->network_nat_ip != 0) {
-			ret = DP_ERROR_VM_ADD_NETNAT_IP_EXISTS;
+			ret = DP_GRPC_ERR_ADD_NAT_IP_EXISTS;
 			goto err;
 		} else {
 			rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_ip6));
@@ -223,13 +223,13 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 
 
 	if (rte_hash_add_key(ipv4_snat_tbl, &nkey) < 0) {
-		ret = DP_ERROR_VM_ADD_NETNAT_KEY;
+		ret = DP_GRPC_ERR_ADD_NAT_SNAT_KEY_ERR;
 		goto err;
 	}
 
 	data = rte_zmalloc("snat_val", sizeof(struct snat_data), RTE_CACHE_LINE_SIZE);
 	if (!data) {
-		ret = DP_ERROR_VM_ADD_NETNAT_ALLO_DATA;
+		ret = DP_GRPC_ERR_ADD_NAT_SNAT_ALLOC;
 		goto err_key;
 	}
 	data->network_nat_ip = s_ip;
@@ -239,7 +239,7 @@ int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint1
 	rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_ip6));
 
 	if (rte_hash_add_key_data(ipv4_snat_tbl, &nkey, data) < 0) {
-		ret = DP_ERROR_VM_ADD_NETNAT_ADD_DATA;
+		ret = DP_GRPC_ERR_ADD_NAT_SNAT_DATA_ERR;
 		goto out;
 	}
 	return ret;
@@ -290,7 +290,7 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 	nkey.vni = vni;
 
 	if (rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data) < 0)
-		return DP_ERROR_VM_DEL_NETNAT_ENTRY_NOT_FOUND;
+		return DP_GRPC_ERR_DEL_NAT_NOT_FOUND;
 
 	if (data->network_nat_ip) {
 		data->network_nat_ip = 0;
@@ -304,7 +304,7 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
 
 		if (pos < 0) {
 			DPS_LOG_WARNING("SNAT hash key already deleted");;
-			return DP_ERROR_VM_DEL_NETNAT_KEY_DELETED;
+			return DP_GRPC_ERR_DEL_NAT_ALREADY_DELETED;
 		}
 	}
 
@@ -351,24 +351,24 @@ int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni)
 	nkey.vni = vni;
 
 	if (rte_hash_lookup(ipv4_dnat_tbl, &nkey) >= 0) {
-		ret = DP_ERROR_VM_ADD_DNAT_IP_EXISTS;
+		ret = DP_GRPC_ERR_ADD_DNAT_IP_EXISTS;
 		goto err;
 	}
 
 	if (rte_hash_add_key(ipv4_dnat_tbl, &nkey) < 0) {
-		ret = DP_ERROR_VM_ADD_DNAT_ALLOC;
+		ret = DP_GRPC_ERR_ADD_DNAT_KEY_ERR;
 		goto err;
 	}
 
 	v_ip = rte_zmalloc("dnat_val", sizeof(uint32_t), RTE_CACHE_LINE_SIZE);
 	if (!v_ip) {
-		ret = DP_ERROR_VM_ADD_DNAT_ADD_KEY;
+		ret = DP_GRPC_ERR_ADD_DNAT_ALLOC;
 		goto err_key;
 	}
 
 	*v_ip = vm_ip;
 	if (rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, v_ip) < 0) {
-		ret = DP_ERROR_VM_ADD_DNAT_ADD_KEY;
+		ret = DP_GRPC_ERR_ADD_DNAT_DATA_ERR;
 		goto out;
 	}
 
@@ -489,7 +489,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 		if (dp_is_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
 			DPS_LOG_ERR("cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d",
 					nat_ipv4, vni, min_port, max_port);
-			return DP_ERROR_VM_ADD_NEIGHNAT_ENTRY_EXIST;
+			return DP_GRPC_ERR_ADD_NEIGHNAT_ALREADY_EXISTS;
 		}
 	}
 
@@ -497,7 +497,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 	if (!new_entry) {
 		DPS_LOG_ERR("failed to allocate network nat entry for ip: %4x, vni: %d", nat_ipv4, vni);
-		return DP_ERROR_VM_ADD_NEIGHNAT_ALLOC;
+		return DP_GRPC_ERR_ADD_NEIGHNAT_ALLOC;
 	}
 
 	if (nat_ipv4)
@@ -531,7 +531,7 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 		}
 	}
 
-	return DP_ERROR_VM_DEL_NEIGHNAT_ENTRY_NOFOUND;
+	return DP_GRPC_ERR_DEL_NEIGHNAT_NOT_FOUND;
 }
 
 const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
@@ -734,7 +734,7 @@ int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint
 	while (true) {
 		ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index);
 		if (ret == -EINVAL)
-			return DP_ERROR_VM_GET_NETNAT_ITER_ERROR;
+			return DP_GRPC_ERR_GET_NAT_ITER_ERR;
 
 		if (ret == -ENOENT)
 			break; // no more key-data item, thus break / return
