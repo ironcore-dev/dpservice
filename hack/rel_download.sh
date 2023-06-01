@@ -7,7 +7,7 @@
 # 4. -pat : Personal Access Token (PAT). A token provided by GitHub to access the repository.
 # 5. -release : (Optional) Release tag. By default, it is set to "latest".
 # Example usage:
-# ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=MY_TAP
+# ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=MY_PAT
 
 
 if [ "$#" -lt 4 ]; then
@@ -51,6 +51,12 @@ if [ ! -d "$DIRECTORY" ]; then
 	mkdir -p "$DIRECTORY"
 fi
 
+if [ -z "$PAT" ]; then
+	touch $DIRECTORY/dummy_$DIRECTORY
+	echo "No PAT defined. Will not download the packages"
+	exit 0
+fi
+
 # Use curl to access the GitHub API and get the asset ID.
 ASSET_ID=$(curl -s -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $PAT" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/$RELEASE | jq -r '.assets[] | select (.name | contains("linux_amd64")) | .id')
 
@@ -64,11 +70,14 @@ curl -s -L -H "Accept: application/octet-stream" -H "Authorization: Bearer $PAT"
 
 tar -xzf $DIRECTORY/$DIRECTORY.tar.gz -C $DIRECTORY
 rm $DIRECTORY/$DIRECTORY.tar.gz
+rm -rf $DIRECTORY/LICENSE*
+rm -rf $DIRECTORY/README.md
 
 if [ "$?" -eq 0 ]; then
 	echo "Release binary successfully copied to $DIRECTORY"
 else
 	echo "Failed to copy the release binary to $DIRECTORY"
+	exit 1
 fi
 
-
+exit 0

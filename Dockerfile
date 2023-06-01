@@ -31,6 +31,8 @@ net-tools \
 xz-utils \
 tar \
 findutils \
+jq \
+curl \
 build-essential \
 pkg-config \
 protobuf-compiler-grpc \
@@ -47,7 +49,12 @@ ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
 # Copy hack/ first as it contains the patch needed
 COPY hack/dpdk_21_11_clang.patch hack/dpdk_21_11_clang.patch
+COPY hack/rel_download.sh hack/rel_download.sh
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
+RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
+sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; \
+else echo ""; fi) && ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter \
+-pat=$GITHUB_TOKEN'
 
 RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
 common/cpt,common/iavf,\
@@ -64,9 +71,6 @@ crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddi
 vhost,gpudev build
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
-
-COPY exporter/*.tar.gz exporter/
-RUN find exporter -name "*.tar.gz" -exec tar -xzvf {} \;
 
 # Now copy the rest to enable DPDK layer caching
 COPY meson.build meson.build
@@ -103,7 +107,7 @@ COPY --from=builder /workspace/build/tools/dp_grpc_client .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
-COPY --from=builder /workspace/prometheus-dpdk-exporter .
+COPY --from=builder /workspace/exporter/* .
 RUN ldconfig
 
 ENTRYPOINT ["/dp_service"]
