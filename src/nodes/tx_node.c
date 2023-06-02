@@ -106,6 +106,11 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		}
 
 		if (df->conntrack) {
+			// mark the flow as default if it is not marked as any other status
+			if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
+				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
+
+			// take care of offloading
 			if (df->flags.dir == DP_FLOW_DIR_ORG)
 				offload_flag = df->conntrack->offload_flags.orig;
 			else

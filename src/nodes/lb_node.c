@@ -40,10 +40,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	dst_ip = ntohl(df->dst.dst_addr);
 	vni = df->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df->tun_info.dst_vni;
 
-	if (cntrack->flow_state == DP_FLOW_STATE_NEW
+	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status)
 		&& df->flags.dir == DP_FLOW_DIR_ORG
 		&& dp_is_ip_lb(dst_ip, vni)
-		&& cntrack->flow_status == DP_FLOW_STATUS_NONE
 	) {
 		if (df->l4_type == IPPROTO_ICMP) {
 			df->flags.nat = DP_LB_CHG_UL_DST_IP;
@@ -56,12 +55,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 		rte_memcpy(df->tun_info.ul_dst_addr6, target_ip6, sizeof(df->tun_info.ul_dst_addr6));
 		rte_memcpy(cntrack->lb_dst_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6));
-		cntrack->flow_status = DP_FLOW_STATUS_DST_LB;
+		cntrack->flow_status |= DP_FLOW_STATUS_FLAG_DST_LB;
 		dp_lb_pfx_vnf_check(df, m->port);
 		return LB_NEXT_OVERLAY_SWITCH;
 	}
 
-	if (cntrack->flow_status == DP_FLOW_STATUS_DST_LB && df->flags.dir == DP_FLOW_DIR_ORG) {
+	if (DP_IS_FLOW_STATUS_FLAG_DST_LB(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
 		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->lb_dst_addr6, sizeof(df->tun_info.ul_dst_addr6));
 		dp_lb_pfx_vnf_check(df, m->port);
 		return LB_NEXT_OVERLAY_SWITCH;

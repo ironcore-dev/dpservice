@@ -21,6 +21,25 @@ extern "C" {
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
 
 
+#define DP_FLOW_STATUS_FLAG_NONE		0x00
+#define DP_FLOW_STATUS_FLAG_SRC_NAT		0x01
+#define DP_FLOW_STATUS_FLAG_DST_NAT		0x02
+#define DP_FLOW_STATUS_FLAG_DST_LB		0x04
+#define DP_FLOW_STATUS_FLAG_FIREWALL	0x08
+#define DP_FLOW_STATUS_FLAG_DEFAULT		0x10
+
+#define DP_FLOW_STATUS_FLAG_NF			(DP_FLOW_STATUS_FLAG_SRC_NAT | DP_FLOW_STATUS_FLAG_DST_NAT | DP_FLOW_STATUS_FLAG_DST_LB)
+
+#define DP_IS_FLOW_STATUS_FLAG_NONE(flag)		(!(flag))
+#define DP_IS_FLOW_STATUS_FLAG_SRC_NAT(flag)	((flag) & DP_FLOW_STATUS_FLAG_SRC_NAT)
+#define DP_IS_FLOW_STATUS_FLAG_DST_NAT(flag)	((flag) & DP_FLOW_STATUS_FLAG_DST_NAT)
+#define DP_IS_FLOW_STATUS_FLAG_DST_LB(flag)	((flag) & DP_FLOW_STATUS_FLAG_DST_LB)
+#define DP_IS_FLOW_STATUS_FLAG_FIREWALL(flag)	((flag) & DP_FLOW_STATUS_FLAG_FIREWALL)
+#define DP_IS_FLOW_STATUS_FLAG_DEFAULT(flag)	((flag) & DP_FLOW_STATUS_FLAG_DEFAULT)
+
+#define DP_IS_FLOW_STATUS_FLAG_NF(flag)		((flag) & DP_FLOW_STATUS_FLAG_NF)
+
+
 enum {
 	DP_FLOW_DIR_ORG,
 	DP_FLOW_DIR_REPLY,
@@ -30,13 +49,6 @@ enum {
 enum {
 	DP_FLOW_STATE_NEW,
 	DP_FLOW_STATE_ESTABLISHED,
-};
-
-enum {
-	DP_FLOW_STATUS_NONE,
-	DP_FLOW_STATUS_SRC_NAT,
-	DP_FLOW_STATUS_DST_NAT,
-	DP_FLOW_STATUS_DST_LB,
 };
 
 enum {
@@ -96,8 +108,7 @@ struct flow_value {
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
 	uint8_t			lb_dst_addr6[16];
-	uint8_t			flow_status; // record if a flow is natted in any means
-	uint8_t			flow_state; // track if a flow has been seen in one or both directions
+	uint8_t			flow_status; // record if a flow has status associated with it
 	uint8_t			fwall_action[DP_FLOW_DIR_MAX];
 	struct {
 		uint8_t orig : 4;
