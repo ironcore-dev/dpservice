@@ -203,9 +203,9 @@ def test_grpc_add_list_del_routes_big_reply(prepare_ifaces, grpc_client):
 		grpc_client.addroute(vni1, ov_target_pfx, 0, neigh_vni1_ul_ipv6)
 
 	specs = grpc_client.listroutes(vni1)
-	# +1 for the one already there (from env setup)
-	assert len(specs) == MAX_LINES_ROUTE_REPLY + 1, \
-		f"Not all routes have been added ({len(specs)}/{MAX_LINES_ROUTE_REPLY+1})"
+	# +2 for the ones already there (from env setup)
+	assert len(specs) == MAX_LINES_ROUTE_REPLY + 2, \
+		f"Not all routes have been added ({len(specs)}/{MAX_LINES_ROUTE_REPLY+2})"
 
 	for subnet in range(30, 30+MAX_LINES_ROUTE_REPLY):
 		ov_target_pfx = f"192.168.{subnet}.0/32"
