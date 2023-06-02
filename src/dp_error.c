@@ -11,9 +11,16 @@
 
 #include "dp_error.h"
 #include <stdio.h>
+#include <rte_common.h>
 
 // rte_strerror() uses 256, we add a number and (optionally) a short name
 #define STRERROR_BUFSIZE 320
+
+#define _DP_GRPC_ERROR_STRING(NAME, NUMBER) \
+	[NUMBER] = #NAME,
+static const char *dp_grpc_error_strings[] = {
+	_DP_GRPC_ERRORS(_DP_GRPC_ERROR_STRING)
+};
 
 const char *dp_strerror(int error)
 {
@@ -39,4 +46,15 @@ const char *dp_strerror(int error)
 	snprintf(buf, sizeof(buf), "(Error %d: %s)", error, errdesc);
 
 	return buf;
+}
+
+
+const char *dp_grpc_strerror(int errcode)
+{
+	if (errcode == 0)
+		return "Success";
+	if (errcode < 0 || errcode >= RTE_DIM(dp_grpc_error_strings)
+		|| !dp_grpc_error_strings[errcode])
+		return "Invalid gRPC error code";
+	return dp_grpc_error_strings[errcode];
 }

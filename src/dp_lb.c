@@ -97,10 +97,10 @@ int dp_get_lb(void *id_key, dp_lb *list_lb)
 	int32_t i;
 
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0)
-		return DP_ERROR_GET_LB_ID_ERR;
+		return DP_GRPC_ERR_GET_LB_ID_ERR;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0)
-		return DP_ERROR_GET_LB_BACK_IP_ERR;
+		return DP_GRPC_ERR_GET_LB_BACK_IP_ERR;
 
 	list_lb->ip_type = RTE_ETHER_TYPE_IPV4;
 	list_lb->vni = lb_k->vni;
@@ -123,12 +123,12 @@ int dp_delete_lb(void *id_key)
 	int32_t pos;
 
 	if (rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k) < 0) {
-		res = DP_ERROR_DEL_LB_ID_ERR;
+		res = DP_GRPC_ERR_DEL_LB_ID_ERR;
 		goto err_id;
 	}
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val) < 0) {
-		res = DP_ERROR_DEL_LB_BACK_IP_ERR;
+		res = DP_GRPC_ERR_DEL_LB_BACK_IP_ERR;
 		goto err_back_ip;
 	}
 

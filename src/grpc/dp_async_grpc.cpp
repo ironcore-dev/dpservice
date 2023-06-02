@@ -4,10 +4,20 @@
 #include "grpc/dp_async_grpc.h"
 #include "grpc/dp_grpc_service.h"
 #include "grpc/dp_grpc_impl.h"
-#include "dp_error.h"
 #include "dp_util.h"
 #include "dp_lpm.h"
 #include "dp_log.h"
+
+inline void BaseCall::SetErrStatus(Status *status, uint32_t err_code) {
+	status->set_error(err_code);
+	status->set_message(dp_grpc_strerror(err_code));
+}
+
+inline Status *BaseCall::CreateErrStatus(uint32_t err_code) {
+	Status *err_status = new Status();
+	SetErrStatus(err_status, err_code);
+	return err_status;
+}
 
 void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule)
 {
@@ -172,7 +182,6 @@ int IsVniInUseCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 
 	if (status_ == REQUEST) {
 		new IsVniInUseCall(service_, cq_);
@@ -205,9 +214,7 @@ int IsVniInUseCall::Proceed()
 		else
 			reply_.set_inuse(false);
 
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -270,7 +277,7 @@ int InitCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -285,7 +292,6 @@ int CreateLBCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	uint16_t i, size;
-	Status *err_status;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -337,9 +343,7 @@ int CreateLBCall::Proceed()
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.get_lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -373,7 +377,7 @@ int DelLBCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -388,7 +392,6 @@ int GetLBCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	struct in_addr addr;
-	Status *err_status;
 	LBPort *lb_port;
 	LBIP *lb_ip;
 	int i;
@@ -434,9 +437,7 @@ int GetLBCall::Proceed()
 		}
 		inet_ntop(AF_INET6, reply.get_lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -482,7 +483,7 @@ int AddLBVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -528,7 +529,7 @@ int DelLBVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -588,7 +589,6 @@ int AddPfxCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -625,9 +625,7 @@ int AddPfxCall::Proceed()
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -671,7 +669,7 @@ int DelPfxCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker(&reply))
 			return -1;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -738,7 +736,6 @@ int CreateLBTargetPfxCall::Proceed()
 	char buf_str[INET6_ADDRSTRLEN];
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -774,9 +771,7 @@ int CreateLBTargetPfxCall::Proceed()
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.route.trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -820,7 +815,7 @@ int DelLBTargetPfxCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker(&reply))
 			return -1;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -886,7 +881,6 @@ int AddVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -921,9 +915,7 @@ int AddVIPCall::Proceed()
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -957,7 +949,7 @@ int DelVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -971,7 +963,6 @@ int GetVIPCall::Proceed()
 	char buf_str[INET6_ADDRSTRLEN];
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	struct in_addr addr;
 
 	if (status_ == REQUEST) {
@@ -999,9 +990,7 @@ int GetVIPCall::Proceed()
 		inet_ntop(AF_INET6, reply.get_vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		status_ = FINISH;
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1015,7 +1004,6 @@ int AddInterfaceCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	VirtualFunction *vf;
-	Status *err_status;
 	IpAdditionResponse *ip_resp;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
@@ -1076,12 +1064,10 @@ int AddInterfaceCall::Proceed()
 		vf->set_slot(reply.vf_pci.slot);
 		vf->set_function(reply.vf_pci.function);
 		reply_.set_allocated_vf(vf);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
 		inet_ntop(AF_INET6, reply.vf_pci.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		ip_resp = new IpAdditionResponse();
 		ip_resp->set_underlayroute(buf_str);
-		ip_resp->set_allocated_status(err_status);
+		ip_resp->set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		reply_.set_allocated_response(ip_resp);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1116,7 +1102,7 @@ int DelInterfaceCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1131,7 +1117,6 @@ int GetInterfaceCall::Proceed()
 	dp_request request = {0};
 	dp_reply reply = {0};
 	dp_vm_info *vm_info;
-	Status *err_status;
 	Interface *machine;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -1169,9 +1154,7 @@ int GetInterfaceCall::Proceed()
 		inet_ntop(AF_INET6, reply.vm_info.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		machine->set_underlayroute(buf_str);
 		reply_.set_allocated_interface(machine);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1232,7 +1215,7 @@ int AddRouteCall::Proceed()
 		dp_fill_head(&reply.com_head, call_type_, 0, 1);
 		if (dp_recv_from_worker(&reply))
 			return -1;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1294,7 +1277,7 @@ int DelRouteCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (dp_recv_from_worker(&reply))
 			return -1;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1377,7 +1360,6 @@ int AddNATVIPCall::Proceed()
 	struct dp_reply reply = {0};
 
 	grpc::Status ret = grpc::Status::OK;
-	Status *err_status;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -1419,9 +1401,7 @@ int AddNATVIPCall::Proceed()
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1434,7 +1414,6 @@ int GetNATVIPCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	struct in_addr addr;
 	NATIP *nat_ip;
 	char buf[INET6_ADDRSTRLEN];
@@ -1468,9 +1447,7 @@ int GetNATVIPCall::Proceed()
 		inet_ntop(AF_INET6, reply.nat_entry.underlay_route, buf, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf);
 		status_ = FINISH;
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1506,7 +1483,7 @@ int DeleteNATVIPCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1564,7 +1541,7 @@ int AddNeighborNATCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1618,7 +1595,7 @@ int DeleteNeighborNATCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1773,7 +1750,6 @@ int AddFirewallRuleCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	const FirewallRule *grpc_rule;
 
 	if (status_ == REQUEST) {
@@ -1806,9 +1782,7 @@ int AddFirewallRuleCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		reply_.set_ruleid(&reply.fw_rule.rule.rule_id, sizeof(reply.fw_rule.rule.rule_id));
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1846,7 +1820,7 @@ int DelFirewallRuleCall::Proceed()
 		if (dp_recv_from_worker(&reply))
 			return -1;
 		status_ = FINISH;
-		reply_.set_error(reply.com_head.err_code);
+		SetErrStatus(&reply_, reply.com_head.err_code);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1859,7 +1833,6 @@ int GetFirewallRuleCall::Proceed()
 {
 	dp_request request = {0};
 	dp_reply reply = {0};
-	Status *err_status;
 	FirewallRule *rule;
 
 	if (status_ == REQUEST) {
@@ -1890,9 +1863,7 @@ int GetFirewallRuleCall::Proceed()
 		reply_.set_allocated_rule(rule);
 
 		status_ = FINISH;
-		err_status = new Status();
-		err_status->set_error(reply.com_head.err_code);
-		reply_.set_allocated_status(err_status);
+		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);

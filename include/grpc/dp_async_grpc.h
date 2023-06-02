@@ -1,5 +1,5 @@
-#ifndef __INCLUDE_DP_ASYNC_GRPC_SERVICE_H
-#define __INCLUDE_DP_ASYNC_GRPC_SERVICE_H
+#ifndef __INCLUDE_DP_ASYNC_GRPC_H__
+#define __INCLUDE_DP_ASYNC_GRPC_H__
 
 #include "../proto/dpdk.grpc.pb.h"
 
@@ -9,6 +9,7 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
+#include "dp_error.h"
 #include "dp_grpc_impl.h"
 #include "dp_firewall.h"
 
@@ -33,6 +34,8 @@ protected:
 	ServerCompletionQueue* cq_;
 	CallStatus status_;
 	uint16_t call_type_;
+	void SetErrStatus(Status *status, uint32_t err_code);
+	Status *CreateErrStatus(uint32_t err_code);
 public:
 	BaseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq, uint16_t call_type)
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
@@ -568,4 +571,4 @@ public:
 	}
 	int Proceed() override;
 };
-#endif //__INCLUDE_DP_ASYNC_GRPC_SERVICE_H
+#endif //__INCLUDE_DP_ASYNC_GRPC_H__

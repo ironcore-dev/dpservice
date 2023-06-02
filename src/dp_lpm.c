@@ -194,13 +194,13 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root) {
-		ret = DP_ERROR_VM_ADD_RT_NO_VM;
+		ret = DP_GRPC_ERR_ADD_ROUTE_NO_VM;
 		goto err;
 	}
 
 	node = rte_rib_lookup_exact(root, ip, depth);
 	if (node) {
-		ret = DP_ERROR_VM_ADD_RT_FAIL4;
+		ret = DP_GRPC_ERR_ADD_ROUTE_FAIL4;
 		goto err;
 	}
 
@@ -208,7 +208,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	if (node) {
 		ret = rte_rib_set_nh(node, portid);
 		if (ret < 0) {
-			ret = DP_ERROR_VM_ADD_RT_FAIL4;
+			ret = DP_GRPC_ERR_ADD_ROUTE_FAIL4;
 			goto err;
 		}
 		/* This is an external route */
@@ -218,14 +218,14 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
 		}
 	} else {
-		ret = DP_ERROR_VM_ADD_RT_FAIL4;
+		ret = DP_GRPC_ERR_ADD_ROUTE_FAIL4;
 		goto err;
 	}
 
 	return ret;
 err:
 	// Addroute with 0.0.0.0 is used by metalnet as a periodic VNI-present query
-	if (ip == 0 && ret == DP_ERROR_VM_ADD_RT_NO_VM)
+	if (ip == 0 && ret == DP_GRPC_ERR_ADD_ROUTE_NO_VM)
 		DPS_LOG_DEBUG("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
 	else
 		DPS_LOG_WARNING("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
