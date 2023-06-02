@@ -285,18 +285,54 @@ static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool
 	}
 }
 
+static __rte_always_inline bool dp_route_in_dhcp_range(struct rte_rib_node *node, uint16_t portid)
+{
+	uint32_t ipv4 = 0;
+	uint8_t depth = 0;
+
+	rte_rib_get_ip(node, &ipv4);
+	rte_rib_get_depth(node, &depth);
+	return dp_get_dhcp_range_ip4(portid) == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
+}
+
+static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid,
+								struct rte_mbuf **m_curr_ptr, struct rte_mbuf *rep_arr[], int8_t *rep_arr_size_ptr,
+								uint16_t msg_per_buf, bool ext_routes)
+{
+	struct rte_mbuf *m_new;
+	dp_reply *rep;
+	uint64_t next_hop;
+
+	// can only fail when any argument is NULL
+	rte_rib_get_nh(node, &next_hop);
+
+	if ((ext_routes && dp_port_is_pf(next_hop))
+		|| (!ext_routes && next_hop == portid && !dp_route_in_dhcp_range(node, portid))
+	) {
+		rep = rte_pktmbuf_mtod(*m_curr_ptr, dp_reply *);
+		// no more space in this mbuf, use another one
+		if (rep->com_head.msg_count && (rep->com_head.msg_count % msg_per_buf == 0)) {
+			m_new = dp_add_mbuf_to_grpc_arr(*m_curr_ptr, rep_arr, rep_arr_size_ptr);
+			if (!m_new) {
+				DPGRPC_LOG_WARNING("No more space in gRPC response array for route entry");
+				return DP_ERROR;
+			}
+			*m_curr_ptr = m_new;
+			rep = rte_pktmbuf_mtod(m_new, dp_reply *);
+		}
+		dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
+	}
+	return DP_OK;
+}
+
 void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 					struct rte_mbuf *rep_arr[], bool ext_routes)
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
+	struct rte_mbuf *m_curr = m;
 	struct rte_rib_node *node = NULL;
 	struct rte_rib *root;
 	uint16_t msg_per_buf;
-	uint32_t ipv4 = 0;
-	uint8_t depth = 0;
-	uint64_t next_hop;
-	dp_reply *rep;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 
@@ -304,41 +340,18 @@ void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
 	if (!root)
 		goto out;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(dp_route));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size, sizeof(dp_route));
 
-	do {
-		node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL);
-		if (node && (rte_rib_get_nh(node, &next_hop) == 0) &&
-			dp_port_is_pf(next_hop) && ext_routes) {
-			if (rep->com_head.msg_count &&
-			    (rep->com_head.msg_count % msg_per_buf == 0)) {
-				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-				if (!m_new)
-					break;
-				m_curr = m_new;
-				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-			}
-			dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
-		} else if (node && (rte_rib_get_nh(node, &next_hop) == 0) && !ext_routes) {
-			if (rep->com_head.msg_count &&
-			    (rep->com_head.msg_count % msg_per_buf == 0)) {
-				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-				if (!m_new)
-					break;
-				m_curr = m_new;
-				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-			}
-			if (next_hop == portid) {
-				rte_rib_get_ip(node, &ipv4);
-				rte_rib_get_depth(node, &depth);
-				if ((dp_get_dhcp_range_ip4(portid) == ipv4) && (depth == DP_LPM_DHCP_IP_DEPTH))
-					continue;
-				dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
-			}
-		}
-	} while (node != NULL);
+	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
+	if (node)
+		dp_list_route_entry(node, portid, &m_curr, rep_arr, &rep_arr_size, msg_per_buf, ext_routes);
+		// failure ignored, should not fail for the first entry anyway
+
+	node = NULL;  // needed to start rte_rib_get_nxt() traversal
+	while ((node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL))) {
+		if (DP_FAILED(dp_list_route_entry(node, portid, &m_curr, rep_arr, &rep_arr_size, msg_per_buf, ext_routes)))
+			break;
+	}
 
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
