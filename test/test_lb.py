@@ -31,13 +31,13 @@ def router_loopback(dst_ipv6, check_ipv4_src, check_ipv4_dst):
 				 TCP(dport=pkt[TCP].dport, sport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, PF0.tap)
 
-def communicate_vip_lb(lb_ipv6, src_ipv6, src_ipv4, vf_tap, sport):
+def communicate_vip_lb(vm, lb_ipv6, src_ipv6, src_ipv4, vf_tap, sport):
 	threading.Thread(target=router_loopback, args=(lb_ipv6, src_ipv4, lb_ip)).start()
-	# VM3(VIP) HTTP request to LB(VM1,VM2) server
-	vm_pkt = (Ether(dst=PF0.mac, src=VM3.mac, type=0x0800) /
-			   IP(dst=lb_ip, src=VM3.ip) /
+	# vm(VIP) HTTP request to LB(VM1,VM2) server
+	vm_pkt = (Ether(dst=PF0.mac, src=vm.mac, type=0x0800) /
+			   IP(dst=lb_ip, src=vm.ip) /
 			   TCP(sport=sport, dport=80))
-	delayed_sendp(vm_pkt, VM3.tap)
+	delayed_sendp(vm_pkt, vm.tap)
 	# LB(VM1,VM2) server request from the router
 	srv_pkt = sniff_packet(vf_tap, is_tcp_pkt)
 	assert srv_pkt[IP].dst == lb_ip, \
@@ -46,14 +46,14 @@ def communicate_vip_lb(lb_ipv6, src_ipv6, src_ipv4, vf_tap, sport):
 		"Invalid server port"
 
 	threading.Thread(target=router_loopback, args=(src_ipv6, lb_ip, src_ipv4)).start()
-	# HTTP response back to VIP(VM3)
+	# HTTP response back to VIP(vm)
 	srv_reply = (Ether(dst=srv_pkt[Ether].src, src=srv_pkt[Ether].dst, type=0x0800) /
 				 IP(dst=srv_pkt[IP].src, src=srv_pkt[IP].dst) /
 				 TCP(sport=srv_pkt[TCP].dport, dport=srv_pkt[TCP].sport))
 	delayed_sendp(srv_reply, vf_tap)
-	# HTTP response from the router on VM3(VIP)
-	vm_reply = sniff_packet(VM3.tap, is_tcp_pkt)
-	assert vm_reply[IP].dst == VM3.ip, \
+	# HTTP response from the router on vm(VIP)
+	vm_reply = sniff_packet(vm.tap, is_tcp_pkt)
+	assert vm_reply[IP].dst == vm.ip, \
 		f"Invalid VIPped destination IP {vm_reply[IP].dst}"
 	assert vm_reply[TCP].sport == 80, \
 		f"Invalid server reply port {vm_reply[TCP].sport}"
@@ -73,17 +73,17 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=80, dst_port_max=80)
 	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
 	# Also test round-robin
-	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
-	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
-	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1235)
-	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1236)
-	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1237)
-	communicate_vip_lb(lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1237)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1235)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1236)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1237)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1237)
 	grpc_client.delvip(VM3.name)
 
 	# NAT should behave the same, just test once (watch out for round-robin from before)
 	nat_ipv6 = grpc_client.addnat(VM3.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	communicate_vip_lb(lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1240)
+	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1240)
 	grpc_client.delnat(VM3.name)
 
 	grpc_client.dellbtarget(VM2.name, lb_vm2_ul_ipv6)
@@ -97,3 +97,28 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 
 	# NOTE: this test, just like in test_pf_to_vf.py
 	# cannot be run twice in a row, since the flows need to age-out
+
+
+def test_nat_to_lb_nat(prepare_ipv4, grpc_client, port_redundancy):
+
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported for NAT <-> LB+NAT test")
+
+	# Create a VM on VNI1 under a loadbalancer and NAT
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_ip)
+	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
+	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 100, 101)
+
+	# Create another VM on the same VNI behind the same NAT and communicate
+	VM4.ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+	request_ip(VM4)
+	nat3_ipv6 = grpc_client.addnat(VM4.name, nat_vip, 400, 401)
+	communicate_vip_lb(VM4, lb_ul_ipv6, nat3_ipv6, nat_vip, VM1.tap, 2400)
+	grpc_client.delnat(VM4.name)
+	grpc_client.delinterface(VM4.name)
+
+	grpc_client.delnat(VM1.name)
+	grpc_client.dellbtarget(VM1.name, lb_vm1_ul_ipv6)
+	grpc_client.dellbprefix(VM1.name, lb_ip)
+	grpc_client.dellb(lb_name)

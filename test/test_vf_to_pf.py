@@ -77,15 +77,15 @@ def send_tcp_through_port(port):
 def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1_max_port, args=(nat_ul_ipv6,)).start()
-	send_tcp_through_port(1242)
-	send_tcp_through_port(1243)
+	send_tcp_through_port(1246)
+	send_tcp_through_port(1247)
 	grpc_client.delnat(VM1.name)
 
 
 def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
-	send_tcp_through_port(1242)
+	send_tcp_through_port(1246)
 	grpc_client.delnat(VM1.name)
 
 
@@ -148,7 +148,7 @@ def request_icmperr(dport, pf_name, nat_ul_ipv6):
 
 def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	request_icmperr(506, PF0.tap, nat_ul_ipv6)
+	request_icmperr(501, PF0.tap, nat_ul_ipv6)
 	if port_redundancy:
 		request_icmperr(500, PF1.tap, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)

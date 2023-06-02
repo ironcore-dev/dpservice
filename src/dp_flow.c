@@ -6,6 +6,7 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
+#include "dp_vnf.h"
 #include "dp_refcount.h"
 #include "dp_mbuf_dyn.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -105,6 +106,28 @@ static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* ou
 	return DP_ERROR;
 }
 
+/* Isolating only VNF NAT conntrack entries at the moment. The others should follow */
+static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow_key *key)
+{
+	struct nat_check_result nat_check;
+
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+		if (df->vnf_type == DP_VNF_TYPE_NAT)
+			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
+		else
+			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
+	} else {
+		if (DP_FAILED(dp_check_if_ip_natted(key->ip_src, key->vni, &nat_check))) {
+			DPS_LOG_WARNING("Failed to perform snat table searching during flow key building");
+			key->vnf = DP_VNF_TYPE_UNDEFINED;
+		} else if (nat_check.is_network_natted) {
+			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
+		} else {
+			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
+		}
+	}
+}
+
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
@@ -119,6 +142,8 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 		key->vni = df->tun_info.dst_vni;
 	else
 		key->vni = dp_get_vm_vni(m->port);
+
+	dp_mark_vnf_type(df, key);
 
 	switch (df->l4_type) {
 	case IPPROTO_TCP:
