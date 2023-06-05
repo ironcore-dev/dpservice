@@ -104,9 +104,14 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			// since this is done in burst, just send out a bad packet..
 		}
 
-		printf("tx_node_process: df->flags.offload_decision = %d\n", df->flags.offload_decision);
-		if (df->conntrack && (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)) {
-			dp_offload_handler(pkt, df);
+		if (df->conntrack) {
+			// mark the flow as default if it is not marked as any other status
+ 			if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
+ 				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
+
+			printf("tx_node_process: df->flags.offload_decision = %d\n", df->flags.offload_decision);
+			if (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
+				dp_offload_handler(pkt, df);
 		}
 	}
 

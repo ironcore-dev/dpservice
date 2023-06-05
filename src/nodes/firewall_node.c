@@ -17,13 +17,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct flow_value *cntrack = df->conntrack;
 	enum dp_fwall_action action;
 
-	if (cntrack->flow_state == DP_FLOW_STATE_NEW && df->flags.dir == DP_FLOW_DIR_ORG) {
+	if (!DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
 		action = dp_get_firewall_action(df, dp_get_ipv4_hdr(m), m->port);
 		cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
 		cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
 	}
 
-	if (cntrack->flow_state == DP_FLOW_STATE_ESTABLISHED)
+	if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status))
 		action = (enum dp_fwall_action)cntrack->fwall_action[df->flags.dir];
 
 	/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */
