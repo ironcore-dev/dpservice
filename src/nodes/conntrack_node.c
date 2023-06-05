@@ -108,8 +108,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	/* Add original direction to conntrack table */
 	dp_add_flow(key);
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
-	flow_val->flow_state = DP_FLOW_STATE_NEW;
-	flow_val->flow_status = DP_FLOW_STATUS_NONE;
+	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
 	flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = m->port;
@@ -118,7 +117,6 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 
 	if (offload_mode_enabled && df->l4_type != IPPROTO_TCP) {  // offload tcp traffic until it is established
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
-		flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 	} else {
 		flow_val->offload_flags.orig = DP_FLOW_NON_OFFLOAD;
 		flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
@@ -149,9 +147,6 @@ static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 			
 			df->flags.dir = DP_FLOW_DIR_ORG;
-			
-			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
 			if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD)
 				flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
@@ -169,20 +164,14 @@ static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct
 			if (DP_PTYPE_IS_RECIRC(m->packet_type))
 				return;
 
-			// flow's offload flags of reply direction can be only changed after the first packet
-			// is configured as to be offloaded,
-			// otherwise it will be never offloaded (too early to change to DP_FLOW_OFFLOADED)
-			if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL
-				&& (flow_val->flow_state == DP_FLOW_STATE_ESTABLISHED))
+			if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
+ 				flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
+ 			else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
 				flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
-
-			if (flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
-
+                                                      
 		}
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-			printf("flow_val->flow_state %d\n", flow_val->flow_state);
 			printf("flow_val->offload_flags.orig in cntrack %d\n", flow_val->offload_flags.orig);
 			df->flags.dir = DP_FLOW_DIR_ORG;
 			
@@ -196,12 +185,6 @@ static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct
 				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 				printf("flow_val->offload_flags.orig in cntrack after changing %d\n", flow_val->offload_flags.orig);
 			}
-
-			// UDP traffic could be only one direction, thus from the second UDP packet in the same direction,
-			// one UDP flow cannot be treated as a new one, otherwise it will always trigger the operations in snat or dnat
-			// for new flows.
-			if (df->l4_type == IPPROTO_UDP && flow_val->flow_state == DP_FLOW_STATE_NEW)
-				flow_val->flow_state = DP_FLOW_STATE_ESTABLISHED;
 
 		}
 	}
