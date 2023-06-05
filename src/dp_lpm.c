@@ -231,7 +231,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 
 	node = rte_rib_lookup_exact(root, ip, depth);
 	if (node) {
-		ret = DP_GRPC_ERR_ADD_ROUTE_FAIL4;
+		ret = DP_GRPC_ERR_ADD_ROUTE_EXISTS;
 		goto err;
 	}
 
@@ -239,7 +239,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	if (node) {
 		ret = rte_rib_set_nh(node, portid);
 		if (ret < 0) {
-			ret = DP_GRPC_ERR_ADD_ROUTE_FAIL4;
+			ret = DP_GRPC_ERR_ADD_ROUTE_SET_ERR;
 			goto err;
 		}
 		/* This is an external route */
@@ -249,7 +249,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
 		}
 	} else {
-		ret = DP_GRPC_ERR_ADD_ROUTE_FAIL4;
+		ret = DP_GRPC_ERR_ADD_ROUTE_INSERT_ERR;
 		goto err;
 	}
 
@@ -275,17 +275,17 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
-		return EXIT_FAILURE;
+		return DP_GRPC_ERR_DEL_ROUTE_NO_VM;
 
 	node = rte_rib_lookup_exact(root, ip, depth);
 	if (node) {
 		if (!DP_FAILED(rte_rib_get_nh(node, &next_hop))) {
 			if (next_hop != portid)
-				return EXIT_FAILURE;
+				return DP_GRPC_ERR_DEL_ROUTE_BAD_PORT;
 		}
 		rte_rib_remove(root, ip, depth);
 	} else {
-		return EXIT_FAILURE;
+		return DP_GRPC_ERR_DEL_ROUTE_NOT_FOUND;
 	}
 
 	return EXIT_SUCCESS;
@@ -405,18 +405,24 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route6_table(vni, socketid);
-	if (!root)
+	if (!root) {
+		ret = DP_GRPC_ERR_ADD_ROUTE_NO_VM;
 		goto err;
+	}
 
 	node = rte_rib6_lookup_exact(root, ipv6, depth);
-	if (node)
+	if (node) {
+		ret = DP_GRPC_ERR_ADD_ROUTE_EXISTS;
 		goto err;
+	}
 
 	node = rte_rib6_insert(root, ipv6, depth);
 	if (node) {
 		ret = rte_rib6_set_nh(node, portid);
-		if (ret < 0)
+		if (ret < 0) {
+			ret = DP_GRPC_ERR_ADD_ROUTE_SET_ERR;
 			goto err;
+		}
 
 		/* This is an external route */
 		if (dp_port_is_pf(portid)) {
@@ -425,11 +431,11 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 			rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
 		}
 	} else {
+		ret = DP_GRPC_ERR_ADD_ROUTE_INSERT_ERR;
 		goto err;
 	}
 	return ret;
 err:
-	ret = EXIT_FAILURE;
 	DPS_LOG_WARNING("Unable to add entry %u to the DP RIB6 table on socket %d", portid, socketid);
 	return ret;
 }
@@ -445,13 +451,13 @@ int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 
 	root = dp_get_vni_route6_table(vni, socketid);
 	if (!root)
-		return EXIT_FAILURE;
+		return DP_GRPC_ERR_DEL_ROUTE_NO_VM;
 
 	node = rte_rib6_lookup_exact(root, ipv6, depth);
 	if (node)
 		rte_rib6_remove(root, ipv6, depth);
 	else
-		return EXIT_FAILURE;
+		return DP_GRPC_ERR_DEL_ROUTE_NOT_FOUND;
 
 	return EXIT_SUCCESS;
 }
