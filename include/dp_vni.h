@@ -22,6 +22,7 @@ extern struct rte_hash *vni_handle_tbl;
 #define DP_IP_PROTO_IPV4		DP_IP_PROTO_IPv4_ENCAP
 #define DP_IP_PROTO_IPV6		DP_IP_PROTO_IPv6_ENCAP
 
+// TODO: packing?
 struct dp_vni_key {
 	int vni;
 	int type;

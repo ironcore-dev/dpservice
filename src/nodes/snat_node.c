@@ -40,7 +40,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		    && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			if (nat_check.is_vip_natted) {
-				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));
+				ipv4_hdr->src_addr = htonl(dp_get_vm_snat_ip(src_ip, vni));  // TODO(plague): this can be zero when no IP set!
 				cntrack->nat_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 			}
 
@@ -52,7 +52,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					return SNAT_NEXT_DROP;
 				}
 				nat_port = htons((uint16_t)ret);
-				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));
+				ipv4_hdr->src_addr = htonl(dp_get_vm_network_snat_ip(src_ip, vni));  // TODO(plague) same as above, jsut get the snat data instead
 
 				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);
 

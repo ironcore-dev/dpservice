@@ -24,7 +24,7 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	assert dst_ip == lb_ip and dport == 80, \
 		f"Wrong packet received (ip: {dst_ip}, dport: {dport})"
 
-	grpc_client.dellbtarget(VM1.name, lbpfx_ul_ipv6)
+	grpc_client.dellbtarget(lb_name, lbpfx_ul_ipv6)
 	grpc_client.dellbprefix(VM1.name, lb_ip)
 	grpc_client.dellb(lb_name)
 	grpc_client.delfwallrule(VM1.name, "fw0-vm1")

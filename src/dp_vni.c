@@ -133,7 +133,7 @@ int dp_create_vni_route_table(int vni, int type, int socketid)
 		temp_val->vni = vni;
 		dp_ref_init(&temp_val->ref_count, dp_free_vni_value);
 	} else if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("vni %d creation error", vni);
+		DPS_LOG_ERR("vni %d creation error %s", vni, dp_strerror(ret));
 		return DP_ERROR;
 	} else {
 		if ((type == DP_IP_PROTO_IPV4) && !temp_val->ipv4[socketid]) {
@@ -176,10 +176,10 @@ int dp_delete_vni_route_table(int vni, int type)
 int dp_reset_vni_route_table(int vni, int type, int socketid)
 {
 	struct dp_vni_value *temp_val = NULL;
-	struct dp_vni_key vni_key;
-
-	vni_key.type = type;
-	vni_key.vni = vni;
+	struct dp_vni_key vni_key = {
+		.type = type,
+		.vni = vni
+	};
 
 	if (DP_FAILED(rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val)))
 		return DP_OK;
@@ -217,10 +217,7 @@ int dp_reset_vni_all_route_tables(int socketid)
 	if (rte_hash_count(vni_handle_tbl) == 0)
 		return DP_OK;
 
-	while (true) {
-		ret = rte_hash_iterate(vni_handle_tbl, (const void **)&key, (void **)&temp_val, &iter);
-		if (ret == -ENOENT)
-			break;
+	while ((ret = rte_hash_iterate(vni_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
 		if (temp_val->ipv4[socketid]) {
 			rte_rib_free(temp_val->ipv4[socketid]);
 			if (DP_FAILED(dp_create_rib(key, socketid, temp_val)))

@@ -51,7 +51,7 @@ struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
 	return NULL;
 }
 
-int dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
+void dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
@@ -83,12 +83,11 @@ int dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep
 
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return DP_OK;
+		return;
 	}
 
 out:
 	rep_arr[--rep_arr_size] = m_curr;
-	return DP_OK;
 }
 
 static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *rule, struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr)

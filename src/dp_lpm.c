@@ -30,96 +30,109 @@ void dp_lpm_free()
 
 int __rte_always_inline dp_lpm_fill_route_tables(int portid, struct vm_entry *entry)
 {
-	if (dp_add_route(portid, entry->vni, 0, entry->info.own_ip, NULL, 32, rte_eth_dev_socket_id(portid))) {
-		DPS_LOG_ERR("dp_add_route failed during table reset");
-		return DP_ERROR;
-	}
-	if (dp_add_route6(portid, entry->vni, 0, entry->info.dhcp_ipv6, NULL, 128, rte_eth_dev_socket_id(portid))) {
-		DPS_LOG_ERR("dp_add_route6 failed during table reset");
-		return DP_ERROR;
-	}
-	return DP_OK;
+	int socket_id = rte_eth_dev_socket_id(portid);
+	int ret;
+
+	ret = dp_add_route(portid, entry->vni, 0, entry->info.own_ip, NULL, 32, socket_id);
+	if (ret)
+		return ret;
+
+	ret = dp_add_route6(portid, entry->vni, 0, entry->info.dhcp_ipv6, NULL, 128, socket_id);
+	if (ret)
+		return ret;
+
+	return DP_GRPC_OK;
 }
 
 int dp_lpm_reset_all_route_tables(int socketid)
 {
-	int i;
+	int ret;
 
-	if (DP_FAILED(dp_reset_vni_all_route_tables(socketid))) {
-		DPS_LOG_ERR("resetting vni route table failed for socketid: %d", socketid);
-		return DP_ERROR;
+	if (DP_FAILED(dp_reset_vni_all_route_tables(socketid)))
+		return DP_GRPC_ERR_ROUTE_RESET;
+
+	for (int i = 0; i < DP_MAX_PORTS; ++i) {
+		if (vm_table[i].vm_ready) {
+			ret = dp_lpm_fill_route_tables(i, &vm_table[i]);
+			if (DP_FAILED(ret))
+				return ret;
+		}
 	}
 
-	for (i = 0; i < DP_MAX_PORTS; i++) {
-		if (vm_table[i].vm_ready)
-			if (DP_FAILED(dp_lpm_fill_route_tables(i, &vm_table[i])))
-				return DP_ERROR;
-	}
-
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 int dp_lpm_reset_route_tables(int vni, int socketid)
 {
-	int i;
+	int ret;
 
 	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid))) {
 		DPS_LOG_ERR("resetting vni route table failed for vni %d socketid: %d", vni, socketid);
-		return DP_ERROR;
+		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
 	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid))) {
 		DPS_LOG_ERR("resetting vni route table failed for vni %d socketid: %d", vni, socketid);
-		return DP_ERROR;
+		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
-	for (i = 0; i < DP_MAX_PORTS; i++) {
-		if (vm_table[i].vm_ready && (vm_table[i].vni == vni))
-			if (DP_FAILED(dp_lpm_fill_route_tables(i, &vm_table[i])))
-				return DP_ERROR;
+	for (int i = 0; i < DP_MAX_PORTS; ++i) {
+		if (vm_table[i].vm_ready && vm_table[i].vni == vni) {
+			ret = dp_lpm_fill_route_tables(i, &vm_table[i]);
+			if (DP_FAILED(ret))
+				return ret;
+		}
 	}
 
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 int dp_map_vm_handle(void *key, uint16_t portid)
 {
 	uint16_t *p_port_id;
+	int ret;
 
 	p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
 	if (!p_port_id) {
-		DPS_LOG_ERR("vm handle for port %d malloc data failed", portid);
-		return EXIT_FAILURE;
+		DPS_LOG_ERR("Cannot allocate vm handle for port %d", portid);
+		goto err;
 	}
 
 	RTE_VERIFY(portid < DP_MAX_PORTS);
-	if (rte_hash_lookup(vm_handle_tbl, key) >= 0)
-		goto err;
+	ret = rte_hash_lookup(vm_handle_tbl, key);
+	if (ret != -ENOENT) {
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("vm handle lookup failed %s", dp_strerror(ret));
+		else
+			DPS_LOG_ERR("vm handle already exists");
+		goto err_free;
+	}
 
 	rte_memcpy(vm_table[portid].machineid, key, sizeof(vm_table[portid].machineid));
 	*p_port_id = portid;
-	if (rte_hash_add_key_data(vm_handle_tbl, key, p_port_id) < 0) {
-		DPS_LOG_ERR("vm handle for port %d add data failed", portid);
-		goto err;
+	ret = rte_hash_add_key_data(vm_handle_tbl, key, p_port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot add vm handle data for port %d %s", portid, dp_strerror(ret));
+		goto err_free;
 	}
-	return EXIT_SUCCESS;
+	return DP_OK;
 
-err:
+err_free:
 	rte_free(p_port_id);
-	return EXIT_FAILURE;
+err:
+	return DP_ERROR;
 }
 
-// TODO(plague?): this needs DP_FAILED() handling, but also uint16_t retval
 int dp_get_portid_with_vm_handle(void *key)
 {
 	uint16_t *p_port_id;
-	uint16_t ret_val;
+	int ret;
 
-	if (rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id) < 0)
-		return -1;
-	ret_val = *p_port_id;
+	ret = rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id);
+	if (DP_FAILED(ret))
+		return ret;
 
-	return ret_val;
+	return *p_port_id;
 }
 
 void dp_del_portid_with_vm_handle(void *key)
@@ -194,7 +207,7 @@ uint8_t *dp_get_vm_machineid(uint16_t portid)
 	return vm_table[portid].machineid;
 }
 
-int dp_get_vm_vni(uint16_t portid)
+uint32_t dp_get_vm_vni(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].vni;
@@ -218,45 +231,43 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
 	struct rte_rib *root;
-	int ret = EXIT_SUCCESS;
+	int ret;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root) {
-		ret = DP_GRPC_ERR_ADD_ROUTE_NO_VM;
+		ret = DP_GRPC_ERR_NO_VNI;
 		goto err;
 	}
 
 	node = rte_rib_lookup_exact(root, ip, depth);
 	if (node) {
-		ret = DP_GRPC_ERR_ADD_ROUTE_EXISTS;
+		ret = DP_GRPC_ERR_ROUTE_EXISTS;
 		goto err;
 	}
 
 	node = rte_rib_insert(root, ip, depth);
-	if (node) {
-		ret = rte_rib_set_nh(node, portid);
-		if (ret < 0) {
-			ret = DP_GRPC_ERR_ADD_ROUTE_SET_ERR;
-			goto err;
-		}
-		/* This is an external route */
-		if (dp_port_is_pf(portid)) {
-			route = rte_rib_get_ext(node);
-			route->vni = t_vni;
-			rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
-		}
-	} else {
-		ret = DP_GRPC_ERR_ADD_ROUTE_INSERT_ERR;
+	if (!node) {
+		ret = DP_GRPC_ERR_ROUTE_INSERT;
 		goto err;
 	}
 
-	return ret;
+	// can only fail if node is NULL
+	rte_rib_set_nh(node, portid);
+	/* This is an external route */
+	if (dp_port_is_pf(portid)) {
+		route = rte_rib_get_ext(node);
+		route->vni = t_vni;
+		rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
+	}
+
+	return DP_GRPC_OK;
 err:
 	// Addroute with 0.0.0.0 is used by metalnet as a periodic VNI-present query
-	if (ip == 0 && ret == DP_GRPC_ERR_ADD_ROUTE_NO_VM)
+	// TODO(guvenc/plague): is this still true?
+	if (ip == 0 && ret == DP_GRPC_ERR_NO_VNI)
 		DPS_LOG_DEBUG("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
 	else
 		DPS_LOG_WARNING("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
@@ -275,20 +286,19 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
-		return DP_GRPC_ERR_DEL_ROUTE_NO_VM;
+		return DP_GRPC_ERR_NO_VNI;
 
 	node = rte_rib_lookup_exact(root, ip, depth);
-	if (node) {
-		if (!DP_FAILED(rte_rib_get_nh(node, &next_hop))) {
-			if (next_hop != portid)
-				return DP_GRPC_ERR_DEL_ROUTE_BAD_PORT;
-		}
-		rte_rib_remove(root, ip, depth);
-	} else {
-		return DP_GRPC_ERR_DEL_ROUTE_NOT_FOUND;
-	}
+	if (!node)
+		return DP_GRPC_ERR_ROUTE_NOT_FOUND;
 
-	return EXIT_SUCCESS;
+	// can only fail if node or next_hop is NULL
+	rte_rib_get_nh(node, &next_hop);
+	if (next_hop != portid)
+		return DP_GRPC_ERR_ROUTE_BAD_PORT;
+
+	rte_rib_remove(root, ip, depth);
+	return DP_GRPC_OK;
 }
 
 static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool ext_routes, uint16_t per_buf)
@@ -399,42 +409,40 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
-	int ret = EXIT_SUCCESS;
+	int ret;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route6_table(vni, socketid);
 	if (!root) {
-		ret = DP_GRPC_ERR_ADD_ROUTE_NO_VM;
+		ret = DP_GRPC_ERR_NO_VNI;
 		goto err;
 	}
 
 	node = rte_rib6_lookup_exact(root, ipv6, depth);
 	if (node) {
-		ret = DP_GRPC_ERR_ADD_ROUTE_EXISTS;
+		ret = DP_GRPC_ERR_ROUTE_EXISTS;
 		goto err;
 	}
 
 	node = rte_rib6_insert(root, ipv6, depth);
-	if (node) {
-		ret = rte_rib6_set_nh(node, portid);
-		if (ret < 0) {
-			ret = DP_GRPC_ERR_ADD_ROUTE_SET_ERR;
-			goto err;
-		}
-
-		/* This is an external route */
-		if (dp_port_is_pf(portid)) {
-			route = rte_rib6_get_ext(node);
-			route->vni = t_vni;
-			rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
-		}
-	} else {
-		ret = DP_GRPC_ERR_ADD_ROUTE_INSERT_ERR;
+	if (!node) {
+		ret = DP_GRPC_ERR_ROUTE_INSERT;
 		goto err;
 	}
-	return ret;
+
+	// can only fail if node is NULL
+	rte_rib6_set_nh(node, portid);
+	/* This is an external route */
+	if (dp_port_is_pf(portid)) {
+		route = rte_rib6_get_ext(node);
+		route->vni = t_vni;
+		rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
+	}
+
+	return DP_GRPC_OK;
+	// TODO not needed anymore?
 err:
 	DPS_LOG_WARNING("Unable to add entry %u to the DP RIB6 table on socket %d", portid, socketid);
 	return ret;
@@ -451,15 +459,14 @@ int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 
 	root = dp_get_vni_route6_table(vni, socketid);
 	if (!root)
-		return DP_GRPC_ERR_DEL_ROUTE_NO_VM;
+		return DP_GRPC_ERR_NO_VNI;
 
 	node = rte_rib6_lookup_exact(root, ipv6, depth);
-	if (node)
-		rte_rib6_remove(root, ipv6, depth);
-	else
-		return DP_GRPC_ERR_DEL_ROUTE_NOT_FOUND;
+	if (!node)
+		return DP_GRPC_ERR_ROUTE_NOT_FOUND;
 
-	return EXIT_SUCCESS;
+	rte_rib6_remove(root, ipv6, depth);
+	return DP_GRPC_OK;
 }
 
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
@@ -533,13 +540,12 @@ int setup_vm(int port_id, int vni, const int socketid)
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
 	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid)))
-		return EXIT_FAILURE;
+		return DP_ERROR;
 
 	dp_init_firewall_rules_list(port_id);
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
-
-	return EXIT_SUCCESS;
+	return DP_OK;
 }
 
 int setup_vm6(int port_id, int vni, const int socketid)
@@ -548,13 +554,14 @@ int setup_vm6(int port_id, int vni, const int socketid)
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
 	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid)))
-		return EXIT_FAILURE;
+		return DP_ERROR;
 
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
-	return EXIT_SUCCESS;
+	return DP_OK;
 }
 
+// TODO(plague): retval DP_FAILED style?
 int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
 						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id)
 {

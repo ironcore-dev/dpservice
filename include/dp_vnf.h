@@ -42,7 +42,7 @@ struct dp_vnf_value *dp_get_vnf_value_with_key(void *key);
 int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);
 int dp_del_vnf_with_vnf_key(void *key);
 int dp_del_vnf_with_value(struct dp_vnf_value *val);
-int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid,
+void dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid,
 								enum vnf_type v_type, struct rte_mbuf *rep_arr[]);
 
 #ifdef __cplusplus

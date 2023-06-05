@@ -58,14 +58,14 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
 	grpc_client.delnat(VM1.name)
 
-	grpc_client.expect_error(453).getnat(VM1.name)
+	grpc_client.expect_error(341).getnat(VM1.name)
 
 	specs = grpc_client.getnatinfo(nat_vip, "neigh")
 	assert len(specs) == 0, \
 		"Failed to delete neighboring NAT entries properly"
 
-	grpc_client.expect_error(492).delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
-	grpc_client.expect_error(431).delnat(VM1.name)
+	grpc_client.expect_error(201).delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
+	grpc_client.expect_error(341).delnat(VM1.name)
 
 
 def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):

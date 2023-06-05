@@ -78,14 +78,18 @@ int dp_del_vnf_with_vnf_key(void *key)
 	int ret;
 
 	ret = rte_hash_lookup_data(vnf_handle_tbl, key, (void **)&temp_val);
-	if (DP_FAILED(ret))
+	if (DP_FAILED(ret)) {
+		DPGRPC_LOG_WARNING("Cannot remove VNF key", DP_LOG_RET(ret));
 		return ret;
+	}
 
 	rte_free(temp_val);
 
 	ret = rte_hash_del_key(vnf_handle_tbl, key);
-	if (DP_FAILED(ret))
+	if (DP_FAILED(ret)) {
+		DPGRPC_LOG_WARNING("Cannot remove VNF key", DP_LOG_RET(ret));
 		return ret;
+	}
 
 	return DP_OK;
 }
@@ -116,7 +120,7 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 	return DP_OK;
 }
 
-int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type v_type, struct rte_mbuf *rep_arr[])
+void dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type v_type, struct rte_mbuf *rep_arr[])
 {
 	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
 	struct rte_mbuf *m_new, *m_curr = m;
@@ -167,11 +171,9 @@ int dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type 
 
 	if (rep_arr_size < 0) {
 		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return DP_OK;
+		return;
 	}
 
 out:
 	rep_arr[--rep_arr_size] = m_curr;
-
-	return DP_OK;
 }
