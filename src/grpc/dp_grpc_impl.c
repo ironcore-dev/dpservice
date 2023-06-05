@@ -189,7 +189,7 @@ static int dp_process_add_lb(dp_request *req, dp_reply *rep)
 						ret = DP_GRPC_ERR_ADD_LB_ROUTE_ERR;
 						goto err_lb;
 					  }
-	}  else {
+	} else {
 		ret = DP_GRPC_ERR_ADD_LB_UNSUPP_IP;
 		goto err;
 	}
@@ -401,13 +401,13 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 
 	/* This machine ID doesnt exist */
 	if (port_id < 0) {
-		ret = DP_GRPC_ERR_ADD_VIP_NO_SNAT_DATA;  // TODO(plague): create new value ADD_VIP_NO_VM
+		ret = DP_GRPC_ERR_ADD_VIP_NO_VM;
 		goto err;
 	}
 
 	if (req->add_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
-			ret = DP_GRPC_ERR_ADD_NATVIP_VNF_ERR;
+			ret = DP_GRPC_ERR_ADD_VIP_VNF_ERR;
 			goto err;
 		}
 		ret = dp_set_vm_snat_ip(dp_get_dhcp_range_ip4(port_id),
@@ -449,7 +449,7 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
 										 dp_get_vm_vni(port_id));
 	if (!s_data) {
-		ret = DP_GRPC_ERR_DEL_NATVIP_NO_SNAT;
+		ret = DP_GRPC_ERR_DEL_VIP_NO_SNAT_DATA;
 		goto err;
 	}
 	dp_remove_vnf_with_key(s_data->ul_ip6);
@@ -476,7 +476,7 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 
 	/* This machine ID doesnt exist */
 	if (port_id < 0) {
-		ret = DP_GRPC_ERR_GET_NATVIP_NO_VM;
+		ret = DP_GRPC_ERR_GET_VIP_NO_VM;
 		goto err;
 	}
 
@@ -484,7 +484,7 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 										 dp_get_vm_vni(port_id));
 
 	if (!s_data || !s_data->vip_ip) {
-		ret = DP_GRPC_ERR_GET_NATVIP_NO_IP_SET;
+		ret = DP_GRPC_ERR_GET_VIP_NO_IP_SET;
 		goto err;
 	}
 	rep->get_vip.vip.vip_addr = htonl(s_data->vip_ip);
@@ -564,7 +564,7 @@ static int dp_process_addprefix(dp_request *req, dp_reply *rep)
 		if (dp_add_route(port_id, dp_get_vm_vni(port_id), 0, ntohl(req->add_pfx.pfx_ip.pfx_addr),
 						 NULL, req->add_pfx.pfx_length, rte_eth_dev_socket_id(port_id))
 		) {
-				ret = DP_GRPC_ERR_ADD_PREFIX_ROUTE;
+				ret = DP_GRPC_ERR_ADD_PREFIX_ROUTE_ERR;
 				goto err;
 		}
 		vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
@@ -600,10 +600,10 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 	}
 
 	if (req->add_pfx.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_del_route(port_id, dp_get_vm_vni(port_id), 0,
+		ret = dp_del_route(port_id, dp_get_vm_vni(port_id), 0,
 					 ntohl(req->add_pfx.pfx_ip.pfx_addr), 0,
-					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
-			ret = DP_GRPC_ERR_DEL_PREFIX_ROUTE_ERR;
+					 req->add_pfx.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+		if (ret) {
 			rep->com_head.err_code = ret;
 			/* try to delete the vnf entry anyways */
 		}
@@ -677,16 +677,14 @@ static int dp_process_addmachine(dp_request *req, dp_reply *rep)
 		dp_set_vm_pxe_str(port_id, req->add_machine.pxe_str);
 		dp_set_dhcp_range_ip6(port_id, req->add_machine.ip6_addr6, DP_LPM_DHCP_IP6_DEPTH,
 							  rte_eth_dev_socket_id(port_id));
-		if (dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
-					 NULL, 32, rte_eth_dev_socket_id(port_id))) {
-			err_code = DP_GRPC_ERR_ADD_IFACE_ROUTE4_ERR;
+		err_code = dp_add_route(port_id, req->add_machine.vni, 0, ntohl(req->add_machine.ip4_addr),
+					 NULL, 32, rte_eth_dev_socket_id(port_id));
+		if (err_code)
 			goto vm_err;
-		}
-		if (dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
-					  NULL, 128, rte_eth_dev_socket_id(port_id))) {
-			err_code = DP_GRPC_ERR_ADD_IFACE_ROUTE6_ERR;
+		err_code = dp_add_route6(port_id, req->add_machine.vni, 0, req->add_machine.ip6_addr6,
+					  NULL, 128, rte_eth_dev_socket_id(port_id));
+		if (err_code)
 			goto route_err;
-		}
 		if (DP_FAILED(dp_port_start(port_id))) {
 			err_code = DP_GRPC_ERR_ADD_IFACE_PORT_START_ERR;
 			goto route6_err;
@@ -787,18 +785,11 @@ static int dp_process_addroute(dp_request *req, dp_reply *rep)
 		ret = dp_add_route(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 						   ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
 						    req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
-		if (ret)
-			goto err;
 	} else {
-		if (dp_add_route6(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
+		ret = dp_add_route6(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
-					  req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
-			ret = DP_GRPC_ERR_ADD_ROUTE_FAIL6;
-			goto err;
-		}
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 	}
-	return ret;
-err:
 	rep->com_head.err_code = ret;
 	return ret;
 }
@@ -808,23 +799,14 @@ static int dp_process_delroute(dp_request *req, dp_reply *rep)
 	int ret = EXIT_SUCCESS;
 
 	if (req->route.pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (dp_del_route(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
+		ret = dp_del_route(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 					 ntohl(req->route.pfx_ip.addr), req->route.trgt_ip.addr6,
-					 req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
-			ret = DP_GRPC_ERR_DEL_ROUTE;
-			goto err;
-		}
+					 req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 	} else {
-		if (dp_del_route6(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
+		ret = dp_del_route6(dp_port_get_pf0_id(), req->route.vni, req->route.trgt_vni,
 					  req->route.pfx_ip.addr6, req->route.trgt_ip.addr6,
-					  req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()))) {
-			ret = DP_GRPC_ERR_DEL_ROUTE;
-			goto err;
-		}
+					  req->route.pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 	}
-
-	return ret;
-err:
 	rep->com_head.err_code = ret;
 	return ret;
 }
@@ -839,7 +821,7 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 	port_id = dp_get_portid_with_vm_handle(req->add_nat_vip.machine_id);
 
 	if (port_id < 0) {
-		ret = DP_GRPC_ERR_GET_IFACE_NOT_FOUND;  // TODO(plague) wrong value
+		ret = DP_GRPC_ERR_ADD_NAT_NO_VM;
 		goto err;
 	}
 
@@ -847,7 +829,7 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 
 	if (req->add_nat_vip.ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, dp_get_vm_vni(port_id), port_id, ul_addr6))) {
-			ret = DP_GRPC_ERR_ADD_NATVIP_VNF_ERR;
+			ret = DP_GRPC_ERR_ADD_NAT_VNF_ERR;
 			goto err;
 		}
 		ret = dp_set_vm_network_snat_ip(dp_get_dhcp_range_ip4(port_id), ntohl(req->add_nat_vip.vip.vip_addr),
@@ -882,7 +864,7 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 
 	port_id = dp_get_portid_with_vm_handle(req->del_nat_vip.machine_id);
 	if (port_id < 0) {
-		ret = DP_GRPC_ERR_GET_IFACE_NOT_FOUND;  // TODO(plague) wrong value
+		ret = DP_GRPC_ERR_DEL_NAT_NO_VM;
 		goto err;
 	}
 
@@ -891,7 +873,7 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id),
 										 dp_get_vm_vni(port_id));
 	if (!s_data) {
-		ret = DP_GRPC_ERR_DEL_NATVIP_NO_SNAT;
+		ret = DP_GRPC_ERR_DEL_NAT_NO_SNAT_DATA;
 		goto err;
 	}
 
@@ -919,13 +901,13 @@ static int dp_process_getnat(dp_request *req, dp_reply *rep)
 
 	/* This machine ID doesnt exist */
 	if (port_id < 0) {
-		ret = DP_GRPC_ERR_GET_NATVIP_NO_VM;
+		ret = DP_GRPC_ERR_GET_NAT_NO_VM;
 		goto err;
 	}
 	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 
 	if (!s_data || (s_data && !s_data->network_nat_ip)) {
-		ret = DP_GRPC_ERR_GET_NATVIP_NO_IP_SET;
+		ret = DP_GRPC_ERR_GET_NAT_NO_IP_SET;
 		goto err;
 	}
 
