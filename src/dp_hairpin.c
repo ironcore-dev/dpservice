@@ -75,7 +75,7 @@ int dp_hairpin_setup(struct dp_port *port)
 		peer_hairpin_queue_id = DP_NR_RESERVED_TX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
 	else
 		peer_hairpin_queue_id = DP_NR_STD_TX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
-	
+
 	if (DP_FAILED(setup_hairpin_rx_tx_queues(port->port_id,
 											 port->peer_pf_port_id,
 											 hairpin_queue_id,

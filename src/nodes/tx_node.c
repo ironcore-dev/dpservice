@@ -92,7 +92,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		//  - packets created by rewriting a source packet (pkt->port == port)
 		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)
 		// Always rewrite regardless the above for:
-		//  - packets that requires the changes to underlaying IPv6 address, mainly LB packets and NAT packets that are bounced back to net 
+		//  - packets that requires the changes to underlaying IPv6 address, mainly LB packets and NAT packets that are bounced back to network
 		//  - packets already encapsulated for outgoing traffic (DP_FLOW_TYPE_OUTGOING)
 		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
 			|| df->flags.nat == DP_CHG_UL_DST_IP
@@ -106,10 +106,9 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 
 		if (df->conntrack) {
 			// mark the flow as default if it is not marked as any other status
- 			if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
- 				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
+		if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
+				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
 
-			printf("tx_node_process: df->flags.offload_decision = %d\n", df->flags.offload_decision);
 			if (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
 				dp_offload_handler(pkt, df);
 		}

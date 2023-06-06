@@ -46,7 +46,6 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		// this is not entirely 1:1 mapping to fin sequence,
 		// but sufficient to determine if a tcp connection is almost successfuly closed
 		// (last ack is still pending)
-		printf("FIN pkt \n");
 		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
 			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
 		else
@@ -83,7 +82,7 @@ static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_v
 		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 	else
 		flow_val->offload_flags.orig = DP_FLOW_NON_OFFLOAD; // offload tcp traffic until it is established
-	
+
 	flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
 }
 
@@ -167,12 +166,12 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
 
-	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH 
+	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD) {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
-			
+
 			df->flags.dir = DP_FLOW_DIR_ORG;
-			dp_cntrack_change_flow_offload_flags(flow_val, df);			
+			dp_cntrack_change_flow_offload_flags(flow_val, df);
 		}
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY]))
@@ -180,13 +179,13 @@ static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG]))
 			df->flags.dir = DP_FLOW_DIR_ORG;
-	
+
 		// recirc pkt shall not change flow's state because its ancestor has already done
 		if (DP_PTYPE_IS_RECIRC(m->packet_type))
 			return;
 
 		// when to offload reply pkt of a tcp flow is determined in dp_cntrack_set_timeout_tcp_flow
-		if (df->l4_type != IPPROTO_TCP) 
+		if (df->l4_type != IPPROTO_TCP)
 			dp_cntrack_change_flow_offload_flags(flow_val, df);
 	}
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
