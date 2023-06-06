@@ -23,10 +23,9 @@ static __rte_always_inline void dp_lb_pfx_vnf_check(struct dp_flow *df, struct r
 	if (DP_FAILED(dp_get_portid_with_vnf_key(df->tun_info.ul_dst_addr6, DP_VNF_TYPE_LB_ALIAS_PFX))) {
 		df->nxt_hop = m->port;
 		df->flags.nat = DP_CHG_UL_DST_IP;
-	} else {
+	} else
 		df->flags.nat = DP_LB_RECIRC;
-		printf("recirc pkt\n");
-	}
+
 }
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
@@ -64,9 +63,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (df->flags.nat != DP_LB_RECIRC) {
 			cntrack->nf_info.nat_type = DP_FLOW_LB_TYPE_FORWARD;
 			dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
-		} else {
+		} else
 			cntrack->nf_info.nat_type = DP_FLOW_LB_TYPE_RECIRC;
-		}
 
 		return LB_NEXT_OVERLAY_SWITCH;
 	}

@@ -213,6 +213,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// replace source port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
+
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
 		action_cnt = create_trans_proto_set_action(action, action_cnt,
 										    &set_tp, df->nat_port, DP_IS_SRC);
@@ -362,10 +363,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item_ipv6 ipv6_mask;
 
 	// restore the actual incoming pkt's ipv6 dst addr
-	if (DP_PTYPE_IS_RECIRC(m->packet_type)) {
-		printf("it is a recycled pkt in rte_offloading\n");
+	if (DP_PTYPE_IS_RECIRC(m->packet_type))
 		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
-	}
+
 
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
@@ -494,6 +494,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	// replace dst port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
+
 	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
 		action_cnt = create_trans_proto_set_action(action, action_cnt,
 										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
@@ -526,7 +527,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			hairpin_rx_queue_id = DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
 		}
 		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
-		printf("hairpin_rx_queue_id = %d\n", hairpin_rx_queue_id);
 	} else {
 		// create flow action -- send to port
 		action_cnt = create_send_to_port_action(action, action_cnt,
@@ -807,12 +807,12 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
 
-	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt 
+	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
 											NULL, 0,
 											df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_src_addr6),
-											df->tun_info.proto_id); 
+											df->tun_info.proto_id);
 
 	// pattern_cnt_before_inner_hdr = pattern_cnt;
 
@@ -841,12 +841,10 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	struct rte_flow_item_tcp tcp_spec;
 	struct rte_flow_item_tcp tcp_mask;
 
-	if (df->l4_type == DP_IP_PROTO_TCP) 
+	if (df->l4_type == DP_IP_PROTO_TCP)
 		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 0);
-
-	
 
 	struct rte_flow_item_udp udp_spec;
 	struct rte_flow_item_udp udp_mask;
@@ -855,7 +853,6 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-		
 
 	struct rte_flow_item_icmp icmp_spec;
 	struct rte_flow_item_icmp icmp_mask;
@@ -864,7 +861,6 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
 												&icmp_spec, &icmp_mask,
 												df->l4_info.icmp_field.icmp_type);
-		
 
 	struct rte_flow_item_icmp6 icmp6_spec;
 	struct rte_flow_item_icmp6 icmp6_mask;
@@ -873,21 +869,23 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
 												  &icmp6_spec, &icmp6_mask,
 												  df->l4_info.icmp_field.icmp_type);
-		
+
 	// create flow match patterns -- end
 	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
 
 	// create flow action -- set src mac
 	struct rte_flow_action_set_mac set_src_mac_action;
+
 	action_cnt = create_src_mac_set_action(action, action_cnt, &set_src_mac_action, dp_get_mac(df->nxt_hop));
 
 	// create flow action -- set dst mac
 	struct rte_flow_action_set_mac set_dst_mac_action;
-	action_cnt = create_dst_mac_set_action(action, action_cnt, &set_dst_mac_action, dp_get_neigh_mac(df->nxt_hop));
 
+	action_cnt = create_dst_mac_set_action(action, action_cnt, &set_dst_mac_action, dp_get_neigh_mac(df->nxt_hop));
 
 	// create flow action -- set ipv6
 	struct rte_flow_action_set_ipv6 set_ipv6;
+
 	action_cnt = create_ipv6_set_action(action, action_cnt,
 									&set_ipv6, df->tun_info.ul_dst_addr6, DP_IS_DST);
 
@@ -915,6 +913,7 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 
 	// validate and install rte flow
 	struct rte_flow *flow = NULL;
+
 	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
@@ -933,7 +932,6 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
 
-	printf("dp_offload_handler\n");
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
 		return dp_offload_handle_local_traffic(m, df);
 
