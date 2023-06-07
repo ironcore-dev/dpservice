@@ -297,7 +297,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 		flow_val->timestamp = rte_rdtsc();
 
-		if (df->l4_type == IPPROTO_TCP) {
+		if (df->l4_type == IPPROTO_TCP && !DP_PTYPE_IS_RECIRC(m->packet_type)) {
 			tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
 			dp_cntrack_tcp_state(flow_val, tcp_hdr);
 			dp_cntrack_set_timeout_tcp_flow(flow_val, df);
