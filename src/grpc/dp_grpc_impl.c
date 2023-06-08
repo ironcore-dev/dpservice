@@ -389,8 +389,7 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 	vm_vni = dp_get_vm_vni(port_id);
 
 	s_data = dp_get_vm_snat_data(vm_ip, vm_vni);
-	// TODO why not ask for zero? like below, code duplication here AND with nat
-	if (!s_data)
+	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	dp_del_vnf_with_vnf_key(s_data->ul_ip6);
@@ -416,7 +415,7 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 
 	s_data = dp_get_vm_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (!s_data || !s_data->vip_ip)
-		return DP_GRPC_ERR_SNAT_NO_DATA;  // TODO split?
+		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	rep->get_vip.vip.vip_addr = htonl(s_data->vip_ip);
 	rte_memcpy(rep->get_vip.ul_addr6, s_data->ul_ip6, sizeof(rep->ul_addr6));
@@ -743,8 +742,7 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	vm_vni = dp_get_vm_vni(port_id);
 
 	s_data = dp_get_vm_snat_data(vm_ip, vm_vni);
-	// TODO why not check IP 0? like below
-	if (!s_data)
+	if (!s_data || !s_data->network_nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	dp_del_vnf_with_vnf_key(s_data->ul_nat_ip6);
@@ -766,7 +764,7 @@ static int dp_process_getnat(dp_request *req, dp_reply *rep)
 
 	s_data = dp_get_vm_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (!s_data || !s_data->network_nat_ip)
-		return DP_GRPC_ERR_SNAT_NO_DATA;   // TODO split the error?
+		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	rep->nat_entry.m_ip.addr = htonl(s_data->network_nat_ip);
 	rep->nat_entry.min_port = s_data->network_nat_port_range[0];
@@ -1072,7 +1070,6 @@ void dp_process_request(struct rte_mbuf *m)
 		// extract the proper value from the standard (negative) retvals
 		ret = dp_errcode_to_grpc_errcode(ret);
 		DPGRPC_LOG_WARNING("Failed request", DP_LOG_GRPCRET(ret), DP_LOG_GRPCERR(ret));
-		// TODO go over all the impl, lb, nat, ... to look for logs, they should only be there for non-grpc return values?
 	}
 	rep.com_head.err_code = ret;
 
