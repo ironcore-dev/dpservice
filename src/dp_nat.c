@@ -537,16 +537,15 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 
 int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 {
-	struct nat_key nkey = {0};
+	struct nat_key nkey;
 	struct snat_data *data;
-	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
-	struct netnat_portmap_key portmap_key = {0};
+	struct netnat_portoverload_tbl_key portoverload_tbl_key;
+	struct netnat_portmap_key portmap_key;
 	struct netnat_portmap_data *portmap_data;
-	uint16_t min_port, max_port, allocated_port = 0, tmp_port = 0;
+	uint16_t min_port, max_port, allocated_port = 0, tmp_port;
 	uint32_t vm_src_info_hash;
 	int ret;
 	bool need_to_find_new_port = true;
-
 	uint32_t vm_ip = ntohl(df->src.src_addr);
 	uint16_t vm_port = ntohs(df->l4_info.trans_port.src_port);
 

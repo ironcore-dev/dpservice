@@ -34,11 +34,11 @@ int __rte_always_inline dp_lpm_fill_route_tables(int portid, struct vm_entry *en
 	int ret;
 
 	ret = dp_add_route(portid, entry->vni, 0, entry->info.own_ip, NULL, 32, socket_id);
-	if (ret)
+	if (DP_FAILED(ret))
 		return ret;
 
 	ret = dp_add_route6(portid, entry->vni, 0, entry->info.dhcp_ipv6, NULL, 128, socket_id);
-	if (ret)
+	if (DP_FAILED(ret))
 		return ret;
 
 	return DP_GRPC_OK;
@@ -231,28 +231,21 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
 	struct rte_rib *root;
-	int ret;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route4_table(vni, socketid);
-	if (!root) {
-		ret = DP_GRPC_ERR_NO_VNI;
-		goto err;
-	}
+	if (!root)
+		return DP_GRPC_ERR_NO_VNI;
 
 	node = rte_rib_lookup_exact(root, ip, depth);
-	if (node) {
-		ret = DP_GRPC_ERR_ROUTE_EXISTS;
-		goto err;
-	}
+	if (node)
+		return DP_GRPC_ERR_ROUTE_EXISTS;
 
 	node = rte_rib_insert(root, ip, depth);
-	if (!node) {
-		ret = DP_GRPC_ERR_ROUTE_INSERT;
-		goto err;
-	}
+	if (!node)
+		return DP_GRPC_ERR_ROUTE_INSERT;
 
 	// can only fail if node is NULL
 	rte_rib_set_nh(node, portid);
@@ -264,14 +257,6 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	}
 
 	return DP_GRPC_OK;
-err:
-	// Addroute with 0.0.0.0 is used by metalnet as a periodic VNI-present query
-	// TODO(guvenc/plague): is this still true?
-	if (ip == 0 && ret == DP_GRPC_ERR_NO_VNI)
-		DPS_LOG_DEBUG("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
-	else
-		DPS_LOG_WARNING("Unable to add entry %u to the DP RIB table on socket %d", portid, socketid);
-	return ret;
 }
 
 int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
@@ -409,28 +394,21 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
-	int ret;
 
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route6_table(vni, socketid);
-	if (!root) {
-		ret = DP_GRPC_ERR_NO_VNI;
-		goto err;
-	}
+	if (!root)
+		return DP_GRPC_ERR_NO_VNI;
 
 	node = rte_rib6_lookup_exact(root, ipv6, depth);
-	if (node) {
-		ret = DP_GRPC_ERR_ROUTE_EXISTS;
-		goto err;
-	}
+	if (node)
+		return DP_GRPC_ERR_ROUTE_EXISTS;
 
 	node = rte_rib6_insert(root, ipv6, depth);
-	if (!node) {
-		ret = DP_GRPC_ERR_ROUTE_INSERT;
-		goto err;
-	}
+	if (!node)
+		return DP_GRPC_ERR_ROUTE_INSERT;
 
 	// can only fail if node is NULL
 	rte_rib6_set_nh(node, portid);
@@ -442,10 +420,6 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	}
 
 	return DP_GRPC_OK;
-	// TODO not needed anymore?
-err:
-	DPS_LOG_WARNING("Unable to add entry %u to the DP RIB6 table on socket %d", portid, socketid);
-	return ret;
 }
 
 int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,

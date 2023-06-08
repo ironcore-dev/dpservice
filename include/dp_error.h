@@ -24,9 +24,6 @@ const char *dp_strerror(int error);
 /*
  * GRPC error values, do not change them!
  */
-// TODO negatives and DP_GRPC_FAILED should all be solved now!
-// --> FIRST do proper numbers and pytest, THEN change all if (ret) to DP_FAILED!!!
-// this hsould be perfect now!
 // TODO merge xNAT_KEY/ALLOC/DATA via a function?
 // TODO go through all return GRPC err and look for unnecessary logs (use colored output from pytest too)
 #define DP_GRPC_OK							0

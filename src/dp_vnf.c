@@ -101,11 +101,11 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 	int32_t ret;
 	void *key;
 
-	while (true) {
-		ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter);
-
-		if (ret == -ENOENT)
-			break;
+	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot iterate VNF table %s", dp_strerror(ret));
+			return ret;
+		}
 
 		if ((val->portid == temp_val->portid)
 			&& (val->alias_pfx.ip == temp_val->alias_pfx.ip)
@@ -113,8 +113,11 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 			&& (val->v_type == temp_val->v_type)
 		) {
 			rte_free(temp_val);
-			if (DP_FAILED(rte_hash_del_key(vnf_handle_tbl, key)))
+			ret = rte_hash_del_key(vnf_handle_tbl, key);
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Cannot delete VNF key %s", dp_strerror(ret));
 				return DP_ERROR;
+			}
 		}
 	}
 	return DP_OK;
@@ -139,11 +142,11 @@ void dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type
 										    &rep_arr_size, sizeof(dp_route));
 	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
 
-	while (true) {
-		ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter);
-
-		if (ret == -ENOENT)
+	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot iterate VNF table %s", dp_strerror(ret));
 			break;
+		}
 
 		if (portid != temp_val->portid)
 			continue;

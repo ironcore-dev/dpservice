@@ -148,16 +148,12 @@ bool dp_is_lb_enabled()
 
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni)
 {
-	struct lb_key nkey;
-	int ret;
+	struct lb_key nkey = {
+		.ip = vm_ip,
+		.vni = vni
+	};
 
-	nkey.ip = vm_ip;
-	nkey.vni = vni;
-
-	ret = rte_hash_lookup(ipv4_lb_tbl, &nkey);
-	if (ret < 0)
-		return false;
-	return true;
+	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey));
 }
 
 static int dp_lb_last_free_pos(struct lb_value *val)
@@ -226,12 +222,12 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 {
 	struct lb_value *lb_val = NULL;
 	uint8_t *ret = NULL;
-	struct lb_key nkey;
+	struct lb_key nkey = {
+		.ip = v_ip,
+		.vni = vni
+	};
 	dp_lb_port lb_port;
 	int pos;
-
-	nkey.ip = v_ip;
-	nkey.vni = vni;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
 		goto out;
@@ -243,7 +239,6 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 	lb_port.port = port;
 	lb_port.protocol = proto;
 	pos = dp_lb_rr_backend(lb_val, &lb_port);
-
 	if (pos < 0)
 		goto out;
 
