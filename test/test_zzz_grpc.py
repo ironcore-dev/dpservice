@@ -80,7 +80,7 @@ def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	assert spec == vipspec, \
 		"VIP not set properly"
 	# Try to add the same vip again
-	grpc_client.expect_error(346).addvip(VM2.name, vip_vip)
+	grpc_client.expect_error(343).addvip(VM2.name, vip_vip)
 	# Try to add to a machine which doesnt exist
 	grpc_client.expect_error(205).addvip("invalid_name", vip_vip)
 	grpc_client.delvip(VM2.name)

@@ -24,8 +24,6 @@ const char *dp_strerror(int error);
 /*
  * GRPC error values, do not change them!
  */
-// TODO merge xNAT_KEY/ALLOC/DATA via a function?
-// TODO go through all return GRPC err and look for unnecessary logs (use colored output from pytest too)
 #define DP_GRPC_OK							0
 #define _DP_GRPC_ERRORS(ERR) \
 	/* Returned for unknown request type */ \
@@ -46,16 +44,12 @@ const char *dp_strerror(int error);
 	ERR(ROUTE_INSERT,						303) \
 	ERR(ROUTE_BAD_PORT,						304) \
 	ERR(ROUTE_RESET,						305) \
-	ERR(DNAT_KEY,							321) \
-	ERR(DNAT_ALLOC,							322) \
-	ERR(DNAT_DATA,							323) \
-	ERR(DNAT_EXISTS,						324) \
+	ERR(DNAT_NO_DATA,						321) \
+	ERR(DNAT_CREATE,						322) \
+	ERR(DNAT_EXISTS,						323) \
 	ERR(SNAT_NO_DATA,						341) \
-	ERR(SNAT_NO_KEY,						342) \
-	ERR(SNAT_KEY,							343) \
-	ERR(SNAT_ALLOC,							344) \
-	ERR(SNAT_DATA,							345) \
-	ERR(SNAT_EXISTS,						346) \
+	ERR(SNAT_CREATE,						342) \
+	ERR(SNAT_EXISTS,						343) \
 	ERR(VNI_INIT4,							361) \
 	ERR(VNI_INIT6,							362) \
 	ERR(VNI_FREE4,							363) \

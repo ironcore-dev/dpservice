@@ -109,7 +109,7 @@ static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* ou
 /* Isolating only VNF NAT conntrack entries at the moment. The others should follow */
 static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow_key *key)
 {
-	struct nat_check_result nat_check;
+	struct snat_data *s_data;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT)
@@ -117,10 +117,8 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 	} else {
-		if (DP_FAILED(dp_check_if_ip_natted(key->ip_src, key->vni, &nat_check))) {
-			DPS_LOG_WARNING("Failed to perform snat table searching during flow key building");
-			key->vnf = DP_VNF_TYPE_UNDEFINED;
-		} else if (nat_check.is_network_natted) {
+		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
+		if (s_data && s_data->network_nat_ip != 0) {
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
 		} else {
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;

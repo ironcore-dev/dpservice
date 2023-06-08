@@ -20,9 +20,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	uint32_t dst_ip, vni, dnat_ip;
+	uint32_t dst_ip, vni;
 	const uint8_t *underlay_dst;
 	struct dp_icmp_err_ip_info icmp_err_ip_info;
+	struct dnat_data *dnat_data;
 
 	if (!cntrack)
 		return DNAT_NEXT_IPV4_LOOKUP;
@@ -30,11 +31,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (cntrack->flow_state == DP_FLOW_STATE_NEW && df->flags.dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df->tun_info.dst_vni;
+		dnat_data = dp_get_dnat_data(dst_ip, vni);
 
-		if (dp_is_ip_dnatted(dst_ip, vni) && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
-			dnat_ip = dp_get_vm_dnat_ip(dst_ip, vni);
+		if (dnat_data && (cntrack->flow_status == DP_FLOW_STATUS_NONE)) {
 			// if it is a network nat pkt
-			if (dnat_ip == 0) {
+			if (dnat_data->dnat_ip == 0) {
 				// extrack identifier field from icmp reply pkt, which is a reply to VM's icmp request
 				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
 					df->l4_info.trans_port.dst_port = df->l4_info.icmp_field.icmp_identifier;
@@ -64,7 +65,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			}
 
 			ipv4_hdr = dp_get_ipv4_hdr(m);
-			ipv4_hdr->dst_addr = htonl(dnat_ip);
+			ipv4_hdr->dst_addr = htonl(dnat_data->dnat_ip);
 
 			df->flags.nat = DP_NAT_CHG_DST_IP;
 			df->nat_addr = df->dst.dst_addr;

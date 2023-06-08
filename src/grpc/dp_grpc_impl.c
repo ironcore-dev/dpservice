@@ -357,7 +357,7 @@ static int dp_process_addvip(dp_request *req, dp_reply *rep)
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
-		ret = dp_set_vm_dnat_ip(ntohl(req->add_vip.vip.vip_addr), vm_ip, vm_vni);
+		ret = dp_set_dnat_ip(ntohl(req->add_vip.vip.vip_addr), vm_ip, vm_vni);
 		if (DP_FAILED(ret))
 			goto err_snat;
 		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
@@ -388,7 +388,7 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 	vm_ip = dp_get_dhcp_range_ip4(port_id);
 	vm_vni = dp_get_vm_vni(port_id);
 
-	s_data = dp_get_vm_network_snat_data(vm_ip, vm_vni);
+	s_data = dp_get_vm_snat_data(vm_ip, vm_vni);
 	// TODO why not ask for zero? like below, code duplication here AND with nat
 	if (!s_data)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
@@ -399,7 +399,7 @@ static int dp_process_delvip(dp_request *req, dp_reply *rep)
 
 	// always delete, i.e. do not use dp_del_vip_from_dnat(),
 	// because 1:1 VIP is not shared with anything
-	dp_del_vm_dnat_ip(s_data->vip_ip, vm_vni);
+	dp_del_dnat_ip(s_data->vip_ip, vm_vni);
 	dp_del_vm_snat_ip(vm_ip, vm_vni);
 
 	return DP_GRPC_OK;
@@ -414,7 +414,7 @@ static int dp_process_getvip(dp_request *req, dp_reply *rep)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+	s_data = dp_get_vm_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;  // TODO split?
 
@@ -710,7 +710,7 @@ static int dp_process_addnat(dp_request *req, dp_reply *rep)
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
-		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr), 0, vm_vni);
+		ret = dp_set_dnat_ip(ntohl(req->add_nat_vip.vip.vip_addr), 0, vm_vni);
 		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS)
 			goto err_dnat;
 		rte_memcpy(rep->ul_addr6, ul_addr6, sizeof(rep->ul_addr6));
@@ -742,7 +742,7 @@ static int dp_process_delnat(dp_request *req, dp_reply *rep)
 	vm_ip = dp_get_dhcp_range_ip4(port_id);
 	vm_vni = dp_get_vm_vni(port_id);
 
-	s_data = dp_get_vm_network_snat_data(vm_ip, vm_vni);
+	s_data = dp_get_vm_snat_data(vm_ip, vm_vni);
 	// TODO why not check IP 0? like below
 	if (!s_data)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
@@ -764,7 +764,7 @@ static int dp_process_getnat(dp_request *req, dp_reply *rep)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_vm_network_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
+	s_data = dp_get_vm_snat_data(dp_get_dhcp_range_ip4(port_id), dp_get_vm_vni(port_id));
 	if (!s_data || !s_data->network_nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;   // TODO split the error?
 
@@ -791,7 +791,7 @@ static int dp_process_add_neigh_nat(dp_request *req, dp_reply *rep)
 		if (DP_FAILED(ret))
 			return ret;
 
-		ret = dp_set_vm_dnat_ip(ntohl(req->add_nat_neigh.vip.vip_addr), 0, req->add_nat_neigh.vni);
+		ret = dp_set_dnat_ip(ntohl(req->add_nat_neigh.vip.vip_addr), 0, req->add_nat_neigh.vni);
 		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS)
 			return ret;
 	} else
