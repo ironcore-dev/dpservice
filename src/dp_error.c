@@ -31,9 +31,12 @@ const char *dp_strerror(int error)
 		error = -error;
 
 	// dp_service specific errors are after rte_ errors (which are after __ELASTERROR)
-	errdesc = error == RTE_MAX_ERRNO
-		? "General dp_service error"
-		: rte_strerror(error);
+	if (error < RTE_MAX_ERRNO)
+		errdesc = rte_strerror(error);
+	else if (error >= -_DP_GRPC_ERRCODES)
+		errdesc = dp_grpc_strerror(error+_DP_GRPC_ERRCODES);
+	else
+		errdesc = "General dp_service error";
 
 	// print the textual errno for easier debugging
 #if defined(DEBUG) && __GLIBC_PREREQ(2, 32)
