@@ -51,6 +51,7 @@ typedef enum {
 	DP_REQ_TYPE_ADD_NEIGH_NAT,
 	DP_REQ_TYPE_DEL_NEIGH_NAT,
 	DP_REQ_TYPE_IS_VNI_IN_USE,
+	DP_REQ_TYPE_VNI_RESET,
 } dp_req_type;
 
 typedef enum {

@@ -95,6 +95,7 @@ const char *dp_strerror(int error);
 	ERR(DEL_PREFIX_ROUTE_ERR,				700) \
 	ERR(DEL_PREFIX_NO_VM,					701) \
 	ERR(INIT_RESET_ERR,						710) \
+	ERR(VNI_TABLE_RESET_ERR,				711) \
 	ERR(ADD_LB_UNSUPP_IP,					750) \
 	ERR(ADD_LB_CREATE_ERR,					751) \
 	ERR(ADD_LB_VNF_ERR,						752) \

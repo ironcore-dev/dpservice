@@ -91,6 +91,7 @@ void GRPCService::HandleRpcs()
 	new DelFirewallRuleCall(this, cq_.get());
 	new ListFirewallRulesCall(this, cq_.get());
 	new IsVniInUseCall(this, cq_.get());
+	new ResetVniCall(this, cq_.get());
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

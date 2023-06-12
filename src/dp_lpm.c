@@ -28,6 +28,19 @@ void dp_lpm_free()
 	dp_free_jhash_table(vm_handle_tbl);
 }
 
+int __rte_always_inline dp_lpm_fill_route_tables(int portid, struct vm_entry *entry)
+{
+	if (dp_add_route(portid, entry->vni, 0, entry->info.own_ip, NULL, 32, rte_eth_dev_socket_id(portid))) {
+		DPS_LOG_ERR("dp_add_route failed during table reset");
+		return DP_ERROR;
+	}
+	if (dp_add_route6(portid, entry->vni, 0, entry->info.dhcp_ipv6, NULL, 128, rte_eth_dev_socket_id(portid))) {
+		DPS_LOG_ERR("dp_add_route6 failed during table reset");
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
 int dp_lpm_reset_all_route_tables(int socketid)
 {
 	int i;
@@ -37,17 +50,35 @@ int dp_lpm_reset_all_route_tables(int socketid)
 		return DP_ERROR;
 	}
 
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready) {
-			if (dp_add_route(i, vm_table[i].vni, 0, vm_table[i].info.own_ip, NULL, 32, rte_eth_dev_socket_id(i))) {
-				DPS_LOG_ERR("dp_add_route failed during table reset");
+	for (i = 0; i < DP_MAX_PORTS; i++) {
+		if (vm_table[i].vm_ready)
+			if (DP_FAILED(dp_lpm_fill_route_tables(i, &vm_table[i])))
 				return DP_ERROR;
-			}
-			if (dp_add_route6(i, vm_table[i].vni, 0, vm_table[i].info.dhcp_ipv6, NULL, 128, rte_eth_dev_socket_id(i))) {
-				DPS_LOG_ERR("dp_add_route6 failed during table reset");
+	}
+
+	return DP_OK;
+}
+
+int dp_lpm_reset_route_tables(int vni, int socketid)
+{
+	int i;
+
+	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid))) {
+		DPS_LOG_ERR("resetting vni route table failed for vni %d socketid: %d", vni, socketid);
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid))) {
+		DPS_LOG_ERR("resetting vni route table failed for vni %d socketid: %d", vni, socketid);
+		return DP_ERROR;
+	}
+
+	for (i = 0; i < DP_MAX_PORTS; i++) {
+		if (vm_table[i].vm_ready && (vm_table[i].vni == vni))
+			if (DP_FAILED(dp_lpm_fill_route_tables(i, &vm_table[i])))
 				return DP_ERROR;
-			}
-		}
+	}
+
 	return DP_OK;
 }
 

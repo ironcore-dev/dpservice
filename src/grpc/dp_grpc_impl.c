@@ -391,6 +391,18 @@ err:
 	return ret;
 }
 
+static int dp_process_vni_reset(dp_request *req, dp_reply *rep)
+{
+	if (req->vni_in_use.type == DP_VNI_BOTH) {
+		if (DP_FAILED(dp_lpm_reset_route_tables(req->vni_in_use.vni, rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
+			rep->com_head.err_code = DP_GRPC_ERR_VNI_TABLE_RESET_ERR;
+			return EXIT_FAILURE;
+		}
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int dp_process_addvip(dp_request *req, dp_reply *rep)
 {
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
@@ -1143,6 +1155,9 @@ int dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_IS_VNI_IN_USE:
 		ret = dp_process_vni_in_use(req, &rep);
+		break;
+	case DP_REQ_TYPE_VNI_RESET:
+		ret = dp_process_vni_reset(req, &rep);
 		break;
 	case DP_REQ_TYPE_CREATELB:
 		ret = dp_process_add_lb(req, &rep);
