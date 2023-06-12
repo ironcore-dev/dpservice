@@ -123,15 +123,15 @@ int dp_delete_lb(void *id_key)
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val))) {
+	ret = rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("Cannot get LB backing IP %s", dp_strerror(ret));
+	} else {
 		rte_free(lb_val);
-		return DP_GRPC_ERR_NO_BACKIP;
+		ret = rte_hash_del_key(ipv4_lb_tbl, lb_k);
+		if (DP_FAILED(ret))
+			DPS_LOG_WARNING("Cannot delete LB key %s", dp_strerror(ret));
 	}
-
-	rte_free(lb_val);
-	ret = rte_hash_del_key(ipv4_lb_tbl, lb_k);
-	if (DP_FAILED(ret))
-		DPS_LOG_WARNING("Cannot delete LB key %s", dp_strerror(ret));
 
 	rte_free(lb_k);
 	ret = rte_hash_del_key(id_map_lb_tbl, id_key);
