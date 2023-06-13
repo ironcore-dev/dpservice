@@ -1,4 +1,4 @@
-FROM debian:11-slim as builder
+FROM debian:12-slim as builder
 
 ARG DPDK_VER=21.11
 
@@ -86,7 +86,7 @@ RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
 RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
 RUN rm -rf build && meson build && cd ./build && ninja
 
-FROM debian:11-slim
+FROM debian:12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
