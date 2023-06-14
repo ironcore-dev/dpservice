@@ -31,13 +31,13 @@ const char *dp_strerror(int error);
 	/* General-purpose errors */ \
 	ERR(NOT_FOUND,							201) \
 	ERR(ALREADY_EXISTS,						202) \
-	ERR(LIMIT_REACHED,						203) \
 	ERR(WRONG_TYPE,							203) \
 	ERR(BAD_IPVER,							204) \
 	ERR(NO_VM,								205) \
 	ERR(NO_VNI,								206) \
 	ERR(ITERATOR,							207) \
 	ERR(OUT_OF_MEMORY,						208) \
+	ERR(LIMIT_REACHED,						209) \
 	/* Specific errors */ \
 	ERR(ROUTE_EXISTS,						301) \
 	ERR(ROUTE_NOT_FOUND,					302) \
