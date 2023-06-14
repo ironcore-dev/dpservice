@@ -40,6 +40,8 @@ class GrpcClient:
 			if errcode == expectedError:
 				return None
 			raise GrpcError(errcode, "Legacy gRPC call failed with error")
+		else:
+			assert not expectedError, f"Legacy gRPC call did not fail with error {expectedError}"
 
 		if negate:
 			assert req_output not in output, "Forbidden GRPC output present"

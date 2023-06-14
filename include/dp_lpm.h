@@ -56,7 +56,7 @@ struct macip_entry {
 struct vm_entry {
 	struct dp_fwall_head	fwall_head;
 	struct macip_entry		info;
-	int						vni;
+	uint32_t				vni;
 	uint8_t					machineid[VM_MACHINE_ID_STR_LEN];
 	uint8_t					ul_ipv6[16];
 	uint8_t					vm_ready;
@@ -110,7 +110,7 @@ bool dp_arp_cycle_needed(uint16_t portid);
 void dp_del_vm(int portid, int socketid, bool rollback);
 int dp_get_active_vm_ports(int* act_ports);
 uint8_t* dp_get_vm_machineid(uint16_t portid);
-int dp_get_vm_vni(uint16_t portid);
+uint32_t dp_get_vm_vni(uint16_t portid);
 uint32_t dp_get_vm_pxe_ip4(uint16_t portid);
 void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid);
 char* dp_get_vm_pxe_str(uint16_t portid);

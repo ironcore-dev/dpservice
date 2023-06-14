@@ -22,6 +22,7 @@ extern struct rte_hash *vni_handle_tbl;
 #define DP_IP_PROTO_IPV4		DP_IP_PROTO_IPv4_ENCAP
 #define DP_IP_PROTO_IPV6		DP_IP_PROTO_IPv6_ENCAP
 
+// TODO: packing?
 struct dp_vni_key {
 	int vni;
 	int type;
@@ -38,11 +39,11 @@ struct dp_vni_value {
 static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int socketid)
 {
 	struct dp_vni_value *temp_val = NULL;
-	struct dp_vni_key vni_key;
+	struct dp_vni_key vni_key = {
+		.type = DP_IP_PROTO_IPV4,
+		.vni = vni
+	};
 	int ret;
-
-	vni_key.type = DP_IP_PROTO_IPV4;
-	vni_key.vni = vni;
 
 	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
 	if (DP_FAILED(ret)) {
@@ -60,11 +61,11 @@ static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int 
 static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int socketid)
 {
 	struct dp_vni_value *temp_val = NULL;
-	struct dp_vni_key vni_key;
+	struct dp_vni_key vni_key = {
+		.type = DP_IP_PROTO_IPV6,
+		.vni = vni
+	};
 	int ret;
-
-	vni_key.type = DP_IP_PROTO_IPV6;
-	vni_key.vni = vni;
 
 	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
 	if (DP_FAILED(ret)) {

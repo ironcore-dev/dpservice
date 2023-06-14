@@ -296,7 +296,7 @@ typedef struct dp_reply {
 int dp_send_to_worker(dp_request *req);
 int dp_recv_from_worker(dp_reply *rep);
 int dp_recv_from_worker_with_mbuf(struct rte_mbuf **m);
-int dp_process_request(struct rte_mbuf *m);
+void dp_process_request(struct rte_mbuf *m);
 void dp_fill_head(dp_com_head* head, uint16_t type,
 				  uint8_t is_chained, uint8_t count);
 struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,

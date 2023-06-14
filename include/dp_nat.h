@@ -26,6 +26,7 @@ enum {
 	DP_LB_RECIRC,
 };
 
+// TODO: key packing?
 struct nat_key {
 	uint32_t	ip;
 	uint32_t	vni;
@@ -48,6 +49,10 @@ struct snat_data {
 	uint16_t	network_nat_port_range[2];
 	uint8_t		ul_ip6[16]; /* VIP underlady */
 	uint8_t		ul_nat_ip6[16]; /* NAT Gateway underlay */
+};
+
+struct dnat_data {
+	uint32_t	dnat_ip;
 };
 
 struct netnat_portmap_key {
@@ -77,14 +82,15 @@ struct nat_check_result {
 
 int dp_nat_init(int socket_id);
 void dp_nat_free();
-void dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
+
+int dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_ipv6);
 
-void dp_del_vm_dnat_ip(uint32_t d_ip, uint32_t vni);
-bool dp_is_ip_dnatted(uint32_t d_ip, uint32_t vni);
-uint32_t dp_get_vm_dnat_ip(uint32_t d_ip, uint32_t vni);
-int dp_set_vm_dnat_ip(uint32_t d_ip, uint32_t vm_ip, uint32_t vni);
+int dp_del_dnat_ip(uint32_t d_ip, uint32_t vni);
+struct dnat_data *dp_get_dnat_data(uint32_t d_ip, uint32_t vni);
+int dp_set_dnat_ip(uint32_t d_ip, uint32_t dnat_ip, uint32_t vni);
+
 void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
@@ -100,7 +106,6 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 											   uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-int dp_check_if_ip_natted(uint32_t vm_ip, uint32_t vni, struct nat_check_result *result);
 uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
 							  uint8_t *ul_ipv6);
@@ -110,7 +115,7 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(struct flow_value *cntrack);
 int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
 int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
-struct snat_data *dp_get_vm_network_snat_data(uint32_t vm_ip, uint32_t vni);
+struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni);
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 
 

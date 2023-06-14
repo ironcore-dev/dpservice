@@ -86,9 +86,9 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1240)
 	grpc_client.delnat(VM3.name)
 
-	grpc_client.dellbtarget(VM2.name, lb_vm2_ul_ipv6)
+	grpc_client.dellbtarget(lb_name, lb_vm2_ul_ipv6)
 	grpc_client.dellbprefix(VM2.name, lb_ip)
-	grpc_client.dellbtarget(VM1.name, lb_vm1_ul_ipv6)
+	grpc_client.dellbtarget(lb_name, lb_vm1_ul_ipv6)
 	grpc_client.dellbprefix(VM1.name, lb_ip)
 	grpc_client.dellb(lb_name)
 
@@ -119,6 +119,6 @@ def test_nat_to_lb_nat(prepare_ipv4, grpc_client, port_redundancy):
 	grpc_client.delinterface(VM4.name)
 
 	grpc_client.delnat(VM1.name)
-	grpc_client.dellbtarget(VM1.name, lb_vm1_ul_ipv6)
+	grpc_client.dellbtarget(lb_name, lb_vm1_ul_ipv6)
 	grpc_client.dellbprefix(VM1.name, lb_ip)
 	grpc_client.dellb(lb_name)

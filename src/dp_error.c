@@ -31,9 +31,12 @@ const char *dp_strerror(int error)
 		error = -error;
 
 	// dp_service specific errors are after rte_ errors (which are after __ELASTERROR)
-	errdesc = error == RTE_MAX_ERRNO
-		? "General dp_service error"
-		: rte_strerror(error);
+	if (error < RTE_MAX_ERRNO)
+		errdesc = rte_strerror(error);
+	else if (error >= -_DP_GRPC_ERRCODES)
+		errdesc = dp_grpc_strerror(error+_DP_GRPC_ERRCODES);
+	else
+		errdesc = "General dp_service error";
 
 	// print the textual errno for easier debugging
 #if defined(DEBUG) && __GLIBC_PREREQ(2, 32)
@@ -49,12 +52,14 @@ const char *dp_strerror(int error)
 }
 
 
-const char *dp_grpc_strerror(int errcode)
+const char *dp_grpc_strerror(int grpc_errcode)
 {
-	if (errcode == 0)
+	if (grpc_errcode == DP_GRPC_OK)
 		return "Success";
-	if (errcode < 0 || errcode >= RTE_DIM(dp_grpc_error_strings)
-		|| !dp_grpc_error_strings[errcode])
+	if (grpc_errcode < 0 || grpc_errcode >= RTE_DIM(dp_grpc_error_strings) || !dp_grpc_error_strings[grpc_errcode]) {
+		// this should never happen, the programmer must have returned a wrong value
+		assert(0);
 		return "Invalid gRPC error code";
-	return dp_grpc_error_strings[errcode];
+	}
+	return dp_grpc_error_strings[grpc_errcode];
 }

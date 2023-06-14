@@ -5,10 +5,12 @@
 extern "C" {
 #endif
 
+#include <assert.h>
 #include <rte_errno.h>
 
 #define DP_OK 0
 #define DP_ERROR (-RTE_MAX_ERRNO)
+#define _DP_GRPC_ERRCODES (DP_ERROR-1)
 
 // NOTICE: these can be used directly with a function call, do not use RET multiple times
 #define DP_FAILED(RET) \
@@ -22,105 +24,57 @@ const char *dp_strerror(int error);
 /*
  * GRPC error values, do not change them!
  */
-// TODO(plague): separate _NATVIP_ errors into _NAT_ and _VIP_ equivalents (and maybe separate prefix and lb prefix)
+#define DP_GRPC_OK							0
 #define _DP_GRPC_ERRORS(ERR) \
-	ERR(_ADD_IFACE,							100) \
-	ERR(_ADD_IFACE_IPV6_FORMAT,				101) \
-	ERR(ADD_IFACE_HANDLE_ERR,				102) \
-	ERR(ADD_IFACE_LPM4_ERR,					104) \
-	ERR(ADD_IFACE_LPM6_ERR,					105) \
-	ERR(ADD_IFACE_ROUTE4_ERR,				106) \
-	ERR(ADD_IFACE_ROUTE6_ERR,				107) \
-	ERR(ADD_IFACE_NO_VFS,					108) \
-	ERR(ADD_IFACE_ALREADY_ALLOCATED,		109) \
-	ERR(ADD_IFACE_BAD_DEVICE_NAME,			110) \
-	ERR(ADD_IFACE_VNF_ERR,					111) \
-	ERR(ADD_IFACE_PORT_START_ERR,			112) \
-	ERR(_DEL_IFACE,							150) \
-	ERR(DEL_IFACE_NOT_FOUND,				151) \
-	ERR(GET_IFACE_NOT_FOUND,				171) \
-	ERR(_LIST_IFACES,						200) \
-	ERR(_ADD_ROUTE,							250) \
-	ERR(ADD_ROUTE_FAIL4,					251) \
-	ERR(ADD_ROUTE_FAIL6,					252) \
-	ERR(ADD_ROUTE_NO_VM,					253) \
-	ERR(DEL_ROUTE,							300) \
-	ERR(GET_NAT_ITER_ERR,					349) \
-	ERR(ADD_VIP_NO_SNAT_DATA,				350) \
-	ERR(ADD_VIP_IP_EXISTS,					351) \
-	ERR(ADD_VIP_SNAT_KEY_ERR,				352) \
-	ERR(ADD_VIP_SNAT_ALLOC,					353) \
-	ERR(ADD_VIP_SNAT_DATA_ERR,				354) \
-	ERR(_ADD_NAT,							355) \
-	ERR(_DEL_NAT,							356) \
-	ERR(_ADD_NAT_NONLOCAL,					357) \
-	ERR(_ADD_NAT_INVALID_PORT,				358) \
-	ERR(ADD_NAT_NO_SNAT_DATA,				359) \
-	ERR(_DEL_NAT_NONLOCAL,					360) \
-	ERR(_DEL_NAT_INVALID_PORT,				361) \
-	ERR(DEL_NAT_NOT_FOUND,					362) \
-	ERR(ADD_NAT_IP_EXISTS,					363) \
-	ERR(ADD_NAT_SNAT_KEY_ERR,				364) \
-	ERR(ADD_NAT_SNAT_ALLOC,					365) \
-	ERR(ADD_NAT_SNAT_DATA_ERR,				366) \
-	ERR(DEL_NAT_ALREADY_DELETED,			367) \
-	ERR(GET_NATINFO_NO_IPV6_SUPPORT,		369) \
-	ERR(ADD_NEIGHNAT_WRONGTYPE,				370) \
-	ERR(DEL_NEIGHNAT_WRONGTYPE,				371) \
-	ERR(ADD_NEIGHNAT_ALREADY_EXISTS,		372) \
-	ERR(ADD_NEIGHNAT_ALLOC,					373) \
-	ERR(DEL_NEIGHNAT_NOT_FOUND,				374) \
-	ERR(_GET_NEIGHNAT_UNDER_IPV6,			375) \
-	ERR(GET_NATINFO_WRONGTYPE,				376) \
-	ERR(ADD_NATVIP_VNF_ERR,					377) \
-	ERR(_ADD_DNAT,							400) \
-	ERR(ADD_DNAT_IP_EXISTS,					401) \
-	ERR(ADD_DNAT_KEY_ERR,					402) \
-	ERR(ADD_DNAT_ALLOC,						403) \
-	ERR(ADD_DNAT_DATA_ERR,					404) \
-	ERR(DEL_VIP_NO_VM,						450) \
-	ERR(DEL_NATVIP_NO_SNAT,					451) \
-	ERR(GET_NATVIP_NO_VM,					500) \
-	ERR(GET_NATVIP_NO_IP_SET,				501) \
-	ERR(ADD_LBVIP_BACKIP_ERR,				550) \
-	ERR(_ADD_LBVIP_NO_VNI,					551) \
-	ERR(ADD_LBVIP_UNSUPP_IP,				552) \
-	ERR(DEL_LBVIP_BACKIP_ERR,				600) \
-	ERR(_DEL_LBVIP_NO_VNI,					601) \
-	ERR(DEL_LBVIP_UNSUPP_IP,				602) \
-	ERR(_ADD_PREFIX,						650) \
-	ERR(ADD_PREFIX_NO_VM,					651) \
-	ERR(ADD_PREFIX_ROUTE,					652) \
-	ERR(ADD_PREFIX_VNF_ERR,					653) \
-	ERR(DEL_PREFIX_ROUTE_ERR,				700) \
-	ERR(DEL_PREFIX_NO_VM,					701) \
-	ERR(INIT_RESET_ERR,						710) \
-	ERR(VNI_TABLE_RESET_ERR,				711) \
-	ERR(ADD_LB_UNSUPP_IP,					750) \
-	ERR(ADD_LB_CREATE_ERR,					751) \
-	ERR(ADD_LB_VNF_ERR,						752) \
-	ERR(ADD_LB_ROUTE_ERR,					753) \
-	ERR(DEL_LB_ID_ERR,						755) \
-	ERR(DEL_LB_BACK_IP_ERR,					756) \
-	ERR(DEL_LB_ROUTE_ERR,					757) \
-	ERR(GET_LB_ID_ERR,						760) \
-	ERR(GET_LB_BACK_IP_ERR,					761) \
-	ERR(ADD_FWRULE_NO_VM,					800) \
-	ERR(ADD_FWRULE_ALLOC_ERR,				801) \
-	ERR(ADD_FWRULE_NO_DROP_SUPPORT,			802) \
-	ERR(ADD_FWRULE_ID_EXISTS,				803) \
-	ERR(GET_FWRULE_NO_VM,					810) \
-	ERR(GET_FWRULE_NOT_FOUND,				811) \
-	ERR(DEL_FWRULE_NO_VM,					820) \
-	ERR(DEL_FWRULE_NOT_FOUND,				821) \
+	/* Returned for unknown request type */ \
+	ERR(BAD_REQUEST,						101) \
+	/* General-purpose errors */ \
+	ERR(NOT_FOUND,							201) \
+	ERR(ALREADY_EXISTS,						202) \
+	ERR(LIMIT_REACHED,						203) \
+	ERR(WRONG_TYPE,							203) \
+	ERR(BAD_IPVER,							204) \
+	ERR(NO_VM,								205) \
+	ERR(NO_VNI,								206) \
+	ERR(ITERATOR,							207) \
+	ERR(OUT_OF_MEMORY,						208) \
+	/* Specific errors */ \
+	ERR(ROUTE_EXISTS,						301) \
+	ERR(ROUTE_NOT_FOUND,					302) \
+	ERR(ROUTE_INSERT,						303) \
+	ERR(ROUTE_BAD_PORT,						304) \
+	ERR(ROUTE_RESET,						305) \
+	ERR(DNAT_NO_DATA,						321) \
+	ERR(DNAT_CREATE,						322) \
+	ERR(DNAT_EXISTS,						323) \
+	ERR(SNAT_NO_DATA,						341) \
+	ERR(SNAT_CREATE,						342) \
+	ERR(SNAT_EXISTS,						343) \
+	ERR(VNI_INIT4,							361) \
+	ERR(VNI_INIT6,							362) \
+	ERR(VNI_FREE4,							363) \
+	ERR(VNI_FREE6,							364) \
+	ERR(PORT_START,							381) \
+	ERR(PORT_STOP,							382) \
+	ERR(VNF_INSERT,							401) \
+	ERR(VM_HANDLE,							402) \
+	ERR(NO_BACKIP,							421) \
+	ERR(NO_DROP_SUPPORT,					441) \
 
 #define _DP_GRPC_ERROR_ENUM(NAME, NUMBER) \
-	DP_GRPC_ERR_##NAME = NUMBER,
+	DP_GRPC_ERR_##NAME = _DP_GRPC_ERRCODES - NUMBER,
 enum dp_grpc_error {
 	_DP_GRPC_ERRORS(_DP_GRPC_ERROR_ENUM)
 };
 
-const char *dp_grpc_strerror(int errcode);
+static inline int dp_errcode_to_grpc_errcode(int dp_errcode)
+{
+	// should never happen, the programmer must have returned a wrong value
+	assert(dp_errcode < _DP_GRPC_ERRCODES);
+	return -(dp_errcode - _DP_GRPC_ERRCODES);
+}
+
+const char *dp_grpc_strerror(int grpc_errcode);
 
 #ifdef __cplusplus
 }
