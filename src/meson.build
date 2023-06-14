@@ -1,6 +1,7 @@
 dp_sources = [
   'grpc/dp_async_grpc.cpp',
   'grpc/dp_grpc_impl.c',
+  'grpc/dp_grpc_responder.c',
   'grpc/dp_grpc_service.cpp',
   'grpc/dp_grpc_thread.cpp',
   'monitoring/dp_event.c',

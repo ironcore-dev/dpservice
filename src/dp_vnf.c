@@ -1,7 +1,8 @@
-#include <rte_malloc.h>
 #include "dp_vnf.h"
+#include <rte_malloc.h>
 #include "dp_error.h"
 #include "dp_log.h"
+#include "grpc/dp_grpc_responder.h"
 
 static struct rte_hash *vnf_handle_tbl = NULL;
 
@@ -123,60 +124,37 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 	return DP_OK;
 }
 
-void dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type v_type, struct rte_mbuf *rep_arr[])
+int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
-	struct dp_vnf_value *temp_val;
-	uint16_t msg_per_buf;
-	dp_route *rp_route;
-	uint32_t iter = 0;
-	dp_reply *rep;
-	int32_t ret;
 	void *key;
+	struct dp_vnf_value *data;
+	uint32_t iter = 0;
+	dp_route *reply;
+	int32_t ret;
 
 	if (rte_hash_count(vnf_handle_tbl) == 0)
-		goto out;
+		return DP_OK;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(dp_route));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
-	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&data, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot iterate VNF table %s", dp_strerror(ret));
-			break;
+			return ret;
 		}
 
-		if (portid != temp_val->portid)
+		if (portid != data->portid || data->v_type != v_type)
 			continue;
 
-		if (temp_val->v_type != v_type)
-			continue;
+		reply = dp_grpc_add_reply(responder);
+		if (!reply)
+			return DP_ERROR;
 
-		if (rep->com_head.msg_count &&
-			(rep->com_head.msg_count % msg_per_buf == 0)) {
-
-			m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-			if (!m_new)
-				break;
-			m_curr = m_new;
-			rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-		}
-		rp_route = &((&rep->route)[rep->com_head.msg_count % msg_per_buf]);
-		rep->com_head.msg_count++;
-
-		rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		rp_route->pfx_ip.addr = temp_val->alias_pfx.ip;
-		rp_route->pfx_length = temp_val->alias_pfx.length;
-		rte_memcpy(rp_route->trgt_ip.addr6, key, sizeof(rp_route->trgt_ip.addr6));
+		reply->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+		reply->pfx_ip.addr = data->alias_pfx.ip;
+		reply->pfx_length = data->alias_pfx.length;
+		rte_memcpy(reply->trgt_ip.addr6, key, sizeof(reply->trgt_ip.addr6));
 	}
 
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return;
-	}
-
-out:
-	rep_arr[--rep_arr_size] = m_curr;
+	return DP_OK;
 }

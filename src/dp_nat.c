@@ -1,3 +1,4 @@
+#include "dp_nat.h"
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_common.h>
@@ -7,11 +8,11 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 #include "dp_error.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_nat.h"
-#include "rte_flow/dp_rte_flow.h"
-#include "dp_log.h"
 #include "dp_internal_stats.h"
+#include "dp_log.h"
+#include "dp_mbuf_dyn.h"
+#include "grpc/dp_grpc_responder.h"
+#include "rte_flow/dp_rte_flow.h"
 
 TAILQ_HEAD(network_nat_head, network_nat_entry);
 
@@ -551,97 +552,55 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 	return ret == -ENOENT ? DP_OK : ret;
 }
 
-int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
+int dp_list_nat_local_entry(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
-	uint16_t msg_per_buf;
 	struct nat_key *nkey;
 	struct snat_data *data;
-	dp_reply *rep;
 	uint32_t index = 0;
 	int32_t ret;
-	struct dp_nat_entry *rp_nat_entry;
+	struct dp_nat_entry *reply;
 
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
-		goto out;
+		return DP_OK;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(struct dp_nat_entry));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	while ((ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index)) != -ENOENT) {
 		if (DP_FAILED(ret))
 			return DP_ERROR;
 
 		if (data->network_nat_ip == nat_ip) {
-			if (rep->com_head.msg_count &&
-				(rep->com_head.msg_count % msg_per_buf == 0)) {
-
-				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-				if (!m_new)
-					break;
-				m_curr = m_new;
-				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-			}
-			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
-			rep->com_head.msg_count++;
-
-			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_LOCAL;
-			rp_nat_entry->min_port = data->network_nat_port_range[0];
-			rp_nat_entry->max_port = data->network_nat_port_range[1];
-			rp_nat_entry->m_ip.addr = nkey->ip;
+			reply = dp_grpc_add_reply(responder);
+			if (!reply)
+				break;
+			reply->entry_type = DP_NETNAT_INFO_TYPE_LOCAL;
+			reply->min_port = data->network_nat_port_range[0];
+			reply->max_port = data->network_nat_port_range[1];
+			reply->m_ip.addr = nkey->ip;
 		}
 	}
 
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return DP_OK;
-	}
-
-out:
-	rep_arr[--rep_arr_size] = m_curr;
 	return DP_OK;
 }
 
-int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
+int dp_list_nat_neigh_entry(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
-	struct dp_nat_entry *rp_nat_entry;
-	struct network_nat_entry *current ;
-	uint16_t msg_per_buf;
-	dp_reply *rep;
+	struct network_nat_entry *current;
+	struct dp_nat_entry *reply;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(struct dp_nat_entry));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (current->nat_ip.nat_ip4 == nat_ip) {
-			if (rep->com_head.msg_count &&
-				(rep->com_head.msg_count % msg_per_buf == 0)) {
-					m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-					if (!m_new)
-						break;
-					m_curr = m_new;
-					rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-			}
-			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
-			rep->com_head.msg_count++;
-			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
-			rp_nat_entry->min_port = current->port_range[0];
-			rp_nat_entry->max_port = current->port_range[1];
-			rte_memcpy(rp_nat_entry->underlay_route, current->dst_ipv6, sizeof(current->dst_ipv6));
+			reply = dp_grpc_add_reply(responder);
+			if (!reply)
+				break;
+			reply->entry_type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+			reply->min_port = current->port_range[0];
+			reply->max_port = current->port_range[1];
+			rte_memcpy(reply->underlay_route, current->dst_ipv6, sizeof(current->dst_ipv6));
 		}
 	}
-
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return DP_OK;
-	}
-
-	rep_arr[--rep_arr_size] = m_curr;
 	return DP_OK;
 }
 

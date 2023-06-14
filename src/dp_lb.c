@@ -1,15 +1,16 @@
-#include <time.h>
+#include "dp_lb.h"
 #include <stdlib.h>
-#include <rte_hash.h>
-#include <rte_jhash.h>
+#include <time.h>
 #include <rte_common.h>
 #include <rte_errno.h>
+#include <rte_hash.h>
+#include <rte_jhash.h>
 #include <rte_malloc.h>
 #include <rte_rib6.h>
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "dp_lb.h"
+#include "grpc/dp_grpc_responder.h"
 
 static struct rte_hash *ipv4_lb_tbl = NULL;
 static struct rte_hash *id_map_lb_tbl = NULL;
@@ -221,7 +222,6 @@ static int dp_lb_rr_backend(struct lb_value *val, dp_lb_port *lb_port)
 uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16_t proto)
 {
 	struct lb_value *lb_val = NULL;
-	uint8_t *ret = NULL;
 	struct lb_key nkey = {
 		.ip = v_ip,
 		.vni = vni
@@ -230,7 +230,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 	int pos;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
-		goto out;
+		return NULL;
 
 	/* TODO This is just temporary. Round robin.
 	   This doesn't distribute the load evenly. 
@@ -240,20 +240,17 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 	lb_port.protocol = proto;
 	pos = dp_lb_rr_backend(lb_val, &lb_port);
 	if (pos < 0)
-		goto out;
+		return NULL;
 
 	lb_val->last_sel_pos = pos;
-	ret = (uint8_t *)&lb_val->back_end_ips[pos][0];
-
-out:
-	return ret;
+	return (uint8_t *)&lb_val->back_end_ips[pos][0];
 }
 
-int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
+int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
 {
-	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
-	uint8_t *rp_b_ip6;
+	struct lb_value *lb_val;
+	dp_lb_backip *reply;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NOT_FOUND;
@@ -261,14 +258,14 @@ int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	rep->com_head.msg_count = 0;
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
-	rp_b_ip6 = &rep->back_ip.b_ip.addr6[0];
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
 		if (lb_val->back_end_ips[i][0] != 0) {
-			rep->com_head.msg_count++;
-			rte_memcpy(rp_b_ip6, &lb_val->back_end_ips[i][0], sizeof(rep->back_ip.b_ip.addr6));
-			rp_b_ip6 += sizeof(rep->back_ip.b_ip.addr6);
+			reply = dp_grpc_add_reply(responder);
+			if (!reply)
+				return DP_GRPC_OK;  // do not fail, show truncated list
+			rte_memcpy(reply->b_ip.addr6, &lb_val->back_end_ips[i][0], sizeof(reply->b_ip.addr6));
 		}
 	}
 	return DP_GRPC_OK;

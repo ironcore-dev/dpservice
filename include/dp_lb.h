@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "grpc/dp_grpc_impl.h"
+#include "grpc/dp_grpc_responder.h"
 
 #define DP_LB_TABLE_MAX			100
 #define DP_LB_MAX_IPS_PER_VIP	20
@@ -37,7 +37,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 bool dp_is_lb_enabled();
 int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip);
 int dp_set_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size);
-int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep);
+int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder);
 int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip);
 int dp_delete_lb(void *id_key);
 int dp_get_lb(void *id_key, dp_lb *list_lb /* out */);

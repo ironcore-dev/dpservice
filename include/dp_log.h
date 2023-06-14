@@ -43,6 +43,7 @@ extern "C" {
 
 #define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE)
 #define DP_LOG_GRPCERR(VALUE) _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
+#define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)
 
 #define DP_LOG_LISTENADDR(VALUE) _DP_LOG_STR("listen_address", VALUE)
 

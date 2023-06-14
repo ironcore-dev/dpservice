@@ -1,8 +1,9 @@
-#include <stdbool.h>
-#include "dp_mbuf_dyn.h"
 #include "dp_firewall.h"
-#include "dp_lpm.h"
+#include <stdbool.h>
 #include "dp_error.h"
+#include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
+#include "grpc/dp_grpc_responder.h"
 
 void dp_init_firewall_rules_list(int port_id)
 {
@@ -51,43 +52,20 @@ struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
 	return NULL;
 }
 
-void dp_list_firewall_rules(int port_id, struct rte_mbuf *m, struct rte_mbuf *rep_arr[])
+int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
-	struct dp_fwall_rule *t_rule, *rule;
-	uint16_t msg_per_buf;
-	dp_reply *rep;
+	struct dp_fwall_rule *rule, *reply;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(dp_route));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	TAILQ_FOREACH(rule, dp_get_fwall_head(port_id), next_rule) {
-		if (rep->com_head.msg_count &&
-			(rep->com_head.msg_count % msg_per_buf == 0)) {
-
-			m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-			if (!m_new)
-				break;
-			m_curr = m_new;
-			rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-		}
-		t_rule = &((&rep->fw_rule.rule)[rep->com_head.msg_count % msg_per_buf]);
-		*t_rule = *rule;
-		rep->com_head.msg_count++;
+		reply = dp_grpc_add_reply(responder);
+		if (!reply)
+			return DP_ERROR;
+		*reply = *rule;
 	}
 
-	if (rep->com_head.msg_count == 0)
-		goto out;
-
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return;
-	}
-
-out:
-	rep_arr[--rep_arr_size] = m_curr;
+	return DP_OK;
 }
 
 static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *rule, struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr)

@@ -1342,7 +1342,6 @@ int ListRoutesCall::Proceed()
 	Route *route;
 	int i;
 	uint8_t is_chained = 0;
-	uint16_t read_so_far = 0;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
@@ -1364,7 +1363,7 @@ int ListRoutesCall::Proceed()
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
 			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+			for (i = 0; i < reply->com_head.msg_count; i++) {
 				route = reply_.add_routes();
 				rp_route = &((&reply->route)[i]);
 
@@ -1385,7 +1384,6 @@ int ListRoutesCall::Proceed()
 				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
 				route->set_nexthopaddress(buf);
 			}
-			read_so_far += (reply->com_head.msg_count - read_so_far);
 			is_chained = reply->com_head.is_chained;
 			rte_pktmbuf_free(mbuf);
 		} while (is_chained);
@@ -1657,7 +1655,6 @@ int ListInterfacesCall::Proceed()
 	struct in_addr addr;
 	dp_vm_info *vm_info;
 	uint8_t is_chained = 0;
-	uint16_t read_so_far = 0;
 	int i;
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -1678,7 +1675,7 @@ int ListInterfacesCall::Proceed()
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
 			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+			for (i = 0; i < reply->com_head.msg_count; i++) {
 				machine = reply_.add_interfaces();
 				vm_info = &((&reply->vm_info)[i]);
 				addr.s_addr = htonl(vm_info->ip_addr);
@@ -1691,7 +1688,6 @@ int ListInterfacesCall::Proceed()
 				inet_ntop(AF_INET6, vm_info->ul_addr6, buf_str, INET6_ADDRSTRLEN);
 				machine->set_underlayroute(buf_str);
 			}
-			read_so_far += (reply->com_head.msg_count - read_so_far);
 			is_chained = reply->com_head.is_chained;
 			rte_pktmbuf_free(mbuf);
 		} while (is_chained);
@@ -1711,7 +1707,6 @@ int GetNATInfoCall::Proceed()
 	struct rte_mbuf *mbuf = NULL;
 	struct dp_reply *reply;
 	uint8_t is_chained = 0;
-	uint16_t read_so_far = 0;
 	int i;
 	NATInfoEntry *rep_nat_entry;
 	dp_nat_entry *dp_nat_item;
@@ -1762,7 +1757,7 @@ int GetNATInfoCall::Proceed()
 			if (dp_recv_from_worker_with_mbuf(&mbuf))
 				return -1;
 			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-			for (i = 0; i < (reply->com_head.msg_count - read_so_far); i++) {
+			for (i = 0; i < reply->com_head.msg_count; i++) {
 				rep_nat_entry = reply_.add_natinfoentries();
 				dp_nat_item = &((&reply->nat_entry)[i]);
 				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
@@ -1777,7 +1772,6 @@ int GetNATInfoCall::Proceed()
 				rep_nat_entry->set_minport(dp_nat_item->min_port);
 				rep_nat_entry->set_maxport(dp_nat_item->max_port);
 			}
-			read_so_far += (reply->com_head.msg_count - read_so_far);
 			is_chained = reply->com_head.is_chained;
 			rte_pktmbuf_free(mbuf);
 		} while (is_chained);
@@ -1827,7 +1821,7 @@ int AddFirewallRuleCall::Proceed()
 			return -1;
 		status_ = FINISH;
 		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
-		reply_.set_ruleid(&reply.fw_rule.rule.rule_id, sizeof(reply.fw_rule.rule.rule_id));
+		reply_.set_ruleid(&reply.fwall_rule.rule_id, sizeof(reply.fwall_rule.rule_id));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1903,7 +1897,7 @@ int GetFirewallRuleCall::Proceed()
 			return -1;
 
 		rule = new FirewallRule();
-		ConvertDPFWallRuleToGRPCFwallRule(&reply.fw_rule.rule, rule);
+		ConvertDPFWallRuleToGRPCFwallRule(&reply.fwall_rule, rule);
 		reply_.set_allocated_rule(rule);
 
 		status_ = FINISH;
@@ -1947,7 +1941,7 @@ int ListFirewallRulesCall::Proceed()
 		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
 		for (i = 0; i < reply->com_head.msg_count; i++) {
 			rule = reply_.add_rules();
-			dp_rule = &((&reply->fw_rule.rule)[i]);
+			dp_rule = &((&reply->fwall_rule)[i]);
 			ConvertDPFWallRuleToGRPCFwallRule(dp_rule, rule);
 		}
 		rte_pktmbuf_free(mbuf);

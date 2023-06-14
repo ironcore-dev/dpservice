@@ -9,7 +9,6 @@
 #include "dpdk_layer.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_util.h"
-#include "grpc/dp_grpc_impl.h"
 #include "dp_firewall.h"
 
 #ifdef __cplusplus
@@ -96,8 +95,7 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
 int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
-void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
-					struct rte_mbuf *rep_arr[], bool ext_routes);
+int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes, struct dp_grpc_responder *responder);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid);
 void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t* ipv6, uint8_t depth, int socketid);
 void dp_set_vm_ip6(uint16_t portid, uint8_t* ipv6);

@@ -6,6 +6,7 @@
 #include <rte_common.h>
 #include <rte_mbuf.h>
 #include "dp_flow.h"
+#include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -113,8 +114,8 @@ int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni);
 const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(struct flow_value *cntrack);
-int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
-int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip);
+int dp_list_nat_local_entry(uint32_t nat_ip, struct dp_grpc_responder *responder);
+int dp_list_nat_neigh_entry(uint32_t nat_ip, struct dp_grpc_responder *responder);
 struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni);
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 

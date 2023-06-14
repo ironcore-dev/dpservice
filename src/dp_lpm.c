@@ -1,11 +1,12 @@
-#include <rte_errno.h>
-#include "dp_log.h"
 #include "dp_lpm.h"
-#include "dp_flow.h"
+#include <rte_errno.h>
 #include "dp_error.h"
-#include "dp_mbuf_dyn.h"
 #include "dp_firewall.h"
+#include "dp_flow.h"
+#include "dp_log.h"
+#include "dp_mbuf_dyn.h"
 #include "dp_vni.h"
+#include "grpc/dp_grpc_responder.h"
 
 static struct vm_entry vm_table[DP_MAX_PORTS];
 static struct rte_hash *vm_handle_tbl = NULL;
@@ -286,31 +287,6 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	return DP_GRPC_OK;
 }
 
-static void dp_copy_route_to_mbuf(struct rte_rib_node *node, dp_reply *rep, bool ext_routes, uint16_t per_buf)
-{
-	struct vm_route *route;
-	dp_route *rp_route;
-	uint32_t ipv4 = 0;
-	uint8_t depth = 0;
-
-	rp_route = &((&rep->route)[rep->com_head.msg_count % per_buf]);
-	rep->com_head.msg_count++;
-
-	rte_rib_get_ip(node, &ipv4);
-	rte_rib_get_depth(node, &depth);
-	rp_route->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-	rp_route->pfx_ip.addr = ipv4;
-	rp_route->pfx_length = depth;
-
-	if (ext_routes) {
-		route = (struct vm_route *)rte_rib_get_ext(node);
-		rp_route->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
-		rp_route->trgt_vni = route->vni;
-		rte_memcpy(rp_route->trgt_ip.addr6, route->nh_ipv6,
-					sizeof(rp_route->trgt_ip.addr6));
-	}
-}
-
 static __rte_always_inline bool dp_route_in_dhcp_range(struct rte_rib_node *node, uint16_t portid)
 {
 	uint32_t ipv4 = 0;
@@ -321,13 +297,14 @@ static __rte_always_inline bool dp_route_in_dhcp_range(struct rte_rib_node *node
 	return dp_get_dhcp_range_ip4(portid) == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
 }
 
-static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid,
-								struct rte_mbuf **m_curr_ptr, struct rte_mbuf *rep_arr[], int8_t *rep_arr_size_ptr,
-								uint16_t msg_per_buf, bool ext_routes)
+static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool ext_routes,
+							   struct dp_grpc_responder *responder)
 {
-	struct rte_mbuf *m_new;
-	dp_reply *rep;
+	dp_route *reply;
 	uint64_t next_hop;
+	struct vm_route *vm_route;
+	uint32_t ipv4;
+	uint8_t depth;
 
 	// can only fail when any argument is NULL
 	rte_rib_get_nh(node, &next_hop);
@@ -335,57 +312,54 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid,
 	if ((ext_routes && dp_port_is_pf(next_hop))
 		|| (!ext_routes && next_hop == portid && !dp_route_in_dhcp_range(node, portid))
 	) {
-		rep = rte_pktmbuf_mtod(*m_curr_ptr, dp_reply *);
-		// no more space in this mbuf, use another one
-		if (rep->com_head.msg_count && (rep->com_head.msg_count % msg_per_buf == 0)) {
-			m_new = dp_add_mbuf_to_grpc_arr(*m_curr_ptr, rep_arr, rep_arr_size_ptr);
-			if (!m_new) {
-				DPGRPC_LOG_WARNING("No more space in gRPC response array for route entry");
-				return DP_ERROR;
-			}
-			*m_curr_ptr = m_new;
-			rep = rte_pktmbuf_mtod(m_new, dp_reply *);
+		reply = dp_grpc_add_reply(responder);
+		if (!reply)
+			return DP_ERROR;
+
+		rte_rib_get_ip(node, &ipv4);
+		rte_rib_get_depth(node, &depth);
+		reply->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
+		reply->pfx_ip.addr = ipv4;
+		reply->pfx_length = depth;
+
+		if (ext_routes) {
+			vm_route = (struct vm_route *)rte_rib_get_ext(node);
+			reply->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+			reply->trgt_vni = vm_route->vni;
+			rte_memcpy(reply->trgt_ip.addr6, vm_route->nh_ipv6, sizeof(reply->trgt_ip.addr6));
 		}
-		dp_copy_route_to_mbuf(node, rep, ext_routes, msg_per_buf);
+
 	}
 	return DP_OK;
 }
 
-void dp_list_routes(int vni, struct rte_mbuf *m, int socketid, uint16_t portid,
-					struct rte_mbuf *rep_arr[], bool ext_routes)
+int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
+				   struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_curr = m;
 	struct rte_rib_node *node = NULL;
 	struct rte_rib *root;
-	uint16_t msg_per_buf;
 
+	// TODO(plague): look into this globally
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
-		goto out;
+		return DP_OK;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size, sizeof(dp_route));
+	dp_grpc_set_multireply(responder, sizeof(dp_route));
 
 	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
 	if (node)
-		dp_list_route_entry(node, portid, &m_curr, rep_arr, &rep_arr_size, msg_per_buf, ext_routes);
-		// failure ignored, should not fail for the first entry anyway
+		if (DP_FAILED(dp_list_route_entry(node, portid, ext_routes, responder)))
+			return DP_ERROR;
 
 	node = NULL;  // needed to start rte_rib_get_nxt() traversal
 	while ((node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL))) {
-		if (DP_FAILED(dp_list_route_entry(node, portid, &m_curr, rep_arr, &rep_arr_size, msg_per_buf, ext_routes)))
-			break;
+		if (DP_FAILED(dp_list_route_entry(node, portid, ext_routes, responder)))
+			return DP_ERROR;
 	}
 
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return;
-	}
-
-out:
-	rep_arr[--rep_arr_size] = m_curr;
+	return DP_OK;
 }
 
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,

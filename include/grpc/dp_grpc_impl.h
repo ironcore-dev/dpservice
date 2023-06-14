@@ -14,6 +14,7 @@ extern "C" {
 
 #define DP_VNF_IPV6_ADDR_SIZE	16
 
+// TODO bring this in line with the functions and go client! (Separate commit in this pr)
 typedef enum {
 	DP_REQ_TYPE_NONE,
 	DP_REQ_TYPE_ADDLBVIP,
@@ -215,6 +216,7 @@ typedef struct dp_nat_vip {
 
 typedef struct dp_request {
 	dp_com_head com_head;
+	// TODO rename fields so they are not only "add_*" but "*" ?
 	union {
 		dp_pfx			add_pfx;
 		dp_vip			add_vip;
@@ -287,8 +289,9 @@ typedef struct dp_reply {
 		dp_route		route;
 		dp_lb_backip	back_ip;
 		dp_nat_entry	nat_entry;
+		// TODO encapsulate this to we can use better request*
 		uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-		dp_fw_rule		fw_rule;
+		struct dp_fwall_rule	fwall_rule;
 		dp_vni_use		vni_in_use;
 	};
 } dp_reply;
@@ -299,14 +302,6 @@ int dp_recv_from_worker_with_mbuf(struct rte_mbuf **m);
 void dp_process_request(struct rte_mbuf *m);
 void dp_fill_head(dp_com_head* head, uint16_t type,
 				  uint8_t is_chained, uint8_t count);
-struct rte_mbuf* dp_add_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,
-										 struct rte_mbuf *rep_arr[],
-										 int8_t *size);
-uint16_t dp_first_mbuf_to_grpc_arr(struct rte_mbuf* m_curr,
-								   struct rte_mbuf *rep_arr[],
-								   int8_t *idx, uint16_t size);
-void dp_last_mbuf_from_grpc_arr(struct rte_mbuf* m_curr,
-								struct rte_mbuf *rep_arr[]);
 
 #ifdef __cplusplus
 }
