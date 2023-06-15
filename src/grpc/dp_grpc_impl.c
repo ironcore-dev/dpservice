@@ -238,7 +238,7 @@ static int dp_process_get_lb(dp_request *req, dp_reply *rep)
 static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 {
 	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV6) {
-		return dp_set_lb_back_ip((void *)req->add_lb_vip.lb_id,
+		return dp_add_lb_back_ip((void *)req->add_lb_vip.lb_id,
 								 (uint8_t *)req->add_lb_vip.back.back_addr6,
 								 sizeof(req->add_lb_vip.back.back_addr6));
 	} else {
