@@ -66,6 +66,9 @@ int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip)
 		.vni = add_lb->vni
 	};
 
+	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey)))
+		return DP_GRPC_ERR_ALREADY_EXISTS;
+
 	lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 	if (!lb_val)
 		goto err;
