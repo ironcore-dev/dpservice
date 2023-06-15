@@ -100,27 +100,26 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 	uint32_t iter = 0;
 	int32_t ret;
 	void *key;
+	int delete_count = 0;
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot iterate VNF table %s", dp_strerror(ret));
-			return ret;
-		}
+		if (DP_FAILED(ret))
+			return DP_GRPC_ERR_ITERATOR;
 
 		if ((val->portid == temp_val->portid)
 			&& (val->alias_pfx.ip == temp_val->alias_pfx.ip)
 			&& (val->alias_pfx.length == temp_val->alias_pfx.length)
 			&& (val->v_type == temp_val->v_type)
 		) {
+			delete_count++;
 			rte_free(temp_val);
+			// should only ever fail on no-entry or invalid-arguments, but both are covered by rte_hash_iterate()
 			ret = rte_hash_del_key(vnf_handle_tbl, key);
-			if (DP_FAILED(ret)) {
+			if (DP_FAILED(ret))
 				DPS_LOG_ERR("Cannot delete VNF key %s", dp_strerror(ret));
-				return DP_ERROR;
-			}
 		}
 	}
-	return DP_OK;
+	return delete_count > 0 ? DP_GRPC_OK : DP_GRPC_ERR_NOT_FOUND;
 }
 
 void dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid, enum vnf_type v_type, struct rte_mbuf *rep_arr[])
