@@ -80,6 +80,14 @@ static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
 	return dp_set_vnf_value((void *)ul_addr6, val);
 }
 
+static __rte_always_inline int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	return dp_find_vnf_with_value(val);
+}
+
 static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
 {
 	val->v_type = v_type;
@@ -433,6 +441,10 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 
 	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
+
+	if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id)))
+		return DP_GRPC_ERR_ALREADY_EXISTS;
+
 	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
