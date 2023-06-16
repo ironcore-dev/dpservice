@@ -25,6 +25,8 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
       - uses: docker/metadata-action@v4
         id: meta
         with:
