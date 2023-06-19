@@ -80,13 +80,20 @@ static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
 	return dp_set_vnf_value((void *)ul_addr6, val);
 }
 
-static void dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
-								uint16_t portid)
+static __rte_always_inline int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
 {
 	val->v_type = v_type;
 	val->portid = portid;
 	val->vni = dp_get_vm_vni(portid);
-	dp_del_vnf_with_value(val);
+	return dp_find_vnf_with_value(val);
+}
+
+static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	return dp_del_vnf_with_value(val);
 }
 
 struct rte_mbuf *dp_add_mbuf_to_grpc_arr(struct rte_mbuf *m_curr, struct rte_mbuf *rep_arr[], int8_t *size)
@@ -238,7 +245,7 @@ static int dp_process_get_lb(dp_request *req, dp_reply *rep)
 static int dp_process_add_lb_vip(dp_request *req, dp_reply *rep)
 {
 	if (req->add_lb_vip.ip_type == RTE_ETHER_TYPE_IPV6) {
-		return dp_set_lb_back_ip((void *)req->add_lb_vip.lb_id,
+		return dp_add_lb_back_ip((void *)req->add_lb_vip.lb_id,
 								 (uint8_t *)req->add_lb_vip.back.back_addr6,
 								 sizeof(req->add_lb_vip.back.back_addr6));
 	} else {
@@ -434,6 +441,10 @@ static int dp_process_addlb_prefix(dp_request *req, dp_reply *rep)
 
 	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
+
+	if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id)))
+		return DP_GRPC_ERR_ALREADY_EXISTS;
+
 	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
@@ -452,8 +463,7 @@ static int dp_process_dellb_prefix(dp_request *req, dp_reply *rep)
 
 	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
-	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
-	return DP_GRPC_OK;
+	return dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
 }
 
 static int dp_process_addprefix(dp_request *req, dp_reply *rep)
@@ -503,7 +513,7 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 {
 	int port_id;
 	struct dp_vnf_value vnf_val = {0};
-	int ret = DP_GRPC_OK;
+	int ret, ret2;
 
 	port_id = dp_get_portid_with_vm_handle(req->add_pfx.machine_id);
 	if (DP_FAILED(port_id))
@@ -519,8 +529,8 @@ static int dp_process_delprefix(dp_request *req, dp_reply *rep)
 
 	vnf_val.alias_pfx.ip = ntohl(req->add_pfx.pfx_ip.pfx_addr);
 	vnf_val.alias_pfx.length = req->add_pfx.pfx_length;
-	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id);
-	return ret;
+	ret2 = dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id);
+	return DP_FAILED(ret) ? ret : ret2;
 }
 
 static int dp_process_addmachine(dp_request *req, dp_reply *rep)

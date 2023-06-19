@@ -66,6 +66,9 @@ int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip)
 		.vni = add_lb->vni
 	};
 
+	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey)))
+		return DP_GRPC_ERR_ALREADY_EXISTS;
+
 	lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 	if (!lb_val)
 		goto err;
@@ -170,15 +173,16 @@ static int dp_lb_last_free_pos(struct lb_value *val)
 	return ret;
 }
 
-static void dp_lb_delete_back_ip(struct lb_value *val, uint8_t *b_ip)
+static int dp_lb_delete_back_ip(struct lb_value *val, uint8_t *b_ip)
 {
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
 		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[i][0], b_ip)) {
 			memset(&val->back_end_ips[i][0], 0, 16);
 			val->back_end_cnt--;
-			break;
+			return DP_GRPC_OK;
 		}
 	}
+	return DP_GRPC_ERR_NOT_FOUND;
 }
 
 static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
@@ -256,7 +260,7 @@ int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
 	uint8_t *rp_b_ip6;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
-		return DP_GRPC_ERR_NOT_FOUND;
+		return DP_GRPC_ERR_NO_LB;
 
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
@@ -274,20 +278,20 @@ int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
 	return DP_GRPC_OK;
 }
 
-int dp_set_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size)
+int dp_add_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
 	int32_t pos;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
-		return DP_GRPC_ERR_NOT_FOUND;
+		return DP_GRPC_ERR_NO_LB;
 
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	if (dp_lb_is_back_ip_inserted(lb_val, back_ip))
-		return DP_GRPC_OK;
+		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	pos = dp_lb_last_free_pos(lb_val);
 	if (pos < 0)
@@ -305,12 +309,10 @@ int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip)
 	struct lb_key *lb_k;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
-		return DP_GRPC_ERR_NOT_FOUND;
+		return DP_GRPC_ERR_NO_LB;
 
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	dp_lb_delete_back_ip(lb_val, back_ip);
-
-	return DP_GRPC_OK;
+	return dp_lb_delete_back_ip(lb_val, back_ip);
 }
