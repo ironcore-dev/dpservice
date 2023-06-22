@@ -139,9 +139,9 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 	} else {
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY])) {
 
-			if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
+			if (offload_mode_enabled && flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
 				flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
-			else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
+			else if (offload_mode_enabled && flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
 				flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
 
 			df->flags.dir = DP_FLOW_DIR_REPLY;
@@ -149,7 +149,7 @@ static __rte_always_inline void change_flow_state_dir(struct flow_key *key, stru
 
 		if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG])) {
 
-			if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+			if (offload_mode_enabled && flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
 				flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 
 			df->flags.dir = DP_FLOW_DIR_ORG;
