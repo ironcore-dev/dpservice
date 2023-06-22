@@ -67,13 +67,6 @@ typedef enum {
 	DP_VNI_BOTH,
 } dp_vni_use_type;
 
-typedef struct dp_com_head {
-	uint8_t com_type;
-	uint8_t is_chained;
-	uint16_t msg_count;
-	uint32_t err_code;
-} dp_com_head;
-
 typedef struct dp_lb_port {
 	uint16_t protocol;
 	uint16_t port;
@@ -215,7 +208,7 @@ typedef struct dp_nat_vip {
 } dp_net_nat;
 
 typedef struct dp_request {
-	dp_com_head com_head;
+	uint16_t type;
 	// TODO rename fields so they are not only "add_*" but "*" ?
 	union {
 		dp_pfx			add_pfx;
@@ -280,8 +273,12 @@ typedef struct dp_nat_entry {
 } dp_nat_entry;
 
 typedef struct dp_reply {
-	dp_com_head com_head;
+	uint8_t type;
+	uint8_t is_chained;
+	uint16_t msg_count;
+	uint32_t err_code;
 	union {
+		uint8_t			messages[0];  // used for multiresponse mode
 		dp_vip			get_vip;
 		dp_lb			get_lb;
 		dp_vf_pci		vf_pci;
@@ -296,12 +293,7 @@ typedef struct dp_reply {
 	};
 } dp_reply;
 
-int dp_send_to_worker(dp_request *req);
-int dp_recv_from_worker(dp_reply *rep);
-int dp_recv_from_worker_with_mbuf(struct rte_mbuf **m);
 void dp_process_request(struct rte_mbuf *m);
-void dp_fill_head(dp_com_head* head, uint16_t type,
-				  uint8_t is_chained, uint8_t count);
 
 #ifdef __cplusplus
 }

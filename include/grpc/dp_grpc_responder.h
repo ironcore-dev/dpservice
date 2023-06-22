@@ -25,12 +25,12 @@ struct dp_grpc_responder {
 	int rep_msgcount;
 };
 
-// returns request's com_head.com_type
-uint8_t dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_mbuf *req_mbuf);
+// returns request's type
+uint16_t dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_mbuf *req_mbuf);
 
 static inline void *dp_grpc_single_reply(struct dp_grpc_responder *responder)
 {
-	return (uint8_t *)responder->rep + sizeof(dp_com_head);  // TODO name the union instead and use offsetof??
+	return responder->rep->messages;  // this is used in place of the parent union (which is anonymous)
 }
 
 static inline void dp_grpc_set_multireply(struct dp_grpc_responder *responder, size_t msg_size)
@@ -47,7 +47,7 @@ static inline void *dp_grpc_add_reply(struct dp_grpc_responder *responder)
 	if (responder->rep_msgcount >= responder->rep_capacity)
 		if (DP_FAILED(dp_grpc_alloc_reply(responder)))
 			return NULL;
-	return (uint8_t *)responder->rep + responder->msg_size * responder->rep_msgcount++ + sizeof(dp_com_head);  // TODO offsetof?
+	return responder->rep->messages + responder->msg_size * responder->rep_msgcount++;
 }
 
 void dp_grpc_send_response(struct dp_grpc_responder *responder, int grpc_ret);

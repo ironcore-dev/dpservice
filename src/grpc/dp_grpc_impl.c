@@ -67,69 +67,6 @@ static void dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
 	dp_del_vnf_with_value(val);
 }
 
-// TODO move somewhere?
-int dp_send_to_worker(dp_request *req)
-{
-	struct rte_mbuf *m = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
-	dp_request *head = rte_pktmbuf_mtod(m, dp_request *);
-	int ret;
-
-	*head = *req;
-
-	ret = rte_ring_sp_enqueue(get_dpdk_layer()->grpc_tx_queue, m);
-	if (DP_FAILED(ret)) {
-		DPGRPC_LOG_WARNING("Cannot enqueue worker request", DP_LOG_RET(ret));
-		return ret;
-	}
-
-	return DP_OK;
-}
-// TODO dtto
-int dp_recv_from_worker(dp_reply *rep)
-{
-	struct rte_mbuf *m;
-	dp_reply *head;
-	int ret;
-
-	ret = rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void **)&m);
-	if (DP_FAILED(ret)) {
-		if (ret != -ENOENT)
-			DPGRPC_LOG_WARNING("Cannot dequeue worker response", DP_LOG_RET(ret));
-		return ret;
-	}
-
-	head = rte_pktmbuf_mtod(m, dp_reply*);
-	*rep = *head;
-	rte_pktmbuf_free(m);
-	return DP_OK;
-}
-// TODO dtto
-int dp_recv_from_worker_with_mbuf(struct rte_mbuf **mbuf)
-{
-	struct rte_mbuf *m;
-	int ret;
-
-	ret = rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void **)&m);
-	if (DP_FAILED(ret)) {
-		if (ret != -ENOENT)
-			DPGRPC_LOG_WARNING("Cannot dequeue worker response", DP_LOG_RET(ret));
-		return ret;
-	}
-
-	*mbuf = m;
-	return DP_OK;
-}
-// TODO this is only called from asnyc (i.e. client, think about moving it)
-__rte_always_inline void dp_fill_head(dp_com_head *head, uint16_t type,
-									  uint8_t is_chained, uint8_t count)
-{
-	RTE_SET_USED(count);
-	head->com_type = type;
-	head->is_chained = is_chained;
-	head->msg_count = 0;
-	head->err_code = DP_GRPC_OK;
-}
-
 static int dp_process_add_lb(struct dp_grpc_responder *responder)
 {
 	dp_add_lb *request = &responder->req.add_lb;

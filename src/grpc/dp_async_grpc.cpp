@@ -1,21 +1,22 @@
-#include <arpa/inet.h>
-#include <rte_mbuf.h>
-#include <rte_ether.h>
 #include "grpc/dp_async_grpc.h"
-#include "grpc/dp_grpc_service.h"
-#include "grpc/dp_grpc_impl.h"
-#include "dp_util.h"
-#include "dp_lpm.h"
+#include <arpa/inet.h>
+#include <rte_ether.h>
+#include <rte_mbuf.h>
 #include "dp_log.h"
+#include "dp_lpm.h"
+#include "dp_util.h"
+#include "grpc/dp_grpc_queue.h"
+#include "grpc/dp_grpc_service.h"
 
-inline void BaseCall::SetErrStatus(Status *status, uint32_t err_code) {
+inline void BaseCall::SetErrStatus(Status *status, dp_reply *reply) {
+	uint32_t err_code = reply->err_code;
 	status->set_error(err_code);
 	status->set_message(dp_grpc_strerror(err_code));
 }
 
-inline Status *BaseCall::CreateErrStatus(uint32_t err_code) {
+inline Status *BaseCall::CreateErrStatus(dp_reply *reply) {
 	Status *err_status = new Status();
-	SetErrStatus(err_status, err_code);
+	SetErrStatus(err_status, reply);
 	return err_status;
 }
 
@@ -180,14 +181,14 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 
 int IsVniInUseCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new IsVniInUseCall(service_, cq_);
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		switch (request_.type())
-		{
+		switch (request_.type()) {
 		case VniIpv4:
 			request.vni_in_use.type = DP_VNI_IPV4;
 			break;
@@ -201,12 +202,11 @@ int IsVniInUseCall::Proceed()
 		request.vni_in_use.vni = request_.vni();
 		DPGRPC_LOG_INFO("Checking VNI usage", DP_LOG_VNI(request.vni_in_use.vni),
 						DP_LOG_VNI_TYPE(request.vni_in_use.type));
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 
 		if (reply.vni_in_use.in_use)
@@ -214,7 +214,7 @@ int IsVniInUseCall::Proceed()
 		else
 			reply_.set_inuse(false);
 
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -226,14 +226,14 @@ int IsVniInUseCall::Proceed()
 
 int ResetVniCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new ResetVniCall(service_, cq_);
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		switch (request_.type())
-		{
+		switch (request_.type()) {
 		case VniIpv4:
 			request.vni_in_use.type = DP_VNI_IPV4;
 			break;
@@ -250,15 +250,14 @@ int ResetVniCall::Proceed()
 		request.vni_in_use.vni = request_.vni();
 		DPGRPC_LOG_INFO("Resetting VNI", DP_LOG_VNI(request.vni_in_use.vni),
 						DP_LOG_VNI_TYPE(request.vni_in_use.type));
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -305,23 +304,23 @@ int InitializedCall::Proceed()
 
 int InitCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new InitCall(service_, cq_);
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		DPGRPC_LOG_INFO("Initializing");
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
 		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
 		grpc_service->SetInitStatus(true);
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -333,8 +332,10 @@ int InitCall::Proceed()
 
 int CreateLBCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	uint16_t i, size;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
@@ -347,7 +348,6 @@ int CreateLBCall::Proceed()
 						DP_LOG_LBID(request_.loadbalancerid().c_str()),
 						DP_LOG_VNI(request_.vni()),
 						DP_LOG_IPV4STR(request_.lbvipip().address().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
 		request.add_lb.vni = request_.vni();
@@ -374,20 +374,19 @@ int CreateLBCall::Proceed()
 			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
 			// FIXME: what happens here?
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.get_lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -398,8 +397,10 @@ int CreateLBCall::Proceed()
 
 int DelLBCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelLBCall(service_, cq_);
@@ -407,21 +408,19 @@ int DelLBCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -433,8 +432,10 @@ int DelLBCall::Proceed()
 int GetLBCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	struct in_addr addr;
 	LBPort *lb_port;
 	LBIP *lb_ip;
@@ -446,18 +447,16 @@ int GetLBCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Getting loadbalancer info",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
 		reply_.set_vni(reply.get_lb.vni);
@@ -481,7 +480,7 @@ int GetLBCall::Proceed()
 		}
 		inet_ntop(AF_INET6, reply.get_lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -492,8 +491,10 @@ int GetLBCall::Proceed()
 
 int AddLBVIPCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -503,7 +504,6 @@ int AddLBVIPCall::Proceed()
 		DPGRPC_LOG_INFO("Adding loadbalancer target",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()),
 						DP_LOG_IPV6STR(request_.targetip().address().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
 		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
@@ -516,18 +516,17 @@ int AddLBVIPCall::Proceed()
 		} else {
 			request.add_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -538,8 +537,10 @@ int AddLBVIPCall::Proceed()
 
 int DelLBVIPCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -549,7 +550,6 @@ int DelLBVIPCall::Proceed()
 		DPGRPC_LOG_INFO("Removing loadbalancer target",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()),
 						DP_LOG_IPV6STR(request_.targetip().address().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
 		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
@@ -562,18 +562,17 @@ int DelLBVIPCall::Proceed()
 		} else {
 			request.del_lb_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -582,15 +581,24 @@ int DelLBVIPCall::Proceed()
 	return 0;
 }
 
-int GetLBVIPBackendsCall::Proceed()
+void GetLBVIPBackendsCall::ListCallback(void *reply, void *context)
 {
-	dp_request request = {0};
-	struct rte_mbuf *mbuf = NULL;
-	struct dp_reply *reply;
-	uint8_t *rp_back_ip;
+	dp_lb_backip *rep_back_ip = (dp_lb_backip *)reply;
+	GetLoadBalancerTargetsResponse *reply_ = (GetLoadBalancerTargetsResponse *)context;
 	LBIP *back_ip;
 	char buf_str[INET6_ADDRSTRLEN];
-	int i;
+
+	back_ip = reply_->add_targetips();
+	inet_ntop(AF_INET6, rep_back_ip->b_ip.addr6, buf_str, INET6_ADDRSTRLEN);
+	back_ip->set_address(buf_str);
+	back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+}
+
+int GetLBVIPBackendsCall::Proceed()
+{
+	dp_request request = {
+		.type = call_type_,
+	};
 
 	if (status_ == REQUEST) {
 		new GetLBVIPBackendsCall(service_, cq_);
@@ -598,28 +606,18 @@ int GetLBVIPBackendsCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Listing loadbalancer targets",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.qry_lb_vip.lb_id, DP_LB_ID_SIZE, "%s",
 				 request_.loadbalancerid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(dp_lb_backip), ListCallback, &reply_, call_type_)))
 			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		rp_back_ip = &reply->back_ip.b_ip.addr6[0];
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			back_ip = reply_.add_targetips();
-			inet_ntop(AF_INET6, rp_back_ip, buf_str, INET6_ADDRSTRLEN);
-			back_ip->set_address(buf_str);
-			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
-			rp_back_ip += sizeof(reply->back_ip.b_ip.addr6);
-		}
-		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -631,8 +629,10 @@ int GetLBVIPBackendsCall::Proceed()
 
 int AddPfxCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -644,7 +644,6 @@ int AddPfxCall::Proceed()
 						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
 						DP_LOG_PREFIX(request_.prefix().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -656,20 +655,19 @@ int AddPfxCall::Proceed()
 								   DP_LOG_IPV4STR(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -680,8 +678,10 @@ int AddPfxCall::Proceed()
 
 int DelPfxCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply= {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -692,7 +692,6 @@ int DelPfxCall::Proceed()
 						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
 						DP_LOG_PREFIX(request_.prefix().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -704,16 +703,16 @@ int DelPfxCall::Proceed()
 								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -723,16 +722,31 @@ int DelPfxCall::Proceed()
 	return 0;
 }
 
+void ListPfxCall::ListCallback(void *reply, void *context)
+{
+	dp_route *rp_route = (dp_route *)reply;
+	PrefixesMsg *reply_ = (PrefixesMsg *)context;
+	Prefix *pfx;
+	struct in_addr addr;
+	char buf_str[INET6_ADDRSTRLEN];
+
+	pfx = reply_->add_prefixes();
+	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		addr.s_addr = htonl(rp_route->pfx_ip.addr);
+		pfx->set_address(inet_ntoa(addr));
+		pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		pfx->set_prefixlength(rp_route->pfx_length);
+		inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
+		pfx->set_underlayroute(buf_str);
+	}
+	// TODO else? (should already be covered by the worker)
+}
+
 int ListPfxCall::Proceed()
 {
-	char buf_str[INET6_ADDRSTRLEN];
-	dp_request request = {0};
-	struct rte_mbuf *mbuf = NULL;
-	struct dp_reply *reply;
-	struct in_addr addr;
-	dp_route *rp_route;
-	Prefix *pfx;
-	int i;
+	dp_request request = {
+		.type = call_type_,
+	};
 
 	if (status_ == REQUEST) {
 		new ListPfxCall(service_, cq_);
@@ -740,32 +754,18 @@ int ListPfxCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Listing alias prefixes",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(dp_route), ListCallback, &reply_, call_type_)))
 			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			pfx = reply_.add_prefixes();
-			rp_route = &((&reply->route)[i]);
-			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-				addr.s_addr = htonl(rp_route->pfx_ip.addr);
-				pfx->set_address(inet_ntoa(addr));
-				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-				pfx->set_prefixlength(rp_route->pfx_length);
-				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
-				pfx->set_underlayroute(buf_str);
-			}
-		}
-		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -778,8 +778,10 @@ int ListPfxCall::Proceed()
 int CreateLBTargetPfxCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -790,7 +792,6 @@ int CreateLBTargetPfxCall::Proceed()
 						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
 						DP_LOG_PREFIX(request_.prefix().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -802,20 +803,19 @@ int CreateLBTargetPfxCall::Proceed()
 								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.route.trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -826,8 +826,10 @@ int CreateLBTargetPfxCall::Proceed()
 
 int DelLBTargetPfxCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply= {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -838,7 +840,6 @@ int DelLBTargetPfxCall::Proceed()
 						DP_LOG_IFACE(request_.interfaceid().interfaceid().c_str()),
 						DP_LOG_PREFIX(request_.prefix().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().interfaceid().c_str());
 		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -850,16 +851,16 @@ int DelLBTargetPfxCall::Proceed()
 								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
 		}
 		request.add_pfx.pfx_length = request_.prefix().prefixlength();
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -869,16 +870,31 @@ int DelLBTargetPfxCall::Proceed()
 	return 0;
 }
 
+void ListLBTargetPfxCall::ListCallback(void *reply, void *context)
+{
+	dp_route *rp_route = (dp_route *)reply;
+	ListInterfaceLoadBalancerPrefixesResponse *reply_ = (ListInterfaceLoadBalancerPrefixesResponse *)context;
+	LBPrefix *pfx;
+	struct in_addr addr;
+	char buf_str[INET6_ADDRSTRLEN];
+
+	pfx = reply_->add_prefixes();
+	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		addr.s_addr = htonl(rp_route->pfx_ip.addr);
+		pfx->set_address(inet_ntoa(addr));
+		pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		pfx->set_prefixlength(rp_route->pfx_length);
+		inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
+		pfx->set_underlayroute(buf_str);
+	}
+	// TODO else? (should already be covered by the worker)
+}
+
 int ListLBTargetPfxCall::Proceed()
 {
-	char buf_str[INET6_ADDRSTRLEN];
-	struct rte_mbuf *mbuf = NULL;
-	dp_request request = {0};
-	struct dp_reply *reply;
-	struct in_addr addr;
-	dp_route *rp_route;
-	LBPrefix *pfx;
-	int i;
+	dp_request request = {
+		.type = call_type_,
+	};
 
 	if (status_ == REQUEST) {
 		new ListLBTargetPfxCall(service_, cq_);
@@ -886,32 +902,18 @@ int ListLBTargetPfxCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Listing loadbalancer target prefixes",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_pfx.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(dp_route), ListCallback, &reply_, call_type_)))
 			return -1;
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			pfx = reply_.add_prefixes();
-			rp_route = &((&reply->route)[i]);
-			if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-				addr.s_addr = htonl(rp_route->pfx_ip.addr);
-				pfx->set_address(inet_ntoa(addr));
-				pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-				pfx->set_prefixlength(rp_route->pfx_length);
-				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf_str, INET6_ADDRSTRLEN);
-				pfx->set_underlayroute(buf_str);
-			}
-		}
-		rte_pktmbuf_free(mbuf);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -923,8 +925,10 @@ int ListLBTargetPfxCall::Proceed()
 
 int AddVIPCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -935,7 +939,6 @@ int AddVIPCall::Proceed()
 		DPGRPC_LOG_INFO("Setting virtual IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()),
 						DP_LOG_IPV4STR(request_.interfacevipip().address().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		if (request_.interfacevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -946,20 +949,19 @@ int AddVIPCall::Proceed()
 				DPGRPC_LOG_WARNING("Invalid virtual IP",
 								   DP_LOG_IPV4STR(request_.interfacevipip().address().c_str()));
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -970,8 +972,10 @@ int AddVIPCall::Proceed()
 
 int DelVIPCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelVIPCall(service_, cq_);
@@ -979,21 +983,19 @@ int DelVIPCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing virtual IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1005,8 +1007,10 @@ int DelVIPCall::Proceed()
 int GetVIPCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	struct in_addr addr;
 
 	if (status_ == REQUEST) {
@@ -1015,18 +1019,16 @@ int GetVIPCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Getting virtual IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		reply_.set_ipversion(dpdkonmetal::IPVersion::IPv4);
 		addr.s_addr = reply.get_vip.vip.vip_addr;
@@ -1034,7 +1036,7 @@ int GetVIPCall::Proceed()
 		inet_ntop(AF_INET6, reply.get_vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
 		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1045,8 +1047,10 @@ int GetVIPCall::Proceed()
 
 int AddInterfaceCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	VirtualFunction *vf;
 	IpAdditionResponse *ip_resp;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -1062,7 +1066,6 @@ int AddInterfaceCall::Proceed()
 						DP_LOG_IPV4STR(request_.ipv4config().primaryaddress().c_str()),
 						DP_LOG_IPV6STR(request_.ipv6config().primaryaddress().c_str()),
 						DP_LOG_PCI(request_.devicename().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.add_machine.vni = request_.vni();
 		ret_val = inet_aton(request_.ipv4config().primaryaddress().c_str(),
 				(in_addr*)&request.add_machine.ip4_addr);
@@ -1091,15 +1094,14 @@ int AddInterfaceCall::Proceed()
 							   DP_LOG_IPV6STR(request_.ipv6config().primaryaddress().c_str()));
 		snprintf(request.add_machine.machine_id, VM_MACHINE_ID_STR_LEN, "%s",
 				 request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		vf = new VirtualFunction();
 		vf->set_name(reply.vf_pci.name);
@@ -1111,7 +1113,7 @@ int AddInterfaceCall::Proceed()
 		inet_ntop(AF_INET6, reply.vf_pci.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		ip_resp = new IpAdditionResponse();
 		ip_resp->set_underlayroute(buf_str);
-		ip_resp->set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		ip_resp->set_allocated_status(CreateErrStatus(&reply));
 		reply_.set_allocated_response(ip_resp);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1124,8 +1126,10 @@ int AddInterfaceCall::Proceed()
 
 int DelInterfaceCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply= {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelInterfaceCall(service_, cq_);
@@ -1133,20 +1137,18 @@ int DelInterfaceCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing interface",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1158,8 +1160,10 @@ int DelInterfaceCall::Proceed()
 
 int GetInterfaceCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	dp_vm_info *vm_info;
 	Interface *machine;
 	struct in_addr addr;
@@ -1171,18 +1175,16 @@ int GetInterfaceCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Getting interface info",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_machine.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 
 		vm_info = &reply.vm_info;
@@ -1198,7 +1200,7 @@ int GetInterfaceCall::Proceed()
 		inet_ntop(AF_INET6, reply.vm_info.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		machine->set_underlayroute(buf_str);
 		reply_.set_allocated_interface(machine);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1210,8 +1212,10 @@ int GetInterfaceCall::Proceed()
 
 int AddRouteCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply= {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -1224,7 +1228,6 @@ int AddRouteCall::Proceed()
 						DP_LOG_PREFLEN(request_.route().prefix().prefixlength()),
 						DP_LOG_TVNI(request_.route().nexthopvni()),
 						DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
 		request.route.trgt_vni = request_.route().nexthopvni();
@@ -1249,17 +1252,16 @@ int AddRouteCall::Proceed()
 				DPGRPC_LOG_WARNING("Invalid prefix IP",
 								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1271,8 +1273,10 @@ int AddRouteCall::Proceed()
 
 int DelRouteCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -1285,7 +1289,6 @@ int DelRouteCall::Proceed()
 						DP_LOG_PREFLEN(request_.route().prefix().prefixlength()),
 						DP_LOG_TVNI(request_.route().nexthopvni()), // TODO re-check for target vni everywhere
 						DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni().vni();
 		request.route.trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
 		request.route.trgt_vni = request_.route().nexthopvni();
@@ -1312,16 +1315,16 @@ int DelRouteCall::Proceed()
 				DPGRPC_LOG_WARNING("Invalid prefix IP",
 								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1331,18 +1334,39 @@ int DelRouteCall::Proceed()
 	return 0;
 }
 
+void ListRoutesCall::ListCallback(void *reply, void *context)
+{
+	dp_route *rp_route = (dp_route *)reply;
+	RoutesMsg *reply_ = (RoutesMsg *)context;
+	Route *route;
+	struct in_addr addr;
+	Prefix *pfx;
+	char buf[INET6_ADDRSTRLEN];
+
+	route = reply_->add_routes();
+	if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
+		route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+	else
+		route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+
+	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+		addr.s_addr = htonl(rp_route->pfx_ip.addr);
+		pfx = new Prefix();
+		pfx->set_address(inet_ntoa(addr));
+		pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		pfx->set_prefixlength(rp_route->pfx_length);
+		route->set_allocated_prefix(pfx);
+	}
+	route->set_nexthopvni(rp_route->trgt_vni);
+	inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
+	route->set_nexthopaddress(buf);
+}
+
 int ListRoutesCall::Proceed()
 {
-	dp_request request = {0};
-	struct rte_mbuf *mbuf = NULL;
-	struct dp_reply *reply;
-	struct in_addr addr;
-	dp_route *rp_route;
-	Prefix *pfx;
-	Route *route;
-	int i;
-	uint8_t is_chained = 0;
-	char buf[INET6_ADDRSTRLEN];
+	dp_request request = {
+		.type = call_type_,
+	};
 
 	if (status_ == REQUEST) {
 		new ListRoutesCall(service_, cq_);
@@ -1350,43 +1374,17 @@ int ListRoutesCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Listing routes",
 						DP_LOG_VNI(request_.vni()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.route.vni = request_.vni();
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		do {
-			if (dp_recv_from_worker_with_mbuf(&mbuf))
-				return -1;
-			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-			for (i = 0; i < reply->com_head.msg_count; i++) {
-				route = reply_.add_routes();
-				rp_route = &((&reply->route)[i]);
-
-				if (rp_route->trgt_hop_ip_type == RTE_ETHER_TYPE_IPV6)
-					route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
-				else
-					route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-
-				if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-					addr.s_addr = htonl(rp_route->pfx_ip.addr);
-					pfx = new Prefix();
-					pfx->set_address(inet_ntoa(addr));
-					pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-					pfx->set_prefixlength(rp_route->pfx_length);
-					route->set_allocated_prefix(pfx);
-				}
-				route->set_nexthopvni(rp_route->trgt_vni);
-				inet_ntop(AF_INET6, rp_route->trgt_ip.addr6, buf, INET6_ADDRSTRLEN);
-				route->set_nexthopaddress(buf);
-			}
-			is_chained = reply->com_head.is_chained;
-			rte_pktmbuf_free(mbuf);
-		} while (is_chained);
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(dp_route), ListCallback, &reply_, call_type_)))
+			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1398,8 +1396,10 @@ int ListRoutesCall::Proceed()
 
 int AddNATVIPCall::Proceed()
 {
-	dp_request request = {0};
-	struct dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	grpc::Status ret = grpc::Status::OK;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -1414,7 +1414,6 @@ int AddNATVIPCall::Proceed()
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()),
 						DP_LOG_MINPORT(request_.minport()),
 						DP_LOG_MAXPORT(request_.maxport()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.add_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -1430,20 +1429,19 @@ int AddNATVIPCall::Proceed()
 		request.add_nat_vip.port_range[0] = request_.minport();
 		request.add_nat_vip.port_range[1] = request_.maxport();
 
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
 		inet_ntop(AF_INET6, reply.ul_addr6, buf_str, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1454,8 +1452,10 @@ int AddNATVIPCall::Proceed()
 
 int GetNATVIPCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	struct in_addr addr;
 	NATIP *nat_ip;
 	char buf[INET6_ADDRSTRLEN];
@@ -1466,18 +1466,16 @@ int GetNATVIPCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Getting NAT IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.get_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		nat_ip = new NATIP();
 		addr.s_addr = reply.nat_entry.m_ip.addr;
@@ -1489,7 +1487,7 @@ int GetNATVIPCall::Proceed()
 		inet_ntop(AF_INET6, reply.nat_entry.underlay_route, buf, INET6_ADDRSTRLEN);
 		reply_.set_underlayroute(buf);
 		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1500,8 +1498,10 @@ int GetNATVIPCall::Proceed()
 
 int DeleteNATVIPCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
@@ -1510,10 +1510,9 @@ int DeleteNATVIPCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing NAT IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.del_nat_vip.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -1521,11 +1520,10 @@ int DeleteNATVIPCall::Proceed()
 		status_ = FINISH;
 	}
 	else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1536,8 +1534,10 @@ int DeleteNATVIPCall::Proceed()
 
 int AddNeighborNATCall::Proceed()
 {
-	dp_request request = {0};
-	struct dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	int ret_val;
 	grpc::Status ret = grpc::Status::OK;
 
@@ -1551,7 +1551,6 @@ int AddNeighborNATCall::Proceed()
 						DP_LOG_MINPORT(request_.minport()),
 						DP_LOG_MAXPORT(request_.maxport()),
 						DP_LOG_IPV6STR(request_.underlayroute().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.add_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
 			request.add_nat_neigh.ip_type = RTE_ETHER_TYPE_IPV4;
@@ -1572,18 +1571,17 @@ int AddNeighborNATCall::Proceed()
 		if (ret_val <= 0)
 			DPGRPC_LOG_WARNING("Invalid underlay IP",
 							   DP_LOG_IPV6STR(request_.underlayroute().c_str()));
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1595,8 +1593,10 @@ int AddNeighborNATCall::Proceed()
 
 int DeleteNeighborNATCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	grpc::Status ret = grpc::Status::OK;
 	int ret_val;
 
@@ -1609,7 +1609,6 @@ int DeleteNeighborNATCall::Proceed()
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()),
 						DP_LOG_MINPORT(request_.minport()),
 						DP_LOG_MAXPORT(request_.maxport()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		request.del_nat_neigh.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
 
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
@@ -1626,18 +1625,17 @@ int DeleteNeighborNATCall::Proceed()
 		request.del_nat_neigh.port_range[0] = request_.minport();
 		request.del_nat_neigh.port_range[1] = request_.maxport();
 
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1646,51 +1644,47 @@ int DeleteNeighborNATCall::Proceed()
 	return 0;
 }
 
-int ListInterfacesCall::Proceed()
+void ListInterfacesCall::ListCallback(void *reply, void *context)
 {
-	dp_request request = {0};
-	struct rte_mbuf *mbuf = NULL;
-	struct dp_reply *reply;
+	dp_vm_info *vm_info = (dp_vm_info *)reply;
+	InterfacesMsg *reply_ = (InterfacesMsg *)context;
 	Interface *machine;
 	struct in_addr addr;
-	dp_vm_info *vm_info;
-	uint8_t is_chained = 0;
-	int i;
 	char buf_str[INET6_ADDRSTRLEN];
+
+	machine = reply_->add_interfaces();
+	addr.s_addr = htonl(vm_info->ip_addr);
+	machine->set_primaryipv4address(inet_ntoa(addr));
+	inet_ntop(AF_INET6, vm_info->ip6_addr, buf_str, INET6_ADDRSTRLEN);
+	machine->set_primaryipv6address(buf_str);
+	machine->set_interfaceid((char *)vm_info->machine_id);
+	machine->set_vni(vm_info->vni);
+	machine->set_pcidpname(vm_info->pci_name);
+	inet_ntop(AF_INET6, vm_info->ul_addr6, buf_str, INET6_ADDRSTRLEN);
+	machine->set_underlayroute(buf_str);
+}
+
+int ListInterfacesCall::Proceed()
+{
+	dp_request request = {
+		.type = call_type_,
+	};
 
 	if (status_ == REQUEST) {
 		new ListInterfacesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Listing interfaces");
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		do {
-			if (dp_recv_from_worker_with_mbuf(&mbuf))
-				return -1;
-			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-			for (i = 0; i < reply->com_head.msg_count; i++) {
-				machine = reply_.add_interfaces();
-				vm_info = &((&reply->vm_info)[i]);
-				addr.s_addr = htonl(vm_info->ip_addr);
-				machine->set_primaryipv4address(inet_ntoa(addr));
-				inet_ntop(AF_INET6, vm_info->ip6_addr, buf_str, INET6_ADDRSTRLEN);
-				machine->set_primaryipv6address(buf_str);
-				machine->set_interfaceid((char *)vm_info->machine_id);
-				machine->set_vni(vm_info->vni);
-				machine->set_pcidpname(vm_info->pci_name);
-				inet_ntop(AF_INET6, vm_info->ul_addr6, buf_str, INET6_ADDRSTRLEN);
-				machine->set_underlayroute(buf_str);
-			}
-			is_chained = reply->com_head.is_chained;
-			rte_pktmbuf_free(mbuf);
-		} while (is_chained);
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(dp_vm_info), ListCallback, &reply_, call_type_)))
+			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1700,19 +1694,42 @@ int ListInterfacesCall::Proceed()
 	return 0;
 }
 
+void GetNATInfoCall::ListCallbackLocal(void *reply, void *context)
+{
+	dp_nat_entry *nat_entry = (dp_nat_entry *)reply;
+	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
+	NATInfoEntry *rep_nat_entry;
+	struct in_addr addr;
+
+	rep_nat_entry = reply_->add_natinfoentries();
+	addr.s_addr = htonl(nat_entry->m_ip.addr);
+	rep_nat_entry->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	rep_nat_entry->set_address(inet_ntoa(addr));
+	rep_nat_entry->set_minport(nat_entry->min_port);
+	rep_nat_entry->set_maxport(nat_entry->max_port);
+}
+
+void GetNATInfoCall::ListCallbackNeigh(void *reply, void *context)
+{
+	dp_nat_entry *nat_entry = (dp_nat_entry *)reply;
+	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
+	NATInfoEntry *rep_nat_entry;
+	char buf[INET6_ADDRSTRLEN];
+
+	rep_nat_entry = reply_->add_natinfoentries();
+	inet_ntop(AF_INET6, nat_entry->underlay_route, buf, INET6_ADDRSTRLEN);
+	rep_nat_entry->set_underlayroute(buf);
+	rep_nat_entry->set_minport(nat_entry->min_port);
+	rep_nat_entry->set_maxport(nat_entry->max_port);
+}
+
 int GetNATInfoCall::Proceed()
 {
-	dp_request request = {0};
-	grpc::Status ret = grpc::Status::OK;
-	struct rte_mbuf *mbuf = NULL;
-	struct dp_reply *reply;
-	uint8_t is_chained = 0;
-	int i;
-	NATInfoEntry *rep_nat_entry;
-	dp_nat_entry *dp_nat_item;
-	struct in_addr addr;
+	dp_request request = {
+		.type = call_type_,
+	};
 	NATIP *nat_ip;
-	char buf[INET6_ADDRSTRLEN];
+	dp_recv_array_callback list_callback;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -1721,8 +1738,7 @@ int GetNATInfoCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Getting NAT info",
 						DP_LOG_NATINFOTYPE(request_.natinfotype()),
-						DP_LOG_IPV4STR(request_.natvipip().address().c_str())),
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
+						DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 
 		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
 			request.get_nat_entry.type = DP_NETNAT_INFO_TYPE_LOCAL;
@@ -1738,7 +1754,7 @@ int GetNATInfoCall::Proceed()
 				DPGRPC_LOG_WARNING("Invalid NAT IP",
 								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 		}
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
@@ -1753,28 +1769,14 @@ int GetNATInfoCall::Proceed()
 			reply_.set_allocated_natvipip(nat_ip);
 		}
 		reply_.set_natinfotype(request_.natinfotype());
-		do {
-			if (dp_recv_from_worker_with_mbuf(&mbuf))
-				return -1;
-			reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-			for (i = 0; i < reply->com_head.msg_count; i++) {
-				rep_nat_entry = reply_.add_natinfoentries();
-				dp_nat_item = &((&reply->nat_entry)[i]);
-				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
-					addr.s_addr = htonl(dp_nat_item->m_ip.addr);
-					rep_nat_entry->set_ipversion(dpdkonmetal::IPVersion::IPv4);
-					rep_nat_entry->set_address(inet_ntoa(addr));
-				}
-				if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
-					inet_ntop(AF_INET6, dp_nat_item->underlay_route, buf, INET6_ADDRSTRLEN);
-					rep_nat_entry->set_underlayroute(buf);
-				}
-				rep_nat_entry->set_minport(dp_nat_item->min_port);
-				rep_nat_entry->set_maxport(dp_nat_item->max_port);
-			}
-			is_chained = reply->com_head.is_chained;
-			rte_pktmbuf_free(mbuf);
-		} while (is_chained);
+		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
+			list_callback = ListCallbackLocal;
+		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
+			list_callback = ListCallbackNeigh;
+		// TODO else invalid type (but that is already covered by the worker...)
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(dp_nat_entry), list_callback, &reply_, call_type_)))
+			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1786,8 +1788,10 @@ int GetNATInfoCall::Proceed()
 
 int AddFirewallRuleCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	const FirewallRule *grpc_rule;
 
 	if (status_ == REQUEST) {
@@ -1805,22 +1809,20 @@ int AddFirewallRuleCall::Proceed()
 						DP_LOG_FWSRCLEN(grpc_rule->sourceprefix().prefixlength()),
 						DP_LOG_FWDST(grpc_rule->destinationprefix().address().c_str()),
 						DP_LOG_FWDSTLEN(grpc_rule->destinationprefix().prefixlength()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		ConvertGRPCFwallRuleToDPFWallRule(grpc_rule, &request.fw_rule.rule);
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		reply_.set_ruleid(&reply.fwall_rule.rule_id, sizeof(reply.fwall_rule.rule_id));
 		responder_.Finish(reply_, ret, this);
 	} else {
@@ -1832,8 +1834,10 @@ int AddFirewallRuleCall::Proceed()
 
 int DelFirewallRuleCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelFirewallRuleCall(service_, cq_);
@@ -1842,23 +1846,21 @@ int DelFirewallRuleCall::Proceed()
 		DPGRPC_LOG_INFO("Removing firewall rule",
 						DP_LOG_IFACE(request_.interfaceid().c_str()),
 						DP_LOG_FWRULE(request_.ruleid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		snprintf(request.fw_rule.rule.rule_id, DP_FIREWALL_ID_STR_LEN,
 				 "%s", request_.ruleid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		status_ = FINISH;
-		SetErrStatus(&reply_, reply.com_head.err_code);
+		SetErrStatus(&reply_, &reply);
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1869,8 +1871,10 @@ int DelFirewallRuleCall::Proceed()
 
 int GetFirewallRuleCall::Proceed()
 {
-	dp_request request = {0};
-	dp_reply reply = {0};
+	dp_request request = {
+		.type = call_type_,
+	};
+	dp_reply reply;
 	FirewallRule *rule;
 
 	if (status_ == REQUEST) {
@@ -1880,20 +1884,18 @@ int GetFirewallRuleCall::Proceed()
 		DPGRPC_LOG_INFO("Getting firewall rule info",
 						DP_LOG_IFACE(request_.interfaceid().c_str()),
 						DP_LOG_FWRULE(request_.ruleid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
 		snprintf(request.fw_rule.rule.rule_id, DP_FIREWALL_ID_STR_LEN,
 				 "%s", request_.ruleid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		dp_fill_head(&reply.com_head, call_type_, 0, 1);
-		if (dp_recv_from_worker(&reply))
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 
 		rule = new FirewallRule();
@@ -1901,7 +1903,7 @@ int GetFirewallRuleCall::Proceed()
 		reply_.set_allocated_rule(rule);
 
 		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(reply.com_head.err_code));
+		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1910,14 +1912,21 @@ int GetFirewallRuleCall::Proceed()
 	return 0;
 }
 
+void ListFirewallRulesCall::ListCallback(void *reply, void *context)
+{
+	struct dp_fwall_rule *dp_rule = (struct dp_fwall_rule *)reply;
+	ListFirewallRulesResponse *reply_ = (ListFirewallRulesResponse *)context;
+	FirewallRule *rule;
+
+	rule = reply_->add_rules();
+	ConvertDPFWallRuleToGRPCFwallRule(dp_rule, rule);
+}
+
 int ListFirewallRulesCall::Proceed()
 {
-	struct dp_fwall_rule *dp_rule;
-	struct rte_mbuf *mbuf = NULL;
-	dp_request request = {0};
-	FirewallRule *rule;
-	dp_reply *reply;
-	int i;
+	dp_request request = {
+		.type = call_type_,
+	};
 
 	if (status_ == REQUEST) {
 		new ListFirewallRulesCall(service_, cq_);
@@ -1925,27 +1934,18 @@ int ListFirewallRulesCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Listing firewall rules",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
-		dp_fill_head(&request.com_head, call_type_, 0, 1);
 		snprintf(request.fw_rule.machine_id, VM_MACHINE_ID_STR_LEN,
 				 "%s", request_.interfaceid().c_str());
-		dp_send_to_worker(&request);
+		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (dp_recv_from_worker_with_mbuf(&mbuf))
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_fwall_rule), ListCallback, &reply_, call_type_)))
 			return -1;
-
-		reply = rte_pktmbuf_mtod(mbuf, dp_reply*);
-		for (i = 0; i < reply->com_head.msg_count; i++) {
-			rule = reply_.add_rules();
-			dp_rule = &((&reply->fwall_rule)[i]);
-			ConvertDPFWallRuleToGRPCFwallRule(dp_rule, rule);
-		}
-		rte_pktmbuf_free(mbuf);
-
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
 	} else {

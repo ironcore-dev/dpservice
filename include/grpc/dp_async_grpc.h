@@ -34,15 +34,15 @@ protected:
 	ServerCompletionQueue* cq_;
 	CallStatus status_;
 	uint16_t call_type_;
-	void SetErrStatus(Status *status, uint32_t err_code);
-	Status *CreateErrStatus(uint32_t err_code);
+	void SetErrStatus(Status *status, dp_reply *reply);
+	Status *CreateErrStatus(dp_reply *reply);
 public:
 	BaseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq, uint16_t call_type)
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
 		}
 	int InitCheck();
-	void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
-	void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule);
+	static void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
+	static void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule);
 	virtual int Proceed() = 0;
 	virtual ~BaseCall() = default;
 };
@@ -112,7 +112,8 @@ class ListLBTargetPfxCall final : BaseCall {
 	ListInterfaceLoadBalancerPrefixesRequest request_;
 	ListInterfaceLoadBalancerPrefixesResponse reply_;
 	ServerAsyncResponseWriter<ListInterfaceLoadBalancerPrefixesResponse> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBPREFIX), responder_(&ctx_) {
@@ -157,7 +158,8 @@ class ListPfxCall final : BaseCall {
 	InterfaceIDMsg request_;
 	PrefixesMsg reply_;
 	ServerAsyncResponseWriter<PrefixesMsg> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTPREFIX), responder_(&ctx_) {
@@ -262,7 +264,8 @@ class GetLBVIPBackendsCall final : BaseCall {
 	GetLoadBalancerTargetsRequest request_;
 	GetLoadBalancerTargetsResponse reply_;
 	ServerAsyncResponseWriter<GetLoadBalancerTargetsResponse> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	GetLBVIPBackendsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBBACKENDS), responder_(&ctx_) {
@@ -382,7 +385,8 @@ class ListRoutesCall final : BaseCall {
 	VNIMsg request_;
 	RoutesMsg reply_;
 	ServerAsyncResponseWriter<RoutesMsg> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListRoutesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTROUTE), responder_(&ctx_) {
@@ -397,7 +401,8 @@ class ListInterfacesCall final : BaseCall {
 	Empty request_;
 	InterfacesMsg reply_;
 	ServerAsyncResponseWriter<InterfacesMsg> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListInterfacesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LISTMACHINE), responder_(&ctx_) {
@@ -427,7 +432,9 @@ class GetNATInfoCall final: BaseCall {
 	GetNATInfoRequest request_;
 	GetNATInfoResponse reply_;
 	ServerAsyncResponseWriter<GetNATInfoResponse> responder_;
-
+private:
+	static void ListCallbackLocal(void *reply, void *context);
+	static void ListCallbackNeigh(void *reply, void *context);
 public:
 	GetNATInfoCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_GET_NATENTRY), responder_(&ctx_) {
@@ -577,7 +584,8 @@ class ListFirewallRulesCall final : BaseCall {
 	ListFirewallRulesRequest request_;
 	ListFirewallRulesResponse reply_;
 	ServerAsyncResponseWriter<ListFirewallRulesResponse> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListFirewallRulesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	:BaseCall(service, cq, DP_REQ_TYPE_LIST_FWALL_RULES), responder_(&ctx_) {
