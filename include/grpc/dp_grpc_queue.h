@@ -2,17 +2,16 @@
 #define __DP_GRPC_QUEUE_H__
 
 #include <stdint.h>
-#include <rte_mbuf.h>
 #include "dp_error.h"
-#include "dp_grpc_impl.h"
+#include "dp_grpc_api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int dp_send_to_worker(dp_request *req);
+int dp_send_to_worker(struct dp_request *req);
 
-int dp_recv_from_worker(dp_reply *rep, uint16_t request_type);
+int dp_recv_from_worker(struct dp_reply *rep, uint16_t request_type);
 
 typedef void (*dp_recv_array_callback)(void *reply, void *context);
 

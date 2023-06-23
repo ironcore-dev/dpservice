@@ -86,7 +86,7 @@ void dp_nat_free();
 
 int dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_ipv6);
+int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
 
 int dp_del_dnat_ip(uint32_t d_ip, uint32_t vni);
 struct dnat_data *dp_get_dnat_data(uint32_t d_ip, uint32_t vni);
@@ -97,19 +97,19 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
-								uint8_t *underlay_ipv6);
+								uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 											   uint32_t vni, uint16_t min_port, uint16_t max_port);
 
 uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
-							  uint8_t *ul_ipv6);
+							  uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
 int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni);
 const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);

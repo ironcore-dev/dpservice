@@ -16,11 +16,11 @@ extern "C" {
 
 #include "dp_conf.h"
 
-#define VM_MACHINE_ID_STR_LEN	64
-#define DP_FIREWALL_ID_STR_LEN	64
-#define VM_MACHINE_PXE_STR_LEN	32
-#define DP_LB_ID_SIZE			64
-#define DP_LB_PORT_SIZE			16
+#define VM_IFACE_ID_MAX_LEN		64
+#define DP_FIREWALL_ID_MAX_LEN	64
+#define VM_MACHINE_PXE_MAX_LEN	32
+#define DP_LB_ID_MAX_LEN		64
+#define DP_LB_MAX_PORTS			16
 
 #define DP_MAC_EQUAL(mac1, mac2) (((mac1)->addr_bytes[0] == (mac2)->addr_bytes[0]) && \
 								((mac1)->addr_bytes[1] == (mac2)->addr_bytes[1]) && \

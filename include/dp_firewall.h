@@ -37,7 +37,7 @@ struct dp_port_filter {
 
 /* This needs to be a typedef because of the TAILQ macros used on it */
 struct dp_fwall_rule {
-	char		rule_id[DP_FIREWALL_ID_STR_LEN];
+	char		rule_id[DP_FIREWALL_ID_MAX_LEN];
 	uint32_t	src_ip;
 	uint32_t	src_ip_mask;
 	uint32_t	dest_ip;

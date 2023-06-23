@@ -16,7 +16,7 @@ static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0,
 
 int dp_lpm_init(int socket_id)
 {
-	vm_handle_tbl = dp_create_jhash_table(DP_MAX_PORTS, VM_MACHINE_ID_STR_LEN,
+	vm_handle_tbl = dp_create_jhash_table(DP_MAX_PORTS, VM_IFACE_ID_MAX_LEN,
 										  "vm_handle_table", socket_id);
 	if (!vm_handle_tbl)
 		return DP_ERROR;
@@ -300,7 +300,7 @@ static __rte_always_inline bool dp_route_in_dhcp_range(struct rte_rib_node *node
 static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool ext_routes,
 							   struct dp_grpc_responder *responder)
 {
-	dp_route *reply;
+	struct dp_route *reply;
 	uint64_t next_hop;
 	struct vm_route *vm_route;
 	uint32_t ipv4;
@@ -319,14 +319,14 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool 
 		rte_rib_get_ip(node, &ipv4);
 		rte_rib_get_depth(node, &depth);
 		reply->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		reply->pfx_ip.addr = ipv4;
+		reply->pfx_addr = ipv4;
 		reply->pfx_length = depth;
 
 		if (ext_routes) {
 			vm_route = (struct vm_route *)rte_rib_get_ext(node);
-			reply->trgt_hop_ip_type = RTE_ETHER_TYPE_IPV6;
+			reply->trgt_ip_type = RTE_ETHER_TYPE_IPV6;
 			reply->trgt_vni = vm_route->vni;
-			rte_memcpy(reply->trgt_ip.addr6, vm_route->nh_ipv6, sizeof(reply->trgt_ip.addr6));
+			rte_memcpy(reply->trgt_addr6, vm_route->nh_ipv6, sizeof(reply->trgt_addr6));
 		}
 
 	}
@@ -346,7 +346,7 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 	if (!root)
 		return DP_OK;
 
-	dp_grpc_set_multireply(responder, sizeof(dp_route));
+	dp_grpc_set_multireply(responder, sizeof(struct dp_route));
 
 	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
 	if (node)

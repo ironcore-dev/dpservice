@@ -1,7 +1,7 @@
 #include "grpc/dp_grpc_queue.h"
 #include "dp_log.h"
 
-int dp_send_to_worker(dp_request *req)
+int dp_send_to_worker(struct dp_request *req)
 {
 	struct rte_mbuf *m;
 	int ret;
@@ -12,8 +12,8 @@ int dp_send_to_worker(dp_request *req)
 		return DP_ERROR;
 	}
 
-	assert(m->buf_len - m->data_off >= sizeof(dp_request));
-	*rte_pktmbuf_mtod(m, dp_request *) = *req;
+	assert(m->buf_len - m->data_off >= sizeof(struct dp_request));
+	*rte_pktmbuf_mtod(m, struct dp_request *) = *req;
 
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->grpc_tx_queue, m);
 	if (DP_FAILED(ret))
@@ -22,7 +22,7 @@ int dp_send_to_worker(dp_request *req)
 	return ret;
 }
 
-int dp_recv_from_worker(dp_reply *reply, uint16_t request_type)
+int dp_recv_from_worker(struct dp_reply *reply, uint16_t request_type)
 {
 	struct rte_mbuf *m;
 	int ret;
@@ -34,8 +34,8 @@ int dp_recv_from_worker(dp_reply *reply, uint16_t request_type)
 		return ret;
 	}
 
-	assert(m->buf_len - m->data_off >= sizeof(dp_reply));
-	*reply = *rte_pktmbuf_mtod(m, dp_reply *);
+	assert(m->buf_len - m->data_off >= sizeof(struct dp_reply));
+	*reply = *rte_pktmbuf_mtod(m, struct dp_reply *);
 
 	if (reply->type != request_type) {
 		DPGRPC_LOG_WARNING("Invalid response received", DP_LOG_GRPCREQUEST(request_type));
@@ -52,7 +52,7 @@ int dp_recv_from_worker(dp_reply *reply, uint16_t request_type)
 int dp_recv_array_from_worker(size_t item_size, dp_recv_array_callback callback, void *context, uint16_t request_type)
 {
 	struct rte_mbuf *m;
-	dp_reply *reply;
+	struct dp_reply *reply;
 	uint8_t is_chained;
 	int ret;
 
@@ -63,7 +63,7 @@ int dp_recv_array_from_worker(size_t item_size, dp_recv_array_callback callback,
 				DPGRPC_LOG_WARNING("Cannot dequeue worker response", DP_LOG_RET(ret));
 			return ret;
 		}
-		reply = rte_pktmbuf_mtod(m, dp_reply *);
+		reply = rte_pktmbuf_mtod(m, struct dp_reply *);
 		if (reply->type != request_type) {
 			DPGRPC_LOG_WARNING("Invalid response received", DP_LOG_GRPCREQUEST(request_type));
 			return DP_ERROR;

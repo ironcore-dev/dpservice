@@ -31,7 +31,7 @@ int dp_delete_firewall_rule(char *rule_id, int port_id)
 
 	for (rule = TAILQ_FIRST(fwall_head); rule != NULL; rule = next_rule) {
 		next_rule = TAILQ_NEXT(rule, next_rule);
-		if (memcmp(rule->rule_id, rule_id, DP_FIREWALL_ID_STR_LEN) == 0) {
+		if (memcmp(rule->rule_id, rule_id, sizeof(rule->rule_id)) == 0) {
 			TAILQ_REMOVE(fwall_head, rule, next_rule);
 			rte_free(rule);
 			return DP_OK;
@@ -46,7 +46,7 @@ struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
 	struct dp_fwall_rule *rule;
 
 	TAILQ_FOREACH(rule, dp_get_fwall_head(port_id), next_rule)
-		if (memcmp(rule->rule_id, rule_id, DP_FIREWALL_ID_STR_LEN) == 0)
+		if (memcmp(rule->rule_id, rule_id, sizeof(rule->rule_id)) == 0)
 			return rule;
 
 	return NULL;

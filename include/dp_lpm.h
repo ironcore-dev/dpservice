@@ -49,14 +49,14 @@ struct macip_entry {
 	uint8_t		dhcp_ipv6[16];
 	uint8_t		vm_ipv6[16];
 	uint32_t	pxe_ip;
-	uint8_t		pxe_str[VM_MACHINE_PXE_STR_LEN];
+	uint8_t		pxe_str[VM_MACHINE_PXE_MAX_LEN];
 };
 
 struct vm_entry {
 	struct dp_fwall_head	fwall_head;
 	struct macip_entry		info;
 	uint32_t				vni;
-	uint8_t					machineid[VM_MACHINE_ID_STR_LEN];
+	uint8_t					machineid[VM_IFACE_ID_MAX_LEN];
 	uint8_t					ul_ipv6[16];
 	uint8_t					vm_ready;
 };

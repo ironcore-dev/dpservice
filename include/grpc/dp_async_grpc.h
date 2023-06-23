@@ -10,7 +10,7 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include "dp_error.h"
-#include "dp_grpc_impl.h"
+#include "dp_grpc_api.h"
 #include "dp_firewall.h"
 
 using grpc::Server;
@@ -41,8 +41,8 @@ public:
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
 		}
 	int InitCheck();
-	static void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
-	static void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule);
+	static void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule * grpc_rule);
+	static void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule * grpc_rule, struct dp_fwall_rule *dp_rule);
 	virtual int Proceed() = 0;
 	virtual ~BaseCall() = default;
 };

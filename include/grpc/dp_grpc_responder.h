@@ -4,21 +4,20 @@
 #include <stdint.h>
 #include <rte_mbuf.h>
 #include "dp_error.h"
-// TODO(plague): move dp_request and dp_reply definitions here instead
-#include "dp_grpc_impl.h"
+#include "dp_grpc_api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct dp_grpc_responder {
-	dp_request req;
-	// reply consists of an array of 'packets'
+	struct dp_request request;
+	// reply consists of an array of 'packets' (called replies)
 	struct rte_mbuf *replies[DP_GRPC_REPLY_ARR_SIZE];
 	int repcount;
 	struct rte_mempool *mempool;
-	// each of which can be divided into 'messages' (the actual replies)
-	dp_reply *rep;
+	// each of which can optinally be divided into 'messages'
+	struct dp_reply *rep;
 	size_t rep_max_size;
 	size_t msg_size;
 	int rep_capacity;
