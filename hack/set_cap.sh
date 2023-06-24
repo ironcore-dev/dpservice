@@ -20,4 +20,4 @@ if [ ! -f "$1" ]; then
 	exit 1
 fi
 
-cp $1 $2 && sudo setcap cap_sys_rawio,cap_net_raw,cap_net_admin,cap_sys_admin,cap_dac_override=eip $2
+cp "$1" "$2.tmp" && sudo setcap cap_sys_rawio,cap_net_raw,cap_net_admin,cap_sys_admin,cap_dac_override=eip "$2.tmp" && mv "$2.tmp" "$2"

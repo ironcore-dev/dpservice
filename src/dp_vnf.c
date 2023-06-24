@@ -95,7 +95,15 @@ int dp_del_vnf_with_vnf_key(void *key)
 	return DP_OK;
 }
 
-int dp_del_vnf_with_value(struct dp_vnf_value *val)
+static __rte_always_inline bool dp_vnf_equal(struct dp_vnf_value *val1, struct dp_vnf_value *val2)
+{
+	return val1->portid == val2->portid
+		&& val1->alias_pfx.ip == val2->alias_pfx.ip
+		&& val1->alias_pfx.length == val2->alias_pfx.length
+		&& val1->v_type == val2->v_type;
+}
+
+int dp_find_vnf_with_value(struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
@@ -103,25 +111,37 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 	void *key;
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot iterate VNF table %s", dp_strerror(ret));
-			return ret;
-		}
+		if (DP_FAILED(ret))
+			return DP_GRPC_ERR_ITERATOR;
 
-		if ((val->portid == temp_val->portid)
-			&& (val->alias_pfx.ip == temp_val->alias_pfx.ip)
-			&& (val->alias_pfx.length == temp_val->alias_pfx.length)
-			&& (val->v_type == temp_val->v_type)
-		) {
+		if (dp_vnf_equal(val, temp_val))
+			return DP_GRPC_OK;
+	}
+	return DP_GRPC_ERR_NOT_FOUND;
+}
+
+int dp_del_vnf_with_value(struct dp_vnf_value *val)
+{
+	struct dp_vnf_value *temp_val = NULL;
+	uint32_t iter = 0;
+	int32_t ret;
+	void *key;
+	int delete_count = 0;
+
+	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret))
+			return DP_GRPC_ERR_ITERATOR;
+
+		if (dp_vnf_equal(val, temp_val)) {
+			delete_count++;
 			rte_free(temp_val);
+			// should only ever fail on no-entry or invalid-arguments, but both are covered by rte_hash_iterate()
 			ret = rte_hash_del_key(vnf_handle_tbl, key);
-			if (DP_FAILED(ret)) {
+			if (DP_FAILED(ret))
 				DPS_LOG_ERR("Cannot delete VNF key %s", dp_strerror(ret));
-				return DP_ERROR;
-			}
 		}
 	}
-	return DP_OK;
+	return delete_count > 0 ? DP_GRPC_OK : DP_GRPC_ERR_NOT_FOUND;
 }
 
 int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder)

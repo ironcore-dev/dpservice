@@ -59,6 +59,7 @@ const char *dp_strerror(int error);
 	ERR(VNF_INSERT,							401) \
 	ERR(VM_HANDLE,							402) \
 	ERR(NO_BACKIP,							421) \
+	ERR(NO_LB,								422) \
 	ERR(NO_DROP_SUPPORT,					441) \
 
 #define _DP_GRPC_ERROR_ENUM(NAME, NUMBER) \

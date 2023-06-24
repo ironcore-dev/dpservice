@@ -41,6 +41,7 @@ struct dp_vnf_value *dp_get_vnf_value_with_key(void *key);
 int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);
 int dp_del_vnf_with_vnf_key(void *key);
 int dp_del_vnf_with_value(struct dp_vnf_value *val);
+int dp_find_vnf_with_value(struct dp_vnf_value *val);
 int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder);
 
 #ifdef __cplusplus

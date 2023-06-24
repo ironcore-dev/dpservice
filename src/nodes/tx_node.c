@@ -117,11 +117,11 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	}
 
 	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);
-	dp_graphtrace_burst_tx(node, objs, sent_count, port);
+	dp_graphtrace_tx_burst(node, objs, sent_count, port);
 
 	if (unlikely(sent_count != nb_objs)) {
 		DPNODE_LOG_WARNING(node, "Not all packets transmitted successfully (%d/%d)", sent_count, nb_objs);
-		dp_graphtrace_burst_next(node, objs + sent_count, nb_objs - sent_count, TX_NEXT_DROP);
+		dp_graphtrace_next_burst(node, objs + sent_count, nb_objs - sent_count, TX_NEXT_DROP);
 		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, nb_objs - sent_count);
 	}
 

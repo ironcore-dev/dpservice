@@ -62,6 +62,12 @@ if get_option('enable_virtual_services')
     'dp_virtsvc.c',
   ]
 endif
+if get_option('enable_graphtrace')
+  dp_sources += [
+    'monitoring/dp_graphtrace.c',
+    'monitoring/dp_graphtrace_shared.c',
+  ]
+endif
 
 exe = executable('dp_service',
   sources: [ dp_sources, grpc_generated ],
@@ -70,12 +76,12 @@ exe = executable('dp_service',
 )
 
 if get_option('enable_usermode')
-custom_target('dp_service_user',
-  depends: exe,
-  input: exe,
-  output: 'dp_service_user',
-  command: [ '../hack/set_cap.sh', '@INPUT@', '@OUTPUT@' ],
-  build_by_default: true,
-  console: true
-)
+  custom_target('dp_service_user',
+    depends: exe,
+    input: exe,
+    output: 'dp_service_user',
+    command: [ '../hack/set_cap.sh', '@INPUT@', '@OUTPUT@' ],
+    build_by_default: true,
+    console: true
+  )
 endif

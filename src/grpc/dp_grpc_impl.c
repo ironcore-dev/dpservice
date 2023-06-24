@@ -59,13 +59,20 @@ static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
 	return dp_set_vnf_value((void *)ul_addr6, val);
 }
 
-static void dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
-								uint16_t portid)
+static __rte_always_inline int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
 {
 	val->v_type = v_type;
 	val->portid = portid;
 	val->vni = dp_get_vm_vni(portid);
-	dp_del_vnf_with_value(val);
+	return dp_find_vnf_with_value(val);
+}
+
+static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	return dp_del_vnf_with_value(val);
 }
 
 static int dp_process_add_lb(struct dp_grpc_responder *responder)
@@ -143,7 +150,7 @@ static int dp_process_add_lb_target(struct dp_grpc_responder *responder)
 	struct dp_lb_target *request = &responder->request.add_lbtrgt;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV6)
-		return dp_set_lb_back_ip(request->lb_id, request->addr6, sizeof(request->addr6));
+		return dp_add_lb_back_ip(request->lb_id, request->addr6, sizeof(request->addr6));
 	else
 		return DP_GRPC_ERR_BAD_IPVER;
 }
@@ -363,6 +370,9 @@ static int dp_process_add_lb_prefix(struct dp_grpc_responder *responder)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
+	if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id)))
+		return DP_GRPC_ERR_ALREADY_EXISTS;
+
 	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, dp_get_vm_vni(port_id), port_id, ul_addr6)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
@@ -384,8 +394,7 @@ static int dp_process_del_lb_prefix(struct dp_grpc_responder *responder)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
-	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
-	return DP_GRPC_OK;
+	return dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
 }
 
 static int dp_process_add_prefix(struct dp_grpc_responder *responder)
@@ -434,7 +443,7 @@ static int dp_process_del_prefix(struct dp_grpc_responder *responder)
 		.alias_pfx.ip = ntohl(request->addr),
 		.alias_pfx.length = request->length,
 	};
-	int ret = DP_GRPC_OK;
+	int ret, ret2;
 
 	port_id = dp_get_portid_with_vm_handle(request->iface_id);
 	if (DP_FAILED(port_id))
@@ -448,8 +457,8 @@ static int dp_process_del_prefix(struct dp_grpc_responder *responder)
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id);
-	return ret;
+	ret2 = dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, port_id);
+	return DP_FAILED(ret) ? ret : ret2;
 }
 
 static int dp_process_add_interface(struct dp_grpc_responder *responder)
