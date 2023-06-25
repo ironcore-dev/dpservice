@@ -11,10 +11,7 @@ extern "C" {
 
 #define DP_VNF_IPV6_ADDR_SIZE	16
 
-// TODO shouldn't all of this be do_grpc though? 'struct dp_lb' seems not ideal for the future
-// TODO OOOOOOR just make them dp_req_* and dp_rep_* !!!
-
-enum dp_request_type {
+enum dpgrpc_request_type {
 	DP_REQ_TYPE_NONE,
 	DP_REQ_TYPE_INIT,
 	DP_REQ_TYPE_INITIALIZED,
@@ -55,20 +52,20 @@ enum dp_request_type {
 };
 
 // in sync with dpdk proto!
-enum dp_natinfo_type {
+enum dpgrpc_natinfo_type {
 	DP_NATINFO_TYPE_ZERO,
 	DP_NATINFO_TYPE_LOCAL,
 	DP_NATINFO_TYPE_NEIGHBOR,
 };
 
 // in sync with dpdk proto!
-enum dp_vni_type {
+enum dpgrpc_vni_type {
 	DP_VNI_IPV4,
 	DP_VNI_IPV6,
 	DP_VNI_BOTH,
 };
 
-struct dp_iface {
+struct dpgrpc_iface {
 	char			iface_id[VM_IFACE_ID_MAX_LEN];
 	uint32_t		ip4_addr;
 	uint8_t			ip6_addr[DP_VNF_IPV6_ADDR_SIZE];
@@ -79,11 +76,11 @@ struct dp_iface {
 	uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
-struct dp_iface_id {
+struct dpgrpc_iface_id {
 	char 			iface_id[VM_IFACE_ID_MAX_LEN];
 };
 
-struct dp_prefix {
+struct dpgrpc_prefix {
 	uint32_t		ip_type;
 	union {
 		uint32_t	addr;
@@ -93,7 +90,7 @@ struct dp_prefix {
 	char			iface_id[VM_IFACE_ID_MAX_LEN];
 };
 
-struct dp_route {
+struct dpgrpc_route {
 	uint32_t		pfx_ip_type;
 	union {
 		uint32_t	pfx_addr;
@@ -109,7 +106,7 @@ struct dp_route {
 	uint32_t		trgt_vni;
 };
 
-struct dp_vip {
+struct dpgrpc_vip {
 	uint32_t		ip_type;
 	union {
 		uint32_t	addr;
@@ -119,7 +116,7 @@ struct dp_vip {
 	uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
-struct dp_nat {
+struct dpgrpc_nat {
 	char			iface_id[VM_IFACE_ID_MAX_LEN];		// local only
 	uint32_t		ip_type;
 	union {
@@ -134,7 +131,7 @@ struct dp_nat {
 	uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
-struct dp_nat_id {
+struct dpgrpc_nat_id {
 	uint8_t			type;  // enum dp_natinfo_type
 	uint32_t		ip_type;
 	union {
@@ -143,28 +140,28 @@ struct dp_nat_id {
 	};
 };
 
-struct dp_lb_port {
+struct dpgrpc_lb_port {
 	uint16_t protocol;
 	uint16_t port;
 };
 
-struct dp_lb {
-	char				lb_id[DP_LB_ID_MAX_LEN];		// request only
-	uint32_t			ip_type;
+struct dpgrpc_lb {
+	char					lb_id[DP_LB_ID_MAX_LEN];			// request only
+	uint32_t				ip_type;
 	union {
-		uint32_t		addr;
-		uint8_t			addr6[DP_VNF_IPV6_ADDR_SIZE];
+		uint32_t			addr;
+		uint8_t				addr6[DP_VNF_IPV6_ADDR_SIZE];
 	};
-	uint32_t			vni;
-	struct dp_lb_port	lbports[DP_LB_MAX_PORTS];
-	uint8_t				ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
+	uint32_t				vni;
+	struct dpgrpc_lb_port	lbports[DP_LB_MAX_PORTS];
+	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
-struct dp_lb_id {
+struct dpgrpc_lb_id {
 	char			lb_id[DP_LB_ID_MAX_LEN];
 };
 
-struct dp_lb_target {
+struct dpgrpc_lb_target {
 	char			lb_id[DP_LB_ID_MAX_LEN];
 	uint32_t		ip_type;
 	union {
@@ -173,61 +170,61 @@ struct dp_lb_target {
 	};
 };
 
-struct dp_fwrule {
+struct dpgrpc_fwrule {
 	char					iface_id[VM_IFACE_ID_MAX_LEN];
 	struct dp_fwall_rule	rule;
 };
 
-struct dp_fwrule_id {
+struct dpgrpc_fwrule_id {
 	char			iface_id[VM_IFACE_ID_MAX_LEN];
 	char			rule_id[DP_FIREWALL_ID_MAX_LEN];
 };
 
-struct dp_vni {
-	uint32_t			vni;
-	enum dp_vni_type	type;
+struct dpgrpc_vni {
+	uint32_t				vni;
+	enum dpgrpc_vni_type	type;
 };
 
-struct dp_request {
-	uint16_t 		type;  // enum dp_request_type
+struct dpgrpc_request {
+	uint16_t 		type;  // enum dpgrpc_request_type
 	union {
-		struct dp_iface		add_iface;
-		struct dp_iface_id	del_iface;
-		struct dp_iface_id	get_iface;
-		struct dp_prefix	add_pfx;
-		struct dp_prefix	del_pfx;
-		struct dp_iface_id	list_pfx;
-		struct dp_route		add_route;
-		struct dp_route		del_route;
-		struct dp_vni		list_route;
-		struct dp_vip		add_vip;
-		struct dp_iface_id	del_vip;
-		struct dp_iface_id	get_vip;
-		struct dp_nat		add_nat;
-		struct dp_iface_id	del_nat;
-		struct dp_iface_id	get_nat;
-		struct dp_nat		add_neighnat;
-		struct dp_nat		del_neighnat;
-		struct dp_nat_id	list_nat;
-		struct dp_lb		add_lb;
-		struct dp_lb_id		del_lb;
-		struct dp_lb_id		get_lb;
-		struct dp_lb_target	add_lbtrgt;
-		struct dp_lb_target	del_lbtrgt;
-		struct dp_lb_id		list_lbtrgt;
-		struct dp_prefix	add_lbpfx;
-		struct dp_prefix	del_lbpfx;
-		struct dp_iface_id	list_lbpfx;
-		struct dp_fwrule	add_fwrule;
-		struct dp_fwrule_id	del_fwrule;
-		struct dp_fwrule_id	get_fwrule;
-		struct dp_iface_id	list_fwrule;
-		struct dp_vni		vni_in_use;
-		struct dp_vni		vni_reset;
+		struct dpgrpc_iface		add_iface;
+		struct dpgrpc_iface_id	del_iface;
+		struct dpgrpc_iface_id	get_iface;
+		struct dpgrpc_prefix	add_pfx;
+		struct dpgrpc_prefix	del_pfx;
+		struct dpgrpc_iface_id	list_pfx;
+		struct dpgrpc_route		add_route;
+		struct dpgrpc_route		del_route;
+		struct dpgrpc_vni		list_route;
+		struct dpgrpc_vip		add_vip;
+		struct dpgrpc_iface_id	del_vip;
+		struct dpgrpc_iface_id	get_vip;
+		struct dpgrpc_nat		add_nat;
+		struct dpgrpc_iface_id	del_nat;
+		struct dpgrpc_iface_id	get_nat;
+		struct dpgrpc_nat		add_neighnat;
+		struct dpgrpc_nat		del_neighnat;
+		struct dpgrpc_nat_id	list_nat;
+		struct dpgrpc_lb		add_lb;
+		struct dpgrpc_lb_id		del_lb;
+		struct dpgrpc_lb_id		get_lb;
+		struct dpgrpc_lb_target	add_lbtrgt;
+		struct dpgrpc_lb_target	del_lbtrgt;
+		struct dpgrpc_lb_id		list_lbtrgt;
+		struct dpgrpc_prefix	add_lbpfx;
+		struct dpgrpc_prefix	del_lbpfx;
+		struct dpgrpc_iface_id	list_lbpfx;
+		struct dpgrpc_fwrule	add_fwrule;
+		struct dpgrpc_fwrule_id	del_fwrule;
+		struct dpgrpc_fwrule_id	get_fwrule;
+		struct dpgrpc_iface_id	list_fwrule;
+		struct dpgrpc_vni		vni_in_use;
+		struct dpgrpc_vni		vni_reset;
 	};
 };
 
-struct dp_vf_pci {
+struct dpgrpc_vf_pci {
 	char		name[RTE_ETH_NAME_MAX_LEN];
 	uint32_t	domain;
 	uint32_t	bus;
@@ -236,30 +233,34 @@ struct dp_vf_pci {
 	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 };
 
-struct dp_ul_addr {
+struct dpgrpc_ul_addr {
 	uint8_t		addr6[DP_VNF_IPV6_ADDR_SIZE];
 };
 
-struct dp_vni_in_use {
+struct dpgrpc_fwrule_info {
+	struct dp_fwall_rule rule;
+};
+
+struct dpgrpc_vni_in_use {
 	uint8_t		in_use;
 };
 
-struct dp_reply {
-	uint8_t		type;
+struct dpgrpc_reply {
+	uint8_t		type;  // copied enum dpgrpc_request_type
 	uint8_t		is_chained;
 	uint16_t	msg_count;
 	uint32_t	err_code;
 	union {
-		uint8_t					messages[0];  // used for multiresponse mode
-		struct dp_ul_addr		ul_addr;
-		struct dp_iface			iface;
-		struct dp_vf_pci		vf_pci;
-		struct dp_route			route;
-		struct dp_vip			vip;
-		struct dp_nat			nat;
-		struct dp_lb			lb;
-		struct dp_fwall_rule	fwall_rule;
-		struct dp_vni_in_use	vni_in_use;
+		uint8_t						messages[0];  // used for multiresponse mode
+		struct dpgrpc_ul_addr		ul_addr;
+		struct dpgrpc_iface			iface;
+		struct dpgrpc_vf_pci		vf_pci;
+		struct dpgrpc_route			route;
+		struct dpgrpc_vip			vip;
+		struct dpgrpc_nat			nat;
+		struct dpgrpc_lb			lb;
+		struct dpgrpc_fwrule_info	fwrule;
+		struct dpgrpc_vni_in_use	vni_in_use;
 	};
 };
 

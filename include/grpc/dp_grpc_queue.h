@@ -9,9 +9,9 @@
 extern "C" {
 #endif
 
-int dp_send_to_worker(struct dp_request *req);
+int dp_send_to_worker(struct dpgrpc_request *req);
 
-int dp_recv_from_worker(struct dp_reply *rep, uint16_t request_type);
+int dp_recv_from_worker(struct dpgrpc_reply *rep, uint16_t request_type);
 
 typedef void (*dp_recv_array_callback)(void *reply, void *context);
 

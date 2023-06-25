@@ -54,7 +54,8 @@ struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
 
 int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 {
-	struct dp_fwall_rule *rule, *reply;
+	struct dpgrpc_fwrule_info *reply;
+	struct dp_fwall_rule *rule;
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
@@ -62,7 +63,7 @@ int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
 			return DP_ERROR;
-		*reply = *rule;
+		reply->rule = *rule;
 	}
 
 	return DP_OK;

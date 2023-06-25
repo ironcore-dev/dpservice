@@ -77,8 +77,8 @@ static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enu
 
 static int dp_process_add_lb(struct dp_grpc_responder *responder)
 {
-	struct dp_lb *request = &responder->request.add_lb;
-	struct dp_ul_addr *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_lb *request = &responder->request.add_lb;
+	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_vnf_value vnf_val = {0};
@@ -117,8 +117,8 @@ err:
 
 static int dp_process_del_lb(struct dp_grpc_responder *responder)
 {
-	struct dp_lb_id *request = &responder->request.del_lb;
-	struct dp_lb lb;
+	struct dpgrpc_lb_id *request = &responder->request.del_lb;
+	struct dpgrpc_lb lb;
 	int ret;
 
 	ret = dp_get_lb(request->lb_id, &lb);
@@ -139,15 +139,15 @@ static int dp_process_del_lb(struct dp_grpc_responder *responder)
 
 static int dp_process_get_lb(struct dp_grpc_responder *responder)
 {
-	struct dp_lb_id *request = &responder->request.del_lb;
-	struct dp_lb *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_lb_id *request = &responder->request.del_lb;
+	struct dpgrpc_lb *reply = dp_grpc_single_reply(responder);
 
 	return dp_get_lb(request->lb_id, reply);
 }
 
 static int dp_process_add_lbtarget(struct dp_grpc_responder *responder)
 {
-	struct dp_lb_target *request = &responder->request.add_lbtrgt;
+	struct dpgrpc_lb_target *request = &responder->request.add_lbtrgt;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV6)
 		return dp_add_lb_back_ip(request->lb_id, request->addr6, sizeof(request->addr6));
@@ -157,7 +157,7 @@ static int dp_process_add_lbtarget(struct dp_grpc_responder *responder)
 
 static int dp_process_del_lbtarget(struct dp_grpc_responder *responder)
 {
-	struct dp_lb_target *request = &responder->request.del_lbtrgt;
+	struct dpgrpc_lb_target *request = &responder->request.del_lbtrgt;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV6)
 		return dp_del_lb_back_ip(request->lb_id, request->addr6);
@@ -173,8 +173,8 @@ static int dp_process_init(struct dp_grpc_responder *responder)
 
 static int dp_process_vni_inuse(struct dp_grpc_responder *responder)
 {
-	struct dp_vni *request = &responder->request.vni_in_use;
-	struct dp_vni_in_use *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_vni *request = &responder->request.vni_in_use;
+	struct dpgrpc_vni_in_use *reply = dp_grpc_single_reply(responder);
 
 	if (request->type == DP_VNI_IPV4) {
 		reply->in_use = dp_is_vni_route_tbl_available(request->vni,
@@ -188,7 +188,7 @@ static int dp_process_vni_inuse(struct dp_grpc_responder *responder)
 
 static int dp_process_add_fwrule(struct dp_grpc_responder *responder)
 {
-	struct dp_fwrule *request = &responder->request.add_fwrule;
+	struct dpgrpc_fwrule *request = &responder->request.add_fwrule;
 	int port_id;
 
 	port_id = dp_get_portid_with_vm_handle(request->iface_id);
@@ -209,8 +209,8 @@ static int dp_process_add_fwrule(struct dp_grpc_responder *responder)
 
 static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 {
-	struct dp_fwrule_id *request = &responder->request.get_fwrule;
-	struct dp_fwall_rule *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_fwrule_id *request = &responder->request.get_fwrule;
+	struct dpgrpc_fwrule_info *reply = dp_grpc_single_reply(responder);
 
 	int port_id;
 	struct dp_fwall_rule *rule;
@@ -223,13 +223,13 @@ static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 	if (!rule)
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	*reply = *rule;
+	reply->rule = *rule;
 	return DP_GRPC_OK;
 }
 
 static int dp_process_del_fwrule(struct dp_grpc_responder *responder)
 {
-	struct dp_fwrule_id *request = &responder->request.del_fwrule;
+	struct dpgrpc_fwrule_id *request = &responder->request.del_fwrule;
 	int port_id;
 
 	port_id = dp_get_portid_with_vm_handle(request->iface_id);
@@ -244,7 +244,7 @@ static int dp_process_del_fwrule(struct dp_grpc_responder *responder)
 
 static int dp_process_vni_reset(struct dp_grpc_responder *responder)
 {
-	struct dp_vni *request = &responder->request.vni_reset;
+	struct dpgrpc_vni *request = &responder->request.vni_reset;
 
 	if (request->type == DP_VNI_BOTH)
 		return dp_lpm_reset_route_tables(request->vni, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
@@ -254,8 +254,8 @@ static int dp_process_vni_reset(struct dp_grpc_responder *responder)
 
 static int dp_process_add_vip(struct dp_grpc_responder *responder)
 {
-	struct dp_vip *request = &responder->request.add_vip;
-	struct dp_ul_addr *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_vip *request = &responder->request.add_vip;
+	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_vnf_value vnf_val = {0};
@@ -303,8 +303,8 @@ err:
 
 static int dp_process_del_vip(struct dp_grpc_responder *responder)
 {
-	struct dp_iface_id *request = &responder->request.del_vip;
-	struct dp_vip *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_iface_id *request = &responder->request.del_vip;
+	struct dpgrpc_vip *reply = dp_grpc_single_reply(responder);
 
 	int port_id;
 	struct snat_data *s_data;
@@ -335,8 +335,8 @@ static int dp_process_del_vip(struct dp_grpc_responder *responder)
 
 static int dp_process_get_vip(struct dp_grpc_responder *responder)
 {
-	struct dp_iface_id *request = &responder->request.get_vip;
-	struct dp_vip *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_iface_id *request = &responder->request.get_vip;
+	struct dpgrpc_vip *reply = dp_grpc_single_reply(responder);
 
 	int port_id;
 	struct snat_data *s_data;
@@ -356,8 +356,8 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 
 static int dp_process_add_lbprefix(struct dp_grpc_responder *responder)
 {
-	struct dp_prefix *request = &responder->request.add_lbpfx;
-	struct dp_route *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_prefix *request = &responder->request.add_lbpfx;
+	struct dpgrpc_route *reply = dp_grpc_single_reply(responder);
 
 	int port_id;
 	struct dp_vnf_value vnf_val = {
@@ -382,7 +382,7 @@ static int dp_process_add_lbprefix(struct dp_grpc_responder *responder)
 
 static int dp_process_del_lbprefix(struct dp_grpc_responder *responder)
 {
-	struct dp_prefix *request = &responder->request.del_lbpfx;
+	struct dpgrpc_prefix *request = &responder->request.del_lbpfx;
 
 	int port_id;
 	struct dp_vnf_value vnf_val = {
@@ -399,8 +399,8 @@ static int dp_process_del_lbprefix(struct dp_grpc_responder *responder)
 
 static int dp_process_add_prefix(struct dp_grpc_responder *responder)
 {
-	struct dp_prefix *request = &responder->request.add_pfx;
-	struct dp_ul_addr *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_prefix *request = &responder->request.add_pfx;
+	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int port_id;
@@ -436,7 +436,7 @@ static int dp_process_add_prefix(struct dp_grpc_responder *responder)
 
 static int dp_process_del_prefix(struct dp_grpc_responder *responder)
 {
-	struct dp_prefix *request = &responder->request.del_pfx;
+	struct dpgrpc_prefix *request = &responder->request.del_pfx;
 
 	int port_id;
 	struct dp_vnf_value vnf_val = {
@@ -463,8 +463,8 @@ static int dp_process_del_prefix(struct dp_grpc_responder *responder)
 
 static int dp_process_add_interface(struct dp_grpc_responder *responder)
 {
-	struct dp_iface *request = &responder->request.add_iface;
-	struct dp_vf_pci *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_iface *request = &responder->request.add_iface;
+	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint16_t port_id = DP_INVALID_PORT_ID;
@@ -555,7 +555,7 @@ err:
 
 static int dp_process_del_interface(struct dp_grpc_responder *responder)
 {
-	struct dp_iface_id *request = &responder->request.del_iface;
+	struct dpgrpc_iface_id *request = &responder->request.del_iface;
 
 	int port_id;
 	int ret = DP_GRPC_OK;
@@ -578,8 +578,8 @@ static int dp_process_del_interface(struct dp_grpc_responder *responder)
 
 static int dp_process_get_interface(struct dp_grpc_responder *responder)
 {
-	struct dp_iface_id *request = &responder->request.get_iface;
-	struct dp_iface *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_iface_id *request = &responder->request.get_iface;
+	struct dpgrpc_iface *reply = dp_grpc_single_reply(responder);
 	int port_id;
 
 	port_id = dp_get_portid_with_vm_handle(request->iface_id);
@@ -597,7 +597,7 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 
 static int dp_process_add_route(struct dp_grpc_responder *responder)
 {
-	struct dp_route *request = &responder->request.add_route;
+	struct dpgrpc_route *request = &responder->request.add_route;
 
 	if (request->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		return dp_add_route(dp_port_get_pf0_id(), request->vni, request->trgt_vni,
@@ -613,7 +613,7 @@ static int dp_process_add_route(struct dp_grpc_responder *responder)
 
 static int dp_process_del_route(struct dp_grpc_responder *responder)
 {
-	struct dp_route *request = &responder->request.del_route;
+	struct dpgrpc_route *request = &responder->request.del_route;
 
 	if (request->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		return dp_del_route(dp_port_get_pf0_id(), request->vni, request->trgt_vni,
@@ -629,8 +629,8 @@ static int dp_process_del_route(struct dp_grpc_responder *responder)
 
 static int dp_process_add_nat(struct dp_grpc_responder *responder)
 {
-	struct dp_nat *request = &responder->request.add_nat;
-	struct dp_ul_addr *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_nat *request = &responder->request.add_nat;
+	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_vnf_value vnf_val = {0};
@@ -678,8 +678,8 @@ err:
 
 static int dp_process_del_nat(struct dp_grpc_responder *responder)
 {
-	struct dp_iface_id *request = &responder->request.del_nat;
-	struct dp_vip *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_iface_id *request = &responder->request.del_nat;
+	struct dpgrpc_vip *reply = dp_grpc_single_reply(responder);
 
 	int port_id;
 	struct snat_data *s_data;
@@ -705,8 +705,8 @@ static int dp_process_del_nat(struct dp_grpc_responder *responder)
 
 static int dp_process_get_nat(struct dp_grpc_responder *responder)
 {
-	struct dp_iface_id *request = &responder->request.get_nat;
-	struct dp_nat *reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_iface_id *request = &responder->request.get_nat;
+	struct dpgrpc_nat *reply = dp_grpc_single_reply(responder);
 
 	int port_id;
 	struct snat_data *s_data;
@@ -728,7 +728,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 
 static int dp_process_add_neighnat(struct dp_grpc_responder *responder)
 {
-	struct dp_nat *request = &responder->request.add_nat;
+	struct dpgrpc_nat *request = &responder->request.add_nat;
 	int ret;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
@@ -751,7 +751,7 @@ static int dp_process_add_neighnat(struct dp_grpc_responder *responder)
 
 static int dp_process_del_neighnat(struct dp_grpc_responder *responder)
 {
-	struct dp_nat *request = &responder->request.del_neighnat;
+	struct dpgrpc_nat *request = &responder->request.del_neighnat;
 	int ret;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
@@ -772,7 +772,7 @@ static int dp_process_del_neighnat(struct dp_grpc_responder *responder)
 
 static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 {
-	struct dp_iface *reply;
+	struct dpgrpc_iface *reply;
 	int act_ports[DP_MAX_PORTS];
 	int count;
 
@@ -849,7 +849,7 @@ static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 
 static int dp_process_get_natinfo(struct dp_grpc_responder *responder)
 {
-	struct dp_nat_id *request = &responder->request.list_nat;
+	struct dpgrpc_nat_id *request = &responder->request.list_nat;
 	int ret;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {

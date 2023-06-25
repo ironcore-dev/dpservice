@@ -561,7 +561,7 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 	struct snat_data *data;
 	uint32_t index = 0;
 	int32_t ret;
-	struct dp_nat *reply;
+	struct dpgrpc_nat *reply;
 
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
 		return DP_OK;
@@ -589,7 +589,7 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
 	struct network_nat_entry *current;
-	struct dp_nat *reply;
+	struct dpgrpc_nat *reply;
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 

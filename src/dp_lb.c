@@ -59,7 +59,7 @@ static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value 
 	return DP_OK;
 }
 
-int dp_create_lb(struct dp_lb *lb, uint8_t *ul_ip)
+int dp_create_lb(struct dpgrpc_lb *lb, uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
@@ -93,7 +93,7 @@ err:
 	return DP_GRPC_ERR_OUT_OF_MEMORY;
 }
 
-int dp_get_lb(void *id_key, struct dp_lb *out_lb)
+int dp_get_lb(void *id_key, struct dpgrpc_lb *out_lb)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
@@ -194,7 +194,7 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
 	return false;
 }
 
-static int dp_lb_rr_backend(struct lb_value *val, struct dp_lb_port *lb_port)
+static int dp_lb_rr_backend(struct lb_value *val, struct dpgrpc_lb_port *lb_port)
 {
 	int ret = -1, k;
 
@@ -230,7 +230,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 		.ip = v_ip,
 		.vni = vni
 	};
-	struct dp_lb_port lb_port;
+	struct dpgrpc_lb_port lb_port;
 	int pos;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
@@ -254,7 +254,7 @@ int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
 {
 	struct lb_key *lb_k;
 	struct lb_value *lb_val;
-	struct dp_lb_target *reply;
+	struct dpgrpc_lb_target *reply;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NO_LB;

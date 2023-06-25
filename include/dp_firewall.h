@@ -53,7 +53,7 @@ struct dp_fwall_rule {
 	TAILQ_ENTRY(dp_fwall_rule) next_rule;
 };
 
-// forward-declaration fue to struct dp_fwall_rule being part of dp_grpc_responder
+// forward-declaration due to 'struct dp_fwall_rule' being part of 'struct dp_grpc_responder'
 struct dp_grpc_responder;
 
 void dp_init_firewall_rules_list(int port_id);

@@ -11,13 +11,13 @@ extern "C" {
 #endif
 
 struct dp_grpc_responder {
-	struct dp_request request;
+	struct dpgrpc_request request;
 	// reply consists of an array of 'packets' (called replies)
 	struct rte_mbuf *replies[DP_GRPC_REPLY_ARR_SIZE];
 	int repcount;
 	struct rte_mempool *mempool;
 	// each of which can optinally be divided into 'messages'
-	struct dp_reply *rep;
+	struct dpgrpc_reply *rep;
 	size_t rep_max_size;
 	size_t msg_size;
 	int rep_capacity;

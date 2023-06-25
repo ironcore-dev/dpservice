@@ -34,8 +34,8 @@ protected:
 	ServerCompletionQueue* cq_;
 	CallStatus status_;
 	uint16_t call_type_;
-	void SetErrStatus(Status *status, dp_reply *reply);
-	Status *CreateErrStatus(dp_reply *reply);
+	void SetErrStatus(Status *status, dpgrpc_reply *reply);
+	Status *CreateErrStatus(dpgrpc_reply *reply);
 public:
 	BaseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq, uint16_t call_type)
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {

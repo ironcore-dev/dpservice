@@ -149,7 +149,7 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 	void *key;
 	struct dp_vnf_value *data;
 	uint32_t iter = 0;
-	struct dp_route *reply;
+	struct dpgrpc_route *reply;
 	int32_t ret;
 
 	if (rte_hash_count(vnf_handle_tbl) == 0)

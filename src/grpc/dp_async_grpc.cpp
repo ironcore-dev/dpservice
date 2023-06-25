@@ -8,13 +8,13 @@
 #include "grpc/dp_grpc_queue.h"
 #include "grpc/dp_grpc_service.h"
 
-inline void BaseCall::SetErrStatus(Status *status, dp_reply *reply) {
+inline void BaseCall::SetErrStatus(Status *status, dpgrpc_reply *reply) {
 	uint32_t err_code = reply->err_code;
 	status->set_error(err_code);
 	status->set_message(dp_grpc_strerror(err_code));
 }
 
-inline Status *BaseCall::CreateErrStatus(dp_reply *reply) {
+inline Status *BaseCall::CreateErrStatus(dpgrpc_reply *reply) {
 	Status *err_status = new Status();
 	SetErrStatus(err_status, reply);
 	return err_status;
@@ -181,10 +181,10 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 
 int IsVniInUseCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new IsVniInUseCall(service_, cq_);
@@ -221,10 +221,10 @@ int IsVniInUseCall::Proceed()
 
 int ResetVniCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new ResetVniCall(service_, cq_);
@@ -299,10 +299,10 @@ int InitializedCall::Proceed()
 
 int InitCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new InitCall(service_, cq_);
@@ -327,10 +327,10 @@ int InitCall::Proceed()
 
 int CreateLBCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	uint16_t i, size;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
@@ -392,10 +392,10 @@ int CreateLBCall::Proceed()
 
 int DelLBCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelLBCall(service_, cq_);
@@ -427,10 +427,10 @@ int DelLBCall::Proceed()
 int GetLBCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	struct in_addr addr;
 	LBPort *lb_port;
 	LBIP *lb_ip;
@@ -486,10 +486,10 @@ int GetLBCall::Proceed()
 
 int AddLBVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -532,10 +532,10 @@ int AddLBVIPCall::Proceed()
 
 int DelLBVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -578,7 +578,7 @@ int DelLBVIPCall::Proceed()
 
 void GetLBVIPBackendsCall::ListCallback(void *reply, void *context)
 {
-	struct dp_lb_target *lb_target = (struct dp_lb_target *)reply;
+	struct dpgrpc_lb_target *lb_target = (struct dpgrpc_lb_target *)reply;
 	GetLoadBalancerTargetsResponse *reply_ = (GetLoadBalancerTargetsResponse *)context;
 	LBIP *back_ip;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -591,7 +591,7 @@ void GetLBVIPBackendsCall::ListCallback(void *reply, void *context)
 
 int GetLBVIPBackendsCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
@@ -611,7 +611,7 @@ int GetLBVIPBackendsCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_lb_target), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_lb_target), ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -624,10 +624,10 @@ int GetLBVIPBackendsCall::Proceed()
 
 int AddPfxCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -673,10 +673,10 @@ int AddPfxCall::Proceed()
 
 int DelPfxCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -719,7 +719,7 @@ int DelPfxCall::Proceed()
 
 void ListPfxCall::ListCallback(void *reply, void *context)
 {
-	dp_route *rp_route = (dp_route *)reply;
+	dpgrpc_route *rp_route = (dpgrpc_route *)reply;
 	PrefixesMsg *reply_ = (PrefixesMsg *)context;
 	Prefix *pfx;
 	struct in_addr addr;
@@ -739,7 +739,7 @@ void ListPfxCall::ListCallback(void *reply, void *context)
 
 int ListPfxCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
@@ -759,7 +759,7 @@ int ListPfxCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_route), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_route), ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -773,10 +773,10 @@ int ListPfxCall::Proceed()
 int CreateLBTargetPfxCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -821,10 +821,10 @@ int CreateLBTargetPfxCall::Proceed()
 
 int DelLBTargetPfxCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -867,7 +867,7 @@ int DelLBTargetPfxCall::Proceed()
 
 void ListLBTargetPfxCall::ListCallback(void *reply, void *context)
 {
-	dp_route *rp_route = (dp_route *)reply;
+	dpgrpc_route *rp_route = (dpgrpc_route *)reply;
 	ListInterfaceLoadBalancerPrefixesResponse *reply_ = (ListInterfaceLoadBalancerPrefixesResponse *)context;
 	LBPrefix *pfx;
 	struct in_addr addr;
@@ -887,7 +887,7 @@ void ListLBTargetPfxCall::ListCallback(void *reply, void *context)
 
 int ListLBTargetPfxCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
@@ -907,7 +907,7 @@ int ListLBTargetPfxCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_route), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_route), ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -920,10 +920,10 @@ int ListLBTargetPfxCall::Proceed()
 
 int AddVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -967,10 +967,10 @@ int AddVIPCall::Proceed()
 
 int DelVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelVIPCall(service_, cq_);
@@ -1002,10 +1002,10 @@ int DelVIPCall::Proceed()
 int GetVIPCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	struct in_addr addr;
 
 	if (status_ == REQUEST) {
@@ -1042,10 +1042,10 @@ int GetVIPCall::Proceed()
 
 int AddInterfaceCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	VirtualFunction *vf;
 	IpAdditionResponse *ip_resp;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -1121,10 +1121,10 @@ int AddInterfaceCall::Proceed()
 
 int DelInterfaceCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelInterfaceCall(service_, cq_);
@@ -1155,11 +1155,11 @@ int DelInterfaceCall::Proceed()
 
 int GetInterfaceCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
-	struct dp_iface *iface;
+	struct dpgrpc_reply reply;
+	struct dpgrpc_iface *iface;
 	Interface *machine;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -1207,10 +1207,10 @@ int GetInterfaceCall::Proceed()
 
 int AddRouteCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -1263,10 +1263,10 @@ int AddRouteCall::Proceed()
 
 int DelRouteCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 
 	if (status_ == REQUEST) {
@@ -1326,7 +1326,7 @@ int DelRouteCall::Proceed()
 
 void ListRoutesCall::ListCallback(void *reply, void *context)
 {
-	struct dp_route *rp_route = (struct dp_route *)reply;
+	struct dpgrpc_route *rp_route = (struct dpgrpc_route *)reply;
 	RoutesMsg *reply_ = (RoutesMsg *)context;
 	Route *route;
 	struct in_addr addr;
@@ -1354,7 +1354,7 @@ void ListRoutesCall::ListCallback(void *reply, void *context)
 
 int ListRoutesCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
@@ -1374,7 +1374,7 @@ int ListRoutesCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_route), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_route), ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1387,10 +1387,10 @@ int ListRoutesCall::Proceed()
 
 int AddNATVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	grpc::Status ret = grpc::Status::OK;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -1441,10 +1441,10 @@ int AddNATVIPCall::Proceed()
 
 int GetNATVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	struct in_addr addr;
 	NATIP *nat_ip;
 	char buf[INET6_ADDRSTRLEN];
@@ -1487,10 +1487,10 @@ int GetNATVIPCall::Proceed()
 
 int DeleteNATVIPCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
@@ -1523,10 +1523,10 @@ int DeleteNATVIPCall::Proceed()
 
 int AddNeighborNATCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	int ret_val;
 	grpc::Status ret = grpc::Status::OK;
 
@@ -1580,10 +1580,10 @@ int AddNeighborNATCall::Proceed()
 
 int DeleteNeighborNATCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	grpc::Status ret = grpc::Status::OK;
 	int ret_val;
 
@@ -1630,7 +1630,7 @@ int DeleteNeighborNATCall::Proceed()
 
 void ListInterfacesCall::ListCallback(void *reply, void *context)
 {
-	struct dp_iface *iface = (struct dp_iface *)reply;
+	struct dpgrpc_iface *iface = (struct dpgrpc_iface *)reply;
 	InterfacesMsg *reply_ = (InterfacesMsg *)context;
 	Interface *machine;
 	struct in_addr addr;
@@ -1650,7 +1650,7 @@ void ListInterfacesCall::ListCallback(void *reply, void *context)
 
 int ListInterfacesCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
@@ -1667,7 +1667,7 @@ int ListInterfacesCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_iface), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_iface), ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1680,7 +1680,7 @@ int ListInterfacesCall::Proceed()
 
 void GetNATInfoCall::ListCallbackLocal(void *reply, void *context)
 {
-	struct dp_nat *nat = (struct dp_nat *)reply;
+	struct dpgrpc_nat *nat = (struct dpgrpc_nat *)reply;
 	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
 	NATInfoEntry *rep_nat_entry;
 	struct in_addr addr;
@@ -1695,7 +1695,7 @@ void GetNATInfoCall::ListCallbackLocal(void *reply, void *context)
 
 void GetNATInfoCall::ListCallbackNeigh(void *reply, void *context)
 {
-	struct dp_nat *nat = (struct dp_nat *)reply;
+	struct dpgrpc_nat *nat = (struct dpgrpc_nat *)reply;
 	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
 	NATInfoEntry *rep_nat_entry;
 	char buf[INET6_ADDRSTRLEN];
@@ -1709,7 +1709,7 @@ void GetNATInfoCall::ListCallbackNeigh(void *reply, void *context)
 
 int GetNATInfoCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 	NATIP *nat_ip;
@@ -1759,7 +1759,7 @@ int GetNATInfoCall::Proceed()
 			list_callback = ListCallbackNeigh;
 		// TODO else invalid type (but that is already covered by the worker...)
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_nat), list_callback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_nat), list_callback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1772,10 +1772,10 @@ int GetNATInfoCall::Proceed()
 
 int AddFirewallRuleCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	const FirewallRule *grpc_rule;
 
 	if (status_ == REQUEST) {
@@ -1807,7 +1807,7 @@ int AddFirewallRuleCall::Proceed()
 			return -1;
 		status_ = FINISH;
 		reply_.set_allocated_status(CreateErrStatus(&reply));
-		reply_.set_ruleid(&reply.fwall_rule.rule_id, sizeof(reply.fwall_rule.rule_id));
+		reply_.set_ruleid(&reply.fwrule.rule.rule_id, sizeof(reply.fwrule.rule.rule_id));
 		responder_.Finish(reply_, ret, this);
 	} else {
 		GPR_ASSERT(status_ == FINISH);
@@ -1818,10 +1818,10 @@ int AddFirewallRuleCall::Proceed()
 
 int DelFirewallRuleCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
 		new DelFirewallRuleCall(service_, cq_);
@@ -1855,10 +1855,10 @@ int DelFirewallRuleCall::Proceed()
 
 int GetFirewallRuleCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	struct dp_reply reply;
+	struct dpgrpc_reply reply;
 	FirewallRule *rule;
 
 	if (status_ == REQUEST) {
@@ -1883,7 +1883,7 @@ int GetFirewallRuleCall::Proceed()
 			return -1;
 
 		rule = new FirewallRule();
-		ConvertDPFWallRuleToGRPCFwallRule(&reply.fwall_rule, rule);
+		ConvertDPFWallRuleToGRPCFwallRule(&reply.fwrule.rule, rule);
 		reply_.set_allocated_rule(rule);
 
 		status_ = FINISH;
@@ -1898,17 +1898,17 @@ int GetFirewallRuleCall::Proceed()
 
 void ListFirewallRulesCall::ListCallback(void *reply, void *context)
 {
-	struct dp_fwall_rule *dp_rule = (struct dp_fwall_rule *)reply;
+	struct dpgrpc_fwrule_info *grpc_rule = (struct dpgrpc_fwrule_info *)reply;
 	ListFirewallRulesResponse *reply_ = (ListFirewallRulesResponse *)context;
 	FirewallRule *rule;
 
 	rule = reply_->add_rules();
-	ConvertDPFWallRuleToGRPCFwallRule(dp_rule, rule);
+	ConvertDPFWallRuleToGRPCFwallRule(&grpc_rule->rule, rule);
 }
 
 int ListFirewallRulesCall::Proceed()
 {
-	struct dp_request request = {
+	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
@@ -1928,7 +1928,7 @@ int ListFirewallRulesCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dp_fwall_rule), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_fwrule_info), ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);

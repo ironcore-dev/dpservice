@@ -300,7 +300,7 @@ static __rte_always_inline bool dp_route_in_dhcp_range(struct rte_rib_node *node
 static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool ext_routes,
 							   struct dp_grpc_responder *responder)
 {
-	struct dp_route *reply;
+	struct dpgrpc_route *reply;
 	uint64_t next_hop;
 	struct vm_route *vm_route;
 	uint32_t ipv4;
@@ -346,7 +346,7 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 	if (!root)
 		return DP_OK;
 
-	dp_grpc_set_multireply(responder, sizeof(struct dp_route));
+	dp_grpc_set_multireply(responder, sizeof(struct dpgrpc_route));
 
 	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
 	if (node)
