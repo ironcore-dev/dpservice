@@ -555,7 +555,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 	return ret == -ENOENT ? DP_OK : ret;
 }
 
-int dp_list_nat_local_entry(uint32_t nat_ip, struct dp_grpc_responder *responder)
+int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
 	struct nat_key *nkey;
 	struct snat_data *data;
@@ -576,7 +576,7 @@ int dp_list_nat_local_entry(uint32_t nat_ip, struct dp_grpc_responder *responder
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				break;
-			reply->type = DP_NETNAT_INFO_TYPE_LOCAL;
+			reply->type = DP_NATINFO_TYPE_LOCAL;
 			reply->min_port = data->network_nat_port_range[0];
 			reply->max_port = data->network_nat_port_range[1];
 			reply->addr = nkey->ip;
@@ -586,7 +586,7 @@ int dp_list_nat_local_entry(uint32_t nat_ip, struct dp_grpc_responder *responder
 	return DP_OK;
 }
 
-int dp_list_nat_neigh_entry(uint32_t nat_ip, struct dp_grpc_responder *responder)
+int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
 	struct network_nat_entry *current;
 	struct dp_nat *reply;
@@ -598,7 +598,7 @@ int dp_list_nat_neigh_entry(uint32_t nat_ip, struct dp_grpc_responder *responder
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				break;
-			reply->type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+			reply->type = DP_NATINFO_TYPE_NEIGHBOR;
 			reply->min_port = current->port_range[0];
 			reply->max_port = current->port_range[1];
 			rte_memcpy(reply->ul_addr6, current->dst_ipv6, sizeof(current->dst_ipv6));

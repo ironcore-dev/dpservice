@@ -1725,9 +1725,9 @@ int GetNATInfoCall::Proceed()
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 
 		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
-			request.list_nat.type = DP_NETNAT_INFO_TYPE_LOCAL;
+			request.list_nat.type = DP_NATINFO_TYPE_LOCAL;
 		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
-			request.list_nat.type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
+			request.list_nat.type = DP_NATINFO_TYPE_NEIGHBOR;
 		// FIXME else enter infinite wait in caller
 
 		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {

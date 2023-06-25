@@ -145,7 +145,7 @@ static int dp_process_get_lb(struct dp_grpc_responder *responder)
 	return dp_get_lb(request->lb_id, reply);
 }
 
-static int dp_process_add_lb_target(struct dp_grpc_responder *responder)
+static int dp_process_add_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dp_lb_target *request = &responder->request.add_lbtrgt;
 
@@ -155,7 +155,7 @@ static int dp_process_add_lb_target(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_BAD_IPVER;
 }
 
-static int dp_process_del_lb_target(struct dp_grpc_responder *responder)
+static int dp_process_del_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dp_lb_target *request = &responder->request.del_lbtrgt;
 
@@ -171,7 +171,7 @@ static int dp_process_init(struct dp_grpc_responder *responder)
 	return dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 }
 
-static int dp_process_vni_in_use(struct dp_grpc_responder *responder)
+static int dp_process_vni_inuse(struct dp_grpc_responder *responder)
 {
 	struct dp_vni *request = &responder->request.vni_in_use;
 	struct dp_vni_in_use *reply = dp_grpc_single_reply(responder);
@@ -186,7 +186,7 @@ static int dp_process_vni_in_use(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_fwall_rule(struct dp_grpc_responder *responder)
+static int dp_process_add_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dp_fwrule *request = &responder->request.add_fwrule;
 	int port_id;
@@ -207,7 +207,7 @@ static int dp_process_add_fwall_rule(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_get_fwall_rule(struct dp_grpc_responder *responder)
+static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dp_fwrule_id *request = &responder->request.get_fwrule;
 	struct dp_fwall_rule *reply = dp_grpc_single_reply(responder);
@@ -227,7 +227,7 @@ static int dp_process_get_fwall_rule(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_fwall_rule(struct dp_grpc_responder *responder)
+static int dp_process_del_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dp_fwrule_id *request = &responder->request.del_fwrule;
 	int port_id;
@@ -354,7 +354,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_lb_prefix(struct dp_grpc_responder *responder)
+static int dp_process_add_lbprefix(struct dp_grpc_responder *responder)
 {
 	struct dp_prefix *request = &responder->request.add_lbpfx;
 	struct dp_route *reply = dp_grpc_single_reply(responder);
@@ -380,7 +380,7 @@ static int dp_process_add_lb_prefix(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_lb_prefix(struct dp_grpc_responder *responder)
+static int dp_process_del_lbprefix(struct dp_grpc_responder *responder)
 {
 	struct dp_prefix *request = &responder->request.del_lbpfx;
 
@@ -726,7 +726,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_neigh_nat(struct dp_grpc_responder *responder)
+static int dp_process_add_neighnat(struct dp_grpc_responder *responder)
 {
 	struct dp_nat *request = &responder->request.add_nat;
 	int ret;
@@ -749,7 +749,7 @@ static int dp_process_add_neigh_nat(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_neigh_nat(struct dp_grpc_responder *responder)
+static int dp_process_del_neighnat(struct dp_grpc_responder *responder)
 {
 	struct dp_nat *request = &responder->request.del_neighnat;
 	int ret;
@@ -806,12 +806,12 @@ static int dp_process_list_routes(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_list_lb_targets(struct dp_grpc_responder *responder)
+static int dp_process_list_lbtargets(struct dp_grpc_responder *responder)
 {
 	return dp_get_lb_back_ips(responder->request.list_lbtrgt.lb_id, responder);
 }
 
-static int dp_process_list_fwall_rules(struct dp_grpc_responder *responder)
+static int dp_process_list_fwrules(struct dp_grpc_responder *responder)
 {
 	int port_id;
 
@@ -823,7 +823,7 @@ static int dp_process_list_fwall_rules(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_list_lb_prefixes(struct dp_grpc_responder *responder)
+static int dp_process_list_lbprefixes(struct dp_grpc_responder *responder)
 {
 	int port_id;
 
@@ -847,16 +847,16 @@ static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_list_nat_entries(struct dp_grpc_responder *responder)
+static int dp_process_get_natinfo(struct dp_grpc_responder *responder)
 {
 	struct dp_nat_id *request = &responder->request.list_nat;
 	int ret;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (request->type == DP_NETNAT_INFO_TYPE_LOCAL)
-			ret = dp_list_nat_local_entry(ntohl(request->addr), responder);
-		else if (request->type == DP_NETNAT_INFO_TYPE_NEIGHBOR)
-			ret = dp_list_nat_neigh_entry(ntohl(request->addr), responder);
+		if (request->type == DP_NATINFO_TYPE_LOCAL)
+			ret = dp_list_nat_local_entries(ntohl(request->addr), responder);
+		else if (request->type == DP_NATINFO_TYPE_NEIGHBOR)
+			ret = dp_list_nat_neigh_entries(ntohl(request->addr), responder);
 		else
 			return DP_GRPC_ERR_WRONG_TYPE;
 		return DP_FAILED(ret) ? DP_GRPC_ERR_ITERATOR : DP_GRPC_OK;
@@ -877,108 +877,109 @@ void dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_INIT:
 		ret = dp_process_init(&responder);
 		break;
-	case DP_REQ_TYPE_IS_VNI_IN_USE:
-		ret = dp_process_vni_in_use(&responder);
+	case DP_REQ_TYPE_ADD_INTERFACE:
+		ret = dp_process_add_interface(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_INTERFACE:
+		ret = dp_process_del_interface(&responder);
+		break;
+	case DP_REQ_TYPE_GET_INTERFACE:
+		ret = dp_process_get_interface(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_INTERFACES:
+		ret = dp_process_list_interfaces(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_PREFIX:
+		ret = dp_process_add_prefix(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_PREFIX:
+		ret = dp_process_del_prefix(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_PREFIXES:
+		ret = dp_process_list_prefixes(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_ROUTE:
+		ret = dp_process_add_route(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_ROUTE:
+		ret = dp_process_del_route(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_ROUTES:
+		ret = dp_process_list_routes(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_VIP:
+		ret = dp_process_add_vip(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_VIP:
+		ret = dp_process_del_vip(&responder);
+		break;
+	case DP_REQ_TYPE_GET_VIP:
+		ret = dp_process_get_vip(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_NAT:
+		ret = dp_process_add_nat(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_NAT:
+		ret = dp_process_del_nat(&responder);
+		break;
+	case DP_REQ_TYPE_GET_NAT:
+		ret = dp_process_get_nat(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_NEIGHNAT:
+		ret = dp_process_add_neighnat(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_NEIGHNAT:
+		ret = dp_process_del_neighnat(&responder);
+		break;
+	case DP_REQ_TYPE_GET_NATINFO:
+		ret = dp_process_get_natinfo(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_LB:
+		ret = dp_process_add_lb(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_LB:
+		ret = dp_process_del_lb(&responder);
+		break;
+	case DP_REQ_TYPE_GET_LB:
+		ret = dp_process_get_lb(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_LBTARGET:
+		ret = dp_process_add_lbtarget(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_LBTARGET:
+		ret = dp_process_del_lbtarget(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_LBTARGETS:
+		ret = dp_process_list_lbtargets(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_LBPREFIX:
+		ret = dp_process_add_lbprefix(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_LBPREFIX:
+		ret = dp_process_del_lbprefix(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_LBPREFIXES:
+		ret = dp_process_list_lbprefixes(&responder);
+		break;
+	case DP_REQ_TYPE_ADD_FWRULE:
+		ret = dp_process_add_fwrule(&responder);
+		break;
+	case DP_REQ_TYPE_DEL_FWRULE:
+		ret = dp_process_del_fwrule(&responder);
+		break;
+	case DP_REQ_TYPE_GET_FWRULE:
+		ret = dp_process_get_fwrule(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_FWRULES:
+		ret = dp_process_list_fwrules(&responder);
+		break;
+	case DP_REQ_TYPE_VNI_INUSE:
+		ret = dp_process_vni_inuse(&responder);
 		break;
 	case DP_REQ_TYPE_VNI_RESET:
 		ret = dp_process_vni_reset(&responder);
 		break;
-	case DP_REQ_TYPE_CREATELB:
-		ret = dp_process_add_lb(&responder);
-		break;
-	case DP_REQ_TYPE_GETLB:
-		ret = dp_process_get_lb(&responder);
-		break;
-	case DP_REQ_TYPE_DELLB:
-		ret = dp_process_del_lb(&responder);
-		break;
-	case DP_REQ_TYPE_ADDLBVIP:
-		ret = dp_process_add_lb_target(&responder);
-		break;
-	case DP_REQ_TYPE_DELLBVIP:
-		ret = dp_process_del_lb_target(&responder);
-		break;
-	case DP_REQ_TYPE_ADDVIP:
-		ret = dp_process_add_vip(&responder);
-		break;
-	case DP_REQ_TYPE_DELVIP:
-		ret = dp_process_del_vip(&responder);
-		break;
-	case DP_REQ_TYPE_GETVIP:
-		ret = dp_process_get_vip(&responder);
-		break;
-	case DP_REQ_TYPE_ADDPREFIX:
-		ret = dp_process_add_prefix(&responder);
-		break;
-	case DP_REQ_TYPE_DELPREFIX:
-		ret = dp_process_del_prefix(&responder);
-		break;
-	case DP_REQ_TYPE_ADDLBPREFIX:
-		ret = dp_process_add_lb_prefix(&responder);
-		break;
-	case DP_REQ_TYPE_DELLBPREFIX:
-		ret = dp_process_del_lb_prefix(&responder);
-		break;
-	case DP_REQ_TYPE_ADDMACHINE:
-		ret = dp_process_add_interface(&responder);
-		break;
-	case DP_REQ_TYPE_DELMACHINE:
-		ret = dp_process_del_interface(&responder);
-		break;
-	case DP_REQ_TYPE_GETMACHINE:
-		ret = dp_process_get_interface(&responder);
-		break;
-	case DP_REQ_TYPE_ADDROUTE:
-		ret = dp_process_add_route(&responder);
-		break;
-	case DP_REQ_TYPE_DELROUTE:
-		ret = dp_process_del_route(&responder);
-		break;
-	case DP_REQ_TYPE_LISTROUTE:
-		ret = dp_process_list_routes(&responder);
-		break;
-	case DP_REQ_TYPE_ADD_NATVIP:
-		ret = dp_process_add_nat(&responder);
-		break;
-	case DP_REQ_TYPE_GET_NATENTRY:
-		ret = dp_process_list_nat_entries(&responder);  // TODO talk about this name in all layers, it's always different
-		break;
-	case DP_REQ_TYPE_DEL_NATVIP:
-		ret = dp_process_del_nat(&responder);
-		break;
-	case DP_REQ_TYPE_GET_NATVIP:
-		ret = dp_process_get_nat(&responder);
-		break;
-	case DP_REQ_TYPE_ADD_NEIGH_NAT:
-		ret = dp_process_add_neigh_nat(&responder);
-		break;
-	case DP_REQ_TYPE_DEL_NEIGH_NAT:
-		ret = dp_process_del_neigh_nat(&responder);
-		break;
-	case DP_REQ_TYPE_LISTPREFIX:
-		ret = dp_process_list_prefixes(&responder);
-		break;
-	case DP_REQ_TYPE_LISTLBPREFIX:
-		ret = dp_process_list_lb_prefixes(&responder);
-		break;
-	case DP_REQ_TYPE_LIST_FWALL_RULES:
-		ret = dp_process_list_fwall_rules(&responder);
-		break;
-	case DP_REQ_TYPE_LISTLBBACKENDS:
-		ret = dp_process_list_lb_targets(&responder);
-		break;
-	case DP_REQ_TYPE_LISTMACHINE:
-		ret = dp_process_list_interfaces(&responder);
-		break;
-	case DP_REQ_TYPE_ADD_FWALL_RULE:
-		ret = dp_process_add_fwall_rule(&responder);
-		break;
-	case DP_REQ_TYPE_DEL_FWALL_RULE:
-		ret = dp_process_del_fwall_rule(&responder);
-		break;
-	case DP_REQ_TYPE_GET_FWALL_RULE:
-		ret = dp_process_get_fwall_rule(&responder);
-		break;
+	// DP_REQ_TYPE_INITIALIZED is handled by the gRPC thread
 	default:
 		ret = DP_GRPC_ERR_BAD_REQUEST;
 		break;
