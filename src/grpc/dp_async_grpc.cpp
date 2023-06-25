@@ -1758,6 +1758,8 @@ int GetNATInfoCall::Proceed()
 		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
 			list_callback = ListCallbackNeigh;
 		// TODO else invalid type (but that is already covered by the worker...)
+		else
+			list_callback = ListCallbackLocal;
 		// TODO can fail hard (this `return -1` is only a wait loop)
 		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_nat), list_callback, &reply_, call_type_)))
 			return -1;
