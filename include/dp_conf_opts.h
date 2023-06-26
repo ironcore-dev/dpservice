@@ -16,6 +16,11 @@ enum dp_conf_color {
 	DP_CONF_COLOR_AUTO,
 };
 
+enum dp_conf_log_format {
+	DP_CONF_LOG_FORMAT_TEXT,
+	DP_CONF_LOG_FORMAT_JSON,
+};
+
 const char *dp_conf_get_pf0_name();
 const char *dp_conf_get_pf1_name();
 const char *dp_conf_get_vf_pattern();
@@ -32,6 +37,7 @@ const int dp_conf_get_graphtrace_loglevel();
 #endif
 #endif
 const enum dp_conf_color dp_conf_get_color();
+const enum dp_conf_log_format dp_conf_get_log_format();
 const int dp_conf_get_grpc_port();
 #ifdef ENABLE_PYTEST
 const int dp_conf_get_flow_timeout();

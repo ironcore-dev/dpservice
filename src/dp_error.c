@@ -22,6 +22,7 @@ static const char *dp_grpc_error_strings[] = {
 	_DP_GRPC_ERRORS(_DP_GRPC_ERROR_STRING)
 };
 
+// TODO phase out along with old logging
 const char *dp_strerror(int error)
 {
 	static __thread char buf[STRERROR_BUFSIZE];
@@ -62,4 +63,17 @@ const char *dp_grpc_strerror(int grpc_errcode)
 		return "Invalid gRPC error code";
 	}
 	return dp_grpc_error_strings[grpc_errcode];
+}
+
+const char *dp_strerror_structured(int error)
+{
+	if (error < 0)
+		error = -error;
+
+	if (error < RTE_MAX_ERRNO)
+		return rte_strerror(error);
+	else if (error >= -_DP_GRPC_ERRCODES)
+		return dp_grpc_strerror(error+_DP_GRPC_ERRCODES);
+	else
+		return "General dp_service error";
 }

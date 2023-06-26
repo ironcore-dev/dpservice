@@ -12,37 +12,31 @@ extern "C" {
 #define RTE_LOGTYPE_DPGRAPH   RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_DPGRPC    RTE_LOGTYPE_USER3
 
-#define _DP_LOG_TYPE_SERVICE "SERVICE"
-#define _DP_LOG_TYPE_GRAPH   "GRAPH"
-#define _DP_LOG_TYPE_GRPC    "GRPC"
-
-// some of these are intentionally commented-out to prevent usage
-// (static_assert cannot be used here due to token pasting below)
-// #define _DP_LOG_LEVEL_EMERG   "M"
-// #define _DP_LOG_LEVEL_ALERT   "A"
-// #define _DP_LOG_LEVEL_CRIT    "C"
-#define _DP_LOG_LEVEL_ERR     "E"
-#define _DP_LOG_LEVEL_WARNING "W"
-// #define _DP_LOG_LEVEL_NOTICE  "N"
-#define _DP_LOG_LEVEL_INFO    "I"
-#define _DP_LOG_LEVEL_DEBUG   "D"
-
 //
 // ----- Macros to generate key-value pairs for structured logging
 //
 
+// using canary values for format type should prevent at least some calling convetion bugs
+#define _DP_LOG_FMT_CANARY_PRE  0x12300000
+#define _DP_LOG_FMT_CANARY_POST 0x00000321
+#define _DP_LOG_FMT_CREATE(VALUE) (_DP_LOG_FMT_CANARY_PRE | ((VALUE) << 12) | _DP_LOG_FMT_CANARY_POST)
+#define _DP_LOG_FMT_STR _DP_LOG_FMT_CREATE(1)
+#define _DP_LOG_FMT_INT _DP_LOG_FMT_CREATE(2)
+#define _DP_LOG_FMT_UINT _DP_LOG_FMT_CREATE(3)
+#define _DP_LOG_FMT_IPV4 _DP_LOG_FMT_CREATE(4)
+#define _DP_LOG_FMT_IPV6 _DP_LOG_FMT_CREATE(6)
+
 // Do not call these directly unless absolutely necessary
 // Create a wrapper macro to prevent typos and collisions in key names
-#define _DP_LOG_STR(KEY, VALUE) KEY, "%s", VALUE
-#define _DP_LOG_INT(KEY, VALUE) KEY, "%d", VALUE
-#define _DP_LOG_UINT(KEY, VALUE) KEY, "%u", VALUE
+#define _DP_LOG_STR(KEY, VALUE) KEY, _DP_LOG_FMT_STR, VALUE
+#define _DP_LOG_INT(KEY, VALUE) KEY, _DP_LOG_FMT_INT, VALUE
+#define _DP_LOG_UINT(KEY, VALUE) KEY, _DP_LOG_FMT_UINT, VALUE
+#define _DP_LOG_IPV4(KEY, VALUE) KEY, _DP_LOG_FMT_IPV4, VALUE
+#define _DP_LOG_IPV6(KEY, VALUE) KEY, _DP_LOG_FMT_IPV6, VALUE
 
-// TODO currently reusing dp_strerror(), this needs to call something better
-// (maybe add error and errstr keys instead)
-#define DP_LOG_RET(VALUE) _DP_LOG_STR("error", dp_strerror(VALUE))
+#define DP_LOG_RET(VALUE) _DP_LOG_INT("error", VALUE), _DP_LOG_STR("errmsg", dp_strerror_structured(VALUE))
 
-#define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE)
-#define DP_LOG_GRPCERR(VALUE) _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
+#define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE), _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
 #define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)
 
 #define DP_LOG_LISTENADDR(VALUE) _DP_LOG_STR("listen_address", VALUE)
@@ -81,6 +75,9 @@ extern "C" {
 #define DP_LOG_FWICMPTYPE(VALUE) _DP_LOG_UINT("fw_icmp_type", VALUE)
 #define DP_LOG_FWICMPCODE(VALUE) _DP_LOG_UINT("fw_icmp_code", VALUE)
 
+//
+// -----
+//
 
 // TODO(plague): This is now a mess because of transitional state of logging
 // over time, this will get converted
@@ -101,9 +98,9 @@ __rte_cold void _dp_log_structured(unsigned int level, unsigned int logtype,
 #ifdef DEBUG
 								   const char *file, unsigned int line, const char *function,
 #endif
-								   const char *loglevel, const char *logger,
 								   const char *message, ...);
 
+// TODO is this still intented to be debuglevel only? Maybe on release only function name?
 #ifdef DEBUG
 #	define _DP_LOG_DEBUGINFO __FILE__, __LINE__, __FUNCTION__,
 #else
@@ -112,19 +109,14 @@ __rte_cold void _dp_log_structured(unsigned int level, unsigned int logtype,
 #define DP_LOG(LEVEL, LOGTYPE, FORMAT, ...) \
 	_dp_log(RTE_LOG_##LEVEL, RTE_LOGTYPE_DP##LOGTYPE, \
 			_DP_LOG_DEBUGINFO \
-			_DP_LOG_LEVEL_##LEVEL " " _DP_LOG_TYPE_##LOGTYPE ": " FORMAT, \
-			##__VA_ARGS__)
+			FORMAT, ##__VA_ARGS__)
 
-// TODO level will need to be a whole word lowercase and non-json logs will simply do UPPER([0])
 #define DP_LOG_STRUCTURED(LEVEL, LOGTYPE, MESSAGE, ...) \
 	_dp_log_structured(RTE_LOG_##LEVEL, RTE_LOGTYPE_DP##LOGTYPE, \
 					   _DP_LOG_DEBUGINFO \
-					   _DP_LOG_LEVEL_##LEVEL, _DP_LOG_TYPE_##LOGTYPE, \
-					   MESSAGE, \
-					   ##__VA_ARGS__, NULL)
+					   MESSAGE, ##__VA_ARGS__, NULL)
 
-// printf-like macros for easier wrapping in macros later
-// also this way IDE autocomplete and click-through is working
+// this way IDE autocomplete and click-through is working while not needing to write the full level/logtype names
 #define DPS_LOG_ERR(FORMAT, ...)     DP_LOG(ERR,     SERVICE, FORMAT, ##__VA_ARGS__)
 #define DPS_LOG_WARNING(FORMAT, ...) DP_LOG(WARNING, SERVICE, FORMAT, ##__VA_ARGS__)
 #define DPS_LOG_INFO(FORMAT, ...)    DP_LOG(INFO,    SERVICE, FORMAT, ##__VA_ARGS__)
@@ -153,5 +145,4 @@ void _dp_log_early(FILE *f, const char *format, ...);
 #ifdef __cplusplus
 }
 #endif
-
 #endif

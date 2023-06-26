@@ -33,6 +33,7 @@ _OPT_SHOPT_MAX = 255,
 #endif
 #endif
 	OPT_COLOR,
+	OPT_LOG_FORMAT,
 	OPT_GRPC_PORT,
 #ifdef ENABLE_PYTEST
 	OPT_FLOW_TIMEOUT,
@@ -70,6 +71,7 @@ static const struct option longopts[] = {
 #endif
 #endif
 	{ "color", 1, 0, OPT_COLOR },
+	{ "log-format", 1, 0, OPT_LOG_FORMAT },
 	{ "grpc-port", 1, 0, OPT_GRPC_PORT },
 #ifdef ENABLE_PYTEST
 	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
@@ -86,6 +88,11 @@ static const char *color_choices[] = {
 	"never",
 	"always",
 	"auto",
+};
+
+static const char *log_format_choices[] = {
+	"text",
+	"json",
 };
 
 static void print_help_args(FILE *outfile)
@@ -117,6 +124,7 @@ static void print_help_args(FILE *outfile)
 #endif
 #endif
 		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
+		"     --log-format=FORMAT                set the format of individual log lines (on standard output): 'text' (default) or 'json'\n"
 		"     --grpc-port=PORT                   listen for gRPC clients on this port\n"
 #ifdef ENABLE_PYTEST
 		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
@@ -140,6 +148,7 @@ static int graphtrace_loglevel = 0;
 #endif
 #endif
 static enum dp_conf_color color = DP_CONF_COLOR_NEVER;
+static enum dp_conf_log_format log_format = DP_CONF_LOG_FORMAT_TEXT;
 static int grpc_port = 1337;
 #ifdef ENABLE_PYTEST
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
@@ -207,6 +216,11 @@ const int dp_conf_get_graphtrace_loglevel()
 const enum dp_conf_color dp_conf_get_color()
 {
 	return color;
+}
+
+const enum dp_conf_log_format dp_conf_get_log_format()
+{
+	return log_format;
 }
 
 const int dp_conf_get_grpc_port()
