@@ -18,8 +18,9 @@ extern "C" {
 #define DP_FAILED_LOG(RET, LOGGER, ...) \
 	(DP_FAILED(RET) ? LOGGER(__VA_ARGS__), true : false)
 
+// TODO phase out later
 const char *dp_strerror(int error);
-
+const char *dp_strerror_structured(int error);
 
 /*
  * GRPC error values, do not change them!

@@ -127,6 +127,15 @@
     "default": "never"
   },
   {
+    "lgopt": "log-format",
+    "arg": "FORMAT",
+    "help": "set the format of individual log lines (on standard output)",
+    "var": "log_format",
+    "type": "enum",
+    "choices": [ "text", "json" ],
+    "default": "text"
+  },
+  {
     "lgopt": "grpc-port",
     "arg": "PORT",
     "help": "listen for gRPC clients on this port",

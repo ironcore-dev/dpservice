@@ -27,6 +27,7 @@ For more information on EAL options, please see [the official docs](https://doc.
 | --no-offload | None | disable traffic offloading |  |
 | --graphtrace-loglevel | LEVEL | verbosity level of packet traversing the graph framework |  |
 | --color | MODE | output colorization mode | 'never' (default), 'always' or 'auto' |
+| --log-format | FORMAT | set the format of individual log lines (on standard output) | 'text' (default) or 'json' |
 | --grpc-port | PORT | listen for gRPC clients on this port |  |
 | --flow-timeout | SECONDS | inactive flow timeout (except TCP established flows) |  |
 
