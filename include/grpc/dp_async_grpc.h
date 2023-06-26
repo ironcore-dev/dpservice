@@ -10,7 +10,7 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include "dp_error.h"
-#include "dp_grpc_impl.h"
+#include "dp_grpc_api.h"
 #include "dp_firewall.h"
 
 using grpc::Server;
@@ -34,15 +34,15 @@ protected:
 	ServerCompletionQueue* cq_;
 	CallStatus status_;
 	uint16_t call_type_;
-	void SetErrStatus(Status *status, uint32_t err_code);
-	Status *CreateErrStatus(uint32_t err_code);
+	void SetErrStatus(Status *status, dpgrpc_reply *reply);
+	Status *CreateErrStatus(dpgrpc_reply *reply);
 public:
 	BaseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq, uint16_t call_type)
 		: service_(service), cq_(cq), status_(REQUEST), call_type_(call_type) {
 		}
 	int InitCheck();
-	void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
-	void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule);
+	static void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule * grpc_rule);
+	static void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule * grpc_rule, struct dp_fwall_rule *dp_rule);
 	virtual int Proceed() = 0;
 	virtual ~BaseCall() = default;
 };
@@ -55,7 +55,7 @@ class CreateLBTargetPfxCall final : BaseCall {
 
 public:
 	CreateLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADDLBPREFIX), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_LBPREFIX), responder_(&ctx_) {
 		service_->RequestcreateInterfaceLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
@@ -70,7 +70,7 @@ class IsVniInUseCall final : BaseCall {
 
 public:
 	IsVniInUseCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_IS_VNI_IN_USE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_VNI_INUSE), responder_(&ctx_) {
 		service_->RequestisVniInUse(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
@@ -85,7 +85,7 @@ class ResetVniCall final : BaseCall {
 
 public:
 	ResetVniCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_VNI_RESET), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_VNI_RESET), responder_(&ctx_) {
 		service_->RequestresetVni(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
@@ -100,7 +100,7 @@ class DelLBTargetPfxCall final : BaseCall {
 
 public:
 	DelLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELLBPREFIX), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_LBPREFIX), responder_(&ctx_) {
 		service_->RequestdeleteInterfaceLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
@@ -112,10 +112,11 @@ class ListLBTargetPfxCall final : BaseCall {
 	ListInterfaceLoadBalancerPrefixesRequest request_;
 	ListInterfaceLoadBalancerPrefixesResponse reply_;
 	ServerAsyncResponseWriter<ListInterfaceLoadBalancerPrefixesResponse> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBPREFIX), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_LBPREFIXES), responder_(&ctx_) {
 		service_->RequestlistInterfaceLoadBalancerPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
@@ -130,7 +131,7 @@ class AddPfxCall final : BaseCall {
 
 public:
 	AddPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADDPREFIX), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_PREFIX), responder_(&ctx_) {
 		service_->RequestaddInterfacePrefix(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -145,7 +146,7 @@ class DelPfxCall final : BaseCall {
 
 public:
 	DelPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELPREFIX), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_PREFIX), responder_(&ctx_) {
 		service_->RequestdeleteInterfacePrefix(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -157,10 +158,11 @@ class ListPfxCall final : BaseCall {
 	InterfaceIDMsg request_;
 	PrefixesMsg reply_;
 	ServerAsyncResponseWriter<PrefixesMsg> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_LISTPREFIX), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_PREFIXES), responder_(&ctx_) {
 		service_->RequestlistInterfacePrefixes(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -175,7 +177,7 @@ class AddVIPCall final : BaseCall {
 
 public:
 	AddVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADDVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_VIP), responder_(&ctx_) {
 		service_->RequestaddInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -190,7 +192,7 @@ class CreateLBCall final : BaseCall {
 
 public:
 	CreateLBCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_CREATELB), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_LB), responder_(&ctx_) {
 		service_->RequestcreateLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
 											this);
 	}
@@ -205,7 +207,7 @@ class GetLBCall final : BaseCall {
 
 public:
 	GetLBCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_GETLB), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_LB), responder_(&ctx_) {
 		service_->RequestgetLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
 											this);
 	}
@@ -220,7 +222,7 @@ class DelLBCall final : BaseCall {
 
 public:
 	DelLBCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELLB), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_LB), responder_(&ctx_) {
 		service_->RequestdeleteLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
 											this);
 	}
@@ -235,7 +237,7 @@ class AddLBVIPCall final : BaseCall {
 
 public:
 	AddLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADDLBVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_LBTARGET), responder_(&ctx_) {
 		service_->RequestaddLoadBalancerTarget(&ctx_, &request_, &responder_, cq_, cq_,
 											   this);
 	}
@@ -250,7 +252,7 @@ class DelLBVIPCall final : BaseCall {
 
 public:
 	DelLBVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELLBVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_LBTARGET), responder_(&ctx_) {
 		service_->RequestdeleteLoadBalancerTarget(&ctx_, &request_, &responder_, cq_, cq_,
 												  this);
 	}
@@ -262,10 +264,11 @@ class GetLBVIPBackendsCall final : BaseCall {
 	GetLoadBalancerTargetsRequest request_;
 	GetLoadBalancerTargetsResponse reply_;
 	ServerAsyncResponseWriter<GetLoadBalancerTargetsResponse> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	GetLBVIPBackendsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_LISTLBBACKENDS), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_LBTARGETS), responder_(&ctx_) {
 		service_->RequestgetLoadBalancerTargets(&ctx_, &request_, &responder_, cq_, cq_,
 												this);
 	}
@@ -280,7 +283,7 @@ class DelVIPCall final : BaseCall {
 
 public:
 	DelVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_VIP), responder_(&ctx_) {
 		service_->RequestdeleteInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -295,7 +298,7 @@ class GetVIPCall final : BaseCall {
 
 public:
 	GetVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_GETVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_VIP), responder_(&ctx_) {
 		service_->RequestgetInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -310,7 +313,7 @@ class AddInterfaceCall final : BaseCall {
 
 public:
 	AddInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADDMACHINE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_INTERFACE), responder_(&ctx_) {
 		service_->RequestcreateInterface(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -325,7 +328,7 @@ class DelInterfaceCall final : BaseCall {
 
 public:
 	DelInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELMACHINE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_INTERFACE), responder_(&ctx_) {
 		service_->RequestdeleteInterface(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -340,7 +343,7 @@ class AddRouteCall final : BaseCall {
 
 public:
 	AddRouteCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADDROUTE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_ROUTE), responder_(&ctx_) {
 		service_->RequestaddRoute(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -355,7 +358,7 @@ class DelRouteCall final : BaseCall {
 
 public:
 	DelRouteCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DELROUTE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_ROUTE), responder_(&ctx_) {
 		service_->RequestdeleteRoute(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -370,7 +373,7 @@ class GetInterfaceCall final : BaseCall {
 
 public:
 	GetInterfaceCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_GETMACHINE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_INTERFACE), responder_(&ctx_) {
 		service_->RequestgetInterface(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -382,10 +385,11 @@ class ListRoutesCall final : BaseCall {
 	VNIMsg request_;
 	RoutesMsg reply_;
 	ServerAsyncResponseWriter<RoutesMsg> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListRoutesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_LISTROUTE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_ROUTES), responder_(&ctx_) {
 		service_->RequestlistRoutes(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -397,10 +401,11 @@ class ListInterfacesCall final : BaseCall {
 	Empty request_;
 	InterfacesMsg reply_;
 	ServerAsyncResponseWriter<InterfacesMsg> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListInterfacesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_LISTMACHINE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_INTERFACES), responder_(&ctx_) {
 		service_->RequestlistInterfaces(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -415,7 +420,7 @@ class AddNATVIPCall final: BaseCall {
 
 public:
 	AddNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADD_NATVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_NAT), responder_(&ctx_) {
 		service_->RequestaddNAT(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -427,10 +432,12 @@ class GetNATInfoCall final: BaseCall {
 	GetNATInfoRequest request_;
 	GetNATInfoResponse reply_;
 	ServerAsyncResponseWriter<GetNATInfoResponse> responder_;
-
+private:
+	static void ListCallbackLocal(void *reply, void *context);
+	static void ListCallbackNeigh(void *reply, void *context);
 public:
 	GetNATInfoCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_GET_NATENTRY), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_NATINFO), responder_(&ctx_) {
 		service_->RequestgetNATInfo(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -445,7 +452,7 @@ class GetNATVIPCall final: BaseCall {
 
 public:
 	GetNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_GET_NATVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_NAT), responder_(&ctx_) {
 		service_->RequestgetNAT(&ctx_, &request_, &responder_, cq_, cq_,
 								this);
 	}
@@ -460,7 +467,7 @@ class DeleteNATVIPCall final: BaseCall {
 
 public:
 	DeleteNATVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DEL_NATVIP), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_NAT), responder_(&ctx_) {
 		service_->RequestdeleteNAT(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -475,7 +482,7 @@ class AddNeighborNATCall final: BaseCall {
 
 public:
 	AddNeighborNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADD_NEIGH_NAT), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_NEIGHNAT), responder_(&ctx_) {
 		service_->RequestaddNeighborNAT(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -490,7 +497,7 @@ class DeleteNeighborNATCall final: BaseCall {
 
 public:
 	DeleteNeighborNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DEL_NEIGH_NAT), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_NEIGHNAT), responder_(&ctx_) {
 		service_->RequestdeleteNeighborNAT(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -505,7 +512,7 @@ class InitializedCall final : BaseCall {
 
 public:
 	InitializedCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_INITIALIZED), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_INITIALIZED), responder_(&ctx_) {
 		service_->Requestinitialized(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -520,7 +527,7 @@ class InitCall final : BaseCall {
 
 public:
 	InitCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_INIT), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_INIT), responder_(&ctx_) {
 		service_->Requestinit(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -535,7 +542,7 @@ class AddFirewallRuleCall final : BaseCall {
 
 public:
 	AddFirewallRuleCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_ADD_FWALL_RULE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_ADD_FWRULE), responder_(&ctx_) {
 		service_->RequestaddFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -550,7 +557,7 @@ class DelFirewallRuleCall final : BaseCall {
 
 public:
 	DelFirewallRuleCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_DEL_FWALL_RULE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_DEL_FWRULE), responder_(&ctx_) {
 		service_->RequestdeleteFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
 											this);
 	}
@@ -565,7 +572,7 @@ class GetFirewallRuleCall final : BaseCall {
 
 public:
 	GetFirewallRuleCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_GET_FWALL_RULE), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_FWRULE), responder_(&ctx_) {
 		service_->RequestgetFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
@@ -577,10 +584,11 @@ class ListFirewallRulesCall final : BaseCall {
 	ListFirewallRulesRequest request_;
 	ListFirewallRulesResponse reply_;
 	ServerAsyncResponseWriter<ListFirewallRulesResponse> responder_;
-
+private:
+	static void ListCallback(void *reply, void *context);
 public:
 	ListFirewallRulesCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	:BaseCall(service, cq, DP_REQ_TYPE_LIST_FWALL_RULES), responder_(&ctx_) {
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_FWRULES), responder_(&ctx_) {
 		service_->RequestlistFirewallRules(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}

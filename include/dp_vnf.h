@@ -4,8 +4,7 @@
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_flow.h>
-#include "dpdk_layer.h"
-#include "grpc/dp_grpc_impl.h"
+#include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,8 +42,7 @@ int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);
 int dp_del_vnf_with_vnf_key(void *key);
 int dp_del_vnf_with_value(struct dp_vnf_value *val);
 int dp_find_vnf_with_value(struct dp_vnf_value *val);
-void dp_list_vnf_alias_routes(struct rte_mbuf *m, uint16_t portid,
-								enum vnf_type v_type, struct rte_mbuf *rep_arr[]);
+int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder);
 
 #ifdef __cplusplus
 }

@@ -1,15 +1,16 @@
-#include <time.h>
+#include "dp_lb.h"
 #include <stdlib.h>
-#include <rte_hash.h>
-#include <rte_jhash.h>
+#include <time.h>
 #include <rte_common.h>
 #include <rte_errno.h>
+#include <rte_hash.h>
+#include <rte_jhash.h>
 #include <rte_malloc.h>
 #include <rte_rib6.h>
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
-#include "dp_lb.h"
+#include "grpc/dp_grpc_responder.h"
 
 static struct rte_hash *ipv4_lb_tbl = NULL;
 static struct rte_hash *id_map_lb_tbl = NULL;
@@ -21,7 +22,7 @@ int dp_lb_init(int socket_id)
 	if (!ipv4_lb_tbl)
 		return DP_ERROR;
 
-	id_map_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, DP_LB_ID_SIZE,
+	id_map_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, DP_LB_ID_MAX_LEN,
 										  "lb_id_map_table", socket_id);
 	if (!id_map_lb_tbl)
 		return DP_ERROR;
@@ -46,7 +47,7 @@ static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value 
 		return DP_ERROR;
 	}
 
-	rte_memcpy(l_val->lb_id, id_key, DP_LB_ID_SIZE);
+	rte_memcpy(l_val->lb_id, id_key, sizeof(l_val->lb_id));
 	*lb_k = *l_key;
 	ret = rte_hash_add_key_data(id_map_lb_tbl, id_key, lb_k);
 	if (DP_FAILED(ret)) {
@@ -58,12 +59,12 @@ static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value 
 	return DP_OK;
 }
 
-int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip)
+int dp_create_lb(struct dpgrpc_lb *lb, uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
-		.ip = ntohl(add_lb->vip.vip_addr),
-		.vni = add_lb->vni
+		.ip = ntohl(lb->addr),
+		.vni = lb->vni
 	};
 
 	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey)))
@@ -76,13 +77,13 @@ int dp_create_lb(dp_add_lb *add_lb, uint8_t *ul_ip)
 	if (DP_FAILED(rte_hash_add_key_data(ipv4_lb_tbl, &nkey, lb_val)))
 		goto err_free;
 
-	if (DP_FAILED(dp_map_lb_handle((void *)add_lb->lb_id, &nkey, lb_val)))
+	if (DP_FAILED(dp_map_lb_handle(lb->lb_id, &nkey, lb_val)))
 		goto err_free;
 
 	rte_memcpy(lb_val->lb_ul_addr, ul_ip, DP_VNF_IPV6_ADDR_SIZE);
-	for (int i = 0; i < DP_LB_PORT_SIZE; ++i) {
-		lb_val->ports[i].port = ntohs(add_lb->lbports[i].port);
-		lb_val->ports[i].protocol = add_lb->lbports[i].protocol;
+	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
+		lb_val->ports[i].port = ntohs(lb->lbports[i].port);
+		lb_val->ports[i].protocol = lb->lbports[i].protocol;
 	}
 	return DP_GRPC_OK;
 
@@ -92,7 +93,7 @@ err:
 	return DP_GRPC_ERR_OUT_OF_MEMORY;
 }
 
-int dp_get_lb(void *id_key, dp_lb *list_lb)
+int dp_get_lb(void *id_key, struct dpgrpc_lb *out_lb)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
@@ -104,14 +105,14 @@ int dp_get_lb(void *id_key, dp_lb *list_lb)
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	list_lb->ip_type = RTE_ETHER_TYPE_IPV4;
-	list_lb->vni = lb_k->vni;
-	list_lb->vip.vip_addr = htonl(lb_k->ip);
-	rte_memcpy(list_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
+	out_lb->ip_type = RTE_ETHER_TYPE_IPV4;
+	out_lb->vni = lb_k->vni;
+	out_lb->addr = htonl(lb_k->ip);
+	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
 
-	for (i = 0; i < DP_LB_PORT_SIZE; i++) {
-		list_lb->lbports[i].port = htons(lb_val->ports[i].port);
-		list_lb->lbports[i].protocol = lb_val->ports[i].protocol;
+	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
+		out_lb->lbports[i].port = htons(lb_val->ports[i].port);
+		out_lb->lbports[i].protocol = lb_val->ports[i].protocol;
 	}
 
 	return DP_GRPC_OK;
@@ -193,11 +194,11 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
 	return false;
 }
 
-static int dp_lb_rr_backend(struct lb_value *val, dp_lb_port *lb_port)
+static int dp_lb_rr_backend(struct lb_value *val, struct dpgrpc_lb_port *lb_port)
 {
 	int ret = -1, k;
 
-	for (k = 0; k < DP_LB_PORT_SIZE; k++) {
+	for (k = 0; k < DP_LB_MAX_PORTS; k++) {
 		if ((val->ports[k].port == lb_port->port) && (val->ports[k].protocol == lb_port->protocol))
 			break;
 		if (val->ports[k].port == 0)
@@ -225,16 +226,15 @@ static int dp_lb_rr_backend(struct lb_value *val, dp_lb_port *lb_port)
 uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16_t proto)
 {
 	struct lb_value *lb_val = NULL;
-	uint8_t *ret = NULL;
 	struct lb_key nkey = {
 		.ip = v_ip,
 		.vni = vni
 	};
-	dp_lb_port lb_port;
+	struct dpgrpc_lb_port lb_port;
 	int pos;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
-		goto out;
+		return NULL;
 
 	/* TODO This is just temporary. Round robin.
 	   This doesn't distribute the load evenly. 
@@ -244,20 +244,17 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16
 	lb_port.protocol = proto;
 	pos = dp_lb_rr_backend(lb_val, &lb_port);
 	if (pos < 0)
-		goto out;
+		return NULL;
 
 	lb_val->last_sel_pos = pos;
-	ret = (uint8_t *)&lb_val->back_end_ips[pos][0];
-
-out:
-	return ret;
+	return (uint8_t *)&lb_val->back_end_ips[pos][0];
 }
 
-int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
+int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
 {
-	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
-	uint8_t *rp_b_ip6;
+	struct lb_value *lb_val;
+	struct dpgrpc_lb_target *reply;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NO_LB;
@@ -265,14 +262,14 @@ int dp_get_lb_back_ips(void *id_key, struct dp_reply *rep)
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	rep->com_head.msg_count = 0;
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
-	rp_b_ip6 = &rep->back_ip.b_ip.addr6[0];
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
 		if (lb_val->back_end_ips[i][0] != 0) {
-			rep->com_head.msg_count++;
-			rte_memcpy(rp_b_ip6, &lb_val->back_end_ips[i][0], sizeof(rep->back_ip.b_ip.addr6));
-			rp_b_ip6 += sizeof(rep->back_ip.b_ip.addr6);
+			reply = dp_grpc_add_reply(responder);
+			if (!reply)
+				return DP_GRPC_OK;  // do not fail, show truncated list
+			rte_memcpy(reply->addr6, &lb_val->back_end_ips[i][0], sizeof(reply->addr6));
 		}
 	}
 	return DP_GRPC_OK;

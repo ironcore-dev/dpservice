@@ -5,12 +5,11 @@
 #include <rte_jhash.h>
 #include <rte_rib.h>
 #include <rte_rib6.h>
-#include "dpdk_layer.h"
 #include "dp_refcount.h"
 #include "dp_lpm.h"
 #include "dp_error.h"
 #include "dp_log.h"
-#include "grpc/dp_grpc_impl.h"
+#include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
 extern "C" {

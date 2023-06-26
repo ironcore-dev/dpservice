@@ -1,3 +1,4 @@
+#include "dp_nat.h"
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_common.h>
@@ -7,11 +8,11 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 #include "dp_error.h"
-#include "dp_mbuf_dyn.h"
-#include "dp_nat.h"
-#include "rte_flow/dp_rte_flow.h"
-#include "dp_log.h"
 #include "dp_internal_stats.h"
+#include "dp_log.h"
+#include "dp_mbuf_dyn.h"
+#include "grpc/dp_grpc_responder.h"
+#include "rte_flow/dp_rte_flow.h"
 
 TAILQ_HEAD(network_nat_head, network_nat_entry);
 
@@ -106,7 +107,7 @@ static void dp_delete_vm_snat_data(uint32_t vm_ip, uint32_t vni, struct snat_dat
 		DPS_LOG_WARNING("Failed to delete SNAT key");
 }
 
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_ipv6)
+int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
@@ -124,7 +125,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t *ul_i
 }
 
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port,
-							  uint16_t max_port, uint8_t *ul_ipv6)
+							  uint16_t max_port, uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
@@ -278,7 +279,8 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 
 
 static __rte_always_inline bool dp_is_network_nat_ip(struct network_nat_entry *entry,
-													 uint32_t nat_ipv4, uint8_t *nat_ipv6, uint32_t vni)
+													 uint32_t nat_ipv4,
+													 uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni)
 {
 	return entry->vni == vni
 			&& ((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
@@ -286,7 +288,8 @@ static __rte_always_inline bool dp_is_network_nat_ip(struct network_nat_entry *e
 }
 
 static __rte_always_inline bool dp_is_network_nat_entry(struct network_nat_entry *entry,
-														uint32_t nat_ipv4, uint8_t *nat_ipv6, uint32_t vni,
+														uint32_t nat_ipv4,
+														uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
 														uint16_t min_port, uint16_t max_port)
 {
 	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
@@ -296,7 +299,8 @@ static __rte_always_inline bool dp_is_network_nat_entry(struct network_nat_entry
 
 // check if a port falls into the range of external nat's port range
 static __rte_always_inline bool dp_is_network_nat_port(struct network_nat_entry *entry,
-													   uint32_t nat_ipv4, uint8_t *nat_ipv6, uint32_t vni,
+													   uint32_t nat_ipv4,
+													   uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
 													   uint16_t port)
 {
 	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
@@ -317,9 +321,9 @@ void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
 	dp_del_dnat_ip(d_ip, vni);
 }
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
-								uint8_t *underlay_ipv6)
+								uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	network_nat_entry *next, *new_entry;
 
@@ -346,7 +350,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	new_entry->vni = vni;
 	new_entry->port_range[0] = min_port;
 	new_entry->port_range[1] = max_port;
-	memcpy(new_entry->dst_ipv6, underlay_ipv6, sizeof(new_entry->dst_ipv6));
+	memcpy(new_entry->dst_ipv6, ul_ipv6, sizeof(new_entry->dst_ipv6));
 
 	TAILQ_INSERT_TAIL(&nat_headp, new_entry, entries);
 
@@ -354,7 +358,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 
 }
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *item, *tmp_item;
@@ -370,7 +374,7 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t *nat_ipv6,
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t *nat_ipv6,
+const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 											  uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *current;
@@ -551,97 +555,55 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 	return ret == -ENOENT ? DP_OK : ret;
 }
 
-int dp_list_nat_local_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
+int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
-	uint16_t msg_per_buf;
 	struct nat_key *nkey;
 	struct snat_data *data;
-	dp_reply *rep;
 	uint32_t index = 0;
 	int32_t ret;
-	struct dp_nat_entry *rp_nat_entry;
+	struct dpgrpc_nat *reply;
 
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
-		goto out;
+		return DP_OK;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(struct dp_nat_entry));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	while ((ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index)) != -ENOENT) {
 		if (DP_FAILED(ret))
 			return DP_ERROR;
 
 		if (data->network_nat_ip == nat_ip) {
-			if (rep->com_head.msg_count &&
-				(rep->com_head.msg_count % msg_per_buf == 0)) {
-
-				m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-				if (!m_new)
-					break;
-				m_curr = m_new;
-				rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-			}
-			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
-			rep->com_head.msg_count++;
-
-			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_LOCAL;
-			rp_nat_entry->min_port = data->network_nat_port_range[0];
-			rp_nat_entry->max_port = data->network_nat_port_range[1];
-			rp_nat_entry->m_ip.addr = nkey->ip;
+			reply = dp_grpc_add_reply(responder);
+			if (!reply)
+				break;
+			reply->type = DP_NATINFO_TYPE_LOCAL;
+			reply->min_port = data->network_nat_port_range[0];
+			reply->max_port = data->network_nat_port_range[1];
+			reply->addr = nkey->ip;
 		}
 	}
 
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return DP_OK;
-	}
-
-out:
-	rep_arr[--rep_arr_size] = m_curr;
 	return DP_OK;
 }
 
-int dp_list_nat_neigh_entry(struct rte_mbuf *m, struct rte_mbuf *rep_arr[], uint32_t nat_ip)
+int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
-	int8_t rep_arr_size = DP_MBUF_ARR_SIZE;
-	struct rte_mbuf *m_new, *m_curr = m;
-	struct dp_nat_entry *rp_nat_entry;
-	struct network_nat_entry *current ;
-	uint16_t msg_per_buf;
-	dp_reply *rep;
+	struct network_nat_entry *current;
+	struct dpgrpc_nat *reply;
 
-	msg_per_buf = dp_first_mbuf_to_grpc_arr(m_curr, rep_arr,
-										    &rep_arr_size, sizeof(struct dp_nat_entry));
-	rep = rte_pktmbuf_mtod(m_curr, dp_reply*);
+	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (current->nat_ip.nat_ip4 == nat_ip) {
-			if (rep->com_head.msg_count &&
-				(rep->com_head.msg_count % msg_per_buf == 0)) {
-					m_new = dp_add_mbuf_to_grpc_arr(m_curr, rep_arr, &rep_arr_size);
-					if (!m_new)
-						break;
-					m_curr = m_new;
-					rep = rte_pktmbuf_mtod(m_new, dp_reply*);
-			}
-			rp_nat_entry = &((&rep->nat_entry)[rep->com_head.msg_count % msg_per_buf]);
-			rep->com_head.msg_count++;
-			rp_nat_entry->entry_type = DP_NETNAT_INFO_TYPE_NEIGHBOR;
-			rp_nat_entry->min_port = current->port_range[0];
-			rp_nat_entry->max_port = current->port_range[1];
-			rte_memcpy(rp_nat_entry->underlay_route, current->dst_ipv6, sizeof(current->dst_ipv6));
+			reply = dp_grpc_add_reply(responder);
+			if (!reply)
+				break;
+			reply->type = DP_NATINFO_TYPE_NEIGHBOR;
+			reply->min_port = current->port_range[0];
+			reply->max_port = current->port_range[1];
+			rte_memcpy(reply->ul_addr6, current->dst_ipv6, sizeof(current->dst_ipv6));
 		}
 	}
-
-	if (rep_arr_size < 0) {
-		dp_last_mbuf_from_grpc_arr(m_curr, rep_arr);
-		return DP_OK;
-	}
-
-	rep_arr[--rep_arr_size] = m_curr;
 	return DP_OK;
 }
 
