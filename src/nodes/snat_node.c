@@ -59,6 +59,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
 						return SNAT_NEXT_DROP;
 					}
+					cntrack->offload_flags.orig = DP_FLOW_OFFLOADED;
+					cntrack->offload_flags.reply = DP_FLOW_OFFLOADED;
+					df->flags.offload_decision = DP_FLOW_NON_OFFLOAD;
 				} else {
 					if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
 						DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port");

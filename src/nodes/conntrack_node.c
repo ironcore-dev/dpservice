@@ -113,6 +113,10 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 		dp_cntrack_change_flow_offload_flags(flow_val, df);
+	} else if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_FINWAIT
+			|| flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN) {
+		dp_cntrack_change_flow_offload_flags(flow_val, df);
+		flow_val->timeout_value = flow_timeout;
 	} else
 		flow_val->timeout_value = flow_timeout;
 }
