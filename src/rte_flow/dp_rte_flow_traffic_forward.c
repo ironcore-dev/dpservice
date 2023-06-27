@@ -5,7 +5,6 @@
 
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-
 	struct underlay_conf *u_conf = get_underlay_conf();
 	bool cross_pf_port = df->nxt_hop == dp_port_get_pf0_id() ? false : true;
 
