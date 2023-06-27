@@ -85,7 +85,7 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 		opt = (struct dhcpv6_option *)&options[i];
 		op_len = ntohs(opt->op_len);
 		if (i + op_len > options_len) {
-			DPS_LOG_WARNING("Malformed DHCPv6 option %u", ntohs(opt->op_code));
+			DPS_LOG_WARNING("Malformed DHCPv6 option", DP_LOG_VALUE(ntohs(opt->op_code)));
 			return DP_ERROR;
 		}
 		op_code = ntohs(opt->op_code);
@@ -136,7 +136,7 @@ static __rte_always_inline int resize_packet(struct rte_mbuf *m, int delta)
 		}
 	} else if (delta < 0) {
 		if (DP_FAILED(rte_pktmbuf_trim(m, -delta))) {
-			DPS_LOG_WARNING("Invalid trim of DHCPv6 packet");
+			DPS_LOG_WARNING("Invalid trim of DHCPv6 packet", DP_LOG_VALUE(-delta));
 			return DP_ERROR;
 		}
 	}
@@ -197,7 +197,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	// packet length is uint16_t, negative value means it's less than the required length
 	if (req_options_len < 0) {
-		DPNODE_LOG_WARNING(node, "Invalid DHCPv6 packet length");
+		DPNODE_LOG_WARNING(node, "Invalid DHCPv6 packet length", DP_LOG_VALUE(req_options_len));
 		return DHCPV6_NEXT_DROP;
 	}
 

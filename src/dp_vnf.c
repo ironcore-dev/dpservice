@@ -24,10 +24,11 @@ void dp_vnf_free()
 int dp_set_vnf_value(void *key, struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val;
+	int ret;
 
 	temp_val = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf_value), RTE_CACHE_LINE_SIZE);
 	if (!temp_val) {
-		DPS_LOG_WARNING("vnf handle for port %d malloc data failed\n", val->portid);
+		DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_PORTID(val->portid));
 		return DP_ERROR;
 	}
 
@@ -36,8 +37,9 @@ int dp_set_vnf_value(void *key, struct dp_vnf_value *val)
 		goto err;
 
 	*temp_val = *val;
-	if (DP_FAILED(rte_hash_add_key_data(vnf_handle_tbl, key, temp_val))) {
-		DPS_LOG_WARNING("vnf handle for port %d add data failed\n", temp_val->portid);
+	ret = rte_hash_add_key_data(vnf_handle_tbl, key, temp_val);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_PORTID(temp_val->portid), DP_LOG_RET(ret));
 		goto err;
 	}
 	return DP_OK;
@@ -138,7 +140,7 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 			// should only ever fail on no-entry or invalid-arguments, but both are covered by rte_hash_iterate()
 			ret = rte_hash_del_key(vnf_handle_tbl, key);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Cannot delete VNF key %s", dp_strerror(ret));
+				DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret));
 		}
 	}
 	return delete_count > 0 ? DP_GRPC_OK : DP_GRPC_ERR_NOT_FOUND;
@@ -159,7 +161,7 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&data, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot iterate VNF table %s", dp_strerror(ret));
+			DPS_LOG_ERR("Cannot iterate VNF table", DP_LOG_RET(ret));
 			return ret;
 		}
 

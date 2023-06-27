@@ -11,18 +11,18 @@ int dp_node_append_tx(struct rte_node_register *node,
 	rte_edge_t count;
 
 	if (port_id >= DP_MAX_PORTS) {
-		DPNODE_LOG_ERR(node, "Port id %u too big, max %u", port_id, DP_MAX_PORTS);
+		DPNODE_LOG_ERR(node, "Port id too big", DP_LOG_PORTID(port_id), DP_LOG_MAX(DP_MAX_PORTS));
 		return DP_ERROR;
 	}
 
 	if (rte_node_edge_update(node->id, RTE_EDGE_ID_INVALID, append_array, 1) != 1) {
-		DPNODE_LOG_ERR(node, "Cannot add Tx edge to %s", tx_node_name);
+		DPNODE_LOG_ERR(node, "Cannot add Tx edge", _DP_LOG_STR("peer_tx_node", tx_node_name));
 		return DP_ERROR;
 	}
 
 	count = rte_node_edge_count(node->id);
 	if (count <= 0) {
-		DPNODE_LOG_ERR(node, "No Tx edge added to %s", tx_node_name);
+		DPNODE_LOG_ERR(node, "No Tx edge added", _DP_LOG_STR("peer_tx_node", tx_node_name));
 		return DP_ERROR;
 	}
 

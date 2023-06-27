@@ -8,13 +8,10 @@ extern "C" {
 #include <rte_common.h>
 #include <rte_log.h>
 
+// Extend RTE's log types to enable filtering via --log-level=user*:#
 #define RTE_LOGTYPE_DPSERVICE RTE_LOGTYPE_USER1
 #define RTE_LOGTYPE_DPGRAPH   RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_DPGRPC    RTE_LOGTYPE_USER3
-
-//
-// ----- Macros to generate key-value pairs for structured logging
-//
 
 // using canary values for format type should prevent at least some calling convetion bugs
 #define _DP_LOG_FMT_CANARY_PRE  0x12300000
@@ -24,6 +21,7 @@ extern "C" {
 #define _DP_LOG_FMT_INT _DP_LOG_FMT_CREATE(2)
 #define _DP_LOG_FMT_UINT _DP_LOG_FMT_CREATE(3)
 #define _DP_LOG_FMT_IPV4 _DP_LOG_FMT_CREATE(4)
+#define _DP_LOG_FMT_PTR _DP_LOG_FMT_CREATE(5)
 #define _DP_LOG_FMT_IPV6 _DP_LOG_FMT_CREATE(6)
 
 // Do not call these directly unless absolutely necessary
@@ -33,32 +31,52 @@ extern "C" {
 #define _DP_LOG_UINT(KEY, VALUE) KEY, _DP_LOG_FMT_UINT, VALUE
 #define _DP_LOG_IPV4(KEY, VALUE) KEY, _DP_LOG_FMT_IPV4, VALUE
 #define _DP_LOG_IPV6(KEY, VALUE) KEY, _DP_LOG_FMT_IPV6, VALUE
+#define _DP_LOG_PTR(KEY, VALUE) KEY, _DP_LOG_FMT_PTR, VALUE
 
-#define DP_LOG_RET(VALUE) _DP_LOG_INT("error", VALUE), _DP_LOG_STR("errmsg", dp_strerror_structured(VALUE))
-
-#define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE), _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
-#define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)
-
-#define DP_LOG_LISTENADDR(VALUE) _DP_LOG_STR("listen_address", VALUE)
-
-#define DP_LOG_IFACE(VALUE) _DP_LOG_STR("interface_id", VALUE)
+// Macros to generate key-value pairs for structured logging
+#define DP_LOG_RET(VALUE) _DP_LOG_INT("error", VALUE), _DP_LOG_STR("errmsg", dp_strerror(VALUE))
+// used for types, values, limit checks, etc.
+#define DP_LOG_VALUE(VALUE) _DP_LOG_INT("value", VALUE)
+#define DP_LOG_MIN(VALUE) _DP_LOG_INT("min", VALUE)
+#define DP_LOG_MAX(VALUE) _DP_LOG_INT("max", VALUE)
+// used for tagged calls (like allocation pools, etc.)
+#define DP_LOG_NAME(VALUE) _DP_LOG_STR("name", VALUE)
+// RTE and NIC related
+#define DP_LOG_PORTID(VALUE) _DP_LOG_UINT("port_id", VALUE)
+#define DP_LOG_PEER_PORTID(VALUE) _DP_LOG_UINT("peer_port_id", VALUE)
+#define DP_LOG_QUEUEID(VALUE) _DP_LOG_UINT("queue_id", VALUE)
+#define DP_LOG_SOCKID(VALUE) _DP_LOG_UINT("socket_id", VALUE)
+#define DP_LOG_IFNAME(VALUE) _DP_LOG_STR("interface_name", VALUE)
+#define DP_LOG_LCORE(VALUE) _DP_LOG_UINT("lcore_id", VALUE)
+// networking stack
+#define DP_LOG_IPV4(VALUE) _DP_LOG_IPV4("ipv4", VALUE)
+#define DP_LOG_IPV6(VALUE) _DP_LOG_IPV6("ipv6", VALUE)
+#define DP_LOG_SRC_IPV4(VALUE) _DP_LOG_IPV4("src_ipv4", VALUE)
+#define DP_LOG_DST_IPV4(VALUE) _DP_LOG_IPV4("dst_ipv4", VALUE)
+#define DP_LOG_PORT(VALUE) _DP_LOG_UINT("port", VALUE)
+#define DP_LOG_SRC_PORT(VALUE) _DP_LOG_UINT("src_port", VALUE)
+#define DP_LOG_DST_PORT(VALUE) _DP_LOG_UINT("dst_port", VALUE)
+#define DP_LOG_PROTO(VALUE) _DP_LOG_UINT("protocol", VALUE)
+// networking
 #define DP_LOG_VNI(VALUE) _DP_LOG_UINT("vni", VALUE)
 #define DP_LOG_VNI_TYPE(VALUE) _DP_LOG_UINT("vni_type", VALUE)
+#define DP_LOG_MINPORT(VALUE) _DP_LOG_UINT("minport", VALUE)
+#define DP_LOG_MAXPORT(VALUE) _DP_LOG_UINT("maxport", VALUE)
+#define DP_LOG_FLOW_ERROR(VALUE) _DP_LOG_STR("flow_error", VALUE)
+// gRPC worker I/O
+#define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE), _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
+#define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)
+#define DP_LOG_IFACE(VALUE) _DP_LOG_STR("interface_id", VALUE)
 #define DP_LOG_TVNI(VALUE) _DP_LOG_UINT("t_vni", VALUE)
-#define DP_LOG_IPV4STR(VALUE) _DP_LOG_STR("ipv4", VALUE)
-#define DP_LOG_IPV6STR(VALUE) _DP_LOG_STR("ipv6", VALUE)
 #define DP_LOG_PCI(VALUE) _DP_LOG_STR("pci", VALUE)
 #define DP_LOG_PXE_SRV(VALUE) _DP_LOG_STR("pxe_server", VALUE)
 #define DP_LOG_PXE_PATH(VALUE) _DP_LOG_STR("pxe_path", VALUE)
+#define DP_LOG_IPV4STR(VALUE) _DP_LOG_STR("ipv4", VALUE)
+#define DP_LOG_IPV6STR(VALUE) _DP_LOG_STR("ipv6", VALUE)
 #define DP_LOG_LBID(VALUE) _DP_LOG_STR("lb_id", VALUE)
-#define DP_LOG_PORT(VALUE) _DP_LOG_UINT("port", VALUE)
-#define DP_LOG_PROTO(VALUE) _DP_LOG_UINT("protocol", VALUE)
 #define DP_LOG_PREFIX(VALUE) _DP_LOG_STR("prefix", VALUE)
 #define DP_LOG_PREFLEN(VALUE) _DP_LOG_UINT("prefix_len", VALUE)
-#define DP_LOG_MINPORT(VALUE) _DP_LOG_UINT("min_port", VALUE)
-#define DP_LOG_MAXPORT(VALUE) _DP_LOG_UINT("max_port", VALUE)
 #define DP_LOG_NATINFOTYPE(VALUE) _DP_LOG_UINT("nat_info_type", VALUE)
-
 #define DP_LOG_FWRULE(VALUE) _DP_LOG_STR("fw_rule", VALUE)
 #define DP_LOG_FWPRIO(VALUE) _DP_LOG_UINT("fw_priority", VALUE)
 #define DP_LOG_FWDIR(VALUE) _DP_LOG_UINT("fw_direction", VALUE)
@@ -74,67 +92,40 @@ extern "C" {
 #define DP_LOG_FWDPORTTO(VALUE) _DP_LOG_INT("fw_dport_to", VALUE)
 #define DP_LOG_FWICMPTYPE(VALUE) _DP_LOG_UINT("fw_icmp_type", VALUE)
 #define DP_LOG_FWICMPCODE(VALUE) _DP_LOG_UINT("fw_icmp_code", VALUE)
+// module-specific
+#define DP_LOG_NODE(VALUE) _DP_LOG_STR("node", (VALUE)->name)
+#define DP_LOG_TELEMETRY_CMD(VALUE) _DP_LOG_STR("telemetry_cmd", VALUE)
 
-//
-// -----
-//
 
-// TODO(plague): This is now a mess because of transitional state of logging
-// over time, this will get converted
-
-__rte_cold
-#ifdef DEBUG
-__rte_format_printf(6, 7)
-#else
-__rte_format_printf(3, 4)
-#endif
-void _dp_log(unsigned int level, unsigned int logtype,
-#ifdef DEBUG
-			 const char *file, unsigned int line, const char *function,
-#endif
-			 const char *format, ...);
-
-__rte_cold void _dp_log_structured(unsigned int level, unsigned int logtype,
-#ifdef DEBUG
-								   const char *file, unsigned int line, const char *function,
-#endif
-								   const char *message, ...);
-
-// TODO is this still intented to be debuglevel only? Maybe on release only function name?
-#ifdef DEBUG
-#	define _DP_LOG_DEBUGINFO __FILE__, __LINE__, __FUNCTION__,
-#else
-#	define _DP_LOG_DEBUGINFO
-#endif
-#define DP_LOG(LEVEL, LOGTYPE, FORMAT, ...) \
+#define DP_STRUCTURED_LOG(LEVEL, LOGTYPE, MESSAGE, ...) \
 	_dp_log(RTE_LOG_##LEVEL, RTE_LOGTYPE_DP##LOGTYPE, \
-			_DP_LOG_DEBUGINFO \
-			FORMAT, ##__VA_ARGS__)
-
-#define DP_LOG_STRUCTURED(LEVEL, LOGTYPE, MESSAGE, ...) \
-	_dp_log_structured(RTE_LOG_##LEVEL, RTE_LOGTYPE_DP##LOGTYPE, \
-					   _DP_LOG_DEBUGINFO \
-					   MESSAGE, ##__VA_ARGS__, NULL)
+			__FILE__, __LINE__, __FUNCTION__, \
+			MESSAGE, ##__VA_ARGS__, NULL)
 
 // this way IDE autocomplete and click-through is working while not needing to write the full level/logtype names
-#define DPS_LOG_ERR(FORMAT, ...)     DP_LOG(ERR,     SERVICE, FORMAT, ##__VA_ARGS__)
-#define DPS_LOG_WARNING(FORMAT, ...) DP_LOG(WARNING, SERVICE, FORMAT, ##__VA_ARGS__)
-#define DPS_LOG_INFO(FORMAT, ...)    DP_LOG(INFO,    SERVICE, FORMAT, ##__VA_ARGS__)
-#define DPS_LOG_DEBUG(FORMAT, ...)   DP_LOG(DEBUG,   SERVICE, FORMAT, ##__VA_ARGS__)
+#define DPS_LOG_ERR(MESSAGE, ...)     DP_STRUCTURED_LOG(ERR,     SERVICE, MESSAGE, ##__VA_ARGS__)
+#define DPS_LOG_WARNING(MESSAGE, ...) DP_STRUCTURED_LOG(WARNING, SERVICE, MESSAGE, ##__VA_ARGS__)
+#define DPS_LOG_INFO(MESSAGE, ...)    DP_STRUCTURED_LOG(INFO,    SERVICE, MESSAGE, ##__VA_ARGS__)
+#define DPS_LOG_DEBUG(MESSAGE, ...)   DP_STRUCTURED_LOG(DEBUG,   SERVICE, MESSAGE, ##__VA_ARGS__)
 
-#define DPGRPC_LOG_ERR(MESSAGE, ...)     DP_LOG_STRUCTURED(ERR,     GRPC, MESSAGE, ##__VA_ARGS__)
-#define DPGRPC_LOG_WARNING(MESSAGE, ...) DP_LOG_STRUCTURED(WARNING, GRPC, MESSAGE, ##__VA_ARGS__)
-#define DPGRPC_LOG_INFO(MESSAGE, ...)    DP_LOG_STRUCTURED(INFO,    GRPC, MESSAGE, ##__VA_ARGS__)
-#define DPGRPC_LOG_DEBUG(MESSAGE, ...)   DP_LOG_STRUCTURED(DEBUG,   GRPC, MESSAGE, ##__VA_ARGS__)
+#define DPGRPC_LOG_ERR(MESSAGE, ...)     DP_STRUCTURED_LOG(ERR,     GRPC, MESSAGE, ##__VA_ARGS__)
+#define DPGRPC_LOG_WARNING(MESSAGE, ...) DP_STRUCTURED_LOG(WARNING, GRPC, MESSAGE, ##__VA_ARGS__)
+#define DPGRPC_LOG_INFO(MESSAGE, ...)    DP_STRUCTURED_LOG(INFO,    GRPC, MESSAGE, ##__VA_ARGS__)
+#define DPGRPC_LOG_DEBUG(MESSAGE, ...)   DP_STRUCTURED_LOG(DEBUG,   GRPC, MESSAGE, ##__VA_ARGS__)
 
-#define DPNODE_LOG_ERR(NODE, FORMAT, ...)     DP_LOG(ERR,     GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
-#define DPNODE_LOG_WARNING(NODE, FORMAT, ...) DP_LOG(WARNING, GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
-#define DPNODE_LOG_INFO(NODE, FORMAT, ...)    DP_LOG(INFO,    GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
-#define DPNODE_LOG_DEBUG(NODE, FORMAT, ...)   DP_LOG(DEBUG,   GRAPH, "%s: " FORMAT, (NODE)->name, ##__VA_ARGS__)
+#define DPNODE_LOG_ERR(NODE, MESSAGE, ...)     DP_STRUCTURED_LOG(ERR,     GRAPH, MESSAGE, DP_LOG_NODE(NODE), ##__VA_ARGS__)
+#define DPNODE_LOG_WARNING(NODE, MESSAGE, ...) DP_STRUCTURED_LOG(WARNING, GRAPH, MESSAGE, DP_LOG_NODE(NODE), ##__VA_ARGS__)
+#define DPNODE_LOG_INFO(NODE, MESSAGE, ...)    DP_STRUCTURED_LOG(INFO,    GRAPH, MESSAGE, DP_LOG_NODE(NODE), ##__VA_ARGS__)
+#define DPNODE_LOG_DEBUG(NODE, MESSAGE, ...)   DP_STRUCTURED_LOG(DEBUG,   GRAPH, MESSAGE, DP_LOG_NODE(NODE), ##__VA_ARGS__)
 
 void dp_log_set_thread_name(const char *name);
 
 int dp_log_init();
+
+__rte_cold
+void _dp_log(unsigned int level, unsigned int logtype,
+			 const char *file, unsigned int line, const char *function,
+			 const char *message, ...);
 
 /** Use this for logging before dp_log_init() */
 __rte_cold __rte_format_printf(2, 3)

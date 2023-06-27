@@ -15,7 +15,7 @@ static int dp_send_event_msg(struct dp_event_msg *msg)
 
 	m = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
 	if (!m) {
-		DPS_LOG_ERR("Cannot allocate monitoring event message type %u", msg->msg_head.type);
+		DPS_LOG_ERR("Cannot allocate monitoring event message", DP_LOG_VALUE(msg->msg_head.type));
 		return DP_ERROR;
 	}
 
@@ -24,7 +24,7 @@ static int dp_send_event_msg(struct dp_event_msg *msg)
 
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->monitoring_rx_queue, m);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot enqueue monitoring event message %u %s", msg->msg_head.type, dp_strerror(ret));
+		DPS_LOG_ERR("Cannot enqueue monitoring event message", DP_LOG_VALUE(msg->msg_head.type), DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -60,7 +60,7 @@ int dp_link_status_change_event_callback(uint16_t port_id,
 
 	ret = rte_eth_link_get_nowait(port_id, &link);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Link change failed to get link get on port %d %s", port_id, dp_strerror(ret));
+		DPS_LOG_ERR("Link change failed to get link", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -77,7 +77,7 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 	uint8_t status = status_msg->event_entry.link_status.status;
 
 	if (DP_FAILED(dp_port_set_link_status(port_id, status)))
-		DPS_LOG_WARNING("Cannot set link status of %u to %u", port_id, status);
+		DPS_LOG_WARNING("Cannot set link status", DP_LOG_PORTID(port_id), DP_LOG_VALUE(status));
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows

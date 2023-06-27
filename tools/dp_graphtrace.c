@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 
 	ret = eal_init();
 	if (DP_FAILED(ret)) {
-		fprintf(stderr, "Cannot init EAL %s\n", dp_strerror(ret));
+		fprintf(stderr, "Cannot init EAL %s\n", dp_strerror_verbose(ret));
 		return EXIT_FAILURE;
 	}
 

@@ -32,7 +32,7 @@ static void dp_flow_aging_timer_cb(__rte_unused struct rte_timer *timer, __rte_u
 	int ret = dp_send_event_flow_aging_msg();
 
 	if (DP_FAILED(ret))
-		DPS_LOG_WARNING("Cannot send flow aging event %s", dp_strerror(ret));
+		DPS_LOG_WARNING("Cannot send flow aging event", DP_LOG_RET(ret));
 }
 
 static void dp_maintenance_timer_cb(__rte_unused struct rte_timer *timer, __rte_unused void *arg)
@@ -75,7 +75,7 @@ int dp_timers_init()
 
 	ret = rte_timer_subsystem_init();
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot init timer subsystem %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot init timer subsystem", DP_LOG_RET(ret));
 		return ret;
 	}
 

@@ -12,17 +12,21 @@ static int create_flow(int port_id,
 {
 	int ret;
 	struct rte_flow *flow;
-	struct rte_flow_error error = {0};
+	struct rte_flow_error error = {
+		.message = "(no stated reason)",
+	};
 
 	ret = rte_flow_validate(port_id, attr, pattern, action, &error);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Flow isolation cannot be validated on port %d: %s %s", port_id, error.message, dp_strerror(ret));
-		return DP_ERROR;
+		DPS_LOG_ERR("Flow isolation cannot be validated",
+					DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
+		return ret;
 	}
 
 	flow = rte_flow_create(port_id, attr, pattern, action, &error);
 	if (!flow) {
-		DPS_LOG_ERR("Flow isolation cannot be created on port %d: %s %s", port_id, error.message, dp_strerror(rte_errno));
+		DPS_LOG_ERR("Flow isolation cannot be created",
+					DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 
@@ -130,7 +134,7 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 											   &udp_spec, &udp_mask,
 											   svc_port, 0);
 	} else {
-		DPS_LOG_ERR("Invalid virtsvc protocol for isolation: %u", proto_id);
+		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));
 		return DP_ERROR;
 	}
 

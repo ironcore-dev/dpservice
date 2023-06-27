@@ -75,7 +75,7 @@ static int dp_port_register_pf(uint16_t port_id)
 			return DP_OK;
 		}
 	}
-	DPS_LOG_ERR("To many physical ports, maximum %d supported", DP_MAX_PF_PORTS);
+	DPS_LOG_ERR("To many physical ports", DP_LOG_MAX(DP_MAX_PF_PORTS));
 	return DP_ERROR;
 }
 
@@ -93,7 +93,7 @@ struct dp_port *dp_port_get(uint16_t port_id)
 	struct dp_port *port = get_port(port_id);
 
 	if (!port)
-		DPS_LOG_ERR("Port %d not registered in dp-service", port_id);
+		DPS_LOG_ERR("Port not registered in dp-service", DP_LOG_PORTID(port_id));
 
 	return port;
 }
@@ -103,7 +103,7 @@ struct dp_port *dp_port_get_vf(uint16_t port_id)
 	struct dp_port *port = get_port(port_id);
 
 	if (!port || port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port %d not registered in dp-service", port_id);
+		DPS_LOG_ERR("VF port not registered in dp-service", DP_LOG_PORTID(port_id));
 		return NULL;
 	}
 
@@ -181,7 +181,7 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
 								&port_conf);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot configure eth device for port %d %s", port_id, dp_strerror(ret));
+		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -195,7 +195,7 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 									 &rxq_conf,
 									 dp_layer->rte_mempool);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Rx queue setup failed for port %d %s", port_id, dp_strerror(ret));
+			DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -208,17 +208,17 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 									 rte_eth_dev_socket_id(port_id),
 									 &txq_conf);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Tx queue setup failed for port %d %s", port_id, dp_strerror(ret));
+			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
 
 	/* dp-service specific config */
 	if (port_type == DP_PORT_VF) {
-		DPS_LOG_INFO("INIT setting port %d to promiscuous mode", port_id);
+		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORTID(port_id));
 		ret = rte_eth_promiscuous_enable(port_id);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Promiscuous mode setting failed for port %d %s", port_id, dp_strerror(ret));
+			DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -241,13 +241,14 @@ static int dp_port_flow_isolate(uint16_t port_id)
 
 	/* Poisoning to make sure PMDs update it in case of error. */
 	memset(&error, 0x66, sizeof(error));
+	error.message = "(null)";
+
 	ret = rte_flow_isolate(port_id, 1, &error);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Flows cannot be isolated (%s) %s",
-					error.message ? error.message : "(null)", dp_strerror(ret));
-		return DP_ERROR;
+		DPS_LOG_ERR("Flows cannot be isolated", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
+		return ret;
 	}
-	DPS_LOG_INFO("Ingress traffic on port %u is now restricted to the defined flow rules", port_id);
+	DPS_LOG_INFO("Ingress traffic on port is now restricted to the defined flow rules", DP_LOG_PORTID(port_id));
 	return DP_OK;
 }
 
@@ -277,7 +278,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	case DP_PORT_PF:
 		ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot register link status callback %s", dp_strerror(ret));
+			DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
 			return NULL;
 		}
 		break;
@@ -308,7 +309,7 @@ static int dp_port_init_pf(const char *pf_name)
 		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
 			return DP_ERROR;
 		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
-			DPS_LOG_INFO("INIT initializing PF port: %d (%s)", port_id, ifname);
+			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
 			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_PF);
 			if (!port)
 				return DP_ERROR;
@@ -316,7 +317,7 @@ static int dp_port_init_pf(const char *pf_name)
 			return DP_OK;
 		}
 	}
-	DPS_LOG_ERR("No such PF: '%s'", pf_name);
+	DPS_LOG_ERR("No such PF", DP_LOG_NAME(pf_name));
 	return DP_ERROR;
 }
 
@@ -332,7 +333,7 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
 			return DP_ERROR;
 		if (strstr(ifname, vf_pattern) && ++vf_count <= num_of_vfs) {
-			DPS_LOG_INFO("INIT initializing VF port: %d (%s)", port_id, ifname);
+			DPS_LOG_INFO("INIT initializing VF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
 			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_VF);
 			if (!port)
 				return DP_ERROR;
@@ -341,10 +342,10 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 		}
 	}
 	if (!vf_count) {
-		DPS_LOG_ERR("No such VF: '%s'", vf_pattern);
+		DPS_LOG_ERR("No such VF", DP_LOG_NAME(vf_pattern));
 		return DP_ERROR;
 	} else if (vf_count < num_of_vfs) {
-		DPS_LOG_ERR("Not all VFs initialized (%d/%d)", vf_count, num_of_vfs);
+		DPS_LOG_ERR("Not all VFs initialized", DP_LOG_VALUE(vf_count), DP_LOG_MAX(num_of_vfs));
 		return DP_ERROR;
 	}
 	return DP_OK;
@@ -410,7 +411,7 @@ int dp_port_start(uint16_t port_id)
 
 	ret = rte_eth_dev_start(port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start ethernet port %d %s", port_id, dp_strerror(ret));
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -451,7 +452,7 @@ int dp_port_stop(uint16_t port_id)
 	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
 		ret = rte_eth_dev_stop(port_id);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot stop eth port %d %s", port_id, dp_strerror(ret));
+			DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}

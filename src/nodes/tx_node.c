@@ -32,14 +32,14 @@ int tx_node_create(uint16_t port_id)
 	rte_node_t node_id;
 
 	if (port_id >= RTE_DIM(tx_node_ids)) {
-		DPS_LOG_ERR("Port id %u too high for Tx nodes, max %lu", port_id, RTE_DIM(tx_node_ids));
+		DPS_LOG_ERR("Port id too high for Tx nodes", DP_LOG_VALUE(port_id), DP_LOG_MAX(RTE_DIM(tx_node_ids)));
 		return DP_ERROR;
 	}
 
 	snprintf(name, sizeof(name), "%u", port_id);
 	node_id = rte_node_clone(DP_NODE_GET_SELF(tx)->id, name);
 	if (node_id == RTE_NODE_ID_INVALID) {
-		DPS_LOG_ERR("Cannot clone Tx node %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot clone Tx node", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 
@@ -120,7 +120,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	dp_graphtrace_tx_burst(node, objs, sent_count, port);
 
 	if (unlikely(sent_count != nb_objs)) {
-		DPNODE_LOG_WARNING(node, "Not all packets transmitted successfully (%d/%d)", sent_count, nb_objs);
+		DPNODE_LOG_WARNING(node, "Not all packets transmitted successfully", DP_LOG_VALUE(sent_count), DP_LOG_MAX(nb_objs));
 		dp_graphtrace_next_burst(node, objs + sent_count, nb_objs - sent_count, TX_NEXT_DROP);
 		rte_node_enqueue(graph, node, TX_NEXT_DROP, objs + sent_count, nb_objs - sent_count);
 	}

@@ -184,7 +184,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					- offsetof(struct dp_dhcp_header, options);
 
 	if (dhcp_hdr->op != DP_BOOTP_REQUEST) {
-		DPNODE_LOG_WARNING(node, "Not a DHCP request");
+		DPNODE_LOG_WARNING(node, "Not a DHCP request", DP_LOG_VALUE(dhcp_hdr->op));
 		return DHCP_NEXT_DROP;
 	}
 
@@ -199,7 +199,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		response_type = DHCPACK;
 	} else {
 		// unhandled by design
-		DPNODE_LOG_DEBUG(node, "Unhandled DHCP message type %u", msg_type);
+		DPNODE_LOG_DEBUG(node, "Unhandled DHCP message type", DP_LOG_VALUE(msg_type));
 		return DHCP_NEXT_DROP;
 	}
 
@@ -238,7 +238,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			break;
 		case DP_PXE_MODE_HTTP:
 			if (!inet_ntop(AF_INET, &pxe_srv_ip, pxe_srv_ip_str, INET_ADDRSTRLEN)) {
-				DPNODE_LOG_WARNING(node, "Cannot convert PXE server IP %s", dp_strerror(errno));
+				DPNODE_LOG_WARNING(node, "Cannot convert PXE server IP",
+								   DP_LOG_IPV4(ntohl(pxe_srv_ip)), DP_LOG_RET(errno));
 				return DHCP_NEXT_DROP;
 			}
 			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
@@ -273,7 +274,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	m->data_len = m->pkt_len;
 
 	if (DP_FAILED(dp_port_set_vf_attach_status(m->port, DP_VF_PORT_ATTACHED))) {
-		DPNODE_LOG_ERR(node, "Cannot attach port %d", m->port);
+		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(m->port));
 		return DHCP_NEXT_DROP;
 	}
 

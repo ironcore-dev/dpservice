@@ -15,33 +15,17 @@
 
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
-#define DP_FLOW_LOG_KEY(MSG, KEY) do { \
-	if (rte_log_get_level(RTE_LOGTYPE_DPSERVICE) >= RTE_LOG_DEBUG) \
-		dp_log_flow_key_info((MSG), (KEY)); \
-} while (0)
+// TODO(Tao?): this debug logging should be removed once the code stabilizes as it does happen quite often in the critical path
+// As this is really specific to this module **and** is calling a function,
+// this is a locally-defined macro for now (macro to preserve call-stack in logging)
+#define DP_LOG_FLOW_KEY(KEY) \
+	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
+	DP_LOG_PROTO((KEY)->proto), \
+	DP_LOG_SRC_IPV4((KEY)->ip_src), DP_LOG_DST_IPV4((KEY)->ip_dst), \
+	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static bool offload_mode_enabled = 0;
-
-static void dp_log_flow_key_info(const char *msg, struct flow_key *key)
-{
-	uint32_t hash_value = dp_get_conntrack_flow_hash_value(key);
-	const char *protocol;
-
-	if (key->proto == IPPROTO_TCP)
-		protocol = "tcp";
-	else if (key->proto == IPPROTO_UDP)
-		protocol = "udp";
-	else if (key->proto == IPPROTO_ICMP)
-		protocol = "icmp";
-	else
-		protocol = "unknown";
-
-	DPS_LOG_DEBUG("%s: %u, %s, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT ", src_port: %d, port_dst: %d",
-		msg, hash_value, protocol,
-		DP_IPV4_PRINT_BYTES(ntohl(key->ip_src)), DP_IPV4_PRINT_BYTES(ntohl(key->ip_dst)),
-		key->src.port_src, key->port_dst);
-}
 
 int dp_flow_init(int socket_id)
 {
@@ -76,16 +60,16 @@ static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* ou
 			&& df->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE
 			&& df->l4_info.icmp_field.icmp_code != DP_IP_ICMP_CODE_FRAGMENT_NEEDED
 		) {
-			DPS_LOG_DEBUG("received an ICMP error message with unsupported error code %d, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT,
-						  df->l4_info.icmp_field.icmp_code,
-						  DP_IPV4_PRINT_BYTES(df->src.src_addr), DP_IPV4_PRINT_BYTES(df->dst.dst_addr));
+			DPS_LOG_DEBUG("Received an ICMP error message with unsupported error code",
+						   DP_LOG_VALUE(df->l4_info.icmp_field.icmp_code),
+						   DP_LOG_SRC_IPV4(ntohl(df->src.src_addr)), DP_LOG_DST_IPV4(ntohl(df->dst.dst_addr)));
 			return DP_ERROR;
 		}
 
 		dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 
 		if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port) {
-			DPS_LOG_WARNING("failed to extract attached ip header in icmp error message during icmp flow key building");
+			DPS_LOG_WARNING("Failed to extract attached ip header in icmp error message during icmp flow key building");
 			return DP_ERROR;
 		}
 
@@ -100,9 +84,9 @@ static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* ou
 		return DP_OK;
 	}
 
-	DPS_LOG_DEBUG("received an ICMP error message with unsupported type %d, src_ip: " DP_IPV4_PRINT_FMT ", dst_ip: " DP_IPV4_PRINT_FMT,
-				  df->l4_info.icmp_field.icmp_type,
-				  DP_IPV4_PRINT_BYTES(df->src.src_addr), DP_IPV4_PRINT_BYTES(df->dst.dst_addr));
+	DPS_LOG_DEBUG("Received an ICMP error message with unsupported type",
+				  DP_LOG_VALUE(df->l4_info.icmp_field.icmp_type),
+				  DP_LOG_SRC_IPV4(ntohl(df->src.src_addr)), DP_LOG_DST_IPV4(ntohl(df->dst.dst_addr)));
 	return DP_ERROR;
 }
 
@@ -189,11 +173,11 @@ int dp_add_flow(struct flow_key *key)
 	int ret = rte_hash_add_key(ipv4_flow_tbl, key);
 
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add key to flow table %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot add key to flow table", DP_LOG_RET(ret));
 		return ret;
 	}
 
-	DP_FLOW_LOG_KEY("Successfully added a hash key", key);
+	DPS_LOG_DEBUG("Successfully added a hash key", DP_LOG_FLOW_KEY(key));
 	return DP_OK;
 }
 
@@ -203,13 +187,13 @@ void dp_delete_flow_key(struct flow_key *key)
 	
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
-			DP_FLOW_LOG_KEY("Attempt to delete a non-existing hash key", key);
+			DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY(key));
 		else
-			DPS_LOG_ERR("Cannot delete key from flow table %s", dp_strerror(ret));
+			DPS_LOG_ERR("Cannot delete key from flow table", DP_LOG_RET(ret));
 		return;
 	}
 
-	DP_FLOW_LOG_KEY("Successfully deleted an existing hash key", key);
+	DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY(key));
 }
 
 int dp_add_flow_data(struct flow_key *key, void *data)
@@ -217,7 +201,7 @@ int dp_add_flow_data(struct flow_key *key, void *data)
 	int ret = rte_hash_add_key_data(ipv4_flow_tbl, key, data);
 
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add data to flow table %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot add data to flow table", DP_LOG_RET(ret));
 		return ret;
 	}
 	return DP_OK;
@@ -260,9 +244,10 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 	if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 		ret = dp_remove_network_snat_port(cntrack);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("failed to remove an allocated network NAT port: " DP_IPV4_PRINT_FMT "::%d %s",
-						DP_IPV4_PRINT_BYTES(htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst)),
-						cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst, dp_strerror(ret));
+			DPS_LOG_ERR("Failed to remove an allocated NAT port",
+						DP_LOG_DST_IPV4(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst),
+						DP_LOG_DST_PORT(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst),
+						DP_LOG_RET(ret));
 	}
 }
 
@@ -271,13 +256,13 @@ int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle
 	int ret;
 
 	memset(error, 0, sizeof(struct rte_flow_error));
+	error->message = "(no stated reason)",
+
 	ret = rte_flow_action_handle_destroy(port_id, handle, error);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("failed to destroy a flow action handle, error code:%d, reason %s", ret,
-								error->message ? error->message : "(no stated reason)");
-		return DP_ERROR;
-	}
-	return DP_OK;
+	if (DP_FAILED(ret))
+		DPS_LOG_WARNING("Failed to destroy flow action handle",
+						DP_LOG_FLOW_ERROR(error->message), DP_LOG_RET(ret));
+	return ret;
 }
 
 void dp_process_aged_flows(int port_id)
@@ -289,17 +274,14 @@ void dp_process_aged_flows(int port_id)
 	int ret;
 
 	total = rte_flow_get_aged_flows(port_id, NULL, 0, &error);
-
 	if (total <= 0)
 		return;
 
-	contexts = rte_zmalloc("aged_ctx", sizeof(void *) * total,
-			       RTE_CACHE_LINE_SIZE);
+	contexts = rte_zmalloc("aged_ctx", sizeof(void *) * total, RTE_CACHE_LINE_SIZE);
 	if (contexts == NULL)
 		return;
 
-	nb_context = rte_flow_get_aged_flows(port_id, contexts,
-					     total, &error);
+	nb_context = rte_flow_get_aged_flows(port_id, contexts, total, &error);
 	if (nb_context != total)
 		goto free;
 
@@ -309,24 +291,24 @@ void dp_process_aged_flows(int port_id)
 			continue;
 
 		if (agectx->handle) {
-
-			if (DP_FAILED(dp_destroy_rte_action_handle(port_id, agectx->handle, &error)))
-				DPS_LOG_ERR("failed to remove a indirect action from port %d", port_id);
-
+			ret = dp_destroy_rte_action_handle(port_id, agectx->handle, &error);
+			if (DP_FAILED(ret))
+				DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			agectx->handle = NULL;
-
 		}
 
 		if (agectx->rte_flow) {
 
 			rte_flow_destroy(port_id, agectx->rte_flow, &error);
 
-			DPS_LOG_DEBUG("Removed an aged rte flow due to timeout, agectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
-									(void *)agectx->rte_flow, rte_atomic32_read(&(agectx->cntrack->ref_count.refcount)), port_id);
+			DPS_LOG_DEBUG("Removed an aged rte flow due to timeout",
+						  DP_LOG_PORTID(port_id),
+						  _DP_LOG_PTR("agectx_rteflow", agectx->rte_flow),
+						  _DP_LOG_INT("flowval_ref_cnt", rte_atomic32_read(&(agectx->cntrack->ref_count.refcount))));
 			agectx->rte_flow = NULL;
 			ret = dp_del_rte_age_ctx(agectx->cntrack, agectx);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("failed to remove age ctx from its associated cntrack obj");
+				DPS_LOG_ERR("Failed to remove agectx from conntrack object", DP_LOG_RET(ret));
 
 			dp_ref_dec(&agectx->cntrack->ref_count);
 
@@ -342,7 +324,9 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 {
 	uint8_t age_ctx_index;
 	struct flow_age_ctx *curr_age_ctx;
-	struct rte_flow_error error;
+	struct rte_flow_error error = {
+		.message = "(no stated reason)",
+	};
 	struct rte_flow_query_age age_query;
 	int ret;
 
@@ -357,34 +341,34 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flo
 				memset(&age_query, 0, sizeof(age_query));
 
 				ret = rte_flow_action_handle_query(curr_age_ctx->port_id, curr_age_ctx->handle, &age_query, &error);
-
 				if (DP_FAILED(ret)) {
-					DPS_LOG_ERR("failed to query tcp flow's age action due to code: %d, with error msg: %s", ret,
-									error.message ? error.message : "(no stated reason)");
-					return DP_ERROR;
+					DPS_LOG_ERR("Failed to query tcp flow age action", DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
+					return ret;
 				}
 
 				// delete this rule regardless if it has expired in hw or not (age_query.aged)
 				if (age_query.sec_since_last_hit >= flow_val->timeout_value) {
 
-					if (DP_FAILED(dp_destroy_rte_action_handle(curr_age_ctx->port_id, curr_age_ctx->handle, &error))) {
-						DPS_LOG_ERR("failed to remove a indirect action from port %d", curr_age_ctx->port_id);
-						return DP_ERROR;
+					ret = dp_destroy_rte_action_handle(curr_age_ctx->port_id, curr_age_ctx->handle, &error);
+					if (DP_FAILED(ret)) {
+						DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(curr_age_ctx->port_id),
+									DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
+						return ret;
 					}
 
 					curr_age_ctx->handle =  NULL;
-					DPS_LOG_DEBUG("Remove an aged rte flow from sw table via query \n				\
-									gectx: rteflow %p\n flowval: flow_ref_cnt %d  rte_flow inserted on port %d \n",
-									(void *)curr_age_ctx->rte_flow, rte_atomic32_read(&(curr_age_ctx->cntrack->ref_count.refcount)),
-									curr_age_ctx->port_id);
+					DPS_LOG_DEBUG("Remove an aged rte flow from sw table via query",
+								  DP_LOG_PORTID(curr_age_ctx->port_id),
+								  _DP_LOG_PTR("agectx_rteflow", curr_age_ctx->rte_flow),
+								  _DP_LOG_INT("flowval_ref_cnt", rte_atomic32_read(&(curr_age_ctx->cntrack->ref_count.refcount))));
 
 					rte_flow_destroy(curr_age_ctx->port_id, curr_age_ctx->rte_flow, &error);
 					curr_age_ctx->rte_flow = NULL;
 
 					ret = dp_del_rte_age_ctx(flow_val, curr_age_ctx);
 					if (DP_FAILED(ret)) {
-						DPS_LOG_ERR("failed to remove age ctx from its associated cntrack obj");
-						return DP_ERROR;
+						DPS_LOG_ERR("Failed to remove agectx from conntrack object", DP_LOG_RET(ret));
+						return ret;
 					}
 
 					dp_ref_dec(&(flow_val->ref_count));
@@ -413,7 +397,7 @@ void dp_process_aged_flows_non_offload(void)
 		if (offload_mode_enabled) {
 			ret = dp_rte_flow_query_and_remove((struct flow_key *)next_key, flow_val);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("failed to query and remove rte flows");
+				DPS_LOG_ERR("Failed to query and remove rte flows", DP_LOG_RET(ret));
 		}
 
 		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value) && (!flow_val->aged)) {
@@ -443,7 +427,8 @@ int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 	}
 
 	if (index >= DP_FLOW_VAL_MAX_AGE_STORE) {
-		DPS_LOG_ERR("try to add age ctx to cntrack storage but exceed its capacity");
+		DPS_LOG_ERR("Cannot add agectx to conntrack storage, at capacity",
+					DP_LOG_VALUE(index), DP_LOG_MAX(DP_FLOW_VAL_MAX_AGE_STORE));
 		return DP_ERROR;
 	}
 
@@ -453,7 +438,8 @@ int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 {
 	if (ctx->ref_index_in_cntrack >= DP_FLOW_VAL_MAX_AGE_STORE) {
-		DPS_LOG_ERR("try to delete age ctx from cntrack storage but it is not a valid index");
+		DPS_LOG_ERR("Cannot delete agectx from conntrack storage, invalid index",
+					DP_LOG_VALUE(ctx->ref_index_in_cntrack), DP_LOG_MAX(DP_FLOW_VAL_MAX_AGE_STORE));
 		return DP_ERROR;
 	}
 

@@ -21,8 +21,7 @@
 #define FORMAT_INT log_formatter[4]
 #define FORMAT_UINT log_formatter[5]
 #define FORMAT_IPV4 log_formatter[6]
-// TODO phase this out
-#define FORMAT_OLDHEADER log_formatter[7]
+#define FORMAT_PTR log_formatter[7]
 static const char *const log_formatter_text[] = {
 	/* header  */ "%s %u(%s) %.1s %s: %s",
 	/* caller  */ " [%s:%u:%s()]",
@@ -31,8 +30,7 @@ static const char *const log_formatter_text[] = {
 	/* int     */ ", %s: %d",
 	/* uint    */ ", %s: %u",
 	/* ipv4    */ ", %s: %u.%u.%u.%u",
-	// TODO phase this out
-	/* oldhead */ "%s %u(%s) %.1s %s: ",
+	/* ptr     */ ", %s: %p",
 };
 static const char *const log_formatter_json[] = {
 	/* header  */ "{ \"ts\": \"%s\", \"thread_id\": %u, \"thread_name\": \"%s\", \"level\": \"%s\", \"logger\": \"%s\", \"msg\": \"%s\"",
@@ -42,8 +40,7 @@ static const char *const log_formatter_json[] = {
 	/* int     */ ", \"%s\": %d",
 	/* uint    */ ", \"%s\": %u",
 	/* ipv4    */ ", \"%s\": \"%u.%u.%u.%u\"",
-	// TODO phase this out
-	/* oldhead */ "{ \"ts\": \"%s\", \"thread_id\": %u, \"thread_name\": \"%s\", \"level\": \"%s\", \"logger\": \"%s\"",
+	/* ptr     */ ", \"%s\": \"%p\"",
 };
 static const char *const log_types_text[] = {
 	"SERVICE", "GRAPH", "GRPC"
@@ -80,7 +77,7 @@ int dp_log_init()
 
 	ret = rte_openlog_stream(stdout);
 	if (DP_FAILED(ret)) {
-		DP_EARLY_ERR("Cannot open logging stream %s", dp_strerror(ret));
+		DP_EARLY_ERR("Cannot open logging stream %s", dp_strerror_verbose(ret));
 		return ret;
 	}
 
@@ -144,63 +141,6 @@ static inline int get_timestamp(char *buf)
 	return DP_OK;
 }
 
-// TODO(plague): remove this once completely phased-out
-void _dp_log(unsigned int level, unsigned int logtype,
-#ifdef DEBUG
-			 const char *file, unsigned int line, const char *function,
-#endif
-			 const char *format, ...)
-{
-	char timestamp[TIMESTAMP_MAXSIZE];
-	va_list args;
-	FILE *f;
-
-	if (!rte_log_can_log(logtype, level))
-		return;
-
-	if (DP_FAILED(get_timestamp(timestamp)))
-		memcpy(timestamp, TIMESTAMP_NUL, TIMESTAMP_MAXSIZE);  // including \0
-
-	// generate a new thread ID if this is the first log in a thread
-	if (!thread_id)
-		thread_id = __sync_add_and_fetch(&thread_id_generator, 1);
-
-	f = rte_log_get_stream();
-
-	flockfile(f);
-
-	if (log_colors)
-		set_color(f, level);
-
-	fprintf(f, FORMAT_OLDHEADER, timestamp, thread_id, thread_name, log_levels[level], log_types[logtype-RTE_LOGTYPE_USER1]);
-
-	// TODO this of course needs JSON-encoding, but as this function will be phased out, I'm not implementing it
-	if (dp_conf_get_log_format() == DP_CONF_LOG_FORMAT_JSON)
-		fputs(", \"msg\": \"", f);
-
-	// In JSON this is just one big lump of course
-	va_start(args, format);
-	vfprintf(f, format, args);
-	va_end(args);
-
-	// TODO dtto as above
-	if (dp_conf_get_log_format() == DP_CONF_LOG_FORMAT_JSON)
-		fputc('"', f);
-
-#ifdef DEBUG
-	fprintf(f, FORMAT_CALLER, file, line, function);
-#endif
-
-	if (log_colors)
-		clear_color(f);
-
-	fputs(FORMAT_ENDLINE, f);
-
-	fflush(f);
-
-	funlockfile(f);
-}
-
 static const char *json_escape(const char *message, char *buf, size_t bufsize)
 {
 	int bufpos = 0;
@@ -237,17 +177,12 @@ static const char *json_escape(const char *message, char *buf, size_t bufsize)
 }
 static __rte_always_inline const char *escape_message(const char *message, char *buf, size_t bufsize)
 {
-	if (log_json)
-		return json_escape(message, buf, bufsize);
-
-	return message;
+	return log_json ? json_escape(message, buf, bufsize) : message;
 }
 
-void _dp_log_structured(unsigned int level, unsigned int logtype,
-#ifdef DEBUG
-						const char *file, unsigned int line, const char *function,
-#endif
-						const char *message, ...)
+void _dp_log(unsigned int level, unsigned int logtype,
+			 const char *file, unsigned int line, const char *function,
+			 const char *message, ...)
 {
 	char timestamp[TIMESTAMP_MAXSIZE];
 	va_list args;
@@ -274,6 +209,12 @@ void _dp_log_structured(unsigned int level, unsigned int logtype,
 
 	if (log_colors)
 		set_color(f, level);
+
+#ifdef DEBUG
+	// check the message for printf-format to prevent issues
+	for (const char *cur = message; *cur; ++cur)
+		assert(*cur != '%');
+#endif
 
 	// everything except the message value is JSON-safe
 	assert(level > 0 && level < RTE_DIM(log_levels));
@@ -302,15 +243,18 @@ void _dp_log_structured(unsigned int level, unsigned int logtype,
 			break;
 		case _DP_LOG_FMT_IPV4:
 			ipv4_value = va_arg(args, rte_be32_t);
-			fprintf(f, FORMAT_IPV4, key, (ipv4_value) & 0xFF,
-										((ipv4_value) >> 8) & 0xFF,
-										((ipv4_value) >> 16) & 0xFF,
-										((ipv4_value) >> 24) & 0xFF);
+			fprintf(f, FORMAT_IPV4, key, ((ipv4_value) >> 24) & 0xFF,
+										 ((ipv4_value) >> 16) & 0xFF,
+										 ((ipv4_value) >> 8) & 0xFF,
+										  (ipv4_value) & 0xFF);
 			break;
 		case _DP_LOG_FMT_IPV6:
 			// re-use the escaping buffer for IP conversion
 			str_value = inet_ntop(AF_INET6, va_arg(args, const uint8_t *), escaped, INET6_ADDRSTRLEN);
 			fprintf(f, FORMAT_STR, key, str_value);
+			break;
+		case _DP_LOG_FMT_PTR:
+			fprintf(f, FORMAT_PTR, key, va_arg(args, const void *));
 			break;
 		default:
 			assert(false);
@@ -320,10 +264,8 @@ void _dp_log_structured(unsigned int level, unsigned int logtype,
 parse_error:
 	va_end(args);
 
-#ifdef DEBUG
 	// everything here should be JSON-safe
 	fprintf(f, FORMAT_CALLER, file, line, function);
-#endif
 
 	if (log_colors)
 		clear_color(f);

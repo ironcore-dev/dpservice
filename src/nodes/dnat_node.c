@@ -106,8 +106,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			if (df->l4_type == DP_IP_PROTO_ICMP) {
 				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
 					if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst) == DP_IP_ICMP_ID_INVALID) {
-						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d",
-								htons(cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst));
+						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
 						return DNAT_NEXT_DROP;
 					}
 				}
@@ -124,8 +123,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				
 			} else {
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src)) == 0) {
-					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's dst port with value %d",
-							htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
+					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's dst port");
 					return DNAT_NEXT_DROP;
 				}
 			}

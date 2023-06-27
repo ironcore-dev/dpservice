@@ -269,6 +269,8 @@ uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t n
 
 	df = dp_get_flow_ptr(m);
 
+	// TODO(tao?) this is always true due to the fact the caller is checking it already
+	// making the subsequent caller's check for failure unnecessary
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		if (df->l4_type == DP_IP_PROTO_TCP) {
@@ -307,6 +309,8 @@ uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
 	df = dp_get_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 	
+	// TODO(tao?): this actually is always guarded by the caller,
+	// making the subsequent caller's check for failure unnecessary
 	if (df->l4_type == DP_IP_PROTO_ICMP) {
 		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
 		old_identifier = icmp_hdr->icmp_ident;
@@ -769,10 +773,8 @@ void free_allocated_agectx(struct flow_age_ctx *agectx)
 
 	if (agectx) {
 		if (agectx->handle) {
-
 			if (DP_FAILED(dp_destroy_rte_action_handle(agectx->port_id, agectx->handle, &error)))
-				DPS_LOG_ERR("failed to remove a indirect action from port %d", agectx->port_id);
-
+				DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(agectx->port_id));
 		}
 		rte_free(agectx);
 	}
@@ -795,25 +797,23 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_action action[],
 												struct dp_flow *df)
 {
-
-	int res;
+	int ret;
 	struct rte_flow *flow = NULL;
+	struct rte_flow_error error = {
+		.message = "(no stated reason)",
+	};
 
-	struct rte_flow_error error;
-
-	res = rte_flow_validate(port_id, attr, pattern, action, &error);
-
-	if (res) {
-		printf("Flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	ret = rte_flow_validate(port_id, attr, pattern, action, &error);
+	if (ret) {
+		DPS_LOG_ERR("Flow cannot be validated", DP_LOG_FLOW_ERROR(error.message), DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return NULL;
 	} else {
-		// printf("Flow validated on port %d\n", port_id);
 		flow = rte_flow_create(port_id, attr, pattern, action, &error);
 		if (!flow) {
-			printf("Flow can't be created on port %d message: %s\n", port_id, error.message ? error.message : "(no stated reason)");
+			DPS_LOG_ERR("Flow cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
 			return NULL;
 		}
-		DPS_LOG_DEBUG("installed a flow rule on port %d", port_id);
+		DPS_LOG_DEBUG("Installed a flow rule", DP_LOG_PORTID(port_id));
 		return flow;
 	}
 }
@@ -826,7 +826,9 @@ int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 		return DP_OK;
 
 	struct rte_flow_indir_action_conf age_indirect_conf;
-	struct rte_flow_error error;
+	struct rte_flow_error error = {
+		.message = "(no stated reason)",
+	};
 	struct rte_flow_action_handle *result = NULL;
 
 	age_indirect_conf.ingress = attr->ingress;
@@ -834,18 +836,15 @@ int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 	age_indirect_conf.transfer = attr->transfer;
 
 	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
-
 	if (!result) {
-		DPS_LOG_ERR("Flow's age cannot be configured as indirect due to error message: %s", error.message ? error.message : "(no stated reason)");
+		DPS_LOG_ERR("Flow's age cannot be configured as indirect", DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;
 	}
 
 	if (DP_FAILED(dp_add_rte_age_ctx(df->conntrack, agectx))) {
-
 		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
-				DPS_LOG_ERR("failed to remove a indirect action from port %d", port_id);
-
-		DPS_LOG_ERR("failed to store agectx in cntrack obj");
+			DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to store agectx in conntrack object");
 		result = NULL;
 		return DP_ERROR;
 	}

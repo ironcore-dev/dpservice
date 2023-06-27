@@ -65,7 +65,8 @@ void dp_grpc_send_response(struct dp_grpc_responder *responder, int grpc_ret)
 
 	sent = rte_ring_sp_enqueue_burst(get_dpdk_layer()->grpc_rx_queue, (void * const *)responder->replies, responder->repcount, NULL);
 	if (sent != responder->repcount) {
-		DPGRPC_LOG_WARNING("Not all gRPC responses were queued", DP_LOG_GRPCREQUEST(responder->request.type));
+		DPGRPC_LOG_WARNING("Not all gRPC responses were queued", DP_LOG_GRPCREQUEST(responder->request.type),
+						   DP_LOG_VALUE(sent), DP_LOG_MAX(responder->repcount));
 		rte_pktmbuf_free_bulk(responder->replies + sent, responder->repcount - sent);
 	}
 }

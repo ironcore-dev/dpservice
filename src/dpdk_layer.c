@@ -25,7 +25,7 @@ static inline int ring_init(const char *name, struct rte_ring **p_ring)
 {
 	*p_ring = rte_ring_create(name, DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!*p_ring) {
-		DPS_LOG_ERR("Error creating '%s' ring buffer %s", name, dp_strerror(rte_errno));
+		DPS_LOG_ERR("Error creating ring buffer", DP_LOG_NAME(name), DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 	return DP_OK;
@@ -44,7 +44,7 @@ static int dp_dpdk_layer_init_unsafe()
 												   RTE_MBUF_DEFAULT_BUF_SIZE,
 												   rte_socket_id());
 	if (!dp_layer.rte_mempool) {
-		DPS_LOG_ERR("Cannot create mbuf pool %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot create mbuf pool", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 
@@ -144,7 +144,7 @@ static int main_core_loop(void)
 		}
 		ret = rte_timer_manage();
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Timer manager failed %s", dp_strerror(ret));
+			DPS_LOG_ERR("Timer manager failed", DP_LOG_RET(ret));
 			// separate thread, need to stop others
 			dp_force_quit();
 			break;
@@ -164,7 +164,7 @@ int dp_dpdk_main_loop(void)
 	/* Launch per-lcore init on every worker lcore */
 	ret = rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot launch lcores %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot launch lcores", DP_LOG_RET(ret));
 		// custom threads are already running, stop them
 		dp_force_quit();
 		return ret;

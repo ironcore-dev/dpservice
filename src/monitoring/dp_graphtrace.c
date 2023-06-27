@@ -9,11 +9,6 @@
 
 #ifdef ENABLE_PYTEST
 #	include "dp_conf.h"
-#	define DP_GRAPHTRACE_LOG(PKT, FORMAT, ...) do { \
-		char _graphtrace_buf[512]; \
-		dp_graphtrace_sprint((PKT), _graphtrace_buf, sizeof(_graphtrace_buf)); \
-		DP_LOG(DEBUG, GRAPH, FORMAT ": %s", __VA_ARGS__, _graphtrace_buf); \
-	} while (0)
 // real id in df_ptr would be better, but that requires initializing df_ptr in rx nodes
 #	define DP_GRAPHTRACE_PKT_ID(PKT) (PKT)
 static enum dp_graphtrace_loglevel graphtrace_loglevel;
@@ -32,14 +27,14 @@ int dp_graphtrace_init()
 											 RTE_MBUF_DEFAULT_BUF_SIZE,
 											 rte_socket_id());
 	if (!graphtrace.mempool) {
-		DPS_LOG_ERR("Cannot allocate graphtrace pool %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot allocate graphtrace pool", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 
 	graphtrace.ringbuf = rte_ring_create(DP_GRAPHTRACE_RINGBUF_NAME, DP_GRAPHTRACE_RINGBUF_SIZE,
 										 rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
 	if (!graphtrace.ringbuf) {
-		DPS_LOG_ERR("Cannot create graphtrace ring buffer %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot create graphtrace ring buffer", DP_LOG_RET(rte_errno));
 		rte_mempool_free(graphtrace.mempool);
 		return DP_ERROR;
 	}
@@ -95,10 +90,26 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 }
 
 #ifdef ENABLE_PYTEST
+__rte_format_printf(2, 3)
+static void dp_graphtrace_log(void *obj, const char *format, ...)
+{
+	char buf[1024];
+	va_list args;
+	int pos;
+
+	va_start(args, format);
+	pos = vsnprintf(buf, sizeof(buf), format, args);
+	va_end(args);
+
+	dp_graphtrace_sprint(obj, buf + pos, sizeof(buf) - pos);
+
+	DP_STRUCTURED_LOG(DEBUG, GRAPH, buf);
+}
+
 void _dp_graphtrace_log_node(struct rte_node *node, void *obj)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
-		DP_GRAPHTRACE_LOG(obj, "%-14s: %p                  ",
+		dp_graphtrace_log(obj, "%-14s: %p                  : ",
 					   node->name, DP_GRAPHTRACE_PKT_ID(obj));
 }
 
@@ -106,14 +117,14 @@ void _dp_graphtrace_log_node_burst(struct rte_node *node, void **objs, uint16_t 
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
 		for (uint i = 0; i < nb_objs; ++i)
-			DP_GRAPHTRACE_LOG(objs[i], "%-14s: %p                  ",
+			dp_graphtrace_log(objs[i], "%-14s: %p                  : ",
 						   node->name, DP_GRAPHTRACE_PKT_ID(objs[i]));
 }
 
 void _dp_graphtrace_log_next(struct rte_node *node, void *obj, rte_edge_t next_index)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
-		DP_GRAPHTRACE_LOG(obj, "%-14s: %p -> %-14s",
+		dp_graphtrace_log(obj, "%-14s: %p -> %-14s: ",
 					   node->name, DP_GRAPHTRACE_PKT_ID(obj), node->nodes[next_index]->name);
 }
 
@@ -121,7 +132,7 @@ void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t 
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint i = 0; i < nb_objs; ++i)
-			DP_GRAPHTRACE_LOG(objs[i], "%-11s #%u: %p -> %-14s",
+			dp_graphtrace_log(objs[i], "%-11s #%u: %p -> %-14s: ",
 						   node->name, i, DP_GRAPHTRACE_PKT_ID(objs[i]), node->nodes[next_index]->name);
 }
 
@@ -129,7 +140,7 @@ void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint i = 0; i < nb_objs; ++i)
-			DP_GRAPHTRACE_LOG(objs[i], "%-11s #%u: %p >> PORT %-9u",
+			dp_graphtrace_log(objs[i], "%-11s #%u: %p >> PORT %-9u: ",
 						   node->name, i, DP_GRAPHTRACE_PKT_ID(objs[i]), port_id);
 }
 #endif  // ENABLE_PYTEST

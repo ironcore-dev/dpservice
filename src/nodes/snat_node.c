@@ -47,8 +47,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			if (snat_data->network_nat_ip != 0) {
 				ret = dp_allocate_network_snat_port(df, vni);
 				if (DP_FAILED(ret)) {
-					DPNODE_LOG_WARNING(node, "Failed to allocate a valid network nat port for " DP_IPV4_PRINT_FMT ":%d",
-									   DP_IPV4_PRINT_BYTES(df->src.src_addr), ntohs(df->l4_info.trans_port.src_port));
+					DPNODE_LOG_WARNING(node, "Failed to allocate new NAT port for connection",
+									   DP_LOG_IPV4(src_ip), DP_LOG_PORT(ntohs(df->l4_info.trans_port.src_port)));
 					return SNAT_NEXT_DROP;
 				}
 				nat_port = htons((uint16_t)ret);
@@ -58,12 +58,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 				if (df->l4_type == DP_IP_PROTO_ICMP) {
 					if (dp_change_icmp_identifier(m, ntohs(nat_port)) == DP_IP_ICMP_ID_INVALID) {
-						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d", nat_port);
+						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
 						return SNAT_NEXT_DROP;
 					}
 				} else {
 					if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port) == 0) {
-						DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port with value %d", nat_port);
+						DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port");
 						return SNAT_NEXT_DROP;
 					}
 				}
@@ -103,14 +103,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		if (cntrack->nat_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == DP_IP_PROTO_ICMP) {
 				if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst) == DP_IP_ICMP_ID_INVALID) {
-					DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier with value %d",
-							htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
+					DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
 					return SNAT_NEXT_DROP;
 				}
 			} else {
 				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
-					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port with value %d",
-							htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst));
+					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port");
 					return SNAT_NEXT_DROP;
 				}
 			}

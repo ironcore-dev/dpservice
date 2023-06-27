@@ -34,14 +34,14 @@ int rx_node_create(uint16_t port_id, uint16_t queue_id)
 	rte_node_t node_id;
 
 	if (port_id >= RTE_DIM(rx_node_ids)) {
-		DPS_LOG_ERR("Port id %u too high for Rx nodes, max %lu", port_id, RTE_DIM(rx_node_ids));
+		DPS_LOG_ERR("Port id too high for Rx nodes", DP_LOG_VALUE(port_id), DP_LOG_MAX(RTE_DIM(rx_node_ids)));
 		return DP_ERROR;
 	}
 
 	snprintf(name, sizeof(name), "%u-%u", port_id, queue_id);
 	node_id = rte_node_clone(DP_NODE_GET_SELF(rx)->id, name);
 	if (node_id == RTE_NODE_ID_INVALID) {
-		DPS_LOG_ERR("Cannot clone Rx node %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot clone Rx node", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 
@@ -52,7 +52,7 @@ int rx_node_create(uint16_t port_id, uint16_t queue_id)
 int rx_node_set_enabled(uint16_t port_id, bool enabled)
 {
 	if (port_id >= RTE_DIM(node_contexts)) {
-		DPS_LOG_ERR("Port id %u too high for Rx nodes, max %lu", port_id, RTE_DIM(node_contexts));
+		DPS_LOG_ERR("Port id too high for Rx nodes", DP_LOG_VALUE(port_id), DP_LOG_MAX(RTE_DIM(node_contexts)));
 		return DP_ERROR;
 	}
 	node_contexts[port_id]->enabled = enabled;
@@ -81,7 +81,7 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	ctx->port_id = port_id;
 	ctx->queue_id = graph->id;
 	ctx->enabled = false;
-	DPNODE_LOG_INFO(node, "Initialized, port_id: %u, queue_id: %u", ctx->port_id, ctx->queue_id);
+	DPNODE_LOG_INFO(node, "Initialized", DP_LOG_PORTID(ctx->port_id), DP_LOG_QUEUEID(ctx->queue_id));
 	return DP_OK;
 }
 
