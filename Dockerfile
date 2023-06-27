@@ -104,7 +104,7 @@ gawk \
 WORKDIR /
 COPY --from=builder /workspace/build/src/dp_service .
 # The asterisk is there to make the copy of dp_graphtrace "conditional" (do not copy when not present)
-COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_gr*aphrace .
+COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_gr*aphtrace .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
