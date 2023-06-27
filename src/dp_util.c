@@ -16,11 +16,11 @@ int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char if
 
 	ret = rte_eth_dev_info_get(port_id, dev_info);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot get device info for port %u %s", port_id, dp_strerror(ret));
+		DPS_LOG_ERR("Cannot get device info", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 	if (!if_indextoname(dev_info->if_index, ifname)) {
-		DPS_LOG_ERR("Cannot get device name for port %u %s", port_id, dp_strerror(errno));
+		DPS_LOG_ERR("Cannot get device name", DP_LOG_PORTID(port_id), DP_LOG_RET(errno));
 		return DP_ERROR;
 	}
 	return DP_OK;
@@ -45,13 +45,13 @@ static int get_num_of_vfs_sriov()
 
 	fp = fopen(filename, "r");
 	if (!fp) {
-		DPS_LOG_ERR("Cannot open SR-IOV sysfs path %s", dp_strerror(errno));
+		DPS_LOG_ERR("Cannot open SR-IOV sysfs path", DP_LOG_RET(errno));
 		return DP_ERROR;
 	}
 
 	vfs = DP_ERROR;
 	if (fscanf(fp, "%d", &vfs) != 1)
-		DPS_LOG_ERR("Cannot parse SR-IOV sysfs VF number %s", dp_strerror(errno));
+		DPS_LOG_ERR("Cannot parse SR-IOV sysfs VF number", DP_LOG_RET(errno));
 	fclose(fp);
 	return vfs;
 }
@@ -85,7 +85,7 @@ int dp_get_num_of_vfs()
 		DPS_LOG_ERR("No VFs defined by the kernel");
 		return DP_ERROR;
 	} else if (vfs > DP_MAX_VF_PORTS) {
-		DPS_LOG_ERR("Too many VFs defined by the kernel (%d, maximum %d supported)", vfs, DP_MAX_VF_PORTS);
+		DPS_LOG_ERR("Too many VFs defined by the kernel", DP_LOG_VALUE(vfs), DP_LOG_MAX(DP_MAX_VF_PORTS));
 		return DP_ERROR;
 	}
 	return vfs;
@@ -158,7 +158,8 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 
 	result = rte_hash_create(&params);
 	if (!result)
-		DPS_LOG_ERR("Cannot create '%s' jhash table on socket %u %s", name, socket_id, dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot create jhash table",
+					DP_LOG_NAME(name), DP_LOG_SOCKID(socket_id), DP_LOG_RET(rte_errno));
 
 	return result;
 }

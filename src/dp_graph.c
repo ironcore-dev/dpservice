@@ -43,7 +43,7 @@ static inline int dp_graph_stats_create()
 
 	dp_graph_stats = rte_graph_cluster_stats_create(&s_param);
 	if (!dp_graph_stats) {
-		DPS_LOG_ERR("Unable to create cluster stats %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Unable to create cluster stats", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 
@@ -78,12 +78,12 @@ static int dp_graph_export(const char *graph_name)
 	}
 	f = fopen(fname, "w");
 	if (!f) {
-		DPS_LOG_ERR("Cannot open graph export file for writing %s", dp_strerror(errno));
+		DPS_LOG_ERR("Cannot open graph export file for writing", DP_LOG_RET(errno));
 		return DP_ERROR;
 	}
 	ret = rte_graph_export(graph_name, f);
 	if (DP_FAILED(ret))
-		DPS_LOG_ERR("rte_graph_export() failed %s", dp_strerror(ret));
+		DPS_LOG_ERR("rte_graph_export() failed", DP_LOG_RET(ret));
 	fclose(f);
 	return ret;
 }
@@ -104,7 +104,7 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 
 	graph_id = rte_graph_create(graph_name, &graph_conf);
 	if (graph_id == RTE_GRAPH_ID_INVALID) {
-		DPS_LOG_ERR("Cannot create graph for lcore %u %s", lcore_id, dp_strerror(rte_errno));
+		DPS_LOG_ERR("Cannot create graph", DP_LOG_LCORE(lcore_id), DP_LOG_RET(rte_errno));
 		return RTE_GRAPH_ID_INVALID;
 	}
 	if (DP_FAILED(dp_graph_export(graph_name)))
@@ -112,7 +112,7 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 
 	dp_graph = rte_graph_lookup(graph_name);
 	if (!dp_graph) {
-		DPS_LOG_ERR("Graph %s not found after creation for lcore %u", graph_name, lcore_id);
+		DPS_LOG_ERR("Graph not found after creation", DP_LOG_NAME(graph_name), DP_LOG_LCORE(lcore_id));
 		return RTE_GRAPH_ID_INVALID;
 	}
 
@@ -163,7 +163,7 @@ int dp_graph_init(void)
 {
 	// currently limited to only one graph (and first core is reserved for the main loop)
 	if (rte_lcore_count() != 2) {
-		DPS_LOG_ERR("Too many worker cores requested (%d), max 2", rte_lcore_count());
+		DPS_LOG_ERR("Too many worker cores requested", DP_LOG_VALUE(rte_lcore_count()), DP_LOG_MAX(2));
 		return DP_ERROR;
 	}
 #ifdef ENABLE_GRAPHTRACE

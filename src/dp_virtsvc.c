@@ -18,11 +18,14 @@
 
 #define DP_VIRTSVC_TELEMETRY_MAX_NAME_SIZE sizeof("TCP:255.255.255.255:65535")
 
-#define DP_VIRTSVC_PRINT_FMT "%s virtual service " DP_IPV4_PRINT_FMT ":%u <-> " DP_IPV6_PRINT_FMT ":%u"
-#define DP_VIRTSVC_PRINT_ARGS(SERVICE) \
-	(SERVICE)->proto == IPPROTO_TCP ? "TCP" : "UDP", \
-	DP_IPV4_PRINT_BYTES((SERVICE)->virtual_addr), (SERVICE)->virtual_port, \
-	DP_IPV6_PRINT_BYTES((SERVICE)->service_addr), (SERVICE)->service_port
+// Due to the specificity (and accessing the struct)
+// Local-only definition
+#define DP_LOG_VIRTSVC(SERVICE) \
+	_DP_LOG_IPV4("virtsvc_address", ntohl((SERVICE)->virtual_addr)), \
+	_DP_LOG_IPV6("service_address", (SERVICE)->service_addr), \
+	_DP_LOG_UINT("virtsvc_port", ntohs((SERVICE)->virtual_port)), \
+	_DP_LOG_UINT("service_port", ntohs((SERVICE)->service_port)), \
+	DP_LOG_PROTO((SERVICE)->proto)
 
 #pragma pack(push, 1)
 // packed, because hashing would include padding otherwise
@@ -147,8 +150,8 @@ int dp_virtsvc_init(int socket_id)
 		return DP_OK;
 
 	dp_virtservices = (struct dp_virtsvc *)rte_zmalloc("virtual_services",
-															sizeof(struct dp_virtsvc) * rules->nb_entries,
-															RTE_CACHE_LINE_SIZE);
+													   sizeof(struct dp_virtsvc) * rules->nb_entries,
+													   RTE_CACHE_LINE_SIZE);
 	if (!dp_virtservices) {
 		DPS_LOG_ERR("Cannot allocate virtual services table");
 		return DP_ERROR;
@@ -169,7 +172,7 @@ int dp_virtsvc_init(int socket_id)
 																hashtable_name,
 																socket_id);
 		if (!dp_virtservices_end->open_ports) {
-			DPS_LOG_ERR("Cannot allocate connection table #%u", i);
+			DPS_LOG_ERR("Cannot allocate connection table", _DP_LOG_INT("virtsvc_entry", i));
 			dp_virtsvc_free();
 			return DP_ERROR;
 		}
@@ -218,13 +221,15 @@ int dp_virtsvc_get_count()
 
 int dp_virtsvc_install_isolation_rules(uint16_t port_id)
 {
+	int ret;
+
 	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
-		if (DP_FAILED(dp_install_isolated_mode_virtsvc(port_id,
-													   service->proto,
-													   service->service_addr,
-													   service->service_port))
-		) {
-			DPS_LOG_ERR("Cannot create isolation rule for " DP_VIRTSVC_PRINT_FMT, DP_VIRTSVC_PRINT_ARGS(service));
+		ret = dp_install_isolated_mode_virtsvc(port_id,
+											   service->proto,
+											   service->service_addr,
+											   service->service_port);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot create isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -259,7 +264,7 @@ static __rte_always_inline int dp_virtsvc_get_free_port(struct dp_virtsvc *virts
 		if (dp_virtsvc_is_connection_old(&virtsvc->connections[port], current_tsc))
 			return virtsvc->last_assigned_port = port;
 
-	DPS_LOG_WARNING(DP_VIRTSVC_PRINT_FMT " ran out of ports", DP_VIRTSVC_PRINT_ARGS(virtsvc));
+	DPS_LOG_WARNING("Out of virtsvc ports", DP_LOG_VIRTSVC(virtsvc));
 	return DP_ERROR;
 }
 
@@ -285,7 +290,7 @@ static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *v
 		delete_key.vf_l4_port = conn->vf_l4_port;
 		ret = rte_hash_del_key(virtsvc->open_ports, &delete_key);
 		if (DP_FAILED(ret))
-			DPS_LOG_WARNING("Cannot delete virtual service NAT entry %s", dp_strerror(ret));
+			DPS_LOG_WARNING("Cannot delete virtual service NAT entry %s", DP_LOG_RET(ret));
 	}
 
 	ret = rte_hash_add_key_with_hash_data(virtsvc->open_ports, key, sig, (void *)(intptr_t)free_port);
@@ -333,8 +338,7 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 	if (ret == -ENOENT)
 		ret = dp_virtsvc_create_connection(virtsvc, &key, key_hash, vf_ip);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Cannot create connection for " DP_VIRTSVC_PRINT_FMT " %s",
-						DP_VIRTSVC_PRINT_ARGS(virtsvc), dp_strerror(ret));
+		DPS_LOG_WARNING("Cannot create virtsvc connection", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -366,7 +370,7 @@ void dp_virtsvc_del_vm(uint16_t port_id)
 				delete_key.vf_l4_port = conn->vf_l4_port;
 				ret = rte_hash_del_key(service->open_ports, &delete_key);
 				if (DP_FAILED(ret))
-					DPS_LOG_WARNING("Cannot delete virtual service NAT entry for port_id %u %s", port_id, dp_strerror(ret));
+					DPS_LOG_WARNING("Cannot delete virtual service NAT entry", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			}
 		}
 	}
@@ -397,7 +401,7 @@ int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict)
 				 ntohs(service->virtual_port));
 		ret = rte_tel_data_add_dict_u64(dict, virtsvc_name, dp_virtsvc_get_used_port_count(service));
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Failed to add virtsvc telemetry data %s", dp_strerror(ret));
+			DPS_LOG_ERR("Failed to add virtsvc telemetry data", DP_LOG_RET(ret));
 			return ret;
 		}
 	}

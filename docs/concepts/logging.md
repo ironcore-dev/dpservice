@@ -29,10 +29,19 @@ To provide any other fields, the logging macro needs additional arguments, that 
 DPGRPC_LOG_WARNING("Failed request", DP_LOG_GRPCRET(ret), DP_LOG_VNI(vni), DP_LOG_IPV4(nat_ipv4));
 ```
 
+### Best practices
+Always use `DP_LOG_RET(ret)` for logging `rte_` and `dp_` function-call results (and errno).
+
+Do not use `_DP_LOG_<TYPE>()` directly, except for situations where the key is unique to a single call/situation. It is better to use pre-defined keys via `DP_LOG_<KEY>()`.
+
+If a general-purpose value is needed, consider using `DP_LOG_VALUE(<int>)`. For limits or counters (like how many items succeeded), consider also using `DP_LOG_MAX()` in conjuction.
+
+For string identifier, consider re-using the appropriate key or adding a new one, if such identifier is global (like loadbalancer id, interface id, etc.). For general cases (like memory allocation tags, debugging, etc.), consider using `DP_LOG_NAME()`.
+
 
 ## Implementation specifics
 Due to the nature fo structured logging, variable-length argument list is needed. In C, this will always be inherently unsafe. Especially since the calling convention does not follow printf-style API.
 
 In reality, logging macros call `_dp_log_structured()` function that accepts standard variadic arguments. Instead of the arguments being parsed based on the format string (like printf), the arguments muse follow a key-format-value schema and be terminated by a `NULL` entry. This is why it is critical to only use provided macros for logging and not use printf-style arguments.
 
-There have been some steps taken to prevent accidental use of wrong arguments (like using canary values for the format field) and there are asserts in debug compilation.
+There have been some steps taken to prevent accidental use of wrong arguments (like using canary values for the format field and preventing the use of `%` in the message) and there are asserts in debug compilation.

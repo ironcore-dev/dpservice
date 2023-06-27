@@ -15,7 +15,7 @@ void dp_process_event_msg(struct rte_mbuf *m)
 		dp_process_event_flow_aging_msg(m);
 		break;
 	default:
-		DPS_LOG_WARNING("Unknown monitoring status message type %d", event_msg->msg_head.type);
+		DPS_LOG_WARNING("Unknown monitoring status message type", DP_LOG_VALUE(event_msg->msg_head.type));
 	}
 
 	rte_pktmbuf_free(m);

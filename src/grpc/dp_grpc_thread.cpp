@@ -31,7 +31,7 @@ int dp_grpc_thread_start()
 	int ret = rte_ctrl_thread_create(&grpc_thread_id, "grpc-thread", NULL, dp_grpc_main_loop, NULL);
 
 	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot create grpc thread %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot create grpc thread", DP_LOG_RET(ret));
 	return ret;
 }
 
@@ -40,7 +40,7 @@ int dp_grpc_thread_join()
 	int ret = pthread_join(grpc_thread_id, NULL);  // returns errno on failure
 
 	if (ret) {
-		DPS_LOG_ERR("Cannot join grpc thread %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot join grpc thread", DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 	return DP_OK;
@@ -51,7 +51,7 @@ int dp_grpc_thread_cancel()
 	int ret = pthread_cancel(grpc_thread_id);  // returns errno on failure
 
 	if (ret) {
-		DPS_LOG_ERR("Cannot cancel grpc thread %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot cancel grpc thread", DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 	return DP_OK;

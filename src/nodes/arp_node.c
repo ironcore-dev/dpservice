@@ -65,7 +65,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return ARP_NEXT_DROP;
 
 	if (DP_FAILED(dp_port_set_vf_attach_status(pkt->port, DP_VF_PORT_ATTACHED))) {
-		DPNODE_LOG_ERR(node, "Cannot attach port %d", pkt->port);
+		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(pkt->port));
 		return ARP_NEXT_DROP;
 	}
 

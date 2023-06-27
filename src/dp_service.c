@@ -115,8 +115,8 @@ static int init_interfaces()
 
 	pf0_socket = rte_eth_dev_socket_id(dp_port_get_pf0_id());
 	if (DP_FAILED(pf0_socket)) {
-		DPS_LOG_ERR("Cannot get numa socket for pf0 port %d %s", dp_port_get_pf0_id(), dp_strerror(pf0_socket));
-		return DP_ERROR;
+		DPS_LOG_ERR("Cannot get numa socket for pf0", DP_LOG_PORTID(dp_port_get_pf0_id()), DP_LOG_RET(pf0_socket));
+		return pf0_socket;
 	}
 
 	if (DP_FAILED(dp_ports_init())
@@ -193,7 +193,7 @@ static int run_service()
 
 	// pre-init sanity checks
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
-		DP_EARLY_ERR("Disabled conntrack requires disabled offloading!");
+		DP_EARLY_ERR("Disabled conntrack requires disabled offloading");
 		return DP_ERROR;
 	}
 
@@ -201,13 +201,13 @@ static int run_service()
 		return DP_ERROR;
 
 	dp_log_set_thread_name("control");
-	DPS_LOG_INFO("Starting DP Service version %s", DP_SERVICE_VERSION);
+	DPS_LOG_INFO("Starting DP Service version " DP_SERVICE_VERSION);
 	// from this point on, only DPS_LOG should be used
 
 	if (signal(SIGINT, signal_handler) == SIG_ERR
 		|| signal(SIGTERM, signal_handler) == SIG_ERR
 	) {
-		DPS_LOG_ERR("Cannot setup signal handling %s", dp_strerror(errno));
+		DPS_LOG_ERR("Cannot setup signal handling", DP_LOG_RET(errno));
 		return DP_ERROR;
 	}
 

@@ -38,20 +38,21 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ipv6_hdr *ipv6_hdr;
 	rte_be16_t payload_len;
 	uint32_t packet_type;
+	uint8_t proto_id = df->tun_info.proto_id;
 
 	m->outer_l2_len = sizeof(struct rte_ether_hdr);
 	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
 	m->l2_len = 0; /* We dont have inner l2, when we encapsulate */
 
 	// TODO(plague): merge this node with ipip_tunnel_node and this condition will get easier
-	if (df->tun_info.proto_id == DP_IP_PROTO_IPv6_ENCAP) {
+	if (proto_id == DP_IP_PROTO_IPv6_ENCAP) {
 		payload_len = htons(ntohs(rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *)->payload_len) + sizeof(struct rte_ipv6_hdr));
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV6;
-	} else if (df->tun_info.proto_id == DP_IP_PROTO_IPv4_ENCAP) {
+	} else if (proto_id == DP_IP_PROTO_IPv4_ENCAP) {
 		payload_len = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *)->total_length;
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4;
 	} else {
-		DPNODE_LOG_WARNING(node, "Invalid tunnel type");
+		DPNODE_LOG_WARNING(node, "Invalid tunnel type", DP_LOG_PROTO(proto_id));
 		return IPV6_ENCAP_NEXT_DROP;
 	}
 
@@ -66,7 +67,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
-	ipv6_hdr->proto = df->tun_info.proto_id;
+	ipv6_hdr->proto = proto_id;
 
 	m->packet_type = packet_type;
 	m->ol_flags |= RTE_MBUF_F_TX_OUTER_IPV6;

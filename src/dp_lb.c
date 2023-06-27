@@ -51,7 +51,7 @@ static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value 
 	*lb_k = *l_key;
 	ret = rte_hash_add_key_data(id_map_lb_tbl, id_key, lb_k);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot insert LB id mapping data %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot insert LB id mapping data", DP_LOG_RET(ret));
 		rte_free(lb_k);
 		return ret;
 	}
@@ -129,18 +129,18 @@ int dp_delete_lb(void *id_key)
 
 	ret = rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Cannot get LB backing IP %s", dp_strerror(ret));
+		DPS_LOG_WARNING("Cannot get LB backing IP", DP_LOG_RET(ret));
 	} else {
 		rte_free(lb_val);
 		ret = rte_hash_del_key(ipv4_lb_tbl, lb_k);
 		if (DP_FAILED(ret))
-			DPS_LOG_WARNING("Cannot delete LB key %s", dp_strerror(ret));
+			DPS_LOG_WARNING("Cannot delete LB key", DP_LOG_RET(ret));
 	}
 
 	rte_free(lb_k);
 	ret = rte_hash_del_key(id_map_lb_tbl, id_key);
 	if (DP_FAILED(ret))
-		DPS_LOG_WARNING("Cannot delete LB map key %s", dp_strerror(ret));
+		DPS_LOG_WARNING("Cannot delete LB map key", DP_LOG_RET(ret));
 
 	return DP_GRPC_OK;
 }

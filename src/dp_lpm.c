@@ -68,12 +68,12 @@ int dp_lpm_reset_route_tables(int vni, int socketid)
 	int ret;
 
 	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid))) {
-		DPS_LOG_ERR("resetting vni route table failed for vni %d socketid: %d", vni, socketid);
+		DPS_LOG_ERR("Resetting vni route table failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
 		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
 	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid))) {
-		DPS_LOG_ERR("resetting vni route table failed for vni %d socketid: %d", vni, socketid);
+		DPS_LOG_ERR("Resetting vni route table failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
 		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
@@ -95,7 +95,7 @@ int dp_map_vm_handle(void *key, uint16_t portid)
 
 	p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
 	if (!p_port_id) {
-		DPS_LOG_ERR("Cannot allocate vm handle for port %d", portid);
+		DPS_LOG_ERR("Cannot allocate VM handle", DP_LOG_PORTID(portid));
 		goto err;
 	}
 
@@ -103,9 +103,9 @@ int dp_map_vm_handle(void *key, uint16_t portid)
 	ret = rte_hash_lookup(vm_handle_tbl, key);
 	if (ret != -ENOENT) {
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("vm handle lookup failed %s", dp_strerror(ret));
+			DPS_LOG_ERR("VM handle lookup failed", DP_LOG_RET(ret));
 		else
-			DPS_LOG_ERR("vm handle already exists");
+			DPS_LOG_ERR("VM handle already exists");
 		goto err_free;
 	}
 
@@ -113,7 +113,7 @@ int dp_map_vm_handle(void *key, uint16_t portid)
 	*p_port_id = portid;
 	ret = rte_hash_add_key_data(vm_handle_tbl, key, p_port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add vm handle data for port %d %s", portid, dp_strerror(ret));
+		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORTID(portid), DP_LOG_RET(ret));
 		goto err_free;
 	}
 	return DP_OK;
@@ -584,9 +584,9 @@ void dp_del_vm(int portid, int socketid, bool rollback)
 			vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
 
 	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV4)))
-		DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV4);
+		DPS_LOG_WARNING("Unable to delete route table", DP_LOG_VNI(vm_table[portid].vni), DP_LOG_PROTO(DP_IP_PROTO_IPV4));
 	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV6)))
-		DPS_LOG_WARNING("Unable to delete route table for vni %d type %d", vm_table[portid].vni, DP_IP_PROTO_IPV6);
+		DPS_LOG_WARNING("Unable to delete route table", DP_LOG_VNI(vm_table[portid].vni), DP_LOG_PROTO(DP_IP_PROTO_IPV6));
 
 	dp_del_all_firewall_rules(portid);
 	memset(&vm_table[portid], 0, sizeof(vm_table[portid]));

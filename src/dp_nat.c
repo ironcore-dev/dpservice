@@ -329,15 +329,16 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADD
 
 	TAILQ_FOREACH(next, &nat_headp, entries) {
 		if (dp_is_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
-			DPS_LOG_ERR("cannot add a redundant network nat entry for ip: %4x, vni: %d, min_port %d, max_port %d",
-					nat_ipv4, vni, min_port, max_port);
+			DPS_LOG_ERR("Cannot add a redundant nat entry", DP_LOG_IPV4(nat_ipv4), DP_LOG_VNI(vni),
+						DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
 			return DP_GRPC_ERR_ALREADY_EXISTS;
 		}
 	}
 
 	new_entry = (network_nat_entry *)rte_zmalloc("network_nat_array", sizeof(network_nat_entry), RTE_CACHE_LINE_SIZE);
 	if (!new_entry) {
-		DPS_LOG_ERR("failed to allocate network nat entry for ip: %4x, vni: %d", nat_ipv4, vni);
+		DPS_LOG_ERR("Failed to allocate nat entry", DP_LOG_IPV4(nat_ipv4), DP_LOG_VNI(vni),
+					DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
 		return DP_GRPC_ERR_OUT_OF_MEMORY;
 	}
 
@@ -423,7 +424,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 
 	ret = rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot lookup ipv4 snat key %s", dp_strerror(ret));
+		DPS_LOG_ERR("Cannot lookup ipv4 snat key", DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -444,7 +445,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
 	if (ret != -ENOENT) {
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot lookup ipv4 portmap key %s", dp_strerror(ret));
+			DPS_LOG_ERR("Cannot lookup ipv4 portmap key", DP_LOG_RET(ret));
 			return ret;
 		}
 
@@ -456,7 +457,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 			allocated_port = portmap_data->nat_port;
 			need_to_find_new_port = false;
 		} else if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port  %s", dp_strerror(ret));
+			DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port", DP_LOG_RET(ret));
 			return ret;
 		}
 	}
@@ -475,7 +476,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 				allocated_port = tmp_port;
 				break;
 			} else if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot lookup ipv4 port overload key %s", dp_strerror(ret));
+				DPS_LOG_ERR("Cannot lookup ipv4 port overload key", DP_LOG_RET(ret));
 				return ret;
 			}
 		}
@@ -489,7 +490,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 
 	ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, (const void *)&portoverload_tbl_key);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key %s", dp_strerror(ret));
+		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -502,7 +503,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 		ret = rte_hash_add_key_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void *)portmap_data);
 		if (DP_FAILED(ret)) {
 			rte_free(portmap_data);
-			DPS_LOG_ERR("Failed to add ipv4 network nat portmap data %s", dp_strerror(ret));
+			DPS_LOG_ERR("Failed to add ipv4 network nat portmap data", DP_LOG_RET(ret));
 			return ret;
 		}
 	}
@@ -527,7 +528,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 	if (!DP_FAILED(ret)) {
 		ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot delete portoverload key %s", dp_strerror(ret));
+			DPS_LOG_ERR("Cannot delete portoverload key", DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	} else if (ret != -ENOENT)
@@ -545,7 +546,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 			rte_free(portmap_data);
 			ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key);
 			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot delete portmap key %s", dp_strerror(ret));
+				DPS_LOG_ERR("Cannot delete portmap key", DP_LOG_RET(ret));
 				return DP_ERROR;
 			}
 		}

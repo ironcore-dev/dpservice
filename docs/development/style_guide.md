@@ -99,7 +99,7 @@ Most of `rte_` calls should use the same convention as [dpservice calls](#datapl
 ```c
   ret = rte_func();
   if (DP_FAILED(ret)) {
-    DPS_LOG_ERR("Failed to do what func does %s", dp_strerror(ret));
+    DPS_LOG_ERR("Failed to do what func does", DP_LOG_ERR(ret));
     return ret;
   }
 ```
@@ -124,17 +124,17 @@ There are currenlty four log-levels. It is expected, that `ERR` will lead to the
 
 Please note that the logging function already adds endline where needed, do not include endlines in logged messages.
 
-For `dp_*`, `rte_*` and system calls that return (or use) errno, there is a `dp_strerror()` function in `dp_error.h`. It can handle both positive and negative error values. Use only simple `%s` as the function adds its own formatting:
+For `dp_*`, `rte_*` and system calls that return (or use) errno, there is a `dp_strerror()` function in `dp_error.h` if needed, but for direct logging, `DP_LOG_RET()` handles that already.
 ```c
   ret = some_call();  // returns 0 for success or 'an error number'
   if (ret) {
-    DPS_LOG_ERR("Cannot do something %d", ret);
+    DPS_LOG_ERR("Cannot do something", DP_LOG_RET(ret));
     return DP_ERROR;
   }
 
   name = get_name();  // return NULL for error and raises errno
   if (!name) {
-    DPS_LOG_ERR("Cannot get something %s", dp_strerror(errno));
+    DPS_LOG_ERR("Cannot get something", DP_LOG_RET(errno));
     return DP_ERROR;
   }
 ```

@@ -989,7 +989,7 @@ void dp_process_request(struct rte_mbuf *m)
 		// as gRPC errors are explicitely defined due to API reasons
 		// extract the proper value from the standard (negative) retvals
 		ret = dp_errcode_to_grpc_errcode(ret);
-		DPGRPC_LOG_WARNING("Failed request", DP_LOG_GRPCRET(ret));
+		DPGRPC_LOG_WARNING("Failed request", DP_LOG_GRPCREQUEST(responder.request.type), DP_LOG_GRPCRET(ret));
 	}
 
 	dp_grpc_send_response(&responder, ret);

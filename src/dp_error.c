@@ -22,37 +22,6 @@ static const char *dp_grpc_error_strings[] = {
 	_DP_GRPC_ERRORS(_DP_GRPC_ERROR_STRING)
 };
 
-// TODO phase out along with old logging
-const char *dp_strerror(int error)
-{
-	static __thread char buf[STRERROR_BUFSIZE];
-	const char *errdesc;
-
-	if (error < 0)
-		error = -error;
-
-	// dp_service specific errors are after rte_ errors (which are after __ELASTERROR)
-	if (error < RTE_MAX_ERRNO)
-		errdesc = rte_strerror(error);
-	else if (error >= -_DP_GRPC_ERRCODES)
-		errdesc = dp_grpc_strerror(error+_DP_GRPC_ERRCODES);
-	else
-		errdesc = "General dp_service error";
-
-	// print the textual errno for easier debugging
-#if defined(DEBUG) && __GLIBC_PREREQ(2, 32)
-	const char *errname = strerrorname_np(error);
-
-	if (errname)
-		snprintf(buf, sizeof(buf), "(Error %d/%s: %s)", error, errname, errdesc);
-	else
-#endif
-	snprintf(buf, sizeof(buf), "(Error %d: %s)", error, errdesc);
-
-	return buf;
-}
-
-
 const char *dp_grpc_strerror(int grpc_errcode)
 {
 	if (grpc_errcode == DP_GRPC_OK)
@@ -65,7 +34,7 @@ const char *dp_grpc_strerror(int grpc_errcode)
 	return dp_grpc_error_strings[grpc_errcode];
 }
 
-const char *dp_strerror_structured(int error)
+const char *dp_strerror(int error)
 {
 	if (error < 0)
 		error = -error;
@@ -76,4 +45,27 @@ const char *dp_strerror_structured(int error)
 		return dp_grpc_strerror(error+_DP_GRPC_ERRCODES);
 	else
 		return "General dp_service error";
+}
+
+const char *dp_strerror_verbose(int error)
+{
+	static __thread char buf[STRERROR_BUFSIZE];
+	const char *errdesc;
+
+	if (error < 0)
+		error = -error;
+
+	errdesc = dp_strerror(error);
+
+	// print the textual errno for easier debugging
+#if defined(DEBUG) && __GLIBC_PREREQ(2, 32)
+	const char *errname = strerrorname_np(error);
+
+	if (errname)
+		snprintf(buf, sizeof(buf), "(Error %d/%s: %s)", error, errname, errdesc);
+	else
+#endif
+	snprintf(buf, sizeof(buf), "(Error %d: %s)", error, errdesc);
+
+	return buf;
 }

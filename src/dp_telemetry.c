@@ -98,7 +98,7 @@ static int dp_telemetry_graph_stats_create()
 
 	tel_stats = rte_graph_cluster_stats_create(&s_param);
 	if (!tel_stats) {
-		DPS_LOG_ERR("Unable to create cluster stats %s", dp_strerror(rte_errno));
+		DPS_LOG_ERR("Unable to create cluster stats", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
 	}
 	return DP_OK;
@@ -118,7 +118,7 @@ static inline int dp_telemetry_start_dict(struct rte_tel_data *data, const char 
 
 	ret = rte_tel_data_start_dict(data);
 	if (DP_FAILED(ret))
-		DPS_LOG_WARNING("Creating telemetry dictionary for %s failed %s", cmd, dp_strerror(ret));
+		DPS_LOG_WARNING("Creating telemetry dictionary failed", DP_LOG_TELEMETRY_CMD(cmd), DP_LOG_RET(ret));
 
 	return ret;
 }
@@ -137,7 +137,7 @@ static int dp_telemetry_handle_graph_command(struct rte_tel_data *data)
 	tel_graph_node_index = 0;
 	rte_graph_cluster_stats_get(tel_stats, 0);
 	if (DP_FAILED(tel_callback_ret))
-		DPS_LOG_WARNING("Graph telemetry failed %s", dp_strerror(tel_callback_ret));
+		DPS_LOG_WARNING("Graph telemetry failed", DP_LOG_RET(tel_callback_ret));
 	return tel_callback_ret;
 }
 DP_TELEMETRY_CREATE_GRAPH_HANDLER(obj_count, objs)
@@ -166,13 +166,15 @@ static int dp_telemetry_handle_nat_used_port_count(const char *cmd,
 
 	ret = dp_telemetry_start_dict(data, cmd);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to init telemetry data to get interface's used nat port cnt");
+		DPS_LOG_WARNING("Failed to init telemetry data to get interface's used nat port cnt",
+						DP_LOG_TELEMETRY_CMD(cmd), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
 	ret = dp_nat_get_used_ports_telemetry(data);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to get used nat ports' telemetry data");
+		DPS_LOG_WARNING("Failed to get used nat ports' telemetry data",
+						DP_LOG_TELEMETRY_CMD(cmd), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -211,7 +213,7 @@ int dp_telemetry_init(void)
 	// make sure one dictionary is enough
 	// (the number should be limited already for other reasons anyway)
 	if (dp_virtsvc_get_count() > RTE_TEL_MAX_DICT_ENTRIES) {
-		DPS_LOG_ERR("Too many virtual services for telemetry to work");
+		DPS_LOG_ERR("Too many virtual services for telemetry to work", DP_LOG_MAX(RTE_TEL_MAX_DICT_ENTRIES));
 		return DP_ERROR;
 	}
 #endif
@@ -219,7 +221,7 @@ int dp_telemetry_init(void)
 	for (int i = 0; i < RTE_DIM(commands); ++i) {
 		ret = rte_telemetry_register_cmd(commands[i].command, commands[i].callback, commands[i].description);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Failed to register telemetry command %s %s", commands[i].command, dp_strerror(ret));
+			DPS_LOG_ERR("Failed to register telemetry command", DP_LOG_TELEMETRY_CMD(commands[i].command), DP_LOG_RET(ret));
 			return ret;
 		}
 	}

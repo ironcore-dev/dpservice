@@ -256,7 +256,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 						return CONNTRACK_NEXT_DROP;
 					}
 				} else {
-					DPNODE_LOG_WARNING(node, "Flow table key search failed %s", dp_strerror(ret));
+					DPNODE_LOG_WARNING(node, "Flow table key search failed", DP_LOG_RET(ret));
 					return CONNTRACK_NEXT_DROP;
 				}
 			} else {
