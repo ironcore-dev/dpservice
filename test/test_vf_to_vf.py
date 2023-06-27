@@ -25,6 +25,33 @@ def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):
 	sniff_packet(VM1.tap, is_tcp_pkt)
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
 
+def test_vf_to_vf_tcp_pfx(prepare_ipv4, grpc_client):
+
+	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
+
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=1234, dst_port_max=1234)
+
+	grpc_client.addprefix(VM1.name, "1.2.3.0/24")
+	grpc_client.listprefixes(VM1.name)
+	grpc_client.init()
+	grpc_client.listprefixes(VM1.name)
+
+	grpc_client.addroute(vni1, neigh_vni1_ov_ip_route, 0, neigh_vni1_ul_ipv6)
+	grpc_client.addroute(vni1, neigh_vni1_ov_ipv6_route, 0, neigh_vni1_ul_ipv6)
+	grpc_client.addroute(vni1, "0.0.0.0/0", vni1, router_ul_ipv6)
+	grpc_client.addroute(vni2, "0.0.0.0/0", vni2, router_ul_ipv6)
+
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
+			   IP(dst=VM2.ip, src="1.2.3.4") /
+			   TCP(dport=1234))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	sniff_packet(VM1.tap, is_tcp_pkt)
+
+	grpc_client.delprefix(VM1.name, "1.2.3.0/24")
+
+	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
+
 
 def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 
