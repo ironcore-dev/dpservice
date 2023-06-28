@@ -45,6 +45,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		&& df->flags.dir == DP_FLOW_DIR_ORG
 		&& dp_is_ip_lb(dst_ip, vni)
 	) {
+
 		if (df->l4_type == IPPROTO_ICMP) {
 			df->flags.nat = DP_CHG_UL_DST_IP;
 			return LB_NEXT_PACKET_RELAY;
@@ -74,6 +75,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
 		dp_lb_pfx_vnf_check(df, m);
 		return LB_NEXT_OVERLAY_SWITCH;
+	}
+
+	if (DP_IS_FLOW_STATUS_FLAG_DEFAULT(cntrack->flow_status) && df->l4_type == IPPROTO_ICMP) {
+		df->flags.nat = DP_CHG_UL_DST_IP;
+		return LB_NEXT_PACKET_RELAY;
 	}
 
 	return LB_NEXT_DNAT;
