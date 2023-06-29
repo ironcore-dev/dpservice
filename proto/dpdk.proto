@@ -317,6 +317,7 @@ message NATInfoEntry {
 	uint32 minPort = 3; 
 	uint32 maxPort = 4;
 	bytes underlayRoute = 5;
+	uint32 vni = 6;
 }
 
 message GetNATInfoResponse {

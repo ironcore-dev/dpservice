@@ -580,6 +580,7 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply->min_port = data->network_nat_port_range[0];
 			reply->max_port = data->network_nat_port_range[1];
 			reply->addr = nkey->ip;
+			reply->vni = nkey->vni;
 		}
 	}
 
@@ -601,6 +602,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply->type = DP_NATINFO_TYPE_NEIGHBOR;
 			reply->min_port = current->port_range[0];
 			reply->max_port = current->port_range[1];
+			reply->vni = current->vni;
 			rte_memcpy(reply->ul_addr6, current->dst_ipv6, sizeof(current->dst_ipv6));
 		}
 	}

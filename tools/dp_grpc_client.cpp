@@ -1413,19 +1413,21 @@ public:
 		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
 			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
 			for (i = 0; i < reply.natinfoentries_size(); i++) {
-				printf("  %d: IP %s, min_port %d, max_port %d\n", i+1,
+				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
 				reply.natinfoentries(i).address().c_str(),
 				reply.natinfoentries(i).minport(),
-				reply.natinfoentries(i).maxport());
+				reply.natinfoentries(i).maxport(),
+				reply.natinfoentries(i).vni());
 			}
 		}
 
 		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
 			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
 			for (i = 0; i < reply.natinfoentries_size(); i++) {
-				printf("  %d: min_port %d, max_port %d --> Underlay IPv6 %s\n", i+1,
+				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
 				reply.natinfoentries(i).minport(),
 				reply.natinfoentries(i).maxport(),
+				reply.natinfoentries(i).vni(),
 				reply.natinfoentries(i).underlayroute().c_str());
 			}
 		}
