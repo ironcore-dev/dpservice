@@ -125,7 +125,7 @@ struct dpgrpc_nat {
 	};
 	uint16_t		min_port;
 	uint16_t		max_port;
-	uint32_t		neigh_vni;							// neighnat only
+	uint32_t		vni;								// neighnat or reply only
 	uint8_t			neigh_addr6[DP_VNF_IPV6_ADDR_SIZE];	// neighnat only
 	uint8_t			type;  // enum dp_natinfo_type		// reply only
 	uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only

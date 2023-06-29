@@ -733,14 +733,14 @@ static int dp_process_add_neighnat(struct dp_grpc_responder *responder)
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
 		ret = dp_add_network_nat_entry(ntohl(request->addr), NULL,
-									   request->neigh_vni,
+									   request->vni,
 									   request->min_port,
 									   request->max_port,
 									   request->neigh_addr6);
 		if (DP_FAILED(ret))
 			return ret;
 
-		ret = dp_set_dnat_ip(ntohl(request->addr), 0, request->neigh_vni);
+		ret = dp_set_dnat_ip(ntohl(request->addr), 0, request->vni);
 		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS)
 			return ret;
 	} else
@@ -756,13 +756,13 @@ static int dp_process_del_neighnat(struct dp_grpc_responder *responder)
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
 		ret = dp_del_network_nat_entry(ntohl(request->addr), NULL,
-									   request->neigh_vni,
+									   request->vni,
 									   request->min_port,
 									   request->max_port);
 		if (DP_FAILED(ret))
 			return ret;
 
-		dp_del_vip_from_dnat(ntohl(request->addr), request->neigh_vni);
+		dp_del_vip_from_dnat(ntohl(request->addr), request->vni);
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 

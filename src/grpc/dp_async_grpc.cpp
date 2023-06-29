@@ -1552,7 +1552,7 @@ int AddNeighborNATCall::Proceed()
 		// maybe add a validity check here to ensure minport is not greater than 2^30
 		request.add_neighnat.min_port = request_.minport();
 		request.add_neighnat.max_port = request_.maxport();
-		request.add_neighnat.neigh_vni = request_.vni();
+		request.add_neighnat.vni = request_.vni();
 		ret_val = inet_pton(AF_INET6, request_.underlayroute().c_str(),
 				request.add_neighnat.neigh_addr6);
 		if (ret_val <= 0)
@@ -1607,7 +1607,7 @@ int DeleteNeighborNATCall::Proceed()
 		// maybe add a validity check here to ensure minport is not greater than 2^30
 		request.del_neighnat.min_port = request_.minport();
 		request.del_neighnat.max_port = request_.maxport();
-		request.del_neighnat.neigh_vni = request_.vni();
+		request.del_neighnat.vni = request_.vni();
 		// neigh_addr6 field is implied by this unique NAT definition
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
@@ -1691,6 +1691,7 @@ void GetNATInfoCall::ListCallbackLocal(void *reply, void *context)
 	rep_nat_entry->set_address(inet_ntoa(addr));
 	rep_nat_entry->set_minport(nat->min_port);
 	rep_nat_entry->set_maxport(nat->max_port);
+	rep_nat_entry->set_vni(nat->vni);
 }
 
 void GetNATInfoCall::ListCallbackNeigh(void *reply, void *context)
@@ -1705,6 +1706,7 @@ void GetNATInfoCall::ListCallbackNeigh(void *reply, void *context)
 	rep_nat_entry->set_underlayroute(buf);
 	rep_nat_entry->set_minport(nat->min_port);
 	rep_nat_entry->set_maxport(nat->max_port);
+	rep_nat_entry->set_vni(nat->vni);
 }
 
 int GetNATInfoCall::Proceed()
