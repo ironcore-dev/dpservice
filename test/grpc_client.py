@@ -214,8 +214,8 @@ class GrpcClient:
 		if not output:
 			return None
 		specs = []
-		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: min_port ([0-9]+), max_port ([0-9]+) --> Underlay IPv6 ([a-f0-9:]+)(?:$|[\n\r])', output):
-			specs.append({ 'natVIPIP': nat_vip, 'underlayRoute': match.group(3), 'minPort': int(match.group(1)), 'maxPort': int(match.group(2)) })
+		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: min_port ([0-9]+), max_port ([0-9]+), vni ([0-9]+) --> Underlay IPv6 ([a-f0-9:]+)(?:$|[\n\r])', output):
+			specs.append({ 'natVIPIP': nat_vip, 'underlayRoute': match.group(4), 'minPort': int(match.group(1)), 'maxPort': int(match.group(2)) })
 		return specs
 
 	def addneighnat(self, nat_vip, vni, min_port, max_port, t_ipv6):

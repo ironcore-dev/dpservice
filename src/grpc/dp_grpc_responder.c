@@ -16,7 +16,7 @@ uint16_t dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_
 	// by default, only one reply with one message
 	responder->rep_capacity = 1;
 	responder->msg_size = sizeof(struct dpgrpc_reply);
-	responder->rep_msgcount = 1;
+	responder->rep_msgcount = 0;
 	responder->rep = (struct dpgrpc_reply *)req_payload;  // again, due to reusal of the request mbuf
 	responder->rep->type = responder->request.type;
 	responder->rep->is_chained = 0;
