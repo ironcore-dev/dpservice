@@ -40,7 +40,7 @@ int dp_recv_from_worker(struct dpgrpc_reply *reply, uint16_t request_type)
 	if (reply->type != request_type) {
 		DPGRPC_LOG_WARNING("Invalid response received", DP_LOG_GRPCREQUEST(request_type));
 		ret = DP_ERROR;
-	} else if (reply->is_chained || reply->msg_count != 1) {
+	} else if (reply->is_chained || reply->msg_count != 0) {
 		DPGRPC_LOG_WARNING("Single response expected, multiresponse received", DP_LOG_GRPCREQUEST(request_type));
 		ret = DP_ERROR;
 	}

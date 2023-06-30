@@ -36,7 +36,6 @@ static inline void dp_grpc_set_multireply(struct dp_grpc_responder *responder, s
 {
 	responder->msg_size = msg_size;
 	responder->rep_capacity = responder->rep_max_size / msg_size;
-	responder->rep_msgcount = 0;
 }
 
 int dp_grpc_alloc_reply(struct dp_grpc_responder *responder);
