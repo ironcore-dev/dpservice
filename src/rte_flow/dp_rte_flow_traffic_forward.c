@@ -918,7 +918,7 @@ int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_m
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install in-network decap flow rule on pf %d", m->port);
+		DPS_LOG_ERR("Failed to install in-network decap flow rule on pf", DP_LOG_PORTID(m->port));
 		return 0;
 	}
 	// config the content of agectx
