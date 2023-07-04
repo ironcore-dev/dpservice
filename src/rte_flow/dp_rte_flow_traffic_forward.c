@@ -485,7 +485,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	action_cnt = create_raw_encap_action(action, action_cnt,
 										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
 
-	// replace dst ip if vip-nat/networ-nat is enabled
+	// replace dst ip if vip-nat/network-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
 	if (df->flags.nat == DP_NAT_CHG_DST_IP)
 		action_cnt = create_ipv4_set_action(action, action_cnt,
@@ -779,7 +779,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	return 1;
 }
 
-int static __rte_always_inline dp_offload_handel_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
+int static __rte_always_inline dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
@@ -940,7 +940,7 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 				|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD)
-			return dp_offload_handel_in_network_traffic(m, df);
+			return dp_offload_handle_in_network_traffic(m, df);
 		else
 			return dp_offload_handle_tunnel_encap_traffic(m, df);
 	}
