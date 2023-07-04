@@ -1,0 +1,77 @@
+diff --git a/lib/eal/common/eal_common_log.c b/lib/eal/common/eal_common_log.c
+index 1be35f5397..159beb63ab 100644
+--- a/lib/eal/common/eal_common_log.c
++++ b/lib/eal/common/eal_common_log.c
+@@ -29,11 +29,14 @@ static struct rte_logs {
+ 	uint32_t type;  /**< Bitfield with enabled logs. */
+ 	uint32_t level; /**< Log level. */
+ 	FILE *file;     /**< Output file set by rte_openlog_stream, or NULL. */
++	/** Print function set by rte_log_set_print_func, or vfprintf. */
++	int (*func)(FILE *stream, const char *format, va_list ap);
+ 	size_t dynamic_types_len;
+ 	struct rte_log_dynamic_type *dynamic_types;
+ } rte_logs = {
+ 	.type = UINT32_MAX,
+ 	.level = RTE_LOG_DEBUG,
++	.func = vfprintf,
+ };
+ 
+ struct rte_eal_opt_loglevel {
+@@ -78,6 +81,13 @@ rte_openlog_stream(FILE *f)
+ 	return 0;
+ }
+ 
++/* Change the print function that will be used by the logging system. */
++void
++rte_log_set_print_func(int (*func)(FILE *stream, const char *format, va_list ap))
++{
++	rte_logs.func = func;
++}
++
+ FILE *
+ rte_log_get_stream(void)
+ {
+@@ -500,7 +510,7 @@ rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
+ 	RTE_PER_LCORE(log_cur_msg).loglevel = level;
+ 	RTE_PER_LCORE(log_cur_msg).logtype = logtype;
+ 
+-	ret = vfprintf(f, format, ap);
++	ret = rte_logs.func(f, format, ap);
+ 	fflush(f);
+ 	return ret;
+ }
+diff --git a/lib/eal/include/rte_log.h b/lib/eal/include/rte_log.h
+index 319e4044a5..ee17cf93a0 100644
+--- a/lib/eal/include/rte_log.h
++++ b/lib/eal/include/rte_log.h
+@@ -88,6 +88,18 @@ extern "C" {
+  */
+ int rte_openlog_stream(FILE *f);
+ 
++/**
++ * Change the print function that will be used by the logging system.
++ *
++ * This can be done at any time. The func argument represents
++ * the vfprintf-like function to be used to print the logs.
++ * Without calling this function, the default (vfprintf) is used.
++ *
++ * @param func
++ *   Pointer to the print function.
++ */
++void rte_log_set_print_func(int (*func)(FILE *stream, const char *format, va_list ap));
++
+ /**
+  * Retrieve the stream used by the logging system (see rte_openlog_stream()
+  * to change it).
+diff --git a/lib/eal/version.map b/lib/eal/version.map
+index ab28c22791..72c8a18111 100644
+--- a/lib/eal/version.map
++++ b/lib/eal/version.map
+@@ -141,6 +141,7 @@ DPDK_22 {
+ 	rte_log_set_level;
+ 	rte_log_set_level_pattern;
+ 	rte_log_set_level_regexp;
++	rte_log_set_print_func;
+ 	rte_malloc;
+ 	rte_malloc_dump_heaps;
+ 	rte_malloc_dump_stats;

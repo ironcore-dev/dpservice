@@ -69,6 +69,21 @@ void dp_log_set_thread_name(const char *name)
 	snprintf(thread_name, sizeof(thread_name), "%s", name);
 }
 
+static int dp_log_eal(FILE *stream, const char *format, va_list ap)
+{
+	char buf[2048];
+	int ret;
+
+	ret = vsnprintf(buf, sizeof(buf), format, ap);
+
+	// as _dp_log only supports custom logtypes, provide one directly
+	// logleves are supported fully
+	_dp_log(rte_log_cur_msg_loglevel(), RTE_LOGTYPE_DPSERVICE,
+			__FILE__, __LINE__, __FUNCTION__,
+			"EAL log message", _DP_LOG_STR("eal_msg", buf), NULL);
+
+	return ret;
+}
 
 int dp_log_init()
 {
@@ -80,6 +95,8 @@ int dp_log_init()
 		DP_EARLY_ERR("Cannot open logging stream %s", dp_strerror_verbose(ret));
 		return ret;
 	}
+
+	rte_log_set_print_func(dp_log_eal);
 
 	log_json = dp_conf_get_log_format() == DP_CONF_LOG_FORMAT_JSON;
 	if (log_json) {
