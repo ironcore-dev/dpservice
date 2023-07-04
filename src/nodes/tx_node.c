@@ -92,7 +92,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		//  - packets created by rewriting a source packet (pkt->port == port)
 		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)
 		// Always rewrite regardless the above for:
-		//  - packets that requires the changes to underlaying IPv6 address, mainly LB packets and NAT packets that are bounced back to network
+		//  - packets that require changes to underlaying IPv6 address, mainly LB packets and NAT packets that are bounced back to network
 		//  - packets already encapsulated for outgoing traffic (DP_FLOW_TYPE_OUTGOING)
 		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
 			|| df->flags.nat == DP_CHG_UL_DST_IP

@@ -108,7 +108,7 @@ void dp_process_event_flow_aging_msg(struct rte_mbuf *m)
 		}
 	}
 
-	// software aged flow and hardware aged flow are binded to a same cntrack obj via shared refcount
+	// software aged flow and hardware aged flow are bound to a same cntrack obj via shared refcount
 	// this cntrack obj gets deleted when the last reference is removed
 	// dp_process_aged_flows_non_offload() also takes care of expired tcp hw rte flow rules via the query mechanism,
 	// which enables fully control of hw rules' lifecycle from the software path for tcp flows.

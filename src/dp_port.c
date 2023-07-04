@@ -417,8 +417,7 @@ static int dp_port_install_isolated_mode(int port_id)
 
 static int dp_port_bind_port_hairpins(struct dp_port *port)
 {
-
-	// two pf port's hairpins are binded when processing the second port
+	// two pf port's hairpins are bound when processing the second port
 	if (port->port_id == dp_port_get_pf0_id())
 		return DP_OK;
 
@@ -449,19 +448,15 @@ int dp_port_start(uint16_t port_id)
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
 
-	// TODO(plague): research - this ordering is due to previously being in GRPC, but it seems this should be done earlier?
 	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
-
 		if (dp_conf_is_offload_enabled()) {
 			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 				return DP_ERROR;
 		}
-
-		// firstly finish pf-pf haripin binding, then install isolation rules
+		// first, finish pf-pf hairpin binding, then install isolation rules
 		if (port_id == dp_port_get_pf1_id()) {
 			if (DP_FAILED(dp_port_install_isolated_mode(dp_port_get_pf0_id())))
 				return DP_ERROR;
-
 			if (DP_FAILED(dp_port_install_isolated_mode(dp_port_get_pf1_id())))
 				return DP_ERROR;
 		}
