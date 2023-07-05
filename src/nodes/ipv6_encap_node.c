@@ -70,7 +70,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// store the original ipv6 dst address in the packet
 		rte_memcpy(ipv6_hdr->src_addr, df->tun_info.ul_src_addr6, sizeof(ipv6_hdr->src_addr));
 	else
-		rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
+		rte_memcpy(ipv6_hdr->src_addr, dp_get_vm_ul_ip6(m->port), sizeof(ipv6_hdr->src_addr));
 
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
 	ipv6_hdr->proto = proto_id;

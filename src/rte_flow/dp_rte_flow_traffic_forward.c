@@ -5,7 +5,6 @@
 
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct underlay_conf *u_conf = get_underlay_conf();
 	bool cross_pf_port = df->nxt_hop == dp_port_get_pf0_id() ? false : true;
 
 	struct rte_flow_attr attr;
@@ -242,7 +241,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	new_ipv6_hdr->proto = df->tun_info.proto_id;
-	rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
+	rte_memcpy(new_ipv6_hdr->src_addr, dp_get_vm_ul_ip6(m->port), sizeof(new_ipv6_hdr->src_addr));
 	rte_memcpy(new_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
 
 	action_cnt = create_raw_encap_action(action, action_cnt,
