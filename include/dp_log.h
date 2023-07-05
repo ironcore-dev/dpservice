@@ -95,6 +95,7 @@ extern "C" {
 // module-specific
 #define DP_LOG_NODE(VALUE) _DP_LOG_STR("node", (VALUE)->name)
 #define DP_LOG_TELEMETRY_CMD(VALUE) _DP_LOG_STR("telemetry_cmd", VALUE)
+#define DP_LOG_NETLINK(VALUE) _DP_LOG_STR("netlink_msg", VALUE)
 
 
 #define DP_STRUCTURED_LOG(LEVEL, LOGTYPE, MESSAGE, ...) \

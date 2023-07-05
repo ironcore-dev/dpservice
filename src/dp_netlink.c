@@ -3,21 +3,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <rte_ethdev.h>
-#include "dp_util.h"
-#include "dp_netlink.h"
+#include "dp_error.h"
 #include "dp_log.h"
+#include "dp_netlink.h"
+#include "dp_util.h"
 
-static int dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neigh,
-						struct rte_ether_addr *own_mac)
+static int dp_read_neigh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neigh,
+						 struct rte_ether_addr *own_mac)
 {
 	struct rtattr *rt_attr;
-	char mac[24];
 	struct ndmsg *rt_msg;
 	int rtl, ndm_family;
-	__be64 mac_num;
 
 	for (; NLMSG_OK(nh, nll); nh = NLMSG_NEXT(nh, nll)) {
 		rt_msg = (struct ndmsg *)NLMSG_DATA(nh);
@@ -27,116 +26,102 @@ static int dp_read_ngh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neig
 			continue;
 		if (rt_msg->ndm_flags & NTF_ROUTER) {
 			rtl = RTM_PAYLOAD(nh);
-			for (; RTA_OK(rt_attr, rtl); rt_attr = RTA_NEXT(rt_attr, rtl))
-				if (rt_attr->rta_type == NDA_LLADDR) {
-					sprintf(mac, "%lld", *((__be64 *)RTA_DATA(rt_attr)));
-					mac_num = atol(mac);
-					memcpy(neigh, &mac_num, sizeof(*neigh));
-					memset(&mac_num, 0, sizeof(mac_num));
-				}
+			for (; RTA_OK(rt_attr, rtl); rt_attr = RTA_NEXT(rt_attr, rtl)) {
+				if (rt_attr->rta_type == NDA_LLADDR)
+					memcpy(&neigh->addr_bytes, RTA_DATA(rt_attr), sizeof(neigh->addr_bytes));
+			}
 			if (!DP_MAC_EQUAL(own_mac, neigh))
-				return 0;
+				return DP_OK;
 		}
 	}
-	return -1;
+	return DP_ERROR;
 }
 
-static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf)
+static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bufsize)
 {
 	struct nlmsghdr *nh;
-	int len, nll = 0;
+	int recv_len;
+	int msg_len = 0;
 
-	while (1) {
-		len = recv(sock, buf, DP_NLINK_BUF_SIZE - nll, 0);
-		if (len < 0)
-			return len;
+	for (;;) {
+		recv_len = recv(sock, buf, bufsize - msg_len, 0);
+		if (recv_len < 0)
+			return recv_len;
 
 		nh = (struct nlmsghdr *)buf;
-
 		if (nh->nlmsg_type == NLMSG_DONE)
 			break;
-		buf += len;
-		nll += len;
+
+		buf += recv_len;
+		msg_len += recv_len;
+
 		if ((sock_addr.nl_groups & RTMGRP_NEIGH) == RTMGRP_NEIGH)
 			break;
-
 		if ((sock_addr.nl_groups & RTMGRP_IPV6_ROUTE) == RTMGRP_IPV6_ROUTE)
 			break;
 	}
-	return nll;
+	return msg_len;
 }
 
 int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr* neigh, struct rte_ether_addr* own_mac)
 { 
-	struct dp_nlnk_req *req;
-	struct sockaddr_nl sa;
-	char *dp_nlink_reply;
-	struct nlmsghdr *nh;
-	int sock, seq = 0;
-	struct msghdr msg;
-	struct iovec iov;
-	int ret = 0;
-	int nll;
+	struct sockaddr_nl sa = {
+		.nl_family = AF_NETLINK,
+		.nl_groups = RTMGRP_NEIGH,
+	};
+	struct dp_nlnk_req req = {
+		.nl.nlmsg_len = NLMSG_LENGTH(sizeof(struct ndmsg) + sizeof(struct dp_nl_tlv)),
+		.nl.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP,
+		.nl.nlmsg_type = RTM_GETNEIGH,
+		.rt.ndm_type = RTN_UNSPEC,
+		.rt.ndm_family = AF_INET6,
+		.nl.nlmsg_pid = 0,
+		.nl.nlmsg_seq = 1,
+		.if_tlv.length = sizeof(struct dp_nl_tlv),
+		.if_tlv.type = NDA_IFINDEX,
+		.if_tlv.val = if_idx,
+	};
+	struct iovec iov = {
+		.iov_base = &req.nl,
+		.iov_len = req.nl.nlmsg_len,
+	};
+	struct msghdr msg = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
+	int sock;
+	char reply[DP_NLINK_BUF_SIZE];
+	int reply_len;
+	int ret = DP_ERROR;
 
 	sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 	if (sock < 0) {
-		printf("open netlink socket: %s\n", strerror(errno));
-		return -1;
+		DPS_LOG_ERR("Cannot open netlink socket", DP_LOG_NETLINK(strerror(errno)));
+		return DP_ERROR;
 	}
-	memset(&sa, 0, sizeof(sa));
-	sa.nl_family = AF_NETLINK;
-	sa.nl_groups = RTMGRP_NEIGH;
-	if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-		printf("bind to netlink: %s\n", strerror(errno));
-		ret = -1;
-		goto cleanup;
-	}
-	req = malloc(sizeof(struct dp_nlnk_req));
-	if (!req)
-		goto cleanup;
-	
-	memset(req, 0, sizeof(struct dp_nlnk_req));
-	req->nl.nlmsg_len = NLMSG_LENGTH(sizeof(struct ndmsg) + sizeof(struct dp_nl_tlv));
-	req->nl.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-	req->nl.nlmsg_type = RTM_GETNEIGH;
-	req->rt.ndm_type = RTN_UNSPEC;
-	req->rt.ndm_family = AF_INET6;
-	req->nl.nlmsg_pid = 0;
-	req->nl.nlmsg_seq = ++seq;
 
-	req->if_tlv.length = sizeof(struct dp_nl_tlv);
-	req->if_tlv.type = NDA_IFINDEX;
-	req->if_tlv.val = if_idx;
-	memset(&msg, 0, sizeof(msg));
-	iov.iov_base = (void *)&req->nl;
-	iov.iov_len = req->nl.nlmsg_len;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	ret = sendmsg(sock, &msg, 0);
-	if (ret < 0) {
-		printf("send to netlink: %s\n", strerror(errno));
-		ret = -1;
-		goto err1;
+	if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		DPS_LOG_ERR("Cannot bind to netlink", DP_LOG_NETLINK(strerror(errno)));
+		goto cleanup;
 	}
-	dp_nlink_reply = malloc(DP_NLINK_BUF_SIZE);
-	memset(dp_nlink_reply, 0, DP_NLINK_BUF_SIZE);
-	if (!dp_nlink_reply)
-		goto err1;
-	nll = dp_recv_msg(sa, sock, dp_nlink_reply);
-	if (nll < 0) {
-		printf("recv from netlink: %s\n", strerror(nll));
-		ret = -1;
-		goto err2;
+
+	if (sendmsg(sock, &msg, 0) < 0) {
+		DPS_LOG_ERR("Cannot send message to netlink", DP_LOG_NETLINK(strerror(errno)));
+		goto cleanup;
 	}
-	nh = (struct nlmsghdr *)dp_nlink_reply;
+
+	reply_len = dp_recv_msg(sa, sock, reply, sizeof(reply));
+	if (reply_len < 0) {
+		DPS_LOG_ERR("Cannot receive message from netlink", DP_LOG_NETLINK(strerror(reply_len)));
+		goto cleanup;
+	}
+
 	// TODO this should be an error in production
-	if (dp_read_ngh(nh, nll, neigh, own_mac) < 0)
+	if (DP_FAILED(dp_read_neigh((struct nlmsghdr *)reply, reply_len, neigh, own_mac)))
 		DPS_LOG_WARNING("No neighboring router found");
 
-err2:
-	free(dp_nlink_reply);
-err1:
-	free(req);
+	ret = DP_OK;
+
 cleanup:
 	close(sock);
 	return ret;
