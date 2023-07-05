@@ -23,6 +23,7 @@ struct dp_nlnk_req {
 };
 
 int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr* neigh, struct rte_ether_addr* own_mac);
+
 #ifdef __cplusplus
 }
 #endif
