@@ -66,7 +66,7 @@ static void print_packet(struct rte_mbuf *pkt)
 	struct dp_graphtrace_pktinfo *pktinfo = dp_get_graphtrace_pktinfo(pkt);
 
 	dp_graphtrace_sprint(pkt, printbuf, sizeof(printbuf));
-	printf("%p: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
+	printf("%u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
 		   pktinfo->pktid,
 		   pktinfo->node->name,
 		   pktinfo->next_node ? "->" : "  ",

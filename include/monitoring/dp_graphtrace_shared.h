@@ -24,7 +24,7 @@ struct dp_graphtrace {
 };
 
 struct dp_graphtrace_pktinfo {
-	struct rte_mbuf *pktid;  // currently the original mbuf's address
+	uint32_t pktid;
 	struct rte_node *node;
 	struct rte_node *next_node;
 };

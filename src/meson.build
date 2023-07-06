@@ -64,6 +64,7 @@ if get_option('enable_virtual_services')
 endif
 if get_option('enable_graphtrace')
   dp_sources += [
+    'dp_mbuf_dyn.c',
     'monitoring/dp_graphtrace.c',
     'monitoring/dp_graphtrace_shared.c',
   ]

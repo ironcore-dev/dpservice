@@ -4,6 +4,9 @@
 #include <assert.h>
 #include <rte_common.h>
 #include <rte_flow.h>
+#ifdef ENABLE_GRAPHTRACE
+#	include <rte_atomic.h>
+#endif
 #include "dp_flow.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
@@ -83,13 +86,26 @@ struct dp_flow {
 	struct dp_virtsvc	*virtsvc;
 #endif
 };
-static_assert(sizeof(struct dp_flow) <= DP_MBUF_PRIV_DATA_SIZE,
-			  "struct dp_flow is too big to fit in packet");
+
+struct dp_pkt_mark {
+#ifdef ENABLE_GRAPHTRACE
+	uint32_t id;
+#endif
+	uint32_t flags;
+	// check the init function if adding more,
+	// due to this being small, memset has not been used
+};
+
+static_assert(sizeof(struct dp_flow) + sizeof(struct dp_pkt_mark) <= DP_MBUF_PRIV_DATA_SIZE,
+			  "packet private data is too big to fit in packet");
 static_assert(sizeof(((struct dp_flow *)0)->periodic_type) == 1,
 			  "enum dp_periodic_type is unnecessarily big");
 static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORTS,
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
 
+#ifdef ENABLE_GRAPHTRACE
+extern rte_atomic32_t dp_pkt_id_counter;
+#endif
 
 static __rte_always_inline struct dp_flow *dp_get_flow_ptr(struct rte_mbuf *m)
 {
@@ -104,6 +120,21 @@ static __rte_always_inline struct dp_flow *dp_init_flow_ptr(struct rte_mbuf *m)
 	memset(df, 0, sizeof(*df));
 
 	return df;
+}
+
+static __rte_always_inline struct dp_pkt_mark *dp_get_pkt_mark(struct rte_mbuf *m)
+{
+	return (struct dp_pkt_mark *)(dp_get_flow_ptr(m) + 1);
+}
+
+static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
+{
+	struct dp_pkt_mark *mark = dp_get_pkt_mark(m);
+
+#ifdef ENABLE_GRAPHTRACE
+	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
+#endif
+	mark->flags = 0;
 }
 
 #ifdef __cplusplus

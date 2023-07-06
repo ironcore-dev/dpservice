@@ -85,6 +85,12 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return DP_OK;
 }
 
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
+{
+	dp_init_pkt_mark(m);
+	return RX_NEXT_CLS;
+}
+
 static uint16_t rx_node_process(struct rte_graph *graph,
 								struct rte_node *node,
 								void **objs,
@@ -106,7 +112,8 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 		return 0;
 
 	node->idx = n_pkts;
-	dp_forward_graph_packets(graph, node, objs, n_pkts, RX_NEXT_CLS);
+
+	dp_foreach_graph_packet(graph, node, objs, n_pkts, RX_NEXT_CLS, get_next_index);
 
 	return n_pkts;
 }

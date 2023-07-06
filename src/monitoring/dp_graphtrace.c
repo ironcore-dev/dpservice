@@ -9,8 +9,6 @@
 
 #ifdef ENABLE_PYTEST
 #	include "dp_conf.h"
-// real id in df_ptr would be better, but that requires initializing df_ptr in rx nodes
-#	define DP_GRAPHTRACE_PKT_ID(PKT) (PKT)
 static enum dp_graphtrace_loglevel graphtrace_loglevel;
 #endif
 
@@ -68,9 +66,7 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 		} else {
 			dups[nb_dups++] = dup;
 			pktinfo = dp_get_graphtrace_pktinfo(dup);
-			// currently, simple mbuf address is used as an id
-			// as custom ids would require df_ptr access in rx nodes
-			pktinfo->pktid = objs[i];
+			pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
 			pktinfo->node = node;
 			pktinfo->next_node = next_node;
 		}
@@ -109,38 +105,38 @@ static void dp_graphtrace_log(void *obj, const char *format, ...)
 void _dp_graphtrace_log_node(struct rte_node *node, void *obj)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
-		dp_graphtrace_log(obj, "%-14s: %p                  : ",
-					   node->name, DP_GRAPHTRACE_PKT_ID(obj));
+		dp_graphtrace_log(obj, "%-14s: %3u                  : ",
+					   node->name, dp_get_pkt_mark(obj)->id);
 }
 
 void _dp_graphtrace_log_node_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
 		for (uint i = 0; i < nb_objs; ++i)
-			dp_graphtrace_log(objs[i], "%-14s: %p                  : ",
-						   node->name, DP_GRAPHTRACE_PKT_ID(objs[i]));
+			dp_graphtrace_log(objs[i], "%-14s: %3u                  : ",
+						   node->name, dp_get_pkt_mark(objs[i])->id);
 }
 
 void _dp_graphtrace_log_next(struct rte_node *node, void *obj, rte_edge_t next_index)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
-		dp_graphtrace_log(obj, "%-14s: %p -> %-14s: ",
-					   node->name, DP_GRAPHTRACE_PKT_ID(obj), node->nodes[next_index]->name);
+		dp_graphtrace_log(obj, "%-14s: %3u -> %-14s: ",
+					   node->name, dp_get_pkt_mark(obj)->id, node->nodes[next_index]->name);
 }
 
 void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint i = 0; i < nb_objs; ++i)
-			dp_graphtrace_log(objs[i], "%-11s #%u: %p -> %-14s: ",
-						   node->name, i, DP_GRAPHTRACE_PKT_ID(objs[i]), node->nodes[next_index]->name);
+			dp_graphtrace_log(objs[i], "%-11s #%u: %3u -> %-14s: ",
+						   node->name, i, dp_get_pkt_mark(objs[i])->id, node->nodes[next_index]->name);
 }
 
 void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint i = 0; i < nb_objs; ++i)
-			dp_graphtrace_log(objs[i], "%-11s #%u: %p >> PORT %-9u: ",
-						   node->name, i, DP_GRAPHTRACE_PKT_ID(objs[i]), port_id);
+			dp_graphtrace_log(objs[i], "%-11s #%u: %3u >> PORT %-9u: ",
+						   node->name, i, dp_get_pkt_mark(objs[i])->id, port_id);
 }
 #endif  // ENABLE_PYTEST
