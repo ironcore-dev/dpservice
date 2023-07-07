@@ -19,7 +19,6 @@ dp_sources = [
   'nodes/firewall_node.c',
   'nodes/ipip_tunnel_node.c',
   'nodes/ipv4_lookup_node.c',
-  'nodes/ipv6_encap_node.c',
   'nodes/ipv6_lookup_node.c',
   'nodes/ipv6_nd_node.c',
   'nodes/l2_decap_node.c',

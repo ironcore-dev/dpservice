@@ -11,7 +11,7 @@
 #include "nodes/arp_node.h"
 #include "nodes/dhcp_node.h"
 #include "nodes/dhcpv6_node.h"
-#include "nodes/ipv6_encap_node.h"
+#include "nodes/ipip_tunnel_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "nodes/l2_decap_node.h"
 #include "nodes/rx_node.h"
@@ -146,7 +146,7 @@ static int dp_graph_init_nodes()
 				return DP_ERROR;
 			break;
 		case DP_PORT_PF:
-			if (DP_FAILED(ipv6_encap_node_append_pf_tx(port_id, name)))
+			if (DP_FAILED(ipip_tunnel_node_append_pf_tx(port_id, name)))
 				return DP_ERROR;
 			break;
 		}
