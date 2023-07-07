@@ -185,7 +185,7 @@ static __rte_always_inline void change_flow_state_dir(struct rte_mbuf *m, struct
 			df->flags.dir = DP_FLOW_DIR_ORG;
 
 		// recirc pkt shall not change flow's state because its ancestor has already done
-		if (DP_PTYPE_IS_RECIRC(m->packet_type))
+		if (dp_get_pkt_mark(m)->flags.is_recirc)
 			return;
 
 		// when to offload reply pkt of a tcp flow is determined in dp_cntrack_set_timeout_tcp_flow
@@ -301,7 +301,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 		flow_val->timestamp = rte_rdtsc();
 
-		if (df->l4_type == IPPROTO_TCP && !DP_PTYPE_IS_RECIRC(m->packet_type)) {
+		if (df->l4_type == IPPROTO_TCP && !dp_get_pkt_mark(m)->flags.is_recirc) {
 			tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
 			dp_cntrack_tcp_state(flow_val, tcp_hdr);
 			dp_cntrack_set_timeout_tcp_flow(flow_val, df);

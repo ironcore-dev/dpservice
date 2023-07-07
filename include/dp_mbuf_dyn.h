@@ -18,14 +18,6 @@
 extern "C" {
 #endif
 
-
-#define	RTE_PTYPE_CUSTOMIZED_DP_RECIRC 0x10000000
-#define	RTE_PTYPE_CUSTOMIZED_DP_INTERNAL_MASK (~RTE_PTYPE_ALL_MASK)
-
-#define DP_PTYPE_IS_RECIRC(ptype) \
-	((ptype & RTE_PTYPE_CUSTOMIZED_DP_INTERNAL_MASK) == RTE_PTYPE_CUSTOMIZED_DP_RECIRC)
-
-
 enum dp_periodic_type {
 	DP_PER_TYPE_ZERO,
 	DP_PER_TYPE_ND_RA,
@@ -91,7 +83,9 @@ struct dp_pkt_mark {
 #ifdef ENABLE_GRAPHTRACE
 	uint32_t id;
 #endif
-	uint32_t flags;
+	struct {
+		uint32_t is_recirc : 1;
+	} flags;
 	// check the init function if adding more,
 	// due to this being small, memset has not been used
 };
@@ -134,7 +128,7 @@ static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
 #ifdef ENABLE_GRAPHTRACE
 	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
 #endif
-	mark->flags = 0;
+	mark->flags.is_recirc = false;
 }
 
 #ifdef __cplusplus

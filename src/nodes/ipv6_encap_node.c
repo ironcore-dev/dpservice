@@ -84,7 +84,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
 			return IPV6_ENCAP_NEXT_DROP;
 		}
-		m->packet_type |= RTE_PTYPE_CUSTOMIZED_DP_RECIRC;
+		dp_get_pkt_mark(m)->flags.is_recirc = true;
 		return IPV6_ENCAP_NEXT_CLS;
 	}
 

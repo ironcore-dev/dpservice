@@ -362,7 +362,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item_ipv6 ipv6_mask;
 
 	// restore the actual incoming pkt's ipv6 dst addr
-	if (DP_PTYPE_IS_RECIRC(m->packet_type))
+	if (dp_get_pkt_mark(m)->flags.is_recirc)
 		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
 
 
