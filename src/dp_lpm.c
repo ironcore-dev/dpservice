@@ -482,7 +482,7 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 	return &vm_table[portid].info.neigh_mac;
 }
 
-int setup_vm(int port_id, int vni, const int socketid)
+int dp_setup_vm(int port_id, int vni, const int socketid)
 {
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
@@ -496,7 +496,7 @@ int setup_vm(int port_id, int vni, const int socketid)
 	return DP_OK;
 }
 
-int setup_vm6(int port_id, int vni, const int socketid)
+int dp_setup_vm6(int port_id, int vni, const int socketid)
 {
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
@@ -509,15 +509,13 @@ int setup_vm6(int port_id, int vni, const int socketid)
 	return DP_OK;
 }
 
-// TODO(plague): retval DP_FAILED style?
-int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
-						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id)
+int dp_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
+						 struct vm_route *route, uint32_t *route_key, uint64_t *dst_port_id)
 {
-	uint32_t dst_ip = rte_be_to_cpu_32(df->dst.dst_addr);
+	uint32_t dst_ip = ntohl(df->dst.dst_addr);
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;
-	int status;
 
 	if (t_vni)
 		root = dp_get_vni_route4_table(t_vni, socketid);
@@ -525,28 +523,27 @@ int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int s
 		root = dp_get_vni_route4_table(vm_table[port_id].vni, socketid);
 
 	if (!root)
-		return DP_ROUTE_DROP;
+		return DP_ERROR;
 
 	node = rte_rib_lookup(root, dst_ip);
+	if (!node)
+		return DP_ERROR;
 
-	if (node) {
-		if (rte_rib_get_nh(node, &next_hop) != 0)
-			return DP_ROUTE_DROP;
-		if (dp_port_is_pf(next_hop))
-			*r = *(struct vm_route *)rte_rib_get_ext(node);
+	if (DP_FAILED(rte_rib_get_nh(node, &next_hop)))
+		return DP_ERROR;
 
-		*dst_port_id = next_hop;
-		status = rte_rib_get_ip(node, route_key);
-		if (status < 0)
-			return DP_ROUTE_DROP;
+	if (dp_port_is_pf(next_hop))
+		*route = *(struct vm_route *)rte_rib_get_ext(node);
 
-		return 0;
-	}
+	*dst_port_id = next_hop;
+	if (DP_FAILED(rte_rib_get_ip(node, route_key)))
+		return DP_ERROR;
 
-	return DP_ROUTE_DROP;
+	return DP_OK;
 }
 
-int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr, struct vm_route *r, int socketid)
+int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
+						 struct vm_route *route, int socketid)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -558,19 +555,19 @@ int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6
 		root = dp_get_vni_route6_table(vm_table[port_id].vni, socketid);
 
 	if (!root)
-		return DP_ROUTE_DROP;
+		return DP_ERROR;
 
 	node = rte_rib6_lookup(root, ipv6_hdr->dst_addr);
+	if (!node)
+		return DP_ERROR;
 
-	if (node) {
-		if (rte_rib6_get_nh(node, &next_hop) != 0)
-			return DP_ROUTE_DROP;
-		if (dp_port_is_pf(next_hop))
-			*r = *(struct vm_route *)rte_rib6_get_ext(node);
-		 return next_hop;
-	}
+	if (DP_FAILED(rte_rib6_get_nh(node, &next_hop)))
+		return DP_ERROR;
 
-	return DP_ROUTE_DROP;
+	if (dp_port_is_pf(next_hop))
+		*route = *(struct vm_route *)rte_rib6_get_ext(node);
+
+	return next_hop;
 }
 
 void dp_del_vm(int portid, int socketid, bool rollback)

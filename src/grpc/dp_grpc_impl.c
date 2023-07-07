@@ -506,11 +506,11 @@ static int dp_process_add_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_VM_HANDLE;
 		goto err_vnf;
 	}
-	if (DP_FAILED(setup_vm(port_id, request->vni, socket_id))) {
+	if (DP_FAILED(dp_setup_vm(port_id, request->vni, socket_id))) {
 		ret = DP_GRPC_ERR_VNI_INIT4;
 		goto handle_err;
 	}
-	if (DP_FAILED(setup_vm6(port_id, request->vni, socket_id))) {
+	if (DP_FAILED(dp_setup_vm6(port_id, request->vni, socket_id))) {
 		ret = DP_GRPC_ERR_VNI_INIT6;
 		goto vm_err;
 	}

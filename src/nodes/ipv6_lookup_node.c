@@ -3,6 +3,7 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_error.h"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
 #include "nodes/common_node.h"
@@ -20,7 +21,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ipv6_hdr *ipv6_hdr;
 	struct vm_route route;
 	int t_vni;
-	int ret;
+	int dst_port;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		t_vni = df->tun_info.dst_vni;
@@ -41,11 +42,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == DP_IP_PROTO_UDP && ntohs(df->l4_info.trans_port.dst_port) == DHCPV6_SERVER_PORT)
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
-	ret = lpm_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
-	if (ret < 0)
+	dst_port = dp_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
+	if (DP_FAILED(dst_port))
 		return IPV6_LOOKUP_NEXT_DROP;
 
-	df->nxt_hop = ret;
+	df->nxt_hop = dst_port;
 
 	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df->tun_info.dst_vni = route.vni;

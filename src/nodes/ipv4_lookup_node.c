@@ -33,9 +33,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// TODO: extract mac info in cls node
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	if (lpm_lookup_ip4_route(m->port, df->tun_info.dst_vni, df,
-							rte_eth_dev_socket_id(m->port),
-							&route, &route_key, &dst_port_id) < 0)
+	if (DP_FAILED(dp_lookup_ip4_route(m->port, df->tun_info.dst_vni, df,
+									  rte_eth_dev_socket_id(m->port),
+									  &route, &route_key, &dst_port_id)))
 		return IPV4_LOOKUP_NEXT_DROP;
 
 	df->nxt_hop = (uint8_t)dst_port_id;

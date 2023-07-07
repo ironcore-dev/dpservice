@@ -15,12 +15,6 @@
 extern "C" {
 #endif
 
-#define DP_ROUTE_DHCP		-2
-#define DP_ROUTE_DROP		-3
-#define DP_ROUTE_FIREWALL	-4
-#define DP_ROUTE_NAT		-5
-#define DP_ROUTE_PKT_RELAY	-6
-
 #define DP_IP_PROTO_UDP		0x11
 #define DP_IP_PROTO_TCP		0x06
 #define DP_IP_PROTO_ICMP	0x01
@@ -67,13 +61,12 @@ struct vm_route {
 
 };
 
-int setup_vm(int port_id, int vni, const int socketid);
-int setup_vm6(int port_id, int vni, const int socketid);
-int lpm_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
-						 struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id);
-// TODO: adapt lpm_get_ip6_dst_port to lpm_lookup_ip4_route, to include necessary returned values.
-int lpm_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
-						 struct vm_route *r, int socketid);
+int dp_setup_vm(int port_id, int vni, const int socketid);
+int dp_setup_vm6(int port_id, int vni, const int socketid);
+int dp_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
+						struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id);
+int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
+						struct vm_route *r, int socketid);
 
 int dp_lpm_init(int socket_id);
 void dp_lpm_free();
