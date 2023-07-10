@@ -169,67 +169,67 @@ const char *dp_conf_get_vf_pattern()
 	return vf_pattern;
 }
 
-const int dp_conf_get_dhcp_mtu()
+int dp_conf_get_dhcp_mtu()
 {
 	return dhcp_mtu;
 }
 
-const double dp_conf_get_wcmp_frac()
+double dp_conf_get_wcmp_frac()
 {
 	return wcmp_frac;
 }
 
-const enum dp_conf_nic_type dp_conf_get_nic_type()
+enum dp_conf_nic_type dp_conf_get_nic_type()
 {
 	return nic_type;
 }
 
-const bool dp_conf_is_stats_enabled()
+bool dp_conf_is_stats_enabled()
 {
 	return stats_enabled;
 }
 
-const bool dp_conf_is_conntrack_enabled()
+bool dp_conf_is_conntrack_enabled()
 {
 	return conntrack_enabled;
 }
 
-const bool dp_conf_is_ipv6_overlay_enabled()
+bool dp_conf_is_ipv6_overlay_enabled()
 {
 	return ipv6_overlay_enabled;
 }
 
-const bool dp_conf_is_offload_enabled()
+bool dp_conf_is_offload_enabled()
 {
 	return offload_enabled;
 }
 
 #ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
-const int dp_conf_get_graphtrace_loglevel()
+int dp_conf_get_graphtrace_loglevel()
 {
 	return graphtrace_loglevel;
 }
 
 #endif
 #endif
-const enum dp_conf_color dp_conf_get_color()
+enum dp_conf_color dp_conf_get_color()
 {
 	return color;
 }
 
-const enum dp_conf_log_format dp_conf_get_log_format()
+enum dp_conf_log_format dp_conf_get_log_format()
 {
 	return log_format;
 }
 
-const int dp_conf_get_grpc_port()
+int dp_conf_get_grpc_port()
 {
 	return grpc_port;
 }
 
 #ifdef ENABLE_PYTEST
-const int dp_conf_get_flow_timeout()
+int dp_conf_get_flow_timeout()
 {
 	return flow_timeout;
 }

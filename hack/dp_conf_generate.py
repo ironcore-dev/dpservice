@@ -80,6 +80,13 @@ class Option:
 			print("#endif")
 
 
+def get_signature(option):
+	ptr = "*" if option.array_size is not None else ""
+	const = "const " if ptr else ""
+	prefix = "dp_conf_is_" if option.ctype == "bool" else "dp_conf_get_"
+	ctype = f"enum dp_conf_{option.varname}" if option.ctype == "enum" else option.ctype
+	return f"{const}{ctype} {ptr}{prefix}{option.varname}()"
+
 def generate_c(options):
 	# Generate IDs
 	print("enum {")
@@ -146,10 +153,8 @@ def generate_c(options):
 	for option in options:
 		if not option.ctype or not option.varname:
 			continue
-		ptr = "*" if option.array_size is not None else ""
-		prefix = "dp_conf_is_" if option.ctype == "bool" else "dp_conf_get_"
-		ctype = f"enum dp_conf_{option.varname}" if option.ctype == "enum" else option.ctype
-		option.print(f"const {ctype} {ptr}{prefix}{option.varname}()\n{{\n\treturn {option.varname};\n}}\n")
+		signature = get_signature(option)
+		option.print(f"{signature}\n{{\n\treturn {option.varname};\n}}\n")
 
 def generate_h(options):
 	# Generate enums
@@ -164,10 +169,8 @@ def generate_h(options):
 	for option in options:
 		if not option.ctype or not option.varname:
 			continue
-		ptr = "*" if option.array_size is not None else ""
-		prefix = "dp_conf_is_" if option.ctype == "bool" else "dp_conf_get_"
-		ctype = f"enum dp_conf_{option.varname}" if option.ctype == "enum" else option.ctype
-		option.print(f"const {ctype} {ptr}{prefix}{option.varname}();")
+		signature = get_signature(option)
+		option.print(f"{signature};")
 
 def generate_md(options):
 	print("# Dataplane Service Command-line Options")
