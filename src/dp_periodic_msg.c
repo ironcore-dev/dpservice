@@ -1,4 +1,5 @@
 #include <rte_arp.h>
+#include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
@@ -19,6 +20,7 @@ void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint1
 	struct dp_ports *ports = get_dp_ports();
 	struct rte_mbuf *clone_buf;
 	struct rte_ether_addr *mac;
+	int ret;
 
 	DP_FOREACH_PORT(ports, port) {
 		if (port->port_type != DP_PORT_VF || !port->allocated)
@@ -48,7 +50,11 @@ void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint1
 		df->periodic_type = per_type;
 		df->l3_type = eth_type;
 				
-		rte_ring_sp_enqueue(dp_layer->periodic_msg_queue, clone_buf);
+		ret = rte_ring_sp_enqueue(dp_layer->periodic_msg_queue, clone_buf);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_WARNING("Cannot enqueue message to a VM", DP_LOG_PORTID(clone_buf->port), DP_LOG_RET(ret));
+			rte_pktmbuf_free(clone_buf);
+		}
 	}
 }
 
