@@ -160,7 +160,7 @@ static inline int get_timestamp(char *buf)
 
 static const char *json_escape(const char *message, char *buf, size_t bufsize)
 {
-	int bufpos = 0;
+	size_t bufpos = 0;
 	char c;
 	uint8_t hi, lo;
 

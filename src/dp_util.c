@@ -37,7 +37,7 @@ static int get_num_of_vfs_sriov()
 				 DP_SYSFS_PREFIX_MLX_VF_COUNT,
 				 dp_conf_get_pf0_name(),
 				 DP_SYSFS_SUFFIX_MLX_VF_COUNT)
-			>= sizeof(filename)
+			>= (int)sizeof(filename)
 	) {
 		DPS_LOG_ERR("SR-IOV sysfs path to number of VFs is too long");
 		return DP_ERROR;

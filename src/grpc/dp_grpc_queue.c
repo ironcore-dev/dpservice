@@ -12,7 +12,7 @@ int dp_send_to_worker(struct dpgrpc_request *req)
 		return DP_ERROR;
 	}
 
-	assert(m->buf_len - m->data_off >= sizeof(struct dpgrpc_request));
+	assert((size_t)m->buf_len - m->data_off >= sizeof(struct dpgrpc_request));
 	*rte_pktmbuf_mtod(m, struct dpgrpc_request *) = *req;
 
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->grpc_tx_queue, m);
@@ -36,7 +36,7 @@ int dp_recv_from_worker(struct dpgrpc_reply *reply, uint16_t request_type)
 		return ret;
 	}
 
-	assert(m->buf_len - m->data_off >= sizeof(struct dpgrpc_reply));
+	assert((size_t)m->buf_len - m->data_off >= sizeof(struct dpgrpc_reply));
 	*reply = *rte_pktmbuf_mtod(m, struct dpgrpc_reply *);
 
 	if (reply->type != request_type) {

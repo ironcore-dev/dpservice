@@ -362,7 +362,7 @@ void dp_virtsvc_del_vm(uint16_t port_id)
 		// But in practice, the port table is always full anyway
 		// as timed-out connections get replaced with new ones on-demand
 		// (i.e. the table is constantly full after the first 64k connections)
-		for (int i = 0; i < RTE_DIM(service->connections); ++i) {
+		for (uint i = 0; i < RTE_DIM(service->connections); ++i) {
 			conn = &service->connections[i];
 			if (conn->vf_port_id == port_id && conn->last_pkt_timestamp) {
 				conn->last_pkt_timestamp = 0;

@@ -73,8 +73,8 @@ static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *
 {
 	uint32_t dest_ip = ntohl(df->dst.dst_addr);
 	uint32_t src_ip = ntohl(df->src.src_addr);
-	int32_t src_port_lower, src_port_upper = 0;
-	int32_t dst_port_lower, dst_port_upper = 0;
+	uint32_t src_port_lower, src_port_upper = 0;
+	uint32_t dst_port_lower, dst_port_upper = 0;
 	uint32_t r_dest_ip = ntohl(rule->dest_ip);
 	uint32_t r_src_ip = ntohl(rule->src_ip);
 	uint8_t protocol = df->l4_type;

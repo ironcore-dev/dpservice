@@ -78,7 +78,8 @@ int dp_lpm_reset_route_tables(int vni, int socketid)
 	}
 
 	for (int i = 0; i < DP_MAX_PORTS; ++i) {
-		if (vm_table[i].vm_ready && vm_table[i].vni == vni) {
+		// TODO(plague?): the cast does not seem nice, define a type for VNIs?
+		if (vm_table[i].vm_ready && (int)vm_table[i].vni == vni) {
 			ret = dp_lpm_fill_route_tables(i, &vm_table[i]);
 			if (DP_FAILED(ret))
 				return ret;

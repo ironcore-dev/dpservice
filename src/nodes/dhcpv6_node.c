@@ -79,7 +79,7 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 	struct dhcpv6_option *opt;
 
 	for (int i = 0;
-		 i + sizeof(struct dhcpv6_option) < options_len;
+		 i + sizeof(struct dhcpv6_option) < (size_t)options_len;  // len already checked for being positive
 		 i += sizeof(struct dhcpv6_option) + op_len
 	) {
 		opt = (struct dhcpv6_option *)&options[i];

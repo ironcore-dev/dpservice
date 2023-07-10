@@ -72,7 +72,7 @@ static int dp_graph_export(const char *graph_name)
 	FILE *f;
 	char fname[RTE_GRAPH_NAMESIZE + 5];  // + ".dot\0"
 
-	if (snprintf(fname, sizeof(fname), "%s.dot", graph_name) >= sizeof(fname)) {
+	if (snprintf(fname, sizeof(fname), "%s.dot", graph_name) >= (int)sizeof(fname)) {
 		DPS_LOG_ERR("Cannot export graph, name too long");
 		return DP_ERROR;
 	}

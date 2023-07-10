@@ -124,7 +124,7 @@ static int opt_str_to_ipv6(void *dst, const char *arg)
 
 static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uint choice_count)
 {
-	for (int i = 0; i < choice_count; ++i) {
+	for (uint i = 0; i < choice_count; ++i) {
 		if (!strcmp(choices[i], arg)) {
 			*dst = i;
 			return DP_OK;

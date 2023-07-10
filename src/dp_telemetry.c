@@ -218,7 +218,7 @@ int dp_telemetry_init(void)
 	}
 #endif
 
-	for (int i = 0; i < RTE_DIM(commands); ++i) {
+	for (uint i = 0; i < RTE_DIM(commands); ++i) {
 		ret = rte_telemetry_register_cmd(commands[i].command, commands[i].callback, commands[i].description);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to register telemetry command", DP_LOG_TELEMETRY_CMD(commands[i].command), DP_LOG_RET(ret));

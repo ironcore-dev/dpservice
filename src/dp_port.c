@@ -344,7 +344,7 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 	uint16_t port_id;
 	struct rte_eth_dev_info dev_info;
 	char ifname[IFNAMSIZ] = {0};
-	uint32_t vf_count = 0;
+	int vf_count = 0;
 	struct dp_port *port;
 
 	RTE_ETH_FOREACH_DEV(port_id) {
