@@ -779,7 +779,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	return 1;
 }
 
-int static __rte_always_inline dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];

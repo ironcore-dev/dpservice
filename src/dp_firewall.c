@@ -69,7 +69,7 @@ int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 	return DP_OK;
 }
 
-static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *rule,
+static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *rule,
 													struct dp_flow *df,
 													__rte_unused struct rte_ipv4_hdr *ipv4_hdr)
 {
@@ -126,7 +126,7 @@ static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *
 		((rule->protocol == DP_FWALL_MATCH_ANY_PROTOCOL) || (rule->protocol == protocol)));
 }
 
-static struct dp_fwall_rule __rte_always_inline *dp_is_matched_in_fwall_list(struct dp_flow *df,
+static __rte_always_inline struct dp_fwall_rule *dp_is_matched_in_fwall_list(struct dp_flow *df,
 																	  struct rte_ipv4_hdr *ipv4_hdr,
 																	  struct dp_fwall_head *fwall_head,
 																	  enum dp_fwall_direction dir,
@@ -147,7 +147,7 @@ static struct dp_fwall_rule __rte_always_inline *dp_is_matched_in_fwall_list(str
 /* Egress default for the traffic originating from VFs is "Accept", when no rule matches. If there is at least one */
 /* Egress rule than the default action becomes drop, if there is no rule matching */
 /* Another approach here could be to install a default egress rule for each interface which allows everything */
-static enum dp_fwall_action __rte_always_inline dp_get_egress_action(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
+static __rte_always_inline enum dp_fwall_action dp_get_egress_action(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 																	 struct dp_fwall_head *fwall_head)
 {
 	uint32_t egress_rule_count = 0;

@@ -29,7 +29,7 @@ void dp_lpm_free()
 	dp_free_jhash_table(vm_handle_tbl);
 }
 
-int __rte_always_inline dp_lpm_fill_route_tables(int portid, struct vm_entry *entry)
+static __rte_always_inline int dp_lpm_fill_route_tables(int portid, struct vm_entry *entry)
 {
 	int socket_id = rte_eth_dev_socket_id(portid);
 	int ret;
