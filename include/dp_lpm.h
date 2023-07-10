@@ -82,8 +82,8 @@ uint8_t* dp_get_vm_ip6(uint16_t portid);
 uint8_t *dp_get_vm_ul_ip6(uint16_t portid);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 uint8_t* ip6, uint8_t depth, int socketid);
-int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, 
-				 uint32_t ip, uint8_t* ip6, uint8_t depth, int socketid);
+int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
+				 uint8_t* ip6, uint8_t depth, int socketid);
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
 				 uint8_t* ext_ip6, uint8_t depth, int socketid);
 int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t* ipv6,
@@ -98,7 +98,7 @@ struct rte_ether_addr *dp_get_mac(uint16_t portid);
 void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr* neigh);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_arp_cycle_needed(uint16_t portid);
-void dp_del_vm(int portid, int socketid, bool rollback);
+void dp_del_vm(int portid, int socketid);
 int dp_get_active_vm_ports(int* act_ports);
 uint8_t* dp_get_vm_machineid(uint16_t portid);
 uint32_t dp_get_vm_vni(uint16_t portid);

@@ -763,12 +763,12 @@ int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
 
 int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_set_tag *set_tag_action,
-							uint32_t tag_value, uint8_t index)
+							uint32_t tag_value, __rte_unused uint8_t index)
 {
 
 	set_tag_action->data =  tag_value;
 	set_tag_action->mask =  0xffffffff;
-	set_tag_action->index = 0;
+	set_tag_action->index = 0;  // This function currently only supports one tag per packet
 
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TAG;
 	action[action_cnt].conf = set_tag_action;
@@ -827,8 +827,7 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
 												const struct rte_flow_item pattern[],
-												const struct rte_flow_action action[],
-												struct dp_flow *df)
+												const struct rte_flow_action action[])
 {
 	int ret;
 	struct rte_flow *flow = NULL;

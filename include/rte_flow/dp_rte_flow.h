@@ -186,8 +186,7 @@ int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
 												const struct rte_flow_item pattern[],
-												const struct rte_flow_action action[],
-												struct dp_flow *df);
+												const struct rte_flow_action action[]);
 
 int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 							struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx);

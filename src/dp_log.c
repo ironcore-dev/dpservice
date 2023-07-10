@@ -69,7 +69,7 @@ void dp_log_set_thread_name(const char *name)
 	snprintf(thread_name, sizeof(thread_name), "%s", name);
 }
 
-static int dp_log_eal(FILE *stream, const char *format, va_list ap)
+static int dp_log_eal(__rte_unused FILE *stream, const char *format, va_list ap)
 {
 	char buf[2048];
 	int ret;

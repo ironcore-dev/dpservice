@@ -69,7 +69,9 @@ int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 	return DP_OK;
 }
 
-static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *rule, struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr)
+static bool __rte_always_inline dp_is_rule_matching(const struct dp_fwall_rule *rule,
+													struct dp_flow *df,
+													__rte_unused struct rte_ipv4_hdr *ipv4_hdr)
 {
 	uint32_t dest_ip = ntohl(df->dst.dst_addr);
 	uint32_t src_ip = ntohl(df->src.src_addr);

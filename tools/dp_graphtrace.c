@@ -104,12 +104,12 @@ static int do_graphtrace(struct dp_graphtrace *graphtrace)
 	return EXIT_SUCCESS;
 }
 
-static void signal_handler(int signum)
+static void signal_handler(__rte_unused int signum)
 {
 	interrupt = true;
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
 	struct dp_graphtrace graphtrace;
 	int retcode;

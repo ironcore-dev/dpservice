@@ -194,7 +194,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 			return 0;
 		}
 
-		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, hairpin_pattern, hairpin_action, df);
+		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, hairpin_pattern, hairpin_action);
 		if (!hairpin_flow) {
 			free_allocated_agectx(hairpin_agectx);
 			DPS_LOG_ERR("Failed to install hairpin queue flow rule on vf", DP_LOG_PORTID(m->port));
@@ -292,7 +292,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		return 0;
 	}
 
-	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action, df);
+	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install encap rule on PF", DP_LOG_PORTID(t_port_id));
@@ -540,7 +540,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 		struct rte_flow *hairpin_flow = NULL;
 
-		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
 		if (!hairpin_flow) {
 			free_allocated_agectx(agectx);
 			return 0;
@@ -556,7 +556,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 		struct rte_flow *flow = NULL;
 
-		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
 		if (!flow) {
 			free_allocated_agectx(agectx);
 			DPS_LOG_ERR("Failed to install normal decap flow rule on PF", DP_LOG_PORTID(m->port));
@@ -605,7 +605,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			return 0;
 		}
 
-		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action, df);
+		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action);
 		if (!hairpin_flow_P2) {
 			free_allocated_agectx(hairpin_agectx);
 			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
@@ -766,7 +766,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	// validate and install rte flow
 	struct rte_flow *flow = NULL;
 
-	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to validate and install rte flow rules");
@@ -915,7 +915,7 @@ int static __rte_always_inline dp_offload_handle_in_network_traffic(struct rte_m
 
 	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
 
-	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action, df);
+	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install in-network decap flow rule on pf", DP_LOG_PORTID(m->port));

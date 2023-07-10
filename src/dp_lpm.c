@@ -227,8 +227,8 @@ uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
 	return vm_table[portid].ul_ipv6;
 }
 
-int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
-				 uint32_t ip, uint8_t *ip6, uint8_t depth, int socketid)
+int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
+				 uint8_t *ip6, uint8_t depth, int socketid)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
@@ -261,8 +261,8 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
 	return DP_GRPC_OK;
 }
 
-int dp_del_route(uint16_t portid, uint32_t vni, uint32_t t_vni,
-				 uint32_t ip, uint8_t *ip6, uint8_t depth, int socketid)
+int dp_del_route(uint16_t portid, uint32_t vni, __rte_unused uint32_t t_vni, uint32_t ip,
+				 __rte_unused uint8_t *ip6, uint8_t depth, int socketid)
 {
 	struct rte_rib_node *node;
 	struct rte_rib *root;
@@ -364,7 +364,7 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 }
 
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
-				 uint8_t *ext_ip6, uint8_t depth, int socketid)
+				  uint8_t *ext_ip6, uint8_t depth, int socketid)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
@@ -397,8 +397,8 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	return DP_GRPC_OK;
 }
 
-int dp_del_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
-				 uint8_t *ext_ip6, uint8_t depth, int socketid)
+int dp_del_route6(uint16_t portid, uint32_t vni, __rte_unused uint32_t t_vni, uint8_t *ipv6,
+				  __rte_unused uint8_t *ext_ip6, uint8_t depth, int socketid)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -571,7 +571,7 @@ int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_
 	return next_hop;
 }
 
-void dp_del_vm(int portid, int socketid, bool rollback)
+void dp_del_vm(int portid, int socketid)
 {
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);

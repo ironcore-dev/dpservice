@@ -52,7 +52,7 @@ static int dp_send_event_link_msg(uint16_t port_id, uint8_t status)
 }
 
 int dp_link_status_change_event_callback(uint16_t port_id,
-										 enum rte_eth_event_type type,
+										 __rte_unused enum rte_eth_event_type type,
 										 __rte_unused void *param,
 										 __rte_unused void *ret_param)
 {
@@ -94,7 +94,7 @@ int dp_send_event_flow_aging_msg()
 	return dp_send_event_msg(&flow_aging_msg);
 }
 
-void dp_process_event_flow_aging_msg(struct rte_mbuf *m)
+void dp_process_event_flow_aging_msg(__rte_unused struct rte_mbuf *m)
 {
 	if (dp_conf_is_offload_enabled()) {
 		struct dp_ports *ports = get_dp_ports();

@@ -165,7 +165,7 @@ static int dp_process_del_lbtarget(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_BAD_IPVER;
 }
 
-static int dp_process_init(struct dp_grpc_responder *responder)
+static int dp_process_init(__rte_unused struct dp_grpc_responder *responder)
 {
 	dp_del_all_neigh_nat_entries_in_vni(DP_NETWORK_NAT_ALL_VNI);
 	return dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id()));
@@ -544,7 +544,7 @@ route6_err:
 route_err:
 	dp_del_route(port_id, request->vni, 0, ntohl(request->ip4_addr), NULL, 32, socket_id);
 vm_err:
-	dp_del_vm(port_id, socket_id, DP_LPM_ROLLBACK);
+	dp_del_vm(port_id, socket_id);
 handle_err:
 	dp_del_portid_with_vm_handle(request->iface_id);
 err_vnf:
@@ -569,7 +569,7 @@ static int dp_process_del_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
 	dp_del_portid_with_vm_handle(request->iface_id);
-	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id), !DP_LPM_ROLLBACK);
+	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_del_vm(port_id);
 #endif

@@ -107,17 +107,17 @@ int rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
 }
 
 
-static uint32_t dp_jhash_1word(const void *key, uint32_t length, uint32_t initval)
+static uint32_t dp_jhash_1word(const void *key, __rte_unused uint32_t length, uint32_t initval)
 {
 	return rte_jhash_1word(((const uint32_t *)key)[0], initval);
 }
 
-static uint32_t dp_jhash_2words(const void *key, uint32_t length, uint32_t initval)
+static uint32_t dp_jhash_2words(const void *key, __rte_unused uint32_t length, uint32_t initval)
 {
 	return rte_jhash_2words(((const uint32_t *)key)[0], ((const uint32_t *)key)[1], initval);
 }
 
-static uint32_t dp_jhash_3words(const void *key, uint32_t length, uint32_t initval)
+static uint32_t dp_jhash_3words(const void *key, __rte_unused uint32_t length, uint32_t initval)
 {
 	return rte_jhash_3words(((const uint32_t *)key)[0], ((const uint32_t *)key)[1], ((const uint32_t *)key)[2], initval);
 }
