@@ -16,8 +16,10 @@ int dp_send_to_worker(struct dpgrpc_request *req)
 	*rte_pktmbuf_mtod(m, struct dpgrpc_request *) = *req;
 
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->grpc_tx_queue, m);
-	if (DP_FAILED(ret))
+	if (DP_FAILED(ret)) {
 		DPGRPC_LOG_WARNING("Cannot enqueue worker request", DP_LOG_RET(ret), DP_LOG_GRPCREQUEST(req->type));
+		rte_pktmbuf_free(m);
+	}
 
 	return ret;
 }

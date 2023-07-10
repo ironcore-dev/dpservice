@@ -25,6 +25,7 @@ static int dp_send_event_msg(struct dp_event_msg *msg)
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->monitoring_rx_queue, m);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot enqueue monitoring event message", DP_LOG_VALUE(msg->msg_head.type), DP_LOG_RET(ret));
+		rte_pktmbuf_free(m);
 		return ret;
 	}
 
