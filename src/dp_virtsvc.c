@@ -89,8 +89,8 @@ static int dp_virtsvc_array_to_tree(struct dp_virtsvc_lookup_entry **dst, struct
 
 static int dp_virtsvc_ipv4_comparator(const void *p1, const void *p2)
 {
-	const struct dp_virtsvc *l = *(const struct dp_virtsvc **)p1;
-	const struct dp_virtsvc *r = *(const struct dp_virtsvc **)p2;
+	const struct dp_virtsvc *l = *(const struct dp_virtsvc * const *)p1;
+	const struct dp_virtsvc *r = *(const struct dp_virtsvc * const *)p2;
 
 	return dp_virtsvc_ipv4_cmp(l->proto, l->virtual_addr, l->virtual_port,
 							   r->proto, r->virtual_addr, r->virtual_port);
@@ -98,8 +98,8 @@ static int dp_virtsvc_ipv4_comparator(const void *p1, const void *p2)
 
 static int dp_virtsvc_ipv6_comparator(const void *p1, const void *p2)
 {
-	const struct dp_virtsvc *l = *(const struct dp_virtsvc **)p1;
-	const struct dp_virtsvc *r = *(const struct dp_virtsvc **)p2;
+	const struct dp_virtsvc *l = *(const struct dp_virtsvc * const *)p1;
+	const struct dp_virtsvc *r = *(const struct dp_virtsvc * const *)p2;
 
 	return dp_virtsvc_ipv6_cmp(l->proto, l->service_addr, l->service_port,
 							   r->proto, r->service_addr, r->service_port);

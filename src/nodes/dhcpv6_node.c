@@ -76,13 +76,13 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 {
 	uint16_t op_code;
 	uint16_t op_len = 0;
-	struct dhcpv6_option *opt;
+	const struct dhcpv6_option *opt;
 
 	for (int i = 0;
 		 i + sizeof(struct dhcpv6_option) < (size_t)options_len;  // len already checked for being positive
 		 i += sizeof(struct dhcpv6_option) + op_len
 	) {
-		opt = (struct dhcpv6_option *)&options[i];
+		opt = (const struct dhcpv6_option *)&options[i];
 		op_len = ntohs(opt->op_len);
 		if (i + op_len > options_len) {
 			DPS_LOG_WARNING("Malformed DHCPv6 option", DP_LOG_VALUE(ntohs(opt->op_code)));

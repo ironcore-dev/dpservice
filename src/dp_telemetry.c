@@ -45,7 +45,7 @@ static int tel_stat_value_offset = 0;
 //
 static __rte_always_inline int get_stat_value(const struct rte_graph_cluster_node_stats *st)
 {
-	return (*(uint64_t *)((uint8_t *)(st) + tel_stat_value_offset));
+	return *(const uint64_t *)((const uint8_t *)(st) + tel_stat_value_offset);
 }
 
 static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,

@@ -324,7 +324,7 @@ free:
 	rte_free(contexts);
 }
 
-static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_key *flow_key, struct flow_value *flow_val)
+static __rte_always_inline int dp_rte_flow_query_and_remove(const struct flow_key *flow_key, struct flow_value *flow_val)
 {
 	uint8_t age_ctx_index;
 	struct flow_age_ctx *curr_age_ctx;
@@ -399,7 +399,7 @@ void dp_process_aged_flows_non_offload(void)
 		// NOTE: possible optimization in moving a runtime constant 'timer_hz *' into 'timeout_value' directly
 		// But it would require enlarging the flow_val member, thus this needs performance analysis first
 		if (offload_mode_enabled) {
-			ret = dp_rte_flow_query_and_remove((struct flow_key *)next_key, flow_val);
+			ret = dp_rte_flow_query_and_remove((const struct flow_key *)next_key, flow_val);
 			if (DP_FAILED(ret))
 				DPS_LOG_ERR("Failed to query and remove rte flows", DP_LOG_RET(ret));
 		}

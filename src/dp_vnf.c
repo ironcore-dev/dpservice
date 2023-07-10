@@ -110,7 +110,7 @@ int dp_find_vnf_with_value(struct dp_vnf_value *val)
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
 	int32_t ret;
-	void *key;
+	const void *key;
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret))
@@ -127,7 +127,7 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
 	int32_t ret;
-	void *key;
+	const void *key;
 	int delete_count = 0;
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&temp_val, &iter)) != -ENOENT) {
@@ -148,7 +148,7 @@ int dp_del_vnf_with_value(struct dp_vnf_value *val)
 
 int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder)
 {
-	void *key;
+	const void *key;
 	struct dp_vnf_value *data;
 	uint32_t iter = 0;
 	struct dpgrpc_route *reply;
