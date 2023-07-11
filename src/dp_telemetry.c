@@ -72,8 +72,8 @@ static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,
 		tel_callback_ret = rte_tel_data_start_dict(tel_curr_block);
 		if (DP_FAILED(tel_callback_ret))
 			return tel_callback_ret;
-		snprintf(dict_name, sizeof(dict_name), "Node_%d_to_%d",
-				tel_graph_node_index-1, tel_graph_node_index + (RTE_TEL_MAX_DICT_ENTRIES-2));
+		snprintf(dict_name, sizeof(dict_name), "Node_%hd_to_%hd",
+				(uint16_t)(tel_graph_node_index-1), (uint16_t)(tel_graph_node_index + (RTE_TEL_MAX_DICT_ENTRIES-2)));
 		tel_callback_ret = rte_tel_data_add_dict_container(tel_data, dict_name, tel_curr_block, 0);
 		if (DP_FAILED(tel_callback_ret))
 			return tel_callback_ret;
