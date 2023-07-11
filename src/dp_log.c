@@ -52,7 +52,7 @@ static const char *const log_types_json[] = {
 static const char *const log_levels[] = {
 	"Success", "Unusable", "Alert", "Critical", "Error", "Warning", "Notice", "Info", "Debug"
 };
-static_assert(RTE_DIM(log_levels) == RTE_LOG_MAX+1);
+static_assert(RTE_DIM(log_levels) == RTE_LOG_MAX+1, "Unknown log levels in DPDK");
 
 static bool log_colors = false;
 static bool log_json = false;

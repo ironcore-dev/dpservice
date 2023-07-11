@@ -76,7 +76,7 @@ static const struct option longopts[] = {
 #ifdef ENABLE_PYTEST
 	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
 #endif
-	{ NULL, }
+	{ NULL, 0, 0, 0 }
 };
 
 static const char *nic_type_choices[] = {

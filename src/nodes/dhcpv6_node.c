@@ -17,12 +17,12 @@
 #define DP_DHCPV6_HW_ID	0xabcd
 
 struct dp_dhcpv6_reply_options {
-	struct dhcpv6_opt_ia_na_single_addr_status opt_iana;
 	int opt_iana_len;
-	struct dhcpv6_option opt_rapid;
-	int opt_rapid_len;
-	struct dhcpv6_opt_client_id opt_cid;
+	struct dhcpv6_opt_ia_na_single_addr_status opt_iana;
 	int opt_cid_len;
+	struct dhcpv6_opt_client_id opt_cid;
+	int opt_rapid_len;
+	struct dhcpv6_option opt_rapid;
 };
 
 
@@ -181,7 +181,8 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 		options += reply_options.opt_iana_len;
 	}
 	if (reply_options.opt_rapid_len)
-		rte_memcpy(options, &reply_options.opt_rapid, reply_options.opt_rapid_len);
+		// had to use the direct value here, because GCC's array-bounds check fails here (granted, the structure is hard to parse)
+		rte_memcpy(options, &reply_options.opt_rapid, sizeof(struct dhcpv6_option));
 
 	return reply_options_len;
 }

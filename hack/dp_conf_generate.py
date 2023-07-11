@@ -115,7 +115,7 @@ def generate_c(options):
 			continue
 		has_arg = 1 if option.arg else 0
 		option.print(f'\t{{ "{option.lgopt}", {has_arg}, 0, {option.optid} }},')
-	print("\t{ NULL, }")
+	print("\t{ NULL, 0, 0, 0 }")
 	print("};\n")
 	# Generate translation tables for choices
 	for option in options:

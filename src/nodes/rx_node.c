@@ -20,7 +20,8 @@ struct rx_node_ctx {
 	uint16_t	queue_id;
 	bool		enabled;
 };
-_Static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ);
+static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ,
+			  "Rx node context will not fit into the node");
 
 // need to access nodes' context to enable/disable them
 static struct rx_node_ctx *node_contexts[DP_MAX_PORTS];

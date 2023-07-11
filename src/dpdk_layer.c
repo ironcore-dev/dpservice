@@ -1,4 +1,5 @@
 #include "dpdk_layer.h"
+#include <rte_graph_worker.h>
 #include "dp_error.h"
 #include "dp_graph.h"
 #include "dp_log.h"
@@ -97,7 +98,7 @@ void dp_force_quit(void)
 }
 
 
-static int graph_main_loop(void *)
+static int graph_main_loop(__rte_unused void *arg)
 {
 	struct rte_graph *graph = dp_graph_get();
 

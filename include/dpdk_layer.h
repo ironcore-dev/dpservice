@@ -1,10 +1,9 @@
 #ifndef _DPDK_LAYER_H_
 #define _DPDK_LAYER_H_
 
-#include <rte_node_eth_api.h>
-#include <rte_graph_worker.h>
-#include <rte_timer.h>
-#include <rte_cycles.h>
+#include <stdint.h>
+#include <rte_mempool.h>
+#include <rte_ring.h>
 
 #include "dp_port.h"
 

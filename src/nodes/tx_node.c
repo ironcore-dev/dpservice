@@ -21,7 +21,8 @@ struct tx_node_ctx {
 	uint16_t port_id;
 	uint16_t queue_id;
 };
-_Static_assert(sizeof(struct tx_node_ctx) <= RTE_NODE_CTX_SZ);
+static_assert(sizeof(struct tx_node_ctx) <= RTE_NODE_CTX_SZ,
+			  "Tx node context will not fit into the node");
 
 // also some way to map ports to nodes is needed
 static rte_node_t tx_node_ids[DP_MAX_PORTS];

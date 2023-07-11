@@ -11,7 +11,7 @@
 #include "dp_netlink.h"
 #include "dp_util.h"
 
-static int dp_read_neigh(struct nlmsghdr *nh, int nll, struct rte_ether_addr *neigh,
+static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *neigh,
 						 struct rte_ether_addr *own_mac)
 {
 	struct rtattr *rt_attr;
