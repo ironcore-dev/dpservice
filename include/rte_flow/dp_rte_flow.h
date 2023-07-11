@@ -51,6 +51,7 @@ int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m);
 struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
 struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset);
+struct rte_icmp_hdr *dp_get_icmp_hdr(struct rte_mbuf *m, uint16_t offset);
 void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info);
 void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t src_port_v);
 
