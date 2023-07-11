@@ -141,7 +141,7 @@ int dp_add_flow_data(struct flow_key *key, void *data);
 int dp_add_flow(struct flow_key *key);
 void dp_delete_flow_key(struct flow_key *key);
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
-void dp_invert_flow_key(struct flow_key *key /* in / out */);
+void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
 int dp_flow_init(int socket_id);
 void dp_flow_free();
 void dp_process_aged_flows(int port_id);

@@ -148,23 +148,25 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	return ret;
 }
 
-void dp_invert_flow_key(struct flow_key *key /* in / out */)
+void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
 {
-	uint32_t ip_tmp;
-	uint16_t port_tmp;
 
-	ip_tmp = key->ip_src;
-	key->ip_src = key->ip_dst;
-	key->ip_dst = ip_tmp;
+	inv_key->ip_src = key->ip_dst;
+	inv_key->ip_dst = key->ip_src;
+
+	inv_key->vni = key->vni;
+	inv_key->vnf = key->vnf;
+
+	inv_key->proto = key->proto;
+
 	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
-		port_tmp = key->src.port_src;
-		key->src.port_src = key->port_dst;
-		key->port_dst = port_tmp;
+		inv_key->src.port_src = key->port_dst;
+		inv_key->port_dst = key->src.port_src;
 	} else if (key->proto == IPPROTO_ICMP) {
 		if (key->src.type_src == RTE_IP_ICMP_ECHO_REPLY)
-			key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
+			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
 		if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
-			key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
+			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
 	}
 }
 

@@ -134,6 +134,7 @@ static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_fl
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
 {
 	struct flow_value *flow_val = NULL;
+	struct flow_key inverted_key = {0};
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val)
@@ -160,10 +161,10 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	// Implicit casting from hash_sig_t to uint32_t!
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
-	dp_invert_flow_key(key);
-	flow_val->flow_key[DP_FLOW_DIR_REPLY] = *key;
-	dp_add_flow(key);
-	dp_add_flow_data(key, flow_val);
+	dp_invert_flow_key(key, &inverted_key);
+	flow_val->flow_key[DP_FLOW_DIR_REPLY] = inverted_key;
+	dp_add_flow(&inverted_key);
+	dp_add_flow_data(&inverted_key, flow_val);
 	return flow_val;
 }
 
