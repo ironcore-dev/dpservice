@@ -44,7 +44,7 @@ static void dp_maintenance_timer_cb(__rte_unused struct rte_timer *timer, __rte_
 	trigger_garp();
 }
 
-uint64_t dp_timers_get_manage_interval_cycles()
+uint64_t dp_timers_get_manage_interval_cycles(void)
 {
 	return dp_timer_manage_interval_cycles;
 }
@@ -63,7 +63,7 @@ static inline int dp_timers_add(struct rte_timer *timer, int period, rte_timer_c
 	return rte_timer_reset(timer, cycles, PERIODICAL, rte_lcore_id(), callback, NULL);
 }
 
-int dp_timers_init()
+int dp_timers_init(void)
 {
 	int ret;
 	int flow_aging_interval = TIMER_FLOW_AGING_INTERVAL;
@@ -92,7 +92,7 @@ int dp_timers_init()
 	return DP_OK;
 }
 
-void dp_timers_free()
+void dp_timers_free(void)
 {
 	rte_timer_subsystem_finalize();
 }

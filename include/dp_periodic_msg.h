@@ -9,9 +9,9 @@ extern "C" {
 #endif
 
 void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type);
-void trigger_garp();
-void trigger_nd_unsol_adv();
-void trigger_nd_ra();
+void trigger_garp(void);
+void trigger_nd_unsol_adv(void);
+void trigger_nd_ra(void);
 
 #ifdef __cplusplus
 }

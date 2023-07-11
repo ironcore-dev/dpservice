@@ -24,8 +24,8 @@ enum dp_graphtrace_loglevel {
 	DP_GRAPHTRACE_LOGLEVEL_MAX = DP_GRAPHTRACE_LOGLEVEL_RECV
 };
 
-int dp_graphtrace_init();
-void dp_graphtrace_free();
+int dp_graphtrace_init(void);
+void dp_graphtrace_free(void);
 
 void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs);
 

@@ -154,82 +154,82 @@ static int grpc_port = 1337;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 #endif
 
-const char *dp_conf_get_pf0_name()
+const char *dp_conf_get_pf0_name(void)
 {
 	return pf0_name;
 }
 
-const char *dp_conf_get_pf1_name()
+const char *dp_conf_get_pf1_name(void)
 {
 	return pf1_name;
 }
 
-const char *dp_conf_get_vf_pattern()
+const char *dp_conf_get_vf_pattern(void)
 {
 	return vf_pattern;
 }
 
-int dp_conf_get_dhcp_mtu()
+int dp_conf_get_dhcp_mtu(void)
 {
 	return dhcp_mtu;
 }
 
-double dp_conf_get_wcmp_frac()
+double dp_conf_get_wcmp_frac(void)
 {
 	return wcmp_frac;
 }
 
-enum dp_conf_nic_type dp_conf_get_nic_type()
+enum dp_conf_nic_type dp_conf_get_nic_type(void)
 {
 	return nic_type;
 }
 
-bool dp_conf_is_stats_enabled()
+bool dp_conf_is_stats_enabled(void)
 {
 	return stats_enabled;
 }
 
-bool dp_conf_is_conntrack_enabled()
+bool dp_conf_is_conntrack_enabled(void)
 {
 	return conntrack_enabled;
 }
 
-bool dp_conf_is_ipv6_overlay_enabled()
+bool dp_conf_is_ipv6_overlay_enabled(void)
 {
 	return ipv6_overlay_enabled;
 }
 
-bool dp_conf_is_offload_enabled()
+bool dp_conf_is_offload_enabled(void)
 {
 	return offload_enabled;
 }
 
 #ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
-int dp_conf_get_graphtrace_loglevel()
+int dp_conf_get_graphtrace_loglevel(void)
 {
 	return graphtrace_loglevel;
 }
 
 #endif
 #endif
-enum dp_conf_color dp_conf_get_color()
+enum dp_conf_color dp_conf_get_color(void)
 {
 	return color;
 }
 
-enum dp_conf_log_format dp_conf_get_log_format()
+enum dp_conf_log_format dp_conf_get_log_format(void)
 {
 	return log_format;
 }
 
-int dp_conf_get_grpc_port()
+int dp_conf_get_grpc_port(void)
 {
 	return grpc_port;
 }
 
 #ifdef ENABLE_PYTEST
-int dp_conf_get_flow_timeout()
+int dp_conf_get_flow_timeout(void)
 {
 	return flow_timeout;
 }

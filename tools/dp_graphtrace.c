@@ -25,7 +25,7 @@ static char *eal_args[RTE_DIM(eal_args_mem)];
 
 static bool interrupt = false;
 
-static int eal_init()
+static int eal_init(void)
 {
 	for (uint i = 0; i < RTE_DIM(eal_arg_strings); ++i) {
 		eal_args[i] = eal_args_mem[i] = strdup(eal_arg_strings[i]);
@@ -39,7 +39,7 @@ static int eal_init()
 	return rte_eal_init(RTE_DIM(eal_args), eal_args);
 }
 
-static void eal_cleanup()
+static void eal_cleanup(void)
 {
 	rte_eal_cleanup();
 	for (uint i = 0; i < RTE_DIM(eal_args_mem); ++i)

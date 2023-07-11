@@ -34,28 +34,28 @@ static struct dp_conf_dhcp_dns dhcp_dns = {0};
 static struct dp_conf_virtual_services virtual_services = {0};
 #endif
 
-int dp_conf_is_wcmp_enabled()
+int dp_conf_is_wcmp_enabled(void)
 {
 	return wcmp_enabled;
 }
 
-const char *dp_conf_get_eal_a_pf0()
+const char *dp_conf_get_eal_a_pf0(void)
 {
 	return eal_a_pf0;
 }
 
-const char *dp_conf_get_eal_a_pf1()
+const char *dp_conf_get_eal_a_pf1(void)
 {
 	return eal_a_pf1;
 }
 
-const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns()
+const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void)
 {
 	return &dhcp_dns;
 }
 
 #ifdef ENABLE_VIRTSVC
-const struct dp_conf_virtual_services *dp_conf_get_virtual_services()
+const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void)
 {
 	return &virtual_services;
 }
@@ -443,7 +443,7 @@ int dp_conf_parse_file(const char *env_filename)
 	return ret;
 }
 
-void dp_conf_free()
+void dp_conf_free(void)
 {
 	free(dhcp_dns.array);
 #ifdef ENABLE_VIRTSVC

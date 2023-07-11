@@ -83,7 +83,7 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 
 // Flow-aging message - sent periodically to age-out conntracked flows
 
-int dp_send_event_flow_aging_msg()
+int dp_send_event_flow_aging_msg(void)
 {
 	struct dp_event_msg flow_aging_msg = {
 		.msg_head = {

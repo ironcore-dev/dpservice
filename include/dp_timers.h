@@ -7,13 +7,13 @@
 extern "C" {
 #endif
 
-int dp_timers_init();
-void dp_timers_free();
+int dp_timers_init(void);
+void dp_timers_free(void);
 
 // NOTE: this can change the value of dp_timers_get_manage_interval_cycles()
 int dp_timers_add_stats(rte_timer_cb_t stats_cb);
 
-uint64_t dp_timers_get_manage_interval_cycles();
+uint64_t dp_timers_get_manage_interval_cycles(void);
 
 #ifdef __cplusplus
 }

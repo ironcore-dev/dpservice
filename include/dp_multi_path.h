@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-void dp_multipath_init();
+void dp_multipath_init(void);
 
 uint16_t dp_multipath_get_pf(uint32_t hash);
 

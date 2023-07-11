@@ -85,7 +85,7 @@ static int dp_log_eal(__rte_unused FILE *stream, const char *format, va_list ap)
 	return ret;
 }
 
-int dp_log_init()
+int dp_log_init(void)
 {
 	enum dp_conf_color color_mode = dp_conf_get_color();
 	int ret;

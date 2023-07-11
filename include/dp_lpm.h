@@ -69,13 +69,13 @@ int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_
 						struct vm_route *r, int socketid);
 
 int dp_lpm_init(int socket_id);
-void dp_lpm_free();
+void dp_lpm_free(void);
 int dp_map_vm_handle(void *key, uint16_t portid);
 int dp_get_portid_with_vm_handle(void *key);
 void dp_del_portid_with_vm_handle(void *key);
 
-uint32_t dp_get_gw_ip4();
-const uint8_t *dp_get_gw_ip6();
+uint32_t dp_get_gw_ip4(void);
+const uint8_t *dp_get_gw_ip6(void);
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
 uint8_t* dp_get_dhcp_range_ip6(uint16_t portid);
 uint8_t* dp_get_vm_ip6(uint16_t portid);

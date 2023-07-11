@@ -35,7 +35,7 @@ struct dp_vnf_value {
 };
 
 int dp_vnf_init(int socket_id);
-void dp_vnf_free();
+void dp_vnf_free(void);
 int dp_set_vnf_value(void *key, struct dp_vnf_value *val);
 struct dp_vnf_value *dp_get_vnf_value_with_key(void *key);
 int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);

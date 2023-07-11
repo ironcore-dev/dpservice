@@ -37,7 +37,7 @@ static int rx_periodic_node_init(__rte_unused const struct rte_graph *graph, __r
 	return DP_OK;
 }
 
-static __rte_always_inline void handle_nongraph_queues()
+static __rte_always_inline void handle_nongraph_queues(void)
 {
 	struct rte_mbuf *mbufs[DP_INTERNAL_Q_SIZE];
 	uint count, i;

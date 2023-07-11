@@ -39,18 +39,18 @@ enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv);
 
 int dp_conf_parse_file(const char *filename);
 
-void dp_conf_free();
+void dp_conf_free(void);
 
 // Generated getters to access current configuration
 #include "dp_conf_opts.h"
 
 // Custom getters
-int dp_conf_is_wcmp_enabled();
-const char *dp_conf_get_eal_a_pf0();
-const char *dp_conf_get_eal_a_pf1();
-const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns();
+int dp_conf_is_wcmp_enabled(void);
+const char *dp_conf_get_eal_a_pf0(void);
+const char *dp_conf_get_eal_a_pf1(void);
+const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void);
 #ifdef ENABLE_VIRTSVC
-const struct dp_conf_virtual_services *dp_conf_get_virtual_services();
+const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void);
 #endif
 
 #ifdef __cplusplus

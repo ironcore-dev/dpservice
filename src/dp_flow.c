@@ -39,7 +39,7 @@ int dp_flow_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_flow_free()
+void dp_flow_free(void)
 {
 	dp_free_jhash_table(ipv4_flow_tbl);
 }

@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-int dp_telemetry_init();
-void dp_telemetry_free();
+int dp_telemetry_init(void);
+void dp_telemetry_free(void);
 
 #ifdef __cplusplus
 }

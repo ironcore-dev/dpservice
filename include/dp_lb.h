@@ -30,11 +30,11 @@ struct lb_value {
 };
 
 int dp_lb_init(int socket_id);
-void dp_lb_free();
+void dp_lb_free(void);
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni);
 uint32_t dp_get_lb_ip(uint32_t vm_ip, uint32_t vni);
 uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16_t proto);
-bool dp_is_lb_enabled();
+bool dp_is_lb_enabled(void);
 int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip);
 int dp_add_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size);
 int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder);

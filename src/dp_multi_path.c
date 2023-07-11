@@ -16,7 +16,7 @@ enum egress_pf_port {
 
 static enum egress_pf_port pf0_egress_select_table[PORT_SELECT_TABLE_SIZE];
 
-void dp_multipath_init()
+void dp_multipath_init(void)
 {
 	if (!dp_conf_is_wcmp_enabled())
 		return;

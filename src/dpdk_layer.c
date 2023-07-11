@@ -37,7 +37,7 @@ static inline void ring_free(struct rte_ring *ring)
 }
 
 /** unsafe - does not do cleanup on failure */
-static int dp_dpdk_layer_init_unsafe()
+static int dp_dpdk_layer_init_unsafe(void)
 {
 	dp_layer.rte_mempool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF(DP_MAX_PORTS),
 												   MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE,
@@ -67,7 +67,7 @@ static int dp_dpdk_layer_init_unsafe()
 	return DP_OK;
 }
 
-int dp_dpdk_layer_init()
+int dp_dpdk_layer_init(void)
 {
 	// set all to NULL-equivalent, so free-on-failure is safe
 	memset(&dp_layer, 0, sizeof(dp_layer));
@@ -89,7 +89,7 @@ void dp_dpdk_layer_free(void)
 	rte_mempool_free(dp_layer.rte_mempool);
 }
 
-void dp_force_quit()
+void dp_force_quit(void)
 {
 	DPS_LOG_INFO("Stopping service...");
 	force_quit = true;
@@ -97,7 +97,7 @@ void dp_force_quit()
 }
 
 
-static int graph_main_loop()
+static int graph_main_loop(void *)
 {
 	struct rte_graph *graph = dp_graph_get();
 
@@ -175,7 +175,7 @@ int dp_dpdk_main_loop(void)
 }
 
 
-__rte_always_inline struct underlay_conf *get_underlay_conf()
+__rte_always_inline struct underlay_conf *get_underlay_conf(void)
 {
 	return &gen_conf;
 }
@@ -186,7 +186,7 @@ __rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
 }
 
 
-struct dp_dpdk_layer *get_dpdk_layer()
+struct dp_dpdk_layer *get_dpdk_layer(void)
 {
 	return &dp_layer;
 }

@@ -15,7 +15,7 @@ static enum dp_graphtrace_loglevel graphtrace_loglevel;
 static struct dp_graphtrace graphtrace;
 
 
-int dp_graphtrace_init()
+int dp_graphtrace_init(void)
 {
 	// DPDK recommendation for mempool size: power of 2 minus one for best memory utilization
 	// So using ringbuffer size minus one, when the ring buffer is (almost) full, allocation will start failing
@@ -42,7 +42,7 @@ int dp_graphtrace_init()
 	return DP_OK;
 }
 
-void dp_graphtrace_free()
+void dp_graphtrace_free(void)
 {
 	rte_ring_free(graphtrace.ringbuf);
 	rte_mempool_free(graphtrace.mempool);

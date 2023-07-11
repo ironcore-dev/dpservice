@@ -16,7 +16,7 @@ int dp_vnf_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_vnf_free()
+void dp_vnf_free(void)
 {
 	dp_free_jhash_table(vnf_handle_tbl);
 }

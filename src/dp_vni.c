@@ -15,7 +15,7 @@ int dp_vni_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_vni_free()
+void dp_vni_free(void)
 {
 	dp_free_jhash_table(vni_handle_tbl);
 }

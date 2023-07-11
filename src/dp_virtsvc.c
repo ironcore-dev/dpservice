@@ -52,12 +52,12 @@ static bool fast_timeout = false;
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv4_tree = NULL;
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv6_tree = NULL;
 
-const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv4_tree()
+const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv4_tree(void)
 {
 	return dp_virtsvc_ipv4_tree;
 }
 
-const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv6_tree()
+const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv6_tree(void)
 {
 	return dp_virtsvc_ipv6_tree;
 }
@@ -105,7 +105,7 @@ static int dp_virtsvc_ipv6_comparator(const void *p1, const void *p2)
 							   r->proto, r->service_addr, r->service_port);
 }
 
-static int dp_virtsvc_create_trees()
+static int dp_virtsvc_create_trees(void)
 {
 	int service_count = dp_virtsvc_get_count();
 	struct dp_virtsvc **array;
@@ -204,7 +204,7 @@ static void dp_virtsvc_free_tree(struct dp_virtsvc_lookup_entry *tree)
 	free(tree);
 }
 
-void dp_virtsvc_free()
+void dp_virtsvc_free(void)
 {
 	dp_virtsvc_free_tree(dp_virtsvc_ipv4_tree);
 	dp_virtsvc_free_tree(dp_virtsvc_ipv6_tree);
@@ -213,7 +213,7 @@ void dp_virtsvc_free()
 	rte_free(dp_virtservices);
 }
 
-int dp_virtsvc_get_count()
+int dp_virtsvc_get_count(void)
 {
 	return dp_virtservices_end - dp_virtservices;
 }

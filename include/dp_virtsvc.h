@@ -50,8 +50,8 @@ struct dp_virtsvc_lookup_entry {
 	struct dp_virtsvc_lookup_entry *right;
 };
 
-const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv4_tree();
-const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv6_tree();
+const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv4_tree(void);
+const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv6_tree(void);
 
 static __rte_always_inline
 int dp_virtsvc_ipv4_cmp(uint16_t proto1, rte_be32_t addr1, rte_be16_t port1,
@@ -88,9 +88,9 @@ int dp_virtsvc_ipv6_cmp(uint16_t proto1, const uint8_t addr1[16], rte_be16_t por
 }
 
 int dp_virtsvc_init(int socket_id);
-void dp_virtsvc_free();
+void dp_virtsvc_free(void);
 
-int dp_virtsvc_get_count();
+int dp_virtsvc_get_count(void);
 
 int dp_virtsvc_install_isolation_rules(uint16_t port_id);
 

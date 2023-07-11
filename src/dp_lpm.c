@@ -24,7 +24,7 @@ int dp_lpm_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_lpm_free()
+void dp_lpm_free(void)
 {
 	dp_free_jhash_table(vm_handle_tbl);
 }
@@ -146,12 +146,12 @@ void dp_del_portid_with_vm_handle(void *key)
 	rte_hash_del_key(vm_handle_tbl, key);
 }
 
-uint32_t dp_get_gw_ip4()
+uint32_t dp_get_gw_ip4(void)
 {
 	return dp_router_gw_ip4;
 }
 
-const uint8_t *dp_get_gw_ip6()
+const uint8_t *dp_get_gw_ip6(void)
 {
 	return dp_router_gw_ip6;
 }

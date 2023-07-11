@@ -80,7 +80,7 @@ static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int
 }
 
 int dp_vni_init(int socket_id);
-void dp_vni_free();
+void dp_vni_free(void);
 bool dp_is_vni_route_tbl_available(int vni, int type, int socketid);
 int dp_create_vni_route_table(int vni, int type, int socketid);
 int dp_delete_vni_route_table(int vni, int type);

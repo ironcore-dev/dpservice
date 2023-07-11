@@ -30,7 +30,7 @@ struct rte_graph *dp_graph_get(void)
 	return dp_graph;
 }
 
-static inline int dp_graph_stats_create()
+static inline int dp_graph_stats_create(void)
 {
 	static const char *patterns[] = { DP_GRAPH_NAME_PREFIX"*" };
 	struct rte_graph_cluster_stats_param s_param = {
@@ -119,7 +119,7 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 	return graph_id;
 }
 
-static int dp_graph_init_nodes()
+static int dp_graph_init_nodes(void)
 {
 	char name[RTE_NODE_NAMESIZE];
 	struct dp_ports *ports = get_dp_ports();

@@ -36,23 +36,23 @@ const struct rte_eth_conf port_conf_default = {
 static uint16_t pf_ports[DP_MAX_PF_PORTS];
 static struct dp_ports dp_ports;
 
-struct dp_ports *get_dp_ports()
+struct dp_ports *get_dp_ports(void)
 {
 	return &dp_ports;
 }
 
-static void dp_port_init_pf_table()
+static void dp_port_init_pf_table(void)
 {
 	for (int i = 0; i < DP_MAX_PF_PORTS; ++i)
 		pf_ports[i] = DP_INVALID_PORT_ID;
 }
 
-uint16_t dp_port_get_pf0_id()
+uint16_t dp_port_get_pf0_id(void)
 {
 	return pf_ports[0];
 }
 
-uint16_t dp_port_get_pf1_id()
+uint16_t dp_port_get_pf1_id(void)
 {
 	return pf_ports[1];
 }
@@ -369,7 +369,7 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 	return DP_OK;
 }
 
-int dp_ports_init()
+int dp_ports_init(void)
 {
 	int num_of_vfs = get_dpdk_layer()->num_of_vfs;
 	int num_of_ports = DP_MAX_PF_PORTS + num_of_vfs;
@@ -396,7 +396,7 @@ int dp_ports_init()
 	return DP_OK;
 }
 
-void dp_ports_free()
+void dp_ports_free(void)
 {
 	free(dp_ports.ports);
 }

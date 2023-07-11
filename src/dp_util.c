@@ -26,7 +26,7 @@ int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char if
 	return DP_OK;
 }
 
-static int get_num_of_vfs_sriov()
+static int get_num_of_vfs_sriov(void)
 {
 	int vfs;
 	char filename[DP_SYSFS_MAX_PATH];
@@ -56,7 +56,7 @@ static int get_num_of_vfs_sriov()
 	return vfs;
 }
 
-static int get_num_of_vfs_pattern()
+static int get_num_of_vfs_pattern(void)
 {
 	int count = 0;
 	uint16_t port_id;
@@ -73,7 +73,7 @@ static int get_num_of_vfs_pattern()
 	return count;
 }
 
-int dp_get_num_of_vfs()
+int dp_get_num_of_vfs(void)
 {
 	int vfs = dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP
 		? get_num_of_vfs_pattern()

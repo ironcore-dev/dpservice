@@ -121,7 +121,7 @@ extern "C" {
 
 void dp_log_set_thread_name(const char *name);
 
-int dp_log_init();
+int dp_log_init(void);
 
 __rte_cold
 void _dp_log(unsigned int level, unsigned int logtype,

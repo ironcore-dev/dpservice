@@ -52,7 +52,7 @@ int dp_nat_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_nat_free()
+void dp_nat_free(void)
 {
 	dp_free_jhash_table(ipv4_netnat_portoverload_tbl);
 	dp_free_jhash_table(ipv4_netnat_portmap_tbl);

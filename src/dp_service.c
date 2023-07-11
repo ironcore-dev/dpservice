@@ -76,7 +76,7 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	return DP_OK;
 }
 
-static void dp_args_free_mellanox()
+static void dp_args_free_mellanox(void)
 {
 	for (int i = 0; i < 4; ++i)
 		free(dp_mlx_args[i]);
@@ -91,7 +91,7 @@ static int dp_eal_init(int *argc_ptr, char ***argv_ptr)
 	return rte_eal_init(*argc_ptr, *argv_ptr);
 }
 
-static void dp_eal_cleanup()
+static void dp_eal_cleanup(void)
 {
 	rte_eal_cleanup();
 	if (dp_is_mellanox_opt_set())
@@ -107,7 +107,7 @@ static void signal_handler(int signum)
 	}
 }
 
-static int init_interfaces()
+static int init_interfaces(void)
 {
 	int pf0_socket;
 
@@ -151,7 +151,7 @@ static int init_interfaces()
 	return DP_OK;
 }
 
-static void free_interfaces()
+static void free_interfaces(void)
 {
 	dp_vnf_free();
 	dp_lpm_free();
@@ -169,7 +169,7 @@ static void free_interfaces()
 	// dp_multipath has no free
 }
 
-static inline int run_dpdk_service()
+static inline int run_dpdk_service(void)
 {
 	int result = DP_ERROR;
 
@@ -187,7 +187,7 @@ end:
 	return result;
 }
 
-static int run_service()
+static int run_service(void)
 {
 	int result;
 

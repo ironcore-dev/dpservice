@@ -26,7 +26,7 @@ static void *dp_grpc_main_loop(__rte_unused void *arg)
 	return NULL;
 }
 
-int dp_grpc_thread_start()
+int dp_grpc_thread_start(void)
 {
 	int ret = rte_ctrl_thread_create(&grpc_thread_id, "grpc-thread", NULL, dp_grpc_main_loop, NULL);
 
@@ -35,7 +35,7 @@ int dp_grpc_thread_start()
 	return ret;
 }
 
-int dp_grpc_thread_join()
+int dp_grpc_thread_join(void)
 {
 	int ret = pthread_join(grpc_thread_id, NULL);  // returns errno on failure
 
@@ -46,7 +46,7 @@ int dp_grpc_thread_join()
 	return DP_OK;
 }
 
-int dp_grpc_thread_cancel()
+int dp_grpc_thread_cancel(void)
 {
 	int ret = pthread_cancel(grpc_thread_id);  // returns errno on failure
 

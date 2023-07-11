@@ -86,7 +86,7 @@ static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,
 	return DP_OK;
 }
 
-static int dp_telemetry_graph_stats_create()
+static int dp_telemetry_graph_stats_create(void)
 {
 	static const char *patterns[] = { DP_GRAPH_NAME_PREFIX"*" };
 	struct rte_graph_cluster_stats_param s_param = {
@@ -104,7 +104,7 @@ static int dp_telemetry_graph_stats_create()
 	return DP_OK;
 }
 
-static void dp_telemetry_graph_stats_destroy()
+static void dp_telemetry_graph_stats_destroy(void)
 {
 	rte_graph_cluster_stats_destroy(tel_stats);
 }

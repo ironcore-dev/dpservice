@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-int dp_grpc_thread_start();
-int dp_grpc_thread_join();
-int dp_grpc_thread_cancel();
+int dp_grpc_thread_start(void);
+int dp_grpc_thread_join(void);
+int dp_grpc_thread_cancel(void);
 
 #ifdef __cplusplus
 }

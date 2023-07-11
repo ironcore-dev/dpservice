@@ -58,7 +58,7 @@ void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint1
 	}
 }
 
-void trigger_garp()
+void trigger_garp(void)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_arp_hdr *arp_hdr;
@@ -92,7 +92,7 @@ void trigger_garp()
 	rte_pktmbuf_free(pkt);
 }
 
-void trigger_nd_unsol_adv()
+void trigger_nd_unsol_adv(void)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
@@ -145,7 +145,7 @@ void trigger_nd_unsol_adv()
 	rte_pktmbuf_free(pkt);
 }
 
-void trigger_nd_ra()
+void trigger_nd_ra(void)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;

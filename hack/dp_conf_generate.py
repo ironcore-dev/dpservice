@@ -85,7 +85,7 @@ def get_signature(option):
 	const = "const " if ptr else ""
 	prefix = "dp_conf_is_" if option.ctype == "bool" else "dp_conf_get_"
 	ctype = f"enum dp_conf_{option.varname}" if option.ctype == "enum" else option.ctype
-	return f"{const}{ctype} {ptr}{prefix}{option.varname}()"
+	return f"{const}{ctype} {ptr}{prefix}{option.varname}(void)"
 
 def generate_c(options):
 	# Generate IDs

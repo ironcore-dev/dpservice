@@ -30,7 +30,7 @@ int dp_lb_init(int socket_id)
 	return DP_OK;
 }
 
-void dp_lb_free()
+void dp_lb_free(void)
 {
 	dp_free_jhash_table(id_map_lb_tbl);
 	dp_free_jhash_table(ipv4_lb_tbl);
@@ -145,9 +145,9 @@ int dp_delete_lb(void *id_key)
 	return DP_GRPC_OK;
 }
 
-bool dp_is_lb_enabled()
+bool dp_is_lb_enabled(void)
 {
-	return (rte_hash_count(ipv4_lb_tbl) > 0);
+	return rte_hash_count(ipv4_lb_tbl) > 0;
 }
 
 bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni)

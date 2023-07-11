@@ -63,11 +63,11 @@ int dp_dpdk_layer_init(void);
 int dp_dpdk_main_loop(void);
 void dp_dpdk_layer_free(void);
 
-void dp_force_quit();
+void dp_force_quit(void);
 
 void set_underlay_conf(struct underlay_conf *u_conf);
-struct underlay_conf *get_underlay_conf();
-struct dp_dpdk_layer *get_dpdk_layer();
+struct underlay_conf *get_underlay_conf(void);
+struct dp_dpdk_layer *get_dpdk_layer(void);
 
 #ifdef __cplusplus
 }
