@@ -223,7 +223,9 @@ bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
 		&& key1->ip_src == key2->ip_src
 		&& key1->ip_dst == key2->ip_dst
 		&& key1->port_dst == key2->port_dst
-		&& key1->src.port_src == key2->src.port_src;
+		&& key1->src.port_src == key2->src.port_src
+		&& key1->vni == key2->vni
+		&& key1->vnf == key2->vnf;
 }
 
 void dp_free_flow(struct dp_ref *ref)
