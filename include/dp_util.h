@@ -38,11 +38,6 @@ extern "C" {
 #define DP_TCP_PKT_FLAG_SYNACK(FLAGS) \
 	(((FLAGS) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
 
-static inline bool dp_is_mellanox_opt_set(void)
-{
-	return dp_conf_get_eal_a_pf0()[0] != '\0'
-		&& dp_conf_get_eal_a_pf1()[0] != '\0';
-}
 
 int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IFNAMSIZ]);
 

@@ -83,6 +83,12 @@ static void dp_args_free_mellanox(void)
 	free(dp_argv);
 }
 
+static bool dp_is_mellanox_opt_set(void)
+{
+	return dp_conf_get_eal_a_pf0()[0] != '\0'
+		&& dp_conf_get_eal_a_pf1()[0] != '\0';
+}
+
 static int dp_eal_init(int *argc_ptr, char ***argv_ptr)
 {
 	if (dp_is_mellanox_opt_set())
