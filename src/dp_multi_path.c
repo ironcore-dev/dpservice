@@ -22,7 +22,7 @@ void dp_multipath_init(void)
 		return;
 
 	double frac = dp_conf_get_wcmp_frac();
-	int round_frac = RTE_MIN((int)round(frac * 10), PORT_SELECT_TABLE_SIZE);
+	int round_frac = RTE_MIN(lround(frac * 10), PORT_SELECT_TABLE_SIZE);
 
 	for (int i = 0; i < round_frac; ++i)
 		pf0_egress_select_table[i] = OWNER_PORT;
