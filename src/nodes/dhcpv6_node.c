@@ -107,7 +107,7 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 				return DP_ERROR;
 			}
 			reply_options->opt_iana = opt_iana_template;
-			reply_options->opt_iana.ia_na.iaid = ((struct dhcpv6_ia_na *)&opt->data)->iaid;
+			reply_options->opt_iana.ia_na.iaid = ((const struct dhcpv6_ia_na *)&opt->data)->iaid;
 			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_dhcp_range_ip6(m->port), 16);
 			reply_options->opt_iana_len = sizeof(opt_iana_template);
 			break;

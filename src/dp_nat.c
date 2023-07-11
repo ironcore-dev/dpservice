@@ -558,7 +558,7 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
-	struct nat_key *nkey;
+	const struct nat_key *nkey;
 	struct snat_data *data;
 	uint32_t index = 0;
 	int32_t ret;

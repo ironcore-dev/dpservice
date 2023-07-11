@@ -61,7 +61,7 @@ static void dp_free_vni_value(struct dp_ref *ref)
 	rte_free(vni_value);
 }
 
-static int dp_create_rib6(struct dp_vni_key *key, int socketid, struct dp_vni_value *temp_val)
+static int dp_create_rib6(const struct dp_vni_key *key, int socketid, struct dp_vni_value *temp_val)
 {
 	struct rte_rib6_conf config_ipv6;
 	char s[64];
@@ -80,7 +80,7 @@ static int dp_create_rib6(struct dp_vni_key *key, int socketid, struct dp_vni_va
 	return DP_OK;
 }
 
-static int dp_create_rib(struct dp_vni_key *key, int socketid, struct dp_vni_value *temp_val)
+static int dp_create_rib(const struct dp_vni_key *key, int socketid, struct dp_vni_value *temp_val)
 {
 	struct rte_rib_conf config_ipv4;
 	char s[64];
@@ -221,7 +221,7 @@ int dp_reset_vni_route_table(int vni, int type, int socketid)
 int dp_reset_vni_all_route_tables(int socketid)
 {
 	struct dp_vni_value *temp_val = NULL;
-	struct dp_vni_key *key;
+	const struct dp_vni_key *key;
 	uint32_t iter = 0;
 	int32_t ret;
 
