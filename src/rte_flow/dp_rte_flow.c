@@ -258,7 +258,7 @@ void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_in
 	}
 }
 
-uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val)
+uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, rte_be16_t new_val)
 {
 
 	struct dp_flow *df;

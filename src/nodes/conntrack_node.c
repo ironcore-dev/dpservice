@@ -240,7 +240,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_tcp_hdr *tcp_hdr;
 	struct dp_flow *df;
 	struct flow_key *key;
-	bool key_cmp_result;
+	bool same_key;
 	int ret;
 
 	df = dp_get_flow_ptr(m);
@@ -268,11 +268,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		if (unlikely(DP_FAILED(dp_build_flow_key(key, m))))
 			return CONNTRACK_NEXT_DROP;
 
-		if (prev_key)
-			key_cmp_result = dp_test_next_n_bytes_identical((const unsigned char *)prev_key,
-													(const unsigned char *)curr_key,
-													sizeof(struct flow_key));
-		if (!prev_key || !key_cmp_result) {
+		same_key = prev_key && dp_test_next_n_bytes_identical((const unsigned char *)prev_key,
+															  (const unsigned char *)curr_key,
+															  sizeof(struct flow_key));
+		if (!same_key) {
 			ret = dp_get_flow_data(key, (void **)&flow_val);
 			if (unlikely(DP_FAILED(ret))) {
 				if (likely(ret == -ENOENT)) {

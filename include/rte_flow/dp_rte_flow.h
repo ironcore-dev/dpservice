@@ -55,7 +55,7 @@ struct rte_icmp_hdr *dp_get_icmp_hdr(struct rte_mbuf *m, uint16_t offset);
 void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info);
 void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t src_port_v);
 
-uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val);
+uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, rte_be16_t new_val);
 
 #define DP_IP_ICMP_ID_INVALID 0xFFFF
 uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier);
