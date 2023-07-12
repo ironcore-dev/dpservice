@@ -2,18 +2,42 @@ project('dp_service', 'c', 'cpp',
   version: run_command('cat', 'include/dp_version.h', check: true).stdout().strip().split(' ').get(2).split('"').get(1),
   license: 'MIT')
 
+common_flags = [
+  '-Werror', '-Wall', '-Wextra', '-Wunused',
+  '-Wshadow', '-Wundef', '-Wcast-qual', '-Wwrite-strings', '-Wpointer-arith',
+]
+cflags = common_flags + [
+  '-Wbad-function-cast', '-Wmissing-declarations', '-Wstrict-prototypes', '-Wmissing-prototypes',
+  '-Wno-deprecated-declarations',  # RTE uses deprecation for experimental API
+]
+cxxflags = common_flags + [
+  '-Wno-missing-field-initializers',
+]
+
 if meson.get_compiler('c').get_id() == 'clang'
-	# Set c_args and cpp_args specific to Clang/Clang++.
-	c_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Wno-c2x-extensions', '-Wno-gnu-variable-sized-type-not-at-end', '-Wno-c++17-extensions', '-Werror']
-	cpp_args = ['-Wno-missing-braces', '-Wno-deprecated-declarations', '-Werror']
-else
-	# Set c_args and cpp_args specific to GCC/G++.
-	c_args = ['-Wno-deprecated-declarations', '-Werror', '-Wno-format-truncation']
-	cpp_args = ['-fpermissive', '-Werror']
+  cflags += [
+    '-Wshadow-all', '-Wparentheses', '-Wcomma', '-Warray-bounds-pointer-arithmetic',
+    '-Wunreachable-code', '-Wunreachable-code-break', '-Wextra-semi-stmt', '-Wmissing-variable-declarations',
+    '-Wuninitialized', '-Wconditional-uninitialized',
+    '-Wassign-enum', '-Wduplicate-enum',
+    '-Wused-but-marked-unused',
+  ]
+else  # Assume GCC
+  cflags += [
+    '-Wstringop-overflow=4',
+  ]
+  # Additional warnings to suggest better code, GCC only (as that is the primary builder)
+  if get_option('compiler_suggestions')
+    cflags += [
+      '-Winline', '-Wno-error=inline',
+      '-Wsuggest-attribute=noreturn', '-Wsuggest-attribute=malloc',
+      # These suggestions are not usable right now, but could be nice: const, pure, cold
+    ]
+  endif
 endif
 
-add_project_arguments(c_args, language : 'c')
-add_project_arguments(cpp_args, language : 'cpp')
+add_project_arguments(cflags, language : 'c')
+add_project_arguments(cxxflags, language : 'cpp')
 
 add_global_arguments('-DDEBUG=true', language: ['c', 'cpp'])
 if get_option('enable_graphtrace')
