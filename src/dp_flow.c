@@ -260,7 +260,7 @@ int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle
 	int ret;
 
 	memset(error, 0, sizeof(struct rte_flow_error));
-	error->message = "(no stated reason)",
+	error->message = "(no stated reason)";
 
 	ret = rte_flow_action_handle_destroy(port_id, handle, error);
 	if (DP_FAILED(ret))
