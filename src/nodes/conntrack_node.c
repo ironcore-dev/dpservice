@@ -215,16 +215,13 @@ static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
 		switch (df->vnf_type) {
 		case DP_VNF_TYPE_LB:
 			return CONNTRACK_NEXT_LB;
-			break;
 		case DP_VNF_TYPE_VIP:
 		case DP_VNF_TYPE_NAT:
 			return CONNTRACK_NEXT_DNAT;
-			break;
 		case DP_VNF_TYPE_LB_ALIAS_PFX:
 		case DP_VNF_TYPE_INTERFACE_IP:
 		case DP_VNF_TYPE_ALIAS_PFX:
 			return CONNTRACK_NEXT_FIREWALL;
-			break;
 		default:
 			return CONNTRACK_NEXT_LB;
 		}

@@ -88,11 +88,11 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	case IPPROTO_TCP:
 		if ((rule->protocol != IPPROTO_TCP) && (rule->protocol != DP_FWALL_MATCH_ANY_PROTOCOL))
 			return false;
-	break;
+		break;
 	case IPPROTO_UDP:
 		if ((rule->protocol != IPPROTO_UDP) && (rule->protocol != DP_FWALL_MATCH_ANY_PROTOCOL))
 			return false;
-	break;
+		break;
 	case IPPROTO_ICMP:
 		if ((rule->protocol != IPPROTO_ICMP) && (rule->protocol != DP_FWALL_MATCH_ANY_PROTOCOL))
 			return false;
@@ -104,10 +104,9 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 			(df->l4_info.icmp_field.icmp_code == r_icmp_code)) &&
 			((rule->protocol == DP_FWALL_MATCH_ANY_PROTOCOL) || (rule->protocol == protocol)))
 			return true;
-	break;
+		break;
 	default:
 		return false;
-	break;
 	}
 
 	src_port = ntohs(df->l4_info.trans_port.src_port);
