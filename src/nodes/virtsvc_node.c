@@ -178,7 +178,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	ipv4_hdr->fragment_offset = 0;
 	ipv4_hdr->time_to_live = ttl;
 	ipv4_hdr->next_proto_id = proto;
-	ipv4_hdr->src_addr = df->virtsvc->virtual_addr;;
+	ipv4_hdr->src_addr = df->virtsvc->virtual_addr;
 	ipv4_hdr->hdr_checksum = 0;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM;
 	m->tx_offload = 0;
