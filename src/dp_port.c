@@ -11,7 +11,7 @@
 #include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 
-const struct rte_eth_conf port_conf_default = {
+static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
 		.mq_mode = RTE_ETH_MQ_RX_NONE,
 	},
