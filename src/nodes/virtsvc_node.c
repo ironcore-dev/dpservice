@@ -225,7 +225,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	return next_tx_index[vf_port_id];
 }
 
-static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 
@@ -241,9 +241,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 }
 
 static uint16_t virtsvc_node_process(struct rte_graph *graph,
-								 struct rte_node *node,
-								 void **objs,
-								 uint16_t nb_objs)
+									 struct rte_node *node,
+									 void **objs,
+									 uint16_t nb_objs)
 {
 	dp_foreach_graph_packet(graph, node, objs, nb_objs, DP_GRAPH_NO_SPECULATED_NODE, get_next_index);
 	return nb_objs;
