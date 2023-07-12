@@ -14,9 +14,6 @@
 #include "grpc/dp_grpc_api.h"
 #include "grpc/dp_grpc_responder.h"
 
-#define DP_SHOW_EXT_ROUTES true
-#define DP_SHOW_INT_ROUTES false
-
 static uint32_t pfx_counter = 1;
 
 static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_IPV6_ADDR_SIZE])
@@ -802,7 +799,7 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 static int dp_process_list_routes(struct dp_grpc_responder *responder)
 {
 	// ignore errors (already logged) and return at least partial list
-	dp_list_routes(responder->request.list_route.vni, rte_eth_dev_socket_id(dp_port_get_pf0_id()), 0, DP_SHOW_EXT_ROUTES, responder);
+	dp_list_routes(responder->request.list_route.vni, rte_eth_dev_socket_id(dp_port_get_pf0_id()), 0, DP_LIST_EXT_ROUTES, responder);
 	return DP_GRPC_OK;
 }
 
