@@ -63,6 +63,7 @@ static __rte_always_inline void dp_graphtrace_next_burst(struct rte_node *node, 
 static __rte_always_inline void dp_graphtrace_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
 {
 	_dp_graphtrace_send(node, NULL, objs, nb_objs);
+	RTE_SET_USED(port_id);
 	_dp_graphtrace_log_tx_burst(node, objs, nb_objs, port_id);
 }
 
