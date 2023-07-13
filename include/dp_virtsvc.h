@@ -58,6 +58,10 @@ int dp_virtsvc_ipv4_cmp(uint16_t proto1, rte_be32_t addr1, rte_be16_t port1,
 						uint16_t proto2, rte_be32_t addr2, rte_be16_t port2)
 {
 	int diff;
+	// this creates a diff between two Network-Byte-Order numbers
+	// the tree structure will work fine, but the actual values (IPs, ports)
+	// are not ordered properly, i.e. the semantics of the values are ignored
+	// but for finding a service in the tree, it works fine
 
 	diff = proto1 - proto2;
 	if (diff)
@@ -75,6 +79,7 @@ int dp_virtsvc_ipv6_cmp(uint16_t proto1, const uint8_t addr1[16], rte_be16_t por
 						uint16_t proto2, const uint8_t addr2[16], rte_be16_t port2)
 {
 	int diff;
+	// dtto, see above
 
 	diff = proto1 - proto2;
 	if (diff)
