@@ -1,5 +1,5 @@
 project('dp_service', 'c', 'cpp',
-  version: run_command('cat', 'include/dp_version.h', check: true).stdout().strip().split(' ').get(2).split('"').get(1),
+  version: run_command('git', 'describe', '--tags').stdout(),
   license: 'MIT',
   default_options: ['warning_level=2', 'werror=true'])
 
