@@ -72,9 +72,16 @@ void dp_log_set_thread_name(const char *name)
 static int dp_log_eal(__rte_unused FILE *stream, const char *format, va_list ap)
 {
 	char buf[2048];
-	int ret;
+	int written;
 
-	ret = vsnprintf(buf, sizeof(buf), format, ap);
+	written = vsnprintf(buf, sizeof(buf), format, ap);
+	if (written <= 0) {
+		strcpy(buf, "<Message conversion failed>");
+	} else {
+		// remove trailing endline(s), produces nicer output that way
+		for (char *end = buf + written - 1; end >= buf && *end == '\n'; --end)
+			*end = 0;
+	}
 
 	// as _dp_log only supports custom logtypes, provide one directly
 	// logleves are supported fully
@@ -82,7 +89,7 @@ static int dp_log_eal(__rte_unused FILE *stream, const char *format, va_list ap)
 			__FILE__, __LINE__, __FUNCTION__,
 			"EAL log message", _DP_LOG_STR("eal_msg", buf), NULL);
 
-	return ret;
+	return written;
 }
 
 int dp_log_init(void)
