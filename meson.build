@@ -1,5 +1,5 @@
 project('dp_service', 'c', 'cpp',
-  version: run_command('git', 'describe', '--tags').stdout(),
+  version: run_command('git', 'describe', '--tags').stdout().strip(),
   license: 'MIT',
   default_options: ['warning_level=2', 'werror=true'])
 
@@ -81,6 +81,7 @@ endif
 includes = include_directories('include')
 
 subdir('proto')
+subdir('include')
 subdir('src')
 subdir('tools')
 if get_option('enable_tests')

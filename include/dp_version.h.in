@@ -1,1 +1,1 @@
-#define DP_SERVICE_VERSION "@GIT_TAG_VERSION@"
+#define DP_SERVICE_VERSION "@dpservice_version@"
