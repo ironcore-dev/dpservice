@@ -74,8 +74,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				cntrack->nf_info.l4_type = df->l4_type;
 				cntrack->nf_info.icmp_err_ip_cksum = ipv4_hdr->hdr_checksum;
 				df->nat_port = nat_port;
-				/* Expect the new destination in this conntrack object */
-				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = nat_port;
 			}
 			df->flags.nat = DP_NAT_CHG_SRC_IP;
 			df->nat_addr = ipv4_hdr->src_addr; // nat_addr is the new src_addr in ipv4_hdr
@@ -85,6 +83,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_SRC_NAT;
 			dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
+			if (snat_data->network_nat_ip != 0)
+				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 
 			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
