@@ -383,11 +383,11 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV4_NUM:
 			strncpy(ip_str, optarg, 29);
-			version = dpdkonmetal::IPVersion::IPv4;
+			version = IPVersion::IPv4;
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV6_NUM:
 			strncpy(ip6_str, optarg, 39);
-			version = dpdkonmetal::IPVersion::IPv6;
+			version = IPVersion::IPv6;
 			break;
 		case CMD_LINE_OPT_T_PRIMARY_IPV6_NUM:
 			strncpy(t_ip6_str, optarg, 39);
@@ -527,7 +527,7 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_FWALL_RULE_NUM:
 			strncpy(machine_str, optarg, 63);
-			version = dpdkonmetal::IPVersion::IPv4;
+			version = IPVersion::IPv4;
 			command = DP_CMD_ADD_FWALL_RULE;
 			break;
 		case CMD_LINE_OPT_FWALL_SRC_IP_NUM:
@@ -616,7 +616,7 @@ public:
 			request.set_vni(vni);
 			request.set_allocated_ipv4config(ip_config);
 			request.set_allocated_ipv6config(ipv6_config);
-			request.set_interfacetype(dpdkonmetal::InterfaceType::VirtualInterface);
+			request.set_interfacetype(InterfaceType::VirtualInterface);
 			if (vm_pci_str[0] != '\0')
 				request.set_devicename(vm_pci_str);
 			stub_->createInterface(&context, request, &response);
@@ -638,14 +638,14 @@ public:
 
 			vni_msg->set_vni(vni);
 			prefix->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4) {
+			if(version == IPVersion::IPv4) {
 				prefix->set_address(ip_str);
 			} else {
 				prefix->set_address(ip6_str);
 			}
 			prefix->set_prefixlength(length);
 			route->set_allocated_prefix(prefix);
-			route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			route->set_ipversion(IPVersion::IPv6);
 			route->set_nexthopvni(t_vni);
 			route->set_weight(100);
 			route->set_nexthopaddress(t_ip6_str);
@@ -668,14 +668,14 @@ public:
 
 			vni_msg->set_vni(vni);
 			prefix->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4) {
+			if(version == IPVersion::IPv4) {
 				prefix->set_address(ip_str);
 			} else {
 				prefix->set_address(ip6_str);
 			}
 			prefix->set_prefixlength(length);
 			route->set_allocated_prefix(prefix);
-			route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			route->set_ipversion(IPVersion::IPv6);
 			route->set_nexthopvni(t_vni);
 			route->set_weight(100);
 			route->set_nexthopaddress(t_ip6_str);
@@ -712,7 +712,7 @@ public:
 			ClientContext context;
 
 			request.set_vni(vni);
-			request.set_type(dpdkonmetal::VniIpv4);
+			request.set_type(VniIpv4);
 
 			stub_->isVniInUse(&context, request, &reply);
 			if (reply.status().error())
@@ -729,7 +729,7 @@ public:
 			ClientContext context;
 
 			request.set_vni(vni);
-			request.set_type(dpdkonmetal::VniIpv4AndIpv6);
+			request.set_type(VniIpv4AndIpv6);
 
 			stub_->resetVni(&context, request, &reply);
 			if (reply.error())
@@ -746,7 +746,7 @@ public:
 
 
 			request.set_loadbalancerid(lb_id_str);
-			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			back_ip->set_ipversion(IPVersion::IPv6);
 			back_ip->set_address(t_ip6_str);
 			request.set_allocated_targetip(back_ip);
 			stub_->addLoadBalancerTarget(&context, request, &reply);
@@ -763,7 +763,7 @@ public:
 			LBIP *back_ip = new LBIP();
 
 			request.set_loadbalancerid(lb_id_str);
-			back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+			back_ip->set_ipversion(IPVersion::IPv6);
 			back_ip->set_address(t_ip6_str);
 			request.set_allocated_targetip(back_ip);
 			stub_->deleteLoadBalancerTarget(&context, request, &reply);
@@ -803,23 +803,23 @@ public:
 			rule->set_ipversion(version);
 			rule->set_priority(priority);
 			if (strncasecmp("ingress", dir_str, 29) == 0)
-				rule->set_direction(dpdkonmetal::Ingress);
+				rule->set_direction(Ingress);
 			else
-				rule->set_direction(dpdkonmetal::Egress);
+				rule->set_direction(Egress);
 
 			if (strncasecmp("accept", action_str, 29) == 0)
-				rule->set_action(dpdkonmetal::Accept);
+				rule->set_action(Accept);
 			else
-				rule->set_action(dpdkonmetal::Drop);
+				rule->set_action(Drop);
 
 			src_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				src_ip->set_address(src_ip_str);
 			src_ip->set_prefixlength(src_length);
 			rule->set_allocated_sourceprefix(src_ip);
 
 			dst_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				dst_ip->set_address(dst_ip_str);
 			dst_ip->set_prefixlength(dst_length);
 			rule->set_allocated_destinationprefix(dst_ip);
@@ -880,46 +880,46 @@ public:
 			stub_->listFirewallRules(&context, request, &reply);
 			for (i = 0; i < reply.rules_size(); i++) {
 				printf("%s / ", reply.rules(i).ruleid().c_str());
-				if (reply.rules(i).sourceprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+				if (reply.rules(i).sourceprefix().ipversion() == IPVersion::IPv4) {
 					printf("src_ip: %s / ", reply.rules(i).sourceprefix().address().c_str());
 					printf("src_ip pfx length: %d / ", reply.rules(i).sourceprefix().prefixlength());
 				}
 
-				if (reply.rules(i).destinationprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+				if (reply.rules(i).destinationprefix().ipversion() == IPVersion::IPv4) {
 					printf("dst_ip: %s / ", reply.rules(i).destinationprefix().address().c_str());
 					printf("dst_ip pfx length: %d \n", reply.rules(i).destinationprefix().prefixlength());
 				}
 
 				switch (reply.rules(i).protocolfilter().filter_case()) {
-					case dpdkonmetal::ProtocolFilter::kTcpFieldNumber:
+					case ProtocolFilter::kTcpFieldNumber:
 						printf("protocol: tcp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
 						reply.rules(i).protocolfilter().tcp().srcportlower(),
 						reply.rules(i).protocolfilter().tcp().srcportupper(),
 						reply.rules(i).protocolfilter().tcp().dstportlower(),
 						reply.rules(i).protocolfilter().tcp().dstportupper());
 					break;
-					case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
+					case ProtocolFilter::kUdpFieldNumber:
 						printf("protocol: udp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
 						reply.rules(i).protocolfilter().tcp().srcportlower(),
 						reply.rules(i).protocolfilter().tcp().srcportupper(),
 						reply.rules(i).protocolfilter().tcp().dstportlower(),
 						reply.rules(i).protocolfilter().tcp().dstportupper());
 					break;
-					case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
+					case ProtocolFilter::kIcmpFieldNumber:
 						printf("protocol: icmp / icmp_type: %d / icmp_code: %d \n",
 						reply.rules(i).protocolfilter().icmp().icmptype(),
 						reply.rules(i).protocolfilter().icmp().icmpcode());
 					break;
-					case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
+					case ProtocolFilter::FILTER_NOT_SET:
 						printf("protocol: any / src_port_min: any / dst_port_min: any\n");
 					break;
 				}
-				if (reply.rules(i).direction() == dpdkonmetal::Ingress)
+				if (reply.rules(i).direction() == Ingress)
 					printf("direction: ingress / ");
 				else
 					printf("direction: egress / ");
 
-				if (reply.rules(i).action() == dpdkonmetal::Accept)
+				if (reply.rules(i).action() == Accept)
 					printf("action: accept \n");
 				else
 					printf("direction: drop \n");
@@ -939,46 +939,46 @@ public:
 				printf("Received an error %d\n", reply.status().error());
 			else {
 				printf("%s / ", reply.rule().ruleid().c_str());
-				if (reply.rule().sourceprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+				if (reply.rule().sourceprefix().ipversion() == IPVersion::IPv4) {
 					printf("src_ip: %s / ", reply.rule().sourceprefix().address().c_str());
 					printf("src_ip pfx length: %d / ", reply.rule().sourceprefix().prefixlength());
 				}
 
-				if (reply.rule().destinationprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+				if (reply.rule().destinationprefix().ipversion() == IPVersion::IPv4) {
 					printf("dst_ip: %s / ", reply.rule().destinationprefix().address().c_str());
 					printf("dst_ip pfx length: %d \n", reply.rule().destinationprefix().prefixlength());
 				}
 
 				switch (reply.rule().protocolfilter().filter_case()) {
-					case dpdkonmetal::ProtocolFilter::kTcpFieldNumber:
+					case ProtocolFilter::kTcpFieldNumber:
 						printf("protocol: tcp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
 						reply.rule().protocolfilter().tcp().srcportlower(),
 						reply.rule().protocolfilter().tcp().srcportupper(),
 						reply.rule().protocolfilter().tcp().dstportlower(),
 						reply.rule().protocolfilter().tcp().dstportupper());
 					break;
-					case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
+					case ProtocolFilter::kUdpFieldNumber:
 						printf("protocol: udp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
 						reply.rule().protocolfilter().tcp().srcportlower(),
 						reply.rule().protocolfilter().tcp().srcportupper(),
 						reply.rule().protocolfilter().tcp().dstportlower(),
 						reply.rule().protocolfilter().tcp().dstportupper());
 					break;
-					case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
+					case ProtocolFilter::kIcmpFieldNumber:
 						printf("protocol: icmp / icmp_type: %d / icmp_code: %d \n",
 						reply.rule().protocolfilter().icmp().icmptype(),
 						reply.rule().protocolfilter().icmp().icmpcode());
 					break;
-					case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
+					case ProtocolFilter::FILTER_NOT_SET:
 						printf("protocol: any / src_port_min: any / dst_port_min: any\n");
 					break;
 				}
-				if (reply.rule().direction() == dpdkonmetal::Ingress)
+				if (reply.rule().direction() == Ingress)
 					printf("direction: ingress / ");
 				else
 					printf("direction: egress / ");
 
-				if (reply.rule().action() == dpdkonmetal::Accept)
+				if (reply.rule().action() == Accept)
 					printf("action: accept \n");
 				else
 					printf("direction: drop \n");
@@ -993,7 +993,7 @@ public:
 
 			request.set_interfaceid(machine_str);
 			vip_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				vip_ip->set_address(ip_str);
 			request.set_allocated_interfacevipip(vip_ip);
 			stub_->addInterfaceVIP(&context, request, &reply);
@@ -1013,7 +1013,7 @@ public:
 			m_id->set_interfaceid(machine_str);
 			request.set_allocated_interfaceid(m_id);
 			pfx_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
@@ -1034,7 +1034,7 @@ public:
 			m_id->set_interfaceid(machine_str);
 			request.set_allocated_interfaceid(m_id);
 			pfx_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
@@ -1059,7 +1059,7 @@ public:
 
 			request.set_loadbalancerid(lb_id_str);
 			request.set_vni(vni);
-			lb_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+			lb_ip->set_ipversion(IPVersion::IPv4);
 			lb_ip->set_address(ip_str);
 			request.set_allocated_lbvipip(lb_ip);
 
@@ -1083,9 +1083,9 @@ public:
 				lb_port = request.add_lbports();
 				lb_port->set_port(ports[i]);
 				if (strncasecmp("tcp", &protos[i][0], 29) == 0)
-					lb_port->set_protocol(dpdkonmetal::Protocol::TCP);
+					lb_port->set_protocol(Protocol::TCP);
 				if (strncasecmp("udp", &protos[i][0], 29) == 0)
-					lb_port->set_protocol(dpdkonmetal::Protocol::UDP);
+					lb_port->set_protocol(Protocol::UDP);
 			}
 
 			stub_->createLoadBalancer(&context, request, &reply);
@@ -1171,7 +1171,7 @@ public:
 			m_id->set_interfaceid(machine_str);
 			request.set_allocated_interfaceid(m_id);
 			pfx_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
@@ -1208,7 +1208,7 @@ public:
 			m_id->set_interfaceid(machine_str);
 			request.set_allocated_interfaceid(m_id);
 			pfx_ip->set_ipversion(version);
-			if(version == dpdkonmetal::IPVersion::IPv4)
+			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
@@ -1319,7 +1319,7 @@ public:
 
 		request.set_interfaceid(machine_str);
 		nat_vip->set_ipversion(version);
-		if(version == dpdkonmetal::IPVersion::IPv4)
+		if(version == IPVersion::IPv4)
 			nat_vip->set_address(ip_str);
 		request.set_allocated_natvipip(nat_vip);
 		request.set_minport(min_port);
@@ -1366,7 +1366,7 @@ public:
 		NATIP *nat_vip = new NATIP();
 
 		nat_vip->set_ipversion(version);
-		if(version == dpdkonmetal::IPVersion::IPv4) {
+		if(version == IPVersion::IPv4) {
 			nat_vip->set_address(ip_str);
 		} else {
 			nat_vip->set_address(ip6_str);
@@ -1393,7 +1393,7 @@ public:
 		int i;
 
 		nat_vip->set_ipversion(version);
-		if(version == dpdkonmetal::IPVersion::IPv4) {
+		if(version == IPVersion::IPv4) {
 			nat_vip->set_address(ip_str);
 		} else {
 			nat_vip->set_address(ip6_str);
@@ -1402,15 +1402,15 @@ public:
 		request.set_allocated_natvipip(nat_vip);
 
 		if (!strcmp(get_nat_info_type_str,"local"))
-			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoLocal);
+			request.set_natinfotype(NATInfoType::NATInfoLocal);
 		else if (!strcmp(get_nat_info_type_str,"neigh"))
-			request.set_natinfotype(dpdkonmetal::NATInfoType::NATInfoNeigh);
+			request.set_natinfotype(NATInfoType::NATInfoNeigh);
 		else
 			printf("Wrong query nat info type parameter, either local or neigh\n");
 
 		stub_->getNATInfo(&context, request, &reply);
 
-		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal) {
+		if (reply.natinfotype() == NATInfoType::NATInfoLocal) {
 			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
 			for (i = 0; i < reply.natinfoentries_size(); i++) {
 				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
@@ -1421,7 +1421,7 @@ public:
 			}
 		}
 
-		if (reply.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh) {
+		if (reply.natinfotype() == NATInfoType::NATInfoNeigh) {
 			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
 			for (i = 0; i < reply.natinfoentries_size(); i++) {
 				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
@@ -1441,7 +1441,7 @@ public:
 		NATIP *nat_vip = new NATIP();
 
 		nat_vip->set_ipversion(version);
-		if(version == dpdkonmetal::IPVersion::IPv4) {
+		if(version == IPVersion::IPv4) {
 			nat_vip->set_address(ip_str);
 		} else {
 			nat_vip->set_address(ip6_str);

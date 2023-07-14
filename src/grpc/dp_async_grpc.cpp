@@ -26,7 +26,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 
 	snprintf(dp_rule->rule_id, sizeof(dp_rule->rule_id),
 				"%s", grpc_rule->ruleid().c_str());
-	if (grpc_rule->sourceprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+	if (grpc_rule->sourceprefix().ipversion() == IPVersion::IPv4) {
 		ret_val = inet_aton(grpc_rule->sourceprefix().address().c_str(),
 					(in_addr*)&dp_rule->src_ip);
 		if (ret_val == 0)
@@ -39,7 +39,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 			dp_rule->src_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
 	}
 
-	if (grpc_rule->destinationprefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+	if (grpc_rule->destinationprefix().ipversion() == IPVersion::IPv4) {
 		ret_val = inet_aton(grpc_rule->destinationprefix().address().c_str(),
 					(in_addr*)&dp_rule->dest_ip);
 		if (ret_val == 0)
@@ -52,12 +52,12 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 			dp_rule->dest_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
 	}
 
-	if (grpc_rule->direction() == dpdkonmetal::Ingress)
+	if (grpc_rule->direction() == Ingress)
 		dp_rule->dir = DP_FWALL_INGRESS;
 	else
 		dp_rule->dir = DP_FWALL_EGRESS;
 
-	if (grpc_rule->action() == dpdkonmetal::Accept)
+	if (grpc_rule->action() == Accept)
 		dp_rule->action = DP_FWALL_ACCEPT;
 	else
 		dp_rule->action = DP_FWALL_DROP;
@@ -65,7 +65,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 	dp_rule->priority = grpc_rule->priority();
 
 	switch (grpc_rule->protocolfilter().filter_case()) {
-		case dpdkonmetal::ProtocolFilter::kTcpFieldNumber:
+		case ProtocolFilter::kTcpFieldNumber:
 			dp_rule->protocol = IPPROTO_TCP;
 			dp_rule->filter.tcp_udp.src_port.lower = grpc_rule->protocolfilter().tcp().srcportlower();
 			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocolfilter().tcp().dstportlower();
@@ -79,7 +79,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 							DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
 							DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
 		break;
-		case dpdkonmetal::ProtocolFilter::kUdpFieldNumber:
+		case ProtocolFilter::kUdpFieldNumber:
 			dp_rule->protocol = IPPROTO_UDP;
 			dp_rule->filter.tcp_udp.src_port.lower = grpc_rule->protocolfilter().udp().srcportlower();
 			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocolfilter().udp().dstportlower();
@@ -93,7 +93,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 							DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
 							DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
 		break;
-		case dpdkonmetal::ProtocolFilter::kIcmpFieldNumber:
+		case ProtocolFilter::kIcmpFieldNumber:
 			dp_rule->protocol = IPPROTO_ICMP;
 			dp_rule->filter.icmp.icmp_type = grpc_rule->protocolfilter().icmp().icmptype();
 			dp_rule->filter.icmp.icmp_code = grpc_rule->protocolfilter().icmp().icmpcode();
@@ -103,7 +103,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 							DP_LOG_FWICMPTYPE(dp_rule->filter.icmp.icmp_type),
 							DP_LOG_FWICMPCODE(dp_rule->filter.icmp.icmp_code));
 		break;
-		case dpdkonmetal::ProtocolFilter::FILTER_NOT_SET:
+		case ProtocolFilter::FILTER_NOT_SET:
 		default:
 			dp_rule->protocol = DP_FWALL_MATCH_ANY_PROTOCOL;
 			dp_rule->filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT;
@@ -125,27 +125,27 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 	Prefix *dst_ip;
 
 	grpc_rule->set_ruleid(dp_rule->rule_id);
-	grpc_rule->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	grpc_rule->set_ipversion(IPVersion::IPv4);
 	grpc_rule->set_priority(dp_rule->priority);
 	if (dp_rule->dir == DP_FWALL_INGRESS)
-		grpc_rule->set_direction(dpdkonmetal::Ingress);
+		grpc_rule->set_direction(Ingress);
 	else
-		grpc_rule->set_direction(dpdkonmetal::Egress);
+		grpc_rule->set_direction(Egress);
 
 	if (dp_rule->action == DP_FWALL_ACCEPT)
-		grpc_rule->set_action(dpdkonmetal::Accept);
+		grpc_rule->set_action(Accept);
 	else
-		grpc_rule->set_action(dpdkonmetal::Drop);
+		grpc_rule->set_action(Drop);
 
 	src_ip = new Prefix();
-	src_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	src_ip->set_ipversion(IPVersion::IPv4);
 	addr.s_addr = dp_rule->src_ip;
 	src_ip->set_address(inet_ntoa(addr));
 	src_ip->set_prefixlength(__builtin_popcount(dp_rule->src_ip_mask));
 	grpc_rule->set_allocated_sourceprefix(src_ip);
 
 	dst_ip = new Prefix();
-	dst_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	dst_ip->set_ipversion(IPVersion::IPv4);
 	addr.s_addr = dp_rule->dest_ip;
 	dst_ip->set_address(inet_ntoa(addr));
 	dst_ip->set_prefixlength(__builtin_popcount(dp_rule->dest_ip_mask));
@@ -346,7 +346,7 @@ int CreateLBCall::Proceed()
 		snprintf(request.add_lb.lb_id, sizeof(request.add_lb.lb_id), "%s",
 				 request_.loadbalancerid().c_str());
 		request.add_lb.vni = request_.vni();
-		if (request_.lbvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.lbvipip().ipversion() == IPVersion::IPv4) {
 			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.lbvipip().address().c_str(),
 					  (in_addr*)&request.add_lb.addr);
@@ -501,7 +501,7 @@ int AddLBVIPCall::Proceed()
 						DP_LOG_IPV6STR(request_.targetip().address().c_str()));
 		snprintf(request.add_lbtrgt.lb_id, sizeof(request.add_lbtrgt.lb_id), "%s",
 				 request_.loadbalancerid().c_str());
-		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
+		if (request_.targetip().ipversion() == IPVersion::IPv6) {
 			request.add_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV6;
 			ret_val = inet_pton(AF_INET6, request_.targetip().address().c_str(),
 					  request.add_lbtrgt.addr6);
@@ -547,7 +547,7 @@ int DelLBVIPCall::Proceed()
 						DP_LOG_IPV6STR(request_.targetip().address().c_str()));
 		snprintf(request.del_lbtrgt.lb_id, sizeof(request.del_lbtrgt.lb_id), "%s",
 				 request_.loadbalancerid().c_str());
-		if (request_.targetip().ipversion() == dpdkonmetal::IPVersion::IPv6) {
+		if (request_.targetip().ipversion() == IPVersion::IPv6) {
 			request.del_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV6;
 			ret_val = inet_pton(AF_INET6, request_.targetip().address().c_str(),
 					  request.del_lbtrgt.addr6);
@@ -586,7 +586,7 @@ void GetLBVIPBackendsCall::ListCallback(void *reply, void *context)
 	back_ip = reply_->add_targetips();
 	inet_ntop(AF_INET6, lb_target->addr6, buf_str, INET6_ADDRSTRLEN);
 	back_ip->set_address(buf_str);
-	back_ip->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+	back_ip->set_ipversion(IPVersion::IPv6);
 }
 
 int GetLBVIPBackendsCall::Proceed()
@@ -641,7 +641,7 @@ int AddPfxCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		snprintf(request.add_pfx.iface_id, sizeof(request.add_pfx.iface_id),
 				 "%s", request_.interfaceid().interfaceid().c_str());
-		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.prefix().ipversion() == IPVersion::IPv4) {
 			request.add_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_pfx.addr);
@@ -689,7 +689,7 @@ int DelPfxCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		snprintf(request.del_pfx.iface_id, sizeof(request.del_pfx.iface_id),
 				 "%s", request_.interfaceid().interfaceid().c_str());
-		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.prefix().ipversion() == IPVersion::IPv4) {
 			request.del_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.del_pfx.addr);
@@ -729,7 +729,7 @@ void ListPfxCall::ListCallback(void *reply, void *context)
 	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		addr.s_addr = htonl(rp_route->pfx_addr);
 		pfx->set_address(inet_ntoa(addr));
-		pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		pfx->set_ipversion(IPVersion::IPv4);
 		pfx->set_prefixlength(rp_route->pfx_length);
 		inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
 		pfx->set_underlayroute(buf_str);
@@ -789,7 +789,7 @@ int CreateLBTargetPfxCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		snprintf(request.add_lbpfx.iface_id, sizeof(request.add_lbpfx.iface_id),
 				 "%s", request_.interfaceid().interfaceid().c_str());
-		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.prefix().ipversion() == IPVersion::IPv4) {
 			request.add_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.add_lbpfx.addr);
@@ -837,7 +837,7 @@ int DelLBTargetPfxCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().prefixlength()));
 		snprintf(request.del_lbpfx.iface_id, sizeof(request.del_lbpfx.iface_id),
 				 "%s", request_.interfaceid().interfaceid().c_str());
-		if (request_.prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.prefix().ipversion() == IPVersion::IPv4) {
 			request.del_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().address().c_str(),
 					  (in_addr*)&request.del_lbpfx.addr);
@@ -877,7 +877,7 @@ void ListLBTargetPfxCall::ListCallback(void *reply, void *context)
 	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		addr.s_addr = htonl(rp_route->pfx_addr);
 		pfx->set_address(inet_ntoa(addr));
-		pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		pfx->set_ipversion(IPVersion::IPv4);
 		pfx->set_prefixlength(rp_route->pfx_length);
 		inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
 		pfx->set_underlayroute(buf_str);
@@ -936,7 +936,7 @@ int AddVIPCall::Proceed()
 						DP_LOG_IPV4STR(request_.interfacevipip().address().c_str()));
 		snprintf(request.add_vip.iface_id, sizeof(request.add_vip.iface_id),
 				 "%s", request_.interfaceid().c_str());
-		if (request_.interfacevipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.interfacevipip().ipversion() == IPVersion::IPv4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.interfacevipip().address().c_str(),
 					  (in_addr*)&request.add_vip.addr);
@@ -1025,7 +1025,7 @@ int GetVIPCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		reply_.set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		reply_.set_ipversion(IPVersion::IPv4);
 		addr.s_addr = reply.vip.addr;
 		reply_.set_address(inet_ntoa(addr));
 		inet_ntop(AF_INET6, reply.vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
@@ -1230,7 +1230,7 @@ int AddRouteCall::Proceed()
 		if (ret_val <= 0)
 			DPGRPC_LOG_WARNING("Invalid nexthop IP", DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
 		request.add_route.pfx_length = request_.route().prefix().prefixlength();
-		if (request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.route().prefix().ipversion() == IPVersion::IPv4) {
 			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.route().prefix().address().c_str(),
 					(in_addr*)&request.add_route.pfx_addr);
@@ -1290,7 +1290,7 @@ int DelRouteCall::Proceed()
 								   DP_LOG_IPV6STR(request_.route().nexthopaddress().c_str()));
 		}
 		request.del_route.pfx_length = request_.route().prefix().prefixlength();
-		if (request_.route().prefix().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.route().prefix().ipversion() == IPVersion::IPv4) {
 			request.del_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.route().prefix().address().c_str(),
 					(in_addr*)&request.del_route.pfx_addr);
@@ -1335,15 +1335,15 @@ void ListRoutesCall::ListCallback(void *reply, void *context)
 
 	route = reply_->add_routes();
 	if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV6)
-		route->set_ipversion(dpdkonmetal::IPVersion::IPv6);
+		route->set_ipversion(IPVersion::IPv6);
 	else
-		route->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		route->set_ipversion(IPVersion::IPv4);
 
 	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 		addr.s_addr = htonl(rp_route->pfx_addr);
 		pfx = new Prefix();
 		pfx->set_address(inet_ntoa(addr));
-		pfx->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		pfx->set_ipversion(IPVersion::IPv4);
 		pfx->set_prefixlength(rp_route->pfx_length);
 		route->set_allocated_prefix(pfx);
 	}
@@ -1406,7 +1406,7 @@ int AddNATVIPCall::Proceed()
 						DP_LOG_MAXPORT(request_.maxport()));
 		snprintf(request.add_nat.iface_id, sizeof(request.add_nat.iface_id),
 				 "%s", request_.interfaceid().c_str());
-		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
 			request.add_nat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_nat.addr);
@@ -1468,7 +1468,7 @@ int GetNATVIPCall::Proceed()
 		nat_ip = new NATIP();
 		addr.s_addr = reply.nat.addr;
 		nat_ip->set_address(inet_ntoa(addr));
-		nat_ip->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+		nat_ip->set_ipversion(IPVersion::IPv4);
 		reply_.set_allocated_natvipip(nat_ip);
 		reply_.set_maxport(reply.nat.max_port);
 		reply_.set_minport(reply.nat.min_port);
@@ -1537,7 +1537,7 @@ int AddNeighborNATCall::Proceed()
 						DP_LOG_MINPORT(request_.minport()),
 						DP_LOG_MAXPORT(request_.maxport()),
 						DP_LOG_IPV6STR(request_.underlayroute().c_str()));
-		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
 			request.add_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.add_neighnat.addr);
@@ -1592,7 +1592,7 @@ int DeleteNeighborNATCall::Proceed()
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()),
 						DP_LOG_MINPORT(request_.minport()),
 						DP_LOG_MAXPORT(request_.maxport()));
-		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
 			request.del_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.del_neighnat.addr);
@@ -1683,7 +1683,7 @@ void GetNATInfoCall::ListCallbackLocal(void *reply, void *context)
 
 	rep_nat_entry = reply_->add_natinfoentries();
 	addr.s_addr = htonl(nat->addr);
-	rep_nat_entry->set_ipversion(dpdkonmetal::IPVersion::IPv4);
+	rep_nat_entry->set_ipversion(IPVersion::IPv4);
 	rep_nat_entry->set_address(inet_ntoa(addr));
 	rep_nat_entry->set_minport(nat->min_port);
 	rep_nat_entry->set_maxport(nat->max_port);
@@ -1722,13 +1722,13 @@ int GetNATInfoCall::Proceed()
 						DP_LOG_NATINFOTYPE(request_.natinfotype()),
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 
-		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
+		if (request_.natinfotype() == NATInfoType::NATInfoLocal)
 			request.list_nat.type = DP_NATINFO_TYPE_LOCAL;
-		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
+		else if (request_.natinfotype() == NATInfoType::NATInfoNeigh)
 			request.list_nat.type = DP_NATINFO_TYPE_NEIGHBOR;
 		// FIXME else enter infinite wait in caller
 
-		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
 			request.list_nat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
 					  (in_addr*)&request.list_nat.addr);
@@ -1743,7 +1743,7 @@ int GetNATInfoCall::Proceed()
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (request_.natvipip().ipversion() == dpdkonmetal::IPVersion::IPv4) {
+		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
 			request.list_nat.ip_type = RTE_ETHER_TYPE_IPV4;
 			nat_ip = new NATIP();
 			nat_ip->set_address(request_.natvipip().address().c_str());
@@ -1751,9 +1751,9 @@ int GetNATInfoCall::Proceed()
 			reply_.set_allocated_natvipip(nat_ip);
 		}
 		reply_.set_natinfotype(request_.natinfotype());
-		if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoLocal)
+		if (request_.natinfotype() == NATInfoType::NATInfoLocal)
 			list_callback = ListCallbackLocal;
-		else if (request_.natinfotype() == dpdkonmetal::NATInfoType::NATInfoNeigh)
+		else if (request_.natinfotype() == NATInfoType::NATInfoNeigh)
 			list_callback = ListCallbackNeigh;
 		// TODO else invalid type (but that is already covered by the worker...)
 		else
