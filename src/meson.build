@@ -69,8 +69,15 @@ if get_option('enable_graphtrace')
   ]
 endif
 
+version_h = vcs_tag(
+  command: ['git', 'describe', '--tags'],
+  input: '../include/dp_version.h.in',
+  output: 'dp_version.h',
+  replace_string: '@GIT_TAG_VERSION@'
+)
+
 exe = executable('dp_service',
-  sources: [ dp_sources, grpc_generated ],
+  sources: [ dp_sources, grpc_generated, version_h ],
   include_directories: [ includes ],
   dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep ]
 )

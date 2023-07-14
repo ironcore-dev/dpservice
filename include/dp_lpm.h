@@ -34,6 +34,9 @@ extern "C" {
 #define DP_LPM_DHCP_IP_DEPTH	32
 #define DP_LPM_DHCP_IP6_DEPTH	128
 
+#define DP_LIST_EXT_ROUTES true
+#define DP_LIST_INT_ROUTES false
+
 struct macip_entry {
 	struct rte_ether_addr	own_mac;
 	struct rte_ether_addr	neigh_mac;

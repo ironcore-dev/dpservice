@@ -34,7 +34,7 @@ static inline int ring_init(const char *name, struct rte_ring **p_ring)
 
 static inline void ring_free(struct rte_ring *ring)
 {
-	rte_ring_free(ring);;
+	rte_ring_free(ring);
 }
 
 /** unsafe - does not do cleanup on failure */

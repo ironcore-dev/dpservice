@@ -13,8 +13,8 @@
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 	static bool virtsvc_present = false;
-	const struct dp_virtsvc_lookup_entry *virtsvc_ipv4_tree;
-	const struct dp_virtsvc_lookup_entry *virtsvc_ipv6_tree;
+	static const struct dp_virtsvc_lookup_entry *virtsvc_ipv4_tree;
+	static const struct dp_virtsvc_lookup_entry *virtsvc_ipv6_tree;
 #	define VIRTSVC_NEXT(NEXT) NEXT(CLS_NEXT_VIRTSVC, "virtsvc")
 #else
 #	define VIRTSVC_NEXT(NEXT)

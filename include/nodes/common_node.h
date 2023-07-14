@@ -81,11 +81,13 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 
 static __rte_always_inline
 void dp_forward_graph_packets(struct rte_graph *graph,
-							 struct rte_node *node,
-							 void **objs,
-							 uint16_t nb_objs,
-							 rte_edge_t next_index)
+							  struct rte_node *node,
+							  void **objs,
+							  uint16_t nb_objs,
+							  rte_edge_t next_index)
 {
+	RTE_SET_USED(objs);
+	RTE_SET_USED(nb_objs);
 	dp_graphtrace_next_burst(node, objs, nb_objs, next_index);
 	rte_node_next_stream_move(graph, node, next_index);
 }

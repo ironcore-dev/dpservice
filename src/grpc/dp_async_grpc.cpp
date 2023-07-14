@@ -1392,7 +1392,6 @@ int AddNATVIPCall::Proceed()
 	};
 	struct dpgrpc_reply reply;
 
-	grpc::Status ret = grpc::Status::OK;
 	char buf_str[INET6_ADDRSTRLEN];
 	int ret_val;
 
@@ -1491,7 +1490,6 @@ int DeleteNATVIPCall::Proceed()
 		.type = call_type_,
 	};
 	struct dpgrpc_reply reply;
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new DeleteNATVIPCall(service_, cq_);
@@ -1528,7 +1526,6 @@ int AddNeighborNATCall::Proceed()
 	};
 	struct dpgrpc_reply reply;
 	int ret_val;
-	grpc::Status ret = grpc::Status::OK;
 
 	if (status_ == REQUEST) {
 		new AddNeighborNATCall(service_, cq_);
@@ -1584,7 +1581,6 @@ int DeleteNeighborNATCall::Proceed()
 		.type = call_type_,
 	};
 	struct dpgrpc_reply reply;
-	grpc::Status ret = grpc::Status::OK;
 	int ret_val;
 
 	if (status_ == REQUEST) {
