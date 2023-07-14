@@ -1,41 +1,47 @@
 project('dp_service', 'c', 'cpp',
   version: run_command('cat', 'include/dp_version.h', check: true).stdout().strip().split(' ').get(2).split('"').get(1),
-  license: 'MIT')
+  license: 'MIT',
+  default_options: ['warning_level=2', 'werror=true'])
 
-common_flags = [
-  '-Werror', '-Wall', '-Wextra', '-Wunused',
-  '-Wshadow', '-Wundef', '-Wcast-qual', '-Wwrite-strings', '-Wpointer-arith',
-]
-cflags = common_flags + [
-  '-Wbad-function-cast', '-Wmissing-declarations', '-Wstrict-prototypes', '-Wmissing-prototypes',
-  '-Wno-deprecated-declarations',  # RTE uses deprecation for experimental API
-]
-cxxflags = common_flags + [
-  '-Wno-missing-field-initializers',
-]
+# RTE uses deprecation for experimental API
+cflags = ['-Wno-deprecated-declarations']
+cxxflags = []
 
-if meson.get_compiler('c').get_id() == 'clang'
-  cflags += [
-    '-Wshadow-all', '-Wparentheses', '-Wcomma', '-Warray-bounds-pointer-arithmetic',
-    '-Wunreachable-code', '-Wunreachable-code-break', '-Wextra-semi-stmt', '-Wmissing-variable-declarations',
-    '-Wuninitialized', '-Wconditional-uninitialized',
-    '-Wassign-enum', '-Wduplicate-enum',
-    '-Wused-but-marked-unused',
+# Customize compiler warnings (unless warning_level is changed to a lower value)
+if get_option('warning_level').to_int() >= 2
+  common_flags = [
+    # -Werror provided by 'werror=true' in default project options
+    # -Wall -Wextra provided by 'warning_level=2' in default project options
+     '-Wunused', '-Wshadow', '-Wundef', '-Wcast-qual', '-Wwrite-strings', '-Wpointer-arith',
   ]
-else  # Assume GCC
-  cflags += [
-    '-Wstringop-overflow=4',
+  cflags += common_flags + [
+    '-Wbad-function-cast', '-Wmissing-declarations', '-Wstrict-prototypes', '-Wmissing-prototypes',
   ]
-  # Additional warnings to suggest better code, GCC only (as that is the primary builder)
-  if get_option('compiler_suggestions')
+  cxxflags += common_flags + [
+    '-Wno-missing-field-initializers',
+  ]
+  if meson.get_compiler('c').get_id() == 'clang'
     cflags += [
-      '-Winline', '-Wno-error=inline',
-      '-Wsuggest-attribute=noreturn', '-Wsuggest-attribute=malloc',
-      # These suggestions are not usable right now, but could be nice: const, pure, cold
+      '-Wshadow-all', '-Wparentheses', '-Wcomma', '-Warray-bounds-pointer-arithmetic',
+      '-Wunreachable-code', '-Wunreachable-code-break', '-Wextra-semi-stmt', '-Wmissing-variable-declarations',
+      '-Wuninitialized', '-Wconditional-uninitialized',
+      '-Wassign-enum', '-Wduplicate-enum',
+      '-Wused-but-marked-unused',
     ]
+  else  # Assume GCC
+    cflags += [
+      '-Wstringop-overflow=4',
+    ]
+    # Additional warnings to suggest better code, GCC only (as that is the primary builder)
+    if get_option('compiler_suggestions')
+      cflags += [
+        '-Winline', '-Wno-error=inline',
+        '-Wsuggest-attribute=noreturn', '-Wsuggest-attribute=malloc',
+        # These suggestions are not usable right now, but could be nice: const, pure, cold
+      ]
+    endif
   endif
 endif
-
 add_project_arguments(cflags, language : 'c')
 add_project_arguments(cxxflags, language : 'cpp')
 
