@@ -594,4 +594,20 @@ public:
 	}
 	int Proceed() override;
 };
+
+class GetVersionCall final : BaseCall {
+	ServerContext ctx_;
+	GetVersionRequest request_;
+	GetVersionResponse reply_;
+	ServerAsyncResponseWriter<GetVersionResponse> responder_;
+
+public:
+	GetVersionCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	: BaseCall(service, cq, DP_REQ_TYPE_GET_VERSION), responder_(&ctx_) {
+		service_->RequestgetVersion(&ctx_, &request_, &responder_, cq_, cq_,
+									this);
+	}
+	int Proceed() override;
+};
+
 #endif //__INCLUDE_DP_ASYNC_GRPC_H__

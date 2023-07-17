@@ -1938,3 +1938,45 @@ int ListFirewallRulesCall::Proceed()
 	}
 	return 0;
 }
+
+int GetVersionCall::Proceed()
+{
+	struct dpgrpc_request request = {
+		.type = call_type_,
+	};
+	struct dpgrpc_reply reply;
+
+	if (status_ == REQUEST) {
+		new GetVersionCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPGRPC_LOG_INFO("Getting version for client",
+						DP_LOG_PROTOVER(request_.clientproto().c_str()),
+						DP_LOG_CLIENTNAME(request_.clientname().c_str()),
+						DP_LOG_CLIENTVER(request_.clientver().c_str()));
+		snprintf(request.get_version.proto, sizeof(request.get_version.proto),
+				 "%s", request_.clientproto().c_str());
+		snprintf(request.get_version.name, sizeof(request.get_version.name),
+				 "%s", request_.clientname().c_str());
+		snprintf(request.get_version.app, sizeof(request.get_version.app),
+				 "%s", request_.clientver().c_str());
+		dp_send_to_worker(&request);  // TODO can fail
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
+			return -1;
+		reply_.set_svcproto(reply.versions.proto);
+		reply_.set_svcver(reply.versions.app);
+		status_ = FINISH;
+		reply_.set_allocated_status(CreateErrStatus(&reply));
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}

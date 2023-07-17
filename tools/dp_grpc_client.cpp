@@ -6,10 +6,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 #include <grpcpp/grpcpp.h>
 
 #include "../proto/dpdk.grpc.pb.h"
+#include "../include/dp_version.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -59,6 +59,7 @@ typedef enum {
 	DP_CMD_GET_FWALL_RULE,
 	DP_CMD_DEL_FWALL_RULE,
 	DP_CMD_LIST_FWALL_RULE,
+	DP_CMD_GET_VERSION,
 } cmd_type;
 
 static char ip6_str[40] = {0};
@@ -169,6 +170,7 @@ static uint32_t priority = 1000;
 #define CMD_LINE_OPT_FWALL_PRIO		"priority"
 #define CMD_LINE_OPT_VNI_IN_USE		"vni_in_use"
 #define CMD_LINE_OPT_RESET_VNI		"reset_vni"
+#define CMD_LINE_OPT_GET_VERSION	"getver"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -237,6 +239,7 @@ enum {
 	CMD_LINE_OPT_FWALL_ACTION_NUM,
 	CMD_LINE_OPT_FWALL_PRIO_NUM,
 	CMD_LINE_OPT_FWALL_RULE_ID_NUM,
+	CMD_LINE_OPT_GET_VERSION_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -308,6 +311,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_FWALL_ICMP_COD, 1, 0, CMD_LINE_OPT_FWALL_ICMP_COD_NUM},
 	{CMD_LINE_OPT_FWALL_ICMP_TYP, 1, 0, CMD_LINE_OPT_FWALL_ICMP_TYP_NUM},
 	{CMD_LINE_OPT_FWALL_RULE_ID, 1, 0, CMD_LINE_OPT_FWALL_RULE_ID_NUM},
+	{CMD_LINE_OPT_GET_VERSION, 0, 0, CMD_LINE_OPT_GET_VERSION_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -580,6 +584,9 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_FWALL_RULE_ID_NUM:
 			strncpy(fwall_id_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_GET_VERSION_NUM:
+			command = DP_CMD_GET_VERSION;
 			break;
 		default:
 			dp_print_usage(prgname);
@@ -1459,6 +1466,22 @@ public:
 			printf("Neighbor NAT deleted\n");
 	}
 
+	void GetVersion() {
+		GetVersionRequest request;
+		GetVersionResponse reply;
+		ClientContext context;
+
+		request.set_clientproto(DP_SERVICE_VERSION);
+		request.set_clientname("dp_grpc_client");
+		request.set_clientver(DP_SERVICE_VERSION);
+
+		stub_->getVersion(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
+			printf("Got protocol '%s' on service '%s'\n", reply.svcproto().c_str(), reply.svcver().c_str());
+	}
+
 private:
 	std::unique_ptr<DPDKonmetal::Stub> stub_;
 };
@@ -1617,6 +1640,10 @@ int main(int argc, char** argv)
 	case DP_CMD_DEL_FWALL_RULE:
 		std::cout << "Del FirewallRule called " << std::endl;
 		dpdk_client.DelFirewallRule();
+		break;
+	case DP_CMD_GET_VERSION:
+		std::cout << "Get Version called " << std::endl;
+		dpdk_client.GetVersion();
 		break;
 	default:
 		break;

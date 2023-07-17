@@ -5,6 +5,7 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
+#include "dp_version.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
@@ -854,6 +855,18 @@ static int dp_process_get_natinfo(struct dp_grpc_responder *responder)
 	}
 }
 
+static int dp_process_get_version(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_versions *reply = dp_grpc_single_reply(responder);
+
+	// currently, ignore client's versions and only report what the service supports
+	static_assert(sizeof(reply->proto) >= sizeof(DP_SERVICE_VERSION));
+	rte_memcpy(reply->proto, DP_SERVICE_VERSION, sizeof(DP_SERVICE_VERSION));
+	static_assert(sizeof(reply->app) >= sizeof(DP_SERVICE_VERSION));
+	rte_memcpy(reply->app, DP_SERVICE_VERSION, sizeof(DP_SERVICE_VERSION));
+	return DP_GRPC_OK;
+}
+
 void dp_process_request(struct rte_mbuf *m)
 {
 	struct dp_grpc_responder responder;
@@ -865,6 +878,9 @@ void dp_process_request(struct rte_mbuf *m)
 	switch (request_type) {
 	case DP_REQ_TYPE_INIT:
 		ret = dp_process_init(&responder);
+		break;
+	case DP_REQ_TYPE_GET_VERSION:
+		ret = dp_process_get_version(&responder);
 		break;
 	case DP_REQ_TYPE_ADD_INTERFACE:
 		ret = dp_process_add_interface(&responder);

@@ -93,6 +93,9 @@ extern "C" {
 #define DP_LOG_FWDPORTTO(VALUE) _DP_LOG_INT("fw_dport_to", VALUE)
 #define DP_LOG_FWICMPTYPE(VALUE) _DP_LOG_UINT("fw_icmp_type", VALUE)
 #define DP_LOG_FWICMPCODE(VALUE) _DP_LOG_UINT("fw_icmp_code", VALUE)
+#define DP_LOG_PROTOVER(VALUE) _DP_LOG_STR("proto_ver", VALUE)
+#define DP_LOG_CLIENTNAME(VALUE) _DP_LOG_STR("client_name", VALUE)
+#define DP_LOG_CLIENTVER(VALUE) _DP_LOG_STR("client_ver", VALUE)
 // module-specific
 #define DP_LOG_NODE(VALUE) _DP_LOG_STR("node", (VALUE)->name)
 #define DP_LOG_TELEMETRY_CMD(VALUE) _DP_LOG_STR("telemetry_cmd", VALUE)

@@ -459,6 +459,18 @@ message ResetVniRequest {
 	VniType type = 2;
 }
 
+message GetVersionRequest {
+	string clientProto = 1;
+	string clientName = 2;
+	string clientVer = 3;
+}
+
+message GetVersionResponse {
+	Status status = 1;
+	string svcProto = 2;
+	string svcVer = 3;
+}
+
 service DPDKonmetal {
 	//// INITIALIZATION
 	// initialized indicates if the DPDK app has been initialized already, if so an UUID is returned.
@@ -469,7 +481,9 @@ service DPDKonmetal {
 	// init returns an error if the DPDK app has been initialized already. So check if it got initialized before calling init.
 	rpc init(InitConfig) returns (Status) {}
 
-
+	//// VERSIONING
+	// Exchange protocol/app versions to establish communication
+	rpc getVersion(GetVersionRequest) returns (GetVersionResponse) {}
 
 	//// INTERFACES
 	rpc listInterfaces(Empty) returns (InterfacesMsg) {}

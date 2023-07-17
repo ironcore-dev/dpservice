@@ -11,10 +11,13 @@ extern "C" {
 
 #define DP_VNF_IPV6_ADDR_SIZE	16
 
+#define DP_GRPC_VERSION_MAX_LEN	64
+
 enum dpgrpc_request_type {
 	DP_REQ_TYPE_NONE,
 	DP_REQ_TYPE_INIT,
 	DP_REQ_TYPE_INITIALIZED,
+	DP_REQ_TYPE_GET_VERSION,
 	DP_REQ_TYPE_ADD_INTERFACE,
 	DP_REQ_TYPE_DEL_INTERFACE,
 	DP_REQ_TYPE_GET_INTERFACE,
@@ -141,8 +144,8 @@ struct dpgrpc_nat_id {
 };
 
 struct dpgrpc_lb_port {
-	uint16_t protocol;
-	uint16_t port;
+	uint16_t		protocol;
+	uint16_t		port;
 };
 
 struct dpgrpc_lb {
@@ -185,6 +188,12 @@ struct dpgrpc_vni {
 	enum dpgrpc_vni_type	type;
 };
 
+struct dpgrpc_versions {
+	char			name[DP_GRPC_VERSION_MAX_LEN];	// request only
+	char			proto[DP_GRPC_VERSION_MAX_LEN];
+	char			app[DP_GRPC_VERSION_MAX_LEN];
+};
+
 struct dpgrpc_request {
 	uint16_t 		type;  // enum dpgrpc_request_type
 	union {
@@ -221,6 +230,7 @@ struct dpgrpc_request {
 		struct dpgrpc_iface_id	list_fwrule;
 		struct dpgrpc_vni		vni_in_use;
 		struct dpgrpc_vni		vni_reset;
+		struct dpgrpc_versions	get_version;
 	};
 };
 
@@ -261,6 +271,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_lb			lb;
 		struct dpgrpc_fwrule_info	fwrule;
 		struct dpgrpc_vni_in_use	vni_in_use;
+		struct dpgrpc_versions		versions;
 	};
 };
 
