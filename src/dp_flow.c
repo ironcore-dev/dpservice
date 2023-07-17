@@ -21,6 +21,8 @@
 #define DP_LOG_FLOW_KEY(KEY) \
 	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
 	DP_LOG_PROTO((KEY)->proto), \
+	DP_LOG_VNI((KEY)->vni), \
+	DP_LOG_VNF_TYPE((KEY)->vnf), \
 	DP_LOG_SRC_IPV4((KEY)->ip_src), DP_LOG_DST_IPV4((KEY)->ip_dst), \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
@@ -105,22 +107,28 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow
 	struct snat_data *s_data;
 	struct dp_vnf_value vnf_val;
 
+	printf("df->flags.flow_type = %d\n", df->flags.flow_type);
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
+			printf("df->vnf_type = %d\n", df->vnf_type);
+		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX) {
 			key->vnf = (uint8_t)df->vnf_type;
+		}
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
-	} else {
+	} else if (!df->flags.flow_type) {
 		vnf_val.alias_pfx.ip = key->ip_src;
 		vnf_val.alias_pfx.length = 32;
 		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->network_nat_ip != 0) {
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
 		} else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port))){
+			printf("LB_ALIAS_PFX\n");
 			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
 		} else {
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 		}
+	} else {
+		key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 	}
 }
 
@@ -230,6 +238,11 @@ int dp_get_flow_data(struct flow_key *key, void **data)
 
 	if (DP_FAILED(result))
 		*data = NULL;
+
+	if (*data != NULL)
+		DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY(key));
+	else
+		DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY(key));
 
 	return result;
 }

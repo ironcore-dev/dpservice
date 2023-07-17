@@ -5,6 +5,7 @@
 
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
+	printf("dp_offload_handle_tunnel_encap_traffic\n");
 	struct underlay_conf *u_conf = get_underlay_conf();
 	bool cross_pf_port = df->nxt_hop == dp_port_get_pf0_id() ? false : true;
 
@@ -307,6 +308,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 	bool cross_pf_port = m->port == dp_port_get_pf0_id() ? false : true;
+
+	printf("dp_offload_handle_tunnel_decap_traffic\n");
 
 	struct rte_flow_attr attr;
 	int hairpin_pattern_cnt = 0;
@@ -621,6 +624,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 
+	printf("dp_offload_handle_local_traffic\n");
 	struct rte_flow_attr attr;
 
 	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
