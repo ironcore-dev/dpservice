@@ -90,20 +90,34 @@ static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* ou
 	return DP_ERROR;
 }
 
+
+static __rte_always_inline int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	return dp_find_vnf_with_value(val);
+}
+
 /* Isolating only VNF NAT conntrack entries at the moment. The others should follow */
-static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow_key *key)
+static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow_key *key, uint16_t port)
 {
 	struct snat_data *s_data;
+	struct dp_vnf_value vnf_val;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (df->vnf_type == DP_VNF_TYPE_NAT)
-			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
+		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
+			key->vnf = (uint8_t)df->vnf_type;
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 	} else {
+		vnf_val.alias_pfx.ip = key->ip_src;
+		vnf_val.alias_pfx.length = 32;
 		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->network_nat_ip != 0) {
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
+		} else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port))){
+			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
 		} else {
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 		}
@@ -125,7 +139,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	else
 		key->vni = dp_get_vm_vni(m->port);
 
-	dp_mark_vnf_type(df, key);
+	dp_mark_vnf_type(df, key, m->port);
 
 	switch (df->l4_type) {
 	case IPPROTO_TCP:
