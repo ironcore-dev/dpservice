@@ -58,6 +58,7 @@ extern "C" {
 #define DP_LOG_DST_PORT(VALUE) _DP_LOG_UINT("dst_port", VALUE)
 #define DP_LOG_PROTO(VALUE) _DP_LOG_UINT("protocol", VALUE)
 // networking
+#define DP_LOG_VNF_TYPE(VALUE) _DP_LOG_UINT("vnf_type", VALUE)
 #define DP_LOG_VNI(VALUE) _DP_LOG_UINT("vni", VALUE)
 #define DP_LOG_VNI_TYPE(VALUE) _DP_LOG_UINT("vni_type", VALUE)
 #define DP_LOG_MINPORT(VALUE) _DP_LOG_UINT("minport", VALUE)
