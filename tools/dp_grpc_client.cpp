@@ -696,14 +696,17 @@ public:
 	}
 
 	void ListRoutes() {
-			VNIMsg request;
-			RoutesMsg reply;
-			ClientContext context;
-			int i;
+		VNIMsg request;
+		RoutesMsg reply;
+		ClientContext context;
+		int i;
 
-			request.set_vni(vni);
+		request.set_vni(vni);
 
-			stub_->listRoutes(&context, request, &reply);
+		stub_->listRoutes(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
 			for (i = 0; i < reply.routes_size(); i++) {
 				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
 					reply.routes(i).prefix().address().c_str(),
@@ -781,14 +784,17 @@ public:
 	}
 
 	void ListBackIPs() {
-			GetLoadBalancerTargetsRequest request;
-			GetLoadBalancerTargetsResponse reply;
-			ClientContext context;
-			int i;
+		GetLoadBalancerTargetsRequest request;
+		GetLoadBalancerTargetsResponse reply;
+		ClientContext context;
+		int i;
 
-			request.set_loadbalancerid(lb_id_str);
+		request.set_loadbalancerid(lb_id_str);
 
-			stub_->getLoadBalancerTargets(&context, request, &reply);
+		stub_->getLoadBalancerTargets(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
 			for (i = 0; i < reply.targetips_size(); i++)
 				printf("Backend ip %s\n", reply.targetips(i).address().c_str());
 	}
@@ -878,13 +884,17 @@ public:
 	}
 
 	void ListFirewallRules() {
-			ListFirewallRulesRequest request;
-			ListFirewallRulesResponse reply;
-			ClientContext context;
-			int i;
+		ListFirewallRulesRequest request;
+		ListFirewallRulesResponse reply;
+		ClientContext context;
+		int i;
 
-			request.set_interfaceid(machine_str);
-			stub_->listFirewallRules(&context, request, &reply);
+		request.set_interfaceid(machine_str);
+
+		stub_->listFirewallRules(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
 			for (i = 0; i < reply.rules_size(); i++) {
 				printf("%s / ", reply.rules(i).ruleid().c_str());
 				if (reply.rules(i).sourceprefix().ipversion() == IPVersion::IPv4) {
@@ -1190,13 +1200,17 @@ public:
 	}
 
 	void ListPfx() {
-			InterfaceIDMsg request;
-			PrefixesMsg reply;
-			ClientContext context;
-			int i;
+		InterfaceIDMsg request;
+		PrefixesMsg reply;
+		ClientContext context;
+		int i;
 
-			request.set_interfaceid(machine_str);
-			stub_->listInterfacePrefixes(&context, request, &reply);
+		request.set_interfaceid(machine_str);
+
+		stub_->listInterfacePrefixes(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("Route prefix %s len %d underlayroute %s\n",
 					reply.prefixes(i).address().c_str(),
@@ -1227,13 +1241,17 @@ public:
 	}
 
 	void ListLBPfx() {
-			ListInterfaceLoadBalancerPrefixesRequest request;
-			ListInterfaceLoadBalancerPrefixesResponse reply;
-			ClientContext context;
-			int i;
+		ListInterfaceLoadBalancerPrefixesRequest request;
+		ListInterfaceLoadBalancerPrefixesResponse reply;
+		ClientContext context;
+		int i;
 
-			request.set_interfaceid(machine_str);
-			stub_->listInterfaceLoadBalancerPrefixes(&context, request, &reply);
+		request.set_interfaceid(machine_str);
+
+		stub_->listInterfaceLoadBalancerPrefixes(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("LB Route prefix %s len %d underlayroute %s\n",
 					reply.prefixes(i).address().c_str(),
@@ -1302,12 +1320,15 @@ public:
 	}
 
 	void GetInterfaces() {
-			Empty request;
-			InterfacesMsg reply;
-			ClientContext context;
-			int i;
+		Empty request;
+		InterfacesMsg reply;
+		ClientContext context;
+		int i;
 
-			stub_->listInterfaces(&context, request, &reply);
+		stub_->listInterfaces(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else
 			for (i = 0; i < reply.interfaces_size(); i++) {
 				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).interfaceid().c_str(),
 					reply.interfaces(i).primaryipv4address().c_str(),
@@ -1416,29 +1437,30 @@ public:
 			printf("Wrong query nat info type parameter, either local or neigh\n");
 
 		stub_->getNATInfo(&context, request, &reply);
-
-		if (reply.natinfotype() == NATInfoType::NATInfoLocal) {
-			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
-			for (i = 0; i < reply.natinfoentries_size(); i++) {
-				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
-				reply.natinfoentries(i).address().c_str(),
-				reply.natinfoentries(i).minport(),
-				reply.natinfoentries(i).maxport(),
-				reply.natinfoentries(i).vni());
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else {
+			if (reply.natinfotype() == NATInfoType::NATInfoLocal) {
+				printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
+				for (i = 0; i < reply.natinfoentries_size(); i++) {
+					printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
+					reply.natinfoentries(i).address().c_str(),
+					reply.natinfoentries(i).minport(),
+					reply.natinfoentries(i).maxport(),
+					reply.natinfoentries(i).vni());
+				}
+			}
+			if (reply.natinfotype() == NATInfoType::NATInfoNeigh) {
+				printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
+				for (i = 0; i < reply.natinfoentries_size(); i++) {
+					printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
+					reply.natinfoentries(i).minport(),
+					reply.natinfoentries(i).maxport(),
+					reply.natinfoentries(i).vni(),
+					reply.natinfoentries(i).underlayroute().c_str());
+				}
 			}
 		}
-
-		if (reply.natinfotype() == NATInfoType::NATInfoNeigh) {
-			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
-			for (i = 0; i < reply.natinfoentries_size(); i++) {
-				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
-				reply.natinfoentries(i).minport(),
-				reply.natinfoentries(i).maxport(),
-				reply.natinfoentries(i).vni(),
-				reply.natinfoentries(i).underlayroute().c_str());
-			}
-		}
-
 	}
 
 	void DelNeighNAT() {

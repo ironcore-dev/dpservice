@@ -775,7 +775,7 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 	for (int i = 0; i < count; ++i) {
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
-			return DP_GRPC_OK;  // just truncate the list
+			return DP_GRPC_ERR_OUT_OF_MEMORY;
 		reply->ip4_addr = dp_get_dhcp_range_ip4(act_ports[i]);
 		rte_memcpy(reply->ip6_addr, dp_get_dhcp_range_ip6(act_ports[i]),
 				   sizeof(reply->ip6_addr));
@@ -791,9 +791,9 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 
 static int dp_process_list_routes(struct dp_grpc_responder *responder)
 {
-	// ignore errors (already logged) and return at least partial list
-	dp_list_routes(responder->request.list_route.vni, rte_eth_dev_socket_id(dp_port_get_pf0_id()), 0, DP_LIST_EXT_ROUTES, responder);
-	return DP_GRPC_OK;
+	return dp_list_routes(responder->request.list_route.vni,
+						  rte_eth_dev_socket_id(dp_port_get_pf0_id()),
+						  0, DP_LIST_EXT_ROUTES, responder);
 }
 
 static int dp_process_list_lbtargets(struct dp_grpc_responder *responder)
@@ -809,8 +809,7 @@ static int dp_process_list_fwrules(struct dp_grpc_responder *responder)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
-	dp_list_firewall_rules(port_id, responder);
-	return DP_GRPC_OK;
+	return dp_list_firewall_rules(port_id, responder);
 }
 
 static int dp_process_list_lbprefixes(struct dp_grpc_responder *responder)
@@ -821,8 +820,7 @@ static int dp_process_list_lbprefixes(struct dp_grpc_responder *responder)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
-	dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_LB_ALIAS_PFX, responder);
-	return DP_GRPC_OK;
+	return dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_LB_ALIAS_PFX, responder);
 }
 
 static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
@@ -833,23 +831,20 @@ static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NO_VM;
 
-	dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_ALIAS_PFX, responder);
-	return DP_GRPC_OK;
+	return dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_ALIAS_PFX, responder);
 }
 
 static int dp_process_get_natinfo(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_nat_id *request = &responder->request.list_nat;
-	int ret;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
 		if (request->type == DP_NATINFO_TYPE_LOCAL)
-			ret = dp_list_nat_local_entries(ntohl(request->addr), responder);
+			return dp_list_nat_local_entries(ntohl(request->addr), responder);
 		else if (request->type == DP_NATINFO_TYPE_NEIGHBOR)
-			ret = dp_list_nat_neigh_entries(ntohl(request->addr), responder);
+			return dp_list_nat_neigh_entries(ntohl(request->addr), responder);
 		else
 			return DP_GRPC_ERR_WRONG_TYPE;
-		return DP_FAILED(ret) ? DP_GRPC_ERR_ITERATOR : DP_GRPC_OK;
 	} else {
 		return DP_GRPC_ERR_BAD_IPVER;
 	}

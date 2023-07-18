@@ -268,10 +268,11 @@ int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
 		if (lb_val->back_end_ips[i][0] != 0) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
-				return DP_GRPC_OK;  // do not fail, show truncated list
+				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			rte_memcpy(reply->addr6, &lb_val->back_end_ips[i][0], sizeof(reply->addr6));
 		}
 	}
+
 	return DP_GRPC_OK;
 }
 

@@ -62,11 +62,11 @@ int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 	TAILQ_FOREACH(rule, dp_get_fwall_head(port_id), next_rule) {
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
-			return DP_ERROR;
+			return DP_GRPC_ERR_OUT_OF_MEMORY;
 		reply->rule = *rule;
 	}
 
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *rule,

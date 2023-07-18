@@ -565,18 +565,18 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 	struct dpgrpc_nat *reply;
 
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
-		return DP_OK;
+		return DP_GRPC_OK;
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	while ((ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index)) != -ENOENT) {
 		if (DP_FAILED(ret))
-			return DP_ERROR;
+			return DP_GRPC_ERR_ITERATOR;
 
 		if (data->network_nat_ip == nat_ip) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
-				break;
+				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			reply->type = DP_NATINFO_TYPE_LOCAL;
 			reply->min_port = data->network_nat_port_range[0];
 			reply->max_port = data->network_nat_port_range[1];
@@ -584,8 +584,7 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply->vni = nkey->vni;
 		}
 	}
-
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
@@ -599,7 +598,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 		if (current->nat_ip.nat_ip4 == nat_ip) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
-				break;
+				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			reply->type = DP_NATINFO_TYPE_NEIGHBOR;
 			reply->min_port = current->port_range[0];
 			reply->max_port = current->port_range[1];
@@ -607,7 +606,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			rte_memcpy(reply->ul_addr6, current->dst_ipv6, sizeof(current->dst_ipv6));
 		}
 	}
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)

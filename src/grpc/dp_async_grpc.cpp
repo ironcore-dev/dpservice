@@ -8,6 +8,9 @@
 #include "grpc/dp_grpc_queue.h"
 #include "grpc/dp_grpc_service.h"
 
+// TODO(plague): this should all get wrapped in a superclass
+#define DPGRPC_GET_MESSAGE(REPLY, I, TYPE) (TYPE *)((REPLY)->messages + (I) * sizeof(TYPE))
+
 inline void BaseCall::SetErrStatus(Status *status, dpgrpc_reply *reply) {
 	uint32_t err_code = reply->err_code;
 	status->set_error(err_code);
@@ -576,17 +579,25 @@ int DelLBVIPCall::Proceed()
 	return 0;
 }
 
-void GetLBVIPBackendsCall::ListCallback(void *reply, void *context)
+void GetLBVIPBackendsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_lb_target *lb_target = (struct dpgrpc_lb_target *)reply;
 	GetLoadBalancerTargetsResponse *reply_ = (GetLoadBalancerTargetsResponse *)context;
 	LBIP *back_ip;
 	char buf_str[INET6_ADDRSTRLEN];
 
-	back_ip = reply_->add_targetips();
-	inet_ntop(AF_INET6, lb_target->addr6, buf_str, INET6_ADDRSTRLEN);
-	back_ip->set_address(buf_str);
-	back_ip->set_ipversion(IPVersion::IPv6);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
+	}
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		lb_target = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_lb_target);
+		back_ip = reply_->add_targetips();
+		inet_ntop(AF_INET6, lb_target->addr6, buf_str, INET6_ADDRSTRLEN);
+		back_ip->set_address(buf_str);
+		back_ip->set_ipversion(IPVersion::IPv6);
+	}
 }
 
 int GetLBVIPBackendsCall::Proceed()
@@ -611,7 +622,7 @@ int GetLBVIPBackendsCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_lb_target), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -717,24 +728,32 @@ int DelPfxCall::Proceed()
 	return 0;
 }
 
-void ListPfxCall::ListCallback(void *reply, void *context)
+void ListPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
-	dpgrpc_route *rp_route = (dpgrpc_route *)reply;
+	struct dpgrpc_route *rp_route;
 	PrefixesMsg *reply_ = (PrefixesMsg *)context;
 	Prefix *pfx;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
-	pfx = reply_->add_prefixes();
-	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		addr.s_addr = htonl(rp_route->pfx_addr);
-		pfx->set_address(inet_ntoa(addr));
-		pfx->set_ipversion(IPVersion::IPv4);
-		pfx->set_prefixlength(rp_route->pfx_length);
-		inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
-		pfx->set_underlayroute(buf_str);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
 	}
-	// TODO else? (should already be covered by the worker)
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
+		pfx = reply_->add_prefixes();
+		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(rp_route->pfx_addr);
+			pfx->set_address(inet_ntoa(addr));
+			pfx->set_ipversion(IPVersion::IPv4);
+			pfx->set_prefixlength(rp_route->pfx_length);
+			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
+			pfx->set_underlayroute(buf_str);
+		}
+		// TODO else? (should already be covered by the worker)
+	}
 }
 
 int ListPfxCall::Proceed()
@@ -759,7 +778,7 @@ int ListPfxCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_route), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -865,24 +884,32 @@ int DelLBTargetPfxCall::Proceed()
 	return 0;
 }
 
-void ListLBTargetPfxCall::ListCallback(void *reply, void *context)
+void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
-	dpgrpc_route *rp_route = (dpgrpc_route *)reply;
+	struct dpgrpc_route *rp_route;
 	ListInterfaceLoadBalancerPrefixesResponse *reply_ = (ListInterfaceLoadBalancerPrefixesResponse *)context;
 	LBPrefix *pfx;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
-	pfx = reply_->add_prefixes();
-	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		addr.s_addr = htonl(rp_route->pfx_addr);
-		pfx->set_address(inet_ntoa(addr));
-		pfx->set_ipversion(IPVersion::IPv4);
-		pfx->set_prefixlength(rp_route->pfx_length);
-		inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
-		pfx->set_underlayroute(buf_str);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
 	}
-	// TODO else? (should already be covered by the worker)
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
+		pfx = reply_->add_prefixes();
+		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(rp_route->pfx_addr);
+			pfx->set_address(inet_ntoa(addr));
+			pfx->set_ipversion(IPVersion::IPv4);
+			pfx->set_prefixlength(rp_route->pfx_length);
+			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
+			pfx->set_underlayroute(buf_str);
+		}
+		// TODO else? (should already be covered by the worker)
+	}
 }
 
 int ListLBTargetPfxCall::Proceed()
@@ -907,7 +934,7 @@ int ListLBTargetPfxCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_route), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1324,32 +1351,41 @@ int DelRouteCall::Proceed()
 	return 0;
 }
 
-void ListRoutesCall::ListCallback(void *reply, void *context)
+void ListRoutesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
-	struct dpgrpc_route *rp_route = (struct dpgrpc_route *)reply;
+	struct dpgrpc_route *rp_route;
 	RoutesMsg *reply_ = (RoutesMsg *)context;
 	Route *route;
 	struct in_addr addr;
 	Prefix *pfx;
 	char buf[INET6_ADDRSTRLEN];
 
-	route = reply_->add_routes();
-	if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV6)
-		route->set_ipversion(IPVersion::IPv6);
-	else
-		route->set_ipversion(IPVersion::IPv4);
-
-	if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-		addr.s_addr = htonl(rp_route->pfx_addr);
-		pfx = new Prefix();
-		pfx->set_address(inet_ntoa(addr));
-		pfx->set_ipversion(IPVersion::IPv4);
-		pfx->set_prefixlength(rp_route->pfx_length);
-		route->set_allocated_prefix(pfx);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
 	}
-	route->set_nexthopvni(rp_route->trgt_vni);
-	inet_ntop(AF_INET6, rp_route->trgt_addr6, buf, INET6_ADDRSTRLEN);
-	route->set_nexthopaddress(buf);
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
+
+		route = reply_->add_routes();
+		if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV6)
+			route->set_ipversion(IPVersion::IPv6);
+		else
+			route->set_ipversion(IPVersion::IPv4);
+
+		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(rp_route->pfx_addr);
+			pfx = new Prefix();
+			pfx->set_address(inet_ntoa(addr));
+			pfx->set_ipversion(IPVersion::IPv4);
+			pfx->set_prefixlength(rp_route->pfx_length);
+			route->set_allocated_prefix(pfx);
+		}
+		route->set_nexthopvni(rp_route->trgt_vni);
+		inet_ntop(AF_INET6, rp_route->trgt_addr6, buf, INET6_ADDRSTRLEN);
+		route->set_nexthopaddress(buf);
+	}
 }
 
 int ListRoutesCall::Proceed()
@@ -1374,7 +1410,7 @@ int ListRoutesCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_route), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1624,24 +1660,32 @@ int DeleteNeighborNATCall::Proceed()
 	return 0;
 }
 
-void ListInterfacesCall::ListCallback(void *reply, void *context)
+void ListInterfacesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
-	struct dpgrpc_iface *iface = (struct dpgrpc_iface *)reply;
+	struct dpgrpc_iface *iface;
 	InterfacesMsg *reply_ = (InterfacesMsg *)context;
 	Interface *machine;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
-	machine = reply_->add_interfaces();
-	addr.s_addr = htonl(iface->ip4_addr);
-	machine->set_primaryipv4address(inet_ntoa(addr));
-	inet_ntop(AF_INET6, iface->ip6_addr, buf_str, INET6_ADDRSTRLEN);
-	machine->set_primaryipv6address(buf_str);
-	machine->set_interfaceid((char *)iface->iface_id);
-	machine->set_vni(iface->vni);
-	machine->set_pcidpname(iface->pci_name);
-	inet_ntop(AF_INET6, iface->ul_addr6, buf_str, INET6_ADDRSTRLEN);
-	machine->set_underlayroute(buf_str);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
+	}
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		iface = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_iface);
+		machine = reply_->add_interfaces();
+		addr.s_addr = htonl(iface->ip4_addr);
+		machine->set_primaryipv4address(inet_ntoa(addr));
+		inet_ntop(AF_INET6, iface->ip6_addr, buf_str, INET6_ADDRSTRLEN);
+		machine->set_primaryipv6address(buf_str);
+		machine->set_interfaceid((char *)iface->iface_id);
+		machine->set_vni(iface->vni);
+		machine->set_pcidpname(iface->pci_name);
+		inet_ntop(AF_INET6, iface->ul_addr6, buf_str, INET6_ADDRSTRLEN);
+		machine->set_underlayroute(buf_str);
+	}
 }
 
 int ListInterfacesCall::Proceed()
@@ -1663,7 +1707,7 @@ int ListInterfacesCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_iface), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1674,35 +1718,51 @@ int ListInterfacesCall::Proceed()
 	return 0;
 }
 
-void GetNATInfoCall::ListCallbackLocal(void *reply, void *context)
+void GetNATInfoCall::ListCallbackLocal(struct dpgrpc_reply *reply, void *context)
 {
-	struct dpgrpc_nat *nat = (struct dpgrpc_nat *)reply;
+	struct dpgrpc_nat *nat;
 	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
 	NATInfoEntry *rep_nat_entry;
 	struct in_addr addr;
 
-	rep_nat_entry = reply_->add_natinfoentries();
-	addr.s_addr = htonl(nat->addr);
-	rep_nat_entry->set_ipversion(IPVersion::IPv4);
-	rep_nat_entry->set_address(inet_ntoa(addr));
-	rep_nat_entry->set_minport(nat->min_port);
-	rep_nat_entry->set_maxport(nat->max_port);
-	rep_nat_entry->set_vni(nat->vni);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
+	}
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		nat = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_nat);
+		rep_nat_entry = reply_->add_natinfoentries();
+		addr.s_addr = htonl(nat->addr);
+		rep_nat_entry->set_ipversion(IPVersion::IPv4);
+		rep_nat_entry->set_address(inet_ntoa(addr));
+		rep_nat_entry->set_minport(nat->min_port);
+		rep_nat_entry->set_maxport(nat->max_port);
+		rep_nat_entry->set_vni(nat->vni);
+	}
 }
 
-void GetNATInfoCall::ListCallbackNeigh(void *reply, void *context)
+void GetNATInfoCall::ListCallbackNeigh(struct dpgrpc_reply *reply, void *context)
 {
-	struct dpgrpc_nat *nat = (struct dpgrpc_nat *)reply;
+	struct dpgrpc_nat *nat;
 	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
 	NATInfoEntry *rep_nat_entry;
 	char buf[INET6_ADDRSTRLEN];
 
-	rep_nat_entry = reply_->add_natinfoentries();
-	inet_ntop(AF_INET6, nat->ul_addr6, buf, INET6_ADDRSTRLEN);
-	rep_nat_entry->set_underlayroute(buf);
-	rep_nat_entry->set_minport(nat->min_port);
-	rep_nat_entry->set_maxport(nat->max_port);
-	rep_nat_entry->set_vni(nat->vni);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
+	}
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		nat = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_nat);
+		rep_nat_entry = reply_->add_natinfoentries();
+		inet_ntop(AF_INET6, nat->ul_addr6, buf, INET6_ADDRSTRLEN);
+		rep_nat_entry->set_underlayroute(buf);
+		rep_nat_entry->set_minport(nat->min_port);
+		rep_nat_entry->set_maxport(nat->max_port);
+		rep_nat_entry->set_vni(nat->vni);
+	}
 }
 
 int GetNATInfoCall::Proceed()
@@ -1759,7 +1819,7 @@ int GetNATInfoCall::Proceed()
 		else
 			list_callback = ListCallbackLocal;
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_nat), list_callback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(list_callback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);
@@ -1896,14 +1956,22 @@ int GetFirewallRuleCall::Proceed()
 	return 0;
 }
 
-void ListFirewallRulesCall::ListCallback(void *reply, void *context)
+void ListFirewallRulesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
-	struct dpgrpc_fwrule_info *grpc_rule = (struct dpgrpc_fwrule_info *)reply;
+	struct dpgrpc_fwrule_info *grpc_rule;
 	ListFirewallRulesResponse *reply_ = (ListFirewallRulesResponse *)context;
 	FirewallRule *rule;
 
-	rule = reply_->add_rules();
-	ConvertDPFWallRuleToGRPCFwallRule(&grpc_rule->rule, rule);
+	if (reply->err_code) {
+		reply_->set_allocated_status(CreateErrStatus(reply));
+		return;
+	}
+
+	for (uint i = 0; i < reply->msg_count; ++i) {
+		grpc_rule = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_fwrule_info);
+		rule = reply_->add_rules();
+		ConvertDPFWallRuleToGRPCFwallRule(&grpc_rule->rule, rule);
+	}
 }
 
 int ListFirewallRulesCall::Proceed()
@@ -1928,7 +1996,7 @@ int ListFirewallRulesCall::Proceed()
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(sizeof(struct dpgrpc_fwrule_info), ListCallback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);

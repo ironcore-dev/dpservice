@@ -315,7 +315,7 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool 
 	) {
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
-			return DP_ERROR;
+			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
 		rte_rib_get_ip(node, &ipv4);
 		rte_rib_get_depth(node, &depth);
@@ -331,7 +331,7 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool 
 		}
 
 	}
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
@@ -339,28 +339,32 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 {
 	struct rte_rib_node *node = NULL;
 	struct rte_rib *root;
+	int ret;
 
 	// TODO(plague): look into this globally
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
-		return DP_OK;
+		return DP_GRPC_ERR_NO_VNI;
 
 	dp_grpc_set_multireply(responder, sizeof(struct dpgrpc_route));
 
 	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
-	if (node)
-		if (DP_FAILED(dp_list_route_entry(node, portid, ext_routes, responder)))
-			return DP_ERROR;
+	if (node) {
+		ret = dp_list_route_entry(node, portid, ext_routes, responder);
+		if (DP_FAILED(ret))
+			return ret;
+	}
 
 	node = NULL;  // needed to start rte_rib_get_nxt() traversal
 	while ((node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL))) {
-		if (DP_FAILED(dp_list_route_entry(node, portid, ext_routes, responder)))
-			return DP_ERROR;
+		ret = dp_list_route_entry(node, portid, ext_routes, responder);
+		if (DP_FAILED(ret))
+			return ret;
 	}
 
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,

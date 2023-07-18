@@ -13,9 +13,9 @@ int dp_send_to_worker(struct dpgrpc_request *req);
 
 int dp_recv_from_worker(struct dpgrpc_reply *rep, uint16_t request_type);
 
-typedef void (*dp_recv_array_callback)(void *reply, void *context);
+typedef void (*dp_recv_array_callback)(struct dpgrpc_reply *reply, void *context);
 
-int dp_recv_array_from_worker(size_t item_size, dp_recv_array_callback callback, void *context, uint16_t request_type);
+int dp_recv_array_from_worker(dp_recv_array_callback callback, void *context, uint16_t request_type);
 
 #ifdef __cplusplus
 }

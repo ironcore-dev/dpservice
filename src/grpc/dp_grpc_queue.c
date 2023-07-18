@@ -51,7 +51,7 @@ int dp_recv_from_worker(struct dpgrpc_reply *reply, uint16_t request_type)
 	return ret;
 }
 
-int dp_recv_array_from_worker(size_t item_size, dp_recv_array_callback callback, void *context, uint16_t request_type)
+int dp_recv_array_from_worker(dp_recv_array_callback callback, void *context, uint16_t request_type)
 {
 	struct rte_mbuf *m;
 	struct dpgrpc_reply *reply;
@@ -68,10 +68,10 @@ int dp_recv_array_from_worker(size_t item_size, dp_recv_array_callback callback,
 		reply = rte_pktmbuf_mtod(m, struct dpgrpc_reply *);
 		if (reply->type != request_type) {
 			DPGRPC_LOG_WARNING("Invalid response received", DP_LOG_GRPCREQUEST(request_type));
+			rte_pktmbuf_free(m);
 			return DP_ERROR;
 		}
-		for (int i = 0; i < reply->msg_count; ++i)
-			callback(reply->messages + i * item_size, context);
+		callback(reply, context);
 		is_chained = reply->is_chained;
 		rte_pktmbuf_free(m);
 	} while (is_chained);

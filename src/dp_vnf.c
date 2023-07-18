@@ -164,14 +164,14 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 	int32_t ret;
 
 	if (rte_hash_count(vnf_handle_tbl) == 0)
-		return DP_OK;
+		return DP_GRPC_OK;
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, (const void **)&key, (void **)&data, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot iterate VNF table", DP_LOG_RET(ret));
-			return ret;
+			return DP_GRPC_ERR_ITERATOR;
 		}
 
 		if (portid != data->portid || data->v_type != v_type)
@@ -179,7 +179,7 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
-			return DP_ERROR;
+			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
 		reply->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 		reply->pfx_addr = data->alias_pfx.ip;
@@ -187,5 +187,5 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 		rte_memcpy(reply->trgt_addr6, key, sizeof(reply->trgt_addr6));
 	}
 
-	return DP_OK;
+	return DP_GRPC_OK;
 }

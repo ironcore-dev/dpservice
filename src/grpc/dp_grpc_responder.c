@@ -46,6 +46,7 @@ int dp_grpc_alloc_reply(struct dp_grpc_responder *responder)
 	rep_new = rte_pktmbuf_mtod(m_new, struct dpgrpc_reply *);
 	rep_new->type = responder->request.type;
 	rep_new->is_chained = 0;
+	rep_new->err_code = 0;  // only the first reply should hold the error code
 	responder->replies[responder->repcount++] = m_new;
 	responder->rep_msgcount = 0;
 	responder->rep = rte_pktmbuf_mtod(m_new, struct dpgrpc_reply *);
