@@ -36,14 +36,13 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 	struct rte_ipv6_hdr *ipv6_hdr;
 	rte_be16_t payload_len;
 	uint32_t packet_type;
-	uint8_t proto_id;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		proto_id = DP_IP_PROTO_IPv4_ENCAP;
+		df->tun_info.proto_id = DP_IP_PROTO_IPv4_ENCAP;
 		payload_len = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *)->total_length;
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		proto_id = DP_IP_PROTO_IPv6_ENCAP;
+		df->tun_info.proto_id = DP_IP_PROTO_IPv6_ENCAP;
 		payload_len = htons(ntohs(rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *)->payload_len) + sizeof(struct rte_ipv6_hdr));
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV6;
 	} else {
@@ -72,7 +71,7 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 		rte_memcpy(ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
 
 	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
-	ipv6_hdr->proto = proto_id;
+	ipv6_hdr->proto = df->tun_info.proto_id;
 
 	m->packet_type = packet_type;
 	m->ol_flags |= RTE_MBUF_F_TX_OUTER_IPV6;
