@@ -107,26 +107,21 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow
 	struct snat_data *s_data;
 	struct dp_vnf_value vnf_val;
 
-	printf("df->flags.flow_type = %d\n", df->flags.flow_type);
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-			printf("df->vnf_type = %d\n", df->vnf_type);
-		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX) {
+		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
 			key->vnf = (uint8_t)df->vnf_type;
-		}
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 	} else if (!df->flags.flow_type) {
 		vnf_val.alias_pfx.ip = key->ip_src;
 		vnf_val.alias_pfx.length = 32;
 		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
-		if (s_data && s_data->network_nat_ip != 0) {
+		if (s_data && s_data->network_nat_ip != 0)
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
-		} else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port))){
-			printf("LB_ALIAS_PFX\n");
+		else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port)))
 			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
-		} else {
+		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
-		}
 	} else {
 		key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 	}

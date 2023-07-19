@@ -75,10 +75,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		|| df->l4_type == IPPROTO_UDP
 		|| df->l4_type == IPPROTO_ICMP
 	) {
-		
+
 		if (DP_FAILED(dp_cntrack_handle(node, m, df)))
 			return CONNTRACK_NEXT_DROP;
-		
+
 	} else {
 		return CONNTRACK_NEXT_DROP;
 	}
