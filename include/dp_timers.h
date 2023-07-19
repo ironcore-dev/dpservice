@@ -14,6 +14,7 @@ void dp_timers_free(void);
 int dp_timers_add_stats(rte_timer_cb_t stats_cb);
 
 uint64_t dp_timers_get_manage_interval_cycles(void);
+void dp_timers_signal_initialization(void);
 
 #ifdef __cplusplus
 }

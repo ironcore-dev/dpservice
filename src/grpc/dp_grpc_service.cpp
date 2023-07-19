@@ -5,6 +5,7 @@
 #include "dpdk_layer.h"
 #include <rte_mbuf.h>
 #include "dp_log.h"
+#include "dp_timers.h"
 
 
 GRPCService::GRPCService()
@@ -43,6 +44,7 @@ char* GRPCService::GetUUID()
 
 void GRPCService::SetInitStatus(bool status)
 {
+	dp_timers_signal_initialization();
 	initialized = status;
 }
 
