@@ -110,7 +110,6 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 
 			if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL && (df->nxt_hop != pkt->port)) {
 				// if the packet is local and the next hop is not the same port, then this packet is transmitted from one VM to another local VM
-				printf("local VM to VM traffic\n");
 				if (unlikely(DP_FAILED(dp_cntrack_handle(node, pkt, df))))
 					DPNODE_LOG_WARNING(node, "Failed to handle conntrack for local VM to VM traffic");
 			}

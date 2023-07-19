@@ -170,7 +170,6 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 {
 	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD) {
-			
 			dp_cntrack_change_flow_offload_flags(flow_val, df);
 	} else {
 
@@ -190,7 +189,7 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 	struct flow_key *key = NULL;
-	bool same_key;;
+	bool same_key;
 	int ret;
 
 	#ifdef ENABLE_PYTEST
@@ -198,7 +197,7 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	#endif
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
-	
+
 	key = curr_key;
 	memset(key, 0, sizeof(struct flow_key));
 
