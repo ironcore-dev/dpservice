@@ -41,8 +41,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					df->l4_info.trans_port.dst_port = df->l4_info.icmp_field.icmp_identifier;
 				
 				// it is icmp request targeting scalable nat
-				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
+				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+					cntrack->nf_info.nat_type = DP_FLOW_NAT_AS_TARGET;
 					return DNAT_NEXT_PACKET_RELAY;
+				}
 
 				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
 				underlay_dst = dp_lookup_network_nat_underlay_ip(df);
@@ -87,7 +89,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	}
 
 
-	if (DP_IS_FLOW_STATUS_FLAG_DEFAULT(cntrack->flow_status)
+	if (DP_IS_FLOW_STATUS_FLAG_DEFAULT(cntrack->flow_status) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
 		&& df->l4_type == DP_IP_PROTO_ICMP
 		&& df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
 		return DNAT_NEXT_PACKET_RELAY;

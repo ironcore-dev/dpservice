@@ -81,3 +81,23 @@ def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	#It should not arrive at the destination VM, as firewall filters it
 	assert sniff_tcp_data["pkt"] == None
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
+
+
+def vf_to_vf_icmp_responder(vf_tap):
+	pkt = sniff_packet(vf_tap, is_icmp_pkt)
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) / IP(dst=pkt[IP].src, src=pkt[IP].dst) / ICMP(type=0, id=pkt[ICMP].id))
+	delayed_sendp(reply_pkt, vf_tap)
+
+	pkt = sniff_packet(vf_tap, is_icmp_pkt)
+	delayed_sendp(reply_pkt, vf_tap)
+
+# send icmp packet from vm1 to vm2, vm2 replies back, for twice
+def test_vf_to_vf_icmp(prepare_ipv4, grpc_client):
+	icmp_respond_thread = threading.Thread(target=vf_to_vf_icmp_responder, args=(VM2.tap,))
+	icmp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) / IP(dst=VM2.ip, src=VM1.ip) / ICMP(type=8, id=0x0040))
+	icmp_respond_thread.start()
+	delayed_sendp(icmp_pkt, VM1.tap)
+	sniff_packet(VM1.tap, is_icmp_pkt)
+
+	delayed_sendp(icmp_pkt, VM1.tap)
+	sniff_packet(VM1.tap, is_icmp_pkt)
