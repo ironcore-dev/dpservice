@@ -36,7 +36,8 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_GET_NAT,
 	DP_REQ_TYPE_ADD_NEIGHNAT,
 	DP_REQ_TYPE_DEL_NEIGHNAT,
-	DP_REQ_TYPE_GET_NATINFO,
+	DP_REQ_TYPE_LIST_LOCALNATS,
+	DP_REQ_TYPE_LIST_NEIGHNATS,
 	DP_REQ_TYPE_ADD_LB,
 	DP_REQ_TYPE_DEL_LB,
 	DP_REQ_TYPE_GET_LB,
@@ -52,13 +53,6 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_LIST_FWRULES,
 	DP_REQ_TYPE_VNI_INUSE,
 	DP_REQ_TYPE_VNI_RESET,
-};
-
-// in sync with dpdk proto!
-enum dpgrpc_natinfo_type {
-	DP_NATINFO_TYPE_ZERO,
-	DP_NATINFO_TYPE_LOCAL,
-	DP_NATINFO_TYPE_NEIGHBOR,
 };
 
 // in sync with dpdk proto!
@@ -130,12 +124,10 @@ struct dpgrpc_nat {
 	uint16_t		max_port;
 	uint32_t		vni;								// neighnat or reply only
 	uint8_t			neigh_addr6[DP_VNF_IPV6_ADDR_SIZE];	// neighnat only
-	uint8_t			type;  // enum dp_natinfo_type		// reply only
 	uint8_t			ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_nat_id {
-	uint8_t			type;  // enum dp_natinfo_type
 	uint32_t		ip_type;
 	union {
 		uint32_t	addr;
@@ -214,7 +206,8 @@ struct dpgrpc_request {
 		struct dpgrpc_iface_id	get_nat;
 		struct dpgrpc_nat		add_neighnat;
 		struct dpgrpc_nat		del_neighnat;
-		struct dpgrpc_nat_id	list_nat;
+		struct dpgrpc_nat_id	list_localnat;
+		struct dpgrpc_nat_id	list_neighnat;
 		struct dpgrpc_lb		add_lb;
 		struct dpgrpc_lb_id		del_lb;
 		struct dpgrpc_lb_id		get_lb;

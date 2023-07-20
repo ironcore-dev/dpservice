@@ -577,7 +577,6 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			reply->type = DP_NATINFO_TYPE_LOCAL;
 			reply->min_port = data->network_nat_port_range[0];
 			reply->max_port = data->network_nat_port_range[1];
 			reply->addr = nkey->ip;
@@ -599,7 +598,6 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			reply->type = DP_NATINFO_TYPE_NEIGHBOR;
 			reply->min_port = current->port_range[0];
 			reply->max_port = current->port_range[1];
 			reply->vni = current->vni;

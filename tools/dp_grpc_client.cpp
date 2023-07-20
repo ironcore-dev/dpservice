@@ -1400,54 +1400,69 @@ public:
 			printf("Neighbor NAT added\n");
 	}
 
-	void GetNATInfo() {
-		GetNATInfoRequest request;
-		GetNATInfoResponse reply;
+	void ListLocalNATs() {
+		ListLocalNATsRequest request;
+		ListLocalNATsResponse reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 		int i;
 
 		nat_vip->set_ipversion(version);
-		if(version == IPVersion::IPv4) {
+		if (version == IPVersion::IPv4)
 			nat_vip->set_address(ip_str);
-		} else {
+		else
 			nat_vip->set_address(ip6_str);
-		}
-
 		request.set_allocated_natvipip(nat_vip);
 
-		if (!strcmp(get_nat_info_type_str,"local"))
-			request.set_natinfotype(NATInfoType::NATInfoLocal);
-		else if (!strcmp(get_nat_info_type_str,"neigh"))
-			request.set_natinfotype(NATInfoType::NATInfoNeigh);
-		else
-			printf("Wrong query nat info type parameter, either local or neigh\n");
-
-		stub_->GetNATInfo(&context, request, &reply);
+		stub_->ListLocalNATs(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else {
-			if (reply.natinfotype() == NATInfoType::NATInfoLocal) {
-				printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
-				for (i = 0; i < reply.natinfoentries_size(); i++) {
-					printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
-					reply.natinfoentries(i).address().c_str(),
-					reply.natinfoentries(i).minport(),
-					reply.natinfoentries(i).maxport(),
-					reply.natinfoentries(i).vni());
-				}
-			}
-			if (reply.natinfotype() == NATInfoType::NATInfoNeigh) {
-				printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", reply.natvipip().address().c_str());
-				for (i = 0; i < reply.natinfoentries_size(); i++) {
-					printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
-					reply.natinfoentries(i).minport(),
-					reply.natinfoentries(i).maxport(),
-					reply.natinfoentries(i).vni(),
-					reply.natinfoentries(i).underlayroute().c_str());
-				}
+			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_vip->address().c_str());
+			for (i = 0; i < reply.natinfoentries_size(); i++) {
+				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
+				reply.natinfoentries(i).address().c_str(),
+				reply.natinfoentries(i).minport(),
+				reply.natinfoentries(i).maxport(),
+				reply.natinfoentries(i).vni());
 			}
 		}
+	}
+	void ListNeighNATs() {
+		ListNeighborNATsRequest request;
+		ListNeighborNATsResponse reply;
+		ClientContext context;
+		NATIP *nat_vip = new NATIP();
+		int i;
+
+		nat_vip->set_ipversion(version);
+		if (version == IPVersion::IPv4)
+			nat_vip->set_address(ip_str);
+		else
+			nat_vip->set_address(ip6_str);
+		request.set_allocated_natvipip(nat_vip);
+
+		stub_->ListNeighborNATs(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
+		else {
+			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", nat_vip->address().c_str());
+			for (i = 0; i < reply.natinfoentries_size(); i++) {
+				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
+				reply.natinfoentries(i).minport(),
+				reply.natinfoentries(i).maxport(),
+				reply.natinfoentries(i).vni(),
+				reply.natinfoentries(i).underlayroute().c_str());
+			}
+		}
+	}
+	void GetNATInfo() {
+		if (!strcmp(get_nat_info_type_str, "local"))
+			ListLocalNATs();
+		else if (!strcmp(get_nat_info_type_str, "neigh"))
+			ListNeighNATs();
+		else
+			printf("Wrong query nat info type parameter, either local or neigh\n");
 	}
 
 	void DelNeighNAT() {

@@ -427,18 +427,33 @@ public:
 	int	Proceed() override;
 };
 
-class GetNATInfoCall final: BaseCall {
+class ListLocalNATsCall final: BaseCall {
 	ServerContext ctx_;
-	GetNATInfoRequest request_;
-	GetNATInfoResponse reply_;
-	ServerAsyncResponseWriter<GetNATInfoResponse> responder_;
+	ListLocalNATsRequest request_;
+	ListLocalNATsResponse reply_;
+	ServerAsyncResponseWriter<ListLocalNATsResponse> responder_;
 private:
-	static void ListCallbackLocal(struct dpgrpc_reply *reply, void *context);
-	static void ListCallbackNeigh(struct dpgrpc_reply *reply, void *context);
+	static void ListCallback(struct dpgrpc_reply *reply, void *context);
 public:
-	GetNATInfoCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
-	: BaseCall(service, cq, DP_REQ_TYPE_GET_NATINFO), responder_(&ctx_) {
-		service_->RequestGetNATInfo(&ctx_, &request_, &responder_, cq_, cq_,
+	ListLocalNATsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_LOCALNATS), responder_(&ctx_) {
+		service_->RequestListLocalNATs(&ctx_, &request_, &responder_, cq_, cq_,
+										 this);
+	}
+	int	Proceed() override;
+};
+
+class ListNeighborNATsCall final: BaseCall {
+	ServerContext ctx_;
+	ListNeighborNATsRequest request_;
+	ListNeighborNATsResponse reply_;
+	ServerAsyncResponseWriter<ListNeighborNATsResponse> responder_;
+private:
+	static void ListCallback(struct dpgrpc_reply *reply, void *context);
+public:
+	ListNeighborNATsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	: BaseCall(service, cq, DP_REQ_TYPE_LIST_NEIGHNATS), responder_(&ctx_) {
+		service_->RequestListNeighborNATs(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;

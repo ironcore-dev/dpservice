@@ -33,12 +33,6 @@ enum FirewallAction {
 	Accept = 1;
 }
 
-enum NATInfoType {
-	NATInfoTypeZero = 0;
-	NATInfoLocal = 1;
-	NATInfoNeigh = 2;
-}
-
 enum VniType {
 	VniIpv4 = 0;
 	VniIpv6 = 1;
@@ -465,14 +459,20 @@ message DeleteNeighborNATResponse {
 	Status status = 1;
 }
 
-message GetNATInfoRequest {
-	NATIP natVIPIP = 1; // list all local machines that are behind this IP
-	NATInfoType natInfoType = 2;
+message ListLocalNATsRequest {
+	NATIP natVIPIP = 1;
 }
 
-message GetNATInfoResponse {
+message ListLocalNATsResponse {
+	repeated NATInfoEntry natInfoEntries = 3;
+	Status status = 4;
+}
+
+message ListNeighborNATsRequest {
 	NATIP natVIPIP = 1;
-	NATInfoType natInfoType = 2;
+}
+
+message ListNeighborNATsResponse {
 	repeated NATInfoEntry natInfoEntries = 3;
 	Status status = 4;
 }
@@ -620,10 +620,11 @@ service DPDKonmetal {
 	rpc GetNAT(GetNATRequest) returns (GetNATResponse) {}
 	rpc DeleteNAT(DeleteNATRequest) returns (DeleteNATResponse) {}
 
+	rpc ListLocalNATs(ListLocalNATsRequest) returns (ListLocalNATsResponse) {}
+
 	rpc CreateNeighborNAT(CreateNeighborNATRequest) returns (CreateNeighborNATResponse) {}
 	rpc DeleteNeighborNAT(DeleteNeighborNATRequest) returns (DeleteNeighborNATResponse) {}
-
-	rpc GetNATInfo(GetNATInfoRequest) returns (GetNATInfoResponse) {}
+	rpc ListNeighborNATs(ListNeighborNATsRequest) returns (ListNeighborNATsResponse) {}
 
 	//// ROUTES
 	rpc ListRoutes(ListRoutesRequest) returns (ListRoutesResponse) {}

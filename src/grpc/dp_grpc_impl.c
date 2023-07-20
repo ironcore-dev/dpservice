@@ -834,21 +834,26 @@ static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 	return dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_ALIAS_PFX, responder);
 }
 
-static int dp_process_get_natinfo(struct dp_grpc_responder *responder)
+static int dp_process_list_localnats(struct dp_grpc_responder *responder)
 {
-	struct dpgrpc_nat_id *request = &responder->request.list_nat;
+	struct dpgrpc_nat_id *request = &responder->request.list_localnat;
 
-	if (request->ip_type == RTE_ETHER_TYPE_IPV4) {
-		if (request->type == DP_NATINFO_TYPE_LOCAL)
-			return dp_list_nat_local_entries(ntohl(request->addr), responder);
-		else if (request->type == DP_NATINFO_TYPE_NEIGHBOR)
-			return dp_list_nat_neigh_entries(ntohl(request->addr), responder);
-		else
-			return DP_GRPC_ERR_WRONG_TYPE;
-	} else {
+	if (request->ip_type == RTE_ETHER_TYPE_IPV4)
+		return dp_list_nat_local_entries(ntohl(request->addr), responder);
+	else
 		return DP_GRPC_ERR_BAD_IPVER;
-	}
 }
+
+static int dp_process_list_neighnats(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_nat_id *request = &responder->request.list_neighnat;
+
+	if (request->ip_type == RTE_ETHER_TYPE_IPV4)
+		return dp_list_nat_neigh_entries(ntohl(request->addr), responder);
+	else
+		return DP_GRPC_ERR_BAD_IPVER;
+}
+
 
 static int dp_process_get_version(struct dp_grpc_responder *responder)
 {
@@ -931,8 +936,11 @@ void dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_DEL_NEIGHNAT:
 		ret = dp_process_del_neighnat(&responder);
 		break;
-	case DP_REQ_TYPE_GET_NATINFO:
-		ret = dp_process_get_natinfo(&responder);
+	case DP_REQ_TYPE_LIST_LOCALNATS:
+		ret = dp_process_list_localnats(&responder);
+		break;
+	case DP_REQ_TYPE_LIST_NEIGHNATS:
+		ret = dp_process_list_neighnats(&responder);
 		break;
 	case DP_REQ_TYPE_ADD_LB:
 		ret = dp_process_add_lb(&responder);

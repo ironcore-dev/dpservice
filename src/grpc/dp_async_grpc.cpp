@@ -1718,10 +1718,10 @@ int ListInterfacesCall::Proceed()
 	return 0;
 }
 
-void GetNATInfoCall::ListCallbackLocal(struct dpgrpc_reply *reply, void *context)
+void ListLocalNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_nat *nat;
-	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
+	ListLocalNATsResponse *reply_ = (ListLocalNATsResponse *)context;
 	NATInfoEntry *rep_nat_entry;
 	struct in_addr addr;
 
@@ -1742,10 +1742,52 @@ void GetNATInfoCall::ListCallbackLocal(struct dpgrpc_reply *reply, void *context
 	}
 }
 
-void GetNATInfoCall::ListCallbackNeigh(struct dpgrpc_reply *reply, void *context)
+int ListLocalNATsCall::Proceed()
+{
+	struct dpgrpc_request request = {
+		.type = call_type_,
+	};
+	int ret_val;
+
+	if (status_ == REQUEST) {
+		new ListLocalNATsCall(service_, cq_);
+		if (InitCheck() == INITCHECK)
+			return -1;
+		DPGRPC_LOG_INFO("Listing local NATs",
+						DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
+
+		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
+			request.list_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
+			ret_val = inet_aton(request_.natvipip().address().c_str(),
+					  (in_addr*)&request.list_neighnat.addr);
+			if (ret_val == 0)
+				DPGRPC_LOG_WARNING("Invalid NAT IP",
+								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
+		}
+		// TODO else?
+		dp_send_to_worker(&request);  // TODO can fail
+		status_ = AWAIT_MSG;
+		return -1;
+	} else if (status_ == INITCHECK) {
+		responder_.Finish(reply_, ret, this);
+		status_ = FINISH;
+	} else if (status_ == AWAIT_MSG) {
+		// TODO can fail hard (this `return -1` is only a wait loop)
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
+			return -1;
+		status_ = FINISH;
+		responder_.Finish(reply_, ret, this);
+	} else {
+		GPR_ASSERT(status_ == FINISH);
+		delete this;
+	}
+	return 0;
+}
+
+void ListNeighborNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_nat *nat;
-	GetNATInfoResponse *reply_ = (GetNATInfoResponse *)context;
+	ListNeighborNATsResponse *reply_ = (ListNeighborNATsResponse *)context;
 	NATInfoEntry *rep_nat_entry;
 	char buf[INET6_ADDRSTRLEN];
 
@@ -1765,37 +1807,29 @@ void GetNATInfoCall::ListCallbackNeigh(struct dpgrpc_reply *reply, void *context
 	}
 }
 
-int GetNATInfoCall::Proceed()
+int ListNeighborNATsCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
-	NATIP *nat_ip;
-	dp_recv_array_callback list_callback;
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new GetNATInfoCall(service_, cq_);
+		new ListNeighborNATsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting NAT info",
-						DP_LOG_NATINFOTYPE(request_.natinfotype()),
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 
-		if (request_.natinfotype() == NATInfoType::NATInfoLocal)
-			request.list_nat.type = DP_NATINFO_TYPE_LOCAL;
-		else if (request_.natinfotype() == NATInfoType::NATInfoNeigh)
-			request.list_nat.type = DP_NATINFO_TYPE_NEIGHBOR;
-		// FIXME else enter infinite wait in caller
-
 		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
-			request.list_nat.ip_type = RTE_ETHER_TYPE_IPV4;
+			request.list_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.natvipip().address().c_str(),
-					  (in_addr*)&request.list_nat.addr);
+					  (in_addr*)&request.list_neighnat.addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid NAT IP",
 								   DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 		}
+		// TODO else
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1803,23 +1837,8 @@ int GetNATInfoCall::Proceed()
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		if (request_.natvipip().ipversion() == IPVersion::IPv4) {
-			request.list_nat.ip_type = RTE_ETHER_TYPE_IPV4;
-			nat_ip = new NATIP();
-			nat_ip->set_address(request_.natvipip().address().c_str());
-			nat_ip->set_ipversion(request_.natvipip().ipversion());
-			reply_.set_allocated_natvipip(nat_ip);
-		}
-		reply_.set_natinfotype(request_.natinfotype());
-		if (request_.natinfotype() == NATInfoType::NATInfoLocal)
-			list_callback = ListCallbackLocal;
-		else if (request_.natinfotype() == NATInfoType::NATInfoNeigh)
-			list_callback = ListCallbackNeigh;
-		// TODO else invalid type (but that is already covered by the worker...)
-		else
-			list_callback = ListCallbackLocal;
 		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(list_callback, &reply_, call_type_)))
+		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
 			return -1;
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);

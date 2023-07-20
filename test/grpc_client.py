@@ -169,8 +169,8 @@ To solve this, you have a few options:
 	def delnat(self, vm_name):
 		self._call(f"del nat --interface-id={vm_name}")
 
-	def getnatinfo(self, nat_vip, info_type):
-		return self._getSpecList(f"get natinfo --nat-ip={nat_vip} --info-type={info_type}")
+	def listneighnats(self, nat_vip):
+		return self._getSpecList(f"get natinfo --nat-ip={nat_vip} --info-type=neigh")
 
 	def addneighnat(self, nat_vip, vni, min_port, max_port, t_ipv6):
 		self._call(f"add neighnat --nat-ip={nat_vip} --vni={vni} --minport={min_port} --maxport={max_port} --underlayroute={t_ipv6}")

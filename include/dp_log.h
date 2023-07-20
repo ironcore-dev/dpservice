@@ -77,7 +77,6 @@ extern "C" {
 #define DP_LOG_LBID(VALUE) _DP_LOG_STR("lb_id", VALUE)
 #define DP_LOG_PREFIX(VALUE) _DP_LOG_STR("prefix", VALUE)
 #define DP_LOG_PREFLEN(VALUE) _DP_LOG_UINT("prefix_len", VALUE)
-#define DP_LOG_NATINFOTYPE(VALUE) _DP_LOG_UINT("nat_info_type", VALUE)
 #define DP_LOG_FWRULE(VALUE) _DP_LOG_STR("fw_rule", VALUE)
 #define DP_LOG_FWPRIO(VALUE) _DP_LOG_UINT("fw_priority", VALUE)
 #define DP_LOG_FWDIR(VALUE) _DP_LOG_UINT("fw_direction", VALUE)
