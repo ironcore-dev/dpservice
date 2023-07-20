@@ -167,32 +167,18 @@ message IPConfig {
 	repeated Prefix interfacePrefixes = 10;
 }
 
-message ThrottlingConfig {
-	uint32 ingressPacketsPerSecond = 1;
-	uint32 ingressMegabitsPerSecond = 2;
-
-	uint32 egressPacketsPerSecond = 3;
-	uint32 egressMegabitsPerSecond = 4;
-
-	uint32 maxOpenFlows = 5;
-}
-
 message CreateInterfaceRequest {
 	// interfaceType defines whether a Bare Metal Interface or a Virtual Interface is created.
 	// Both instance types cannot be mixed during a session.
 	// Maximum number of instantiated bare metal interfaces is 1.
 	// Maximum number of Virtual Interfaces is not defined.
-	// If you specify device name, a device with this name will be assigned, if it exists
-	// otherwise an error code. If you dont specify any device name, next available VF 
-	// will be assigned. 
 	InterfaceType interfaceType = 1;
-
 	bytes interfaceID = 2;
 	uint32 vni = 3;
 	IPConfig ipv4Config = 4;
 	IPConfig ipv6Config = 5;
+	// Device with this name will be assigned if it exists, otherwise error is returned.
 	string deviceName = 6;
-	ThrottlingConfig throttlingConfig = 7;
 }
 
 message Interface {
@@ -200,7 +186,6 @@ message Interface {
 	uint32 vni = 2;
 	bytes primaryIPv4Address = 3;
 	bytes primaryIPv6Address = 4;
-	ThrottlingConfig throttlingConfig = 5;
 	bytes underlayRoute = 6;
 	string pciDpName = 7;
 }
@@ -352,11 +337,6 @@ message RuleIDMsg {
 	bytes ruleID = 1;
 }
 
-message ThrottlingConfigMsg {
-	InterfaceIDMsg interfaceID = 1;
-	ThrottlingConfig throttlingConfig = 2;
-}
-
 message CreateInterfaceLoadBalancerPrefixRequest {
 	InterfaceIDMsg interfaceID = 1;
 	Prefix prefix = 2;
@@ -505,9 +485,6 @@ service DPDKonmetal {
 	// The VF will be released and can be reused for other VMs.
 	// If the interface was the last interface of a VNet on this hypervisor, the VNet and its routes will be freed from the DPDK app.
 	rpc deleteInterface(InterfaceIDMsg) returns (Status) {}
-
-	// updateThrottlingConfig changes a interface's throttling configuration during runtime.
-	rpc updateThrottlingConfig(ThrottlingConfigMsg) returns (Status) {}
 
 	// listInterfacePrefixes returns a list of prefixes, that will be routed to the interface by the DPDK app.
 	// For example this could be a node's Kubernetes Pod CIDR.
