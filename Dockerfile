@@ -88,7 +88,7 @@ COPY tools/ tools/
 
 RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
 RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
-RUN rm -rf build && meson build -Denable_graphtrace=true && cd ./build && ninja
+RUN rm -rf build && meson build && cd ./build && ninja
 
 FROM debian:11-slim
 
