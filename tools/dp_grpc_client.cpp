@@ -606,7 +606,7 @@ class GRPCClient {
 public:
 	GRPCClient(std::shared_ptr<Channel> channel)
 		: stub_(DPDKonmetal::NewStub(channel)) {}
-	void AddInterface() {
+	void CreateInterface() {
 			CreateInterfaceRequest request;
 			CreateInterfaceResponse response;
 			ClientContext context;
@@ -626,24 +626,23 @@ public:
 			request.set_interfacetype(InterfaceType::VirtualInterface);
 			if (vm_pci_str[0] != '\0')
 				request.set_devicename(vm_pci_str);
-			stub_->createInterface(&context, request, &response);
-			if (!response.response().status().error()) {
+			stub_->CreateInterface(&context, request, &response);
+			if (!response.status().error()) {
 				printf("Allocated VF for you %s\n", response.vf().name().c_str());
-				printf("Received underlay route : %s\n", response.response().underlayroute().c_str());
+				printf("Received underlay route : %s\n", response.underlayroute().c_str());
 			} else {
-				printf("Received an error %d\n", response.response().status().error());
+				printf("Received an error %d\n", response.status().error());
 			}
 	}
 
-	void AddRoute() {
-			VNIRouteMsg request;
-			Status reply;
+	void CreateRoute() {
+			CreateRouteRequest request;
+			CreateRouteResponse reply;
 			ClientContext context;
-			VNIMsg *vni_msg = new VNIMsg();
 			Route *route = new Route();
 			Prefix *prefix = new Prefix();
 
-			vni_msg->set_vni(vni);
+			request.set_vni(vni);
 			prefix->set_ipversion(version);
 			if(version == IPVersion::IPv4) {
 				prefix->set_address(ip_str);
@@ -657,23 +656,21 @@ public:
 			route->set_weight(100);
 			route->set_nexthopaddress(t_ip6_str);
 			request.set_allocated_route(route);
-			request.set_allocated_vni(vni_msg);
-			stub_->addRoute(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->CreateRoute(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Route added\n");
 	}
 
 	void DelRoute() {
-			VNIRouteMsg request;
-			Status reply;
+			DeleteRouteRequest request;
+			DeleteRouteResponse reply;
 			ClientContext context;
-			VNIMsg *vni_msg = new VNIMsg();
 			Route *route = new Route();
 			Prefix *prefix = new Prefix();
 
-			vni_msg->set_vni(vni);
+			request.set_vni(vni);
 			prefix->set_ipversion(version);
 			if(version == IPVersion::IPv4) {
 				prefix->set_address(ip_str);
@@ -687,23 +684,22 @@ public:
 			route->set_weight(100);
 			route->set_nexthopaddress(t_ip6_str);
 			request.set_allocated_route(route);
-			request.set_allocated_vni(vni_msg);
-			stub_->deleteRoute(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteRoute(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Route deleted\n");
 	}
 
 	void ListRoutes() {
-		VNIMsg request;
-		RoutesMsg reply;
+		ListRoutesRequest request;
+		ListRoutesResponse reply;
 		ClientContext context;
 		int i;
 
 		request.set_vni(vni);
 
-		stub_->listRoutes(&context, request, &reply);
+		stub_->ListRoutes(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -717,14 +713,14 @@ public:
 	}
 
 	void VniInUse() {
-			IsVniInUseRequest request;
-			IsVniInUseResponse reply;
+			CheckVniInUseRequest request;
+			CheckVniInUseResponse reply;
 			ClientContext context;
 
 			request.set_vni(vni);
 			request.set_type(VniIpv4);
 
-			stub_->isVniInUse(&context, request, &reply);
+			stub_->CheckVniInUse(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else if (reply.inuse())
@@ -735,40 +731,39 @@ public:
 
 	void ResetVni() {
 			ResetVniRequest request;
-			Status reply;
+			ResetVniResponse reply;
 			ClientContext context;
 
 			request.set_vni(vni);
 			request.set_type(VniIpv4AndIpv6);
 
-			stub_->resetVni(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->ResetVni(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Vni: %d resetted\n", vni);
 	}
 
-	void AddLBVIP() {
-			AddLoadBalancerTargetRequest request;
-			Status reply;
+	void CreateLBTarget() {
+			CreateLoadBalancerTargetRequest request;
+			CreateLoadBalancerTargetResponse reply;
 			ClientContext context;
 			LBIP *back_ip = new LBIP();
-
 
 			request.set_loadbalancerid(lb_id_str);
 			back_ip->set_ipversion(IPVersion::IPv6);
 			back_ip->set_address(t_ip6_str);
 			request.set_allocated_targetip(back_ip);
-			stub_->addLoadBalancerTarget(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->CreateLoadBalancerTarget(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("LB VIP added\n");
 	}
 
-	void DelLBVIP() {
+	void DelLBTarget() {
 			DeleteLoadBalancerTargetRequest request;
-			Status reply;
+			DeleteLoadBalancerTargetResponse reply;
 			ClientContext context;
 			LBIP *back_ip = new LBIP();
 
@@ -776,22 +771,22 @@ public:
 			back_ip->set_ipversion(IPVersion::IPv6);
 			back_ip->set_address(t_ip6_str);
 			request.set_allocated_targetip(back_ip);
-			stub_->deleteLoadBalancerTarget(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteLoadBalancerTarget(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("LB VIP deleted\n");
 	}
 
-	void ListBackIPs() {
-		GetLoadBalancerTargetsRequest request;
-		GetLoadBalancerTargetsResponse reply;
+	void ListLBTargets() {
+		ListLoadBalancerTargetsRequest request;
+		ListLoadBalancerTargetsResponse reply;
 		ClientContext context;
 		int i;
 
 		request.set_loadbalancerid(lb_id_str);
 
-		stub_->getLoadBalancerTargets(&context, request, &reply);
+		stub_->ListLoadBalancerTargets(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -799,9 +794,9 @@ public:
 				printf("Backend ip %s\n", reply.targetips(i).address().c_str());
 	}
 
-	void AddFirewallRule() {
-			AddFirewallRuleRequest request;
-			AddFirewallRuleResponse reply;
+	void CreateFirewallRule() {
+			CreateFirewallRuleRequest request;
+			CreateFirewallRuleResponse reply;
 			ClientContext context;
 			Prefix *src_ip = new Prefix();
 			Prefix *dst_ip = new Prefix();
@@ -864,21 +859,21 @@ public:
 			}
 
 			request.set_allocated_rule(rule);
-			stub_->addFirewallRule(&context, request, &reply);
+			stub_->CreateFirewallRule(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 	}
 
 	void DelFirewallRule() {
 			DeleteFirewallRuleRequest request;
-			Status reply;
+			DeleteFirewallRuleResponse reply;
 			ClientContext context;
 
 			request.set_interfaceid(machine_str);
 			request.set_ruleid(fwall_id_str);
-			stub_->deleteFirewallRule(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteFirewallRule(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Firewall Rule Deleted\n");
 	}
@@ -891,7 +886,7 @@ public:
 
 		request.set_interfaceid(machine_str);
 
-		stub_->listFirewallRules(&context, request, &reply);
+		stub_->ListFirewallRules(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -951,7 +946,7 @@ public:
 
 			request.set_interfaceid(machine_str);
 			request.set_ruleid(fwall_id_str);
-			stub_->getFirewallRule(&context, request, &reply);
+			stub_->GetFirewallRule(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else {
@@ -1002,9 +997,9 @@ public:
 			}
 	}
 
-	void AddVIP() {
-			InterfaceVIPMsg request;
-			IpAdditionResponse reply;
+	void CreateVIP() {
+			CreateInterfaceVIPRequest request;
+			CreateInterfaceVIPResponse reply;
 			ClientContext context;
 			InterfaceVIPIP *vip_ip = new InterfaceVIPIP();
 
@@ -1013,49 +1008,45 @@ public:
 			if(version == IPVersion::IPv4)
 				vip_ip->set_address(ip_str);
 			request.set_allocated_interfacevipip(vip_ip);
-			stub_->addInterfaceVIP(&context, request, &reply);
+			stub_->CreateInterfaceVIP(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
-	void AddPfx() {
-			InterfacePrefixMsg request;
-			IpAdditionResponse reply;
+	void CreatePfx() {
+			CreateInterfacePrefixRequest request;
+			CreateInterfacePrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
-			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
-			m_id->set_interfaceid(machine_str);
-			request.set_allocated_interfaceid(m_id);
+			request.set_interfaceid(machine_str);
 			pfx_ip->set_ipversion(version);
 			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->addInterfacePrefix(&context, request, &reply);
+			stub_->CreateInterfacePrefix(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
 	}
 
-	void AddLBPfx() {
+	void CreateLBPfx() {
 			CreateInterfaceLoadBalancerPrefixRequest request;
 			CreateInterfaceLoadBalancerPrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
-			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
-			m_id->set_interfaceid(machine_str);
-			request.set_allocated_interfaceid(m_id);
+			request.set_interfaceid(machine_str);
 			pfx_ip->set_ipversion(version);
 			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->createInterfaceLoadBalancerPrefix(&context, request, &reply);
+			stub_->CreateInterfaceLoadBalancerPrefix(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else
@@ -1105,7 +1096,7 @@ public:
 					lb_port->set_protocol(Protocol::UDP);
 			}
 
-			stub_->createLoadBalancer(&context, request, &reply);
+			stub_->CreateLoadBalancer(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else
@@ -1120,7 +1111,7 @@ public:
 
 			request.set_loadbalancerid(lb_id_str);
 
-			stub_->getLoadBalancer(&context, request, &reply);
+			stub_->GetLoadBalancer(&context, request, &reply);
 			if (reply.status().error()) {
 				printf("Received an error %d\n", reply.status().error());
 			} else {
@@ -1138,28 +1129,28 @@ public:
 
 	void DelLB() {
 			DeleteLoadBalancerRequest request;
+			DeleteLoadBalancerResponse reply;
 			ClientContext context;
-			Status reply;
 
 			request.set_loadbalancerid(lb_id_str);
 
-			stub_->deleteLoadBalancer(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteLoadBalancer(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("LB deleted\n");
 	}
 
 	void Initialized() {
-			Empty request;
-			UUIDMsg reply;
+			CheckInitializedRequest request;
+			CheckInitializedResponse reply;
 			ClientContext context;
 			system_clock::time_point deadline = system_clock::now() + seconds(5);
 
 			context.set_deadline(deadline);
 			reply.set_uuid("");
 
-			grpc::Status ret = stub_->initialized(&context, request, &reply);
+			grpc::Status ret = stub_->CheckInitialized(&context, request, &reply);
 			/* Aborted answers mean that dp-service is not initialized with init() call yet */
 			/* So do not exit with error in that case */
 			if ((reply.uuid().c_str()[0] == '\0') && (ret.error_code() != grpc::StatusCode::ABORTED))
@@ -1168,46 +1159,44 @@ public:
 	}
 
 	void Init() {
-			InitConfig request;
-			Status reply;
+			InitializeRequest request;
+			InitializeResponse reply;
 			ClientContext context;
 			system_clock::time_point deadline = system_clock::now() + seconds(5);
 
 			context.set_deadline(deadline);
 
-			stub_->init(&context, request, &reply);
+			stub_->Initialize(&context, request, &reply);
 	}
 
 	void DelPfx() {
-			InterfacePrefixMsg request;
-			Status reply;
+			DeleteInterfacePrefixRequest request;
+			DeleteInterfacePrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
-			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
-			m_id->set_interfaceid(machine_str);
-			request.set_allocated_interfaceid(m_id);
+			request.set_interfaceid(machine_str);
 			pfx_ip->set_ipversion(version);
 			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->deleteInterfacePrefix(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteInterfacePrefix(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Prefix deleted\n");
 	}
 
 	void ListPfx() {
-		InterfaceIDMsg request;
-		PrefixesMsg reply;
+		ListInterfacePrefixesRequest request;
+		ListInterfacePrefixesResponse reply;
 		ClientContext context;
 		int i;
 
 		request.set_interfaceid(machine_str);
 
-		stub_->listInterfacePrefixes(&context, request, &reply);
+		stub_->ListInterfacePrefixes(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -1221,21 +1210,19 @@ public:
 
 	void DelLBPfx() {
 			DeleteInterfaceLoadBalancerPrefixRequest request;
-			Status reply;
+			DeleteInterfaceLoadBalancerPrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
-			InterfaceIDMsg *m_id = new InterfaceIDMsg();
 
-			m_id->set_interfaceid(machine_str);
-			request.set_allocated_interfaceid(m_id);
+			request.set_interfaceid(machine_str);
 			pfx_ip->set_ipversion(version);
 			if(version == IPVersion::IPv4)
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_prefixlength(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->deleteInterfaceLoadBalancerPrefix(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteInterfaceLoadBalancerPrefix(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("LB prefix deleted\n");
 	}
@@ -1248,7 +1235,7 @@ public:
 
 		request.set_interfaceid(machine_str);
 
-		stub_->listInterfaceLoadBalancerPrefixes(&context, request, &reply);
+		stub_->ListInterfaceLoadBalancerPrefixes(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -1261,52 +1248,52 @@ public:
 	}
 
 	void DelVIP() {
-			InterfaceIDMsg request;
-			Status reply;
+			DeleteInterfaceVIPRequest request;
+			DeleteInterfaceVIPResponse reply;
 			ClientContext context;
 
 			request.set_interfaceid(machine_str);
-			stub_->deleteInterfaceVIP(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteInterfaceVIP(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("VIP deleted\n");
 	}
 
 	void GetVIP() {
-			InterfaceIDMsg request;
-			InterfaceVIPIP reply;
+			GetInterfaceVIPRequest request;
+			GetInterfaceVIPResponse reply;
 			ClientContext context;
 
 			request.set_interfaceid(machine_str);
-			stub_->getInterfaceVIP(&context, request, &reply);
+			stub_->GetInterfaceVIP(&context, request, &reply);
 			if (reply.status().error())
 				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Received VIP %s underlayroute %s\n",
-					   reply.address().c_str(), reply.underlayroute().c_str());
+					   reply.interfacevipip().address().c_str(), reply.interfacevipip().underlayroute().c_str());
 	}
 
 	void DelInterface() {
-			InterfaceIDMsg request;
-			Status reply;
+			DeleteInterfaceRequest request;
+			DeleteInterfaceResponse reply;
 			ClientContext context;
 
 			request.set_interfaceid(machine_str);
-			stub_->deleteInterface(&context, request, &reply);
-			if (reply.error())
-				printf("Received an error %d\n", reply.error());
+			stub_->DeleteInterface(&context, request, &reply);
+			if (reply.status().error())
+				printf("Received an error %d\n", reply.status().error());
 			else
 				printf("Interface deleted\n");
 	}
 
 	void GetInterface() {
-			InterfaceIDMsg request;
+			GetInterfaceRequest request;
 			GetInterfaceResponse reply;
 			ClientContext context;
 
 			request.set_interfaceid(machine_str);
-			stub_->getInterface(&context, request, &reply);
+			stub_->GetInterface(&context, request, &reply);
 			if (reply.status().error()) {
 				printf("Received an error %d\n", reply.status().error());
 			} else {
@@ -1319,13 +1306,13 @@ public:
 			}
 	}
 
-	void GetInterfaces() {
-		Empty request;
-		InterfacesMsg reply;
+	void ListInterfaces() {
+		ListInterfacesRequest request;
+		ListInterfacesResponse reply;
 		ClientContext context;
 		int i;
 
-		stub_->listInterfaces(&context, request, &reply);
+		stub_->ListInterfaces(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -1339,9 +1326,9 @@ public:
 			}
 	}
 
-	void AddNAT() {
-		AddNATRequest request;
-		AddNATResponse reply;
+	void CreateNAT() {
+		CreateNATRequest request;
+		CreateNATResponse reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
@@ -1352,7 +1339,7 @@ public:
 		request.set_allocated_natvipip(nat_vip);
 		request.set_minport(min_port);
 		request.set_maxport(max_port);
-		stub_->addNAT(&context, request, &reply);
+		stub_->CreateNAT(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -1361,13 +1348,13 @@ public:
 
 	void DelNAT() {
 		DeleteNATRequest request;
-		Status reply;
+		DeleteNATResponse reply;
 		ClientContext context;
 
 		request.set_interfaceid(machine_str);
-		stub_->deleteNAT(&context, request, &reply);
-		if (reply.error())
-			printf("Received an error %d\n", reply.error());
+		stub_->DeleteNAT(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
 		else
 			printf("NAT deleted\n");
 	}
@@ -1378,7 +1365,7 @@ public:
 		ClientContext context;
 
 		request.set_interfaceid(machine_str);
-		stub_->getNAT(&context, request, &reply);
+		stub_->GetNAT(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -1387,9 +1374,9 @@ public:
 					reply.underlayroute().c_str());
 	}
 
-	void AddNeighNAT() {
-		AddNeighborNATRequest request;
-		Status reply;
+	void CreateNeighNAT() {
+		CreateNeighborNATRequest request;
+		CreateNeighborNATResponse reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
@@ -1406,9 +1393,9 @@ public:
 		request.set_maxport(max_port);
 		request.set_underlayroute(t_ip6_str);
 
-		stub_->addNeighborNAT(&context, request, &reply);
-		if (reply.error())
-			printf("Received an error %d\n", reply.error());
+		stub_->CreateNeighborNAT(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
 		else
 			printf("Neighbor NAT added\n");
 	}
@@ -1436,7 +1423,7 @@ public:
 		else
 			printf("Wrong query nat info type parameter, either local or neigh\n");
 
-		stub_->getNATInfo(&context, request, &reply);
+		stub_->GetNATInfo(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else {
@@ -1465,7 +1452,7 @@ public:
 
 	void DelNeighNAT() {
 		DeleteNeighborNATRequest request;
-		Status reply;
+		DeleteNeighborNATResponse reply;
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
@@ -1481,9 +1468,9 @@ public:
 		request.set_minport(min_port);
 		request.set_maxport(max_port);
 
-		stub_->deleteNeighborNAT(&context, request, &reply);
-		if (reply.error())
-			printf("Received an error %d\n", reply.error());
+		stub_->DeleteNeighborNAT(&context, request, &reply);
+		if (reply.status().error())
+			printf("Received an error %d\n", reply.status().error());
 		else
 			printf("Neighbor NAT deleted\n");
 	}
@@ -1497,7 +1484,7 @@ public:
 		request.set_clientname("dp_grpc_client");
 		request.set_clientver(DP_SERVICE_VERSION);
 
-		stub_->getVersion(&context, request, &reply);
+		stub_->GetVersion(&context, request, &reply);
 		if (reply.status().error())
 			printf("Received an error %d\n", reply.status().error());
 		else
@@ -1517,7 +1504,7 @@ int main(int argc, char** argv)
 	switch (command)
 	{
 	case DP_CMD_ADD_MACHINE:
-		dpdk_client.AddInterface();
+		dpdk_client.CreateInterface();
 		std::cout << "Addmachine called " << std::endl;
 		printf("IP %s, IPv6 %s PXE Server IP %s PXE Path %s\n", ip_str, ip6_str, pxe_ip_str, pxe_path_str);
 		break;
@@ -1531,10 +1518,10 @@ int main(int argc, char** argv)
 		break;
 	case DP_CMD_LIST_MACHINES:
 		std::cout << "Getmachine called " << std::endl;
-		dpdk_client.GetInterfaces();
+		dpdk_client.ListInterfaces();
 		break;
 	case DP_CMD_ADD_ROUTE:
-		dpdk_client.AddRoute();
+		dpdk_client.CreateRoute();
 		std::cout << "Addroute called " << std::endl;
 		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", ip_str, length, vni, ip6_str, t_vni);
 		break;
@@ -1555,7 +1542,7 @@ int main(int argc, char** argv)
 		std::cout << "Delroute called " << std::endl;
 		break;
 	case DP_CMD_ADD_VIP:
-		dpdk_client.AddVIP();
+		dpdk_client.CreateVIP();
 		std::cout << "Addvip called " << std::endl;
 		break;
 	case DP_CMD_DEL_VIP:
@@ -1567,19 +1554,19 @@ int main(int argc, char** argv)
 		dpdk_client.GetVIP();
 		break;
 	case DP_CMD_ADD_LB_VIP:
-		dpdk_client.AddLBVIP();
+		dpdk_client.CreateLBTarget();
 		std::cout << "Addlbvip called " << std::endl;
 		break;
 	case DP_CMD_DEL_LB_VIP:
-		dpdk_client.DelLBVIP();
+		dpdk_client.DelLBTarget();
 		std::cout << "Dellbvip called " << std::endl;
 		break;
 	case DP_CMD_LIST_LB_VIP:
 		std::cout << "List back IPs called " << std::endl;
-		dpdk_client.ListBackIPs();
+		dpdk_client.ListLBTargets();
 		break;
 	case DP_CMD_ADD_PFX:
-		dpdk_client.AddPfx();
+		dpdk_client.CreatePfx();
 		std::cout << "Addprefix called " << std::endl;
 		break;
 	case DP_CMD_DEL_PFX:
@@ -1591,7 +1578,7 @@ int main(int argc, char** argv)
 		dpdk_client.ListPfx();
 		break;
 	case DP_CMD_ADD_LBPFX:
-		dpdk_client.AddLBPfx();
+		dpdk_client.CreateLBPfx();
 		std::cout << "AddLBprefix called " << std::endl;
 		break;
 	case DP_CMD_DEL_LBPFX:
@@ -1604,7 +1591,7 @@ int main(int argc, char** argv)
 		break;
 	case DP_CMD_ADD_NAT_VIP:
 		std::cout << "Addnat called " << std::endl;
-		dpdk_client.AddNAT();
+		dpdk_client.CreateNAT();
 		break;
 	case DP_CMD_GET_NAT_INFO:
 		std::cout << "getNATEntry called " << std::endl;
@@ -1620,7 +1607,7 @@ int main(int argc, char** argv)
 		break;
 	case DP_CMD_ADD_NEIGH_NAT:
 		std::cout << "AddNeighNat called " << std::endl;
-		dpdk_client.AddNeighNAT();
+		dpdk_client.CreateNeighNAT();
 		break;
 	case DP_CMD_DEL_NEIGH_NAT:
 		std::cout << "DelNeighNat called " << std::endl;
@@ -1649,7 +1636,7 @@ int main(int argc, char** argv)
 		break;
 	case DP_CMD_ADD_FWALL_RULE:
 		std::cout << "Add FirewallRule called " << std::endl;
-		dpdk_client.AddFirewallRule();
+		dpdk_client.CreateFirewallRule();
 		break;
 	case DP_CMD_GET_FWALL_RULE:
 		std::cout << "Get FirewallRule called " << std::endl;
