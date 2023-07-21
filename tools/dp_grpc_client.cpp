@@ -92,7 +92,7 @@ static char dst_port_min_str[30]={0};
 static char dst_port_max_str[30]={0};
 static char icmp_code_str[30]={0};
 static char icmp_type_str[30]={0};
-static IPVersion version;
+static IpVersion version;
 static char get_nat_info_type_str[10]={0};
 
 static int command;
@@ -387,11 +387,11 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV4_NUM:
 			strncpy(ip_str, optarg, 29);
-			version = IPVersion::IPV4;
+			version = IpVersion::IPV4;
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV6_NUM:
 			strncpy(ip6_str, optarg, 39);
-			version = IPVersion::IPV6;
+			version = IpVersion::IPV6;
 			break;
 		case CMD_LINE_OPT_T_PRIMARY_IPV6_NUM:
 			strncpy(t_ip6_str, optarg, 39);
@@ -531,7 +531,7 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_FWALL_RULE_NUM:
 			strncpy(machine_str, optarg, 63);
-			version = IPVersion::IPV4;
+			version = IpVersion::IPV4;
 			command = DP_CMD_ADD_FWALL_RULE;
 			break;
 		case CMD_LINE_OPT_FWALL_SRC_IP_NUM:
@@ -610,9 +610,9 @@ public:
 			CreateInterfaceRequest request;
 			CreateInterfaceResponse response;
 			ClientContext context;
-			IPConfig *ip_config = new IPConfig();
-			PXEConfig *pxe_config = new PXEConfig();
-			IPConfig *ipv6_config = new IPConfig();
+			IpConfig *ip_config = new IpConfig();
+			PxeConfig *pxe_config = new PxeConfig();
+			IpConfig *ipv6_config = new IpConfig();
 
 			ip_config->set_primary_address(ip_str);
 			pxe_config->set_boot_filename(pxe_path_str);
@@ -641,19 +641,19 @@ public:
 			ClientContext context;
 			Route *route = new Route();
 			Prefix *prefix = new Prefix();
-			IPAddress *ip = new IPAddress();
-			IPAddress *nh = new IPAddress();
+			IpAddress *ip = new IpAddress();
+			IpAddress *nh = new IpAddress();
 
 			request.set_vni(vni);
 			ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				ip->set_address(ip_str);
 			else
 				ip->set_address(ip6_str);
 			prefix->set_allocated_ip(ip);
 			prefix->set_length(length);
 			route->set_allocated_prefix(prefix);
-			nh->set_ipver(IPVersion::IPV6);
+			nh->set_ipver(IpVersion::IPV6);
 			nh->set_address(t_ip6_str);
 			route->set_allocated_nexthop_address(nh);
 			route->set_nexthop_vni(t_vni);
@@ -672,19 +672,19 @@ public:
 			ClientContext context;
 			Route *route = new Route();
 			Prefix *prefix = new Prefix();
-			IPAddress *ip = new IPAddress();
-			IPAddress *nh = new IPAddress();
+			IpAddress *ip = new IpAddress();
+			IpAddress *nh = new IpAddress();
 
 			request.set_vni(vni);
 			ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				ip->set_address(ip_str);
 			else
 				ip->set_address(ip6_str);
 			prefix->set_allocated_ip(ip);
 			prefix->set_length(length);
 			route->set_allocated_prefix(prefix);
-			nh->set_ipver(IPVersion::IPV6);
+			nh->set_ipver(IpVersion::IPV6);
 			nh->set_address(t_ip6_str);
 			route->set_allocated_nexthop_address(nh);
 			route->set_nexthop_vni(t_vni);
@@ -754,10 +754,10 @@ public:
 			CreateLoadBalancerTargetRequest request;
 			CreateLoadBalancerTargetResponse reply;
 			ClientContext context;
-			IPAddress *target_ip = new IPAddress();
+			IpAddress *target_ip = new IpAddress();
 
 			request.set_loadbalancer_id(lb_id_str);
-			target_ip->set_ipver(IPVersion::IPV6);
+			target_ip->set_ipver(IpVersion::IPV6);
 			target_ip->set_address(t_ip6_str);
 			request.set_allocated_target_ip(target_ip);
 			stub_->CreateLoadBalancerTarget(&context, request, &reply);
@@ -771,10 +771,10 @@ public:
 			DeleteLoadBalancerTargetRequest request;
 			DeleteLoadBalancerTargetResponse reply;
 			ClientContext context;
-			IPAddress *target_ip = new IPAddress();
+			IpAddress *target_ip = new IpAddress();
 
 			request.set_loadbalancer_id(lb_id_str);
-			target_ip->set_ipver(IPVersion::IPV6);
+			target_ip->set_ipver(IpVersion::IPV6);
 			target_ip->set_address(t_ip6_str);
 			request.set_allocated_target_ip(target_ip);
 			stub_->DeleteLoadBalancerTarget(&context, request, &reply);
@@ -806,13 +806,13 @@ public:
 			ClientContext context;
 			Prefix *src_pfx = new Prefix();
 			Prefix *dst_pfx = new Prefix();
-			IPAddress *src_ip = new IPAddress();
-			IPAddress *dst_ip = new IPAddress();
+			IpAddress *src_ip = new IpAddress();
+			IpAddress *dst_ip = new IpAddress();
 			ProtocolFilter *filter = new ProtocolFilter();
 			FirewallRule *rule = new FirewallRule();
-			ICMPFilter *icmp_filter;
-			TCPFilter *tcp_filter;
-			UDPFilter *udp_filter;
+			IcmpFilter *icmp_filter;
+			TcpFilter *tcp_filter;
+			UdpFilter *udp_filter;
 
 			request.set_interface_id(machine_str);
 			rule->set_id(fwall_id_str);
@@ -828,21 +828,21 @@ public:
 				rule->set_action(FirewallAction::DROP);
 
 			src_ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				src_ip->set_address(src_ip_str);
 			src_pfx->set_allocated_ip(src_ip);
 			src_pfx->set_length(src_length);
 			rule->set_allocated_source_prefix(src_pfx);
 
 			dst_ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				dst_ip->set_address(dst_ip_str);
 			dst_pfx->set_allocated_ip(dst_ip);
 			dst_pfx->set_length(dst_length);
 			rule->set_allocated_destination_prefix(dst_pfx);
 
 			if (strncasecmp("tcp", proto_str, 29) == 0) {
-				tcp_filter = new TCPFilter();
+				tcp_filter = new TcpFilter();
 				tcp_filter->set_dst_port_lower(dst_port_min);
 				tcp_filter->set_dst_port_upper(dst_port_max);
 				tcp_filter->set_src_port_lower(src_port_min);
@@ -851,7 +851,7 @@ public:
 				rule->set_allocated_protocol_filter(filter);
 			}
 			if (strncasecmp("udp", proto_str, 29) == 0) {
-				udp_filter = new UDPFilter();
+				udp_filter = new UdpFilter();
 				udp_filter->set_dst_port_lower(dst_port_min);
 				udp_filter->set_dst_port_upper(dst_port_max);
 				udp_filter->set_src_port_lower(src_port_min);
@@ -860,7 +860,7 @@ public:
 				rule->set_allocated_protocol_filter(filter);
 			}
 			if (strncasecmp("icmp", proto_str, 29) == 0) {
-				icmp_filter = new ICMPFilter();
+				icmp_filter = new IcmpFilter();
 				icmp_filter->set_icmp_code(icmp_code);
 				icmp_filter->set_icmp_type(icmp_type);
 				filter->set_allocated_icmp(icmp_filter);
@@ -901,12 +901,12 @@ public:
 		else
 			for (i = 0; i < reply.rules_size(); i++) {
 				printf("%s / ", reply.rules(i).id().c_str());
-				if (reply.rules(i).source_prefix().ip().ipver() == IPVersion::IPV4) {
+				if (reply.rules(i).source_prefix().ip().ipver() == IpVersion::IPV4) {
 					printf("src_ip: %s / ", reply.rules(i).source_prefix().ip().address().c_str());
 					printf("src_ip pfx length: %d / ", reply.rules(i).source_prefix().length());
 				}
 
-				if (reply.rules(i).destination_prefix().ip().ipver() == IPVersion::IPV4) {
+				if (reply.rules(i).destination_prefix().ip().ipver() == IpVersion::IPV4) {
 					printf("dst_ip: %s / ", reply.rules(i).destination_prefix().ip().address().c_str());
 					printf("dst_ip pfx length: %d \n", reply.rules(i).destination_prefix().length());
 				}
@@ -960,12 +960,12 @@ public:
 				printf("Received an error %d\n", reply.status().code());
 			else {
 				printf("%s / ", reply.rule().id().c_str());
-				if (reply.rule().source_prefix().ip().ipver() == IPVersion::IPV4) {
+				if (reply.rule().source_prefix().ip().ipver() == IpVersion::IPV4) {
 					printf("src_ip: %s / ", reply.rule().source_prefix().ip().address().c_str());
 					printf("src_ip pfx length: %d / ", reply.rule().source_prefix().length());
 				}
 
-				if (reply.rule().destination_prefix().ip().ipver() == IPVersion::IPV4) {
+				if (reply.rule().destination_prefix().ip().ipver() == IpVersion::IPV4) {
 					printf("dst_ip: %s / ", reply.rule().destination_prefix().ip().address().c_str());
 					printf("dst_ip pfx length: %d \n", reply.rule().destination_prefix().length());
 				}
@@ -1006,18 +1006,18 @@ public:
 			}
 	}
 
-	void CreateVIP() {
-			CreateVIPRequest request;
-			CreateVIPResponse reply;
+	void CreateVip() {
+			CreateVipRequest request;
+			CreateVipResponse reply;
 			ClientContext context;
-			IPAddress *vip_ip = new IPAddress();
+			IpAddress *vip_ip = new IpAddress();
 
 			request.set_interface_id(machine_str);
 			vip_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if(version == IpVersion::IPV4)
 				vip_ip->set_address(ip_str);
 			request.set_allocated_vip_ip(vip_ip);
-			stub_->CreateVIP(&context, request, &reply);
+			stub_->CreateVip(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1029,11 +1029,11 @@ public:
 			CreatePrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx = new Prefix();
-			IPAddress *pfx_ip = new IPAddress();
+			IpAddress *pfx_ip = new IpAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
@@ -1050,11 +1050,11 @@ public:
 			CreateLoadBalancerPrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx = new Prefix();
-			IPAddress *pfx_ip = new IPAddress();
+			IpAddress *pfx_ip = new IpAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
@@ -1070,8 +1070,8 @@ public:
 			CreateLoadBalancerRequest request;
 			CreateLoadBalancerResponse reply;
 			ClientContext context;
-			IPAddress *lb_ip = new IPAddress();
-			LBPort *lb_port;
+			IpAddress *lb_ip = new IpAddress();
+			LbPort *lb_port;
 			uint16_t ports[DP_MAX_LB_PORTS];
 			uint16_t countpro = 0, countp = 0, i;
 			uint16_t final_count = 0;
@@ -1080,7 +1080,7 @@ public:
 
 			request.set_loadbalancer_id(lb_id_str);
 			request.set_vni(vni);
-			lb_ip->set_ipver(IPVersion::IPV4);
+			lb_ip->set_ipver(IpVersion::IPV4);
 			lb_ip->set_address(ip_str);
 			request.set_allocated_loadbalanced_ip(lb_ip);
 
@@ -1187,11 +1187,11 @@ public:
 			DeletePrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx = new Prefix();
-			IPAddress *pfx_ip = new IPAddress();
+			IpAddress *pfx_ip = new IpAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
@@ -1228,11 +1228,11 @@ public:
 			DeleteLoadBalancerPrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx = new Prefix();
-			IPAddress *pfx_ip = new IPAddress();
+			IpAddress *pfx_ip = new IpAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if (version == IPVersion::IPV4)
+			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
@@ -1264,26 +1264,26 @@ public:
 			}
 	}
 
-	void DelVIP() {
-			DeleteVIPRequest request;
-			DeleteVIPResponse reply;
+	void DelVip() {
+			DeleteVipRequest request;
+			DeleteVipResponse reply;
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->DeleteVIP(&context, request, &reply);
+			stub_->DeleteVip(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("VIP deleted\n");
 	}
 
-	void GetVIP() {
-			GetVIPRequest request;
-			GetVIPResponse reply;
+	void GetVip() {
+			GetVipRequest request;
+			GetVipResponse reply;
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->GetVIP(&context, request, &reply);
+			stub_->GetVip(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1343,46 +1343,46 @@ public:
 			}
 	}
 
-	void CreateNAT() {
-		CreateNATRequest request;
-		CreateNATResponse reply;
+	void CreateNat() {
+		CreateNatRequest request;
+		CreateNatResponse reply;
 		ClientContext context;
-		IPAddress *nat_ip = new IPAddress();
+		IpAddress *nat_ip = new IpAddress();
 
 		request.set_interface_id(machine_str);
 		nat_ip->set_ipver(version);
-		if(version == IPVersion::IPV4)
+		if(version == IpVersion::IPV4)
 			nat_ip->set_address(ip_str);
 		request.set_allocated_nat_ip(nat_ip);
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
-		stub_->CreateNAT(&context, request, &reply);
+		stub_->CreateNat(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
-	void DelNAT() {
-		DeleteNATRequest request;
-		DeleteNATResponse reply;
+	void DelNat() {
+		DeleteNatRequest request;
+		DeleteNatResponse reply;
 		ClientContext context;
 
 		request.set_interface_id(machine_str);
-		stub_->DeleteNAT(&context, request, &reply);
+		stub_->DeleteNat(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("NAT deleted\n");
 	}
 
-	void GetNAT() {
-		GetNATRequest request;
-		GetNATResponse reply;
+	void GetNat() {
+		GetNatRequest request;
+		GetNatResponse reply;
 		ClientContext context;
 
 		request.set_interface_id(machine_str);
-		stub_->GetNAT(&context, request, &reply);
+		stub_->GetNat(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
@@ -1391,14 +1391,14 @@ public:
 					reply.underlay_route().c_str());
 	}
 
-	void CreateNeighNAT() {
-		CreateNeighborNATRequest request;
-		CreateNeighborNATResponse reply;
+	void CreateNeighNat() {
+		CreateNeighborNatRequest request;
+		CreateNeighborNatResponse reply;
 		ClientContext context;
-		IPAddress *nat_ip = new IPAddress();
+		IpAddress *nat_ip = new IpAddress();
 
 		nat_ip->set_ipver(version);
-		if(version == IPVersion::IPV4) {
+		if(version == IpVersion::IPV4) {
 			nat_ip->set_address(ip_str);
 		} else {
 			nat_ip->set_address(ip6_str);
@@ -1410,28 +1410,28 @@ public:
 		request.set_max_port(max_port);
 		request.set_underlay_route(t_ip6_str);
 
-		stub_->CreateNeighborNAT(&context, request, &reply);
+		stub_->CreateNeighborNat(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("Neighbor NAT added\n");
 	}
 
-	void ListLocalNATs() {
-		ListLocalNATsRequest request;
-		ListLocalNATsResponse reply;
+	void ListLocalNats() {
+		ListLocalNatsRequest request;
+		ListLocalNatsResponse reply;
 		ClientContext context;
-		IPAddress *nat_ip = new IPAddress();
+		IpAddress *nat_ip = new IpAddress();
 		int i;
 
 		nat_ip->set_ipver(version);
-		if (version == IPVersion::IPV4)
+		if (version == IpVersion::IPV4)
 			nat_ip->set_address(ip_str);
 		else
 			nat_ip->set_address(ip6_str);
 		request.set_allocated_nat_ip(nat_ip);
 
-		stub_->ListLocalNATs(&context, request, &reply);
+		stub_->ListLocalNats(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else {
@@ -1446,20 +1446,20 @@ public:
 		}
 	}
 	void ListNeighNATs() {
-		ListNeighborNATsRequest request;
-		ListNeighborNATsResponse reply;
+		ListNeighborNatsRequest request;
+		ListNeighborNatsResponse reply;
 		ClientContext context;
-		IPAddress *nat_ip = new IPAddress();
+		IpAddress *nat_ip = new IpAddress();
 		int i;
 
 		nat_ip->set_ipver(version);
-		if (version == IPVersion::IPV4)
+		if (version == IpVersion::IPV4)
 			nat_ip->set_address(ip_str);
 		else
 			nat_ip->set_address(ip6_str);
 		request.set_allocated_nat_ip(nat_ip);
 
-		stub_->ListNeighborNATs(&context, request, &reply);
+		stub_->ListNeighborNats(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else {
@@ -1473,23 +1473,23 @@ public:
 			}
 		}
 	}
-	void GetNATInfo() {
+	void GetNatEntries() {
 		if (!strcmp(get_nat_info_type_str, "local"))
-			ListLocalNATs();
+			ListLocalNats();
 		else if (!strcmp(get_nat_info_type_str, "neigh"))
 			ListNeighNATs();
 		else
 			printf("Wrong query nat info type parameter, either local or neigh\n");
 	}
 
-	void DelNeighNAT() {
-		DeleteNeighborNATRequest request;
-		DeleteNeighborNATResponse reply;
+	void DelNeighNat() {
+		DeleteNeighborNatRequest request;
+		DeleteNeighborNatResponse reply;
 		ClientContext context;
-		IPAddress *nat_ip = new IPAddress();
+		IpAddress *nat_ip = new IpAddress();
 
 		nat_ip->set_ipver(version);
-		if(version == IPVersion::IPV4) {
+		if(version == IpVersion::IPV4) {
 			nat_ip->set_address(ip_str);
 		} else {
 			nat_ip->set_address(ip6_str);
@@ -1500,7 +1500,7 @@ public:
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
 
-		stub_->DeleteNeighborNAT(&context, request, &reply);
+		stub_->DeleteNeighborNat(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
@@ -1574,16 +1574,16 @@ int main(int argc, char** argv)
 		std::cout << "Delroute called " << std::endl;
 		break;
 	case DP_CMD_ADD_VIP:
-		dpdk_client.CreateVIP();
+		dpdk_client.CreateVip();
 		std::cout << "Addvip called " << std::endl;
 		break;
 	case DP_CMD_DEL_VIP:
-		dpdk_client.DelVIP();
+		dpdk_client.DelVip();
 		std::cout << "Delvip called " << std::endl;
 		break;
 	case DP_CMD_GET_VIP:
 		std::cout << "Getvip called " << std::endl;
-		dpdk_client.GetVIP();
+		dpdk_client.GetVip();
 		break;
 	case DP_CMD_ADD_LB_VIP:
 		dpdk_client.CreateLBTarget();
@@ -1623,27 +1623,27 @@ int main(int argc, char** argv)
 		break;
 	case DP_CMD_ADD_NAT_VIP:
 		std::cout << "Addnat called " << std::endl;
-		dpdk_client.CreateNAT();
+		dpdk_client.CreateNat();
 		break;
 	case DP_CMD_GET_NAT_INFO:
 		std::cout << "getNATEntry called " << std::endl;
-		dpdk_client.GetNATInfo();
+		dpdk_client.GetNatEntries();
 		break;
 	case DP_CMD_DEL_NAT_VIP:
 		std::cout << "Delnat called " << std::endl;
-		dpdk_client.DelNAT();
+		dpdk_client.DelNat();
 		break;
 	case DP_CMD_GET_NAT_VIP:
 		std::cout << "Getnat called " << std::endl;
-		dpdk_client.GetNAT();
+		dpdk_client.GetNat();
 		break;
 	case DP_CMD_ADD_NEIGH_NAT:
 		std::cout << "AddNeighNat called " << std::endl;
-		dpdk_client.CreateNeighNAT();
+		dpdk_client.CreateNeighNat();
 		break;
 	case DP_CMD_DEL_NEIGH_NAT:
 		std::cout << "DelNeighNat called " << std::endl;
-		dpdk_client.DelNeighNAT();
+		dpdk_client.DelNeighNat();
 		break;
 	case DP_CMD_INITIALIZED:
 		std::cout << "Initialized called " << std::endl;

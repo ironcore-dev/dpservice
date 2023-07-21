@@ -168,16 +168,16 @@ public:
 	int Proceed() override;
 };
 
-class CreateVIPCall final : BaseCall {
+class CreateVipCall final : BaseCall {
 	ServerContext ctx_;
-	CreateVIPRequest request_;
-	CreateVIPResponse reply_;
-	ServerAsyncResponseWriter<CreateVIPResponse> responder_;
+	CreateVipRequest request_;
+	CreateVipResponse reply_;
+	ServerAsyncResponseWriter<CreateVipResponse> responder_;
 
 public:
-	CreateVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	CreateVipCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_CREATE_VIP), responder_(&ctx_) {
-		service_->RequestCreateVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestCreateVip(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -274,31 +274,31 @@ public:
 	int Proceed() override;
 };
 
-class DeleteVIPCall final : BaseCall {
+class DeleteVipCall final : BaseCall {
 	ServerContext ctx_;
-	DeleteVIPRequest request_;
-	DeleteVIPResponse reply_;
-	ServerAsyncResponseWriter<DeleteVIPResponse> responder_;
+	DeleteVipRequest request_;
+	DeleteVipResponse reply_;
+	ServerAsyncResponseWriter<DeleteVipResponse> responder_;
 
 public:
-	DeleteVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	DeleteVipCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_DELETE_VIP), responder_(&ctx_) {
-		service_->RequestDeleteVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestDeleteVip(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
 };
 
-class GetVIPCall final : BaseCall {
+class GetVipCall final : BaseCall {
 	ServerContext ctx_;
-	GetVIPRequest request_;
-	GetVIPResponse reply_;
-	ServerAsyncResponseWriter<GetVIPResponse> responder_;
+	GetVipRequest request_;
+	GetVipResponse reply_;
+	ServerAsyncResponseWriter<GetVipResponse> responder_;
 
 public:
-	GetVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	GetVipCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_GET_VIP), responder_(&ctx_) {
-		service_->RequestGetVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestGetVip(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -411,108 +411,108 @@ public:
 	int Proceed() override;
 };
 
-class CreateNATCall final: BaseCall {
+class CreateNatCall final: BaseCall {
 	ServerContext ctx_;
-	CreateNATRequest request_;
-	CreateNATResponse reply_;
-	ServerAsyncResponseWriter<CreateNATResponse> responder_;
+	CreateNatRequest request_;
+	CreateNatResponse reply_;
+	ServerAsyncResponseWriter<CreateNatResponse> responder_;
 
 public:
-	CreateNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	CreateNatCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_CREATE_NAT), responder_(&ctx_) {
-		service_->RequestCreateNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestCreateNat(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;
 };
 
-class ListLocalNATsCall final: BaseCall {
+class ListLocalNatsCall final: BaseCall {
 	ServerContext ctx_;
-	ListLocalNATsRequest request_;
-	ListLocalNATsResponse reply_;
-	ServerAsyncResponseWriter<ListLocalNATsResponse> responder_;
+	ListLocalNatsRequest request_;
+	ListLocalNatsResponse reply_;
+	ServerAsyncResponseWriter<ListLocalNatsResponse> responder_;
 private:
 	static void ListCallback(struct dpgrpc_reply *reply, void *context);
 public:
-	ListLocalNATsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	ListLocalNatsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_LIST_LOCALNATS), responder_(&ctx_) {
-		service_->RequestListLocalNATs(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestListLocalNats(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;
 };
 
-class ListNeighborNATsCall final: BaseCall {
+class ListNeighborNatsCall final: BaseCall {
 	ServerContext ctx_;
-	ListNeighborNATsRequest request_;
-	ListNeighborNATsResponse reply_;
-	ServerAsyncResponseWriter<ListNeighborNATsResponse> responder_;
+	ListNeighborNatsRequest request_;
+	ListNeighborNatsResponse reply_;
+	ServerAsyncResponseWriter<ListNeighborNatsResponse> responder_;
 private:
 	static void ListCallback(struct dpgrpc_reply *reply, void *context);
 public:
-	ListNeighborNATsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	ListNeighborNatsCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_LIST_NEIGHNATS), responder_(&ctx_) {
-		service_->RequestListNeighborNATs(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestListNeighborNats(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;
 };
 
-class GetNATCall final: BaseCall {
+class GetNatCall final: BaseCall {
 	ServerContext ctx_;
-	GetNATRequest request_;
-	GetNATResponse reply_;
-	ServerAsyncResponseWriter<GetNATResponse> responder_;
+	GetNatRequest request_;
+	GetNatResponse reply_;
+	ServerAsyncResponseWriter<GetNatResponse> responder_;
 
 public:
-	GetNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	GetNatCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_GET_NAT), responder_(&ctx_) {
-		service_->RequestGetNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestGetNat(&ctx_, &request_, &responder_, cq_, cq_,
 								this);
 	}
 	int	Proceed() override;
 };
 
-class DeleteNATCall final: BaseCall {
+class DeleteNatCall final: BaseCall {
 	ServerContext ctx_;
-	DeleteNATRequest request_;
-	DeleteNATResponse reply_;
-	ServerAsyncResponseWriter<DeleteNATResponse> responder_;
+	DeleteNatRequest request_;
+	DeleteNatResponse reply_;
+	ServerAsyncResponseWriter<DeleteNatResponse> responder_;
 
 public:
-	DeleteNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	DeleteNatCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_DELETE_NAT), responder_(&ctx_) {
-		service_->RequestDeleteNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestDeleteNat(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;
 };
 
-class CreateNeighborNATCall final: BaseCall {
+class CreateNeighborNatCall final: BaseCall {
 	ServerContext ctx_;
-	CreateNeighborNATRequest request_;
-	CreateNeighborNATResponse reply_;
-	ServerAsyncResponseWriter<CreateNeighborNATResponse> responder_;
+	CreateNeighborNatRequest request_;
+	CreateNeighborNatResponse reply_;
+	ServerAsyncResponseWriter<CreateNeighborNatResponse> responder_;
 
 public:
-	CreateNeighborNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	CreateNeighborNatCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_CREATE_NEIGHNAT), responder_(&ctx_) {
-		service_->RequestCreateNeighborNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestCreateNeighborNat(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;
 };
 
-class DeleteNeighborNATCall final: BaseCall {
+class DeleteNeighborNatCall final: BaseCall {
 	ServerContext ctx_;
-	DeleteNeighborNATRequest request_;
-	DeleteNeighborNATResponse reply_;
-	ServerAsyncResponseWriter<DeleteNeighborNATResponse> responder_;
+	DeleteNeighborNatRequest request_;
+	DeleteNeighborNatResponse reply_;
+	ServerAsyncResponseWriter<DeleteNeighborNatResponse> responder_;
 
 public:
-	DeleteNeighborNATCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
+	DeleteNeighborNatCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_DELETE_NEIGHNAT), responder_(&ctx_) {
-		service_->RequestDeleteNeighborNAT(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestDeleteNeighborNat(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int	Proceed() override;

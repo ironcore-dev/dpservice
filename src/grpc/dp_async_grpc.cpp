@@ -25,7 +25,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 
 	snprintf(dp_rule->rule_id, sizeof(dp_rule->rule_id),
 				"%s", grpc_rule->id().c_str());
-	if (grpc_rule->source_prefix().ip().ipver() == IPVersion::IPV4) {
+	if (grpc_rule->source_prefix().ip().ipver() == IpVersion::IPV4) {
 		ret_val = inet_aton(grpc_rule->source_prefix().ip().address().c_str(),
 					(in_addr*)&dp_rule->src_ip);
 		if (ret_val == 0)
@@ -38,7 +38,7 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 			dp_rule->src_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
 	}
 
-	if (grpc_rule->destination_prefix().ip().ipver() == IPVersion::IPV4) {
+	if (grpc_rule->destination_prefix().ip().ipver() == IpVersion::IPV4) {
 		ret_val = inet_aton(grpc_rule->destination_prefix().ip().address().c_str(),
 					(in_addr*)&dp_rule->dest_ip);
 		if (ret_val == 0)
@@ -115,15 +115,15 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 
 void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, FirewallRule *grpc_rule)
 {
-	ICMPFilter *icmp_filter;
+	IcmpFilter *icmp_filter;
 	ProtocolFilter *filter;
-	TCPFilter *tcp_filter;
-	UDPFilter *udp_filter;
+	TcpFilter *tcp_filter;
+	UdpFilter *udp_filter;
 	struct in_addr addr;
 	Prefix *src_pfx;
 	Prefix *dst_pfx;
-	IPAddress *src_ip;
-	IPAddress *dst_ip;
+	IpAddress *src_ip;
+	IpAddress *dst_ip;
 
 	grpc_rule->set_id(dp_rule->rule_id);
 	grpc_rule->set_priority(dp_rule->priority);
@@ -137,8 +137,8 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 	else
 		grpc_rule->set_action(FirewallAction::DROP);
 
-	src_ip = new IPAddress();
-	src_ip->set_ipver(IPVersion::IPV4);
+	src_ip = new IpAddress();
+	src_ip->set_ipver(IpVersion::IPV4);
 	addr.s_addr = dp_rule->src_ip;
 	src_ip->set_address(inet_ntoa(addr));
 	src_pfx = new Prefix();
@@ -146,8 +146,8 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 	src_pfx->set_length(__builtin_popcount(dp_rule->src_ip_mask));
 	grpc_rule->set_allocated_source_prefix(src_pfx);
 
-	dst_ip = new IPAddress();
-	dst_ip->set_ipver(IPVersion::IPV4);
+	dst_ip = new IpAddress();
+	dst_ip->set_ipver(IpVersion::IPV4);
 	addr.s_addr = dp_rule->dest_ip;
 	dst_ip->set_address(inet_ntoa(addr));
 	dst_pfx = new Prefix();
@@ -157,7 +157,7 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 
 	filter = new ProtocolFilter();
 	if (dp_rule->protocol == IPPROTO_TCP) {
-		tcp_filter = new TCPFilter();
+		tcp_filter = new TcpFilter();
 		tcp_filter->set_dst_port_lower(dp_rule->filter.tcp_udp.dst_port.lower);
 		tcp_filter->set_dst_port_upper(dp_rule->filter.tcp_udp.dst_port.upper);
 		tcp_filter->set_src_port_lower(dp_rule->filter.tcp_udp.src_port.lower);
@@ -166,7 +166,7 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 		grpc_rule->set_allocated_protocol_filter(filter);
 	}
 	if (dp_rule->protocol == IPPROTO_UDP) {
-		udp_filter = new UDPFilter();
+		udp_filter = new UdpFilter();
 		udp_filter->set_dst_port_lower(dp_rule->filter.tcp_udp.dst_port.lower);
 		udp_filter->set_dst_port_upper(dp_rule->filter.tcp_udp.dst_port.upper);
 		udp_filter->set_src_port_lower(dp_rule->filter.tcp_udp.src_port.lower);
@@ -175,7 +175,7 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 		grpc_rule->set_allocated_protocol_filter(filter);
 	}
 	if (dp_rule->protocol == IPPROTO_ICMP) {
-		icmp_filter = new ICMPFilter();
+		icmp_filter = new IcmpFilter();
 		icmp_filter->set_icmp_code(dp_rule->filter.icmp.icmp_code);
 		icmp_filter->set_icmp_type(dp_rule->filter.icmp.icmp_type);
 		filter->set_allocated_icmp(icmp_filter);
@@ -349,7 +349,7 @@ int CreateLoadBalancerCall::Proceed()
 		snprintf(request.add_lb.lb_id, sizeof(request.add_lb.lb_id), "%s",
 				 request_.loadbalancer_id().c_str());
 		request.add_lb.vni = request_.vni();
-		if (request_.loadbalanced_ip().ipver() == IPVersion::IPV4) {
+		if (request_.loadbalanced_ip().ipver() == IpVersion::IPV4) {
 			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.loadbalanced_ip().address().c_str(),
 					  (in_addr*)&request.add_lb.addr);
@@ -435,8 +435,8 @@ int GetLoadBalancerCall::Proceed()
 	};
 	struct dpgrpc_reply reply;
 	struct in_addr addr;
-	LBPort *lb_port;
-	IPAddress *lb_ip;
+	LbPort *lb_port;
+	IpAddress *lb_ip;
 	int i;
 
 	if (status_ == REQUEST) {
@@ -458,13 +458,13 @@ int GetLoadBalancerCall::Proceed()
 			return -1;
 		status_ = FINISH;
 		reply_.set_vni(reply.lb.vni);
-		lb_ip = new IPAddress();
+		lb_ip = new IpAddress();
 		addr.s_addr = reply.lb.addr;
 		lb_ip->set_address(inet_ntoa(addr));
 		if (reply.lb.ip_type == RTE_ETHER_TYPE_IPV4)
-			lb_ip->set_ipver(IPVersion::IPV4);
+			lb_ip->set_ipver(IpVersion::IPV4);
 		else
-			lb_ip->set_ipver(IPVersion::IPV6);
+			lb_ip->set_ipver(IpVersion::IPV6);
 		reply_.set_allocated_loadbalanced_ip(lb_ip);
 		for (i = 0; i < DP_LB_MAX_PORTS; i++) {
 			if (reply.lb.lbports[i].port == 0)
@@ -504,7 +504,7 @@ int CreateLoadBalancerTargetCall::Proceed()
 						DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
 		snprintf(request.add_lbtrgt.lb_id, sizeof(request.add_lbtrgt.lb_id), "%s",
 				 request_.loadbalancer_id().c_str());
-		if (request_.target_ip().ipver() == IPVersion::IPV6) {
+		if (request_.target_ip().ipver() == IpVersion::IPV6) {
 			request.add_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV6;
 			ret_val = inet_pton(AF_INET6, request_.target_ip().address().c_str(),
 					  request.add_lbtrgt.addr6);
@@ -550,7 +550,7 @@ int DeleteLoadBalancerTargetCall::Proceed()
 						DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
 		snprintf(request.del_lbtrgt.lb_id, sizeof(request.del_lbtrgt.lb_id), "%s",
 				 request_.loadbalancer_id().c_str());
-		if (request_.target_ip().ipver() == IPVersion::IPV6) {
+		if (request_.target_ip().ipver() == IpVersion::IPV6) {
 			request.del_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV6;
 			ret_val = inet_pton(AF_INET6, request_.target_ip().address().c_str(),
 					  request.del_lbtrgt.addr6);
@@ -583,7 +583,7 @@ void ListLoadBalancerTargetsCall::ListCallback(struct dpgrpc_reply *reply, void 
 {
 	struct dpgrpc_lb_target *lb_target = (struct dpgrpc_lb_target *)reply;
 	ListLoadBalancerTargetsResponse *reply_ = (ListLoadBalancerTargetsResponse *)context;
-	IPAddress *target_ip;
+	IpAddress *target_ip;
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (reply->err_code) {
@@ -596,7 +596,7 @@ void ListLoadBalancerTargetsCall::ListCallback(struct dpgrpc_reply *reply, void 
 		target_ip = reply_->add_target_ips();
 		inet_ntop(AF_INET6, lb_target->addr6, buf_str, INET6_ADDRSTRLEN);
 		target_ip->set_address(buf_str);
-		target_ip->set_ipver(IPVersion::IPV6);
+		target_ip->set_ipver(IpVersion::IPV6);
 	}
 }
 
@@ -652,7 +652,7 @@ int CreatePrefixCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.add_pfx.iface_id, sizeof(request.add_pfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
 			request.add_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.add_pfx.addr);
@@ -700,7 +700,7 @@ int DeletePrefixCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.del_pfx.iface_id, sizeof(request.del_pfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
 			request.del_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.del_pfx.addr);
@@ -733,7 +733,7 @@ void ListPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	struct dpgrpc_route *rp_route;
 	ListPrefixesResponse *reply_ = (ListPrefixesResponse *)context;
 	Prefix *pfx;
-	IPAddress *pfx_ip;
+	IpAddress *pfx_ip;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -745,11 +745,11 @@ void ListPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	for (uint i = 0; i < reply->msg_count; ++i) {
 		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
 		pfx = reply_->add_prefixes();
-		pfx_ip = new IPAddress();
+		pfx_ip = new IpAddress();
 		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->pfx_addr);
 			pfx_ip->set_address(inet_ntoa(addr));
-			pfx_ip->set_ipver(IPVersion::IPV4);
+			pfx_ip->set_ipver(IpVersion::IPV4);
 			pfx->set_length(rp_route->pfx_length);
 			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
 			pfx->set_underlay_route(buf_str);
@@ -811,7 +811,7 @@ int CreateLoadBalancerPrefixCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.add_lbpfx.iface_id, sizeof(request.add_lbpfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
 			request.add_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.add_lbpfx.addr);
@@ -859,7 +859,7 @@ int DeleteLoadBalancerPrefixCall::Proceed()
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.del_lbpfx.iface_id, sizeof(request.del_lbpfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
 			request.del_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.del_lbpfx.addr);
@@ -892,7 +892,7 @@ void ListLoadBalancerPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void
 	struct dpgrpc_route *rp_route;
 	ListLoadBalancerPrefixesResponse *reply_ = (ListLoadBalancerPrefixesResponse *)context;
 	Prefix *pfx;
-	IPAddress *pfx_ip;
+	IpAddress *pfx_ip;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -904,11 +904,11 @@ void ListLoadBalancerPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void
 	for (uint i = 0; i < reply->msg_count; ++i) {
 		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
 		pfx = reply_->add_prefixes();
-		pfx_ip = new IPAddress();
+		pfx_ip = new IpAddress();
 		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->pfx_addr);
 			pfx_ip->set_address(inet_ntoa(addr));
-			pfx_ip->set_ipver(IPVersion::IPV4);
+			pfx_ip->set_ipver(IpVersion::IPV4);
 			pfx->set_length(rp_route->pfx_length);
 			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
 			pfx->set_underlay_route(buf_str);
@@ -951,7 +951,7 @@ int ListLoadBalancerPrefixesCall::Proceed()
 	return 0;
 }
 
-int CreateVIPCall::Proceed()
+int CreateVipCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -961,7 +961,7 @@ int CreateVIPCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateVIPCall(service_, cq_);
+		new CreateVipCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Setting virtual IP",
@@ -969,7 +969,7 @@ int CreateVIPCall::Proceed()
 						DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
 		snprintf(request.add_vip.iface_id, sizeof(request.add_vip.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.vip_ip().ipver() == IPVersion::IPV4) {
+		if (request_.vip_ip().ipver() == IpVersion::IPV4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.vip_ip().address().c_str(),
 					  (in_addr*)&request.add_vip.addr);
@@ -998,7 +998,7 @@ int CreateVIPCall::Proceed()
 	return 0;
 }
 
-int DeleteVIPCall::Proceed()
+int DeleteVipCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1006,7 +1006,7 @@ int DeleteVIPCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteVIPCall(service_, cq_);
+		new DeleteVipCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing virtual IP",
@@ -1032,7 +1032,7 @@ int DeleteVIPCall::Proceed()
 	return 0;
 }
 
-int GetVIPCall::Proceed()
+int GetVipCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
 	struct dpgrpc_request request = {
@@ -1040,10 +1040,10 @@ int GetVIPCall::Proceed()
 	};
 	struct dpgrpc_reply reply;
 	struct in_addr addr;
-	IPAddress *vip_ip;
+	IpAddress *vip_ip;
 
 	if (status_ == REQUEST) {
-		new GetVIPCall(service_, cq_);
+		new GetVipCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting virtual IP",
@@ -1059,8 +1059,8 @@ int GetVIPCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		vip_ip = new IPAddress();
-		vip_ip->set_ipver(IPVersion::IPV4);
+		vip_ip = new IpAddress();
+		vip_ip->set_ipver(IpVersion::IPV4);
 		addr.s_addr = reply.vip.addr;
 		vip_ip->set_address(inet_ntoa(addr));
 		inet_ntop(AF_INET6, reply.vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
@@ -1264,7 +1264,7 @@ int CreateRouteCall::Proceed()
 		if (ret_val <= 0)
 			DPGRPC_LOG_WARNING("Invalid nexthop IP", DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 		request.add_route.pfx_length = request_.route().prefix().length();
-		if (request_.route().prefix().ip().ipver() == IPVersion::IPV4) {
+		if (request_.route().prefix().ip().ipver() == IpVersion::IPV4) {
 			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.route().prefix().ip().address().c_str(),
 					(in_addr*)&request.add_route.pfx_addr);
@@ -1325,7 +1325,7 @@ int DeleteRouteCall::Proceed()
 								   DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 		}
 		request.del_route.pfx_length = request_.route().prefix().length();
-		if (request_.route().prefix().ip().ipver() == IPVersion::IPV4) {
+		if (request_.route().prefix().ip().ipver() == IpVersion::IPV4) {
 			request.del_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.route().prefix().ip().address().c_str(),
 					(in_addr*)&request.del_route.pfx_addr);
@@ -1364,10 +1364,10 @@ void ListRoutesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	struct dpgrpc_route *rp_route;
 	ListRoutesResponse *reply_ = (ListRoutesResponse *)context;
 	Route *route;
-	IPAddress *nh_ip;
+	IpAddress *nh_ip;
 	struct in_addr addr;
 	Prefix *pfx;
-	IPAddress *pfx_ip;
+	IpAddress *pfx_ip;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (reply->err_code) {
@@ -1381,27 +1381,27 @@ void ListRoutesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 		route = reply_->add_routes();
 		route->set_nexthop_vni(rp_route->trgt_vni);
 
-		nh_ip = new IPAddress();
+		nh_ip = new IpAddress();
 		if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->trgt_addr);
 			nh_ip->set_address(inet_ntoa(addr));
-			nh_ip->set_ipver(IPVersion::IPV4);
+			nh_ip->set_ipver(IpVersion::IPV4);
 		} else {
 			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf, INET6_ADDRSTRLEN);
 			nh_ip->set_address(buf);
-			nh_ip->set_ipver(IPVersion::IPV6);
+			nh_ip->set_ipver(IpVersion::IPV6);
 		}
 		route->set_allocated_nexthop_address(nh_ip);
 
-		pfx_ip = new IPAddress();
+		pfx_ip = new IpAddress();
 		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->pfx_addr);
 			pfx_ip->set_address(inet_ntoa(addr));
-			pfx_ip->set_ipver(IPVersion::IPV4);
+			pfx_ip->set_ipver(IpVersion::IPV4);
 		} else {
 			inet_ntop(AF_INET6, rp_route->pfx_addr6, buf, INET6_ADDRSTRLEN);
 			pfx_ip->set_address(buf);
-			pfx_ip->set_ipver(IPVersion::IPV6);
+			pfx_ip->set_ipver(IpVersion::IPV6);
 		}
 		pfx = new Prefix();
 		pfx->set_allocated_ip(pfx_ip);
@@ -1443,7 +1443,7 @@ int ListRoutesCall::Proceed()
 	return 0;
 }
 
-int CreateNATCall::Proceed()
+int CreateNatCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1454,7 +1454,7 @@ int CreateNATCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateNATCall(service_, cq_);
+		new CreateNatCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Setting NAT IP",
@@ -1464,7 +1464,7 @@ int CreateNATCall::Proceed()
 						DP_LOG_MAXPORT(request_.max_port()));
 		snprintf(request.add_nat.iface_id, sizeof(request.add_nat.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.nat_ip().ipver() == IPVersion::IPV4) {
+		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
 			request.add_nat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.nat_ip().address().c_str(),
 					  (in_addr*)&request.add_nat.addr);
@@ -1496,18 +1496,18 @@ int CreateNATCall::Proceed()
 	return 0;
 }
 
-int GetNATCall::Proceed()
+int GetNatCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 	struct dpgrpc_reply reply;
 	struct in_addr addr;
-	IPAddress *nat_ip;
+	IpAddress *nat_ip;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new GetNATCall(service_, cq_);
+		new GetNatCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting NAT IP",
@@ -1523,10 +1523,10 @@ int GetNATCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		nat_ip = new IPAddress();
+		nat_ip = new IpAddress();
 		addr.s_addr = reply.nat.addr;
 		nat_ip->set_address(inet_ntoa(addr));
-		nat_ip->set_ipver(IPVersion::IPV4);
+		nat_ip->set_ipver(IpVersion::IPV4);
 		reply_.set_allocated_nat_ip(nat_ip);
 		reply_.set_max_port(reply.nat.max_port);
 		reply_.set_min_port(reply.nat.min_port);
@@ -1542,7 +1542,7 @@ int GetNATCall::Proceed()
 	return 0;
 }
 
-int DeleteNATCall::Proceed()
+int DeleteNatCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1550,7 +1550,7 @@ int DeleteNATCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteNATCall(service_, cq_);
+		new DeleteNatCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing NAT IP",
@@ -1577,7 +1577,7 @@ int DeleteNATCall::Proceed()
 	return 0;
 }
 
-int CreateNeighborNATCall::Proceed()
+int CreateNeighborNatCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1586,7 +1586,7 @@ int CreateNeighborNATCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateNeighborNATCall(service_, cq_);
+		new CreateNeighborNatCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding neighboring NAT",
@@ -1595,7 +1595,7 @@ int CreateNeighborNATCall::Proceed()
 						DP_LOG_MINPORT(request_.min_port()),
 						DP_LOG_MAXPORT(request_.max_port()),
 						DP_LOG_IPV6STR(request_.underlay_route().c_str()));
-		if (request_.nat_ip().ipver() == IPVersion::IPV4) {
+		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
 			request.add_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.nat_ip().address().c_str(),
 					  (in_addr*)&request.add_neighnat.addr);
@@ -1633,7 +1633,7 @@ int CreateNeighborNATCall::Proceed()
 
 }
 
-int DeleteNeighborNATCall::Proceed()
+int DeleteNeighborNatCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1642,7 +1642,7 @@ int DeleteNeighborNATCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DeleteNeighborNATCall(service_, cq_);
+		new DeleteNeighborNatCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing neighboring NAT",
@@ -1650,7 +1650,7 @@ int DeleteNeighborNATCall::Proceed()
 						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
 						DP_LOG_MINPORT(request_.min_port()),
 						DP_LOG_MAXPORT(request_.max_port()));
-		if (request_.nat_ip().ipver() == IPVersion::IPV4) {
+		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
 			request.del_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.nat_ip().address().c_str(),
 					  (in_addr*)&request.del_neighnat.addr);
@@ -1740,12 +1740,12 @@ int ListInterfacesCall::Proceed()
 	return 0;
 }
 
-void ListLocalNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+void ListLocalNatsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_nat *nat;
-	ListLocalNATsResponse *reply_ = (ListLocalNATsResponse *)context;
-	NATEntry *nat_entry;
-	IPAddress *nat_ip;
+	ListLocalNatsResponse *reply_ = (ListLocalNatsResponse *)context;
+	NatEntry *nat_entry;
+	IpAddress *nat_ip;
 	struct in_addr addr;
 
 	if (reply->err_code) {
@@ -1756,8 +1756,8 @@ void ListLocalNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	for (uint i = 0; i < reply->msg_count; ++i) {
 		nat = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_nat);
 		nat_entry = reply_->add_nat_entries();
-		nat_ip = new IPAddress();
-		nat_ip->set_ipver(IPVersion::IPV4);
+		nat_ip = new IpAddress();
+		nat_ip->set_ipver(IpVersion::IPV4);
 		addr.s_addr = htonl(nat->addr);
 		nat_ip->set_address(inet_ntoa(addr));
 		nat_entry->set_allocated_nat_ip(nat_ip);
@@ -1767,7 +1767,7 @@ void ListLocalNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	}
 }
 
-int ListLocalNATsCall::Proceed()
+int ListLocalNatsCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1775,13 +1775,13 @@ int ListLocalNATsCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new ListLocalNATsCall(service_, cq_);
+		new ListLocalNatsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing local NATs",
+		DPGRPC_LOG_INFO("Listing local Nats",
 						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
 
-		if (request_.nat_ip().ipver() == IPVersion::IPV4) {
+		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
 			request.list_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.nat_ip().address().c_str(),
 					  (in_addr*)&request.list_neighnat.addr);
@@ -1809,11 +1809,11 @@ int ListLocalNATsCall::Proceed()
 	return 0;
 }
 
-void ListNeighborNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+void ListNeighborNatsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_nat *nat;
-	ListNeighborNATsResponse *reply_ = (ListNeighborNATsResponse *)context;
-	NATEntry *nat_entry;
+	ListNeighborNatsResponse *reply_ = (ListNeighborNatsResponse *)context;
+	NatEntry *nat_entry;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (reply->err_code) {
@@ -1832,7 +1832,7 @@ void ListNeighborNATsCall::ListCallback(struct dpgrpc_reply *reply, void *contex
 	}
 }
 
-int ListNeighborNATsCall::Proceed()
+int ListNeighborNatsCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1840,13 +1840,13 @@ int ListNeighborNATsCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new ListNeighborNATsCall(service_, cq_);
+		new ListNeighborNatsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting NAT info",
 						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
 
-		if (request_.nat_ip().ipver() == IPVersion::IPV4) {
+		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
 			request.list_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
 			ret_val = inet_aton(request_.nat_ip().address().c_str(),
 					  (in_addr*)&request.list_neighnat.addr);

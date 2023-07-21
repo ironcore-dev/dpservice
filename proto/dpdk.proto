@@ -9,7 +9,7 @@ enum InterfaceType {
 	BAREMETAL = 1;
 }
 
-enum IPVersion {
+enum IpVersion {
 	IPV4 = 0;
 	IPV6 = 1;
 }
@@ -49,13 +49,13 @@ message Status {
 	string message = 2;
 }
 
-message IPAddress {
-	IPVersion ipver = 1;
-	bytes address = 2;    // holds 4 bytes (IPVersion::IPV4) or 16 bytes (IPVersion::IPV6)
+message IpAddress {
+	IpVersion ipver = 1;
+	bytes address = 2;    // holds 4 bytes (IpVersion::IPV4) or 16 bytes (IpVersion::IPV6)
 }
 
 message Prefix {
-	IPAddress ip = 1;
+	IpAddress ip = 1;
 	uint32 length = 2;    // max length is 32 for IPv4 and 128 for IPv6 (based on ip->ipver)
 	bytes underlay_route = 3;
 }
@@ -69,11 +69,11 @@ message Interface {
 	string pci_name = 6;
 }
 
-message IPConfig {
+message IpConfig {
 	bytes primary_address = 2;
 }
 
-message PXEConfig {
+message PxeConfig {
 	string next_server = 1;
 	string boot_filename = 2;
 }
@@ -86,13 +86,13 @@ message VirtualFunction {
 	uint32 function = 5;  // PCIe Function
 }
 
-message LBPort {
+message LbPort {
 	uint32 port = 1;
 	Protocol protocol = 2;
 }
 
-message NATEntry {
-	IPAddress nat_ip = 1;
+message NatEntry {
+	IpAddress nat_ip = 1;
 	uint32 min_port = 2;
 	uint32 max_port = 3;
 	bytes underlay_route = 4;
@@ -102,23 +102,23 @@ message NATEntry {
 message Route {
 	Prefix prefix = 1;
 	uint32 nexthop_vni = 2;
-	IPAddress nexthop_address = 3;
+	IpAddress nexthop_address = 3;
 	uint32 weight = 4;
 }
 
-message ICMPFilter {
+message IcmpFilter {
 	int32 icmp_type = 1; // -1 matches all ICMP Codes
 	int32 icmp_code = 2; // -1 matches all ICMP Types
 }
 
-message TCPFilter {
+message TcpFilter {
 	int32 src_port_lower = 1; // -1 matches all source ports
 	int32 src_port_upper = 2;
 	int32 dst_port_lower = 3; // -1 matches all destination ports
 	int32 dst_port_upper = 4;
 }
 
-message UDPFilter {
+message UdpFilter {
 	int32 src_port_lower = 1; // -1 matches all source ports
 	int32 src_port_upper = 2;
 	int32 dst_port_lower = 3; // -1 matches all destination ports
@@ -127,9 +127,9 @@ message UDPFilter {
 
 message ProtocolFilter {
 	oneof filter {
-		ICMPFilter icmp = 1;
-		TCPFilter tcp = 2;
-		UDPFilter udp = 3;
+		IcmpFilter icmp = 1;
+		TcpFilter tcp = 2;
+		UdpFilter udp = 3;
 	}
 }
 
@@ -204,9 +204,9 @@ message CreateInterfaceRequest {
 	InterfaceType interface_type = 1;
 	bytes interface_id = 2;
 	uint32 vni = 3;
-	IPConfig ipv4_config = 4;
-	IPConfig ipv6_config = 5;
-	PXEConfig pxe_config = 6;
+	IpConfig ipv4_config = 4;
+	IpConfig ipv6_config = 5;
+	PxeConfig pxe_config = 6;
 	// Device with this name will be assigned if it exists, otherwise error is returned.
 	string device_name = 7;
 }
@@ -281,39 +281,39 @@ message DeleteLoadBalancerPrefixResponse {
 	Status status = 1;
 }
 
-message CreateVIPRequest {
+message CreateVipRequest {
 	bytes interface_id = 1;
-	IPAddress vip_ip = 2;
+	IpAddress vip_ip = 2;
 }
 
-message CreateVIPResponse {
+message CreateVipResponse {
 	Status status = 1;
 	bytes underlay_route = 2;
 }
 
-message GetVIPRequest {
+message GetVipRequest {
 	bytes interface_id = 1;
 }
 
-message GetVIPResponse {
+message GetVipResponse {
 	Status status = 1;
-	IPAddress vip_ip = 2;
+	IpAddress vip_ip = 2;
 	bytes underlay_route = 3;
 }
 
-message DeleteVIPRequest {
+message DeleteVipRequest {
 	bytes interface_id = 1;
 }
 
-message DeleteVIPResponse {
+message DeleteVipResponse {
 	Status status = 1;
 }
 
 message CreateLoadBalancerRequest {
 	bytes loadbalancer_id = 1;
-	IPAddress loadbalanced_ip = 2;
+	IpAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
-	repeated LBPort loadbalanced_ports = 4;
+	repeated LbPort loadbalanced_ports = 4;
 }
 
 message CreateLoadBalancerResponse {
@@ -327,9 +327,9 @@ message GetLoadBalancerRequest {
 
 message GetLoadBalancerResponse {
 	Status status = 1;
-	IPAddress loadbalanced_ip = 2;
+	IpAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
-	repeated LBPort loadbalanced_ports = 4;
+	repeated LbPort loadbalanced_ports = 4;
 	bytes underlay_route = 5;
 }
 
@@ -343,7 +343,7 @@ message DeleteLoadBalancerResponse {
 
 message CreateLoadBalancerTargetRequest {
 	bytes loadbalancer_id = 1;
-	IPAddress target_ip = 2;
+	IpAddress target_ip = 2;
 }
 
 message CreateLoadBalancerTargetResponse {
@@ -356,89 +356,89 @@ message ListLoadBalancerTargetsRequest {
 
 message ListLoadBalancerTargetsResponse {
 	Status status = 1;
-	repeated IPAddress target_ips = 2;
+	repeated IpAddress target_ips = 2;
 }
 
 message DeleteLoadBalancerTargetRequest {
 	bytes loadbalancer_id = 1;
-	IPAddress target_ip = 2;
+	IpAddress target_ip = 2;
 }
 
 message DeleteLoadBalancerTargetResponse {
 	Status status = 1;
 }
 
-message CreateNATRequest {
+message CreateNatRequest {
 	bytes interface_id =1;
-	IPAddress nat_ip = 2;
+	IpAddress nat_ip = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
 }
 
-message CreateNATResponse {
+message CreateNatResponse {
 	Status status = 1;
 	bytes underlay_route = 2;
 }
 
-message GetNATRequest {
+message GetNatRequest {
 	bytes interface_id =1;
 }
 
-message GetNATResponse {
+message GetNatResponse {
 	Status status = 1;
-	IPAddress nat_ip = 2;
+	IpAddress nat_ip = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
 	bytes underlay_route = 5;
 }
 
-message DeleteNATRequest {
+message DeleteNatRequest {
 	bytes interface_id = 1;
 }
 
-message DeleteNATResponse {
+message DeleteNatResponse {
 	Status status = 1;
 }
 
-message CreateNeighborNATRequest {
-	IPAddress nat_ip = 1;
+message CreateNeighborNatRequest {
+	IpAddress nat_ip = 1;
 	uint32 vni = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
 	bytes underlay_route = 5;
 }
 
-message CreateNeighborNATResponse {
+message CreateNeighborNatResponse {
 	Status status = 1;
 }
 
-message DeleteNeighborNATRequest {
-	IPAddress nat_ip = 1;
+message DeleteNeighborNatRequest {
+	IpAddress nat_ip = 1;
 	uint32 vni = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
 }
 
-message DeleteNeighborNATResponse {
+message DeleteNeighborNatResponse {
 	Status status = 1;
 }
 
-message ListLocalNATsRequest {
-	IPAddress nat_ip = 1;
+message ListLocalNatsRequest {
+	IpAddress nat_ip = 1;
 }
 
-message ListLocalNATsResponse {
+message ListLocalNatsResponse {
 	Status status = 1;
-	repeated NATEntry nat_entries = 2;
+	repeated NatEntry nat_entries = 2;
 }
 
-message ListNeighborNATsRequest {
-	IPAddress nat_ip = 1;
+message ListNeighborNatsRequest {
+	IpAddress nat_ip = 1;
 }
 
-message ListNeighborNATsResponse {
+message ListNeighborNatsResponse {
 	Status status = 1;
-	repeated NATEntry nat_entries = 2;
+	repeated NatEntry nat_entries = 2;
 }
 
 message ListRoutesRequest {
@@ -564,10 +564,10 @@ service DPDKonmetal {
 	rpc CreateLoadBalancerPrefix(CreateLoadBalancerPrefixRequest) returns (CreateLoadBalancerPrefixResponse) {}
 	rpc DeleteLoadBalancerPrefix(DeleteLoadBalancerPrefixRequest) returns (DeleteLoadBalancerPrefixResponse) {}
 
-	// NAT related, add/get/del Virtual IP for a given Interface
-	rpc CreateVIP(CreateVIPRequest) returns (CreateVIPResponse) {}
-	rpc GetVIP(GetVIPRequest) returns (GetVIPResponse) {}
-	rpc DeleteVIP(DeleteVIPRequest) returns (DeleteVIPResponse) {}
+	// Nat related, add/get/del Virtual IP for a given Interface
+	rpc CreateVip(CreateVipRequest) returns (CreateVipResponse) {}
+	rpc GetVip(GetVipRequest) returns (GetVipResponse) {}
+	rpc DeleteVip(DeleteVipRequest) returns (DeleteVipResponse) {}
 
 	// create/list/del Loadbalancer for a given IP to be loadbalanced
 	rpc CreateLoadBalancer(CreateLoadBalancerRequest) returns (CreateLoadBalancerResponse) {}
@@ -579,16 +579,16 @@ service DPDKonmetal {
 	rpc ListLoadBalancerTargets(ListLoadBalancerTargetsRequest) returns (ListLoadBalancerTargetsResponse) {}
 	rpc DeleteLoadBalancerTarget(DeleteLoadBalancerTargetRequest) returns (DeleteLoadBalancerTargetResponse) {}
 
-	// Network-NAT related, add/del/get a NAT for an interface
-	rpc CreateNAT(CreateNATRequest) returns (CreateNATResponse) {}
-	rpc GetNAT(GetNATRequest) returns (GetNATResponse) {}
-	rpc DeleteNAT(DeleteNATRequest) returns (DeleteNATResponse) {}
+	// Network-Nat related, add/del/get a Nat for an interface
+	rpc CreateNat(CreateNatRequest) returns (CreateNatResponse) {}
+	rpc GetNat(GetNatRequest) returns (GetNatResponse) {}
+	rpc DeleteNat(DeleteNatRequest) returns (DeleteNatResponse) {}
 
-	rpc ListLocalNATs(ListLocalNATsRequest) returns (ListLocalNATsResponse) {}
+	rpc ListLocalNats(ListLocalNatsRequest) returns (ListLocalNatsResponse) {}
 
-	rpc CreateNeighborNAT(CreateNeighborNATRequest) returns (CreateNeighborNATResponse) {}
-	rpc DeleteNeighborNAT(DeleteNeighborNATRequest) returns (DeleteNeighborNATResponse) {}
-	rpc ListNeighborNATs(ListNeighborNATsRequest) returns (ListNeighborNATsResponse) {}
+	rpc CreateNeighborNat(CreateNeighborNatRequest) returns (CreateNeighborNatResponse) {}
+	rpc DeleteNeighborNat(DeleteNeighborNatRequest) returns (DeleteNeighborNatResponse) {}
+	rpc ListNeighborNats(ListNeighborNatsRequest) returns (ListNeighborNatsResponse) {}
 
 	//// ROUTES
 	rpc ListRoutes(ListRoutesRequest) returns (ListRoutesResponse) {}
