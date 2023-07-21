@@ -25,26 +25,26 @@ void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, 
 
 	snprintf(dp_rule->rule_id, sizeof(dp_rule->rule_id),
 				"%s", grpc_rule->id().c_str());
-	if (grpc_rule->source_prefix().ipver() == IPVersion::IPV4) {
-		ret_val = inet_aton(grpc_rule->source_prefix().address().c_str(),
+	if (grpc_rule->source_prefix().ip().ipver() == IPVersion::IPV4) {
+		ret_val = inet_aton(grpc_rule->source_prefix().ip().address().c_str(),
 					(in_addr*)&dp_rule->src_ip);
 		if (ret_val == 0)
 			DPGRPC_LOG_WARNING("Bad firewall rule, wrong source prefix address",
 							   DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							   DP_LOG_FWSRC(grpc_rule->source_prefix().address().c_str()));
+							   DP_LOG_FWSRC(grpc_rule->source_prefix().ip().address().c_str()));
 		if (grpc_rule->source_prefix().length() != DP_FWALL_MATCH_ANY_LENGTH)
 			dp_rule->src_ip_mask = ~((1 << (32 - grpc_rule->source_prefix().length())) - 1);
 		else
 			dp_rule->src_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
 	}
 
-	if (grpc_rule->destination_prefix().ipver() == IPVersion::IPV4) {
-		ret_val = inet_aton(grpc_rule->destination_prefix().address().c_str(),
+	if (grpc_rule->destination_prefix().ip().ipver() == IPVersion::IPV4) {
+		ret_val = inet_aton(grpc_rule->destination_prefix().ip().address().c_str(),
 					(in_addr*)&dp_rule->dest_ip);
 		if (ret_val == 0)
 			DPGRPC_LOG_WARNING("Bad firewall rule, wrong destination prefix address",
 							   DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							   DP_LOG_FWSRC(grpc_rule->destination_prefix().address().c_str()));
+							   DP_LOG_FWSRC(grpc_rule->destination_prefix().ip().address().c_str()));
 		if (grpc_rule->destination_prefix().length() != DP_FWALL_MATCH_ANY_LENGTH)
 			dp_rule->dest_ip_mask = ~((1 << (32 - grpc_rule->destination_prefix().length())) - 1);
 		else
@@ -120,11 +120,12 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 	TCPFilter *tcp_filter;
 	UDPFilter *udp_filter;
 	struct in_addr addr;
-	Prefix *src_ip;
-	Prefix *dst_ip;
+	Prefix *src_pfx;
+	Prefix *dst_pfx;
+	IPAddress *src_ip;
+	IPAddress *dst_ip;
 
 	grpc_rule->set_id(dp_rule->rule_id);
-	grpc_rule->set_ipver(IPVersion::IPV4);
 	grpc_rule->set_priority(dp_rule->priority);
 	if (dp_rule->dir == DP_FWALL_INGRESS)
 		grpc_rule->set_direction(TrafficDirection::INGRESS);
@@ -136,19 +137,23 @@ void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, 
 	else
 		grpc_rule->set_action(FirewallAction::DROP);
 
-	src_ip = new Prefix();
+	src_ip = new IPAddress();
 	src_ip->set_ipver(IPVersion::IPV4);
 	addr.s_addr = dp_rule->src_ip;
 	src_ip->set_address(inet_ntoa(addr));
-	src_ip->set_length(__builtin_popcount(dp_rule->src_ip_mask));
-	grpc_rule->set_allocated_source_prefix(src_ip);
+	src_pfx = new Prefix();
+	src_pfx->set_allocated_ip(src_ip);
+	src_pfx->set_length(__builtin_popcount(dp_rule->src_ip_mask));
+	grpc_rule->set_allocated_source_prefix(src_pfx);
 
-	dst_ip = new Prefix();
+	dst_ip = new IPAddress();
 	dst_ip->set_ipver(IPVersion::IPV4);
 	addr.s_addr = dp_rule->dest_ip;
 	dst_ip->set_address(inet_ntoa(addr));
-	dst_ip->set_length(__builtin_popcount(dp_rule->dest_ip_mask));
-	grpc_rule->set_allocated_destination_prefix(dst_ip);
+	dst_pfx = new Prefix();
+	dst_pfx->set_allocated_ip(dst_ip);
+	dst_pfx->set_length(__builtin_popcount(dp_rule->dest_ip_mask));
+	grpc_rule->set_allocated_destination_prefix(dst_pfx);
 
 	filter = new ProtocolFilter();
 	if (dp_rule->protocol == IPPROTO_TCP) {
@@ -643,17 +648,17 @@ int CreatePfxCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Adding alias prefix",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.add_pfx.iface_id, sizeof(request.add_pfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
 			request.add_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.add_pfx.addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid alias prefix IP",
-								   DP_LOG_IPV4STR(request_.prefix().address().c_str()));
+								   DP_LOG_IPV4STR(request_.prefix().ip().address().c_str()));
 		}
 		request.add_pfx.length = request_.prefix().length();
 		dp_send_to_worker(&request);  // TODO can fail
@@ -691,17 +696,17 @@ int DelPfxCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing alias prefix",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.del_pfx.iface_id, sizeof(request.del_pfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
 			request.del_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.del_pfx.addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid alias prefix IP",
-								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
+								   DP_LOG_PREFIX(request_.prefix().ip().address().c_str()));
 		}
 		request.del_pfx.length = request_.prefix().length();
 		dp_send_to_worker(&request);  // TODO can fail
@@ -728,6 +733,7 @@ void ListPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	struct dpgrpc_route *rp_route;
 	ListPrefixesResponse *reply_ = (ListPrefixesResponse *)context;
 	Prefix *pfx;
+	IPAddress *pfx_ip;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -739,15 +745,17 @@ void ListPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	for (uint i = 0; i < reply->msg_count; ++i) {
 		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
 		pfx = reply_->add_prefixes();
+		pfx_ip = new IPAddress();
 		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->pfx_addr);
-			pfx->set_address(inet_ntoa(addr));
-			pfx->set_ipver(IPVersion::IPV4);
+			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_ipver(IPVersion::IPV4);
 			pfx->set_length(rp_route->pfx_length);
 			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
 			pfx->set_underlay_route(buf_str);
 		}
 		// TODO else? (should already be covered by the worker)
+		pfx->set_allocated_ip(pfx_ip);
 	}
 }
 
@@ -799,17 +807,17 @@ int CreateLBTargetPfxCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.add_lbpfx.iface_id, sizeof(request.add_lbpfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
 			request.add_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.add_lbpfx.addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid target prefix IP",
-								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
+								   DP_LOG_PREFIX(request_.prefix().ip().address().c_str()));
 		}
 		request.add_lbpfx.length = request_.prefix().length();
 		dp_send_to_worker(&request);  // TODO can fail
@@ -847,17 +855,17 @@ int DelLBTargetPfxCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer target prefix",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().address().c_str()),
+						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
 						DP_LOG_PREFLEN(request_.prefix().length()));
 		snprintf(request.del_lbpfx.iface_id, sizeof(request.del_lbpfx.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ipver() == IPVersion::IPV4) {
+		if (request_.prefix().ip().ipver() == IPVersion::IPV4) {
 			request.del_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().address().c_str(),
+			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
 					  (in_addr*)&request.del_lbpfx.addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid target prefix IP",
-								   DP_LOG_PREFIX(request_.prefix().address().c_str()));
+								   DP_LOG_PREFIX(request_.prefix().ip().address().c_str()));
 		}
 		request.del_lbpfx.length = request_.prefix().length();
 		dp_send_to_worker(&request);  // TODO can fail
@@ -884,6 +892,7 @@ void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context
 	struct dpgrpc_route *rp_route;
 	ListLoadBalancerPrefixesResponse *reply_ = (ListLoadBalancerPrefixesResponse *)context;
 	Prefix *pfx;
+	IPAddress *pfx_ip;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 
@@ -895,15 +904,17 @@ void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context
 	for (uint i = 0; i < reply->msg_count; ++i) {
 		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
 		pfx = reply_->add_prefixes();
+		pfx_ip = new IPAddress();
 		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->pfx_addr);
-			pfx->set_address(inet_ntoa(addr));
-			pfx->set_ipver(IPVersion::IPV4);
+			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_ipver(IPVersion::IPV4);
 			pfx->set_length(rp_route->pfx_length);
 			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
 			pfx->set_underlay_route(buf_str);
 		}
 		// TODO else? (should already be covered by the worker)
+		pfx->set_allocated_ip(pfx_ip);
 	}
 }
 
@@ -1241,28 +1252,29 @@ int CreateRouteCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Adding route",
 						DP_LOG_VNI(request_.vni()),
-						DP_LOG_PREFIX(request_.route().prefix().address().c_str()),
+						DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
 						DP_LOG_PREFLEN(request_.route().prefix().length()),
 						DP_LOG_TVNI(request_.route().nexthop_vni()),
-						DP_LOG_IPV6STR(request_.route().nexthop_address().c_str()));
+						DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 		request.add_route.vni = request_.vni();
 		request.add_route.trgt_ip_type = RTE_ETHER_TYPE_IPV6;
 		request.add_route.trgt_vni = request_.route().nexthop_vni();
-		ret_val = inet_pton(AF_INET6, request_.route().nexthop_address().c_str(), request.add_route.trgt_addr6);
+		// TODO no check for IPv4/IPv6 nexthop type
+		ret_val = inet_pton(AF_INET6, request_.route().nexthop_address().address().c_str(), request.add_route.trgt_addr6);
 		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("Invalid nexthop IP", DP_LOG_IPV6STR(request_.route().nexthop_address().c_str()));
+			DPGRPC_LOG_WARNING("Invalid nexthop IP", DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 		request.add_route.pfx_length = request_.route().prefix().length();
-		if (request_.route().prefix().ipver() == IPVersion::IPV4) {
+		if (request_.route().prefix().ip().ipver() == IPVersion::IPV4) {
 			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.route().prefix().address().c_str(),
+			ret_val = inet_aton(request_.route().prefix().ip().address().c_str(),
 					(in_addr*)&request.add_route.pfx_addr);
 			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid prefix IP", DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
+				DPGRPC_LOG_WARNING("Invalid prefix IP", DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
 		} else {
 			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
-			ret_val = inet_pton(AF_INET6, request_.route().prefix().address().c_str(), request.add_route.pfx_addr6);
+			ret_val = inet_pton(AF_INET6, request_.route().prefix().ip().address().c_str(), request.add_route.pfx_addr6);
 			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("Invalid prefix IP", DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
+				DPGRPC_LOG_WARNING("Invalid prefix IP", DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
 		}
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
@@ -1297,35 +1309,36 @@ int DelRouteCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Removing route",
 						DP_LOG_VNI(request_.vni()),
-						DP_LOG_PREFIX(request_.route().prefix().address().c_str()),
+						DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
 						DP_LOG_PREFLEN(request_.route().prefix().length()),
 						DP_LOG_TVNI(request_.route().nexthop_vni()), // TODO re-check for target vni everywhere
-						DP_LOG_IPV6STR(request_.route().nexthop_address().c_str()));
+						DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 		request.del_route.vni = request_.vni();
 		request.del_route.trgt_ip_type = RTE_ETHER_TYPE_IPV6;
 		request.del_route.trgt_vni = request_.route().nexthop_vni();
-		if (!request_.route().nexthop_address().empty()) {
-			ret_val = inet_pton(AF_INET6, request_.route().nexthop_address().c_str(),
+		if (!request_.route().nexthop_address().address().empty()) {
+			// TODO missing check for IPv6/IPv4 type
+			ret_val = inet_pton(AF_INET6, request_.route().nexthop_address().address().c_str(),
 					request.del_route.trgt_addr6);
 			if (ret_val <= 0)
 				DPGRPC_LOG_WARNING("Invalid nexthop IP",
-								   DP_LOG_IPV6STR(request_.route().nexthop_address().c_str()));
+								   DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 		}
 		request.del_route.pfx_length = request_.route().prefix().length();
-		if (request_.route().prefix().ipver() == IPVersion::IPV4) {
+		if (request_.route().prefix().ip().ipver() == IPVersion::IPV4) {
 			request.del_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.route().prefix().address().c_str(),
+			ret_val = inet_aton(request_.route().prefix().ip().address().c_str(),
 					(in_addr*)&request.del_route.pfx_addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid prefix IP",
-								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
+								   DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
 		} else {
 			request.del_route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
-			ret_val = inet_pton(AF_INET6, request_.route().prefix().address().c_str(),
+			ret_val = inet_pton(AF_INET6, request_.route().prefix().ip().address().c_str(),
 					request.del_route.pfx_addr6);
 			if (ret_val <= 0)
 				DPGRPC_LOG_WARNING("Invalid prefix IP",
-								   DP_LOG_PREFIX(request_.route().prefix().address().c_str()));
+								   DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
 		}
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
@@ -1351,8 +1364,10 @@ void ListRoutesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	struct dpgrpc_route *rp_route;
 	ListRoutesResponse *reply_ = (ListRoutesResponse *)context;
 	Route *route;
+	IPAddress *nh_ip;
 	struct in_addr addr;
 	Prefix *pfx;
+	IPAddress *pfx_ip;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (reply->err_code) {
@@ -1364,22 +1379,34 @@ void ListRoutesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
 
 		route = reply_->add_routes();
-		if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV6)
-			route->set_ipver(IPVersion::IPV6);
-		else
-			route->set_ipver(IPVersion::IPV4);
+		route->set_nexthop_vni(rp_route->trgt_vni);
 
+		nh_ip = new IPAddress();
+		if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(rp_route->trgt_addr);
+			nh_ip->set_address(inet_ntoa(addr));
+			nh_ip->set_ipver(IPVersion::IPV4);
+		} else {
+			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf, INET6_ADDRSTRLEN);
+			nh_ip->set_address(buf);
+			nh_ip->set_ipver(IPVersion::IPV6);
+		}
+		route->set_allocated_nexthop_address(nh_ip);
+
+		pfx_ip = new IPAddress();
 		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
 			addr.s_addr = htonl(rp_route->pfx_addr);
-			pfx = new Prefix();
-			pfx->set_address(inet_ntoa(addr));
-			pfx->set_ipver(IPVersion::IPV4);
-			pfx->set_length(rp_route->pfx_length);
-			route->set_allocated_prefix(pfx);
+			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_ipver(IPVersion::IPV4);
+		} else {
+			inet_ntop(AF_INET6, rp_route->pfx_addr6, buf, INET6_ADDRSTRLEN);
+			pfx_ip->set_address(buf);
+			pfx_ip->set_ipver(IPVersion::IPV6);
 		}
-		route->set_nexthop_vni(rp_route->trgt_vni);
-		inet_ntop(AF_INET6, rp_route->trgt_addr6, buf, INET6_ADDRSTRLEN);
-		route->set_nexthop_address(buf);
+		pfx = new Prefix();
+		pfx->set_allocated_ip(pfx_ip);
+		pfx->set_length(rp_route->pfx_length);
+		route->set_allocated_prefix(pfx);
 	}
 }
 
@@ -1718,6 +1745,7 @@ void ListLocalNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	struct dpgrpc_nat *nat;
 	ListLocalNATsResponse *reply_ = (ListLocalNATsResponse *)context;
 	NATEntry *nat_entry;
+	IPAddress *nat_ip;
 	struct in_addr addr;
 
 	if (reply->err_code) {
@@ -1728,9 +1756,11 @@ void ListLocalNATsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	for (uint i = 0; i < reply->msg_count; ++i) {
 		nat = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_nat);
 		nat_entry = reply_->add_nat_entries();
+		nat_ip = new IPAddress();
+		nat_ip->set_ipver(IPVersion::IPV4);
 		addr.s_addr = htonl(nat->addr);
-		nat_entry->set_ipver(IPVersion::IPV4);
-		nat_entry->set_address(inet_ntoa(addr));
+		nat_ip->set_address(inet_ntoa(addr));
+		nat_entry->set_allocated_nat_ip(nat_ip);
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
 		nat_entry->set_vni(nat->vni);
@@ -1863,9 +1893,9 @@ int CreateFirewallRuleCall::Proceed()
 						DP_LOG_FWPRIO(grpc_rule->priority()),
 						DP_LOG_FWDIR(grpc_rule->direction()),
 						DP_LOG_FWACTION(grpc_rule->action()),
-						DP_LOG_FWSRC(grpc_rule->source_prefix().address().c_str()),
+						DP_LOG_FWSRC(grpc_rule->source_prefix().ip().address().c_str()),
 						DP_LOG_FWSRCLEN(grpc_rule->source_prefix().length()),
-						DP_LOG_FWDST(grpc_rule->destination_prefix().address().c_str()),
+						DP_LOG_FWDST(grpc_rule->destination_prefix().ip().address().c_str()),
 						DP_LOG_FWDSTLEN(grpc_rule->destination_prefix().length()));
 		snprintf(request.add_fwrule.iface_id, sizeof(request.add_fwrule.iface_id),
 				 "%s", request_.interface_id().c_str());

@@ -55,10 +55,9 @@ message IPAddress {
 }
 
 message Prefix {
-	IPVersion ipver = 1;
-	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
-	uint32 length = 3;  // max length is 32 for IPv4 and 128 for IPv6
-	bytes underlay_route = 4;
+	IPAddress ip = 1;
+	uint32 length = 2;    // max length is 32 for IPv4 and 128 for IPv6 (based on ip->ipver)
+	bytes underlay_route = 3;
 }
 
 message Interface {
@@ -66,8 +65,8 @@ message Interface {
 	uint32 vni = 2;
 	bytes primary_ipv4 = 3;
 	bytes primary_ipv6 = 4;
-	bytes underlay_route = 6;
-	string pci_name = 7;
+	bytes underlay_route = 5;
+	string pci_name = 6;
 }
 
 message IPConfig {
@@ -93,21 +92,18 @@ message LBPort {
 }
 
 message NATEntry {
-	// TODO rework
-	IPVersion ipver = 1;
-	bytes address = 2;	// Can be both ipv4 and ipv6
-	uint32 min_port = 3;
-	uint32 max_port = 4;
-	bytes underlay_route = 5;
-	uint32 vni = 6;
+	IPAddress nat_ip = 1;
+	uint32 min_port = 2;
+	uint32 max_port = 3;
+	bytes underlay_route = 4;
+	uint32 vni = 5;
 }
 
 message Route {
-	IPVersion ipver = 1;
-	Prefix prefix = 2;
-	uint32 nexthop_vni = 3;
-	bytes nexthop_address = 4;
-	uint32 weight = 5;
+	Prefix prefix = 1;
+	uint32 nexthop_vni = 2;
+	IPAddress nexthop_address = 3;
+	uint32 weight = 4;
 }
 
 message ICMPFilter {
@@ -149,7 +145,6 @@ message FirewallRule {
 	TrafficDirection direction = 2;
 	FirewallAction action = 3;			// Can be only "accept" at the moment.
 	uint32 priority = 4;				// For future use. No effect at the moment.
-	IPVersion ipver = 5;
 	Prefix source_prefix = 6;			// 0.0.0.0 with prefix length 0 matches all source ips
 	Prefix destination_prefix = 7;		// 0.0.0.0 with prefix length 0 matches all destination ips
 	ProtocolFilter protocol_filter = 8;	// Not defining a protocol filter matches all protocols

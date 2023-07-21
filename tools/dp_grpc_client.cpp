@@ -641,20 +641,23 @@ public:
 			ClientContext context;
 			Route *route = new Route();
 			Prefix *prefix = new Prefix();
+			IPAddress *ip = new IPAddress();
+			IPAddress *nh = new IPAddress();
 
 			request.set_vni(vni);
-			prefix->set_ipver(version);
-			if(version == IPVersion::IPV4) {
-				prefix->set_address(ip_str);
-			} else {
-				prefix->set_address(ip6_str);
-			}
+			ip->set_ipver(version);
+			if (version == IPVersion::IPV4)
+				ip->set_address(ip_str);
+			else
+				ip->set_address(ip6_str);
+			prefix->set_allocated_ip(ip);
 			prefix->set_length(length);
 			route->set_allocated_prefix(prefix);
-			route->set_ipver(IPVersion::IPV6);
+			nh->set_ipver(IPVersion::IPV6);
+			nh->set_address(t_ip6_str);
+			route->set_allocated_nexthop_address(nh);
 			route->set_nexthop_vni(t_vni);
 			route->set_weight(100);
-			route->set_nexthop_address(t_ip6_str);
 			request.set_allocated_route(route);
 			stub_->CreateRoute(&context, request, &reply);
 			if (reply.status().code())
@@ -669,20 +672,23 @@ public:
 			ClientContext context;
 			Route *route = new Route();
 			Prefix *prefix = new Prefix();
+			IPAddress *ip = new IPAddress();
+			IPAddress *nh = new IPAddress();
 
 			request.set_vni(vni);
-			prefix->set_ipver(version);
-			if(version == IPVersion::IPV4) {
-				prefix->set_address(ip_str);
-			} else {
-				prefix->set_address(ip6_str);
-			}
+			ip->set_ipver(version);
+			if (version == IPVersion::IPV4)
+				ip->set_address(ip_str);
+			else
+				ip->set_address(ip6_str);
+			prefix->set_allocated_ip(ip);
 			prefix->set_length(length);
 			route->set_allocated_prefix(prefix);
-			route->set_ipver(IPVersion::IPV6);
+			nh->set_ipver(IPVersion::IPV6);
+			nh->set_address(t_ip6_str);
+			route->set_allocated_nexthop_address(nh);
 			route->set_nexthop_vni(t_vni);
 			route->set_weight(100);
-			route->set_nexthop_address(t_ip6_str);
 			request.set_allocated_route(route);
 			stub_->DeleteRoute(&context, request, &reply);
 			if (reply.status().code())
@@ -705,10 +711,10 @@ public:
 		else
 			for (i = 0; i < reply.routes_size(); i++) {
 				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
-					reply.routes(i).prefix().address().c_str(),
+					reply.routes(i).prefix().ip().address().c_str(),
 					reply.routes(i).prefix().length(),
 					reply.routes(i).nexthop_vni(),
-					reply.routes(i).nexthop_address().c_str());
+					reply.routes(i).nexthop_address().address().c_str());
 			}
 	}
 
@@ -798,8 +804,10 @@ public:
 			CreateFirewallRuleRequest request;
 			CreateFirewallRuleResponse reply;
 			ClientContext context;
-			Prefix *src_ip = new Prefix();
-			Prefix *dst_ip = new Prefix();
+			Prefix *src_pfx = new Prefix();
+			Prefix *dst_pfx = new Prefix();
+			IPAddress *src_ip = new IPAddress();
+			IPAddress *dst_ip = new IPAddress();
 			ProtocolFilter *filter = new ProtocolFilter();
 			FirewallRule *rule = new FirewallRule();
 			ICMPFilter *icmp_filter;
@@ -808,7 +816,6 @@ public:
 
 			request.set_interface_id(machine_str);
 			rule->set_id(fwall_id_str);
-			rule->set_ipver(version);
 			rule->set_priority(priority);
 			if (strncasecmp("ingress", dir_str, 29) == 0)
 				rule->set_direction(TrafficDirection::INGRESS);
@@ -821,16 +828,18 @@ public:
 				rule->set_action(FirewallAction::DROP);
 
 			src_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if (version == IPVersion::IPV4)
 				src_ip->set_address(src_ip_str);
-			src_ip->set_length(src_length);
-			rule->set_allocated_source_prefix(src_ip);
+			src_pfx->set_allocated_ip(src_ip);
+			src_pfx->set_length(src_length);
+			rule->set_allocated_source_prefix(src_pfx);
 
 			dst_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if (version == IPVersion::IPV4)
 				dst_ip->set_address(dst_ip_str);
-			dst_ip->set_length(dst_length);
-			rule->set_allocated_destination_prefix(dst_ip);
+			dst_pfx->set_allocated_ip(dst_ip);
+			dst_pfx->set_length(dst_length);
+			rule->set_allocated_destination_prefix(dst_pfx);
 
 			if (strncasecmp("tcp", proto_str, 29) == 0) {
 				tcp_filter = new TCPFilter();
@@ -892,13 +901,13 @@ public:
 		else
 			for (i = 0; i < reply.rules_size(); i++) {
 				printf("%s / ", reply.rules(i).id().c_str());
-				if (reply.rules(i).source_prefix().ipver() == IPVersion::IPV4) {
-					printf("src_ip: %s / ", reply.rules(i).source_prefix().address().c_str());
+				if (reply.rules(i).source_prefix().ip().ipver() == IPVersion::IPV4) {
+					printf("src_ip: %s / ", reply.rules(i).source_prefix().ip().address().c_str());
 					printf("src_ip pfx length: %d / ", reply.rules(i).source_prefix().length());
 				}
 
-				if (reply.rules(i).destination_prefix().ipver() == IPVersion::IPV4) {
-					printf("dst_ip: %s / ", reply.rules(i).destination_prefix().address().c_str());
+				if (reply.rules(i).destination_prefix().ip().ipver() == IPVersion::IPV4) {
+					printf("dst_ip: %s / ", reply.rules(i).destination_prefix().ip().address().c_str());
 					printf("dst_ip pfx length: %d \n", reply.rules(i).destination_prefix().length());
 				}
 
@@ -951,13 +960,13 @@ public:
 				printf("Received an error %d\n", reply.status().code());
 			else {
 				printf("%s / ", reply.rule().id().c_str());
-				if (reply.rule().source_prefix().ipver() == IPVersion::IPV4) {
-					printf("src_ip: %s / ", reply.rule().source_prefix().address().c_str());
+				if (reply.rule().source_prefix().ip().ipver() == IPVersion::IPV4) {
+					printf("src_ip: %s / ", reply.rule().source_prefix().ip().address().c_str());
 					printf("src_ip pfx length: %d / ", reply.rule().source_prefix().length());
 				}
 
-				if (reply.rule().destination_prefix().ipver() == IPVersion::IPV4) {
-					printf("dst_ip: %s / ", reply.rule().destination_prefix().address().c_str());
+				if (reply.rule().destination_prefix().ip().ipver() == IPVersion::IPV4) {
+					printf("dst_ip: %s / ", reply.rule().destination_prefix().ip().address().c_str());
 					printf("dst_ip pfx length: %d \n", reply.rule().destination_prefix().length());
 				}
 
@@ -1019,14 +1028,16 @@ public:
 			CreatePrefixRequest request;
 			CreatePrefixResponse reply;
 			ClientContext context;
-			Prefix *pfx_ip = new Prefix();
+			Prefix *pfx = new Prefix();
+			IPAddress *pfx_ip = new IPAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if (version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_length(length);
-			request.set_allocated_prefix(pfx_ip);
+			pfx->set_allocated_ip(pfx_ip);
+			pfx->set_length(length);
+			request.set_allocated_prefix(pfx);
 			stub_->CreatePrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -1038,14 +1049,16 @@ public:
 			CreateLoadBalancerPrefixRequest request;
 			CreateLoadBalancerPrefixResponse reply;
 			ClientContext context;
-			Prefix *pfx_ip = new Prefix();
+			Prefix *pfx = new Prefix();
+			IPAddress *pfx_ip = new IPAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if (version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_length(length);
-			request.set_allocated_prefix(pfx_ip);
+			pfx->set_allocated_ip(pfx_ip);
+			pfx->set_length(length);
+			request.set_allocated_prefix(pfx);
 			stub_->CreateLoadBalancerPrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -1173,14 +1186,16 @@ public:
 			DeletePrefixRequest request;
 			DeletePrefixResponse reply;
 			ClientContext context;
-			Prefix *pfx_ip = new Prefix();
+			Prefix *pfx = new Prefix();
+			IPAddress *pfx_ip = new IPAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if (version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_length(length);
-			request.set_allocated_prefix(pfx_ip);
+			pfx->set_allocated_ip(pfx_ip);
+			pfx->set_length(length);
+			request.set_allocated_prefix(pfx);
 			stub_->DeletePrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -1202,7 +1217,7 @@ public:
 		else
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("Route prefix %s len %d underlayroute %s\n",
-					reply.prefixes(i).address().c_str(),
+					reply.prefixes(i).ip().address().c_str(),
 					reply.prefixes(i).length(),
 					reply.prefixes(i).underlay_route().c_str());
 			}
@@ -1212,14 +1227,16 @@ public:
 			DeleteLoadBalancerPrefixRequest request;
 			DeleteLoadBalancerPrefixResponse reply;
 			ClientContext context;
-			Prefix *pfx_ip = new Prefix();
+			Prefix *pfx = new Prefix();
+			IPAddress *pfx_ip = new IPAddress();
 
 			request.set_interface_id(machine_str);
 			pfx_ip->set_ipver(version);
-			if(version == IPVersion::IPV4)
+			if (version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_length(length);
-			request.set_allocated_prefix(pfx_ip);
+			pfx->set_allocated_ip(pfx_ip);
+			pfx->set_length(length);
+			request.set_allocated_prefix(pfx);
 			stub_->DeleteLoadBalancerPrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -1241,7 +1258,7 @@ public:
 		else
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("LB Route prefix %s len %d underlayroute %s\n",
-					reply.prefixes(i).address().c_str(),
+					reply.prefixes(i).ip().address().c_str(),
 					reply.prefixes(i).length(),
 					reply.prefixes(i).underlay_route().c_str());
 			}
@@ -1421,7 +1438,7 @@ public:
 			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_ip->address().c_str());
 			for (i = 0; i < reply.nat_entries_size(); i++) {
 				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
-				reply.nat_entries(i).address().c_str(),
+				reply.nat_entries(i).nat_ip().address().c_str(),
 				reply.nat_entries(i).min_port(),
 				reply.nat_entries(i).max_port(),
 				reply.nat_entries(i).vni());
