@@ -65,8 +65,7 @@ static int setup_hairpin_rx_tx_queues(uint16_t port_id,
 
 int dp_hairpin_setup(struct dp_port *port)
 {
-	if (port->port_type == DP_PORT_VF)
-		return DP_OK;
+
 	uint16_t hairpin_queue_id = 0;
 	uint16_t peer_hairpin_queue_id = 0;
 
