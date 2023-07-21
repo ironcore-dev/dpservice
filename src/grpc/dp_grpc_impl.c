@@ -65,7 +65,7 @@ static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enu
 	return dp_del_vnf_with_value(val);
 }
 
-static int dp_process_add_lb(struct dp_grpc_responder *responder)
+static int dp_process_create_lb(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb *request = &responder->request.add_lb;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
@@ -105,7 +105,7 @@ err:
 	return ret;
 }
 
-static int dp_process_del_lb(struct dp_grpc_responder *responder)
+static int dp_process_delete_lb(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_id *request = &responder->request.del_lb;
 	struct dpgrpc_lb lb;
@@ -135,7 +135,7 @@ static int dp_process_get_lb(struct dp_grpc_responder *responder)
 	return dp_get_lb(request->lb_id, reply);
 }
 
-static int dp_process_add_lbtarget(struct dp_grpc_responder *responder)
+static int dp_process_create_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.add_lbtrgt;
 
@@ -145,7 +145,7 @@ static int dp_process_add_lbtarget(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_BAD_IPVER;
 }
 
-static int dp_process_del_lbtarget(struct dp_grpc_responder *responder)
+static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.del_lbtrgt;
 
@@ -155,13 +155,13 @@ static int dp_process_del_lbtarget(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_BAD_IPVER;
 }
 
-static int dp_process_init(__rte_unused struct dp_grpc_responder *responder)
+static int dp_process_initialize(__rte_unused struct dp_grpc_responder *responder)
 {
 	dp_del_all_neigh_nat_entries_in_vni(DP_NETWORK_NAT_ALL_VNI);
 	return dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 }
 
-static int dp_process_vni_inuse(struct dp_grpc_responder *responder)
+static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_vni *request = &responder->request.vni_in_use;
 	struct dpgrpc_vni_in_use *reply = dp_grpc_single_reply(responder);
@@ -176,7 +176,7 @@ static int dp_process_vni_inuse(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_fwrule(struct dp_grpc_responder *responder)
+static int dp_process_create_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_fwrule *request = &responder->request.add_fwrule;
 	int port_id;
@@ -217,7 +217,7 @@ static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_fwrule(struct dp_grpc_responder *responder)
+static int dp_process_delete_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_fwrule_id *request = &responder->request.del_fwrule;
 	int port_id;
@@ -232,7 +232,7 @@ static int dp_process_del_fwrule(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_vni_reset(struct dp_grpc_responder *responder)
+static int dp_process_reset_vni(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_vni *request = &responder->request.vni_reset;
 
@@ -242,7 +242,7 @@ static int dp_process_vni_reset(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_WRONG_TYPE;
 }
 
-static int dp_process_add_vip(struct dp_grpc_responder *responder)
+static int dp_process_create_vip(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_vip *request = &responder->request.add_vip;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
@@ -291,7 +291,7 @@ err:
 	return ret;
 }
 
-static int dp_process_del_vip(struct dp_grpc_responder *responder)
+static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_iface_id *request = &responder->request.del_vip;
 	struct dpgrpc_vip *reply = dp_grpc_single_reply(responder);
@@ -344,7 +344,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_lbprefix(struct dp_grpc_responder *responder)
+static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.add_lbpfx;
 	struct dpgrpc_route *reply = dp_grpc_single_reply(responder);
@@ -370,7 +370,7 @@ static int dp_process_add_lbprefix(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_lbprefix(struct dp_grpc_responder *responder)
+static int dp_process_delete_lbprefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.del_lbpfx;
 
@@ -387,7 +387,7 @@ static int dp_process_del_lbprefix(struct dp_grpc_responder *responder)
 	return dp_remove_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id);
 }
 
-static int dp_process_add_prefix(struct dp_grpc_responder *responder)
+static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.add_pfx;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
@@ -424,7 +424,7 @@ static int dp_process_add_prefix(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_prefix(struct dp_grpc_responder *responder)
+static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.del_pfx;
 
@@ -451,7 +451,7 @@ static int dp_process_del_prefix(struct dp_grpc_responder *responder)
 	return DP_FAILED(ret) ? ret : ret2;
 }
 
-static int dp_process_add_interface(struct dp_grpc_responder *responder)
+static int dp_process_create_interface(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_iface *request = &responder->request.add_iface;
 	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
@@ -543,7 +543,7 @@ err:
 	return ret;
 }
 
-static int dp_process_del_interface(struct dp_grpc_responder *responder)
+static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_iface_id *request = &responder->request.del_iface;
 
@@ -585,7 +585,7 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_route(struct dp_grpc_responder *responder)
+static int dp_process_create_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.add_route;
 
@@ -601,7 +601,7 @@ static int dp_process_add_route(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_BAD_IPVER;
 }
 
-static int dp_process_del_route(struct dp_grpc_responder *responder)
+static int dp_process_delete_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.del_route;
 
@@ -617,7 +617,7 @@ static int dp_process_del_route(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_BAD_IPVER;
 }
 
-static int dp_process_add_nat(struct dp_grpc_responder *responder)
+static int dp_process_create_nat(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_nat *request = &responder->request.add_nat;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
@@ -666,7 +666,7 @@ err:
 
 }
 
-static int dp_process_del_nat(struct dp_grpc_responder *responder)
+static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_iface_id *request = &responder->request.del_nat;
 	struct dpgrpc_vip *reply = dp_grpc_single_reply(responder);
@@ -716,7 +716,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_add_neighnat(struct dp_grpc_responder *responder)
+static int dp_process_create_neighnat(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_nat *request = &responder->request.add_nat;
 	int ret;
@@ -739,7 +739,7 @@ static int dp_process_add_neighnat(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-static int dp_process_del_neighnat(struct dp_grpc_responder *responder)
+static int dp_process_delete_neighnat(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_nat *request = &responder->request.del_neighnat;
 	int ret;
@@ -876,17 +876,17 @@ void dp_process_request(struct rte_mbuf *m)
 	request_type = dp_grpc_init_responder(&responder, m);
 
 	switch (request_type) {
-	case DP_REQ_TYPE_INIT:
-		ret = dp_process_init(&responder);
+	case DP_REQ_TYPE_INITIALIZE:
+		ret = dp_process_initialize(&responder);
 		break;
 	case DP_REQ_TYPE_GET_VERSION:
 		ret = dp_process_get_version(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_INTERFACE:
-		ret = dp_process_add_interface(&responder);
+	case DP_REQ_TYPE_CREATE_INTERFACE:
+		ret = dp_process_create_interface(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_INTERFACE:
-		ret = dp_process_del_interface(&responder);
+	case DP_REQ_TYPE_DELETE_INTERFACE:
+		ret = dp_process_delete_interface(&responder);
 		break;
 	case DP_REQ_TYPE_GET_INTERFACE:
 		ret = dp_process_get_interface(&responder);
@@ -894,47 +894,47 @@ void dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_LIST_INTERFACES:
 		ret = dp_process_list_interfaces(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_PREFIX:
-		ret = dp_process_add_prefix(&responder);
+	case DP_REQ_TYPE_CREATE_PREFIX:
+		ret = dp_process_create_prefix(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_PREFIX:
-		ret = dp_process_del_prefix(&responder);
+	case DP_REQ_TYPE_DELETE_PREFIX:
+		ret = dp_process_delete_prefix(&responder);
 		break;
 	case DP_REQ_TYPE_LIST_PREFIXES:
 		ret = dp_process_list_prefixes(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_ROUTE:
-		ret = dp_process_add_route(&responder);
+	case DP_REQ_TYPE_CREATE_ROUTE:
+		ret = dp_process_create_route(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_ROUTE:
-		ret = dp_process_del_route(&responder);
+	case DP_REQ_TYPE_DELETE_ROUTE:
+		ret = dp_process_delete_route(&responder);
 		break;
 	case DP_REQ_TYPE_LIST_ROUTES:
 		ret = dp_process_list_routes(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_VIP:
-		ret = dp_process_add_vip(&responder);
+	case DP_REQ_TYPE_CREATE_VIP:
+		ret = dp_process_create_vip(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_VIP:
-		ret = dp_process_del_vip(&responder);
+	case DP_REQ_TYPE_DELETE_VIP:
+		ret = dp_process_delete_vip(&responder);
 		break;
 	case DP_REQ_TYPE_GET_VIP:
 		ret = dp_process_get_vip(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_NAT:
-		ret = dp_process_add_nat(&responder);
+	case DP_REQ_TYPE_CREATE_NAT:
+		ret = dp_process_create_nat(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_NAT:
-		ret = dp_process_del_nat(&responder);
+	case DP_REQ_TYPE_DELETE_NAT:
+		ret = dp_process_delete_nat(&responder);
 		break;
 	case DP_REQ_TYPE_GET_NAT:
 		ret = dp_process_get_nat(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_NEIGHNAT:
-		ret = dp_process_add_neighnat(&responder);
+	case DP_REQ_TYPE_CREATE_NEIGHNAT:
+		ret = dp_process_create_neighnat(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_NEIGHNAT:
-		ret = dp_process_del_neighnat(&responder);
+	case DP_REQ_TYPE_DELETE_NEIGHNAT:
+		ret = dp_process_delete_neighnat(&responder);
 		break;
 	case DP_REQ_TYPE_LIST_LOCALNATS:
 		ret = dp_process_list_localnats(&responder);
@@ -942,38 +942,38 @@ void dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_LIST_NEIGHNATS:
 		ret = dp_process_list_neighnats(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_LB:
-		ret = dp_process_add_lb(&responder);
+	case DP_REQ_TYPE_CREATE_LB:
+		ret = dp_process_create_lb(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_LB:
-		ret = dp_process_del_lb(&responder);
+	case DP_REQ_TYPE_DELETE_LB:
+		ret = dp_process_delete_lb(&responder);
 		break;
 	case DP_REQ_TYPE_GET_LB:
 		ret = dp_process_get_lb(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_LBTARGET:
-		ret = dp_process_add_lbtarget(&responder);
+	case DP_REQ_TYPE_CREATE_LBTARGET:
+		ret = dp_process_create_lbtarget(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_LBTARGET:
-		ret = dp_process_del_lbtarget(&responder);
+	case DP_REQ_TYPE_DELETE_LBTARGET:
+		ret = dp_process_delete_lbtarget(&responder);
 		break;
 	case DP_REQ_TYPE_LIST_LBTARGETS:
 		ret = dp_process_list_lbtargets(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_LBPREFIX:
-		ret = dp_process_add_lbprefix(&responder);
+	case DP_REQ_TYPE_CREATE_LBPREFIX:
+		ret = dp_process_create_lbprefix(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_LBPREFIX:
-		ret = dp_process_del_lbprefix(&responder);
+	case DP_REQ_TYPE_DELETE_LBPREFIX:
+		ret = dp_process_delete_lbprefix(&responder);
 		break;
 	case DP_REQ_TYPE_LIST_LBPREFIXES:
 		ret = dp_process_list_lbprefixes(&responder);
 		break;
-	case DP_REQ_TYPE_ADD_FWRULE:
-		ret = dp_process_add_fwrule(&responder);
+	case DP_REQ_TYPE_CREATE_FWRULE:
+		ret = dp_process_create_fwrule(&responder);
 		break;
-	case DP_REQ_TYPE_DEL_FWRULE:
-		ret = dp_process_del_fwrule(&responder);
+	case DP_REQ_TYPE_DELETE_FWRULE:
+		ret = dp_process_delete_fwrule(&responder);
 		break;
 	case DP_REQ_TYPE_GET_FWRULE:
 		ret = dp_process_get_fwrule(&responder);
@@ -981,13 +981,13 @@ void dp_process_request(struct rte_mbuf *m)
 	case DP_REQ_TYPE_LIST_FWRULES:
 		ret = dp_process_list_fwrules(&responder);
 		break;
-	case DP_REQ_TYPE_VNI_INUSE:
-		ret = dp_process_vni_inuse(&responder);
+	case DP_REQ_TYPE_CHECK_VNIINUSE:
+		ret = dp_process_check_vniinuse(&responder);
 		break;
-	case DP_REQ_TYPE_VNI_RESET:
-		ret = dp_process_vni_reset(&responder);
+	case DP_REQ_TYPE_RESET_VNI:
+		ret = dp_process_reset_vni(&responder);
 		break;
-	// DP_REQ_TYPE_INITIALIZED is handled by the gRPC thread
+	// DP_REQ_TYPE_CHECK_INITIALIZED is handled by the gRPC thread
 	default:
 		ret = DP_GRPC_ERR_BAD_REQUEST;
 		break;

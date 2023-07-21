@@ -328,7 +328,7 @@ int InitializeCall::Proceed()
 	return 0;
 }
 
-int CreateLBCall::Proceed()
+int CreateLoadBalancerCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -339,7 +339,7 @@ int CreateLBCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateLBCall(service_, cq_);
+		new CreateLoadBalancerCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Creating loadbalancer",
@@ -393,7 +393,7 @@ int CreateLBCall::Proceed()
 	return 0;
 }
 
-int DelLBCall::Proceed()
+int DeleteLoadBalancerCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -401,7 +401,7 @@ int DelLBCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DelLBCall(service_, cq_);
+		new DeleteLoadBalancerCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer",
@@ -427,7 +427,7 @@ int DelLBCall::Proceed()
 	return 0;
 }
 
-int GetLBCall::Proceed()
+int GetLoadBalancerCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
 	struct dpgrpc_request request = {
@@ -440,7 +440,7 @@ int GetLBCall::Proceed()
 	int i;
 
 	if (status_ == REQUEST) {
-		new GetLBCall(service_, cq_);
+		new GetLoadBalancerCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting loadbalancer info",
@@ -487,7 +487,7 @@ int GetLBCall::Proceed()
 	return 0;
 }
 
-int CreateLBVIPCall::Proceed()
+int CreateLoadBalancerTargetCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -496,7 +496,7 @@ int CreateLBVIPCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateLBVIPCall(service_, cq_);
+		new CreateLoadBalancerTargetCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding loadbalancer target",
@@ -533,7 +533,7 @@ int CreateLBVIPCall::Proceed()
 	return 0;
 }
 
-int DelLBVIPCall::Proceed()
+int DeleteLoadBalancerTargetCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -542,7 +542,7 @@ int DelLBVIPCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DelLBVIPCall(service_, cq_);
+		new DeleteLoadBalancerTargetCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer target",
@@ -579,7 +579,7 @@ int DelLBVIPCall::Proceed()
 	return 0;
 }
 
-void GetLBVIPBackendsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+void ListLoadBalancerTargetsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_lb_target *lb_target = (struct dpgrpc_lb_target *)reply;
 	ListLoadBalancerTargetsResponse *reply_ = (ListLoadBalancerTargetsResponse *)context;
@@ -600,14 +600,14 @@ void GetLBVIPBackendsCall::ListCallback(struct dpgrpc_reply *reply, void *contex
 	}
 }
 
-int GetLBVIPBackendsCall::Proceed()
+int ListLoadBalancerTargetsCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
 	if (status_ == REQUEST) {
-		new GetLBVIPBackendsCall(service_, cq_);
+		new ListLoadBalancerTargetsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing loadbalancer targets",
@@ -633,7 +633,7 @@ int GetLBVIPBackendsCall::Proceed()
 	return 0;
 }
 
-int CreatePfxCall::Proceed()
+int CreatePrefixCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -643,7 +643,7 @@ int CreatePfxCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreatePfxCall(service_, cq_);
+		new CreatePrefixCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding alias prefix",
@@ -682,7 +682,7 @@ int CreatePfxCall::Proceed()
 	return 0;
 }
 
-int DelPfxCall::Proceed()
+int DeletePrefixCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -691,7 +691,7 @@ int DelPfxCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DelPfxCall(service_, cq_);
+		new DeletePrefixCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing alias prefix",
@@ -728,7 +728,7 @@ int DelPfxCall::Proceed()
 	return 0;
 }
 
-void ListPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+void ListPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_route *rp_route;
 	ListPrefixesResponse *reply_ = (ListPrefixesResponse *)context;
@@ -759,14 +759,14 @@ void ListPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	}
 }
 
-int ListPfxCall::Proceed()
+int ListPrefixesCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
 	if (status_ == REQUEST) {
-		new ListPfxCall(service_, cq_);
+		new ListPrefixesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing alias prefixes",
@@ -792,7 +792,7 @@ int ListPfxCall::Proceed()
 	return 0;
 }
 
-int CreateLBTargetPfxCall::Proceed()
+int CreateLoadBalancerPrefixCall::Proceed()
 {
 	char buf_str[INET6_ADDRSTRLEN];
 	struct dpgrpc_request request = {
@@ -802,7 +802,7 @@ int CreateLBTargetPfxCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateLBTargetPfxCall(service_, cq_);
+		new CreateLoadBalancerPrefixCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
@@ -841,7 +841,7 @@ int CreateLBTargetPfxCall::Proceed()
 	return 0;
 }
 
-int DelLBTargetPfxCall::Proceed()
+int DeleteLoadBalancerPrefixCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -850,7 +850,7 @@ int DelLBTargetPfxCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DelLBTargetPfxCall(service_, cq_);
+		new DeleteLoadBalancerPrefixCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer target prefix",
@@ -887,7 +887,7 @@ int DelLBTargetPfxCall::Proceed()
 	return 0;
 }
 
-void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+void ListLoadBalancerPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_route *rp_route;
 	ListLoadBalancerPrefixesResponse *reply_ = (ListLoadBalancerPrefixesResponse *)context;
@@ -918,14 +918,14 @@ void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context
 	}
 }
 
-int ListLBTargetPfxCall::Proceed()
+int ListLoadBalancerPrefixesCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
 	};
 
 	if (status_ == REQUEST) {
-		new ListLBTargetPfxCall(service_, cq_);
+		new ListLoadBalancerPrefixesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing loadbalancer target prefixes",
@@ -998,7 +998,7 @@ int CreateVIPCall::Proceed()
 	return 0;
 }
 
-int DelVIPCall::Proceed()
+int DeleteVIPCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1006,7 +1006,7 @@ int DelVIPCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DelVIPCall(service_, cq_);
+		new DeleteVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing virtual IP",
@@ -1152,7 +1152,7 @@ int CreateInterfaceCall::Proceed()
 	return 0;
 }
 
-int DelInterfaceCall::Proceed()
+int DeleteInterfaceCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1160,7 +1160,7 @@ int DelInterfaceCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DelInterfaceCall(service_, cq_);
+		new DeleteInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing interface",
@@ -1295,7 +1295,7 @@ int CreateRouteCall::Proceed()
 	return 0;
 }
 
-int DelRouteCall::Proceed()
+int DeleteRouteCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1304,7 +1304,7 @@ int DelRouteCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DelRouteCall(service_, cq_);
+		new DeleteRouteCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing route",
@@ -1443,7 +1443,7 @@ int ListRoutesCall::Proceed()
 	return 0;
 }
 
-int CreateNATVIPCall::Proceed()
+int CreateNATCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1454,7 +1454,7 @@ int CreateNATVIPCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateNATVIPCall(service_, cq_);
+		new CreateNATCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Setting NAT IP",
@@ -1496,7 +1496,7 @@ int CreateNATVIPCall::Proceed()
 	return 0;
 }
 
-int GetNATVIPCall::Proceed()
+int GetNATCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1507,7 +1507,7 @@ int GetNATVIPCall::Proceed()
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new GetNATVIPCall(service_, cq_);
+		new GetNATCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting NAT IP",
@@ -1542,7 +1542,7 @@ int GetNATVIPCall::Proceed()
 	return 0;
 }
 
-int DeleteNATVIPCall::Proceed()
+int DeleteNATCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1550,7 +1550,7 @@ int DeleteNATVIPCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteNATVIPCall(service_, cq_);
+		new DeleteNATCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing NAT IP",
@@ -1920,7 +1920,7 @@ int CreateFirewallRuleCall::Proceed()
 	return 0;
 }
 
-int DelFirewallRuleCall::Proceed()
+int DeleteFirewallRuleCall::Proceed()
 {
 	struct dpgrpc_request request = {
 		.type = call_type_,
@@ -1928,7 +1928,7 @@ int DelFirewallRuleCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DelFirewallRuleCall(service_, cq_);
+		new DeleteFirewallRuleCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing firewall rule",
