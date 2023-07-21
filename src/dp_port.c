@@ -448,16 +448,14 @@ int dp_port_start(uint16_t port_id)
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
 
-	if (port->port_type == DP_PORT_PF && dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
+	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
 		if (dp_conf_is_offload_enabled()) {
 			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 				return DP_ERROR;
 		}
-		// first, finish pf-pf hairpin binding, then install isolation rules
-		if (port_id == dp_port_get_pf1_id()) {
-			if (DP_FAILED(dp_port_install_isolated_mode(dp_port_get_pf0_id())))
-				return DP_ERROR;
-			if (DP_FAILED(dp_port_install_isolated_mode(dp_port_get_pf1_id())))
+
+		if (port->port_type == DP_PORT_PF) {
+			if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
 				return DP_ERROR;
 		}
 	}
