@@ -387,11 +387,11 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV4_NUM:
 			strncpy(ip_str, optarg, 29);
-			version = IPVersion::IPv4;
+			version = IPVersion::IPV4;
 			break;
 		case CMD_LINE_OPT_PRIMARY_IPV6_NUM:
 			strncpy(ip6_str, optarg, 39);
-			version = IPVersion::IPv6;
+			version = IPVersion::IPV6;
 			break;
 		case CMD_LINE_OPT_T_PRIMARY_IPV6_NUM:
 			strncpy(t_ip6_str, optarg, 39);
@@ -531,7 +531,7 @@ int parse_args(int argc, char **argv)
 			break;
 		case CMD_LINE_OPT_ADD_FWALL_RULE_NUM:
 			strncpy(machine_str, optarg, 63);
-			version = IPVersion::IPv4;
+			version = IPVersion::IPV4;
 			command = DP_CMD_ADD_FWALL_RULE;
 			break;
 		case CMD_LINE_OPT_FWALL_SRC_IP_NUM:
@@ -614,24 +614,24 @@ public:
 			PXEConfig *pxe_config = new PXEConfig();
 			IPConfig *ipv6_config = new IPConfig();
 
-			ip_config->set_primaryaddress(ip_str);
-			pxe_config->set_bootfilename(pxe_path_str);
-			pxe_config->set_nextserver(pxe_ip_str);
-			ip_config->set_allocated_pxeconfig(pxe_config);
-			ipv6_config->set_primaryaddress(ip6_str);
-			request.set_interfaceid(machine_str);
+			ip_config->set_primary_address(ip_str);
+			pxe_config->set_boot_filename(pxe_path_str);
+			pxe_config->set_next_server(pxe_ip_str);
+			ipv6_config->set_primary_address(ip6_str);
+			request.set_interface_id(machine_str);
 			request.set_vni(vni);
-			request.set_allocated_ipv4config(ip_config);
-			request.set_allocated_ipv6config(ipv6_config);
-			request.set_interfacetype(InterfaceType::VirtualInterface);
+			request.set_allocated_ipv4_config(ip_config);
+			request.set_allocated_ipv6_config(ipv6_config);
+			request.set_allocated_pxe_config(pxe_config);
+			request.set_interface_type(InterfaceType::VIRTUAL);
 			if (vm_pci_str[0] != '\0')
-				request.set_devicename(vm_pci_str);
+				request.set_device_name(vm_pci_str);
 			stub_->CreateInterface(&context, request, &response);
-			if (!response.status().error()) {
+			if (!response.status().code()) {
 				printf("Allocated VF for you %s\n", response.vf().name().c_str());
-				printf("Received underlay route : %s\n", response.underlayroute().c_str());
+				printf("Received underlay route : %s\n", response.underlay_route().c_str());
 			} else {
-				printf("Received an error %d\n", response.status().error());
+				printf("Received an error %d\n", response.status().code());
 			}
 	}
 
@@ -643,22 +643,22 @@ public:
 			Prefix *prefix = new Prefix();
 
 			request.set_vni(vni);
-			prefix->set_ipversion(version);
-			if(version == IPVersion::IPv4) {
+			prefix->set_ipver(version);
+			if(version == IPVersion::IPV4) {
 				prefix->set_address(ip_str);
 			} else {
 				prefix->set_address(ip6_str);
 			}
-			prefix->set_prefixlength(length);
+			prefix->set_length(length);
 			route->set_allocated_prefix(prefix);
-			route->set_ipversion(IPVersion::IPv6);
-			route->set_nexthopvni(t_vni);
+			route->set_ipver(IPVersion::IPV6);
+			route->set_nexthop_vni(t_vni);
 			route->set_weight(100);
-			route->set_nexthopaddress(t_ip6_str);
+			route->set_nexthop_address(t_ip6_str);
 			request.set_allocated_route(route);
 			stub_->CreateRoute(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Route added\n");
 	}
@@ -671,22 +671,22 @@ public:
 			Prefix *prefix = new Prefix();
 
 			request.set_vni(vni);
-			prefix->set_ipversion(version);
-			if(version == IPVersion::IPv4) {
+			prefix->set_ipver(version);
+			if(version == IPVersion::IPV4) {
 				prefix->set_address(ip_str);
 			} else {
 				prefix->set_address(ip6_str);
 			}
-			prefix->set_prefixlength(length);
+			prefix->set_length(length);
 			route->set_allocated_prefix(prefix);
-			route->set_ipversion(IPVersion::IPv6);
-			route->set_nexthopvni(t_vni);
+			route->set_ipver(IPVersion::IPV6);
+			route->set_nexthop_vni(t_vni);
 			route->set_weight(100);
-			route->set_nexthopaddress(t_ip6_str);
+			route->set_nexthop_address(t_ip6_str);
 			request.set_allocated_route(route);
 			stub_->DeleteRoute(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Route deleted\n");
 	}
@@ -700,15 +700,15 @@ public:
 		request.set_vni(vni);
 
 		stub_->ListRoutes(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			for (i = 0; i < reply.routes_size(); i++) {
 				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
 					reply.routes(i).prefix().address().c_str(),
-					reply.routes(i).prefix().prefixlength(),
-					reply.routes(i).nexthopvni(),
-					reply.routes(i).nexthopaddress().c_str());
+					reply.routes(i).prefix().length(),
+					reply.routes(i).nexthop_vni(),
+					reply.routes(i).nexthop_address().c_str());
 			}
 	}
 
@@ -718,11 +718,11 @@ public:
 			ClientContext context;
 
 			request.set_vni(vni);
-			request.set_type(VniIpv4);
+			request.set_type(VniType::VNI_IPV4);
 
 			stub_->CheckVniInUse(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else if (reply.inuse())
 				printf("Vni: %d is in use\n", vni);
 			else
@@ -735,11 +735,11 @@ public:
 			ClientContext context;
 
 			request.set_vni(vni);
-			request.set_type(VniIpv4AndIpv6);
+			request.set_type(VniType::VNI_BOTH);
 
 			stub_->ResetVni(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Vni: %d resetted\n", vni);
 	}
@@ -750,13 +750,13 @@ public:
 			ClientContext context;
 			LBIP *back_ip = new LBIP();
 
-			request.set_loadbalancerid(lb_id_str);
-			back_ip->set_ipversion(IPVersion::IPv6);
+			request.set_loadbalancer_id(lb_id_str);
+			back_ip->set_ipver(IPVersion::IPV6);
 			back_ip->set_address(t_ip6_str);
-			request.set_allocated_targetip(back_ip);
+			request.set_allocated_target_ip(back_ip);
 			stub_->CreateLoadBalancerTarget(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("LB VIP added\n");
 	}
@@ -767,13 +767,13 @@ public:
 			ClientContext context;
 			LBIP *back_ip = new LBIP();
 
-			request.set_loadbalancerid(lb_id_str);
-			back_ip->set_ipversion(IPVersion::IPv6);
+			request.set_loadbalancer_id(lb_id_str);
+			back_ip->set_ipver(IPVersion::IPV6);
 			back_ip->set_address(t_ip6_str);
-			request.set_allocated_targetip(back_ip);
+			request.set_allocated_target_ip(back_ip);
 			stub_->DeleteLoadBalancerTarget(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("LB VIP deleted\n");
 	}
@@ -784,14 +784,14 @@ public:
 		ClientContext context;
 		int i;
 
-		request.set_loadbalancerid(lb_id_str);
+		request.set_loadbalancer_id(lb_id_str);
 
 		stub_->ListLoadBalancerTargets(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
-			for (i = 0; i < reply.targetips_size(); i++)
-				printf("Backend ip %s\n", reply.targetips(i).address().c_str());
+			for (i = 0; i < reply.target_ips_size(); i++)
+				printf("Backend ip %s\n", reply.target_ips(i).address().c_str());
 	}
 
 	void CreateFirewallRule() {
@@ -806,62 +806,62 @@ public:
 			TCPFilter *tcp_filter;
 			UDPFilter *udp_filter;
 
-			request.set_interfaceid(machine_str);
-			rule->set_ruleid(fwall_id_str);
-			rule->set_ipversion(version);
+			request.set_interface_id(machine_str);
+			rule->set_id(fwall_id_str);
+			rule->set_ipver(version);
 			rule->set_priority(priority);
 			if (strncasecmp("ingress", dir_str, 29) == 0)
-				rule->set_direction(Ingress);
+				rule->set_direction(TrafficDirection::INGRESS);
 			else
-				rule->set_direction(Egress);
+				rule->set_direction(TrafficDirection::EGRESS);
 
 			if (strncasecmp("accept", action_str, 29) == 0)
-				rule->set_action(Accept);
+				rule->set_action(FirewallAction::ACCEPT);
 			else
-				rule->set_action(Drop);
+				rule->set_action(FirewallAction::DROP);
 
-			src_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			src_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				src_ip->set_address(src_ip_str);
-			src_ip->set_prefixlength(src_length);
-			rule->set_allocated_sourceprefix(src_ip);
+			src_ip->set_length(src_length);
+			rule->set_allocated_source_prefix(src_ip);
 
-			dst_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			dst_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				dst_ip->set_address(dst_ip_str);
-			dst_ip->set_prefixlength(dst_length);
-			rule->set_allocated_destinationprefix(dst_ip);
+			dst_ip->set_length(dst_length);
+			rule->set_allocated_destination_prefix(dst_ip);
 
 			if (strncasecmp("tcp", proto_str, 29) == 0) {
 				tcp_filter = new TCPFilter();
-				tcp_filter->set_dstportlower(dst_port_min);
-				tcp_filter->set_dstportupper(dst_port_max);
-				tcp_filter->set_srcportlower(src_port_min);
-				tcp_filter->set_srcportupper(src_port_max);
+				tcp_filter->set_dst_port_lower(dst_port_min);
+				tcp_filter->set_dst_port_upper(dst_port_max);
+				tcp_filter->set_src_port_lower(src_port_min);
+				tcp_filter->set_src_port_upper(src_port_max);
 				filter->set_allocated_tcp(tcp_filter);
-				rule->set_allocated_protocolfilter(filter);
+				rule->set_allocated_protocol_filter(filter);
 			}
 			if (strncasecmp("udp", proto_str, 29) == 0) {
 				udp_filter = new UDPFilter();
-				udp_filter->set_dstportlower(dst_port_min);
-				udp_filter->set_dstportupper(dst_port_max);
-				udp_filter->set_srcportlower(src_port_min);
-				udp_filter->set_srcportupper(src_port_max);
+				udp_filter->set_dst_port_lower(dst_port_min);
+				udp_filter->set_dst_port_upper(dst_port_max);
+				udp_filter->set_src_port_lower(src_port_min);
+				udp_filter->set_src_port_upper(src_port_max);
 				filter->set_allocated_udp(udp_filter);
-				rule->set_allocated_protocolfilter(filter);
+				rule->set_allocated_protocol_filter(filter);
 			}
 			if (strncasecmp("icmp", proto_str, 29) == 0) {
 				icmp_filter = new ICMPFilter();
-				icmp_filter->set_icmpcode(icmp_code);
-				icmp_filter->set_icmptype(icmp_type);
+				icmp_filter->set_icmp_code(icmp_code);
+				icmp_filter->set_icmp_type(icmp_type);
 				filter->set_allocated_icmp(icmp_filter);
-				rule->set_allocated_protocolfilter(filter);
+				rule->set_allocated_protocol_filter(filter);
 			}
 
 			request.set_allocated_rule(rule);
 			stub_->CreateFirewallRule(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 	}
 
 	void DelFirewallRule() {
@@ -869,11 +869,11 @@ public:
 			DeleteFirewallRuleResponse reply;
 			ClientContext context;
 
-			request.set_interfaceid(machine_str);
-			request.set_ruleid(fwall_id_str);
+			request.set_interface_id(machine_str);
+			request.set_rule_id(fwall_id_str);
 			stub_->DeleteFirewallRule(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Firewall Rule Deleted\n");
 	}
@@ -884,54 +884,54 @@ public:
 		ClientContext context;
 		int i;
 
-		request.set_interfaceid(machine_str);
+		request.set_interface_id(machine_str);
 
 		stub_->ListFirewallRules(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			for (i = 0; i < reply.rules_size(); i++) {
-				printf("%s / ", reply.rules(i).ruleid().c_str());
-				if (reply.rules(i).sourceprefix().ipversion() == IPVersion::IPv4) {
-					printf("src_ip: %s / ", reply.rules(i).sourceprefix().address().c_str());
-					printf("src_ip pfx length: %d / ", reply.rules(i).sourceprefix().prefixlength());
+				printf("%s / ", reply.rules(i).id().c_str());
+				if (reply.rules(i).source_prefix().ipver() == IPVersion::IPV4) {
+					printf("src_ip: %s / ", reply.rules(i).source_prefix().address().c_str());
+					printf("src_ip pfx length: %d / ", reply.rules(i).source_prefix().length());
 				}
 
-				if (reply.rules(i).destinationprefix().ipversion() == IPVersion::IPv4) {
-					printf("dst_ip: %s / ", reply.rules(i).destinationprefix().address().c_str());
-					printf("dst_ip pfx length: %d \n", reply.rules(i).destinationprefix().prefixlength());
+				if (reply.rules(i).destination_prefix().ipver() == IPVersion::IPV4) {
+					printf("dst_ip: %s / ", reply.rules(i).destination_prefix().address().c_str());
+					printf("dst_ip pfx length: %d \n", reply.rules(i).destination_prefix().length());
 				}
 
-				switch (reply.rules(i).protocolfilter().filter_case()) {
+				switch (reply.rules(i).protocol_filter().filter_case()) {
 					case ProtocolFilter::kTcpFieldNumber:
 						printf("protocol: tcp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
-						reply.rules(i).protocolfilter().tcp().srcportlower(),
-						reply.rules(i).protocolfilter().tcp().srcportupper(),
-						reply.rules(i).protocolfilter().tcp().dstportlower(),
-						reply.rules(i).protocolfilter().tcp().dstportupper());
+						reply.rules(i).protocol_filter().tcp().src_port_lower(),
+						reply.rules(i).protocol_filter().tcp().src_port_upper(),
+						reply.rules(i).protocol_filter().tcp().dst_port_lower(),
+						reply.rules(i).protocol_filter().tcp().dst_port_upper());
 					break;
 					case ProtocolFilter::kUdpFieldNumber:
 						printf("protocol: udp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
-						reply.rules(i).protocolfilter().tcp().srcportlower(),
-						reply.rules(i).protocolfilter().tcp().srcportupper(),
-						reply.rules(i).protocolfilter().tcp().dstportlower(),
-						reply.rules(i).protocolfilter().tcp().dstportupper());
+						reply.rules(i).protocol_filter().tcp().src_port_lower(),
+						reply.rules(i).protocol_filter().tcp().src_port_upper(),
+						reply.rules(i).protocol_filter().tcp().dst_port_lower(),
+						reply.rules(i).protocol_filter().tcp().dst_port_upper());
 					break;
 					case ProtocolFilter::kIcmpFieldNumber:
 						printf("protocol: icmp / icmp_type: %d / icmp_code: %d \n",
-						reply.rules(i).protocolfilter().icmp().icmptype(),
-						reply.rules(i).protocolfilter().icmp().icmpcode());
+						reply.rules(i).protocol_filter().icmp().icmp_type(),
+						reply.rules(i).protocol_filter().icmp().icmp_code());
 					break;
 					case ProtocolFilter::FILTER_NOT_SET:
 						printf("protocol: any / src_port_min: any / dst_port_min: any\n");
 					break;
 				}
-				if (reply.rules(i).direction() == Ingress)
+				if (reply.rules(i).direction() == TrafficDirection::INGRESS)
 					printf("direction: ingress / ");
 				else
 					printf("direction: egress / ");
 
-				if (reply.rules(i).action() == Accept)
+				if (reply.rules(i).action() == FirewallAction::ACCEPT)
 					printf("action: accept \n");
 				else
 					printf("direction: drop \n");
@@ -944,53 +944,53 @@ public:
 			GetFirewallRuleResponse reply;
 			ClientContext context;
 
-			request.set_interfaceid(machine_str);
-			request.set_ruleid(fwall_id_str);
+			request.set_interface_id(machine_str);
+			request.set_rule_id(fwall_id_str);
 			stub_->GetFirewallRule(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else {
-				printf("%s / ", reply.rule().ruleid().c_str());
-				if (reply.rule().sourceprefix().ipversion() == IPVersion::IPv4) {
-					printf("src_ip: %s / ", reply.rule().sourceprefix().address().c_str());
-					printf("src_ip pfx length: %d / ", reply.rule().sourceprefix().prefixlength());
+				printf("%s / ", reply.rule().id().c_str());
+				if (reply.rule().source_prefix().ipver() == IPVersion::IPV4) {
+					printf("src_ip: %s / ", reply.rule().source_prefix().address().c_str());
+					printf("src_ip pfx length: %d / ", reply.rule().source_prefix().length());
 				}
 
-				if (reply.rule().destinationprefix().ipversion() == IPVersion::IPv4) {
-					printf("dst_ip: %s / ", reply.rule().destinationprefix().address().c_str());
-					printf("dst_ip pfx length: %d \n", reply.rule().destinationprefix().prefixlength());
+				if (reply.rule().destination_prefix().ipver() == IPVersion::IPV4) {
+					printf("dst_ip: %s / ", reply.rule().destination_prefix().address().c_str());
+					printf("dst_ip pfx length: %d \n", reply.rule().destination_prefix().length());
 				}
 
-				switch (reply.rule().protocolfilter().filter_case()) {
+				switch (reply.rule().protocol_filter().filter_case()) {
 					case ProtocolFilter::kTcpFieldNumber:
 						printf("protocol: tcp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
-						reply.rule().protocolfilter().tcp().srcportlower(),
-						reply.rule().protocolfilter().tcp().srcportupper(),
-						reply.rule().protocolfilter().tcp().dstportlower(),
-						reply.rule().protocolfilter().tcp().dstportupper());
+						reply.rule().protocol_filter().tcp().src_port_lower(),
+						reply.rule().protocol_filter().tcp().src_port_upper(),
+						reply.rule().protocol_filter().tcp().dst_port_lower(),
+						reply.rule().protocol_filter().tcp().dst_port_upper());
 					break;
 					case ProtocolFilter::kUdpFieldNumber:
 						printf("protocol: udp / src_port_min: %d / src_port_max: %d / dst_port_min: %d / dst_port_max: %d \n",
-						reply.rule().protocolfilter().tcp().srcportlower(),
-						reply.rule().protocolfilter().tcp().srcportupper(),
-						reply.rule().protocolfilter().tcp().dstportlower(),
-						reply.rule().protocolfilter().tcp().dstportupper());
+						reply.rule().protocol_filter().tcp().src_port_lower(),
+						reply.rule().protocol_filter().tcp().src_port_upper(),
+						reply.rule().protocol_filter().tcp().dst_port_lower(),
+						reply.rule().protocol_filter().tcp().dst_port_upper());
 					break;
 					case ProtocolFilter::kIcmpFieldNumber:
 						printf("protocol: icmp / icmp_type: %d / icmp_code: %d \n",
-						reply.rule().protocolfilter().icmp().icmptype(),
-						reply.rule().protocolfilter().icmp().icmpcode());
+						reply.rule().protocol_filter().icmp().icmp_type(),
+						reply.rule().protocol_filter().icmp().icmp_code());
 					break;
 					case ProtocolFilter::FILTER_NOT_SET:
 						printf("protocol: any / src_port_min: any / dst_port_min: any\n");
 					break;
 				}
-				if (reply.rule().direction() == Ingress)
+				if (reply.rule().direction() == TrafficDirection::INGRESS)
 					printf("direction: ingress / ");
 				else
 					printf("direction: egress / ");
 
-				if (reply.rule().action() == Accept)
+				if (reply.rule().action() == FirewallAction::ACCEPT)
 					printf("action: accept \n");
 				else
 					printf("direction: drop \n");
@@ -1003,16 +1003,16 @@ public:
 			ClientContext context;
 			InterfaceVIPIP *vip_ip = new InterfaceVIPIP();
 
-			request.set_interfaceid(machine_str);
-			vip_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			request.set_interface_id(machine_str);
+			vip_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				vip_ip->set_address(ip_str);
-			request.set_allocated_interfacevipip(vip_ip);
+			request.set_allocated_vip(vip_ip);
 			stub_->CreateInterfaceVIP(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
-				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
+				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void CreatePfx() {
@@ -1021,17 +1021,17 @@ public:
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
-			request.set_interfaceid(machine_str);
-			pfx_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			request.set_interface_id(machine_str);
+			pfx_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_prefixlength(length);
+			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->CreateInterfacePrefix(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
-				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
+				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void CreateLBPfx() {
@@ -1040,17 +1040,17 @@ public:
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
-			request.set_interfaceid(machine_str);
-			pfx_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			request.set_interface_id(machine_str);
+			pfx_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_prefixlength(length);
+			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->CreateInterfaceLoadBalancerPrefix(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
-				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
+				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void CreateLB() {
@@ -1065,11 +1065,11 @@ public:
 			char protos[DP_MAX_LB_PORTS][4];
 			char *pt;
 
-			request.set_loadbalancerid(lb_id_str);
+			request.set_loadbalancer_id(lb_id_str);
 			request.set_vni(vni);
-			lb_ip->set_ipversion(IPVersion::IPv4);
+			lb_ip->set_ipver(IPVersion::IPV4);
 			lb_ip->set_address(ip_str);
-			request.set_allocated_lbvipip(lb_ip);
+			request.set_allocated_loadbalanced_ip(lb_ip);
 
 			pt = strtok(port_str,",");
 			while (pt != NULL) {
@@ -1088,7 +1088,7 @@ public:
 			}
 			final_count = countpro > countp ? countp : countpro;
 			for (i = 0; i < final_count; i++) {
-				lb_port = request.add_lbports();
+				lb_port = request.add_loadbalanced_ports();
 				lb_port->set_port(ports[i]);
 				if (strncasecmp("tcp", &protos[i][0], 29) == 0)
 					lb_port->set_protocol(Protocol::TCP);
@@ -1097,10 +1097,10 @@ public:
 			}
 
 			stub_->CreateLoadBalancer(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
-				printf("Received underlay route : %s\n", reply.underlayroute().c_str());
+				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void GetLB() {
@@ -1109,19 +1109,19 @@ public:
 			ClientContext context;
 			int i;
 
-			request.set_loadbalancerid(lb_id_str);
+			request.set_loadbalancer_id(lb_id_str);
 
 			stub_->GetLoadBalancer(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code()) {
+				printf("Received an error %d\n", reply.status().code());
 			} else {
 				printf("Received LB with vni: %d UL: %s LB ip: %s with ports: ", reply.vni(),
-					   reply.underlayroute().c_str(), reply.lbvipip().address().c_str());
-				for (i = 0; i < reply.lbports_size(); i++) {
-					if (reply.lbports(i).protocol() == TCP)
-						printf("%d,%s ", reply.lbports(i).port(), "tcp");
-					if (reply.lbports(i).protocol() == UDP)
-						printf("%d,%s ", reply.lbports(i).port(), "udp");
+					   reply.underlay_route().c_str(), reply.loadbalanced_ip().address().c_str());
+				for (i = 0; i < reply.loadbalanced_ports_size(); i++) {
+					if (reply.loadbalanced_ports(i).protocol() == TCP)
+						printf("%d,%s ", reply.loadbalanced_ports(i).port(), "tcp");
+					if (reply.loadbalanced_ports(i).protocol() == UDP)
+						printf("%d,%s ", reply.loadbalanced_ports(i).port(), "udp");
 				}
 				printf("\n");
 			}
@@ -1132,11 +1132,11 @@ public:
 			DeleteLoadBalancerResponse reply;
 			ClientContext context;
 
-			request.set_loadbalancerid(lb_id_str);
+			request.set_loadbalancer_id(lb_id_str);
 
 			stub_->DeleteLoadBalancer(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("LB deleted\n");
 	}
@@ -1175,15 +1175,15 @@ public:
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
-			request.set_interfaceid(machine_str);
-			pfx_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			request.set_interface_id(machine_str);
+			pfx_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_prefixlength(length);
+			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->DeleteInterfacePrefix(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Prefix deleted\n");
 	}
@@ -1194,17 +1194,17 @@ public:
 		ClientContext context;
 		int i;
 
-		request.set_interfaceid(machine_str);
+		request.set_interface_id(machine_str);
 
 		stub_->ListInterfacePrefixes(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("Route prefix %s len %d underlayroute %s\n",
 					reply.prefixes(i).address().c_str(),
-					reply.prefixes(i).prefixlength(),
-					reply.prefixes(i).underlayroute().c_str());
+					reply.prefixes(i).length(),
+					reply.prefixes(i).underlay_route().c_str());
 			}
 	}
 
@@ -1214,15 +1214,15 @@ public:
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
-			request.set_interfaceid(machine_str);
-			pfx_ip->set_ipversion(version);
-			if(version == IPVersion::IPv4)
+			request.set_interface_id(machine_str);
+			pfx_ip->set_ipver(version);
+			if(version == IPVersion::IPV4)
 				pfx_ip->set_address(ip_str);
-			pfx_ip->set_prefixlength(length);
+			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
 			stub_->DeleteInterfaceLoadBalancerPrefix(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("LB prefix deleted\n");
 	}
@@ -1233,17 +1233,17 @@ public:
 		ClientContext context;
 		int i;
 
-		request.set_interfaceid(machine_str);
+		request.set_interface_id(machine_str);
 
 		stub_->ListInterfaceLoadBalancerPrefixes(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			for (i = 0; i < reply.prefixes_size(); i++) {
 				printf("LB Route prefix %s len %d underlayroute %s\n",
 					reply.prefixes(i).address().c_str(),
-					reply.prefixes(i).prefixlength(),
-					reply.prefixes(i).underlayroute().c_str());
+					reply.prefixes(i).length(),
+					reply.prefixes(i).underlay_route().c_str());
 			}
 	}
 
@@ -1252,10 +1252,10 @@ public:
 			DeleteInterfaceVIPResponse reply;
 			ClientContext context;
 
-			request.set_interfaceid(machine_str);
+			request.set_interface_id(machine_str);
 			stub_->DeleteInterfaceVIP(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("VIP deleted\n");
 	}
@@ -1265,13 +1265,13 @@ public:
 			GetInterfaceVIPResponse reply;
 			ClientContext context;
 
-			request.set_interfaceid(machine_str);
+			request.set_interface_id(machine_str);
 			stub_->GetInterfaceVIP(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Received VIP %s underlayroute %s\n",
-					   reply.interfacevipip().address().c_str(), reply.interfacevipip().underlayroute().c_str());
+					   reply.vip().address().c_str(), reply.vip().underlay_route().c_str());
 	}
 
 	void DelInterface() {
@@ -1279,10 +1279,10 @@ public:
 			DeleteInterfaceResponse reply;
 			ClientContext context;
 
-			request.set_interfaceid(machine_str);
+			request.set_interface_id(machine_str);
 			stub_->DeleteInterface(&context, request, &reply);
-			if (reply.status().error())
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code())
+				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Interface deleted\n");
 	}
@@ -1292,17 +1292,17 @@ public:
 			GetInterfaceResponse reply;
 			ClientContext context;
 
-			request.set_interfaceid(machine_str);
+			request.set_interface_id(machine_str);
 			stub_->GetInterface(&context, request, &reply);
-			if (reply.status().error()) {
-				printf("Received an error %d\n", reply.status().error());
+			if (reply.status().code()) {
+				printf("Received an error %d\n", reply.status().code());
 			} else {
 				printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
-				reply.interface().primaryipv4address().c_str(),
-				reply.interface().primaryipv6address().c_str(),
+				reply.interface().primary_ipv4().c_str(),
+				reply.interface().primary_ipv6().c_str(),
 				reply.interface().vni(),
-				reply.interface().pcidpname().c_str(),
-				reply.interface().underlayroute().c_str());
+				reply.interface().pci_name().c_str(),
+				reply.interface().underlay_route().c_str());
 			}
 	}
 
@@ -1313,16 +1313,16 @@ public:
 		int i;
 
 		stub_->ListInterfaces(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			for (i = 0; i < reply.interfaces_size(); i++) {
-				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).interfaceid().c_str(),
-					reply.interfaces(i).primaryipv4address().c_str(),
-					reply.interfaces(i).primaryipv6address().c_str(),
+				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).id().c_str(),
+					reply.interfaces(i).primary_ipv4().c_str(),
+					reply.interfaces(i).primary_ipv6().c_str(),
 					reply.interfaces(i).vni(),
-					reply.interfaces(i).pcidpname().c_str(),
-					reply.interfaces(i).underlayroute().c_str());
+					reply.interfaces(i).pci_name().c_str(),
+					reply.interfaces(i).underlay_route().c_str());
 			}
 	}
 
@@ -1332,18 +1332,18 @@ public:
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
-		request.set_interfaceid(machine_str);
-		nat_vip->set_ipversion(version);
-		if(version == IPVersion::IPv4)
+		request.set_interface_id(machine_str);
+		nat_vip->set_ipver(version);
+		if(version == IPVersion::IPV4)
 			nat_vip->set_address(ip_str);
-		request.set_allocated_natvipip(nat_vip);
-		request.set_minport(min_port);
-		request.set_maxport(max_port);
+		request.set_allocated_nat_ip(nat_vip);
+		request.set_min_port(min_port);
+		request.set_max_port(max_port);
 		stub_->CreateNAT(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
-			printf("Received underlay route : %s\n", reply.underlayroute().c_str());
+			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void DelNAT() {
@@ -1351,10 +1351,10 @@ public:
 		DeleteNATResponse reply;
 		ClientContext context;
 
-		request.set_interfaceid(machine_str);
+		request.set_interface_id(machine_str);
 		stub_->DeleteNAT(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("NAT deleted\n");
 	}
@@ -1364,14 +1364,14 @@ public:
 		GetNATResponse reply;
 		ClientContext context;
 
-		request.set_interfaceid(machine_str);
+		request.set_interface_id(machine_str);
 		stub_->GetNAT(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("Received NAT IP %s with min port: %d and max port: %d underlay %s\n",
-					reply.natvipip().address().c_str(), reply.minport(), reply.maxport(),
-					reply.underlayroute().c_str());
+					reply.nat_ip().address().c_str(), reply.min_port(), reply.max_port(),
+					reply.underlay_route().c_str());
 	}
 
 	void CreateNeighNAT() {
@@ -1380,22 +1380,22 @@ public:
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
-		nat_vip->set_ipversion(version);
-		if(version == IPVersion::IPv4) {
+		nat_vip->set_ipver(version);
+		if(version == IPVersion::IPV4) {
 			nat_vip->set_address(ip_str);
 		} else {
 			nat_vip->set_address(ip6_str);
 		}
 
-		request.set_allocated_natvipip(nat_vip);
+		request.set_allocated_nat_ip(nat_vip);
 		request.set_vni(vni);
-		request.set_minport(min_port);
-		request.set_maxport(max_port);
-		request.set_underlayroute(t_ip6_str);
+		request.set_min_port(min_port);
+		request.set_max_port(max_port);
+		request.set_underlay_route(t_ip6_str);
 
 		stub_->CreateNeighborNAT(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("Neighbor NAT added\n");
 	}
@@ -1407,24 +1407,24 @@ public:
 		NATIP *nat_vip = new NATIP();
 		int i;
 
-		nat_vip->set_ipversion(version);
-		if (version == IPVersion::IPv4)
+		nat_vip->set_ipver(version);
+		if (version == IPVersion::IPV4)
 			nat_vip->set_address(ip_str);
 		else
 			nat_vip->set_address(ip6_str);
-		request.set_allocated_natvipip(nat_vip);
+		request.set_allocated_nat_ip(nat_vip);
 
 		stub_->ListLocalNATs(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else {
 			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_vip->address().c_str());
-			for (i = 0; i < reply.natinfoentries_size(); i++) {
+			for (i = 0; i < reply.nat_entries_size(); i++) {
 				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
-				reply.natinfoentries(i).address().c_str(),
-				reply.natinfoentries(i).minport(),
-				reply.natinfoentries(i).maxport(),
-				reply.natinfoentries(i).vni());
+				reply.nat_entries(i).address().c_str(),
+				reply.nat_entries(i).min_port(),
+				reply.nat_entries(i).max_port(),
+				reply.nat_entries(i).vni());
 			}
 		}
 	}
@@ -1435,24 +1435,24 @@ public:
 		NATIP *nat_vip = new NATIP();
 		int i;
 
-		nat_vip->set_ipversion(version);
-		if (version == IPVersion::IPv4)
+		nat_vip->set_ipver(version);
+		if (version == IPVersion::IPV4)
 			nat_vip->set_address(ip_str);
 		else
 			nat_vip->set_address(ip6_str);
-		request.set_allocated_natvipip(nat_vip);
+		request.set_allocated_nat_ip(nat_vip);
 
 		stub_->ListNeighborNATs(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else {
 			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", nat_vip->address().c_str());
-			for (i = 0; i < reply.natinfoentries_size(); i++) {
+			for (i = 0; i < reply.nat_entries_size(); i++) {
 				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
-				reply.natinfoentries(i).minport(),
-				reply.natinfoentries(i).maxport(),
-				reply.natinfoentries(i).vni(),
-				reply.natinfoentries(i).underlayroute().c_str());
+				reply.nat_entries(i).min_port(),
+				reply.nat_entries(i).max_port(),
+				reply.nat_entries(i).vni(),
+				reply.nat_entries(i).underlay_route().c_str());
 			}
 		}
 	}
@@ -1471,21 +1471,21 @@ public:
 		ClientContext context;
 		NATIP *nat_vip = new NATIP();
 
-		nat_vip->set_ipversion(version);
-		if(version == IPVersion::IPv4) {
+		nat_vip->set_ipver(version);
+		if(version == IPVersion::IPV4) {
 			nat_vip->set_address(ip_str);
 		} else {
 			nat_vip->set_address(ip6_str);
 		}
 
-		request.set_allocated_natvipip(nat_vip);
+		request.set_allocated_nat_ip(nat_vip);
 		request.set_vni(vni);
-		request.set_minport(min_port);
-		request.set_maxport(max_port);
+		request.set_min_port(min_port);
+		request.set_max_port(max_port);
 
 		stub_->DeleteNeighborNAT(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
 			printf("Neighbor NAT deleted\n");
 	}
@@ -1495,15 +1495,15 @@ public:
 		GetVersionResponse reply;
 		ClientContext context;
 
-		request.set_clientproto(DP_SERVICE_VERSION);
-		request.set_clientname("dp_grpc_client");
-		request.set_clientver(DP_SERVICE_VERSION);
+		request.set_client_protocol(DP_SERVICE_VERSION);
+		request.set_client_name("dp_grpc_client");
+		request.set_client_version(DP_SERVICE_VERSION);
 
 		stub_->GetVersion(&context, request, &reply);
-		if (reply.status().error())
-			printf("Received an error %d\n", reply.status().error());
+		if (reply.status().code())
+			printf("Received an error %d\n", reply.status().code());
 		else
-			printf("Got protocol '%s' on service '%s'\n", reply.svcproto().c_str(), reply.svcver().c_str());
+			printf("Got protocol '%s' on service '%s'\n", reply.service_protocol().c_str(), reply.service_version().c_str());
 	}
 
 private:
