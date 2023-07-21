@@ -726,7 +726,7 @@ int DelPfxCall::Proceed()
 void ListPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_route *rp_route;
-	ListInterfacePrefixesResponse *reply_ = (ListInterfacePrefixesResponse *)context;
+	ListPrefixesResponse *reply_ = (ListPrefixesResponse *)context;
 	Prefix *pfx;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
@@ -882,7 +882,7 @@ int DelLBTargetPfxCall::Proceed()
 void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 {
 	struct dpgrpc_route *rp_route;
-	ListInterfaceLoadBalancerPrefixesResponse *reply_ = (ListInterfaceLoadBalancerPrefixesResponse *)context;
+	ListLoadBalancerPrefixesResponse *reply_ = (ListLoadBalancerPrefixesResponse *)context;
 	Prefix *pfx;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];

@@ -48,14 +48,14 @@ public:
 
 class CreateLBTargetPfxCall final : BaseCall {
 	ServerContext ctx_;
-	CreateInterfaceLoadBalancerPrefixRequest request_;
-	CreateInterfaceLoadBalancerPrefixResponse reply_;
-	ServerAsyncResponseWriter<CreateInterfaceLoadBalancerPrefixResponse> responder_;
+	CreateLoadBalancerPrefixRequest request_;
+	CreateLoadBalancerPrefixResponse reply_;
+	ServerAsyncResponseWriter<CreateLoadBalancerPrefixResponse> responder_;
 
 public:
 	CreateLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_ADD_LBPREFIX), responder_(&ctx_) {
-		service_->RequestCreateInterfaceLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestCreateLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
 	int Proceed() override;
@@ -93,14 +93,14 @@ public:
 
 class DelLBTargetPfxCall final : BaseCall {
 	ServerContext ctx_;
-	DeleteInterfaceLoadBalancerPrefixRequest request_;
-	DeleteInterfaceLoadBalancerPrefixResponse reply_;
-	ServerAsyncResponseWriter<DeleteInterfaceLoadBalancerPrefixResponse> responder_;
+	DeleteLoadBalancerPrefixRequest request_;
+	DeleteLoadBalancerPrefixResponse reply_;
+	ServerAsyncResponseWriter<DeleteLoadBalancerPrefixResponse> responder_;
 
 public:
 	DelLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_DEL_LBPREFIX), responder_(&ctx_) {
-		service_->RequestDeleteInterfaceLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestDeleteLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
 	int Proceed() override;
@@ -108,15 +108,15 @@ public:
 
 class ListLBTargetPfxCall final : BaseCall {
 	ServerContext ctx_;
-	ListInterfaceLoadBalancerPrefixesRequest request_;
-	ListInterfaceLoadBalancerPrefixesResponse reply_;
-	ServerAsyncResponseWriter<ListInterfaceLoadBalancerPrefixesResponse> responder_;
+	ListLoadBalancerPrefixesRequest request_;
+	ListLoadBalancerPrefixesResponse reply_;
+	ServerAsyncResponseWriter<ListLoadBalancerPrefixesResponse> responder_;
 private:
 	static void ListCallback(struct dpgrpc_reply *reply, void *context);
 public:
 	ListLBTargetPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_LIST_LBPREFIXES), responder_(&ctx_) {
-		service_->RequestListInterfaceLoadBalancerPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestListLoadBalancerPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
 														   this);
 	}
 	int Proceed() override;
@@ -124,14 +124,14 @@ public:
 
 class CreatePfxCall final : BaseCall {
 	ServerContext ctx_;
-	CreateInterfacePrefixRequest request_;
-	CreateInterfacePrefixResponse reply_;
-	ServerAsyncResponseWriter<CreateInterfacePrefixResponse> responder_;
+	CreatePrefixRequest request_;
+	CreatePrefixResponse reply_;
+	ServerAsyncResponseWriter<CreatePrefixResponse> responder_;
 
 public:
 	CreatePfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_ADD_PREFIX), responder_(&ctx_) {
-		service_->RequestCreateInterfacePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestCreatePrefix(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -139,14 +139,14 @@ public:
 
 class DelPfxCall final : BaseCall {
 	ServerContext ctx_;
-	DeleteInterfacePrefixRequest request_;
-	DeleteInterfacePrefixResponse reply_;
-	ServerAsyncResponseWriter<DeleteInterfacePrefixResponse> responder_;
+	DeletePrefixRequest request_;
+	DeletePrefixResponse reply_;
+	ServerAsyncResponseWriter<DeletePrefixResponse> responder_;
 
 public:
 	DelPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_DEL_PREFIX), responder_(&ctx_) {
-		service_->RequestDeleteInterfacePrefix(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestDeletePrefix(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -154,15 +154,15 @@ public:
 
 class ListPfxCall final : BaseCall {
 	ServerContext ctx_;
-	ListInterfacePrefixesRequest request_;
-	ListInterfacePrefixesResponse reply_;
-	ServerAsyncResponseWriter<ListInterfacePrefixesResponse> responder_;
+	ListPrefixesRequest request_;
+	ListPrefixesResponse reply_;
+	ServerAsyncResponseWriter<ListPrefixesResponse> responder_;
 private:
 	static void ListCallback(struct dpgrpc_reply *reply, void *context);
 public:
 	ListPfxCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_LIST_PREFIXES), responder_(&ctx_) {
-		service_->RequestListInterfacePrefixes(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestListPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -170,14 +170,14 @@ public:
 
 class CreateVIPCall final : BaseCall {
 	ServerContext ctx_;
-	CreateInterfaceVIPRequest request_;
-	CreateInterfaceVIPResponse reply_;
-	ServerAsyncResponseWriter<CreateInterfaceVIPResponse> responder_;
+	CreateVIPRequest request_;
+	CreateVIPResponse reply_;
+	ServerAsyncResponseWriter<CreateVIPResponse> responder_;
 
 public:
 	CreateVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_ADD_VIP), responder_(&ctx_) {
-		service_->RequestCreateInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestCreateVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -276,14 +276,14 @@ public:
 
 class DelVIPCall final : BaseCall {
 	ServerContext ctx_;
-	DeleteInterfaceVIPRequest request_;
-	DeleteInterfaceVIPResponse reply_;
-	ServerAsyncResponseWriter<DeleteInterfaceVIPResponse> responder_;
+	DeleteVIPRequest request_;
+	DeleteVIPResponse reply_;
+	ServerAsyncResponseWriter<DeleteVIPResponse> responder_;
 
 public:
 	DelVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_DEL_VIP), responder_(&ctx_) {
-		service_->RequestDeleteInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestDeleteVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;
@@ -291,14 +291,14 @@ public:
 
 class GetVIPCall final : BaseCall {
 	ServerContext ctx_;
-	GetInterfaceVIPRequest request_;
-	GetInterfaceVIPResponse reply_;
-	ServerAsyncResponseWriter<GetInterfaceVIPResponse> responder_;
+	GetVIPRequest request_;
+	GetVIPResponse reply_;
+	ServerAsyncResponseWriter<GetVIPResponse> responder_;
 
 public:
 	GetVIPCall(DPDKonmetal::AsyncService* service, ServerCompletionQueue* cq)
 	: BaseCall(service, cq, DP_REQ_TYPE_GET_VIP), responder_(&ctx_) {
-		service_->RequestGetInterfaceVIP(&ctx_, &request_, &responder_, cq_, cq_,
+		service_->RequestGetVIP(&ctx_, &request_, &responder_, cq_, cq_,
 										 this);
 	}
 	int Proceed() override;

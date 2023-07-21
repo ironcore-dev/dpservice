@@ -998,8 +998,8 @@ public:
 	}
 
 	void CreateVIP() {
-			CreateInterfaceVIPRequest request;
-			CreateInterfaceVIPResponse reply;
+			CreateVIPRequest request;
+			CreateVIPResponse reply;
 			ClientContext context;
 			InterfaceVIPIP *vip_ip = new InterfaceVIPIP();
 
@@ -1008,7 +1008,7 @@ public:
 			if(version == IPVersion::IPV4)
 				vip_ip->set_address(ip_str);
 			request.set_allocated_vip(vip_ip);
-			stub_->CreateInterfaceVIP(&context, request, &reply);
+			stub_->CreateVIP(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1016,8 +1016,8 @@ public:
 	}
 
 	void CreatePfx() {
-			CreateInterfacePrefixRequest request;
-			CreateInterfacePrefixResponse reply;
+			CreatePrefixRequest request;
+			CreatePrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
@@ -1027,7 +1027,7 @@ public:
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->CreateInterfacePrefix(&context, request, &reply);
+			stub_->CreatePrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1035,8 +1035,8 @@ public:
 	}
 
 	void CreateLBPfx() {
-			CreateInterfaceLoadBalancerPrefixRequest request;
-			CreateInterfaceLoadBalancerPrefixResponse reply;
+			CreateLoadBalancerPrefixRequest request;
+			CreateLoadBalancerPrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
@@ -1046,7 +1046,7 @@ public:
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->CreateInterfaceLoadBalancerPrefix(&context, request, &reply);
+			stub_->CreateLoadBalancerPrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1170,8 +1170,8 @@ public:
 	}
 
 	void DelPfx() {
-			DeleteInterfacePrefixRequest request;
-			DeleteInterfacePrefixResponse reply;
+			DeletePrefixRequest request;
+			DeletePrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
@@ -1181,7 +1181,7 @@ public:
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->DeleteInterfacePrefix(&context, request, &reply);
+			stub_->DeletePrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1189,14 +1189,14 @@ public:
 	}
 
 	void ListPfx() {
-		ListInterfacePrefixesRequest request;
-		ListInterfacePrefixesResponse reply;
+		ListPrefixesRequest request;
+		ListPrefixesResponse reply;
 		ClientContext context;
 		int i;
 
 		request.set_interface_id(machine_str);
 
-		stub_->ListInterfacePrefixes(&context, request, &reply);
+		stub_->ListPrefixes(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
@@ -1209,8 +1209,8 @@ public:
 	}
 
 	void DelLBPfx() {
-			DeleteInterfaceLoadBalancerPrefixRequest request;
-			DeleteInterfaceLoadBalancerPrefixResponse reply;
+			DeleteLoadBalancerPrefixRequest request;
+			DeleteLoadBalancerPrefixResponse reply;
 			ClientContext context;
 			Prefix *pfx_ip = new Prefix();
 
@@ -1220,7 +1220,7 @@ public:
 				pfx_ip->set_address(ip_str);
 			pfx_ip->set_length(length);
 			request.set_allocated_prefix(pfx_ip);
-			stub_->DeleteInterfaceLoadBalancerPrefix(&context, request, &reply);
+			stub_->DeleteLoadBalancerPrefix(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1228,14 +1228,14 @@ public:
 	}
 
 	void ListLBPfx() {
-		ListInterfaceLoadBalancerPrefixesRequest request;
-		ListInterfaceLoadBalancerPrefixesResponse reply;
+		ListLoadBalancerPrefixesRequest request;
+		ListLoadBalancerPrefixesResponse reply;
 		ClientContext context;
 		int i;
 
 		request.set_interface_id(machine_str);
 
-		stub_->ListInterfaceLoadBalancerPrefixes(&context, request, &reply);
+		stub_->ListLoadBalancerPrefixes(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else
@@ -1248,12 +1248,12 @@ public:
 	}
 
 	void DelVIP() {
-			DeleteInterfaceVIPRequest request;
-			DeleteInterfaceVIPResponse reply;
+			DeleteVIPRequest request;
+			DeleteVIPResponse reply;
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->DeleteInterfaceVIP(&context, request, &reply);
+			stub_->DeleteVIP(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
@@ -1261,12 +1261,12 @@ public:
 	}
 
 	void GetVIP() {
-			GetInterfaceVIPRequest request;
-			GetInterfaceVIPResponse reply;
+			GetVIPRequest request;
+			GetVIPResponse reply;
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->GetInterfaceVIP(&context, request, &reply);
+			stub_->GetVIP(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
 			else
