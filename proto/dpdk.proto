@@ -173,8 +173,8 @@ message CheckInitializedRequest {
 }
 
 message CheckInitializedResponse {
-	string uuid = 1;
-	Status status = 2;
+	Status status = 1;
+	string uuid = 2;
 }
 
 message InitializeRequest {
@@ -200,8 +200,8 @@ message ListInterfacesRequest {
 }
 
 message ListInterfacesResponse {
-	repeated Interface interfaces = 1;
-	Status status = 2;
+	Status status = 1;
+	repeated Interface interfaces = 2;
 }
 
 message GetInterfaceRequest {
@@ -223,9 +223,9 @@ message CreateInterfaceRequest {
 	uint32 vni = 3;
 	IPConfig ipv4_config = 4;
 	IPConfig ipv6_config = 5;
-	PXEConfig pxe_config = 7;
+	PXEConfig pxe_config = 6;
 	// Device with this name will be assigned if it exists, otherwise error is returned.
-	string device_name = 6;
+	string device_name = 7;
 }
 
 message CreateInterfaceResponse {
@@ -247,8 +247,8 @@ message ListPrefixesRequest {
 }
 
 message ListPrefixesResponse {
-	repeated Prefix prefixes = 1;
-	Status status = 2;
+	Status status = 1;
+	repeated Prefix prefixes = 2;
 }
 
 message CreatePrefixRequest {
@@ -275,8 +275,8 @@ message ListLoadBalancerPrefixesRequest {
 }
 
 message ListLoadBalancerPrefixesResponse {
-	repeated Prefix prefixes = 1;
-	Status status = 2;
+	Status status = 1;
+	repeated Prefix prefixes = 2;
 }
 
 message CreateLoadBalancerPrefixRequest {
@@ -409,7 +409,7 @@ message GetNATResponse {
 }
 
 message DeleteNATRequest {
-	bytes interface_id =1;
+	bytes interface_id = 1;
 }
 
 message DeleteNATResponse {
@@ -444,8 +444,8 @@ message ListLocalNATsRequest {
 }
 
 message ListLocalNATsResponse {
-	repeated NATEntry nat_entries = 3;
-	Status status = 4;
+	Status status = 1;
+	repeated NATEntry nat_entries = 2;
 }
 
 message ListNeighborNATsRequest {
@@ -453,8 +453,8 @@ message ListNeighborNATsRequest {
 }
 
 message ListNeighborNATsResponse {
-	repeated NATEntry nat_entries = 3;
-	Status status = 4;
+	Status status = 1;
+	repeated NATEntry nat_entries = 2;
 }
 
 message ListRoutesRequest {
@@ -462,8 +462,8 @@ message ListRoutesRequest {
 }
 
 message ListRoutesResponse {
-	repeated Route routes = 1;
-	Status status = 2;
+	Status status = 1;
+	repeated Route routes = 2;
 }
 
 message CreateRouteRequest {
@@ -490,8 +490,8 @@ message CheckVniInUseRequest {
 }
 
 message CheckVniInUseResponse {
-	bool inUse = 1;
-	Status status = 2;
+	Status status = 1;
+	bool inUse = 2;
 }
 
 message ResetVniRequest {
@@ -507,8 +507,8 @@ message ListFirewallRulesRequest {
 }
 
 message ListFirewallRulesResponse {
-	repeated FirewallRule rules = 1;
-	Status status = 2;
+	Status status = 1;
+	repeated FirewallRule rules = 2;
 }
 
 message CreateFirewallRuleRequest {
