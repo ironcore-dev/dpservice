@@ -888,7 +888,7 @@ void ListLBTargetPfxCall::ListCallback(struct dpgrpc_reply *reply, void *context
 {
 	struct dpgrpc_route *rp_route;
 	ListInterfaceLoadBalancerPrefixesResponse *reply_ = (ListInterfaceLoadBalancerPrefixesResponse *)context;
-	LBPrefix *pfx;
+	Prefix *pfx;
 	struct in_addr addr;
 	char buf_str[INET6_ADDRSTRLEN];
 

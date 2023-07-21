@@ -56,14 +56,6 @@ message Prefix {
 	bytes underlayRoute = 4;
 }
 
-// TODO hmmm!
-message LBPrefix {
-	IPVersion ipVersion = 1;
-	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
-	uint32 prefixLength = 3;  // max length is 32 for IPv4 and 128 for IPv6
-	bytes underlayRoute = 4;
-}
-
 message Interface {
 	bytes interfaceID = 1;
 	uint32 vni = 2;
@@ -295,7 +287,7 @@ message ListInterfaceLoadBalancerPrefixesRequest {
 }
 
 message ListInterfaceLoadBalancerPrefixesResponse {
-	repeated LBPrefix prefixes = 1;
+	repeated Prefix prefixes = 1;
 	Status status = 2;
 }
 
