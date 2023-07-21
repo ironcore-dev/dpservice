@@ -48,9 +48,10 @@ RUN unzip dpdk-${DPDK_VER}.zip
 ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
 # Copy DPDK patches
-COPY hack/dpdk_21_11_clang.patch hack/dpdk_21_11_log.patch hack/
+COPY hack/*.patch hack/
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_log.patch
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_xstats_mem_leak.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
