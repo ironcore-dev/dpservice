@@ -49,6 +49,11 @@ message Status {
 	string message = 2;
 }
 
+message IPAddress {
+	IPVersion ipver = 1;
+	bytes address = 2;    // holds 4 bytes (IPVersion::IPV4) or 16 bytes (IPVersion::IPV6)
+}
+
 message Prefix {
 	IPVersion ipver = 1;
 	bytes address = 2;        // can hold 4 bytes (IPv4) or 16 bytes (IPv6)
@@ -82,26 +87,9 @@ message VirtualFunction {
 	uint32 function = 5;  // PCIe Function
 }
 
-// TODO ah!!! address
-message InterfaceVIPIP {
-	IPVersion ipver = 2;
-	bytes address = 3;	// Can be both ipv4 and ipv6
-	bytes underlay_route = 4;
-}
-
-message LBIP {
-	IPVersion ipver = 1;
-	bytes address = 2;	// Can be both ipv4 and ipv6
-}
-
 message LBPort {
 	uint32 port = 1;
 	Protocol protocol = 2;
-}
-
-message NATIP {
-	IPVersion ipver = 1;
-	bytes address = 2;	// Can be both ipv4 and ipv6
 }
 
 message NATEntry {
@@ -300,7 +288,7 @@ message DeleteLoadBalancerPrefixResponse {
 
 message CreateVIPRequest {
 	bytes interface_id = 1;
-	InterfaceVIPIP vip = 2;
+	IPAddress vip_ip = 2;
 }
 
 message CreateVIPResponse {
@@ -314,7 +302,8 @@ message GetVIPRequest {
 
 message GetVIPResponse {
 	Status status = 1;
-	InterfaceVIPIP vip = 2;
+	IPAddress vip_ip = 2;
+	bytes underlay_route = 3;
 }
 
 message DeleteVIPRequest {
@@ -327,7 +316,7 @@ message DeleteVIPResponse {
 
 message CreateLoadBalancerRequest {
 	bytes loadbalancer_id = 1;
-	LBIP loadbalanced_ip = 2;
+	IPAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
 	repeated LBPort loadbalanced_ports = 4;
 }
@@ -343,7 +332,7 @@ message GetLoadBalancerRequest {
 
 message GetLoadBalancerResponse {
 	Status status = 1;
-	LBIP loadbalanced_ip = 2;
+	IPAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
 	repeated LBPort loadbalanced_ports = 4;
 	bytes underlay_route = 5;
@@ -359,7 +348,7 @@ message DeleteLoadBalancerResponse {
 
 message CreateLoadBalancerTargetRequest {
 	bytes loadbalancer_id = 1;
-	LBIP target_ip = 2;
+	IPAddress target_ip = 2;
 }
 
 message CreateLoadBalancerTargetResponse {
@@ -372,12 +361,12 @@ message ListLoadBalancerTargetsRequest {
 
 message ListLoadBalancerTargetsResponse {
 	Status status = 1;
-	repeated LBIP target_ips = 2;
+	repeated IPAddress target_ips = 2;
 }
 
 message DeleteLoadBalancerTargetRequest {
 	bytes loadbalancer_id = 1;
-	LBIP target_ip = 2;
+	IPAddress target_ip = 2;
 }
 
 message DeleteLoadBalancerTargetResponse {
@@ -386,7 +375,7 @@ message DeleteLoadBalancerTargetResponse {
 
 message CreateNATRequest {
 	bytes interface_id =1;
-	NATIP nat_ip = 2;
+	IPAddress nat_ip = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
 }
@@ -402,7 +391,7 @@ message GetNATRequest {
 
 message GetNATResponse {
 	Status status = 1;
-	NATIP nat_ip = 2;
+	IPAddress nat_ip = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
 	bytes underlay_route = 5;
@@ -417,7 +406,7 @@ message DeleteNATResponse {
 }
 
 message CreateNeighborNATRequest {
-	NATIP nat_ip = 1;
+	IPAddress nat_ip = 1;
 	uint32 vni = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
@@ -429,7 +418,7 @@ message CreateNeighborNATResponse {
 }
 
 message DeleteNeighborNATRequest {
-	NATIP nat_ip = 1;
+	IPAddress nat_ip = 1;
 	uint32 vni = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
@@ -440,7 +429,7 @@ message DeleteNeighborNATResponse {
 }
 
 message ListLocalNATsRequest {
-	NATIP nat_ip = 1;
+	IPAddress nat_ip = 1;
 }
 
 message ListLocalNATsResponse {
@@ -449,7 +438,7 @@ message ListLocalNATsResponse {
 }
 
 message ListNeighborNATsRequest {
-	NATIP nat_ip = 1;
+	IPAddress nat_ip = 1;
 }
 
 message ListNeighborNATsResponse {

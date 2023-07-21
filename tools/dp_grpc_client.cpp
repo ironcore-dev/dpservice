@@ -748,12 +748,12 @@ public:
 			CreateLoadBalancerTargetRequest request;
 			CreateLoadBalancerTargetResponse reply;
 			ClientContext context;
-			LBIP *back_ip = new LBIP();
+			IPAddress *target_ip = new IPAddress();
 
 			request.set_loadbalancer_id(lb_id_str);
-			back_ip->set_ipver(IPVersion::IPV6);
-			back_ip->set_address(t_ip6_str);
-			request.set_allocated_target_ip(back_ip);
+			target_ip->set_ipver(IPVersion::IPV6);
+			target_ip->set_address(t_ip6_str);
+			request.set_allocated_target_ip(target_ip);
 			stub_->CreateLoadBalancerTarget(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -765,12 +765,12 @@ public:
 			DeleteLoadBalancerTargetRequest request;
 			DeleteLoadBalancerTargetResponse reply;
 			ClientContext context;
-			LBIP *back_ip = new LBIP();
+			IPAddress *target_ip = new IPAddress();
 
 			request.set_loadbalancer_id(lb_id_str);
-			back_ip->set_ipver(IPVersion::IPV6);
-			back_ip->set_address(t_ip6_str);
-			request.set_allocated_target_ip(back_ip);
+			target_ip->set_ipver(IPVersion::IPV6);
+			target_ip->set_address(t_ip6_str);
+			request.set_allocated_target_ip(target_ip);
 			stub_->DeleteLoadBalancerTarget(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -1001,13 +1001,13 @@ public:
 			CreateVIPRequest request;
 			CreateVIPResponse reply;
 			ClientContext context;
-			InterfaceVIPIP *vip_ip = new InterfaceVIPIP();
+			IPAddress *vip_ip = new IPAddress();
 
 			request.set_interface_id(machine_str);
 			vip_ip->set_ipver(version);
 			if(version == IPVersion::IPV4)
 				vip_ip->set_address(ip_str);
-			request.set_allocated_vip(vip_ip);
+			request.set_allocated_vip_ip(vip_ip);
 			stub_->CreateVIP(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
@@ -1057,7 +1057,7 @@ public:
 			CreateLoadBalancerRequest request;
 			CreateLoadBalancerResponse reply;
 			ClientContext context;
-			LBIP *lb_ip = new LBIP(); 
+			IPAddress *lb_ip = new IPAddress();
 			LBPort *lb_port;
 			uint16_t ports[DP_MAX_LB_PORTS];
 			uint16_t countpro = 0, countp = 0, i;
@@ -1271,7 +1271,7 @@ public:
 				printf("Received an error %d\n", reply.status().code());
 			else
 				printf("Received VIP %s underlayroute %s\n",
-					   reply.vip().address().c_str(), reply.vip().underlay_route().c_str());
+					   reply.vip_ip().address().c_str(), reply.underlay_route().c_str());
 	}
 
 	void DelInterface() {
@@ -1330,13 +1330,13 @@ public:
 		CreateNATRequest request;
 		CreateNATResponse reply;
 		ClientContext context;
-		NATIP *nat_vip = new NATIP();
+		IPAddress *nat_ip = new IPAddress();
 
 		request.set_interface_id(machine_str);
-		nat_vip->set_ipver(version);
+		nat_ip->set_ipver(version);
 		if(version == IPVersion::IPV4)
-			nat_vip->set_address(ip_str);
-		request.set_allocated_nat_ip(nat_vip);
+			nat_ip->set_address(ip_str);
+		request.set_allocated_nat_ip(nat_ip);
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
 		stub_->CreateNAT(&context, request, &reply);
@@ -1378,16 +1378,16 @@ public:
 		CreateNeighborNATRequest request;
 		CreateNeighborNATResponse reply;
 		ClientContext context;
-		NATIP *nat_vip = new NATIP();
+		IPAddress *nat_ip = new IPAddress();
 
-		nat_vip->set_ipver(version);
+		nat_ip->set_ipver(version);
 		if(version == IPVersion::IPV4) {
-			nat_vip->set_address(ip_str);
+			nat_ip->set_address(ip_str);
 		} else {
-			nat_vip->set_address(ip6_str);
+			nat_ip->set_address(ip6_str);
 		}
 
-		request.set_allocated_nat_ip(nat_vip);
+		request.set_allocated_nat_ip(nat_ip);
 		request.set_vni(vni);
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
@@ -1404,21 +1404,21 @@ public:
 		ListLocalNATsRequest request;
 		ListLocalNATsResponse reply;
 		ClientContext context;
-		NATIP *nat_vip = new NATIP();
+		IPAddress *nat_ip = new IPAddress();
 		int i;
 
-		nat_vip->set_ipver(version);
+		nat_ip->set_ipver(version);
 		if (version == IPVersion::IPV4)
-			nat_vip->set_address(ip_str);
+			nat_ip->set_address(ip_str);
 		else
-			nat_vip->set_address(ip6_str);
-		request.set_allocated_nat_ip(nat_vip);
+			nat_ip->set_address(ip6_str);
+		request.set_allocated_nat_ip(nat_ip);
 
 		stub_->ListLocalNATs(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else {
-			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_vip->address().c_str());
+			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_ip->address().c_str());
 			for (i = 0; i < reply.nat_entries_size(); i++) {
 				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
 				reply.nat_entries(i).address().c_str(),
@@ -1432,21 +1432,21 @@ public:
 		ListNeighborNATsRequest request;
 		ListNeighborNATsResponse reply;
 		ClientContext context;
-		NATIP *nat_vip = new NATIP();
+		IPAddress *nat_ip = new IPAddress();
 		int i;
 
-		nat_vip->set_ipver(version);
+		nat_ip->set_ipver(version);
 		if (version == IPVersion::IPV4)
-			nat_vip->set_address(ip_str);
+			nat_ip->set_address(ip_str);
 		else
-			nat_vip->set_address(ip6_str);
-		request.set_allocated_nat_ip(nat_vip);
+			nat_ip->set_address(ip6_str);
+		request.set_allocated_nat_ip(nat_ip);
 
 		stub_->ListNeighborNATs(&context, request, &reply);
 		if (reply.status().code())
 			printf("Received an error %d\n", reply.status().code());
 		else {
-			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", nat_vip->address().c_str());
+			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", nat_ip->address().c_str());
 			for (i = 0; i < reply.nat_entries_size(); i++) {
 				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
 				reply.nat_entries(i).min_port(),
@@ -1469,16 +1469,16 @@ public:
 		DeleteNeighborNATRequest request;
 		DeleteNeighborNATResponse reply;
 		ClientContext context;
-		NATIP *nat_vip = new NATIP();
+		IPAddress *nat_ip = new IPAddress();
 
-		nat_vip->set_ipver(version);
+		nat_ip->set_ipver(version);
 		if(version == IPVersion::IPV4) {
-			nat_vip->set_address(ip_str);
+			nat_ip->set_address(ip_str);
 		} else {
-			nat_vip->set_address(ip6_str);
+			nat_ip->set_address(ip6_str);
 		}
 
-		request.set_allocated_nat_ip(nat_vip);
+		request.set_allocated_nat_ip(nat_ip);
 		request.set_vni(vni);
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);

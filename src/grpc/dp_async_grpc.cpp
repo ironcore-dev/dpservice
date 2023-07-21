@@ -431,7 +431,7 @@ int GetLBCall::Proceed()
 	struct dpgrpc_reply reply;
 	struct in_addr addr;
 	LBPort *lb_port;
-	LBIP *lb_ip;
+	IPAddress *lb_ip;
 	int i;
 
 	if (status_ == REQUEST) {
@@ -453,7 +453,7 @@ int GetLBCall::Proceed()
 			return -1;
 		status_ = FINISH;
 		reply_.set_vni(reply.lb.vni);
-		lb_ip = new LBIP();
+		lb_ip = new IPAddress();
 		addr.s_addr = reply.lb.addr;
 		lb_ip->set_address(inet_ntoa(addr));
 		if (reply.lb.ip_type == RTE_ETHER_TYPE_IPV4)
@@ -578,7 +578,7 @@ void GetLBVIPBackendsCall::ListCallback(struct dpgrpc_reply *reply, void *contex
 {
 	struct dpgrpc_lb_target *lb_target = (struct dpgrpc_lb_target *)reply;
 	ListLoadBalancerTargetsResponse *reply_ = (ListLoadBalancerTargetsResponse *)context;
-	LBIP *target_ip;
+	IPAddress *target_ip;
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (reply->err_code) {
@@ -955,16 +955,16 @@ int CreateVIPCall::Proceed()
 			return -1;
 		DPGRPC_LOG_INFO("Setting virtual IP",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_IPV4STR(request_.vip().address().c_str()));
+						DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
 		snprintf(request.add_vip.iface_id, sizeof(request.add_vip.iface_id),
 				 "%s", request_.interface_id().c_str());
-		if (request_.vip().ipver() == IPVersion::IPV4) {
+		if (request_.vip_ip().ipver() == IPVersion::IPV4) {
 			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.vip().address().c_str(),
+			ret_val = inet_aton(request_.vip_ip().address().c_str(),
 					  (in_addr*)&request.add_vip.addr);
 			if (ret_val == 0)
 				DPGRPC_LOG_WARNING("Invalid virtual IP",
-								   DP_LOG_IPV4STR(request_.vip().address().c_str()));
+								   DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
 		}
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
@@ -1029,7 +1029,7 @@ int GetVIPCall::Proceed()
 	};
 	struct dpgrpc_reply reply;
 	struct in_addr addr;
-	InterfaceVIPIP *vip;
+	IPAddress *vip_ip;
 
 	if (status_ == REQUEST) {
 		new GetVIPCall(service_, cq_);
@@ -1048,13 +1048,13 @@ int GetVIPCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		vip = new InterfaceVIPIP();
-		vip->set_ipver(IPVersion::IPV4);
+		vip_ip = new IPAddress();
+		vip_ip->set_ipver(IPVersion::IPV4);
 		addr.s_addr = reply.vip.addr;
-		vip->set_address(inet_ntoa(addr));
+		vip_ip->set_address(inet_ntoa(addr));
 		inet_ntop(AF_INET6, reply.vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
-		vip->set_underlay_route(buf_str);
-		reply_.set_allocated_vip(vip);
+		reply_.set_allocated_vip_ip(vip_ip);
+		reply_.set_underlay_route(buf_str);
 		status_ = FINISH;
 		reply_.set_allocated_status(CreateErrStatus(&reply));
 		responder_.Finish(reply_, ret, this);
@@ -1476,7 +1476,7 @@ int GetNATVIPCall::Proceed()
 	};
 	struct dpgrpc_reply reply;
 	struct in_addr addr;
-	NATIP *nat_ip;
+	IPAddress *nat_ip;
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
@@ -1496,7 +1496,7 @@ int GetNATVIPCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		nat_ip = new NATIP();
+		nat_ip = new IPAddress();
 		addr.s_addr = reply.nat.addr;
 		nat_ip->set_address(inet_ntoa(addr));
 		nat_ip->set_ipver(IPVersion::IPV4);
