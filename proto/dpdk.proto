@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package dpdkonmetal;
+package dpdkonmetal.v1;
 option go_package = "./dpdkproto";
 
 //// ENUMS

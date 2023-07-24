@@ -23,7 +23,7 @@ using grpc::ServerWriter;
 using grpc::ServerAsyncResponseWriter;
 using grpc::ServerCompletionQueue;
 
-using namespace dpdkonmetal;
+using namespace dpdkonmetal::v1;
 
 enum CallStatus { REQUEST, INITCHECK, AWAIT_MSG, FINISH };
 

@@ -13,7 +13,7 @@
 
 using grpc::Channel;
 using grpc::ClientContext;
-using namespace dpdkonmetal;
+using namespace dpdkonmetal::v1;
 using namespace std::chrono;
 
 static const char short_options[] = "d" /* debug */
