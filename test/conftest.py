@@ -2,6 +2,7 @@ import pytest
 import os
 
 from config import *
+from dp_grpc_client import DpGrpcClient
 from dp_service import DpService
 from grpc_client import GrpcClient
 from helpers import request_ip
@@ -30,6 +31,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--offloading", action="store_true", help="Test with offloadin enabled (HW only)"
 	)
+	parser.addoption(
+		"--dpgrpc", action="store_true", help="Use C++ gRPC client"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -44,7 +48,9 @@ def fast_flow_timeout(request):
 	return request.config.getoption("--fast-flow-timeout")
 
 @pytest.fixture(scope="package")
-def grpc_client(build_path):
+def grpc_client(request, build_path):
+	if request.config.getoption("--dpgrpc"):
+		return DpGrpcClient(build_path)
 	return GrpcClient(build_path)
 
 
