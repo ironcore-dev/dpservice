@@ -28,7 +28,7 @@ const char *dp_grpc_strerror(int grpc_errcode)
 		return "Success";
 	if (grpc_errcode < 0 || grpc_errcode >= (int)RTE_DIM(dp_grpc_error_strings) || !dp_grpc_error_strings[grpc_errcode]) {
 		// this should never happen, the programmer must have returned a wrong value
-		assert(0);
+		assert("Invalid gRPC error code provided" == NULL);
 		return "Invalid gRPC error code";
 	}
 	return dp_grpc_error_strings[grpc_errcode];

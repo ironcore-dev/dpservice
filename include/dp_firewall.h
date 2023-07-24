@@ -35,7 +35,6 @@ struct dp_port_filter {
 	struct dp_port_range dst_port;
 };
 
-/* This needs to be a typedef because of the TAILQ macros used on it */
 struct dp_fwall_rule {
 	char		rule_id[DP_FIREWALL_ID_MAX_LEN];
 	uint32_t	src_ip;

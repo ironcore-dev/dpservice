@@ -5,1756 +5,606 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
-#include "grpc/dp_grpc_queue.h"
+#include "grpc/dp_grpc_conv.h"
 #include "grpc/dp_grpc_service.h"
 
-// TODO(plague): this should all get wrapped in a superclass
-#define DPGRPC_GET_MESSAGE(REPLY, I, TYPE) (TYPE *)((REPLY)->messages + (I) * sizeof(TYPE))
+// this is arbitrary, just not error or DP_OK
+#define DP_GRPC_REPLY_NOT_READY 1
 
-inline Status *BaseCall::CreateErrStatus(dpgrpc_reply *reply) {
-	uint32_t err_code = reply->err_code;
-	Status *err_status = new Status();
-	err_status->set_code(err_code);
-	err_status->set_message(dp_grpc_strerror(err_code));
-	return err_status;
-}
+// Iterator for MultiReplyCall message array
+#define FOREACH_MESSAGE(ITERATOR, REPLY) \
+	for (ITERATOR = (typeof ITERATOR)(REPLY)->messages; \
+		 ITERATOR < (typeof ITERATOR)(REPLY)->messages + (REPLY)->msg_count; \
+		 ++ITERATOR)
 
-void BaseCall::ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule *grpc_rule, struct dp_fwall_rule *dp_rule)
+// Prevent errors and large inputs (negative values/errors will be converted to huge size by uint)
+#define SNPRINTF_FAILED(DEST, SRC) \
+	((uint)snprintf(DEST, sizeof(DEST), "%s", SRC.c_str()) >= sizeof(DEST))
+
+
+CallState BaseCall::HandleRpc()
 {
-	int ret_val;
-
-	snprintf(dp_rule->rule_id, sizeof(dp_rule->rule_id),
-				"%s", grpc_rule->id().c_str());
-	if (grpc_rule->source_prefix().ip().ipver() == IpVersion::IPV4) {
-		ret_val = inet_aton(grpc_rule->source_prefix().ip().address().c_str(),
-					(in_addr*)&dp_rule->src_ip);
-		if (ret_val == 0)
-			DPGRPC_LOG_WARNING("Bad firewall rule, wrong source prefix address",
-							   DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							   DP_LOG_FWSRC(grpc_rule->source_prefix().ip().address().c_str()));
-		if (grpc_rule->source_prefix().length() != DP_FWALL_MATCH_ANY_LENGTH)
-			dp_rule->src_ip_mask = ~((1 << (32 - grpc_rule->source_prefix().length())) - 1);
-		else
-			dp_rule->src_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
-	}
-
-	if (grpc_rule->destination_prefix().ip().ipver() == IpVersion::IPV4) {
-		ret_val = inet_aton(grpc_rule->destination_prefix().ip().address().c_str(),
-					(in_addr*)&dp_rule->dest_ip);
-		if (ret_val == 0)
-			DPGRPC_LOG_WARNING("Bad firewall rule, wrong destination prefix address",
-							   DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							   DP_LOG_FWSRC(grpc_rule->destination_prefix().ip().address().c_str()));
-		if (grpc_rule->destination_prefix().length() != DP_FWALL_MATCH_ANY_LENGTH)
-			dp_rule->dest_ip_mask = ~((1 << (32 - grpc_rule->destination_prefix().length())) - 1);
-		else
-			dp_rule->dest_ip_mask = DP_FWALL_MATCH_ANY_LENGTH;
-	}
-
-	if (grpc_rule->direction() == TrafficDirection::INGRESS)
-		dp_rule->dir = DP_FWALL_INGRESS;
-	else
-		dp_rule->dir = DP_FWALL_EGRESS;
-
-	if (grpc_rule->action() == FirewallAction::ACCEPT)
-		dp_rule->action = DP_FWALL_ACCEPT;
-	else
-		dp_rule->action = DP_FWALL_DROP;
-
-	dp_rule->priority = grpc_rule->priority();
-
-	switch (grpc_rule->protocol_filter().filter_case()) {
-		case ProtocolFilter::kTcpFieldNumber:
-			dp_rule->protocol = IPPROTO_TCP;
-			dp_rule->filter.tcp_udp.src_port.lower = grpc_rule->protocol_filter().tcp().src_port_lower();
-			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocol_filter().tcp().dst_port_lower();
-			dp_rule->filter.tcp_udp.src_port.upper = grpc_rule->protocol_filter().tcp().src_port_upper();
-			dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule->protocol_filter().tcp().dst_port_upper();
-			DPGRPC_LOG_INFO("Adding firewall rule filter",
-							DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							DP_LOG_FWPROTO(dp_rule->protocol),
-							DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
-							DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
-							DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
-							DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
-		break;
-		case ProtocolFilter::kUdpFieldNumber:
-			dp_rule->protocol = IPPROTO_UDP;
-			dp_rule->filter.tcp_udp.src_port.lower = grpc_rule->protocol_filter().udp().src_port_lower();
-			dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule->protocol_filter().udp().dst_port_lower();
-			dp_rule->filter.tcp_udp.src_port.upper = grpc_rule->protocol_filter().udp().src_port_upper();
-			dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule->protocol_filter().udp().dst_port_upper();
-			DPGRPC_LOG_INFO("Adding firewall rule filter",
-							DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							DP_LOG_FWPROTO(dp_rule->protocol),
-							DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
-							DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
-							DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
-							DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
-		break;
-		case ProtocolFilter::kIcmpFieldNumber:
-			dp_rule->protocol = IPPROTO_ICMP;
-			dp_rule->filter.icmp.icmp_type = grpc_rule->protocol_filter().icmp().icmp_type();
-			dp_rule->filter.icmp.icmp_code = grpc_rule->protocol_filter().icmp().icmp_code();
-			DPGRPC_LOG_INFO("Adding firewall rule filter",
-							DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							DP_LOG_FWPROTO(dp_rule->protocol),
-							DP_LOG_FWICMPTYPE(dp_rule->filter.icmp.icmp_type),
-							DP_LOG_FWICMPCODE(dp_rule->filter.icmp.icmp_code));
-		break;
-		case ProtocolFilter::FILTER_NOT_SET:
-		default:
-			dp_rule->protocol = DP_FWALL_MATCH_ANY_PROTOCOL;
-			dp_rule->filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT;
-			dp_rule->filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT;
-			DPGRPC_LOG_INFO("Adding firewall rule filter",
-							DP_LOG_FWRULE(grpc_rule->id().c_str()),
-							DP_LOG_FWPROTO(dp_rule->protocol));
-	}
-}
-
-void BaseCall::ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule	*dp_rule, FirewallRule *grpc_rule)
-{
-	IcmpFilter *icmp_filter;
-	ProtocolFilter *filter;
-	TcpFilter *tcp_filter;
-	UdpFilter *udp_filter;
-	struct in_addr addr;
-	Prefix *src_pfx;
-	Prefix *dst_pfx;
-	IpAddress *src_ip;
-	IpAddress *dst_ip;
-
-	grpc_rule->set_id(dp_rule->rule_id);
-	grpc_rule->set_priority(dp_rule->priority);
-	if (dp_rule->dir == DP_FWALL_INGRESS)
-		grpc_rule->set_direction(TrafficDirection::INGRESS);
-	else
-		grpc_rule->set_direction(TrafficDirection::EGRESS);
-
-	if (dp_rule->action == DP_FWALL_ACCEPT)
-		grpc_rule->set_action(FirewallAction::ACCEPT);
-	else
-		grpc_rule->set_action(FirewallAction::DROP);
-
-	src_ip = new IpAddress();
-	src_ip->set_ipver(IpVersion::IPV4);
-	addr.s_addr = dp_rule->src_ip;
-	src_ip->set_address(inet_ntoa(addr));
-	src_pfx = new Prefix();
-	src_pfx->set_allocated_ip(src_ip);
-	src_pfx->set_length(__builtin_popcount(dp_rule->src_ip_mask));
-	grpc_rule->set_allocated_source_prefix(src_pfx);
-
-	dst_ip = new IpAddress();
-	dst_ip->set_ipver(IpVersion::IPV4);
-	addr.s_addr = dp_rule->dest_ip;
-	dst_ip->set_address(inet_ntoa(addr));
-	dst_pfx = new Prefix();
-	dst_pfx->set_allocated_ip(dst_ip);
-	dst_pfx->set_length(__builtin_popcount(dp_rule->dest_ip_mask));
-	grpc_rule->set_allocated_destination_prefix(dst_pfx);
-
-	filter = new ProtocolFilter();
-	if (dp_rule->protocol == IPPROTO_TCP) {
-		tcp_filter = new TcpFilter();
-		tcp_filter->set_dst_port_lower(dp_rule->filter.tcp_udp.dst_port.lower);
-		tcp_filter->set_dst_port_upper(dp_rule->filter.tcp_udp.dst_port.upper);
-		tcp_filter->set_src_port_lower(dp_rule->filter.tcp_udp.src_port.lower);
-		tcp_filter->set_src_port_upper(dp_rule->filter.tcp_udp.src_port.upper);
-		filter->set_allocated_tcp(tcp_filter);
-		grpc_rule->set_allocated_protocol_filter(filter);
-	}
-	if (dp_rule->protocol == IPPROTO_UDP) {
-		udp_filter = new UdpFilter();
-		udp_filter->set_dst_port_lower(dp_rule->filter.tcp_udp.dst_port.lower);
-		udp_filter->set_dst_port_upper(dp_rule->filter.tcp_udp.dst_port.upper);
-		udp_filter->set_src_port_lower(dp_rule->filter.tcp_udp.src_port.lower);
-		udp_filter->set_src_port_upper(dp_rule->filter.tcp_udp.src_port.upper);
-		filter->set_allocated_udp(udp_filter);
-		grpc_rule->set_allocated_protocol_filter(filter);
-	}
-	if (dp_rule->protocol == IPPROTO_ICMP) {
-		icmp_filter = new IcmpFilter();
-		icmp_filter->set_icmp_code(dp_rule->filter.icmp.icmp_code);
-		icmp_filter->set_icmp_type(dp_rule->filter.icmp.icmp_type);
-		filter->set_allocated_icmp(icmp_filter);
-		grpc_rule->set_allocated_protocol_filter(filter);
-	}
-}
-
-int CheckVniInUseCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new CheckVniInUseCall();
-		switch (request_.type()) {
-		case VniType::VNI_IPV4:
-			request.vni_in_use.type = DP_VNI_IPV4;
-			break;
-		case VniType::VNI_IPV6:
-			request.vni_in_use.type = DP_VNI_IPV6;
-			break;
-		// TODO(guvenc,plague): is this wanted? requesting both gives only one
-		default:
-			request.vni_in_use.type = DP_VNI_IPV4;
-			break;
-		}
-		request.vni_in_use.vni = request_.vni();
-		DPGRPC_LOG_DEBUG("Checking VNI usage", DP_LOG_VNI(request.vni_in_use.vni),
-						DP_LOG_VNI_TYPE(request.vni_in_use.type));
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_in_use(!!reply.vni_in_use.in_use);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int ResetVniCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new ResetVniCall();
-		switch (request_.type()) {
-		case VniType::VNI_IPV4:
-			request.vni_in_use.type = DP_VNI_IPV4;
-			break;
-		case VniType::VNI_IPV6:
-			request.vni_in_use.type = DP_VNI_IPV6;
-			break;
-		case VniType::VNI_BOTH:
-		default:
-			request.vni_in_use.type = DP_VNI_BOTH;
-			break;
-		}
-		request.vni_in_use.vni = request_.vni();
-		DPGRPC_LOG_INFO("Resetting VNI", DP_LOG_VNI(request.vni_in_use.vni),
-						DP_LOG_VNI_TYPE(request.vni_in_use.type));
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int BaseCall::InitCheck()
-{
-	if (!GRPCService::GetInstance()->IsInitialized()) {
-		status_ = INITCHECK;
-		ret = grpc::Status(grpc::StatusCode::ABORTED, "not initialized");
-	} else {
-		status_ = AWAIT_MSG;
-	}
-	return status_;
-}
-
-int CheckInitializedCall::Proceed()
-{
-	if (status_ == REQUEST) {
-		new CheckInitializedCall();
-		InitCheck();
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		reply_.set_uuid(GRPCService::GetInstance()->GetUUID());
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int InitializeCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new InitializeCall();
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		DPGRPC_LOG_INFO("Initializing");
-		return -1;
-	} else if (status_ == AWAIT_MSG) {
-		GRPCService::GetInstance()->SetInitStatus(true);
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_uuid(grpc_service->GetUUID());
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int CreateLoadBalancerCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	uint16_t i, size;
-	char buf_str[INET6_ADDRSTRLEN];
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new CreateLoadBalancerCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Creating loadbalancer",
-						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
-						DP_LOG_VNI(request_.vni()),
-						DP_LOG_IPV4STR(request_.loadbalanced_ip().address().c_str()));
-		snprintf(request.add_lb.lb_id, sizeof(request.add_lb.lb_id), "%s",
-				 request_.loadbalancer_id().c_str());
-		request.add_lb.vni = request_.vni();
-		if (request_.loadbalanced_ip().ipver() == IpVersion::IPV4) {
-			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.loadbalanced_ip().address().c_str(),
-					  (in_addr*)&request.add_lb.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid loadbalancer VIP",
-								   DP_LOG_IPV4STR(request_.loadbalanced_ip().address().c_str()));
-			size = (request_.loadbalanced_ports_size() >= DP_LB_MAX_PORTS) ? DP_LB_MAX_PORTS : request_.loadbalanced_ports_size();
-			for (i = 0; i < size; i++) {
-				DPGRPC_LOG_INFO("Adding loadbalancer port",
-								DP_LOG_LBID(request_.loadbalancer_id().c_str()),
-								DP_LOG_PORT(request_.loadbalanced_ports(i).port()),
-								DP_LOG_PROTO(request_.loadbalanced_ports(i).protocol()));
-				request.add_lb.lbports[i].port = request_.loadbalanced_ports(i).port();
-				if (request_.loadbalanced_ports(i).protocol() == TCP)
-					request.add_lb.lbports[i].protocol = DP_IP_PROTO_TCP;
-				if (request_.loadbalanced_ports(i).protocol() == UDP)
-					request.add_lb.lbports[i].protocol = DP_IP_PROTO_UDP;
-			}
+	switch (call_state_) {
+	case REQUEST: {
+		struct dpgrpc_request request = {
+			.type = (uint16_t)call_type_,
+		};
+		const char* error;
+		// this is how gRPC is implemented here,
+		// one object per call type is always waiting in the queue (my understanding)
+		// so, replace this object with a new one
+		// see https://grpc.io/docs/languages/cpp/async/
+		Clone();
+		if (NeedsInit()) {
+			Finish(grpc::Status(grpc::StatusCode::ABORTED, "not initialized"));
+			call_state_ = FINISH;
 		} else {
-			request.add_lb.ip_type = RTE_ETHER_TYPE_IPV4;
-			// FIXME: what happens here?
+			error = FillRequest(&request);
+			if (error) {
+				Finish(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, error));
+				call_state_ = FINISH;
+			} else if (DP_FAILED(WriteRequest(&request))) {
+				Finish(grpc::Status(grpc::StatusCode::INTERNAL, "ipc write failed"));
+				call_state_ = FINISH;
+			} else
+				call_state_ = AWAIT_MSG;
 		}
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		inet_ntop(AF_INET6, reply.ul_addr.addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
+		break;
 	}
-	return 0;
+	case AWAIT_MSG: {
+		int ret = HandleReply();
+		if (DP_FAILED(ret)) {
+			Finish(grpc::Status(grpc::StatusCode::INTERNAL, "reply parsing failed"));
+			call_state_ = FINISH;
+		} else if (ret == DP_OK) {
+			Finish(grpc::Status::OK);
+			call_state_ = FINISH;
+		} else
+			assert(ret == DP_GRPC_REPLY_NOT_READY);  // keep waiting
+		break;
+	}
+	case FINISH:
+		delete this;
+		break;
+	}
+	return call_state_;
 }
 
-int DeleteLoadBalancerCall::Proceed()
+int BaseCall::WriteRequest(struct dpgrpc_request *request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
+	struct rte_mbuf *m;
+	int ret;
 
-	if (status_ == REQUEST) {
-		new DeleteLoadBalancerCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing loadbalancer",
-						DP_LOG_LBID(request_.loadbalancer_id().c_str()));
-		snprintf(request.del_lb.lb_id, sizeof(request.del_lb.lb_id), "%s",
-				 request_.loadbalancer_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
+	m = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
+	if (!m) {
+		DPGRPC_LOG_WARNING("Cannot allocate worker request", DP_LOG_GRPCREQUEST(request->type));
+		return DP_ERROR;
 	}
-	return 0;
+
+	assert((size_t)m->buf_len - m->data_off >= sizeof(struct dpgrpc_request));
+	*rte_pktmbuf_mtod(m, struct dpgrpc_request *) = *request;
+
+	ret = rte_ring_sp_enqueue(get_dpdk_layer()->grpc_tx_queue, m);
+	if (DP_FAILED(ret)) {
+		DPGRPC_LOG_WARNING("Cannot enqueue worker request", DP_LOG_RET(ret), DP_LOG_GRPCREQUEST(request->type));
+		rte_pktmbuf_free(m);
+		return ret;
+	}
+
+	return DP_OK;
 }
 
-int GetLoadBalancerCall::Proceed()
+int SingleReplyCall::HandleReply()
 {
-	char buf_str[INET6_ADDRSTRLEN];
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	struct in_addr addr;
-	LbPort *lb_port;
-	IpAddress *lb_ip;
-	int i;
+	struct dpgrpc_reply *reply;
+	struct rte_mbuf *m;
+	int ret;
 
-	if (status_ == REQUEST) {
-		new GetLoadBalancerCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Getting loadbalancer info",
-						DP_LOG_LBID(request_.loadbalancer_id().c_str()));
-		snprintf(request.get_lb.lb_id, sizeof(request.get_lb.lb_id), "%s",
-				 request_.loadbalancer_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_vni(reply.lb.vni);
-		lb_ip = new IpAddress();
-		addr.s_addr = reply.lb.addr;
-		lb_ip->set_address(inet_ntoa(addr));
-		if (reply.lb.ip_type == RTE_ETHER_TYPE_IPV4)
-			lb_ip->set_ipver(IpVersion::IPV4);
-		else
-			lb_ip->set_ipver(IpVersion::IPV6);
-		reply_.set_allocated_loadbalanced_ip(lb_ip);
-		for (i = 0; i < DP_LB_MAX_PORTS; i++) {
-			if (reply.lb.lbports[i].port == 0)
-				continue;
-			lb_port = reply_.add_loadbalanced_ports();
-			lb_port->set_port(reply.lb.lbports[i].port);
-			if (reply.lb.lbports[i].protocol == DP_IP_PROTO_TCP)
-				lb_port->set_protocol(TCP);
-			if (reply.lb.lbports[i].protocol == DP_IP_PROTO_UDP)
-				lb_port->set_protocol(UDP);
+	ret = rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void **)&m);
+	if (DP_FAILED(ret)) {
+		if (ret == -ENOENT)
+			return DP_GRPC_REPLY_NOT_READY;
+		DPGRPC_LOG_WARNING("Cannot dequeue worker response", DP_LOG_RET(ret));
+		return ret;
+	}
+
+	assert((size_t)m->buf_len - m->data_off >= sizeof(struct dpgrpc_reply));
+	reply = rte_pktmbuf_mtod(m, struct dpgrpc_reply *);
+
+	if (reply->type != call_type_) {
+		DPGRPC_LOG_WARNING("Invalid response received", DP_LOG_GRPCREQUEST(call_type_));
+		ret = DP_ERROR;
+	} else if (reply->is_chained || reply->msg_count != 0) {
+		DPGRPC_LOG_WARNING("Single response expected, multiresponse received", DP_LOG_GRPCREQUEST(call_type_));
+		ret = DP_ERROR;
+	} else {
+		SetStatus(reply->err_code);
+		if (reply->err_code == DP_GRPC_OK)
+			ParseReply(reply);
+	}
+
+	rte_pktmbuf_free(m);
+	return ret;
+}
+
+int MultiReplyCall::HandleReply()
+{
+	struct rte_mbuf *m;
+	struct dpgrpc_reply *reply;
+	uint8_t is_chained;
+	int ret;
+
+	do {
+		ret = rte_ring_sc_dequeue(get_dpdk_layer()->grpc_rx_queue, (void **)&m);
+		if (DP_FAILED(ret)) {
+			if (ret == -ENOENT)
+				return DP_GRPC_REPLY_NOT_READY;
+			DPGRPC_LOG_WARNING("Cannot dequeue worker response", DP_LOG_RET(ret));
+			return ret;
 		}
-		inet_ntop(AF_INET6, reply.lb.ul_addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int CreateLoadBalancerTargetCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new CreateLoadBalancerTargetCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Adding loadbalancer target",
-						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
-						DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
-		snprintf(request.add_lbtrgt.lb_id, sizeof(request.add_lbtrgt.lb_id), "%s",
-				 request_.loadbalancer_id().c_str());
-		if (request_.target_ip().ipver() == IpVersion::IPV6) {
-			request.add_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV6;
-			ret_val = inet_pton(AF_INET6, request_.target_ip().address().c_str(),
-					  request.add_lbtrgt.addr6);
-			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("Invalid loadbalancer target IP",
-								   DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
-		} else {
-			request.add_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV4;
+		reply = rte_pktmbuf_mtod(m, struct dpgrpc_reply *);
+		if (reply->type != call_type_) {
+			DPGRPC_LOG_WARNING("Invalid response received", DP_LOG_GRPCREQUEST(call_type_));
+			rte_pktmbuf_free(m);
+			return DP_ERROR;
 		}
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+		SetStatus(reply->err_code);
+		if (reply->err_code == DP_GRPC_OK)
+			ParseReply(reply);  // cannot stop on error here, chained replies need to be popped
+		is_chained = reply->is_chained;
+		rte_pktmbuf_free(m);
+	} while (is_chained);
+
+	return DP_OK;
 }
 
-int DeleteLoadBalancerTargetCall::Proceed()
+int NoIpcCall::WriteRequest(__rte_unused struct dpgrpc_request *request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new DeleteLoadBalancerTargetCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing loadbalancer target",
-						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
-						DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
-		snprintf(request.del_lbtrgt.lb_id, sizeof(request.del_lbtrgt.lb_id), "%s",
-				 request_.loadbalancer_id().c_str());
-		if (request_.target_ip().ipver() == IpVersion::IPV6) {
-			request.del_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV6;
-			ret_val = inet_pton(AF_INET6, request_.target_ip().address().c_str(),
-					  request.del_lbtrgt.addr6);
-			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("Invalid loadbalancer target IP",
-								   DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
-		} else {
-			request.del_lbtrgt.ip_type = RTE_ETHER_TYPE_IPV4;
-		}
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	// no IPC, so no request needs to be filled here, do nothing
+	return DP_OK;
 }
 
-void ListLoadBalancerTargetsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+int NoIpcCall::HandleReply()
 {
-	struct dpgrpc_lb_target *lb_target = (struct dpgrpc_lb_target *)reply;
-	ListLoadBalancerTargetsResponse *reply_ = (ListLoadBalancerTargetsResponse *)context;
-	IpAddress *target_ip;
-	char buf_str[INET6_ADDRSTRLEN];
-
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		lb_target = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_lb_target);
-		target_ip = reply_->add_target_ips();
-		inet_ntop(AF_INET6, lb_target->addr6, buf_str, INET6_ADDRSTRLEN);
-		target_ip->set_address(buf_str);
-		target_ip->set_ipver(IpVersion::IPV6);
-	}
+	// no IPC, so no reading from worker, but reply status still needs to be filled
+	SetStatus(DP_GRPC_OK);
+	ParseReply(NULL);
+	return DP_OK;
 }
 
-int ListLoadBalancerTargetsCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
 
-	if (status_ == REQUEST) {
-		new ListLoadBalancerTargetsCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Listing loadbalancer targets",
-						DP_LOG_LBID(request_.loadbalancer_id().c_str()));
-		snprintf(request.list_lbtrgt.lb_id, sizeof(request.list_lbtrgt.lb_id), "%s",
-				 request_.loadbalancer_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+const char* InitializeCall::FillRequest(__rte_unused struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Initializing");
+	return NULL;
+}
+void InitializeCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+	GRPCService::GetInstance()->SetInitStatus(true);
+	reply_.set_uuid(service_->GetUUID());
 }
 
-int CreatePrefixCall::Proceed()
+const char* CheckInitializedCall::FillRequest(__rte_unused struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	char buf_str[INET6_ADDRSTRLEN];
-	int ret_val;
+	return NULL;
+}
+void CheckInitializedCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+	// reply is actually NULL here
+	reply_.set_uuid(service_->GetUUID());
+}
 
-	if (status_ == REQUEST) {
-		new CreatePrefixCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Adding alias prefix",
+const char* GetVersionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting version for client",
+					DP_LOG_PROTOVER(request_.client_protocol().c_str()),
+					DP_LOG_CLIENTNAME(request_.client_name().c_str()),
+					DP_LOG_CLIENTVER(request_.client_version().c_str()));
+	if (SNPRINTF_FAILED(request->get_version.proto, request_.client_protocol()))
+		return "Invalid client_protocol";
+	if (SNPRINTF_FAILED(request->get_version.name, request_.client_name()))
+		return "Invalid client_name";
+	if (SNPRINTF_FAILED(request->get_version.app, request_.client_version()))
+		return "Invalid client_version";
+	return NULL;
+}
+void GetVersionCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	reply_.set_service_protocol(reply->versions.proto);
+	reply_.set_service_version(reply->versions.app);
+}
+
+
+const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Adding interface",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_VNI(request_.vni()),
+					DP_LOG_IPV4STR(request_.ipv4_config().primary_address().c_str()),
+					DP_LOG_IPV6STR(request_.ipv6_config().primary_address().c_str()),
+					DP_LOG_PCI(request_.device_name().c_str()));
+	request->add_iface.vni = request_.vni();
+	if (!GrpcConv::StrToIpv4(request_.ipv4_config().primary_address(), &request->add_iface.ip4_addr))
+		return "Invalid ipv4_config.primary_address";
+	if (!request_.pxe_config().next_server().empty()) {
+		DPGRPC_LOG_INFO("Setting PXE",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
-						DP_LOG_PREFLEN(request_.prefix().length()));
-		snprintf(request.add_pfx.iface_id, sizeof(request.add_pfx.iface_id),
-				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
-			request.add_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
-					  (in_addr*)&request.add_pfx.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid alias prefix IP",
-								   DP_LOG_IPV4STR(request_.prefix().ip().address().c_str()));
-		}
-		request.add_pfx.length = request_.prefix().length();
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		inet_ntop(AF_INET6, reply.ul_addr.addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
+						DP_LOG_PXE_SRV(request_.pxe_config().next_server().c_str()),
+						DP_LOG_PXE_PATH(request_.pxe_config().boot_filename().c_str()));
+		if (!GrpcConv::StrToIpv4(request_.pxe_config().next_server(), &request->add_iface.ip4_pxe_addr))
+			return "Invalid pxe_config.next_server";
+		if (SNPRINTF_FAILED(request->add_iface.pxe_str, request_.pxe_config().boot_filename()))
+			return "Invalid pxe_config.boot_filename";
 	}
-	return 0;
+	if (SNPRINTF_FAILED(request->add_iface.pci_name, request_.device_name()))
+		return "Invalid device_name";
+	if (!GrpcConv::StrToIpv6(request_.ipv6_config().primary_address(), request->add_iface.ip6_addr))
+		return "Invalid ipv6_config.primary_address";
+	if (SNPRINTF_FAILED(request->add_iface.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
 }
-
-int DeletePrefixCall::Proceed()
+void CreateInterfaceCall::ParseReply(struct dpgrpc_reply* reply)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new DeletePrefixCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing alias prefix",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
-						DP_LOG_PREFLEN(request_.prefix().length()));
-		snprintf(request.del_pfx.iface_id, sizeof(request.del_pfx.iface_id),
-				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
-			request.del_pfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
-					  (in_addr*)&request.del_pfx.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid alias prefix IP",
-								   DP_LOG_PREFIX(request_.prefix().ip().address().c_str()));
-		}
-		request.del_pfx.length = request_.prefix().length();
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-void ListPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
-{
-	struct dpgrpc_route *rp_route;
-	ListPrefixesResponse *reply_ = (ListPrefixesResponse *)context;
-	Prefix *pfx;
-	IpAddress *pfx_ip;
-	struct in_addr addr;
-	char buf_str[INET6_ADDRSTRLEN];
-
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
-		pfx = reply_->add_prefixes();
-		pfx_ip = new IpAddress();
-		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(rp_route->pfx_addr);
-			pfx_ip->set_address(inet_ntoa(addr));
-			pfx_ip->set_ipver(IpVersion::IPV4);
-			pfx->set_length(rp_route->pfx_length);
-			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
-			pfx->set_underlay_route(buf_str);
-		}
-		// TODO else? (should already be covered by the worker)
-		pfx->set_allocated_ip(pfx_ip);
-	}
-}
-
-int ListPrefixesCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-
-	if (status_ == REQUEST) {
-		new ListPrefixesCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Listing alias prefixes",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.list_pfx.iface_id, sizeof(request.list_pfx.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int CreateLoadBalancerPrefixCall::Proceed()
-{
-	char buf_str[INET6_ADDRSTRLEN];
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new CreateLoadBalancerPrefixCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
-						DP_LOG_PREFLEN(request_.prefix().length()));
-		snprintf(request.add_lbpfx.iface_id, sizeof(request.add_lbpfx.iface_id),
-				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
-			request.add_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
-					  (in_addr*)&request.add_lbpfx.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid target prefix IP",
-								   DP_LOG_PREFIX(request_.prefix().ip().address().c_str()));
-		}
-		request.add_lbpfx.length = request_.prefix().length();
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		inet_ntop(AF_INET6, reply.route.trgt_addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int DeleteLoadBalancerPrefixCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new DeleteLoadBalancerPrefixCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing loadbalancer target prefix",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
-						DP_LOG_PREFLEN(request_.prefix().length()));
-		snprintf(request.del_lbpfx.iface_id, sizeof(request.del_lbpfx.iface_id),
-				 "%s", request_.interface_id().c_str());
-		if (request_.prefix().ip().ipver() == IpVersion::IPV4) {
-			request.del_lbpfx.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.prefix().ip().address().c_str(),
-					  (in_addr*)&request.del_lbpfx.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid target prefix IP",
-								   DP_LOG_PREFIX(request_.prefix().ip().address().c_str()));
-		}
-		request.del_lbpfx.length = request_.prefix().length();
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-void ListLoadBalancerPrefixesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
-{
-	struct dpgrpc_route *rp_route;
-	ListLoadBalancerPrefixesResponse *reply_ = (ListLoadBalancerPrefixesResponse *)context;
-	Prefix *pfx;
-	IpAddress *pfx_ip;
-	struct in_addr addr;
-	char buf_str[INET6_ADDRSTRLEN];
-
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
-		pfx = reply_->add_prefixes();
-		pfx_ip = new IpAddress();
-		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(rp_route->pfx_addr);
-			pfx_ip->set_address(inet_ntoa(addr));
-			pfx_ip->set_ipver(IpVersion::IPV4);
-			pfx->set_length(rp_route->pfx_length);
-			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf_str, INET6_ADDRSTRLEN);
-			pfx->set_underlay_route(buf_str);
-		}
-		// TODO else? (should already be covered by the worker)
-		pfx->set_allocated_ip(pfx_ip);
-	}
-}
-
-int ListLoadBalancerPrefixesCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-
-	if (status_ == REQUEST) {
-		new ListLoadBalancerPrefixesCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Listing loadbalancer target prefixes",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.list_lbpfx.iface_id, sizeof(request.list_lbpfx.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int CreateVipCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	char buf_str[INET6_ADDRSTRLEN];
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new CreateVipCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Setting virtual IP",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
-		snprintf(request.add_vip.iface_id, sizeof(request.add_vip.iface_id),
-				 "%s", request_.interface_id().c_str());
-		if (request_.vip_ip().ipver() == IpVersion::IPV4) {
-			request.add_vip.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.vip_ip().address().c_str(),
-					  (in_addr*)&request.add_vip.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid virtual IP",
-								   DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
-		}
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		inet_ntop(AF_INET6, reply.ul_addr.addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int DeleteVipCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new DeleteVipCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing virtual IP",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.del_vip.iface_id, sizeof(request.del_vip.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int GetVipCall::Proceed()
-{
-	char buf_str[INET6_ADDRSTRLEN];
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	struct in_addr addr;
-	IpAddress *vip_ip;
-
-	if (status_ == REQUEST) {
-		new GetVipCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Getting virtual IP",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.get_vip.iface_id, sizeof(request.get_vip.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		vip_ip = new IpAddress();
-		vip_ip->set_ipver(IpVersion::IPV4);
-		addr.s_addr = reply.vip.addr;
-		vip_ip->set_address(inet_ntoa(addr));
-		inet_ntop(AF_INET6, reply.vip.ul_addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_allocated_vip_ip(vip_ip);
-		reply_.set_underlay_route(buf_str);
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-int CreateInterfaceCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
 	VirtualFunction *vf;
-	char buf_str[INET6_ADDRSTRLEN];
-	int ret_val;
+	char strbuf[INET6_ADDRSTRLEN];
 
-	if (status_ == REQUEST) {
-		new CreateInterfaceCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Adding interface",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_VNI(request_.vni()),
-						DP_LOG_IPV4STR(request_.ipv4_config().primary_address().c_str()),
-						DP_LOG_IPV6STR(request_.ipv6_config().primary_address().c_str()),
-						DP_LOG_PCI(request_.device_name().c_str()));
-		request.add_iface.vni = request_.vni();
-		ret_val = inet_aton(request_.ipv4_config().primary_address().c_str(),
-				(in_addr*)&request.add_iface.ip4_addr);
-		if (ret_val == 0)
-			DPGRPC_LOG_WARNING("AddInterface: wrong primary IP",
-							   DP_LOG_IPV4STR(request_.ipv4_config().primary_address().c_str()));
-		if (!request_.pxe_config().next_server().empty()) {
-			DPGRPC_LOG_INFO("Setting PXE",
-							DP_LOG_IFACE(request_.interface_id().c_str()),
-							DP_LOG_PXE_SRV(request_.pxe_config().next_server().c_str()),
-							DP_LOG_PXE_PATH(request_.pxe_config().boot_filename().c_str()));
-			ret_val = inet_aton(request_.pxe_config().next_server().c_str(),
-					(in_addr*)&request.add_iface.ip4_pxe_addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("AddInterface: wrong PXE next server IP",
-								   DP_LOG_IPV4STR(request_.pxe_config().next_server().c_str()));
-		}
-		snprintf(request.add_iface.pxe_str, sizeof(request.add_iface.pxe_str), "%s",
-				 request_.pxe_config().boot_filename().c_str());
-		snprintf(request.add_iface.pci_name, sizeof(request.add_iface.pci_name), "%s",
-				 request_.device_name().c_str());
-		ret_val = inet_pton(AF_INET6, request_.ipv6_config().primary_address().c_str(),
-								request.add_iface.ip6_addr);
-		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("AddInterface: wrong IPv6 primary IP",
-							   DP_LOG_IPV6STR(request_.ipv6_config().primary_address().c_str()));
-		snprintf(request.add_iface.iface_id, sizeof(request.add_iface.iface_id), "%s",
-				 request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		vf = new VirtualFunction();
-		vf->set_name(reply.vf_pci.name);
-		vf->set_bus(reply.vf_pci.bus);
-		vf->set_domain(reply.vf_pci.domain);
-		vf->set_slot(reply.vf_pci.slot);
-		vf->set_function(reply.vf_pci.function);
-		reply_.set_allocated_vf(vf);
-		inet_ntop(AF_INET6, reply.vf_pci.ul_addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	vf = new VirtualFunction();
+	vf->set_name(reply->vf_pci.name);
+	vf->set_bus(reply->vf_pci.bus);
+	vf->set_domain(reply->vf_pci.domain);
+	vf->set_slot(reply->vf_pci.slot);
+	vf->set_function(reply->vf_pci.function);
+	reply_.set_allocated_vf(vf);
+	inet_ntop(AF_INET6, reply->vf_pci.ul_addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
 }
 
-int DeleteInterfaceCall::Proceed()
+const char* DeleteInterfaceCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new DeleteInterfaceCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing interface",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.del_iface.iface_id, sizeof(request.del_iface.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Removing interface",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->del_iface.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void DeleteInterfaceCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-int GetInterfaceCall::Proceed()
+const char* GetInterfaceCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	struct dpgrpc_iface *iface;
-	Interface *machine;
+	DPGRPC_LOG_INFO("Getting interface info",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_iface.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetInterfaceCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	Interface *grpc_iface;
+
+	grpc_iface = new Interface();
+	GrpcConv::DpToGrpcInterface(&reply->iface, grpc_iface);
+	reply_.set_allocated_interface(grpc_iface);
+}
+
+const char* ListInterfacesCall::FillRequest(__rte_unused struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Listing interfaces");
+	return NULL;
+}
+void ListInterfacesCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_iface *dp_iface;
+	Interface *grpc_iface;
+
+	FOREACH_MESSAGE(dp_iface, reply) {
+		grpc_iface = reply_.add_interfaces();
+		GrpcConv::DpToGrpcInterface(dp_iface, grpc_iface);
+	}
+}
+
+
+const char* CreatePrefixCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Adding alias prefix",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
+					DP_LOG_PREFLEN(request_.prefix().length()));
+	if (SNPRINTF_FAILED(request->add_pfx.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_pfx.addr))
+		return "Invalid prefix.ip";
+	request->del_pfx.length = request_.prefix().length();
+	return NULL;
+}
+void CreatePrefixCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	char strbuf[INET6_ADDRSTRLEN];
+
+	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
+}
+
+const char* DeletePrefixCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing alias prefix",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
+					DP_LOG_PREFLEN(request_.prefix().length()));
+	if (SNPRINTF_FAILED(request->del_pfx.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_pfx.addr))
+		return "Invalid prefix.ip";
+	request->del_pfx.length = request_.prefix().length();
+	return NULL;
+}
+void DeletePrefixCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* ListPrefixesCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Listing alias prefixes",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->list_pfx.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void ListPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_route *route;
+	Prefix *pfx;
+	IpAddress *pfx_ip;
 	struct in_addr addr;
-	char buf_str[INET6_ADDRSTRLEN];
+	char strbuf[INET6_ADDRSTRLEN];
 
-	if (status_ == REQUEST) {
-		new GetInterfaceCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Getting interface info",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.get_iface.iface_id, sizeof(request.get_iface.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-
-		iface = &reply.iface;
-		addr.s_addr = htonl(iface->ip4_addr);
-		machine = new Interface();
-		machine->set_primary_ipv4(inet_ntoa(addr));
-		inet_ntop(AF_INET6, iface->ip6_addr, buf_str, INET6_ADDRSTRLEN);
-		machine->set_primary_ipv6(buf_str);
-		machine->set_id((char *)iface->iface_id);
-		machine->set_vni(iface->vni);
-		machine->set_pci_name(iface->pci_name);
-
-		inet_ntop(AF_INET6, reply.iface.ul_addr6, buf_str, INET6_ADDRSTRLEN);
-		machine->set_underlay_route(buf_str);
-		reply_.set_allocated_interface(machine);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
+	FOREACH_MESSAGE(route, reply) {
+		pfx = reply_.add_prefixes();
+		pfx_ip = new IpAddress();
+		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(route->pfx_addr.ipv4);
+			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_ipver(IpVersion::IPV4);
+			pfx->set_length(route->pfx_length);
+			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+			pfx->set_underlay_route(strbuf);
+		} else
+			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4);
+		pfx->set_allocated_ip(pfx_ip);
 	}
-	return 0;
 }
 
-int CreateRouteCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
 
-	if (status_ == REQUEST) {
-		new CreateRouteCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Adding route",
-						DP_LOG_VNI(request_.vni()),
-						DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
-						DP_LOG_PREFLEN(request_.route().prefix().length()),
-						DP_LOG_TVNI(request_.route().nexthop_vni()),
-						DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
-		request.add_route.vni = request_.vni();
-		request.add_route.trgt_ip_type = RTE_ETHER_TYPE_IPV6;
-		request.add_route.trgt_vni = request_.route().nexthop_vni();
-		// TODO no check for IPv4/IPv6 nexthop type
-		ret_val = inet_pton(AF_INET6, request_.route().nexthop_address().address().c_str(), request.add_route.trgt_addr6);
-		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("Invalid nexthop IP", DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
-		request.add_route.pfx_length = request_.route().prefix().length();
-		if (request_.route().prefix().ip().ipver() == IpVersion::IPV4) {
-			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.route().prefix().ip().address().c_str(),
-					(in_addr*)&request.add_route.pfx_addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid prefix IP", DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
-		} else {
-			request.add_route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
-			ret_val = inet_pton(AF_INET6, request_.route().prefix().ip().address().c_str(), request.add_route.pfx_addr6);
-			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("Invalid prefix IP", DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
-		}
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+const char* CreateRouteCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Adding route",
+					DP_LOG_VNI(request_.vni()),
+					DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
+					DP_LOG_PREFLEN(request_.route().prefix().length()),
+					DP_LOG_TVNI(request_.route().nexthop_vni()),
+					DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
+	request->add_route.vni = request_.vni();
+	request->add_route.trgt_vni = request_.route().nexthop_vni();
+	request->add_route.pfx_length = request_.route().prefix().length();
+	if (!GrpcConv::GrpcToDpAddress(request_.route().prefix().ip(), &request->add_route.pfx_addr))
+		return "Invalid route.prefix.ip";
+	if (!GrpcConv::GrpcToDpAddress(request_.route().nexthop_address(), &request->add_route.trgt_addr))
+		return "Invalid route.nexthop_address";
+	return NULL;
+}
+void CreateRouteCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-int DeleteRouteCall::Proceed()
+const char* DeleteRouteCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new DeleteRouteCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing route",
-						DP_LOG_VNI(request_.vni()),
-						DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
-						DP_LOG_PREFLEN(request_.route().prefix().length()),
-						DP_LOG_TVNI(request_.route().nexthop_vni()), // TODO re-check for target vni everywhere
-						DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
-		request.del_route.vni = request_.vni();
-		request.del_route.trgt_ip_type = RTE_ETHER_TYPE_IPV6;
-		request.del_route.trgt_vni = request_.route().nexthop_vni();
-		if (!request_.route().nexthop_address().address().empty()) {
-			// TODO missing check for IPv6/IPv4 type
-			ret_val = inet_pton(AF_INET6, request_.route().nexthop_address().address().c_str(),
-					request.del_route.trgt_addr6);
-			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("Invalid nexthop IP",
-								   DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
-		}
-		request.del_route.pfx_length = request_.route().prefix().length();
-		if (request_.route().prefix().ip().ipver() == IpVersion::IPV4) {
-			request.del_route.pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.route().prefix().ip().address().c_str(),
-					(in_addr*)&request.del_route.pfx_addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid prefix IP",
-								   DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
-		} else {
-			request.del_route.pfx_ip_type = RTE_ETHER_TYPE_IPV6;
-			ret_val = inet_pton(AF_INET6, request_.route().prefix().ip().address().c_str(),
-					request.del_route.pfx_addr6);
-			if (ret_val <= 0)
-				DPGRPC_LOG_WARNING("Invalid prefix IP",
-								   DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()));
-		}
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Removing route",
+					DP_LOG_VNI(request_.vni()),
+					DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
+					DP_LOG_PREFLEN(request_.route().prefix().length()));
+	request->del_route.vni = request_.vni();
+	request->add_route.pfx_length = request_.route().prefix().length();
+	if (!GrpcConv::GrpcToDpAddress(request_.route().prefix().ip(), &request->add_route.pfx_addr))
+		return "Invalid route.prefix.ip";
+	return NULL;
+}
+void DeleteRouteCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-void ListRoutesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+const char* ListRoutesCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_route *rp_route;
-	ListRoutesResponse *reply_ = (ListRoutesResponse *)context;
-	Route *route;
+	DPGRPC_LOG_INFO("Listing routes",
+					DP_LOG_VNI(request_.vni()));
+	request->list_route.vni = request_.vni();
+	request->list_route.type = DP_VNI_BOTH;
+	return NULL;
+}
+void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_route *route;
+	Route *grpc_route;
 	IpAddress *nh_ip;
 	struct in_addr addr;
 	Prefix *pfx;
 	IpAddress *pfx_ip;
-	char buf[INET6_ADDRSTRLEN];
+	char strbuf[INET6_ADDRSTRLEN];
 
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		rp_route = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_route);
-
-		route = reply_->add_routes();
-		route->set_nexthop_vni(rp_route->trgt_vni);
+	FOREACH_MESSAGE(route, reply) {
+		grpc_route = reply_.add_routes();
+		grpc_route->set_nexthop_vni(route->trgt_vni);
 
 		nh_ip = new IpAddress();
-		if (rp_route->trgt_ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(rp_route->trgt_addr);
+		if (route->trgt_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(route->trgt_addr.ipv4);
 			nh_ip->set_address(inet_ntoa(addr));
 			nh_ip->set_ipver(IpVersion::IPV4);
 		} else {
-			inet_ntop(AF_INET6, rp_route->trgt_addr6, buf, INET6_ADDRSTRLEN);
-			nh_ip->set_address(buf);
+			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+			nh_ip->set_address(strbuf);
 			nh_ip->set_ipver(IpVersion::IPV6);
 		}
-		route->set_allocated_nexthop_address(nh_ip);
+		grpc_route->set_allocated_nexthop_address(nh_ip);
 
 		pfx_ip = new IpAddress();
-		if (rp_route->pfx_ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(rp_route->pfx_addr);
+		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(route->pfx_addr.ipv4);
 			pfx_ip->set_address(inet_ntoa(addr));
 			pfx_ip->set_ipver(IpVersion::IPV4);
 		} else {
-			inet_ntop(AF_INET6, rp_route->pfx_addr6, buf, INET6_ADDRSTRLEN);
-			pfx_ip->set_address(buf);
+			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
+			pfx_ip->set_address(strbuf);
 			pfx_ip->set_ipver(IpVersion::IPV6);
 		}
 		pfx = new Prefix();
 		pfx->set_allocated_ip(pfx_ip);
-		pfx->set_length(rp_route->pfx_length);
-		route->set_allocated_prefix(pfx);
+		pfx->set_length(route->pfx_length);
+		grpc_route->set_allocated_prefix(pfx);
 	}
 }
 
-int ListRoutesCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
 
-	if (status_ == REQUEST) {
-		new ListRoutesCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Listing routes",
-						DP_LOG_VNI(request_.vni()));
-		request.list_route.vni = request_.vni();
-		request.list_route.type = DP_VNI_BOTH;
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+const char* CreateVipCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Setting virtual IP",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
+	if (SNPRINTF_FAILED(request->add_vip.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.vip_ip(), &request->add_vip.addr))
+		return "Invalid vip_ip";
+	return NULL;
+}
+void CreateVipCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	char strbuf[INET6_ADDRSTRLEN];
+
+	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
 }
 
-int CreateNatCall::Proceed()
+const char* DeleteVipCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	char buf_str[INET6_ADDRSTRLEN];
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new CreateNatCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Setting NAT IP",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
-						DP_LOG_MINPORT(request_.min_port()),
-						DP_LOG_MAXPORT(request_.max_port()));
-		snprintf(request.add_nat.iface_id, sizeof(request.add_nat.iface_id),
-				 "%s", request_.interface_id().c_str());
-		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
-			request.add_nat.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.nat_ip().address().c_str(),
-					  (in_addr*)&request.add_nat.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid NAT IP",
-								   DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-		}
-		// maybe add a validity check here to ensure minport is not greater than 2^30
-		request.add_nat.min_port = request_.min_port();
-		request.add_nat.max_port = request_.max_port();
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		inet_ntop(AF_INET6, reply.ul_addr.addr6, buf_str, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf_str);
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Removing virtual IP",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->del_vip.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void DeleteVipCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-int GetNatCall::Proceed()
+const char* GetVipCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
+	DPGRPC_LOG_INFO("Getting virtual IP",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_vip.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetVipCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct in_addr addr;
+	IpAddress *vip_ip;
+	char strbuf[INET6_ADDRSTRLEN];
+
+	vip_ip = new IpAddress();
+	vip_ip->set_ipver(IpVersion::IPV4);
+	addr.s_addr = reply->vip.addr.ipv4;
+	vip_ip->set_address(inet_ntoa(addr));
+	inet_ntop(AF_INET6, reply->vip.ul_addr6, strbuf, sizeof(strbuf));
+	reply_.set_allocated_vip_ip(vip_ip);
+	reply_.set_underlay_route(strbuf);
+}
+
+
+const char* CreateNatCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Setting NAT IP",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
+					DP_LOG_MINPORT(request_.min_port()),
+					DP_LOG_MAXPORT(request_.max_port()));
+	if (SNPRINTF_FAILED(request->add_nat.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->add_nat.addr))
+		return "Invalid nat_ip";
+	if (request_.min_port() > UINT16_MAX)
+		return "Invalid min_port";
+	if (request_.max_port() > UINT16_MAX)
+		return "Invalid max_port";
+	request->add_nat.min_port = request_.min_port();
+	request->add_nat.max_port = request_.max_port();
+	return NULL;
+}
+void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	char strbuf[INET6_ADDRSTRLEN];
+
+	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
+}
+
+const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting NAT IP",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_vip.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetNatCall::ParseReply(struct dpgrpc_reply* reply)
+{
 	struct in_addr addr;
 	IpAddress *nat_ip;
-	char buf[INET6_ADDRSTRLEN];
+	char strbuf[INET6_ADDRSTRLEN];
 
-	if (status_ == REQUEST) {
-		new GetNatCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Getting NAT IP",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.get_vip.iface_id, sizeof(request.get_vip.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		nat_ip = new IpAddress();
-		addr.s_addr = reply.nat.addr;
-		nat_ip->set_address(inet_ntoa(addr));
-		nat_ip->set_ipver(IpVersion::IPV4);
-		reply_.set_allocated_nat_ip(nat_ip);
-		reply_.set_max_port(reply.nat.max_port);
-		reply_.set_min_port(reply.nat.min_port);
-		inet_ntop(AF_INET6, reply.nat.ul_addr6, buf, INET6_ADDRSTRLEN);
-		reply_.set_underlay_route(buf);
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	nat_ip = new IpAddress();
+	addr.s_addr = reply->nat.addr.ipv4;
+	nat_ip->set_address(inet_ntoa(addr));
+	nat_ip->set_ipver(IpVersion::IPV4);
+	reply_.set_allocated_nat_ip(nat_ip);
+	reply_.set_max_port(reply->nat.max_port);
+	reply_.set_min_port(reply->nat.min_port);
+	inet_ntop(AF_INET6, reply->nat.ul_addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
 }
 
-int DeleteNatCall::Proceed()
+const char* DeleteNatCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new DeleteNatCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing NAT IP",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.del_nat.iface_id, sizeof(request.del_nat.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	}
-	else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Removing NAT IP",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->del_nat.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
 }
-
-int CreateNeighborNatCall::Proceed()
+void DeleteNatCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new CreateNeighborNatCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Adding neighboring NAT",
-						DP_LOG_VNI(request_.vni()),
-						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
-						DP_LOG_MINPORT(request_.min_port()),
-						DP_LOG_MAXPORT(request_.max_port()),
-						DP_LOG_IPV6STR(request_.underlay_route().c_str()));
-		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
-			request.add_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.nat_ip().address().c_str(),
-					  (in_addr*)&request.add_neighnat.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid NAT IP",
-								   DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-		}
-		// FIXME adding ipv6 will break this
-		// maybe add a validity check here to ensure minport is not greater than 2^30
-		request.add_neighnat.min_port = request_.min_port();
-		request.add_neighnat.max_port = request_.max_port();
-		request.add_neighnat.vni = request_.vni();
-		ret_val = inet_pton(AF_INET6, request_.underlay_route().c_str(),
-				request.add_neighnat.neigh_addr6);
-		if (ret_val <= 0)
-			DPGRPC_LOG_WARNING("Invalid underlay IP",
-							   DP_LOG_IPV6STR(request_.underlay_route().c_str()));
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-
 }
 
-int DeleteNeighborNatCall::Proceed()
+const char* ListLocalNatsCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new DeleteNeighborNatCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing neighboring NAT",
-						DP_LOG_VNI(request_.vni()),
-						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
-						DP_LOG_MINPORT(request_.min_port()),
-						DP_LOG_MAXPORT(request_.max_port()));
-		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
-			request.del_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.nat_ip().address().c_str(),
-					  (in_addr*)&request.del_neighnat.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid NAT IP",
-								   DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-		}
-		// maybe add a validity check here to ensure minport is not greater than 2^30
-		request.del_neighnat.min_port = request_.min_port();
-		request.del_neighnat.max_port = request_.max_port();
-		request.del_neighnat.vni = request_.vni();
-		// neigh_addr6 field is implied by this unique NAT definition
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Listing local Nats",
+					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
+	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->list_localnat))
+		return "Invalid nat_ip";
+	return NULL;
 }
-
-void ListInterfacesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
-{
-	struct dpgrpc_iface *iface;
-	ListInterfacesResponse *reply_ = (ListInterfacesResponse *)context;
-	Interface *machine;
-	struct in_addr addr;
-	char buf_str[INET6_ADDRSTRLEN];
-
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		iface = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_iface);
-		machine = reply_->add_interfaces();
-		addr.s_addr = htonl(iface->ip4_addr);
-		machine->set_primary_ipv4(inet_ntoa(addr));
-		inet_ntop(AF_INET6, iface->ip6_addr, buf_str, INET6_ADDRSTRLEN);
-		machine->set_primary_ipv6(buf_str);
-		machine->set_id((char *)iface->iface_id);
-		machine->set_vni(iface->vni);
-		machine->set_pci_name(iface->pci_name);
-		inet_ntop(AF_INET6, iface->ul_addr6, buf_str, INET6_ADDRSTRLEN);
-		machine->set_underlay_route(buf_str);
-	}
-}
-
-int ListInterfacesCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-
-	if (status_ == REQUEST) {
-		new ListInterfacesCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Listing interfaces");
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
-}
-
-void ListLocalNatsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+void ListLocalNatsCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	struct dpgrpc_nat *nat;
-	ListLocalNatsResponse *reply_ = (ListLocalNatsResponse *)context;
 	NatEntry *nat_entry;
 	IpAddress *nat_ip;
 	struct in_addr addr;
 
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		nat = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_nat);
-		nat_entry = reply_->add_nat_entries();
+	FOREACH_MESSAGE(nat, reply) {
+		nat_entry = reply_.add_nat_entries();
 		nat_ip = new IpAddress();
 		nat_ip->set_ipver(IpVersion::IPV4);
-		addr.s_addr = htonl(nat->addr);
+		addr.s_addr = htonl(nat->addr.ipv4);
 		nat_ip->set_address(inet_ntoa(addr));
 		nat_entry->set_allocated_nat_ip(nat_ip);
 		nat_entry->set_min_port(nat->min_port);
@@ -1763,328 +613,461 @@ void ListLocalNatsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
 	}
 }
 
-int ListLocalNatsCall::Proceed()
+const char* CreateNeighborNatCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new ListLocalNatsCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Listing local Nats",
-						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-
-		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
-			request.list_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.nat_ip().address().c_str(),
-					  (in_addr*)&request.list_neighnat.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid NAT IP",
-								   DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-		}
-		// TODO else?
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Adding neighboring NAT",
+					DP_LOG_VNI(request_.vni()),
+					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
+					DP_LOG_MINPORT(request_.min_port()),
+					DP_LOG_MAXPORT(request_.max_port()),
+					DP_LOG_IPV6STR(request_.underlay_route().c_str()));
+	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->add_neighnat.addr))
+		return "Invalid nat_ip";
+	if (request_.min_port() > UINT16_MAX)
+		return "Invalid min_port";
+	if (request_.max_port() > UINT16_MAX)
+		return "Invalid max_port";
+	request->add_neighnat.min_port = request_.min_port();
+	request->add_neighnat.max_port = request_.max_port();
+	request->add_neighnat.vni = request_.vni();
+	if (!GrpcConv::StrToIpv6(request_.underlay_route(), request->add_neighnat.neigh_addr6))
+		return "Invalid underlay_route";
+	return NULL;
+}
+void CreateNeighborNatCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-void ListNeighborNatsCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+const char* DeleteNeighborNatCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing neighboring NAT",
+					DP_LOG_VNI(request_.vni()),
+					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
+					DP_LOG_MINPORT(request_.min_port()),
+					DP_LOG_MAXPORT(request_.max_port()));
+	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->add_neighnat.addr))
+		return "Invalid nat_ip";
+	if (request_.min_port() > UINT16_MAX)
+		return "Invalid min_port";
+	if (request_.max_port() > UINT16_MAX)
+		return "Invalid max_port";
+	request->del_neighnat.min_port = request_.min_port();
+	request->del_neighnat.max_port = request_.max_port();
+	request->del_neighnat.vni = request_.vni();
+	// neigh_addr6 field is implied by this unique NAT definition
+	return NULL;
+}
+void DeleteNeighborNatCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* ListNeighborNatsCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting NAT info",
+					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
+	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->list_localnat))
+		return "Invalid nat_ip";
+	return NULL;
+}
+void ListNeighborNatsCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	struct dpgrpc_nat *nat;
-	ListNeighborNatsResponse *reply_ = (ListNeighborNatsResponse *)context;
 	NatEntry *nat_entry;
-	char buf[INET6_ADDRSTRLEN];
+	char strbuf[INET6_ADDRSTRLEN];
 
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		nat = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_nat);
-		nat_entry = reply_->add_nat_entries();
-		inet_ntop(AF_INET6, nat->ul_addr6, buf, INET6_ADDRSTRLEN);
-		nat_entry->set_underlay_route(buf);
+	FOREACH_MESSAGE(nat, reply) {
+		nat_entry = reply_.add_nat_entries();
+		inet_ntop(AF_INET6, nat->ul_addr6, strbuf, sizeof(strbuf));
+		nat_entry->set_underlay_route(strbuf);
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
 		nat_entry->set_vni(nat->vni);
 	}
 }
 
-int ListNeighborNatsCall::Proceed()
+
+const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	int ret_val;
-
-	if (status_ == REQUEST) {
-		new ListNeighborNatsCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Getting NAT info",
-						DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-
-		if (request_.nat_ip().ipver() == IpVersion::IPV4) {
-			request.list_neighnat.ip_type = RTE_ETHER_TYPE_IPV4;
-			ret_val = inet_aton(request_.nat_ip().address().c_str(),
-					  (in_addr*)&request.list_neighnat.addr);
-			if (ret_val == 0)
-				DPGRPC_LOG_WARNING("Invalid NAT IP",
-								   DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
-		}
-		// TODO else
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
+	DPGRPC_LOG_INFO("Creating loadbalancer",
+					DP_LOG_LBID(request_.loadbalancer_id().c_str()),
+					DP_LOG_VNI(request_.vni()),
+					DP_LOG_IPV4STR(request_.loadbalanced_ip().address().c_str()));
+	if (SNPRINTF_FAILED(request->add_lb.lb_id, request_.loadbalancer_id()))
+		return "Invalid loadbalancer_id";
+	request->add_lb.vni = request_.vni();
+	if (!GrpcConv::GrpcToDpAddress(request_.loadbalanced_ip(), &request->add_lb.addr))
+		return "Invalid loadbalanced_ip";
+	if (request_.loadbalanced_ports_size() >= DP_LB_MAX_PORTS)
+		return "Too many loadbalanced_ports";
+	for (int i = 0; i < request_.loadbalanced_ports_size(); ++i) {
+		DPGRPC_LOG_INFO("Adding loadbalanced port",
+						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
+						DP_LOG_PORT(request_.loadbalanced_ports(i).port()),
+						DP_LOG_PROTO(request_.loadbalanced_ports(i).protocol()));
+		if (request_.loadbalanced_ports(i).port() > UINT16_MAX)
+			return "Invalid loadbalanced_ports.port";
+		request->add_lb.lbports[i].port = request_.loadbalanced_ports(i).port();
+		if (request_.loadbalanced_ports(i).protocol() == TCP)
+			request->add_lb.lbports[i].protocol = DP_IP_PROTO_TCP;
+		else if (request_.loadbalanced_ports(i).protocol() == UDP)
+			request->add_lb.lbports[i].protocol = DP_IP_PROTO_UDP;
+		else
+			return "Invalid loadbalanced_ports.protocol";
 	}
-	return 0;
+	return NULL;
+}
+void CreateLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	char strbuf[INET6_ADDRSTRLEN];
+
+	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
 }
 
-int CreateFirewallRuleCall::Proceed()
+const char* DeleteLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	const FirewallRule *grpc_rule;
-
-	if (status_ == REQUEST) {
-		new CreateFirewallRuleCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		grpc_rule = &request_.rule();
-		DPGRPC_LOG_INFO("Adding firewall rule",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_FWRULE(grpc_rule->id().c_str()),
-						DP_LOG_FWPRIO(grpc_rule->priority()),
-						DP_LOG_FWDIR(grpc_rule->direction()),
-						DP_LOG_FWACTION(grpc_rule->action()),
-						DP_LOG_FWSRC(grpc_rule->source_prefix().ip().address().c_str()),
-						DP_LOG_FWSRCLEN(grpc_rule->source_prefix().length()),
-						DP_LOG_FWDST(grpc_rule->destination_prefix().ip().address().c_str()),
-						DP_LOG_FWDSTLEN(grpc_rule->destination_prefix().length()));
-		snprintf(request.add_fwrule.iface_id, sizeof(request.add_fwrule.iface_id),
-				 "%s", request_.interface_id().c_str());
-		ConvertGRPCFwallRuleToDPFWallRule(grpc_rule, &request.add_fwrule.rule);
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		reply_.set_rule_id(&reply.fwrule.rule.rule_id, sizeof(reply.fwrule.rule.rule_id));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Removing loadbalancer",
+					DP_LOG_LBID(request_.loadbalancer_id().c_str()));
+	if (SNPRINTF_FAILED(request->del_lb.lb_id, request_.loadbalancer_id()))
+		return "Invalid loadbalancer_id";
+	return NULL;
+}
+void DeleteLoadBalancerCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-int DeleteFirewallRuleCall::Proceed()
+const char* GetLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
+	DPGRPC_LOG_INFO("Getting loadbalancer info",
+					DP_LOG_LBID(request_.loadbalancer_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_lb.lb_id, request_.loadbalancer_id()))
+		return "Invalid loadbalancer_id";
+	return NULL;
+}
+void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct in_addr addr;
+	LbPort *lb_port;
+	IpAddress *lb_ip;
+	char strbuf[INET6_ADDRSTRLEN];
 
-	if (status_ == REQUEST) {
-		new DeleteFirewallRuleCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Removing firewall rule",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_FWRULE(request_.rule_id().c_str()));
-		snprintf(request.del_fwrule.iface_id, sizeof(request.del_fwrule.iface_id),
-				 "%s", request_.interface_id().c_str());
-		snprintf(request.del_fwrule.rule_id, sizeof(request.del_fwrule.rule_id),
-				 "%s", request_.rule_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
+	reply_.set_vni(reply->lb.vni);
+	lb_ip = new IpAddress();
+	addr.s_addr = reply->lb.addr.ipv4;
+	lb_ip->set_address(inet_ntoa(addr));
+	if (reply->lb.addr.ip_type == RTE_ETHER_TYPE_IPV4)
+		lb_ip->set_ipver(IpVersion::IPV4);
+	else
+		lb_ip->set_ipver(IpVersion::IPV6);
+	reply_.set_allocated_loadbalanced_ip(lb_ip);
+	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
+		if (reply->lb.lbports[i].port == 0)
+			continue;
+		lb_port = reply_.add_loadbalanced_ports();
+		lb_port->set_port(reply->lb.lbports[i].port);
+		if (reply->lb.lbports[i].protocol == DP_IP_PROTO_TCP)
+			lb_port->set_protocol(TCP);
+		if (reply->lb.lbports[i].protocol == DP_IP_PROTO_UDP)
+			lb_port->set_protocol(UDP);
 	}
-	return 0;
+	inet_ntop(AF_INET6, reply->lb.ul_addr6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
 }
 
-int GetFirewallRuleCall::Proceed()
+
+const char* CreateLoadBalancerTargetCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-	FirewallRule *rule;
-
-	if (status_ == REQUEST) {
-		new GetFirewallRuleCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Getting firewall rule info",
-						DP_LOG_IFACE(request_.interface_id().c_str()),
-						DP_LOG_FWRULE(request_.rule_id().c_str()));
-		snprintf(request.get_fwrule.iface_id, sizeof(request.get_fwrule.iface_id),
-				 "%s", request_.interface_id().c_str());
-		snprintf(request.get_fwrule.rule_id, sizeof(request.get_fwrule.rule_id),
-				 "%s", request_.rule_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-
-		rule = new FirewallRule();
-		ConvertDPFWallRuleToGRPCFwallRule(&reply.fwrule.rule, rule);
-		reply_.set_allocated_rule(rule);
-
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	DPGRPC_LOG_INFO("Adding loadbalancer target",
+					DP_LOG_LBID(request_.loadbalancer_id().c_str()),
+					DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
+	if (SNPRINTF_FAILED(request->add_lbtrgt.lb_id, request_.loadbalancer_id()))
+		return "Invalid loadbalancer_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.target_ip(), &request->add_lbtrgt.addr))
+		return "Invalid target_ip";
+	return NULL;
+}
+void CreateLoadBalancerTargetCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
-void ListFirewallRulesCall::ListCallback(struct dpgrpc_reply *reply, void *context)
+const char* DeleteLoadBalancerTargetCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing loadbalancer target",
+					DP_LOG_LBID(request_.loadbalancer_id().c_str()),
+					DP_LOG_IPV6STR(request_.target_ip().address().c_str()));
+	if (SNPRINTF_FAILED(request->del_lbtrgt.lb_id, request_.loadbalancer_id()))
+		return "Invalid loadbalancer_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.target_ip(), &request->del_lbtrgt.addr))
+		return "Invalid target_ip";
+	return NULL;
+}
+void DeleteLoadBalancerTargetCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* ListLoadBalancerTargetsCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Listing loadbalancer targets",
+					DP_LOG_LBID(request_.loadbalancer_id().c_str()));
+	if (SNPRINTF_FAILED(request->list_lbtrgt.lb_id, request_.loadbalancer_id()))
+		return "Invalid loadbalancer_id";
+	return NULL;
+}
+void ListLoadBalancerTargetsCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_lb_target *lb_target;
+	IpAddress *target_ip;
+	char strbuf[INET6_ADDRSTRLEN];
+
+	FOREACH_MESSAGE(lb_target, reply) {
+		target_ip = reply_.add_target_ips();
+		inet_ntop(AF_INET6, lb_target->addr.ipv6, strbuf, sizeof(strbuf));
+		target_ip->set_address(strbuf);
+		target_ip->set_ipver(IpVersion::IPV6);
+	}
+}
+
+
+const char* CreateLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
+					DP_LOG_PREFLEN(request_.prefix().length()));
+	if (SNPRINTF_FAILED(request->add_lbpfx.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->add_lbpfx.addr))
+		return "Invalid prefix.ip";
+	request->add_lbpfx.length = request_.prefix().length();
+	return NULL;
+}
+void CreateLoadBalancerPrefixCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	char strbuf[INET6_ADDRSTRLEN];
+
+	inet_ntop(AF_INET6, reply->route.trgt_addr.ipv6, strbuf, sizeof(strbuf));
+	reply_.set_underlay_route(strbuf);
+}
+
+const char* DeleteLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing loadbalancer target prefix",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
+					DP_LOG_PREFLEN(request_.prefix().length()));
+	if (SNPRINTF_FAILED(request->del_lbpfx.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_lbpfx.addr))
+		return "Invalid prefix.ip";
+	request->del_lbpfx.length = request_.prefix().length();
+	return NULL;
+}
+void DeleteLoadBalancerPrefixCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* ListLoadBalancerPrefixesCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Listing loadbalancer target prefixes",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->list_lbpfx.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void ListLoadBalancerPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_route *route;
+	Prefix *pfx;
+	IpAddress *pfx_ip;
+	struct in_addr addr;
+	char strbuf[INET6_ADDRSTRLEN];
+
+	FOREACH_MESSAGE(route, reply) {
+		pfx = reply_.add_prefixes();
+		pfx_ip = new IpAddress();
+		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+			addr.s_addr = htonl(route->pfx_addr.ipv4);
+			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_ipver(IpVersion::IPV4);
+			pfx->set_length(route->pfx_length);
+			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+			pfx->set_underlay_route(strbuf);
+		} else
+			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4);
+		pfx->set_allocated_ip(pfx_ip);
+	}
+}
+
+
+const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
+{
+	const FirewallRule& grpc_rule = request_.rule();
+	struct dp_fwall_rule *dp_rule = &request->add_fwrule.rule;
+
+	DPGRPC_LOG_INFO("Adding firewall rule",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_FWRULE(grpc_rule.id().c_str()),
+					DP_LOG_FWPRIO(grpc_rule.priority()),
+					DP_LOG_FWDIR(grpc_rule.direction()),
+					DP_LOG_FWACTION(grpc_rule.action()),
+					DP_LOG_FWSRC(grpc_rule.source_prefix().ip().address().c_str()),
+					DP_LOG_FWSRCLEN(grpc_rule.source_prefix().length()),
+					DP_LOG_FWDST(grpc_rule.destination_prefix().ip().address().c_str()),
+					DP_LOG_FWDSTLEN(grpc_rule.destination_prefix().length()));
+	if (SNPRINTF_FAILED(request->add_fwrule.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (SNPRINTF_FAILED(dp_rule->rule_id, grpc_rule.id()))
+		return "Invalid rule id";
+	if (grpc_rule.source_prefix().ip().ipver() != IpVersion::IPV4)
+		return "Invalid source_prefix.ip.ipver";
+	if (!GrpcConv::StrToIpv4(grpc_rule.source_prefix().ip().address(), &dp_rule->src_ip))
+		return "Invalid source_prefix.ip";
+	dp_rule->src_ip_mask = GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length());
+	if (grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV4)
+		return "Invalid destination_prefix.ip.ipver";
+	if (!GrpcConv::StrToIpv4(grpc_rule.destination_prefix().ip().address(), &dp_rule->dest_ip))
+		return "Invalid destination_prefix.ip";
+	dp_rule->dest_ip_mask = GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length());
+	if (!GrpcConv::GrpcToDpFwallDirection(grpc_rule.direction(), &dp_rule->dir))
+		return "Invalid direction";
+	if (!GrpcConv::GrpcToDpFwallAction(grpc_rule.action(), &dp_rule->action))
+		return "Invalid action";
+	if (grpc_rule.priority() > UINT16_MAX)
+		return "Invalid priority";
+	dp_rule->priority = grpc_rule.priority();
+
+	switch (grpc_rule.protocol_filter().filter_case()) {
+	case ProtocolFilter::kTcpFieldNumber:
+		DPGRPC_LOG_INFO("Adding firewall rule filter",
+						DP_LOG_FWRULE(grpc_rule.id().c_str()),
+						DP_LOG_FWPROTO(dp_rule->protocol),
+						DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
+						DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
+						DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
+						DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
+		dp_rule->protocol = IPPROTO_TCP;
+		dp_rule->filter.tcp_udp.src_port.lower = grpc_rule.protocol_filter().tcp().src_port_lower();
+		dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule.protocol_filter().tcp().dst_port_lower();
+		dp_rule->filter.tcp_udp.src_port.upper = grpc_rule.protocol_filter().tcp().src_port_upper();
+		dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule.protocol_filter().tcp().dst_port_upper();
+		break;
+	case ProtocolFilter::kUdpFieldNumber:
+		DPGRPC_LOG_INFO("Adding firewall rule filter",
+						DP_LOG_FWRULE(grpc_rule.id().c_str()),
+						DP_LOG_FWPROTO(dp_rule->protocol),
+						DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
+						DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
+						DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
+						DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
+		dp_rule->protocol = IPPROTO_UDP;
+		dp_rule->filter.tcp_udp.src_port.lower = grpc_rule.protocol_filter().udp().src_port_lower();
+		dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule.protocol_filter().udp().dst_port_lower();
+		dp_rule->filter.tcp_udp.src_port.upper = grpc_rule.protocol_filter().udp().src_port_upper();
+		dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule.protocol_filter().udp().dst_port_upper();
+		break;
+	case ProtocolFilter::kIcmpFieldNumber:
+		DPGRPC_LOG_INFO("Adding firewall rule filter",
+						DP_LOG_FWRULE(grpc_rule.id().c_str()),
+						DP_LOG_FWPROTO(dp_rule->protocol),
+						DP_LOG_FWICMPTYPE(dp_rule->filter.icmp.icmp_type),
+						DP_LOG_FWICMPCODE(dp_rule->filter.icmp.icmp_code));
+		dp_rule->protocol = IPPROTO_ICMP;
+		dp_rule->filter.icmp.icmp_type = grpc_rule.protocol_filter().icmp().icmp_type();
+		dp_rule->filter.icmp.icmp_code = grpc_rule.protocol_filter().icmp().icmp_code();
+		break;
+	case ProtocolFilter::FILTER_NOT_SET:
+	default:
+		DPGRPC_LOG_INFO("Adding firewall rule filter",
+						DP_LOG_FWRULE(grpc_rule.id().c_str()),
+						DP_LOG_FWPROTO(dp_rule->protocol));
+		dp_rule->protocol = DP_FWALL_MATCH_ANY_PROTOCOL;
+		dp_rule->filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT;
+		dp_rule->filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT;
+	}
+	return NULL;
+}
+void CreateFirewallRuleCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	reply_.set_rule_id(&reply->fwrule.rule.rule_id, sizeof(reply->fwrule.rule.rule_id));
+}
+
+const char* DeleteFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing firewall rule",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_FWRULE(request_.rule_id().c_str()));
+	if (SNPRINTF_FAILED(request->del_fwrule.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (SNPRINTF_FAILED(request->del_fwrule.rule_id, request_.rule_id()))
+		return "Invalid rule_id";
+	return NULL;
+}
+void DeleteFirewallRuleCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* GetFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting firewall rule info",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_FWRULE(request_.rule_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_fwrule.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (SNPRINTF_FAILED(request->get_fwrule.rule_id, request_.rule_id()))
+		return "Invalid rule_id";
+	return NULL;
+}
+void GetFirewallRuleCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	FirewallRule *rule = new FirewallRule();
+
+	GrpcConv::DpToGrpcFwrule(&reply->fwrule.rule, rule);
+	reply_.set_allocated_rule(rule);
+}
+
+const char* ListFirewallRulesCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Listing firewall rules",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->list_fwrule.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void ListFirewallRulesCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	struct dpgrpc_fwrule_info *grpc_rule;
-	ListFirewallRulesResponse *reply_ = (ListFirewallRulesResponse *)context;
 	FirewallRule *rule;
 
-	if (reply->err_code) {
-		reply_->set_allocated_status(CreateErrStatus(reply));
-		return;
-	}
-
-	for (uint i = 0; i < reply->msg_count; ++i) {
-		grpc_rule = DPGRPC_GET_MESSAGE(reply, i, struct dpgrpc_fwrule_info);
-		rule = reply_->add_rules();
-		ConvertDPFWallRuleToGRPCFwallRule(&grpc_rule->rule, rule);
+	FOREACH_MESSAGE(grpc_rule, reply) {
+		rule = reply_.add_rules();
+		GrpcConv::DpToGrpcFwrule(&grpc_rule->rule, rule);
 	}
 }
 
-int ListFirewallRulesCall::Proceed()
-{
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
 
-	if (status_ == REQUEST) {
-		new ListFirewallRulesCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_DEBUG("Listing firewall rules",
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		snprintf(request.list_fwrule.iface_id, sizeof(request.list_fwrule.iface_id),
-				 "%s", request_.interface_id().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		// TODO can fail hard (this `return -1` is only a wait loop)
-		if (DP_FAILED(dp_recv_array_from_worker(ListCallback, &reply_, call_type_)))
-			return -1;
-		status_ = FINISH;
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+const char* CheckVniInUseCall::FillRequest(struct dpgrpc_request* request)
+{
+	if (!GrpcConv::GrpcToDpVniType(request_.type(), &request->vni_in_use.type))
+		return "Invalid type";
+	request->vni_in_use.vni = request_.vni();
+	DPGRPC_LOG_INFO("Checking VNI usage", DP_LOG_VNI(request->vni_in_use.vni),
+					DP_LOG_VNI_TYPE(request->vni_in_use.type));
+	return NULL;
+}
+void CheckVniInUseCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	reply_.set_in_use(!!reply->vni_in_use.in_use);
 }
 
-int GetVersionCall::Proceed()
+const char* ResetVniCall::FillRequest(struct dpgrpc_request* request)
 {
-	struct dpgrpc_request request = {
-		.type = call_type_,
-	};
-	struct dpgrpc_reply reply;
-
-	if (status_ == REQUEST) {
-		new GetVersionCall();
-		if (InitCheck() == INITCHECK)
-			return -1;
-		DPGRPC_LOG_INFO("Getting version for client",
-						DP_LOG_PROTOVER(request_.client_protocol().c_str()),
-						DP_LOG_CLIENTNAME(request_.client_name().c_str()),
-						DP_LOG_CLIENTVER(request_.client_version().c_str()));
-		snprintf(request.get_version.proto, sizeof(request.get_version.proto),
-				 "%s", request_.client_protocol().c_str());
-		snprintf(request.get_version.name, sizeof(request.get_version.name),
-				 "%s", request_.client_name().c_str());
-		snprintf(request.get_version.app, sizeof(request.get_version.app),
-				 "%s", request_.client_version().c_str());
-		dp_send_to_worker(&request);  // TODO can fail
-		status_ = AWAIT_MSG;
-		return -1;
-	} else if (status_ == INITCHECK) {
-		responder_.Finish(reply_, ret, this);
-		status_ = FINISH;
-	} else if (status_ == AWAIT_MSG) {
-		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
-			return -1;
-		reply_.set_service_protocol(reply.versions.proto);
-		reply_.set_service_version(reply.versions.app);
-		status_ = FINISH;
-		reply_.set_allocated_status(CreateErrStatus(&reply));
-		responder_.Finish(reply_, ret, this);
-	} else {
-		GPR_ASSERT(status_ == FINISH);
-		delete this;
-	}
-	return 0;
+	if (!GrpcConv::GrpcToDpVniType(request_.type(), &request->vni_reset.type))
+		return "Invalid type";
+	request->vni_in_use.vni = request_.vni();
+	DPGRPC_LOG_INFO("Resetting VNI", DP_LOG_VNI(request->vni_in_use.vni),
+					DP_LOG_VNI_TYPE(request->vni_in_use.type));
+	return NULL;
+}
+void ResetVniCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }

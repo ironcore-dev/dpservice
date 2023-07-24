@@ -1,5 +1,5 @@
-#ifndef __INCLUDE_DP_GRPC_SERVICE_H
-#define __INCLUDE_DP_GRPC_SERVICE_H
+#ifndef __INCLUDE_DP_GRPC_SERVICE_H__
+#define __INCLUDE_DP_GRPC_SERVICE_H__
 
 #include "../proto/dpdk.grpc.pb.h"
 
@@ -30,6 +30,7 @@ private:
 	void HandleRpcs();
 	
 public:
+	GRPCService(const GRPCService& obj) = delete;
 	static GRPCService* GetInstance();
 	static void Cleanup();
 
@@ -40,4 +41,4 @@ public:
 	ServerCompletionQueue* GetCq() { return cq_.get(); }
 };
 
-#endif //__INCLUDE_DP_GRPC_SERVICE_H
+#endif

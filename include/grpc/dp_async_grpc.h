@@ -3,7 +3,6 @@
 
 #include "../proto/dpdk.grpc.pb.h"
 
-
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server.h>
@@ -11,7 +10,32 @@
 #include <grpcpp/server_context.h>
 #include "dp_error.h"
 #include "dp_grpc_api.h"
+#include "dp_grpc_conv.h"
 #include "dp_firewall.h"
+
+// unfortunately, templates are not usable due to the fact that the RequestXxx() is always different
+#define CREATE_CALLCLASS(NAME, BASE) \
+class NAME ## Call final : private BASE { \
+private: \
+	NAME ## Request request_; \
+	NAME ## Response reply_; \
+	ServerAsyncResponseWriter<NAME ## Response> responder_; \
+	void Clone() override { \
+		new NAME ## Call(); \
+	} \
+	void Finish(const grpc::Status& status) override { \
+		responder_.Finish(reply_, status, this); \
+	} \
+	void SetStatus(uint32_t grpc_errcode) override { \
+		reply_.set_allocated_status(GrpcConv::CreateStatus(grpc_errcode)); \
+	} \
+	const char* FillRequest(struct dpgrpc_request* request) override; \
+	void ParseReply(struct dpgrpc_reply* reply) override; \
+public: \
+	NAME ## Call() : BASE(DP_REQ_TYPE_ ## NAME), responder_(&ctx_) { \
+		service_->Request ## NAME(&ctx_, &request_, &responder_, cq_, cq_, this); \
+	} \
+}
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -27,567 +51,136 @@ using namespace dpdkonmetal::v1;
 
 #include "dp_grpc_service.h"
 
-enum CallStatus { REQUEST, INITCHECK, AWAIT_MSG, FINISH };
+enum CallState { REQUEST, AWAIT_MSG, FINISH };
 
 class BaseCall {
+private:
+	CallState call_state_;
+
+	// Sends the request to worker thread (override to prevent this)
+	virtual int WriteRequest(struct dpgrpc_request *request);
+	// Reads a (possibly chained) response from worker (needs single/multi implementation variants)
+	virtual int HandleReply() = 0;
+	// Indicates that gRPC call to Initialize() is required before running this call (override to disable)
+	virtual bool NeedsInit() { return !service_->IsInitialized(); }
+
+	// Generated for each message handler
+	virtual void Clone() = 0;
+	virtual void Finish(const grpc::Status& status) = 0;
+
 protected:
-	grpc::Status ret = grpc::Status::OK;
-	// TODO maybe some std::pointer stuff here?
-	GRPCService* service_;
-	ServerCompletionQueue* cq_;
-	CallStatus status_;
+	GRPCService *service_;
+	ServerCompletionQueue *cq_;
 	dpgrpc_request_type call_type_;
 	ServerContext ctx_;
-	static Status *CreateErrStatus(dpgrpc_reply *reply);
-public:
+
 	BaseCall(dpgrpc_request_type call_type)
-		: service_(GRPCService::GetInstance()), cq_(service_->GetCq()), status_(REQUEST), call_type_(call_type) {
-		}
-	int InitCheck();
-	static void ConvertDPFWallRuleToGRPCFwallRule(struct dp_fwall_rule *dp_rule, FirewallRule * grpc_rule);
-	static void ConvertGRPCFwallRuleToDPFWallRule(const FirewallRule * grpc_rule, struct dp_fwall_rule *dp_rule);
-	virtual int Proceed() = 0;
+		: call_state_(REQUEST),
+		  service_(GRPCService::GetInstance()),
+		  cq_(service_->GetCq()),
+		  call_type_(call_type)
+		{}
 	virtual ~BaseCall() = default;
-};
 
-class CreateLoadBalancerPrefixCall final : BaseCall {
-	CreateLoadBalancerPrefixRequest request_;
-	CreateLoadBalancerPrefixResponse reply_;
-	ServerAsyncResponseWriter<CreateLoadBalancerPrefixResponse> responder_;
+	// Generated for each message handler
+	virtual void SetStatus(uint32_t grpc_errcode) = 0;
 
-public:
-	CreateLoadBalancerPrefixCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_LBPREFIX), responder_(&ctx_) {
-		service_->RequestCreateLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
-														   this);
-	}
-	int Proceed() override;
-};
-
-class CheckVniInUseCall final : BaseCall {
-	CheckVniInUseRequest request_;
-	CheckVniInUseResponse reply_;
-	ServerAsyncResponseWriter<CheckVniInUseResponse> responder_;
+	// To be implemented by the message handlers proper (in .cpp)
+	virtual const char* FillRequest(struct dpgrpc_request* request) = 0;
+	virtual void ParseReply(struct dpgrpc_reply* reply) = 0;
 
 public:
-	CheckVniInUseCall()
-	: BaseCall(DP_REQ_TYPE_CHECK_VNIINUSE), responder_(&ctx_) {
-		service_->RequestCheckVniInUse(&ctx_, &request_, &responder_, cq_, cq_,
-														   this);
-	}
-	int Proceed() override;
+	CallState HandleRpc();
 };
 
-class ResetVniCall final : BaseCall {
-	ResetVniRequest request_;
-	ResetVniResponse reply_;
-	ServerAsyncResponseWriter<ResetVniResponse> responder_;
 
-public:
-	ResetVniCall()
-	: BaseCall(DP_REQ_TYPE_RESET_VNI), responder_(&ctx_) {
-		service_->RequestResetVni(&ctx_, &request_, &responder_, cq_, cq_,
-														   this);
-	}
-	int Proceed() override;
-};
-
-class DeleteLoadBalancerPrefixCall final : BaseCall {
-	DeleteLoadBalancerPrefixRequest request_;
-	DeleteLoadBalancerPrefixResponse reply_;
-	ServerAsyncResponseWriter<DeleteLoadBalancerPrefixResponse> responder_;
-
-public:
-	DeleteLoadBalancerPrefixCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_LBPREFIX), responder_(&ctx_) {
-		service_->RequestDeleteLoadBalancerPrefix(&ctx_, &request_, &responder_, cq_, cq_,
-														   this);
-	}
-	int Proceed() override;
-};
-
-class ListLoadBalancerPrefixesCall final : BaseCall {
-	ListLoadBalancerPrefixesRequest request_;
-	ListLoadBalancerPrefixesResponse reply_;
-	ServerAsyncResponseWriter<ListLoadBalancerPrefixesResponse> responder_;
+// Variant for call that do not use the worker thread at all
+class NoIpcCall : protected BaseCall {
 private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
+	int WriteRequest(struct dpgrpc_request *request) override;
+	int HandleReply() override;
 public:
-	ListLoadBalancerPrefixesCall()
-	: BaseCall(DP_REQ_TYPE_LIST_LBPREFIXES), responder_(&ctx_) {
-		service_->RequestListLoadBalancerPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
-														   this);
-	}
-	int Proceed() override;
+	NoIpcCall(dpgrpc_request_type call_type) : BaseCall(call_type) {}
 };
 
-class CreatePrefixCall final : BaseCall {
-	CreatePrefixRequest request_;
-	CreatePrefixResponse reply_;
-	ServerAsyncResponseWriter<CreatePrefixResponse> responder_;
 
-public:
-	CreatePrefixCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_PREFIX), responder_(&ctx_) {
-		service_->RequestCreatePrefix(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class DeletePrefixCall final : BaseCall {
-	DeletePrefixRequest request_;
-	DeletePrefixResponse reply_;
-	ServerAsyncResponseWriter<DeletePrefixResponse> responder_;
-
-public:
-	DeletePrefixCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_PREFIX), responder_(&ctx_) {
-		service_->RequestDeletePrefix(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class ListPrefixesCall final : BaseCall {
-	ListPrefixesRequest request_;
-	ListPrefixesResponse reply_;
-	ServerAsyncResponseWriter<ListPrefixesResponse> responder_;
+// Variant for calls with only one reply from worker thread
+class SingleReplyCall : protected BaseCall {
 private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
+	int HandleReply() override;
 public:
-	ListPrefixesCall()
-	: BaseCall(DP_REQ_TYPE_LIST_PREFIXES), responder_(&ctx_) {
-		service_->RequestListPrefixes(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
+	SingleReplyCall(dpgrpc_request_type call_type) : BaseCall(call_type) {}
 };
 
-class CreateVipCall final : BaseCall {
-	CreateVipRequest request_;
-	CreateVipResponse reply_;
-	ServerAsyncResponseWriter<CreateVipResponse> responder_;
 
-public:
-	CreateVipCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_VIP), responder_(&ctx_) {
-		service_->RequestCreateVip(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class CreateLoadBalancerCall final : BaseCall {
-	CreateLoadBalancerRequest request_;
-	CreateLoadBalancerResponse reply_;
-	ServerAsyncResponseWriter<CreateLoadBalancerResponse> responder_;
-
-public:
-	CreateLoadBalancerCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_LB), responder_(&ctx_) {
-		service_->RequestCreateLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
-											this);
-	}
-	int Proceed() override;
-};
-
-class GetLoadBalancerCall final : BaseCall {
-	GetLoadBalancerRequest request_;
-	GetLoadBalancerResponse reply_;
-	ServerAsyncResponseWriter<GetLoadBalancerResponse> responder_;
-
-public:
-	GetLoadBalancerCall()
-	: BaseCall(DP_REQ_TYPE_GET_LB), responder_(&ctx_) {
-		service_->RequestGetLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
-											this);
-	}
-	int Proceed() override;
-};
-
-class DeleteLoadBalancerCall final : BaseCall {
-	DeleteLoadBalancerRequest request_;
-	DeleteLoadBalancerResponse reply_;
-	ServerAsyncResponseWriter<DeleteLoadBalancerResponse> responder_;
-
-public:
-	DeleteLoadBalancerCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_LB), responder_(&ctx_) {
-		service_->RequestDeleteLoadBalancer(&ctx_, &request_, &responder_, cq_, cq_,
-											this);
-	}
-	int Proceed() override;
-};
-
-class CreateLoadBalancerTargetCall final : BaseCall {
-	CreateLoadBalancerTargetRequest request_;
-	CreateLoadBalancerTargetResponse reply_;
-	ServerAsyncResponseWriter<CreateLoadBalancerTargetResponse> responder_;
-
-public:
-	CreateLoadBalancerTargetCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_LBTARGET), responder_(&ctx_) {
-		service_->RequestCreateLoadBalancerTarget(&ctx_, &request_, &responder_, cq_, cq_,
-											   this);
-	}
-	int Proceed() override;
-};
-
-class DeleteLoadBalancerTargetCall final : BaseCall {
-	DeleteLoadBalancerTargetRequest request_;
-	DeleteLoadBalancerTargetResponse reply_;
-	ServerAsyncResponseWriter<DeleteLoadBalancerTargetResponse> responder_;
-
-public:
-	DeleteLoadBalancerTargetCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_LBTARGET), responder_(&ctx_) {
-		service_->RequestDeleteLoadBalancerTarget(&ctx_, &request_, &responder_, cq_, cq_,
-												  this);
-	}
-	int Proceed() override;
-};
-
-class ListLoadBalancerTargetsCall final : BaseCall {
-	ListLoadBalancerTargetsRequest request_;
-	ListLoadBalancerTargetsResponse reply_;
-	ServerAsyncResponseWriter<ListLoadBalancerTargetsResponse> responder_;
+// Variant for calls with a chained reply from worker thread
+class MultiReplyCall : protected BaseCall {
 private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
+	int HandleReply() override;
 public:
-	ListLoadBalancerTargetsCall()
-	: BaseCall(DP_REQ_TYPE_LIST_LBTARGETS), responder_(&ctx_) {
-		service_->RequestListLoadBalancerTargets(&ctx_, &request_, &responder_, cq_, cq_,
-												this);
-	}
-	int Proceed() override;
+	MultiReplyCall(dpgrpc_request_type call_type) : BaseCall(call_type) {}
 };
 
-class DeleteVipCall final : BaseCall {
-	DeleteVipRequest request_;
-	DeleteVipResponse reply_;
-	ServerAsyncResponseWriter<DeleteVipResponse> responder_;
 
-public:
-	DeleteVipCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_VIP), responder_(&ctx_) {
-		service_->RequestDeleteVip(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class GetVipCall final : BaseCall {
-	GetVipRequest request_;
-	GetVipResponse reply_;
-	ServerAsyncResponseWriter<GetVipResponse> responder_;
-
-public:
-	GetVipCall()
-	: BaseCall(DP_REQ_TYPE_GET_VIP), responder_(&ctx_) {
-		service_->RequestGetVip(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class CreateInterfaceCall final : BaseCall {
-	CreateInterfaceRequest request_;
-	CreateInterfaceResponse reply_;
-	ServerAsyncResponseWriter<CreateInterfaceResponse> responder_;
-
-public:
-	CreateInterfaceCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_INTERFACE), responder_(&ctx_) {
-		service_->RequestCreateInterface(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class DeleteInterfaceCall final : BaseCall {
-	DeleteInterfaceRequest request_;
-	DeleteInterfaceResponse reply_;
-	ServerAsyncResponseWriter<DeleteInterfaceResponse> responder_;
-
-public:
-	DeleteInterfaceCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_INTERFACE), responder_(&ctx_) {
-		service_->RequestDeleteInterface(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class CreateRouteCall final : BaseCall {
-	CreateRouteRequest request_;
-	CreateRouteResponse reply_;
-	ServerAsyncResponseWriter<CreateRouteResponse> responder_;
-
-public:
-	CreateRouteCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_ROUTE), responder_(&ctx_) {
-		service_->RequestCreateRoute(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class DeleteRouteCall final : BaseCall {
-	DeleteRouteRequest request_;
-	DeleteRouteResponse reply_;
-	ServerAsyncResponseWriter<DeleteRouteResponse> responder_;
-
-public:
-	DeleteRouteCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_ROUTE), responder_(&ctx_) {
-		service_->RequestDeleteRoute(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class GetInterfaceCall final : BaseCall {
-	GetInterfaceRequest request_;
-	GetInterfaceResponse reply_;
-	ServerAsyncResponseWriter<GetInterfaceResponse> responder_;
-
-public:
-	GetInterfaceCall()
-	: BaseCall(DP_REQ_TYPE_GET_INTERFACE), responder_(&ctx_) {
-		service_->RequestGetInterface(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class ListRoutesCall final : BaseCall {
-	ListRoutesRequest request_;
-	ListRoutesResponse reply_;
-	ServerAsyncResponseWriter<ListRoutesResponse> responder_;
+// Special case for Initialize() as it does not need to be initialized to work
+class InitCall : protected SingleReplyCall {
 private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
+	bool NeedsInit() override { return false; }
 public:
-	ListRoutesCall()
-	: BaseCall(DP_REQ_TYPE_LIST_ROUTES), responder_(&ctx_) {
-		service_->RequestListRoutes(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
+	InitCall(dpgrpc_request_type call_type) : SingleReplyCall(call_type) {}
 };
 
-class ListInterfacesCall final : BaseCall {
-	ListInterfacesRequest request_;
-	ListInterfacesResponse reply_;
-	ServerAsyncResponseWriter<ListInterfacesResponse> responder_;
-private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
-public:
-	ListInterfacesCall()
-	: BaseCall(DP_REQ_TYPE_LIST_INTERFACES), responder_(&ctx_) {
-		service_->RequestListInterfaces(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
 
-class CreateNatCall final: BaseCall {
-	CreateNatRequest request_;
-	CreateNatResponse reply_;
-	ServerAsyncResponseWriter<CreateNatResponse> responder_;
+// Generated classes for each gRPC call
+CREATE_CALLCLASS(Initialize, InitCall);
+CREATE_CALLCLASS(CheckInitialized, NoIpcCall);
 
-public:
-	CreateNatCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_NAT), responder_(&ctx_) {
-		service_->RequestCreateNat(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(GetVersion, SingleReplyCall);
 
-class ListLocalNatsCall final: BaseCall {
-	ListLocalNatsRequest request_;
-	ListLocalNatsResponse reply_;
-	ServerAsyncResponseWriter<ListLocalNatsResponse> responder_;
-private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
-public:
-	ListLocalNatsCall()
-	: BaseCall(DP_REQ_TYPE_LIST_LOCALNATS), responder_(&ctx_) {
-		service_->RequestListLocalNats(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(CreateInterface, SingleReplyCall);
+CREATE_CALLCLASS(DeleteInterface, SingleReplyCall);
+CREATE_CALLCLASS(GetInterface, SingleReplyCall);
+CREATE_CALLCLASS(ListInterfaces, MultiReplyCall);
 
-class ListNeighborNatsCall final: BaseCall {
-	ListNeighborNatsRequest request_;
-	ListNeighborNatsResponse reply_;
-	ServerAsyncResponseWriter<ListNeighborNatsResponse> responder_;
-private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
-public:
-	ListNeighborNatsCall()
-	: BaseCall(DP_REQ_TYPE_LIST_NEIGHNATS), responder_(&ctx_) {
-		service_->RequestListNeighborNats(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(CreatePrefix, SingleReplyCall);
+CREATE_CALLCLASS(DeletePrefix, SingleReplyCall);
+CREATE_CALLCLASS(ListPrefixes, MultiReplyCall);
 
-class GetNatCall final: BaseCall {
-	GetNatRequest request_;
-	GetNatResponse reply_;
-	ServerAsyncResponseWriter<GetNatResponse> responder_;
+CREATE_CALLCLASS(CreateRoute, SingleReplyCall);
+CREATE_CALLCLASS(DeleteRoute, SingleReplyCall);
+CREATE_CALLCLASS(ListRoutes, MultiReplyCall);
 
-public:
-	GetNatCall()
-	: BaseCall(DP_REQ_TYPE_GET_NAT), responder_(&ctx_) {
-		service_->RequestGetNat(&ctx_, &request_, &responder_, cq_, cq_,
-								this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(CreateVip, SingleReplyCall);
+CREATE_CALLCLASS(DeleteVip, SingleReplyCall);
+CREATE_CALLCLASS(GetVip, SingleReplyCall);
 
-class DeleteNatCall final: BaseCall {
-	DeleteNatRequest request_;
-	DeleteNatResponse reply_;
-	ServerAsyncResponseWriter<DeleteNatResponse> responder_;
+CREATE_CALLCLASS(CreateNat, SingleReplyCall);
+CREATE_CALLCLASS(DeleteNat, SingleReplyCall);
+CREATE_CALLCLASS(GetNat, SingleReplyCall);
+CREATE_CALLCLASS(ListLocalNats, MultiReplyCall);
 
-public:
-	DeleteNatCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_NAT), responder_(&ctx_) {
-		service_->RequestDeleteNat(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(CreateNeighborNat, SingleReplyCall);
+CREATE_CALLCLASS(DeleteNeighborNat, SingleReplyCall);
+CREATE_CALLCLASS(ListNeighborNats, MultiReplyCall);
 
-class CreateNeighborNatCall final: BaseCall {
-	CreateNeighborNatRequest request_;
-	CreateNeighborNatResponse reply_;
-	ServerAsyncResponseWriter<CreateNeighborNatResponse> responder_;
+CREATE_CALLCLASS(CreateLoadBalancer, SingleReplyCall);
+CREATE_CALLCLASS(DeleteLoadBalancer, SingleReplyCall);
+CREATE_CALLCLASS(GetLoadBalancer, SingleReplyCall);
 
-public:
-	CreateNeighborNatCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_NEIGHNAT), responder_(&ctx_) {
-		service_->RequestCreateNeighborNat(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(CreateLoadBalancerTarget, SingleReplyCall);
+CREATE_CALLCLASS(DeleteLoadBalancerTarget, SingleReplyCall);
+CREATE_CALLCLASS(ListLoadBalancerTargets, MultiReplyCall);
 
-class DeleteNeighborNatCall final: BaseCall {
-	DeleteNeighborNatRequest request_;
-	DeleteNeighborNatResponse reply_;
-	ServerAsyncResponseWriter<DeleteNeighborNatResponse> responder_;
+CREATE_CALLCLASS(CreateLoadBalancerPrefix, SingleReplyCall);
+CREATE_CALLCLASS(DeleteLoadBalancerPrefix, SingleReplyCall);
+CREATE_CALLCLASS(ListLoadBalancerPrefixes, MultiReplyCall);
 
-public:
-	DeleteNeighborNatCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_NEIGHNAT), responder_(&ctx_) {
-		service_->RequestDeleteNeighborNat(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int	Proceed() override;
-};
+CREATE_CALLCLASS(CreateFirewallRule, SingleReplyCall);
+CREATE_CALLCLASS(DeleteFirewallRule, SingleReplyCall);
+CREATE_CALLCLASS(GetFirewallRule, SingleReplyCall);
+CREATE_CALLCLASS(ListFirewallRules, MultiReplyCall);
 
-class CheckInitializedCall final : BaseCall {
-	CheckInitializedRequest request_;
-	CheckInitializedResponse reply_;
-	ServerAsyncResponseWriter<CheckInitializedResponse> responder_;
+CREATE_CALLCLASS(CheckVniInUse, SingleReplyCall);
+CREATE_CALLCLASS(ResetVni, SingleReplyCall);
 
-public:
-	CheckInitializedCall()
-	: BaseCall(DP_REQ_TYPE_CHECK_INITIALIZED), responder_(&ctx_) {
-		service_->RequestCheckInitialized(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class InitializeCall final : BaseCall {
-	InitializeRequest request_;
-	InitializeResponse reply_;
-	ServerAsyncResponseWriter<InitializeResponse> responder_;
-
-public:
-	InitializeCall()
-	: BaseCall(DP_REQ_TYPE_INITIALIZE), responder_(&ctx_) {
-		service_->RequestInitialize(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class CreateFirewallRuleCall final : BaseCall {
-	CreateFirewallRuleRequest request_;
-	CreateFirewallRuleResponse reply_;
-	ServerAsyncResponseWriter<CreateFirewallRuleResponse> responder_;
-
-public:
-	CreateFirewallRuleCall()
-	: BaseCall(DP_REQ_TYPE_CREATE_FWRULE), responder_(&ctx_) {
-		service_->RequestCreateFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class DeleteFirewallRuleCall final : BaseCall {
-	DeleteFirewallRuleRequest request_;
-	DeleteFirewallRuleResponse reply_;
-	ServerAsyncResponseWriter<DeleteFirewallRuleResponse> responder_;
-
-public:
-	DeleteFirewallRuleCall()
-	: BaseCall(DP_REQ_TYPE_DELETE_FWRULE), responder_(&ctx_) {
-		service_->RequestDeleteFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
-											this);
-	}
-	int Proceed() override;
-};
-
-class GetFirewallRuleCall final : BaseCall {
-	GetFirewallRuleRequest request_;
-	GetFirewallRuleResponse reply_;
-	ServerAsyncResponseWriter<GetFirewallRuleResponse> responder_;
-
-public:
-	GetFirewallRuleCall()
-	: BaseCall(DP_REQ_TYPE_GET_FWRULE), responder_(&ctx_) {
-		service_->RequestGetFirewallRule(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class ListFirewallRulesCall final : BaseCall {
-	ListFirewallRulesRequest request_;
-	ListFirewallRulesResponse reply_;
-	ServerAsyncResponseWriter<ListFirewallRulesResponse> responder_;
-private:
-	static void ListCallback(struct dpgrpc_reply *reply, void *context);
-public:
-	ListFirewallRulesCall()
-	: BaseCall(DP_REQ_TYPE_LIST_FWRULES), responder_(&ctx_) {
-		service_->RequestListFirewallRules(&ctx_, &request_, &responder_, cq_, cq_,
-										 this);
-	}
-	int Proceed() override;
-};
-
-class GetVersionCall final : BaseCall {
-	GetVersionRequest request_;
-	GetVersionResponse reply_;
-	ServerAsyncResponseWriter<GetVersionResponse> responder_;
-
-public:
-	GetVersionCall()
-	: BaseCall(DP_REQ_TYPE_GET_VERSION), responder_(&ctx_) {
-		service_->RequestGetVersion(&ctx_, &request_, &responder_, cq_, cq_,
-									this);
-	}
-	int Proceed() override;
-};
-
-#endif //__INCLUDE_DP_ASYNC_GRPC_H__
+#endif

@@ -181,10 +181,10 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 		if (!reply)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
-		reply->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		reply->pfx_addr = data->alias_pfx.ip;
+		reply->pfx_addr.ip_type = RTE_ETHER_TYPE_IPV4;
+		reply->pfx_addr.ipv4 = data->alias_pfx.ip;
 		reply->pfx_length = data->alias_pfx.length;
-		rte_memcpy(reply->trgt_addr6, key, sizeof(reply->trgt_addr6));
+		rte_memcpy(reply->trgt_addr.ipv6, key, sizeof(reply->trgt_addr.ipv6));
 	}
 
 	return DP_GRPC_OK;

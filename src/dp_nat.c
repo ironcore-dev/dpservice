@@ -579,7 +579,8 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			reply->min_port = data->network_nat_port_range[0];
 			reply->max_port = data->network_nat_port_range[1];
-			reply->addr = nkey->ip;
+			reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+			reply->addr.ipv4 = nkey->ip;
 			reply->vni = nkey->vni;
 		}
 	}

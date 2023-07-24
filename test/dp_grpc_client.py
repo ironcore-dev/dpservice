@@ -18,7 +18,7 @@ class DpGrpcClient:
 	def __init__(self, build_path):
 		self.cmd = build_path + "/tools/dp_grpc_client"
 		self.re_ipv6 = re.compile(r'(?:^|[\n\r])Received underlay route : ([a-f0-9:]+)(?:$|[\n\r])')
-		self.re_error = re.compile(r'(?:^|[\n\r])Received an error ([1-9][0-9][0-9])(?:$|[\n\r])')
+		self.re_error = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' reply with error code ([1-9][0-9][0-9]), message \'[A-Z_]*\'(?:$|[\n\r])')
 		self.expectedError = 0
 
 	def expect_error(self, errcode):
@@ -57,7 +57,7 @@ class DpGrpcClient:
 		return self.re_ipv6.search(output).group(1)
 
 	def init(self):
-		self._call("--init", "Init called")
+		self._call("--init", "Initialized")
 
 	def addinterface(self, vm_name, pci, vni, ipv4, ipv6):
 		return self._getUnderlayRoute(f"--addmachine {vm_name} --vm_pci {pci} --vni {vni} --ipv4 {ipv4} --ipv6 {ipv6}",
@@ -237,7 +237,7 @@ class DpGrpcClient:
 		self._call(f"--addfwrule {vm_name} --fw_ruleid {rule_id} --src_ip {src_addr} --src_length {src_len} --dst_ip {dst_addr} --dst_length {dst_len} {protospec}"
 				  f" --src_port_min {src_port_min} --src_port_max {src_port_max} --dst_port_min {dst_port_min} --dst_port_max {dst_port_max}"
 				  f" --action {action} --direction {direction} {priospec}",
-			"Add FirewallRule called")
+			"Firewall rule created")
 
 	def getfwallrule(self, vm_name, rule_id):
 		output = self._call(f"--getfwrule {vm_name} --fw_ruleid {rule_id}", "")
@@ -256,7 +256,7 @@ class DpGrpcClient:
 
 	def delfwallrule(self, vm_name, rule_id):
 		self._call(f"--delfwrule {vm_name} --fw_ruleid {rule_id}",
-			"Firewall Rule Deleted")
+			"Firewall rule deleted")
 
 	def listfwallrules(self, vm_name):
 		output = self._call(f"--listfwrules {vm_name}", "")

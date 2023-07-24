@@ -63,7 +63,7 @@ int dp_create_lb(struct dpgrpc_lb *lb, uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
-		.ip = ntohl(lb->addr),
+		.ip = ntohl(lb->addr.ipv4),
 		.vni = lb->vni
 	};
 
@@ -105,9 +105,9 @@ int dp_get_lb(void *id_key, struct dpgrpc_lb *out_lb)
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	out_lb->ip_type = RTE_ETHER_TYPE_IPV4;
 	out_lb->vni = lb_k->vni;
-	out_lb->addr = htonl(lb_k->ip);
+	out_lb->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+	out_lb->addr.ipv4 = htonl(lb_k->ip);
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
@@ -269,7 +269,7 @@ int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			rte_memcpy(reply->addr6, &lb_val->back_end_ips[i][0], sizeof(reply->addr6));
+			rte_memcpy(reply->addr.ipv6, &lb_val->back_end_ips[i][0], sizeof(reply->addr.ipv6));
 		}
 	}
 

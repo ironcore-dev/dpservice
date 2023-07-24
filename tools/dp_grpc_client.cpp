@@ -11,6 +11,22 @@
 #include "../proto/dpdk.grpc.pb.h"
 #include "../include/dp_version.h"
 
+#define CALL_GRPC(FUNC, CTX, REQ, REP) do { \
+	grpc::Status status = stub_->FUNC(CTX, REQ, REP); \
+	int err = status.error_code(); \
+	if (err) { \
+		printf("gRPC call '%s' failed with error code %d, message '%s'\n", \
+				#FUNC, err, status.error_message().c_str()); \
+		exit(0); \
+	} \
+	err = (REP)->status().code(); \
+	if (err) { \
+		printf("gRPC call '%s' reply with error code %d, message '%s'\n", \
+				#FUNC, err, (REP)->status().message().c_str()); \
+		exit(0); \
+	} \
+} while (0)
+
 using grpc::Channel;
 using grpc::ClientContext;
 using namespace dpdkonmetal::v1;
@@ -326,7 +342,7 @@ static void dp_print_usage(const char *prgname)
 		prgname);
 }
 
-int parse_args(int argc, char **argv)
+static int parse_args(int argc, char **argv)
 {
 	char *prgname = argv[0];
 	int option_index;
@@ -626,13 +642,9 @@ public:
 			request.set_interface_type(InterfaceType::VIRTUAL);
 			if (vm_pci_str[0] != '\0')
 				request.set_device_name(vm_pci_str);
-			stub_->CreateInterface(&context, request, &response);
-			if (!response.status().code()) {
-				printf("Allocated VF for you %s\n", response.vf().name().c_str());
-				printf("Received underlay route : %s\n", response.underlay_route().c_str());
-			} else {
-				printf("Received an error %d\n", response.status().code());
-			}
+			CALL_GRPC(CreateInterface, &context, request, &response);
+			printf("Allocated VF for you %s\n", response.vf().name().c_str());
+			printf("Received underlay route : %s\n", response.underlay_route().c_str());
 	}
 
 	void CreateRoute() {
@@ -659,11 +671,8 @@ public:
 			route->set_nexthop_vni(t_vni);
 			route->set_weight(100);
 			request.set_allocated_route(route);
-			stub_->CreateRoute(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Route added\n");
+			CALL_GRPC(CreateRoute, &context, request, &reply);
+			printf("Route added\n");
 	}
 
 	void DelRoute() {
@@ -690,11 +699,8 @@ public:
 			route->set_nexthop_vni(t_vni);
 			route->set_weight(100);
 			request.set_allocated_route(route);
-			stub_->DeleteRoute(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Route deleted\n");
+			CALL_GRPC(DeleteRoute, &context, request, &reply);
+			printf("Route deleted\n");
 	}
 
 	void ListRoutes() {
@@ -705,17 +711,14 @@ public:
 
 		request.set_vni(vni);
 
-		stub_->ListRoutes(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			for (i = 0; i < reply.routes_size(); i++) {
-				printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
-					reply.routes(i).prefix().ip().address().c_str(),
-					reply.routes(i).prefix().length(),
-					reply.routes(i).nexthop_vni(),
-					reply.routes(i).nexthop_address().address().c_str());
-			}
+		CALL_GRPC(ListRoutes, &context, request, &reply);
+		for (i = 0; i < reply.routes_size(); i++) {
+			printf("Route prefix %s len %d target vni %d target ipv6 %s\n",
+				reply.routes(i).prefix().ip().address().c_str(),
+				reply.routes(i).prefix().length(),
+				reply.routes(i).nexthop_vni(),
+				reply.routes(i).nexthop_address().address().c_str());
+		}
 	}
 
 	void VniInUse() {
@@ -726,10 +729,8 @@ public:
 			request.set_vni(vni);
 			request.set_type(VniType::VNI_IPV4);
 
-			stub_->CheckVniInUse(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else if (reply.in_use())
+			CALL_GRPC(CheckVniInUse, &context, request, &reply);
+			if (reply.in_use())
 				printf("Vni: %d is in use\n", vni);
 			else
 				printf("Vni: %d is not in use\n", vni);
@@ -743,11 +744,8 @@ public:
 			request.set_vni(vni);
 			request.set_type(VniType::VNI_BOTH);
 
-			stub_->ResetVni(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Vni: %d resetted\n", vni);
+			CALL_GRPC(ResetVni, &context, request, &reply);
+			printf("Vni: %d resetted\n", vni);
 	}
 
 	void CreateLBTarget() {
@@ -760,11 +758,8 @@ public:
 			target_ip->set_ipver(IpVersion::IPV6);
 			target_ip->set_address(t_ip6_str);
 			request.set_allocated_target_ip(target_ip);
-			stub_->CreateLoadBalancerTarget(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("LB VIP added\n");
+			CALL_GRPC(CreateLoadBalancerTarget, &context, request, &reply);
+			printf("LB VIP added\n");
 	}
 
 	void DelLBTarget() {
@@ -777,11 +772,8 @@ public:
 			target_ip->set_ipver(IpVersion::IPV6);
 			target_ip->set_address(t_ip6_str);
 			request.set_allocated_target_ip(target_ip);
-			stub_->DeleteLoadBalancerTarget(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("LB VIP deleted\n");
+			CALL_GRPC(DeleteLoadBalancerTarget, &context, request, &reply);
+			printf("LB VIP deleted\n");
 	}
 
 	void ListLBTargets() {
@@ -792,12 +784,9 @@ public:
 
 		request.set_loadbalancer_id(lb_id_str);
 
-		stub_->ListLoadBalancerTargets(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			for (i = 0; i < reply.target_ips_size(); i++)
-				printf("Backend ip %s\n", reply.target_ips(i).address().c_str());
+		CALL_GRPC(ListLoadBalancerTargets, &context, request, &reply);
+		for (i = 0; i < reply.target_ips_size(); i++)
+			printf("Backend ip %s\n", reply.target_ips(i).address().c_str());
 	}
 
 	void CreateFirewallRule() {
@@ -868,9 +857,8 @@ public:
 			}
 
 			request.set_allocated_rule(rule);
-			stub_->CreateFirewallRule(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
+			CALL_GRPC(CreateFirewallRule, &context, request, &reply);
+			printf("Firewall rule created\n");
 	}
 
 	void DelFirewallRule() {
@@ -880,11 +868,8 @@ public:
 
 			request.set_interface_id(machine_str);
 			request.set_rule_id(fwall_id_str);
-			stub_->DeleteFirewallRule(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Firewall Rule Deleted\n");
+			CALL_GRPC(DeleteFirewallRule, &context, request, &reply);
+			printf("Firewall rule deleted\n");
 	}
 
 	void ListFirewallRules() {
@@ -895,10 +880,7 @@ public:
 
 		request.set_interface_id(machine_str);
 
-		stub_->ListFirewallRules(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
+		CALL_GRPC(ListFirewallRules, &context, request, &reply);
 			for (i = 0; i < reply.rules_size(); i++) {
 				printf("%s / ", reply.rules(i).id().c_str());
 				if (reply.rules(i).source_prefix().ip().ipver() == IpVersion::IPV4) {
@@ -945,7 +927,6 @@ public:
 				else
 					printf("direction: drop \n");
 			}
-
 	}
 
 	void GetFirewallRule() {
@@ -955,10 +936,7 @@ public:
 
 			request.set_interface_id(machine_str);
 			request.set_rule_id(fwall_id_str);
-			stub_->GetFirewallRule(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else {
+			CALL_GRPC(GetFirewallRule, &context, request, &reply);
 				printf("%s / ", reply.rule().id().c_str());
 				if (reply.rule().source_prefix().ip().ipver() == IpVersion::IPV4) {
 					printf("src_ip: %s / ", reply.rule().source_prefix().ip().address().c_str());
@@ -1003,7 +981,6 @@ public:
 					printf("action: accept \n");
 				else
 					printf("direction: drop \n");
-			}
 	}
 
 	void CreateVip() {
@@ -1017,11 +994,8 @@ public:
 			if(version == IpVersion::IPV4)
 				vip_ip->set_address(ip_str);
 			request.set_allocated_vip_ip(vip_ip);
-			stub_->CreateVip(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
+			CALL_GRPC(CreateVip, &context, request, &reply);
+			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void CreatePfx() {
@@ -1038,11 +1012,8 @@ public:
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
-			stub_->CreatePrefix(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
+			CALL_GRPC(CreatePrefix, &context, request, &reply);
+			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void CreateLBPfx() {
@@ -1059,11 +1030,8 @@ public:
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
-			stub_->CreateLoadBalancerPrefix(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
+			CALL_GRPC(CreateLoadBalancerPrefix, &context, request, &reply);
+			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void CreateLB() {
@@ -1109,11 +1077,8 @@ public:
 					lb_port->set_protocol(Protocol::UDP);
 			}
 
-			stub_->CreateLoadBalancer(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Received underlay route : %s\n", reply.underlay_route().c_str());
+			CALL_GRPC(CreateLoadBalancer, &context, request, &reply);
+			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void GetLB() {
@@ -1124,10 +1089,7 @@ public:
 
 			request.set_loadbalancer_id(lb_id_str);
 
-			stub_->GetLoadBalancer(&context, request, &reply);
-			if (reply.status().code()) {
-				printf("Received an error %d\n", reply.status().code());
-			} else {
+			CALL_GRPC(GetLoadBalancer, &context, request, &reply);
 				printf("Received LB with vni: %d UL: %s LB ip: %s with ports: ", reply.vni(),
 					   reply.underlay_route().c_str(), reply.loadbalanced_ip().address().c_str());
 				for (i = 0; i < reply.loadbalanced_ports_size(); i++) {
@@ -1137,7 +1099,6 @@ public:
 						printf("%d,%s ", reply.loadbalanced_ports(i).port(), "udp");
 				}
 				printf("\n");
-			}
 	}
 
 	void DelLB() {
@@ -1147,11 +1108,8 @@ public:
 
 			request.set_loadbalancer_id(lb_id_str);
 
-			stub_->DeleteLoadBalancer(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("LB deleted\n");
+			CALL_GRPC(DeleteLoadBalancer, &context, request, &reply);
+			printf("LB deleted\n");
 	}
 
 	void Initialized() {
@@ -1163,9 +1121,9 @@ public:
 			context.set_deadline(deadline);
 			reply.set_uuid("");
 
-			grpc::Status ret = stub_->CheckInitialized(&context, request, &reply);
 			/* Aborted answers mean that dp-service is not initialized with init() call yet */
 			/* So do not exit with error in that case */
+			grpc::Status ret = stub_->CheckInitialized(&context, request, &reply);
 			if ((reply.uuid().c_str()[0] == '\0') && (ret.error_code() != grpc::StatusCode::ABORTED))
 				exit(1);
 			printf("Received UUID %s\n", reply.uuid().c_str());
@@ -1179,7 +1137,8 @@ public:
 
 			context.set_deadline(deadline);
 
-			stub_->Initialize(&context, request, &reply);
+			CALL_GRPC(Initialize, &context, request, &reply);
+			printf("Initialized\n");
 			printf("Received UUID %s\n", reply.uuid().c_str());
 	}
 
@@ -1197,11 +1156,8 @@ public:
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
-			stub_->DeletePrefix(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Prefix deleted\n");
+			CALL_GRPC(DeletePrefix, &context, request, &reply);
+			printf("Prefix deleted\n");
 	}
 
 	void ListPfx() {
@@ -1212,16 +1168,13 @@ public:
 
 		request.set_interface_id(machine_str);
 
-		stub_->ListPrefixes(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			for (i = 0; i < reply.prefixes_size(); i++) {
-				printf("Route prefix %s len %d underlayroute %s\n",
-					reply.prefixes(i).ip().address().c_str(),
-					reply.prefixes(i).length(),
-					reply.prefixes(i).underlay_route().c_str());
-			}
+		CALL_GRPC(ListPrefixes, &context, request, &reply);
+		for (i = 0; i < reply.prefixes_size(); i++) {
+			printf("Route prefix %s len %d underlayroute %s\n",
+				reply.prefixes(i).ip().address().c_str(),
+				reply.prefixes(i).length(),
+				reply.prefixes(i).underlay_route().c_str());
+		}
 	}
 
 	void DelLBPfx() {
@@ -1238,11 +1191,8 @@ public:
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
-			stub_->DeleteLoadBalancerPrefix(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("LB prefix deleted\n");
+			CALL_GRPC(DeleteLoadBalancerPrefix, &context, request, &reply);
+			printf("LB prefix deleted\n");
 	}
 
 	void ListLBPfx() {
@@ -1253,16 +1203,13 @@ public:
 
 		request.set_interface_id(machine_str);
 
-		stub_->ListLoadBalancerPrefixes(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			for (i = 0; i < reply.prefixes_size(); i++) {
-				printf("LB Route prefix %s len %d underlayroute %s\n",
-					reply.prefixes(i).ip().address().c_str(),
-					reply.prefixes(i).length(),
-					reply.prefixes(i).underlay_route().c_str());
-			}
+		CALL_GRPC(ListLoadBalancerPrefixes, &context, request, &reply);
+		for (i = 0; i < reply.prefixes_size(); i++) {
+			printf("LB Route prefix %s len %d underlayroute %s\n",
+				reply.prefixes(i).ip().address().c_str(),
+				reply.prefixes(i).length(),
+				reply.prefixes(i).underlay_route().c_str());
+		}
 	}
 
 	void DelVip() {
@@ -1271,11 +1218,8 @@ public:
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->DeleteVip(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("VIP deleted\n");
+			CALL_GRPC(DeleteVip, &context, request, &reply);
+			printf("VIP deleted\n");
 	}
 
 	void GetVip() {
@@ -1284,12 +1228,9 @@ public:
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->GetVip(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Received VIP %s underlayroute %s\n",
-					   reply.vip_ip().address().c_str(), reply.underlay_route().c_str());
+			CALL_GRPC(GetVip, &context, request, &reply);
+			printf("Received VIP %s underlayroute %s\n",
+				   reply.vip_ip().address().c_str(), reply.underlay_route().c_str());
 	}
 
 	void DelInterface() {
@@ -1298,11 +1239,8 @@ public:
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->DeleteInterface(&context, request, &reply);
-			if (reply.status().code())
-				printf("Received an error %d\n", reply.status().code());
-			else
-				printf("Interface deleted\n");
+			CALL_GRPC(DeleteInterface, &context, request, &reply);
+			printf("Interface deleted\n");
 	}
 
 	void GetInterface() {
@@ -1311,17 +1249,13 @@ public:
 			ClientContext context;
 
 			request.set_interface_id(machine_str);
-			stub_->GetInterface(&context, request, &reply);
-			if (reply.status().code()) {
-				printf("Received an error %d\n", reply.status().code());
-			} else {
-				printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
-				reply.interface().primary_ipv4().c_str(),
-				reply.interface().primary_ipv6().c_str(),
-				reply.interface().vni(),
-				reply.interface().pci_name().c_str(),
-				reply.interface().underlay_route().c_str());
-			}
+			CALL_GRPC(GetInterface, &context, request, &reply);
+			printf("Interface with ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n",
+			reply.interface().primary_ipv4().c_str(),
+			reply.interface().primary_ipv6().c_str(),
+			reply.interface().vni(),
+			reply.interface().pci_name().c_str(),
+			reply.interface().underlay_route().c_str());
 	}
 
 	void ListInterfaces() {
@@ -1330,18 +1264,15 @@ public:
 		ClientContext context;
 		int i;
 
-		stub_->ListInterfaces(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			for (i = 0; i < reply.interfaces_size(); i++) {
-				printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).id().c_str(),
-					reply.interfaces(i).primary_ipv4().c_str(),
-					reply.interfaces(i).primary_ipv6().c_str(),
-					reply.interfaces(i).vni(),
-					reply.interfaces(i).pci_name().c_str(),
-					reply.interfaces(i).underlay_route().c_str());
-			}
+		CALL_GRPC(ListInterfaces, &context, request, &reply);
+		for (i = 0; i < reply.interfaces_size(); i++) {
+			printf("Interface %s ipv4 %s ipv6 %s vni %d pci %s underlayroute %s\n", reply.interfaces(i).id().c_str(),
+				reply.interfaces(i).primary_ipv4().c_str(),
+				reply.interfaces(i).primary_ipv6().c_str(),
+				reply.interfaces(i).vni(),
+				reply.interfaces(i).pci_name().c_str(),
+				reply.interfaces(i).underlay_route().c_str());
+		}
 	}
 
 	void CreateNat() {
@@ -1357,11 +1288,8 @@ public:
 		request.set_allocated_nat_ip(nat_ip);
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
-		stub_->CreateNat(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
+		CALL_GRPC(CreateNat, &context, request, &reply);
+		printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
 
 	void DelNat() {
@@ -1370,11 +1298,8 @@ public:
 		ClientContext context;
 
 		request.set_interface_id(machine_str);
-		stub_->DeleteNat(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			printf("NAT deleted\n");
+		CALL_GRPC(DeleteNat, &context, request, &reply);
+		printf("NAT deleted\n");
 	}
 
 	void GetNat() {
@@ -1383,13 +1308,10 @@ public:
 		ClientContext context;
 
 		request.set_interface_id(machine_str);
-		stub_->GetNat(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			printf("Received NAT IP %s with min port: %d and max port: %d underlay %s\n",
-					reply.nat_ip().address().c_str(), reply.min_port(), reply.max_port(),
-					reply.underlay_route().c_str());
+		CALL_GRPC(GetNat, &context, request, &reply);
+		printf("Received NAT IP %s with min port: %d and max port: %d underlay %s\n",
+				reply.nat_ip().address().c_str(), reply.min_port(), reply.max_port(),
+				reply.underlay_route().c_str());
 	}
 
 	void CreateNeighNat() {
@@ -1411,11 +1333,8 @@ public:
 		request.set_max_port(max_port);
 		request.set_underlay_route(t_ip6_str);
 
-		stub_->CreateNeighborNat(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			printf("Neighbor NAT added\n");
+		CALL_GRPC(CreateNeighborNat, &context, request, &reply);
+		printf("Neighbor NAT added\n");
 	}
 
 	void ListLocalNats() {
@@ -1432,18 +1351,14 @@ public:
 			nat_ip->set_address(ip6_str);
 		request.set_allocated_nat_ip(nat_ip);
 
-		stub_->ListLocalNats(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else {
-			printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_ip->address().c_str());
-			for (i = 0; i < reply.nat_entries_size(); i++) {
-				printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
-				reply.nat_entries(i).nat_ip().address().c_str(),
-				reply.nat_entries(i).min_port(),
-				reply.nat_entries(i).max_port(),
-				reply.nat_entries(i).vni());
-			}
+		CALL_GRPC(ListLocalNats, &context, request, &reply);
+		printf("Following private IPs are NAT into this IPv4 NAT address: %s\n", nat_ip->address().c_str());
+		for (i = 0; i < reply.nat_entries_size(); i++) {
+			printf("  %d: IP %s, min_port %u, max_port %u, vni: %u\n", i+1,
+			reply.nat_entries(i).nat_ip().address().c_str(),
+			reply.nat_entries(i).min_port(),
+			reply.nat_entries(i).max_port(),
+			reply.nat_entries(i).vni());
 		}
 	}
 	void ListNeighNATs() {
@@ -1460,18 +1375,14 @@ public:
 			nat_ip->set_address(ip6_str);
 		request.set_allocated_nat_ip(nat_ip);
 
-		stub_->ListNeighborNats(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else {
-			printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", nat_ip->address().c_str());
-			for (i = 0; i < reply.nat_entries_size(); i++) {
-				printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
-				reply.nat_entries(i).min_port(),
-				reply.nat_entries(i).max_port(),
-				reply.nat_entries(i).vni(),
-				reply.nat_entries(i).underlay_route().c_str());
-			}
+		CALL_GRPC(ListNeighborNats, &context, request, &reply);
+		printf("Following port ranges and their route of neighbor NAT exists for this IPv4 NAT address: %s\n", nat_ip->address().c_str());
+		for (i = 0; i < reply.nat_entries_size(); i++) {
+			printf("  %d: min_port %u, max_port %u, vni %u --> Underlay IPv6 %s\n", i+1,
+			reply.nat_entries(i).min_port(),
+			reply.nat_entries(i).max_port(),
+			reply.nat_entries(i).vni(),
+			reply.nat_entries(i).underlay_route().c_str());
 		}
 	}
 	void GetNatEntries() {
@@ -1501,11 +1412,8 @@ public:
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
 
-		stub_->DeleteNeighborNat(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			printf("Neighbor NAT deleted\n");
+		CALL_GRPC(DeleteNeighborNat, &context, request, &reply);
+		printf("Neighbor NAT deleted\n");
 	}
 
 	void GetVersion() {
@@ -1517,11 +1425,8 @@ public:
 		request.set_client_name("dp_grpc_client");
 		request.set_client_version(DP_SERVICE_VERSION);
 
-		stub_->GetVersion(&context, request, &reply);
-		if (reply.status().code())
-			printf("Received an error %d\n", reply.status().code());
-		else
-			printf("Got protocol '%s' on service '%s'\n", reply.service_protocol().c_str(), reply.service_version().c_str());
+		CALL_GRPC(GetVersion, &context, request, &reply);
+		printf("Got protocol '%s' on service '%s'\n", reply.service_protocol().c_str(), reply.service_version().c_str());
 	}
 
 private:

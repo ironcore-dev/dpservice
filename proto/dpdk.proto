@@ -45,7 +45,7 @@ message Empty {
 }
 
 message Status {
-	int32 code = 1;
+	uint32 code = 1;
 	string message = 2;
 }
 
@@ -382,7 +382,7 @@ message CreateNatResponse {
 }
 
 message GetNatRequest {
-	bytes interface_id =1;
+	bytes interface_id = 1;
 }
 
 message GetNatResponse {

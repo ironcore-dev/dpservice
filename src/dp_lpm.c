@@ -261,8 +261,7 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 	return DP_GRPC_OK;
 }
 
-int dp_del_route(uint16_t portid, uint32_t vni, __rte_unused uint32_t t_vni, uint32_t ip,
-				 __rte_unused uint8_t *ip6, uint8_t depth, int socketid)
+int dp_del_route(uint16_t portid, uint32_t vni, uint32_t ip, uint8_t depth, int socketid)
 {
 	struct rte_rib_node *node;
 	struct rte_rib *root;
@@ -319,15 +318,15 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool 
 
 		rte_rib_get_ip(node, &ipv4);
 		rte_rib_get_depth(node, &depth);
-		reply->pfx_ip_type = RTE_ETHER_TYPE_IPV4;
-		reply->pfx_addr = ipv4;
+		reply->pfx_addr.ip_type = RTE_ETHER_TYPE_IPV4;
+		reply->pfx_addr.ipv4 = ipv4;
 		reply->pfx_length = depth;
 
 		if (ext_routes) {
 			vm_route = (struct vm_route *)rte_rib_get_ext(node);
-			reply->trgt_ip_type = RTE_ETHER_TYPE_IPV6;
+			reply->trgt_addr.ip_type = RTE_ETHER_TYPE_IPV6;
 			reply->trgt_vni = vm_route->vni;
-			rte_memcpy(reply->trgt_addr6, vm_route->nh_ipv6, sizeof(reply->trgt_addr6));
+			rte_memcpy(reply->trgt_addr.ipv6, vm_route->nh_ipv6, sizeof(reply->trgt_addr.ipv6));
 		}
 
 	}
@@ -401,8 +400,7 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	return DP_GRPC_OK;
 }
 
-int dp_del_route6(uint16_t portid, uint32_t vni, __rte_unused uint32_t t_vni, uint8_t *ipv6,
-				  __rte_unused uint8_t *ext_ip6, uint8_t depth, int socketid)
+int dp_del_route6(uint16_t portid, uint32_t vni, uint8_t *ipv6, uint8_t depth, int socketid)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -580,10 +578,8 @@ void dp_del_vm(int portid, int socketid)
 	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
-	dp_del_route(portid, vm_table[portid].vni, 0,
-				vm_table[portid].info.own_ip, NULL, 32, socketid);
-	dp_del_route6(portid, vm_table[portid].vni, 0,
-			vm_table[portid].info.dhcp_ipv6, NULL, 128, socketid);
+	dp_del_route(portid, vm_table[portid].vni, vm_table[portid].info.own_ip, 32, socketid);
+	dp_del_route6(portid, vm_table[portid].vni, vm_table[portid].info.dhcp_ipv6, 128, socketid);
 
 	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV4)))
 		DPS_LOG_WARNING("Unable to delete route table", DP_LOG_VNI(vm_table[portid].vni), DP_LOG_PROTO(DP_IP_PROTO_IPV4));

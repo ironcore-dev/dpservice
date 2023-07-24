@@ -73,6 +73,7 @@ bool GRPCService::IsInitialized()
 
 void GRPCService::HandleRpcs()
 {
+	BaseCall* call;
 	void* tag;
 	bool ok;
 
@@ -115,10 +116,13 @@ void GRPCService::HandleRpcs()
 	new ResetVniCall();
 	new GetVersionCall();
 
-	while (true) {
-		GPR_ASSERT(cq_->Next(&tag, &ok));
-		GPR_ASSERT(ok);
-		while (static_cast<BaseCall*>(tag)->Proceed() < 0) {};
+	while (cq_->Next(&tag, &ok) && ok) {
+		call = static_cast<BaseCall*>(tag);
+		while (call->HandleRpc() == CallState::AWAIT_MSG) {
+			// wait for response from worker
+		};
 	}
+	DPGRPC_LOG_ERR("gRPC internal error (cannot read next message)");
+	rte_exit(EXIT_FAILURE, "gRPC service aborted\n");
 }
 
