@@ -8,17 +8,35 @@
 #include "dp_timers.h"
 
 
+GRPCService* GRPCService::instance = nullptr;
+
+GRPCService* GRPCService::GetInstance()
+{
+	if (!instance)
+		instance = new GRPCService();
+	return instance;
+}
+
+void GRPCService::Cleanup()
+{
+	if (!instance)
+		return;
+	delete instance;
+	instance = nullptr;
+}
+
 GRPCService::GRPCService()
 {
-	uuid = malloc(DP_UUID_SIZE);
+	uuid = new char[DP_UUID_SIZE];
 	uuid_generate_random(binuuid);
-	uuid_unparse_upper(binuuid, (char*)uuid);
+	uuid_unparse_upper(binuuid, uuid);
 }
 
 GRPCService::~GRPCService()
 {
-	free(uuid);
+	delete uuid;
 }
+
 
 bool GRPCService::run(std::string listen_address)
 {
@@ -37,9 +55,9 @@ bool GRPCService::run(std::string listen_address)
 	return true;
 }
 
-char* GRPCService::GetUUID()
+const char* GRPCService::GetUUID()
 {
-	return (char*)uuid;
+	return uuid;
 }
 
 void GRPCService::SetInitStatus(bool status)
@@ -58,44 +76,44 @@ void GRPCService::HandleRpcs()
 	void* tag;
 	bool ok;
 
-	new InitializeCall(this, cq_.get());
-	new CheckInitializedCall(this, cq_.get());
-	new DeletePrefixCall(this, cq_.get());
-	new ListPrefixesCall(this, cq_.get());
-	new CreatePrefixCall(this, cq_.get());
-	new ListLoadBalancerTargetsCall(this, cq_.get());
-	new CreateLoadBalancerTargetCall(this, cq_.get());
-	new DeleteLoadBalancerTargetCall(this, cq_.get());
-	new CreateVipCall(this, cq_.get());
-	new DeleteVipCall(this, cq_.get());
-	new GetVipCall(this, cq_.get());
-	new CreateRouteCall(this, cq_.get());
-	new DeleteRouteCall(this, cq_.get());
-	new ListRoutesCall(this, cq_.get());
-	new CreateInterfaceCall(this, cq_.get());
-	new DeleteInterfaceCall(this, cq_.get());
-	new ListInterfacesCall(this, cq_.get());
-	new GetInterfaceCall(this, cq_.get());
-	new CreateLoadBalancerCall(this, cq_.get());
-	new GetLoadBalancerCall(this, cq_.get());
-	new DeleteLoadBalancerCall(this, cq_.get());
-	new CreateNatCall(this, cq_.get());
-	new GetNatCall(this, cq_.get());
-	new DeleteNatCall(this, cq_.get());
-	new CreateNeighborNatCall(this, cq_.get());
-	new DeleteNeighborNatCall(this, cq_.get());
-	new ListLocalNatsCall(this, cq_.get());
-	new ListNeighborNatsCall(this, cq_.get());
-	new ListLoadBalancerPrefixesCall(this, cq_.get());
-	new DeleteLoadBalancerPrefixCall(this, cq_.get());
-	new CreateLoadBalancerPrefixCall(this, cq_.get());
-	new CreateFirewallRuleCall(this, cq_.get());
-	new GetFirewallRuleCall(this, cq_.get());
-	new DeleteFirewallRuleCall(this, cq_.get());
-	new ListFirewallRulesCall(this, cq_.get());
-	new CheckVniInUseCall(this, cq_.get());
-	new ResetVniCall(this, cq_.get());
-	new GetVersionCall(this, cq_.get());
+	new InitializeCall();
+	new CheckInitializedCall();
+	new DeletePrefixCall();
+	new ListPrefixesCall();
+	new CreatePrefixCall();
+	new ListLoadBalancerTargetsCall();
+	new CreateLoadBalancerTargetCall();
+	new DeleteLoadBalancerTargetCall();
+	new CreateVipCall();
+	new DeleteVipCall();
+	new GetVipCall();
+	new CreateRouteCall();
+	new DeleteRouteCall();
+	new ListRoutesCall();
+	new CreateInterfaceCall();
+	new DeleteInterfaceCall();
+	new ListInterfacesCall();
+	new GetInterfaceCall();
+	new CreateLoadBalancerCall();
+	new GetLoadBalancerCall();
+	new DeleteLoadBalancerCall();
+	new CreateNatCall();
+	new GetNatCall();
+	new DeleteNatCall();
+	new CreateNeighborNatCall();
+	new DeleteNeighborNatCall();
+	new ListLocalNatsCall();
+	new ListNeighborNatsCall();
+	new ListLoadBalancerPrefixesCall();
+	new DeleteLoadBalancerPrefixCall();
+	new CreateLoadBalancerPrefixCall();
+	new CreateFirewallRuleCall();
+	new GetFirewallRuleCall();
+	new DeleteFirewallRuleCall();
+	new ListFirewallRulesCall();
+	new CheckVniInUseCall();
+	new ResetVniCall();
+	new GetVersionCall();
 
 	while (true) {
 		GPR_ASSERT(cq_->Next(&tag, &ok));

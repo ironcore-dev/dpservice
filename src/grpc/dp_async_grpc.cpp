@@ -191,7 +191,7 @@ int CheckVniInUseCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new CheckVniInUseCall(service_, cq_);
+		new CheckVniInUseCall();
 		switch (request_.type()) {
 		case VniType::VNI_IPV4:
 			request.vni_in_use.type = DP_VNI_IPV4;
@@ -232,7 +232,7 @@ int ResetVniCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new ResetVniCall(service_, cq_);
+		new ResetVniCall();
 		switch (request_.type()) {
 		case VniType::VNI_IPV4:
 			request.vni_in_use.type = DP_VNI_IPV4;
@@ -267,30 +267,26 @@ int ResetVniCall::Proceed()
 
 int BaseCall::InitCheck()
 {
-	GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-
-	if (!grpc_service->IsInitialized()) {
+	if (!GRPCService::GetInstance()->IsInitialized()) {
 		status_ = INITCHECK;
 		ret = grpc::Status(grpc::StatusCode::ABORTED, "not initialized");
 	} else {
 		status_ = AWAIT_MSG;
 	}
-
 	return status_;
 }
 
 int CheckInitializedCall::Proceed()
 {
 	if (status_ == REQUEST) {
-		new CheckInitializedCall(service_, cq_);
+		new CheckInitializedCall();
 		InitCheck();
 		return -1;
 	} else if (status_ == INITCHECK) {
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else if (status_ == AWAIT_MSG) {
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		reply_.set_uuid(grpc_service->GetUUID());
+		reply_.set_uuid(GRPCService::GetInstance()->GetUUID());
 		responder_.Finish(reply_, ret, this);
 		status_ = FINISH;
 	} else {
@@ -308,14 +304,13 @@ int InitializeCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new InitializeCall(service_, cq_);
+		new InitializeCall();
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		DPGRPC_LOG_INFO("Initializing");
 		return -1;
 	} else if (status_ == AWAIT_MSG) {
-		GRPCService* grpc_service = dynamic_cast<GRPCService*>(service_);
-		grpc_service->SetInitStatus(true);
+		GRPCService::GetInstance()->SetInitStatus(true);
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
 		reply_.set_uuid(grpc_service->GetUUID());
@@ -340,7 +335,7 @@ int CreateLoadBalancerCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateLoadBalancerCall(service_, cq_);
+		new CreateLoadBalancerCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Creating loadbalancer",
@@ -402,7 +397,7 @@ int DeleteLoadBalancerCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteLoadBalancerCall(service_, cq_);
+		new DeleteLoadBalancerCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer",
@@ -441,7 +436,7 @@ int GetLoadBalancerCall::Proceed()
 	int i;
 
 	if (status_ == REQUEST) {
-		new GetLoadBalancerCall(service_, cq_);
+		new GetLoadBalancerCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting loadbalancer info",
@@ -497,7 +492,7 @@ int CreateLoadBalancerTargetCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateLoadBalancerTargetCall(service_, cq_);
+		new CreateLoadBalancerTargetCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding loadbalancer target",
@@ -543,7 +538,7 @@ int DeleteLoadBalancerTargetCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DeleteLoadBalancerTargetCall(service_, cq_);
+		new DeleteLoadBalancerTargetCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer target",
@@ -608,7 +603,7 @@ int ListLoadBalancerTargetsCall::Proceed()
 	};
 
 	if (status_ == REQUEST) {
-		new ListLoadBalancerTargetsCall(service_, cq_);
+		new ListLoadBalancerTargetsCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing loadbalancer targets",
@@ -644,7 +639,7 @@ int CreatePrefixCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreatePrefixCall(service_, cq_);
+		new CreatePrefixCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding alias prefix",
@@ -692,7 +687,7 @@ int DeletePrefixCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DeletePrefixCall(service_, cq_);
+		new DeletePrefixCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing alias prefix",
@@ -767,7 +762,7 @@ int ListPrefixesCall::Proceed()
 	};
 
 	if (status_ == REQUEST) {
-		new ListPrefixesCall(service_, cq_);
+		new ListPrefixesCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing alias prefixes",
@@ -803,7 +798,7 @@ int CreateLoadBalancerPrefixCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateLoadBalancerPrefixCall(service_, cq_);
+		new CreateLoadBalancerPrefixCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
@@ -851,7 +846,7 @@ int DeleteLoadBalancerPrefixCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DeleteLoadBalancerPrefixCall(service_, cq_);
+		new DeleteLoadBalancerPrefixCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing loadbalancer target prefix",
@@ -926,7 +921,7 @@ int ListLoadBalancerPrefixesCall::Proceed()
 	};
 
 	if (status_ == REQUEST) {
-		new ListLoadBalancerPrefixesCall(service_, cq_);
+		new ListLoadBalancerPrefixesCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing loadbalancer target prefixes",
@@ -962,7 +957,7 @@ int CreateVipCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateVipCall(service_, cq_);
+		new CreateVipCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Setting virtual IP",
@@ -1007,7 +1002,7 @@ int DeleteVipCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteVipCall(service_, cq_);
+		new DeleteVipCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing virtual IP",
@@ -1044,7 +1039,7 @@ int GetVipCall::Proceed()
 	IpAddress *vip_ip;
 
 	if (status_ == REQUEST) {
-		new GetVipCall(service_, cq_);
+		new GetVipCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting virtual IP",
@@ -1088,7 +1083,7 @@ int CreateInterfaceCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateInterfaceCall(service_, cq_);
+		new CreateInterfaceCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding interface",
@@ -1161,7 +1156,7 @@ int DeleteInterfaceCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteInterfaceCall(service_, cq_);
+		new DeleteInterfaceCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing interface",
@@ -1199,7 +1194,7 @@ int GetInterfaceCall::Proceed()
 	char buf_str[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new GetInterfaceCall(service_, cq_);
+		new GetInterfaceCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting interface info",
@@ -1248,7 +1243,7 @@ int CreateRouteCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateRouteCall(service_, cq_);
+		new CreateRouteCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding route",
@@ -1305,7 +1300,7 @@ int DeleteRouteCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DeleteRouteCall(service_, cq_);
+		new DeleteRouteCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing route",
@@ -1418,7 +1413,7 @@ int ListRoutesCall::Proceed()
 	};
 
 	if (status_ == REQUEST) {
-		new ListRoutesCall(service_, cq_);
+		new ListRoutesCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing routes",
@@ -1455,7 +1450,7 @@ int CreateNatCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateNatCall(service_, cq_);
+		new CreateNatCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Setting NAT IP",
@@ -1508,7 +1503,7 @@ int GetNatCall::Proceed()
 	char buf[INET6_ADDRSTRLEN];
 
 	if (status_ == REQUEST) {
-		new GetNatCall(service_, cq_);
+		new GetNatCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting NAT IP",
@@ -1551,7 +1546,7 @@ int DeleteNatCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteNatCall(service_, cq_);
+		new DeleteNatCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing NAT IP",
@@ -1587,7 +1582,7 @@ int CreateNeighborNatCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new CreateNeighborNatCall(service_, cq_);
+		new CreateNeighborNatCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Adding neighboring NAT",
@@ -1643,7 +1638,7 @@ int DeleteNeighborNatCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new DeleteNeighborNatCall(service_, cq_);
+		new DeleteNeighborNatCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing neighboring NAT",
@@ -1718,7 +1713,7 @@ int ListInterfacesCall::Proceed()
 	};
 
 	if (status_ == REQUEST) {
-		new ListInterfacesCall(service_, cq_);
+		new ListInterfacesCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing interfaces");
@@ -1776,7 +1771,7 @@ int ListLocalNatsCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new ListLocalNatsCall(service_, cq_);
+		new ListLocalNatsCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Listing local Nats",
@@ -1841,7 +1836,7 @@ int ListNeighborNatsCall::Proceed()
 	int ret_val;
 
 	if (status_ == REQUEST) {
-		new ListNeighborNatsCall(service_, cq_);
+		new ListNeighborNatsCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting NAT info",
@@ -1884,7 +1879,7 @@ int CreateFirewallRuleCall::Proceed()
 	const FirewallRule *grpc_rule;
 
 	if (status_ == REQUEST) {
-		new CreateFirewallRuleCall(service_, cq_);
+		new CreateFirewallRuleCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		grpc_rule = &request_.rule();
@@ -1929,7 +1924,7 @@ int DeleteFirewallRuleCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new DeleteFirewallRuleCall(service_, cq_);
+		new DeleteFirewallRuleCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Removing firewall rule",
@@ -1967,7 +1962,7 @@ int GetFirewallRuleCall::Proceed()
 	FirewallRule *rule;
 
 	if (status_ == REQUEST) {
-		new GetFirewallRuleCall(service_, cq_);
+		new GetFirewallRuleCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Getting firewall rule info",
@@ -2026,7 +2021,7 @@ int ListFirewallRulesCall::Proceed()
 	};
 
 	if (status_ == REQUEST) {
-		new ListFirewallRulesCall(service_, cq_);
+		new ListFirewallRulesCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_DEBUG("Listing firewall rules",
@@ -2060,7 +2055,7 @@ int GetVersionCall::Proceed()
 	struct dpgrpc_reply reply;
 
 	if (status_ == REQUEST) {
-		new GetVersionCall(service_, cq_);
+		new GetVersionCall();
 		if (InitCheck() == INITCHECK)
 			return -1;
 		DPGRPC_LOG_INFO("Getting version for client",

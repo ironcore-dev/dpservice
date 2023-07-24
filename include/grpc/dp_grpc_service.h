@@ -3,34 +3,41 @@
 
 #include "../proto/dpdk.grpc.pb.h"
 
-
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
-#include "dp_async_grpc.h"
 #include <uuid/uuid.h>
 
 #define DP_UUID_SIZE 37
 
-class GRPCService final : public DPDKonmetal::AsyncService {
+using grpc::Server;
+using grpc::ServerCompletionQueue;
+
+class GRPCService final : public dpdkonmetal::v1::DPDKonmetal::AsyncService {
 private:
+	static GRPCService* instance;
+	GRPCService();
+	~GRPCService();
+
 	std::unique_ptr<ServerCompletionQueue> cq_;
 	std::unique_ptr<Server> server_;
 	uuid_t binuuid;
-	void *uuid;
+	char* uuid;
 	bool initialized = false;
 
 	void HandleRpcs();
 	
 public:
-	GRPCService();
-	~GRPCService();
+	static GRPCService* GetInstance();
+	static void Cleanup();
+
 	bool run(std::string listen_address);
-	char* GetUUID();
+	const char* GetUUID();
 	void SetInitStatus(bool status);
 	bool IsInitialized();
+	ServerCompletionQueue* GetCq() { return cq_.get(); }
 };
 
 #endif //__INCLUDE_DP_GRPC_SERVICE_H

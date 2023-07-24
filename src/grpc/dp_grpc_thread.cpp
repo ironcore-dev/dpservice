@@ -1,4 +1,5 @@
 #include "grpc/dp_grpc_thread.h"
+#include <rte_lcore.h>
 #include <rte_thread.h>
 #include "dp_conf.h"
 #include "dp_error.h"
@@ -14,7 +15,7 @@ static void *dp_grpc_main_loop(__rte_unused void *arg)
 
 	dp_log_set_thread_name("grpc");
 
-	grpc_svc = new GRPCService();
+	grpc_svc = GRPCService::GetInstance();
 
 	snprintf(addr, sizeof(addr), "[::]:%d", dp_conf_get_grpc_port());
 
@@ -22,7 +23,7 @@ static void *dp_grpc_main_loop(__rte_unused void *arg)
 	if (!grpc_svc->run(addr))
 		rte_exit(EXIT_FAILURE, "Cannot run without working GRPC server\n");
 
-	delete grpc_svc;
+	GRPCService::Cleanup();
 	return NULL;
 }
 
