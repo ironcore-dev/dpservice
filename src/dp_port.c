@@ -177,8 +177,8 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
 		: (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs);
 	ret = rte_eth_dev_configure(port_id,
-								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
-								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
+								DP_NR_NON_HAIRPIN_RX_QUEUE + nr_hairpin_queues,
+								DP_NR_NON_HAIRPIN_TX_QUEUE + nr_hairpin_queues,
 								&port_conf);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
@@ -189,7 +189,9 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	rxq_conf.offloads = port_conf.rxmode.offloads;
 
 	/* RX and TX queues config */
-	for (int i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
+	// uint8_t max_non_hairpin_rx_queue = port_type == DP_PORT_VF ? DP_NR_STD_RX_QUEUES : DP_NR_NON_HAIRPIN_RX_QUEUE;
+	for (int i = 0; i < DP_NR_NON_HAIRPIN_RX_QUEUE; ++i) {
+		printf("port_id: %d, queueindex = %d \n", port_id, i);
 		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
 									 rte_eth_dev_socket_id(port_id),
 									 &rxq_conf,
@@ -254,7 +256,7 @@ static int dp_port_flow_isolate(uint16_t port_id)
 
 static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type type)
 {
-	static int last_pf1_hairpin_tx_rx_queue_offset = 1;
+	static int last_pf1_hairpin_tx_rx_queue_offset = 0;
 	struct dp_port *port;
 	int ret;
 
@@ -306,7 +308,7 @@ static int dp_port_set_up_hairpin(void)
 			port->peer_pf_port_id = \
 					port->port_id == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
 
-			port->peer_pf_hairpin_tx_rx_queue_offset = 1;
+			port->peer_pf_hairpin_tx_rx_queue_offset = 0;
 		}
 
 		if (DP_FAILED(dp_hairpin_setup(port)))
@@ -457,7 +459,15 @@ int dp_port_start(uint16_t port_id)
 		if (port->port_type == DP_PORT_PF) {
 			if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
 				return DP_ERROR;
+
 		}
+
+		if (port->port_type == DP_PORT_VF) {
+			dp_install_jump_from_default_group(port_id);
+			dp_install_default_monitoring_group(port_id, DP_SAMPLE_RX_QUEUE_ID);
+			dp_install_default_capture_rule(port_id);
+		}
+
 	}
 
 	return DP_OK;

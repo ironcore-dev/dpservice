@@ -34,6 +34,10 @@ extern "C"
 #define DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE 3
 #define DP_IP_ICMP_CODE_FRAGMENT_NEEDED 4
 
+#define DP_RTE_FLOW_DEFAULT_GROUP		0
+#define DP_RTE_FLOW_MONITORING_GROUP	1
+#define DP_RTE_FLOW_VNET_GROUP			2
+
 #define DP_RTE_TCP_CNTL_FLAGS \
 	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
 
@@ -179,6 +183,14 @@ int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
 int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_set_meta *meta_action,
 							uint32_t meta_value);
+
+int create_sample_action(struct rte_flow_action *action, int action_cnt,
+						 struct rte_flow_action_sample *sample_action,
+						 uint32_t ratio, struct rte_flow_action *sub_action);
+
+int create_jump_group_action(struct rte_flow_action *action, int action_cnt, 
+							 struct rte_flow_action_jump *jump_action,
+							 uint32_t group);
 
 int create_end_action(struct rte_flow_action *action, int action_cnt);
 

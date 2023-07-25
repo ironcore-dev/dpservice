@@ -8,6 +8,11 @@ extern "C" {
 #include <stdint.h>
 
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id);
+void dp_install_jump_from_default_group(uint16_t port_id);
+void dp_install_default_monitoring_group(uint16_t port_id, uint8_t sample_queue_id);
+
+void dp_install_default_capture_rule(uint16_t port_id);
+
 #ifdef ENABLE_VIRTSVC
 int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], uint16_t svc_port);
 #endif

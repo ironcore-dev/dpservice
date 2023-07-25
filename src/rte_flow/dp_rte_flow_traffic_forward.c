@@ -185,7 +185,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
 
 		// validate and install rte flow
-		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
+		create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 1, 0, 0);
 		struct rte_flow *hairpin_flow = NULL;
 
 		ret = dp_create_age_indirect_action(&attr, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
@@ -274,12 +274,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow *flow = NULL;
 
 	if (cross_pf_port)
-		create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
+		create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 0, 1, 0);
 	else {
 		#ifdef ENABLE_DPDK_22_11
-			create_rte_flow_rule_attr(&attr, 0, 0, 0, 0, 1);
+			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 0, 0, 1);
 		#else
-			create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
+			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 1, 0, 1);
 		#endif
 	}
 
@@ -522,8 +522,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			DPS_LOG_WARNING("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
 			hairpin_rx_queue_id = 0;
 		} else {
-			// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
-			hairpin_rx_queue_id = DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
+			// pf's rx hairpin queue for vf starts from index 3. (0: normal rxq, 1: sample queue, 2: hairpin rxq for another pf.)
+			hairpin_rx_queue_id = DP_VF_HAIRPIN_RX_QUEUE_BASE_ID + port->peer_pf_hairpin_tx_rx_queue_offset;
 		}
 		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
 	} else {
@@ -623,7 +623,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	struct rte_flow_attr attr;
 
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
+	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 1, 0, 1);
 
 	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
 	int pattern_cnt = 0;
@@ -903,7 +903,8 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 	struct rte_flow_action_queue queue_action;
 	// it is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
-	uint16_t hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES;
+	// it is the first queue after STD_RX_QUEUES. no need to treat it specially (e.g, be more precise on its value) as the sampling queue is arranged 
+	uint16_t hairpin_rx_queue_id = DP_NR_NON_HAIRPIN_RX_QUEUE;
 
 	action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
 
@@ -913,7 +914,7 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// validate and install rte flow
 	struct rte_flow *flow = NULL;
 
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
+	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 1, 0, 0);
 
 	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
 	if (!flow) {
@@ -934,8 +935,8 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
 		return dp_offload_handle_local_traffic(m, df);
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		return dp_offload_handle_tunnel_decap_traffic(m, df);
+	// if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		// return dp_offload_handle_tunnel_decap_traffic(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH

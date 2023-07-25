@@ -791,6 +791,33 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 	return ++action_cnt;
 }
 
+int create_sample_action(struct rte_flow_action *action, int action_cnt,
+						 struct rte_flow_action_sample *sample_action,
+						 uint32_t ratio, struct rte_flow_action *sub_action) 
+{
+
+	sample_action -> ratio=ratio;
+	sample_action->actions=sub_action;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SAMPLE;
+	action[action_cnt].conf=sample_action;
+
+	return ++action_cnt;
+}
+
+int create_jump_group_action(struct rte_flow_action *action, int action_cnt, 
+							 struct rte_flow_action_jump *jump_action,
+							 uint32_t group)
+{
+	jump_action->group=group;
+
+	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_JUMP;
+	action[action_cnt].conf=jump_action;
+
+	return ++action_cnt;
+}
+
+
 int create_end_action(struct rte_flow_action *action, int action_cnt)
 {
 

@@ -83,6 +83,174 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	return create_flow(port_id, &attr, pattern, action);
 }
 
+void dp_install_jump_from_default_group(uint16_t port_id)
+{
+	// create flow attributes
+	struct rte_flow_attr attr;
+	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_DEFAULT_GROUP, 1, 1, 0, 0); // group 0, priority 1, ingress 1
+
+	struct rte_flow_item pattern[2];
+	int pattern_cnt = 0;
+	struct rte_flow_action action[2];
+	int action_cnt = 0;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	// all ethernet packets
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].spec=NULL;
+	pattern[0].mask=NULL;
+	pattern[0].last=NULL;
+	pattern_cnt++;
+
+	// end pattern matching
+	pattern_cnt = insert_end_match_pattern(pattern,pattern_cnt);
+
+	// create actions
+	// create jump action
+	struct rte_flow_action_jump jump_action;
+	action_cnt = create_jump_group_action(action, action_cnt, &jump_action, DP_RTE_FLOW_MONITORING_GROUP);
+
+	// end actions
+	action_cnt = create_end_action(action,action_cnt);
+
+	int res;
+	struct rte_flow *flow;
+
+	struct rte_flow_error error;
+	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
+
+	if (res)
+	{
+		printf("The flow rule that jumps from default group to monitoring group can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+	else
+	{
+		printf("The flow rule that jumps from default group to monitoring group is validated on port %d \n ", port_id);
+		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
+		if (!flow)
+			printf("The flow rule that jumps from default group to monitoring group can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+
+}
+
+void dp_install_default_monitoring_group(uint16_t port_id, uint8_t sample_queue_id)
+{
+	// create flow attributes
+	struct rte_flow_attr attr;
+	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_MONITORING_GROUP, 0, 1, 0, 0); // group 1, priority 0, ingress 1
+
+	struct rte_flow_item pattern[4];
+	int pattern_cnt = 0;
+	struct rte_flow_action action[3];
+	int action_cnt = 0;
+	struct rte_flow_action sample_sub_action[3];
+	int sample_sub_action_cnt =0;
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+	memset(sample_sub_action, 0, sizeof(action));
+
+	// all ethernet packets
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].spec=NULL;
+	pattern[0].mask=NULL;
+	pattern[0].last=NULL;
+	pattern_cnt++;
+
+
+	struct rte_flow_action_queue queue_action;
+	sample_sub_action_cnt = create_redirect_queue_action(sample_sub_action, sample_sub_action_cnt, &queue_action, sample_queue_id);
+
+	// end sub actions for the sample action
+	sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
+
+	// create actions 
+	// create sampling action
+	struct rte_flow_action_sample sample_action;
+	action_cnt = create_sample_action(action, action_cnt, &sample_action, 1, sample_sub_action); // mirror all packets
+
+	// create jump group action
+	struct rte_flow_action_jump jump_action;
+	action_cnt = create_jump_group_action(action, action_cnt, &jump_action, DP_RTE_FLOW_VNET_GROUP); // jump to group DP_RTE_FLOW_VNET_GROUP
+
+	// end actions
+	action_cnt=create_end_action(action,action_cnt);
+
+	int res;
+	struct rte_flow *flow;
+
+	struct rte_flow_error error;
+	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
+
+	if (res)
+	{
+		printf("Sampling/monitoring flow can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+	else
+	{
+		printf("Sampling/monitoring flow validated on port %d \n ", port_id);
+		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
+		if (!flow)
+			printf("Sampling/monitoring flow can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+
+}
+
+void dp_install_default_capture_rule(uint16_t port_id)
+{
+	// create flow attributes
+	struct rte_flow_attr attr;
+	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 10, 1, 0, 0); // group 0, priority 1, ingress 1
+
+	struct rte_flow_item pattern[2];
+	int pattern_cnt = 0;
+	struct rte_flow_action action[2];
+	int action_cnt = 0;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	// all ethernet packets
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].spec=NULL;
+	pattern[0].mask=NULL;
+	pattern[0].last=NULL;
+	pattern_cnt++;
+
+	// end pattern matching
+	pattern_cnt = insert_end_match_pattern(pattern,pattern_cnt);
+
+	// create actions
+	// create flow action -- queue
+	struct rte_flow_action_queue queue_action;
+
+	action_cnt = create_redirect_queue_action(action, action_cnt,
+											  &queue_action, 0);
+
+	// create flow action -- end
+	action_cnt = create_end_action(action, action_cnt);
+
+	int res;
+	struct rte_flow *flow;
+
+	struct rte_flow_error error;
+	res = rte_flow_validate(port_id, &attr, pattern, action, &error);
+
+	if (res)
+	{
+		printf("The flow rule that does default pkt capturing can't be validated message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+	else
+	{
+		printf("The flow rule that does default pkt capturing is validated on port %d \n ", port_id);
+		flow = rte_flow_create(port_id, &attr, pattern, action, &error);
+		if (!flow)
+			printf("The flow rule that does default pkt capturing can't be created message: %s\n", error.message ? error.message : "(no stated reason)");
+	}
+}
+
+
 #ifdef ENABLE_VIRTSVC
 int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], rte_be16_t svc_port)
 {
