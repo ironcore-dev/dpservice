@@ -19,6 +19,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int hairpin_action_cnt = 0;
 
+
+	struct rte_flow_action sample_sub_action[3];
+	int sample_sub_action_cnt =0;
+	memset(sample_sub_action, 0, sizeof(action));
+
 	int age_action_index;
 	int ret;
 
@@ -158,6 +163,22 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
 
 
+	// end sub actions for the sample action
+	// 	struct rte_flow_action_port_id port_id_action;
+	// sample_sub_action_cnt = create_send_to_port_action(sample_sub_action, sample_sub_action_cnt, &port_id_action, 1);
+
+	// 	struct rte_flow_action_queue queue_action;
+	// sample_sub_action_cnt = create_redirect_queue_action(sample_sub_action, sample_sub_action_cnt, &queue_action, 1);
+	// sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
+
+
+	// // create actions 
+	// // create sampling action
+	// struct rte_flow_action_sample sample_action;
+	// action_cnt = create_sample_action(action, action_cnt, &sample_action, 1, sample_sub_action); // mirror all packets
+
+
+
 	/*Firstly install a flow rule to modify mac addr to embed vni info and move packet to hairpin rxq*/
 	if (cross_pf_port) {
 		struct rte_flow_action_set_mac set_mac_action;
@@ -185,7 +206,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
 
 		// validate and install rte flow
-		create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 1, 0, 0);
+		create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 1, 1, 0, 0);
 		struct rte_flow *hairpin_flow = NULL;
 
 		ret = dp_create_age_indirect_action(&attr, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
@@ -202,7 +223,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		}
 		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
 	}
-
 
 	// replace source ip if vip-nat/network-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
@@ -263,6 +283,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_action_port_id send_to_port;
 
 	if (!cross_pf_port)
+		// action_cnt = create_send_to_port_action(action, action_cnt,
+												// &send_to_port, 5);
 		action_cnt = create_send_to_port_action(action, action_cnt,
 												&send_to_port, df->nxt_hop);
 
@@ -274,12 +296,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow *flow = NULL;
 
 	if (cross_pf_port)
-		create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 0, 1, 0);
+		create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 1, 0, 1, 0);
 	else {
 		#ifdef ENABLE_DPDK_22_11
-			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 0, 0, 1);
+			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 1, 0, 0, 1);
 		#else
-			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 0, 1, 0, 1);
+			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 1, 1, 0, 1);
 		#endif
 	}
 
@@ -295,7 +317,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install encap rule on PF", DP_LOG_PORTID(t_port_id));
+		DPS_LOG_ERR("Failed to install encap rule on port ", DP_LOG_PORTID(t_port_id));
 		return 0;
 	}
 

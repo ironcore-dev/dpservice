@@ -102,29 +102,34 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
 	uint16_t n_pkts = 0;
+	uint16_t poll_queue_id;
 
 	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
 	if (unlikely(!ctx->enabled))
 		return 0;
 
-
+	if (dp_port_is_pf(ctx->port_id))
+		poll_queue_id = 0;
+	else
+		poll_queue_id = 1;
+	
 	// start the second loop
-	n_pkts = rte_eth_rx_burst(ctx->port_id,
-							  DP_SAMPLE_RX_QUEUE_ID,
-							  (struct rte_mbuf **)objs,
-							  32);
+	// n_pkts = rte_eth_rx_burst(ctx->port_id,
+	// 						  DP_SAMPLE_RX_QUEUE_ID,
+	// 						  (struct rte_mbuf **)objs,
+	// 						  32);
 
-	if (n_pkts > 0 && ctx->port_id == 1) {
-		printf("port_id: %d\n", ctx->port_id);
-		printf("n_pkts: %d\n", n_pkts);
-	}
+	// if (n_pkts > 0 && ctx->port_id == 1) {
+	// 	printf("port_id: %d\n", ctx->port_id);
+	// 	printf("n_pkts: %d\n", n_pkts);
+	// }
 	
 	
 	n_pkts = 0;
 
 	n_pkts = rte_eth_rx_burst(ctx->port_id,
-							  ctx->queue_id,
+							  0,
 							  (struct rte_mbuf **)objs,
 							  RTE_GRAPH_BURST_SIZE);
 	if (unlikely(!n_pkts))
