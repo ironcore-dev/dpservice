@@ -143,7 +143,7 @@ void dp_install_default_monitoring_group(uint16_t port_id, uint8_t sample_queue_
 {
 	// create flow attributes
 	struct rte_flow_attr attr;
-	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_MONITORING_GROUP, 5, 1, 0, 0); // group 1, priority 0, ingress 1
+	create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_MONITORING_GROUP, 5, 1, 0, 1); // group 1, priority 0, ingress 1
 
 	struct rte_flow_item pattern[4];
 	int pattern_cnt = 0;
@@ -155,6 +155,11 @@ void dp_install_default_monitoring_group(uint16_t port_id, uint8_t sample_queue_
 
 	memset(pattern, 0, sizeof(pattern));
 	memset(action, 0, sizeof(action));
+
+	uint16_t queues[1] = {sample_queue_id};
+	uint32_t nb_queues = 1;
+
+
 	// all ethernet packets
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[0].spec=NULL;
@@ -167,14 +172,14 @@ void dp_install_default_monitoring_group(uint16_t port_id, uint8_t sample_queue_
 	// sample_sub_action_cnt =  create_packet_mark_action(sample_sub_action, sample_sub_action_cnt, &mirror_mark, 0xbefeb);
 
 
-	struct rte_flow_action_queue queue_action;
-	sample_sub_action_cnt = create_redirect_queue_action(sample_sub_action, sample_sub_action_cnt, &queue_action, sample_queue_id);
+	// struct rte_flow_action_queue queue_action;
+	// sample_sub_action_cnt = create_redirect_queue_action(sample_sub_action, sample_sub_action_cnt, &queue_action, sample_queue_id);
 
 	// struct rte_flow_action_port_id port_id_action;
 	// sample_sub_action_cnt = create_send_to_port_action(sample_sub_action, sample_sub_action_cnt, &port_id_action, 3);
 
-	// end sub actions for the sample action
-	sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
+	// struct rte_flow_action_set_meta meta_action;
+	// sample_sub_action_cnt = create_set_meta_action(sample_sub_action, sample_sub_action_cnt, &meta_action, 0xdeadbeef);
 
 	// create actions 
 	// create sampling action

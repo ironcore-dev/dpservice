@@ -20,9 +20,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	int hairpin_action_cnt = 0;
 
 
-	struct rte_flow_action sample_sub_action[3];
-	int sample_sub_action_cnt =0;
-	memset(sample_sub_action, 0, sizeof(action));
+	// struct rte_flow_action sample_sub_action[3];
+	// int sample_sub_action_cnt =0;
+	// memset(sample_sub_action, 0, sizeof(action));
 
 	int age_action_index;
 	int ret;
@@ -169,7 +169,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// 	struct rte_flow_action_queue queue_action;
 	// sample_sub_action_cnt = create_redirect_queue_action(sample_sub_action, sample_sub_action_cnt, &queue_action, 1);
-	sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
+	// sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
 
 
 	// // create actions 
@@ -301,7 +301,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		#ifdef ENABLE_DPDK_22_11
 			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 1, 0, 0, 1);
 		#else
-			create_rte_flow_rule_attr(&attr, 0, 1, 1, 0, 1);
+			create_rte_flow_rule_attr(&attr, DP_RTE_FLOW_VNET_GROUP, 1, 1, 0, 1);
 		#endif
 	}
 

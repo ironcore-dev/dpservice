@@ -466,9 +466,9 @@ int dp_port_start(uint16_t port_id)
 		}
 
 		if (port->port_type == DP_PORT_VF) {
-			// dp_install_jump_from_default_group(port_id);
-			// dp_install_default_monitoring_group(port_id, 1);
-			// dp_install_default_capture_rule(port_id);
+			dp_install_jump_from_default_group(port_id);
+			dp_install_default_monitoring_group(port_id, 1);
+			dp_install_default_capture_rule(port_id);
 		}
 
 	}

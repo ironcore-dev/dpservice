@@ -122,6 +122,19 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_valu
 }
 
 
+static __rte_always_inline int dp_capture_offloaded_pkts(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
+{
+
+	printf("flow_val->offload_flags.orig = %d, flow_val->offload_flags.reply = %d\n", flow_val->offload_flags.orig, flow_val->offload_flags.reply);
+	if (!offload_mode_enabled ||
+			(flow_val->offload_flags.orig != DP_FLOW_OFFLOADED || flow_val->offload_flags.reply != DP_FLOW_OFFLOADED))
+		return 0;
+
+	printf("offloaded pkt captured\n");
+	return 1;
+	
+}
+
 
 static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_flow *df)
 {
@@ -209,6 +222,7 @@ static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned ch
 	return true;
 }
 
+
 static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
 {
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
@@ -282,6 +296,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					return CONNTRACK_NEXT_DROP;
 				}
 			} else {
+				// if (dp_capture_offloaded_pkts(m, flow_val, df))
+				// 	return CONNTRACK_NEXT_DROP;
 				change_flow_state_dir(m, key, flow_val, df);
 			}
 			prev_key = curr_key;
@@ -293,6 +309,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			prev_flow_val = flow_val;
 		} else {
 			flow_val = prev_flow_val;
+			// if (dp_capture_offloaded_pkts(m, flow_val, df))
+			// 		return CONNTRACK_NEXT_DROP;
 			change_flow_state_dir(m, key, flow_val, df);
 		}
 
