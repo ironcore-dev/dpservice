@@ -102,8 +102,11 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct flow
 
 		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
+		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL) {
+				if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+					flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
+		}
 	}
 }
 
@@ -296,8 +299,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 					return CONNTRACK_NEXT_DROP;
 				}
 			} else {
-				// if (dp_capture_offloaded_pkts(m, flow_val, df))
-				// 	return CONNTRACK_NEXT_DROP;
+				if (dp_capture_offloaded_pkts(m, flow_val, df))
+					return CONNTRACK_NEXT_DROP;
 				change_flow_state_dir(m, key, flow_val, df);
 			}
 			prev_key = curr_key;
@@ -309,8 +312,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			prev_flow_val = flow_val;
 		} else {
 			flow_val = prev_flow_val;
-			// if (dp_capture_offloaded_pkts(m, flow_val, df))
-			// 		return CONNTRACK_NEXT_DROP;
+			if (dp_capture_offloaded_pkts(m, flow_val, df))
+					return CONNTRACK_NEXT_DROP;
 			change_flow_state_dir(m, key, flow_val, df);
 		}
 

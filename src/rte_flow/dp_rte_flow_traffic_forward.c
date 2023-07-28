@@ -178,7 +178,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// action_cnt = create_sample_action(action, action_cnt, &sample_action, 1, sample_sub_action); // mirror all packets
 
 
-
 	/*Firstly install a flow rule to modify mac addr to embed vni info and move packet to hairpin rxq*/
 	if (cross_pf_port) {
 		struct rte_flow_action_set_mac set_mac_action;
@@ -340,9 +339,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	int age_action_index;
 	int ret = 0;
 
-	struct rte_flow_action sample_sub_action[3];
-	int sample_sub_action_cnt =0;
-	memset(sample_sub_action, 0, sizeof(sample_sub_action));
+	// struct rte_flow_action sample_sub_action[3];
+	// int sample_sub_action_cnt =0;
+	// memset(sample_sub_action, 0, sizeof(sample_sub_action));
 
 	#if !defined(ENABLE_DPDK_22_11)
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
@@ -507,7 +506,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	// sample_sub_action_cnt = create_send_to_port_action(sample_sub_action, sample_sub_action_cnt, &port_id_action, 3);
 
 	// end sub actions for the sample action
-	sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
+	// sample_sub_action_cnt = create_end_action(sample_sub_action, sample_sub_action_cnt);
 
 	// create actions 
 	// create sampling action
@@ -975,8 +974,8 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
 		return dp_offload_handle_local_traffic(m, df);
 
-	// if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		// return dp_offload_handle_tunnel_decap_traffic(m, df);
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+		return dp_offload_handle_tunnel_decap_traffic(m, df);
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
