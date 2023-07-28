@@ -163,6 +163,7 @@ void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key 
 		inv_key->src.port_src = key->port_dst;
 		inv_key->port_dst = key->src.port_src;
 	} else if (key->proto == IPPROTO_ICMP) {
+		inv_key->port_dst = key->port_dst;
 		if (key->src.type_src == RTE_IP_ICMP_ECHO_REPLY)
 			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
 		if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
