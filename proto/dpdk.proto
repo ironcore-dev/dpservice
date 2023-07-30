@@ -165,6 +165,7 @@ message InitializeRequest {
 
 message InitializeResponse {
 	Status status = 1;
+	string uuid = 2;
 }
 
 message GetVersionRequest {

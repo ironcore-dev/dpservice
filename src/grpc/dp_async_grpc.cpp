@@ -318,6 +318,7 @@ int InitializeCall::Proceed()
 		grpc_service->SetInitStatus(true);
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
+		reply_.set_uuid(grpc_service->GetUUID());
 		reply_.set_allocated_status(CreateErrStatus(&reply));
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);

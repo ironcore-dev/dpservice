@@ -1180,6 +1180,7 @@ public:
 			context.set_deadline(deadline);
 
 			stub_->Initialize(&context, request, &reply);
+			printf("Received UUID %s\n", reply.uuid().c_str());
 	}
 
 	void DelPfx() {
