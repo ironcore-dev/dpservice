@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 #define DP_VNF_MAX_TABLE_SIZE 1000
+#define DP_VNF_MATCH_ALL_PORT_ID 0xFFFF
 
 enum vnf_type {
 	DP_VNF_TYPE_UNDEFINED,
@@ -42,6 +43,8 @@ int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);
 int dp_del_vnf_with_vnf_key(void *key);
 int dp_del_vnf_with_value(struct dp_vnf_value *val);
 int dp_find_vnf_with_value(struct dp_vnf_value *val);
+int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid);
+int dp_get_vnf_entry_match_all_port_ids(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid);
 int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder);
 
 #ifdef __cplusplus

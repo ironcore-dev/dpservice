@@ -11,7 +11,6 @@
 #include "dp_nat.h"
 #include "dp_port.h"
 #include "nodes/common_node.h"
-#include "dp_cntrack.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
@@ -107,14 +106,6 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		}
 
 		if (df->conntrack) {
-
-			if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL && (df->nxt_hop != pkt->port)) {
-				// if the packet is local and the next hop is not the same port, then this packet is transmitted from one VM to another local VM
-				if (unlikely(DP_FAILED(dp_cntrack_handle(node, pkt, df))))
-					DPNODE_LOG_WARNING(node, "Failed to handle conntrack for local VM to VM traffic");
-			}
-
-
 			// mark the flow as default if it is not marked as any other status
 			if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
 				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
