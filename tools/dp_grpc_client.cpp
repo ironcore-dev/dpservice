@@ -729,7 +729,7 @@ public:
 			stub_->CheckVniInUse(&context, request, &reply);
 			if (reply.status().code())
 				printf("Received an error %d\n", reply.status().code());
-			else if (reply.inuse())
+			else if (reply.in_use())
 				printf("Vni: %d is in use\n", vni);
 			else
 				printf("Vni: %d is not in use\n", vni);

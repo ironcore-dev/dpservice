@@ -213,7 +213,7 @@ int CheckVniInUseCall::Proceed()
 	} else if (status_ == AWAIT_MSG) {
 		if (DP_FAILED(dp_recv_from_worker(&reply, call_type_)))  // TODO can fail (this `return -1` is only a wait loop)
 			return -1;
-		reply_.set_inuse(!!reply.vni_in_use.in_use);
+		reply_.set_in_use(!!reply.vni_in_use.in_use);
 		reply_.set_allocated_status(CreateErrStatus(&reply));
 		status_ = FINISH;
 		responder_.Finish(reply_, ret, this);

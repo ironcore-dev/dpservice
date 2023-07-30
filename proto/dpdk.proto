@@ -70,7 +70,7 @@ message Interface {
 }
 
 message IpConfig {
-	bytes primary_address = 2;
+	bytes primary_address = 1;
 }
 
 message PxeConfig {
@@ -145,9 +145,9 @@ message FirewallRule {
 	TrafficDirection direction = 2;
 	FirewallAction action = 3;			// Can be only "accept" at the moment.
 	uint32 priority = 4;				// For future use. No effect at the moment.
-	Prefix source_prefix = 6;			// 0.0.0.0 with prefix length 0 matches all source ips
-	Prefix destination_prefix = 7;		// 0.0.0.0 with prefix length 0 matches all destination ips
-	ProtocolFilter protocol_filter = 8;	// Not defining a protocol filter matches all protocols
+	Prefix source_prefix = 5;			// 0.0.0.0 with prefix length 0 matches all source ips
+	Prefix destination_prefix = 6;		// 0.0.0.0 with prefix length 0 matches all destination ips
+	ProtocolFilter protocol_filter = 7;	// Not defining a protocol filter matches all protocols
 }
 
 
@@ -475,7 +475,7 @@ message CheckVniInUseRequest {
 
 message CheckVniInUseResponse {
 	Status status = 1;
-	bool inUse = 2;
+	bool in_use = 2;
 }
 
 message ResetVniRequest {
