@@ -56,14 +56,6 @@ static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
 	return dp_set_vnf_value((void *)ul_addr6, val);
 }
 
-static __rte_always_inline int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
-{
-	val->v_type = v_type;
-	val->portid = portid;
-	val->vni = dp_get_vm_vni(portid);
-	return dp_find_vnf_with_value(val);
-}
-
 static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
 {
 	val->v_type = v_type;

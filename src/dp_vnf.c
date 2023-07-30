@@ -2,6 +2,7 @@
 #include <rte_malloc.h>
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_lpm.h"
 #include "grpc/dp_grpc_responder.h"
 
 static struct rte_hash *vnf_handle_tbl = NULL;
@@ -47,6 +48,22 @@ int dp_set_vnf_value(void *key, struct dp_vnf_value *val)
 err:
 	rte_free(temp_val);
 	return DP_ERROR;
+}
+
+int dp_get_vnf_entry_match_all_port_ids(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = DP_VNF_MATCH_ALL_PORT_ID;
+	val->vni = dp_get_vm_vni(portid);
+	return dp_find_vnf_with_value(val);
+}
+
+int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+{
+	val->v_type = v_type;
+	val->portid = portid;
+	val->vni = dp_get_vm_vni(portid);
+	return dp_find_vnf_with_value(val);
 }
 
 int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type)
@@ -99,7 +116,7 @@ int dp_del_vnf_with_vnf_key(void *key)
 
 static __rte_always_inline bool dp_vnf_equal(struct dp_vnf_value *val1, struct dp_vnf_value *val2)
 {
-	return val1->portid == val2->portid
+	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_ID) || (val1->portid == val2->portid))
 		&& val1->alias_pfx.ip == val2->alias_pfx.ip
 		&& val1->alias_pfx.length == val2->alias_pfx.length
 		&& val1->v_type == val2->v_type;

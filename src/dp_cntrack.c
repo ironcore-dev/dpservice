@@ -2,6 +2,7 @@
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
+#include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
 
 
@@ -109,15 +110,28 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 {
 	struct flow_value *flow_val = NULL;
 	struct flow_key inverted_key = {0};
+	struct dp_vnf_value vnf_val;
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val)
 		return flow_val;
+
+	vnf_val.alias_pfx.ip = key->ip_dst;
+	vnf_val.alias_pfx.length = 32;
 	/* Add original direction to conntrack table */
 	dp_add_flow(key);
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
-	flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
+	/* This will be an uni-directional traffic. So prepare the flag to offload immediately */
+	if (dp_conf_is_offload_enabled()
+		&& (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
+		&& !DP_FAILED(dp_get_vnf_entry_match_all_port_ids(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, m->port))
+	)
+		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;
+	else
+		flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
+
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = m->port;
 
@@ -169,7 +183,8 @@ static __rte_always_inline void dp_set_pkt_flow_direction(struct flow_key *key, 
 static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
 	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
-			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD) {
+			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
+			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC) {
 			dp_cntrack_change_flow_offload_flags(flow_val, df);
 	} else {
 
