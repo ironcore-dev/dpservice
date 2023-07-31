@@ -33,6 +33,7 @@ struct dp_flow {
 		uint16_t	offload_ipv6 : 1;	// tmp solution to set if we should offload ipv6 pkts
 		uint16_t	dir : 2;			// store the direction of each packet
 		uint16_t	offload_decision: 2;	// store the offload status of each packet
+		uint16_t	offload_mark: 1;	// store the offload mark of each packet
 	} flags;
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	union {

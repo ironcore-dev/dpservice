@@ -49,7 +49,7 @@ void dp_graphtrace_free(void)
 }
 
 
-void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs)
+void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs, int type)
 {
 	uint16_t nb_dups = 0;
 	struct rte_mbuf *dups[nb_objs];
@@ -67,8 +67,13 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 			dups[nb_dups++] = dup;
 			pktinfo = dp_get_graphtrace_pktinfo(dup);
 			pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
-			pktinfo->node = node;
-			pktinfo->next_node = next_node;
+			if (type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE) {
+				pktinfo->pkt_type = DP_GRAPHTRACE_PKT_TYPE_SOFTWARE;
+				pktinfo->node = node;
+				pktinfo->next_node = next_node;
+			} else if (type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD) {
+				pktinfo->pkt_type = DP_GRAPHTRACE_PKT_TYPE_OFFLOAD;
+			}
 		}
 	}
 
@@ -84,6 +89,7 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 		rte_pktmbuf_free_bulk(&dups[sent], nb_dups - sent);
 	}
 }
+
 
 #ifdef ENABLE_PYTEST
 __rte_format_printf(2, 3)
