@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 
+void dp_cntrack_init(void);
 int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df);
 
 
