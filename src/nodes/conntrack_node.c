@@ -13,8 +13,6 @@
 #include "nodes/dhcp_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
-static bool offload_mode_enabled = 0;
-
 #define NEXT_NODES(NEXT) \
 	NEXT(CONNTRACK_NEXT_LB, "lb") \
 	NEXT(CONNTRACK_NEXT_DNAT, "dnat") \
@@ -23,12 +21,9 @@ DP_NODE_REGISTER(CONNTRACK, conntrack, NEXT_NODES);
 
 static int conntrack_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-
-	offload_mode_enabled = dp_conf_is_offload_enabled();
-
+	dp_cntrack_init();
 	return DP_OK;
 }
-
 
 static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
 {

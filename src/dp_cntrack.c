@@ -11,6 +11,12 @@ static struct flow_key second_key = {0};
 static struct flow_key *prev_key = NULL, *curr_key = &first_key;
 static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+static bool offload_mode_enabled = 0;
+
+void dp_cntrack_init(void)
+{
+	offload_mode_enabled = dp_conf_is_offload_enabled();
+}
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
 {
@@ -52,7 +58,7 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 
 static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_value *flow_val, struct dp_flow *df)
 {
-	if (!dp_conf_is_offload_enabled())
+	if (!offload_mode_enabled)
 		return;
 
 	if (df->l4_type != IPPROTO_TCP)
@@ -66,7 +72,7 @@ static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_v
 
 static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct flow_value *flow_val, struct dp_flow *df)
 {
-	if (!dp_conf_is_offload_enabled())
+	if (!offload_mode_enabled)
 		return;
 
 	if (df->flags.dir == DP_FLOW_DIR_ORG) {
@@ -124,7 +130,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic. So prepare the flag to offload immediately */
-	if (dp_conf_is_offload_enabled()
+	if (offload_mode_enabled
 		&& (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, m->port, DP_VNF_MATCH_ALL_PORT_ID))
 	)
