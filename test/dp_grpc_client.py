@@ -68,7 +68,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		match = re.search(r'(?:^|[\n\r])Interface with ipv4 ([0-9\.]+) ipv6 ([0-9a-fA-F:]+) vni ([0-9]+) pci ([^ ]+) underlayroute ([0-9a-fA-F:]+)', output)
-		return { 'vni': int(match.group(3)), 'device': match.group(4), 'ips': [ match.group(1), match.group(2) ], 'underlayRoute': match.group(5) }
+		return { 'vni': int(match.group(3)), 'device': match.group(4), 'primary_ipv4': match.group(1), 'primary_ipv6': match.group(2), 'underlay_route': match.group(5) }
 
 	def delinterface(self, vm_name):
 		self._call(f"--delmachine {vm_name}", "Interface deleted")
@@ -79,7 +79,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])Interface [a-zA-Z0-9_]+ ipv4 ([0-9\.]+) ipv6 ([0-9a-fA-F:]+) vni ([0-9]+) pci ([^ ]+) underlayroute ([0-9a-fA-F:]+)', output):
-			specs.append({ 'vni': int(match.group(3)), 'device': match.group(4), 'ips': [ match.group(1), match.group(2) ], 'underlayRoute': match.group(5) })
+			specs.append({ 'vni': int(match.group(3)), 'device': match.group(4), 'primary_ipv4': match.group(1), 'primary_ipv6': match.group(2), 'underlay_route': match.group(5) })
 		return specs
 
 	def addroute(self, vni, prefix, t_vni, t_ipv6):
@@ -103,7 +103,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])Route prefix ([0-9\.]+) len ([0-9]+) target vni ([0-9]+) target ipv6 ([0-9a-fA-F:]+)', output):
-			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "nextHop": { "vni": int(match.group(3)), "ip": match.group(4) } })
+			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "next_hop": { "vni": int(match.group(3)), "address": match.group(4) } })
 		return specs
 
 	def addprefix(self, vm_name, prefix):
@@ -120,7 +120,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])Route prefix ([0-9\.]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
-			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlayRoute": match.group(3) })
+			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlay_route": match.group(3) })
 		return specs
 
 	def createlb(self, name, vni, vip, portspecs):
@@ -144,7 +144,7 @@ class DpGrpcClient:
 			elif proto.lower() == 'icmp':
 				proto = 1
 			lbports.append({ 'protocol': proto, 'port': int(port) })
-		return { "vni": int(match.group(1)), "lbVipIP": match.group(3), "lbports": lbports, "underlayRoute": match.group(2) }
+		return { "vni": int(match.group(1)), "loadbalanced_ip": match.group(3), "loadbalanced_ports": lbports, "underlay_route": match.group(2) }
 
 	def dellb(self, name):
 		self._call(f"--dellb {name}", "LB deleted")
@@ -161,7 +161,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])Backend ip ([0-9a-fA-F:]+)', output):
-			specs.append({ 'targetIP': match.group(1) })
+			specs.append({ 'target_ip': match.group(1) })
 		return specs
 
 	def addlbprefix(self, vm_name, vip):
@@ -178,7 +178,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])LB Route prefix ([0-9\.]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
-			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlayRoute": match.group(3) })
+			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlay_route": match.group(3) })
 		return specs
 
 	def addvip(self, vm_name, vip):
@@ -190,7 +190,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		match = re.search(r'Received VIP ([0-9\.]+) underlayroute ([a-f0-9:]+)', output)
-		return { 'ip': match.group(1), 'underlayRoute': match.group(2) }
+		return { 'vip_ip': match.group(1), 'underlay_route': match.group(2) }
 
 	def delvip(self, vm_name):
 		self._call(f"--delvip {vm_name}", "VIP deleted")
@@ -204,7 +204,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		match = re.search(r'Received NAT IP ([0-9\.]+) with min port: ([0-9]+) and max port: ([0-9]+) underlay ([a-f0-9:]+)', output)
-		return { 'natVIPIP': match.group(1), 'underlayRoute': match.group(4), 'minPort': int(match.group(2)), 'maxPort': int(match.group(3)) }
+		return { 'nat_ip': match.group(1), 'underlay_route': match.group(4), 'min_port': int(match.group(2)), 'max_port': int(match.group(3)) }
 
 	def delnat(self, vm_name):
 		self._call(f"--delnat {vm_name}", "NAT deleted")
@@ -215,7 +215,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: min_port ([0-9]+), max_port ([0-9]+), vni ([0-9]+) --> Underlay IPv6 ([a-f0-9:]+)(?:$|[\n\r])', output):
-			specs.append({ 'underlayRoute': match.group(4), 'minPort': int(match.group(1)), 'maxPort': int(match.group(2)), 'vni': int(match.group(3)) })
+			specs.append({ 'underlay_route': match.group(4), 'min_port': int(match.group(1)), 'max_port': int(match.group(2)), 'vni': int(match.group(3)) })
 		return specs
 
 	def addneighnat(self, nat_vip, vni, min_port, max_port, t_ipv6):
@@ -246,11 +246,12 @@ class DpGrpcClient:
 		match = re.search(rule_id + r' / src_ip: ([0-9\.]+) / src_ip pfx length: ([0-9]+) / dst_ip: ([0-9\.]+) / dst_ip pfx length: ([0-9]+) \n'
 						r'protocol: ([a-z]+) / src_port_min: (\-?[0-9]+) / src_port_max: (\-?[0-9]+) / dst_port_min: (\-?[0-9]+) / dst_port_max: (\-?[0-9]+) \n'
 						r'direction: ([a-z]+) / action: ([a-z]+)', output)
-		return { "ruleID": rule_id,
-				 "trafficDirection": match.group(10).capitalize(), "firewallAction": match.group(11).capitalize(), "priority": 1000, "ipVersion": "IPv4",
-				 "sourcePrefix": match.group(1)+'/'+match.group(2), "destinationPrefix": match.group(3)+'/'+match.group(4),
-				 "protocolFilter": { "Filter": { match.group(5).capitalize(): {
-					 "srcPortLower": int(match.group(6)), "srcPortUpper": int(match.group(7)), "dstPortLower": int(match.group(8)), "dstPortUpper": int(match.group(9))
+		return { "id": rule_id,
+				 "direction": match.group(10).capitalize(), "action": match.group(11).capitalize(), "priority": 1000,
+				 "source_prefix": match.group(1)+'/'+match.group(2), "destination_prefix": match.group(3)+'/'+match.group(4),
+				 "protocol_filter": { "Filter": { match.group(5).capitalize(): {
+					 "src_port_lower": int(match.group(6)), "src_port_upper": int(match.group(7)),
+					 "dst_port_lower": int(match.group(8)), "dst_port_upper": int(match.group(9))
 				 } } } }
 
 	def delfwallrule(self, vm_name, rule_id):
@@ -265,11 +266,12 @@ class DpGrpcClient:
 		for match in re.finditer(r'([a-zA-Z0-9\-_]*) / src_ip: ([0-9\.]+) / src_ip pfx length: ([0-9]+) / dst_ip: ([0-9\.]+) / dst_ip pfx length: ([0-9]+) \n'
 						r'protocol: ([a-z]+) / src_port_min: (\-?[0-9]+) / src_port_max: (\-?[0-9]+) / dst_port_min: (\-?[0-9]+) / dst_port_max: (\-?[0-9]+) \n'
 						r'direction: ([a-z]+) / action: ([a-z]+)', output):
-			specs.append({ "ruleID": match.group(1),
-				"trafficDirection": match.group(11).capitalize(), "firewallAction": match.group(12).capitalize(), "priority": 1000, "ipVersion": "IPv4",
-				"sourcePrefix": match.group(2)+'/'+match.group(3), "destinationPrefix": match.group(4)+'/'+match.group(5),
-				"protocolFilter": { "Filter": { match.group(6).capitalize(): {
-					"srcPortLower": int(match.group(7)), "srcPortUpper": int(match.group(8)), "dstPortLower": int(match.group(9)), "dstPortUpper": int(match.group(10))
+			specs.append({ "id": match.group(1),
+				"direction": match.group(11).capitalize(), "action": match.group(12).capitalize(), "priority": 1000,
+				"source_prefix": match.group(2)+'/'+match.group(3), "destination_prefix": match.group(4)+'/'+match.group(5),
+				"protocol_filter": { "Filter": { match.group(6).capitalize(): {
+					"src_port_lower": int(match.group(7)), "src_port_upper": int(match.group(8)),
+					"dst_port_lower": int(match.group(9)), "dst_port_upper": int(match.group(10))
 				} } } })
 		return specs
 
@@ -285,7 +287,7 @@ class DpGrpcClient:
 
 	def getvni(self, vni):
 		inuse = self.vniinuse(vni)
-		return { 'inUse': inuse }
+		return { 'in_use': inuse }
 
 
 	@staticmethod

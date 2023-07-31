@@ -860,9 +860,11 @@ static int dp_process_get_version(struct dp_grpc_responder *responder)
 	struct dpgrpc_versions *reply = dp_grpc_single_reply(responder);
 
 	// currently, ignore client's versions and only report what the service supports
-	static_assert(sizeof(reply->proto) >= sizeof(DP_SERVICE_VERSION));
+	static_assert(sizeof(reply->proto) >= sizeof(DP_SERVICE_VERSION),
+				  "gRPC protocol's proto version field is too large");
 	rte_memcpy(reply->proto, DP_SERVICE_VERSION, sizeof(DP_SERVICE_VERSION));
-	static_assert(sizeof(reply->app) >= sizeof(DP_SERVICE_VERSION));
+	static_assert(sizeof(reply->app) >= sizeof(DP_SERVICE_VERSION),
+				  "gRPC protocol's app version field is too large");
 	rte_memcpy(reply->app, DP_SERVICE_VERSION, sizeof(DP_SERVICE_VERSION));
 	return DP_GRPC_OK;
 }

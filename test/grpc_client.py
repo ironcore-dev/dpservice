@@ -56,7 +56,7 @@ To solve this, you have a few options:
 		print(" >", output.replace("\n", "\n > "))
 		response = json.loads(output)
 		status = response['status']
-		errcode = status['error']
+		errcode = status['code']
 		if errcode != 0:
 			assert p.returncode == 2, \
 				"Grpc client process returned invalid error value"
@@ -89,13 +89,13 @@ To solve this, you have a few options:
 
 	def _getUnderlayRoute(self, args):
 		spec = self._getSpec(args)
-		return spec['underlayRoute'] if spec else None
+		return spec['underlay_route'] if spec else None
 
 	def init(self):
 		self._call("init")
 
 	def addinterface(self, vm_name, pci, vni, ipv4, ipv6):
-		return self._getUnderlayRoute(f"add interface --id={vm_name} --device={pci} --vni={vni} --ip={ipv4} --ip={ipv6}")
+		return self._getUnderlayRoute(f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6}")
 
 	def getinterface(self, vm_name):
 		return self._getSpec(f"get interface --id={vm_name}")
@@ -170,7 +170,7 @@ To solve this, you have a few options:
 		self._call(f"del nat --interface-id={vm_name}")
 
 	def listneighnats(self, nat_vip):
-		return self._getSpecList(f"get natinfo --nat-ip={nat_vip} --info-type=neigh")
+		return self._getSpecList(f"list nats --nat-ip={nat_vip} --nat-type=neigh")
 
 	def addneighnat(self, nat_vip, vni, min_port, max_port, t_ipv6):
 		self._call(f"add neighnat --nat-ip={nat_vip} --vni={vni} --minport={min_port} --maxport={max_port} --underlayroute={t_ipv6}")
@@ -184,7 +184,7 @@ To solve this, you have a few options:
 				     action="accept", direction="ingress", priority=None):
 		protospec = "" if proto is None else f"--protocol={proto}"
 		priospec = "" if priority is None else f"--priority={priority}"
-		self._call(f"add fwrule --interface-id={vm_name} --rule-id={rule_id} --ipver=ipv4 --src={src_prefix} --dst={dst_prefix} {protospec}"
+		self._call(f"add fwrule --interface-id={vm_name} --rule-id={rule_id} --src={src_prefix} --dst={dst_prefix} {protospec}"
 				  f" --src-port-min={src_port_min} --src-port-max={src_port_max} --dst-port-min={dst_port_min} --dst-port-max={dst_port_max}"
 				  f" --action={action} --direction={direction} {priospec}")
 

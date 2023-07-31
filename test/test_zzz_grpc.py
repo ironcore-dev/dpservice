@@ -11,7 +11,7 @@ def test_grpc_addinterface_bad_interface(prepare_ifaces, grpc_client):
 
 def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
-	myspec = { 'vni': VM2.vni, 'device': VM2.pci, 'ips': [ VM2.ip, VM2.ipv6 ], 'underlayRoute': VM2.ul_ipv6 }
+	myspec = { "vni": VM2.vni, "device": VM2.pci, "primary_ipv4": VM2.ip, "primary_ipv6": VM2.ipv6, "underlay_route": VM2.ul_ipv6 }
 	spec = grpc_client.getinterface(VM2.name)
 	assert spec == myspec, \
 		f"Invalid getmachine output for {VM2.name}"
@@ -27,7 +27,7 @@ def test_grpc_delinterface_not_found(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delinterface(prepare_ifaces, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
 	vm4_ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
-	myspec = { "vni": VM4.vni, "device": VM4.pci, "ips": [ VM4.ip, VM4.ipv6 ], "underlayRoute": vm4_ul_ipv6 }
+	myspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6 }
 	specs = grpc_client.listinterfaces()
 	assert myspec in specs, \
 		f"Interface {VM4.name} not properly added"
@@ -44,7 +44,7 @@ def test_grpc_addroute_route_exists(prepare_ifaces, grpc_client):
 def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 	# Try to list routes, delete one of them, list and add again
 	# NOTE this route has to be the one in DpService::init_ifaces()
-	routespec = { "prefix": neigh_vni1_ov_ip_route, "nextHop": { "ip": neigh_vni1_ul_ipv6, "vni": 0 } }
+	routespec = { "prefix": neigh_vni1_ov_ip_route, "next_hop": { "address": neigh_vni1_ul_ipv6, "vni": 0 } }
 	routes = grpc_client.listroutes(vni1)
 	assert routespec in routes, \
 		"List of routes does not contain an initial route"
@@ -57,14 +57,14 @@ def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
 	# Try to add NAT, delete and add VIP with same IP
 	nat_ul_ipv6 = grpc_client.addnat(VM2.name, vip_vip, nat_local_min_port, nat_local_max_port)
-	natspec = { "natVIPIP": vip_vip, "minPort": nat_local_min_port, "maxPort": nat_local_max_port, "underlayRoute": nat_ul_ipv6 }
+	natspec = { "nat_ip": vip_vip, "min_port": nat_local_min_port, "max_port": nat_local_max_port, "underlay_route": nat_ul_ipv6 }
 	spec = grpc_client.getnat(VM2.name)
 	assert spec == natspec, \
 		"NAT not added properly"
 	grpc_client.delnat(VM2.name)
 
 	vip_ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	vipspec = { "ip": vip_vip, "underlayRoute": vip_ul_ipv6}
+	vipspec = { "vip_ip": vip_vip, "underlay_route": vip_ul_ipv6}
 	spec = grpc_client.getvip(VM2.name)
 	assert spec == vipspec, \
 		"VIP not set properly"
@@ -75,7 +75,7 @@ def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delVIP(prepare_ifaces, grpc_client):
 	# Try to add VIP, list, test error cases, delete vip and list again
 	ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	vipspec = { "ip": vip_vip, "underlayRoute": ul_ipv6}
+	vipspec = { "vip_ip": vip_vip, "underlay_route": ul_ipv6}
 	spec = grpc_client.getvip(VM2.name)
 	assert spec == vipspec, \
 		"VIP not set properly"
@@ -91,13 +91,13 @@ def test_grpc_add_list_delLBVIP(prepare_ifaces, grpc_client):
 	back_ip2 = "2a10:abc0:d015:4027:0:7b::"
 	# Try to add LB VIP, list, test error cases, delete vip and list again
 	ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-	lbspec = { "vni": vni1, "lbVipIP": lb_ip, "lbports": [ { "protocol": 6, "port": 80 } ], "underlayRoute": ul_ipv6 }
+	lbspec = { "vni": vni1, "loadbalanced_ip": lb_ip, "loadbalanced_ports": [ { "protocol": 6, "port": 80 } ], "underlay_route": ul_ipv6 }
 	spec = grpc_client.getlb(lb_name)
 	assert spec == lbspec, \
 		"Loadbalancer not created properly"
 
-	spec1 = { "targetIP": back_ip1 }
-	spec2 = { "targetIP": back_ip2 }
+	spec1 = { "target_ip": back_ip1 }
+	spec2 = { "target_ip": back_ip2 }
 	grpc_client.addlbtarget(lb_name, back_ip1)
 	specs = grpc_client.listlbtargets(lb_name)
 	assert spec1 in specs, \
@@ -122,7 +122,7 @@ def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	prefix = f"{pfx_ip}/24"
 	ul_ipv6 = grpc_client.addprefix(VM2.name, prefix)
-	myspec = { "prefix": prefix, "underlayRoute": ul_ipv6 }
+	myspec = { "prefix": prefix, "underlay_route": ul_ipv6 }
 	specs = grpc_client.listprefixes(VM2.name)
 	assert myspec in specs, \
 		f"Prefix {prefix} not added properly"
@@ -140,7 +140,7 @@ def test_grpc_add_list_delLoadBalancerTargets(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	lb_prefix = f"{lb_ip}/32"
 	ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_ip)
-	myspec = { "prefix": lb_prefix, "underlayRoute": ul_ipv6 }
+	myspec = { "prefix": lb_prefix, "underlay_route": ul_ipv6 }
 	specs = grpc_client.listlbprefixes(VM2.name)
 	assert myspec in specs, \
 		f"Loadbalancer prefix {lb_prefix} not added properly"
@@ -162,11 +162,11 @@ def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 	# Used rule-id
 	grpc_client.expect_error(202).addfwallrule(VM3.name, "fw0-vm3", src_prefix="1.2.3.4/16", proto="tcp", action="drop")
 
-	rulespec = { "ruleID": "fw0-vm3",
-				 "trafficDirection": "Ingress", "firewallAction": "Accept", "priority": 1000, "ipVersion": "IPv4",
-				 "sourcePrefix": "1.2.3.4/16", "destinationPrefix": "0.0.0.0/0",
-				 "protocolFilter": { "Filter": { "Tcp": {
-					 "srcPortLower": -1, "srcPortUpper": -1, "dstPortLower": -1, "dstPortUpper": -1
+	rulespec = { "id": "fw0-vm3",
+				 "direction": "Ingress", "action": "Accept", "priority": 1000,
+				 "source_prefix": "1.2.3.4/16", "destination_prefix": "0.0.0.0/0",
+				 "protocol_filter": { "Filter": { "Tcp": {
+					 "src_port_lower": -1, "src_port_upper": -1, "dst_port_lower": -1, "dst_port_upper": -1
 				 } } } }
 	spec = grpc_client.getfwallrule(VM3.name, "fw0-vm3")
 	assert spec == rulespec, \
@@ -174,7 +174,7 @@ def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 
 	grpc_client.addfwallrule(VM3.name, "fw1-vm3", src_prefix="8.8.8.8/16", proto="udp", direction="egress")
 	spec = grpc_client.getfwallrule(VM3.name, "fw1-vm3")
-	assert spec['trafficDirection'] == "Egress", \
+	assert spec['direction'] == "Egress", \
 		"Failed to add egress rule"
 
 	specs = grpc_client.listfwallrules(VM3.name)
@@ -186,7 +186,7 @@ def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 	assert rulespec not in specs, \
 		"Firewall rule deletion failed corruption"
 	# The other must still remain
-	assert len(specs) == 1 and specs[0]['sourcePrefix'] == '8.8.8.8/16', \
+	assert len(specs) == 1 and specs[0]['source_prefix'] == '8.8.8.8/16', \
 		"Firewall rule list corruption"
 
 	grpc_client.delfwallrule(VM3.name, "fw1-vm3")
