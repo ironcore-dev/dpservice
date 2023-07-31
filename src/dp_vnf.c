@@ -50,18 +50,10 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_vnf_entry_match_all_port_ids(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
+int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid, bool match_all)
 {
 	val->v_type = v_type;
-	val->portid = DP_VNF_MATCH_ALL_PORT_ID;
-	val->vni = dp_get_vm_vni(portid);
-	return dp_find_vnf_with_value(val);
-}
-
-int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid)
-{
-	val->v_type = v_type;
-	val->portid = portid;
+	val->portid = match_all ? DP_VNF_MATCH_ALL_PORT_ID_VALUE : portid;
 	val->vni = dp_get_vm_vni(portid);
 	return dp_find_vnf_with_value(val);
 }
@@ -116,7 +108,7 @@ int dp_del_vnf_with_vnf_key(void *key)
 
 static __rte_always_inline bool dp_vnf_equal(struct dp_vnf_value *val1, struct dp_vnf_value *val2)
 {
-	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_ID) || (val1->portid == val2->portid))
+	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_ID_VALUE) || (val1->portid == val2->portid))
 		&& val1->alias_pfx.ip == val2->alias_pfx.ip
 		&& val1->alias_pfx.length == val2->alias_pfx.length
 		&& val1->v_type == val2->v_type;

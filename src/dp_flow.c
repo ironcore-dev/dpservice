@@ -109,7 +109,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow
 		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->network_nat_ip != 0)
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
-		else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port)))
+		else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, !DP_VNF_MATCH_ALL_PORT_ID)))
 			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
@@ -222,11 +222,12 @@ int dp_get_flow_data(struct flow_key *key, void **data)
 	if (DP_FAILED(result))
 		*data = NULL;
 
+#ifdef ENABLE_PYTEST
 	if (*data != NULL)
 		DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY(key));
 	else
 		DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY(key));
-
+#endif
 	return result;
 }
 
