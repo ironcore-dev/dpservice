@@ -126,7 +126,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	/* This will be an uni-directional traffic. So prepare the flag to offload immediately */
 	if (dp_conf_is_offload_enabled()
 		&& (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
-		&& !DP_FAILED(dp_get_vnf_entry_match_all_port_ids(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, m->port))
+		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, m->port, DP_VNF_MATCH_ALL_PORT_ID))
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;
 	else
