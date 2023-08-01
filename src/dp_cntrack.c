@@ -75,35 +75,52 @@ static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_v
 }
 
 
-static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct flow_value *flow_val, struct dp_flow *df)
+static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
+	bool offload_check = false;
+
 	if (!offload_mode_enabled)
 		return;
+
+	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+		if (m->port == dp_port_get_pf0_id())
+			offload_check = flow_val->incoming_flow_offloaded_flag.pf0;
+		else
+			offload_check = flow_val->incoming_flow_offloaded_flag.pf1;
+	}
 
 	if (df->flags.dir == DP_FLOW_DIR_ORG) {
 
 		if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD)
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
+		else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL) {
+			/* Despite the incoming flow is offloaded to one of the pf ports, pkts can arrive on another one */
+			/* So we need to check if the incoming flow is offloaded on the current port, if not, we hold the change of offload flags and do another offloading */
+			if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check)
+				return;
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
+		}
 	} else if (df->flags.dir == DP_FLOW_DIR_REPLY) {
 
 		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
+		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL) {
+				if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check)
+				return;
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
+		}
 	}
 }
 
-static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct flow_value *flow_val, struct dp_flow *df)
+static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
 
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
-		dp_cntrack_change_flow_offload_flags(flow_val, df);
+		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	} else if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_FINWAIT
 			|| flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN) {
-		dp_cntrack_change_flow_offload_flags(flow_val, df);
+		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 		flow_val->timeout_value = flow_timeout;
 	} else
 		flow_val->timeout_value = flow_timeout;
@@ -197,7 +214,7 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC) {
-			dp_cntrack_change_flow_offload_flags(flow_val, df);
+			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	} else {
 
 		// recirc pkt shall not change flow's state because its ancestor has already done
@@ -206,7 +223,7 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 
 		// when to offload reply pkt of a tcp flow is determined in dp_cntrack_set_timeout_tcp_flow
 		if (df->l4_type != IPPROTO_TCP)
-			dp_cntrack_change_flow_offload_flags(flow_val, df);
+			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	}
 }
 
@@ -280,7 +297,7 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	if (df->l4_type == IPPROTO_TCP && !dp_get_pkt_mark(m)->flags.is_recirc) {
 		tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
 		dp_cntrack_tcp_state(flow_val, tcp_hdr);
-		dp_cntrack_set_timeout_tcp_flow(flow_val, df);
+		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}
 	df->conntrack = flow_val;
 	dp_cntrack_set_pkt_offload_decision(df);

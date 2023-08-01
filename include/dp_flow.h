@@ -15,7 +15,7 @@ extern "C" {
 
 #define FLOW_MAX						(1*1024*1024UL)
 
-#define DP_FLOW_VAL_MAX_AGE_STORE		4
+#define DP_FLOW_VAL_MAX_AGE_STORE		5
 
 #define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
@@ -117,6 +117,10 @@ struct flow_value {
 		uint8_t orig : 4;
 		uint8_t reply : 4;
 	} offload_flags;
+	struct {
+		uint8_t pf0 : 4;
+		uint8_t pf1 : 4;
+	} incoming_flow_offloaded_flag;
 	struct dp_ref	ref_count;
 	union {
 		enum dp_flow_tcp_state		tcp_state;
