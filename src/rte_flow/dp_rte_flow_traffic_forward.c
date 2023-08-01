@@ -306,7 +306,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	bool cross_pf_port = m->port == dp_port_get_pf0_id() ? false : true;
+	bool cross_pf_port;
+
+	if (m->port == dp_port_get_pf0_id()) {
+		cross_pf_port = false;
+		df->conntrack->incoming_flow_offloaded_flag.pf0 = true;
+	} else {
+		cross_pf_port = true;
+		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
+	}
 
 	struct rte_flow_attr attr;
 	int hairpin_pattern_cnt = 0;
