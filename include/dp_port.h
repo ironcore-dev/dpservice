@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/if.h>
+#include <rte_pci.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,7 @@ struct dp_port {
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
 	enum dp_vf_port_attach_status	attach_status;
+	struct rte_pci_addr				pci_addr;
 };
 
 struct dp_ports {

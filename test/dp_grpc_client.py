@@ -61,7 +61,7 @@ class DpGrpcClient:
 
 	def addinterface(self, vm_name, pci, vni, ipv4, ipv6):
 		return self._getUnderlayRoute(f"--addmachine {vm_name} --vm_pci {pci} --vni {vni} --ipv4 {ipv4} --ipv6 {ipv6}",
-			f"Allocated VF for you {pci}")
+			f"Allocated VF for you")
 
 	def getinterface(self, vm_name):
 		output = self._call(f"--getmachine {vm_name}", "")

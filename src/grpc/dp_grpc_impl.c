@@ -464,6 +464,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	struct dpgrpc_iface *request = &responder->request.add_iface;
 	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
 
+	struct dp_port *dp_port;
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint16_t port_id = DP_INVALID_PORT_ID;
 	struct dp_vnf_value vnf_val;
@@ -484,12 +485,6 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 
 	if (!dp_port_is_vf_free(port_id)) {
 		ret = DP_GRPC_ERR_ALREADY_EXISTS;
-		// fill the device details anyway so the caller knows which one is already allocated
-		// TODO as below, fill in properly
-		reply->bus = 2;
-		reply->domain = 2;
-		reply->function = 2;
-		rte_eth_dev_get_name_by_port(port_id, reply->name);
 		goto err;
 	}
 
@@ -526,12 +521,15 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_PORT_START;
 		goto route6_err;
 	}
-	/* TODO get the pci info of this port and fill it accordingly */
-	// NOTE: this should be part of dp_port structure so no rte_ call should be needed at this point
-	reply->bus = 2;
-	reply->domain = 2;
-	reply->function = 2;
-	rte_eth_dev_get_name_by_port(port_id, reply->name);
+	// should never fail as we just created it
+	dp_port = dp_port_get(port_id);
+	if (dp_port) {
+		snprintf(reply->name, sizeof(reply->name), "%s", dp_port->vf_name);
+		reply->domain = dp_port->pci_addr.domain;
+		reply->bus = dp_port->pci_addr.bus;
+		reply->slot = dp_port->pci_addr.devid;
+		reply->function = dp_port->pci_addr.function;
+	}
 
 	rte_memcpy(dp_get_vm_ul_ip6(port_id), ul_addr6, sizeof(ul_addr6));
 	rte_memcpy(reply->ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(reply->ul_addr6));

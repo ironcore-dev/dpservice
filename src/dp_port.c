@@ -1,4 +1,5 @@
 #include "dp_error.h"
+#include <rte_bus_pci.h>
 #include "dp_hairpin.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
@@ -427,6 +428,24 @@ static int dp_port_bind_port_hairpins(struct dp_port *port)
 	return DP_OK;
 }
 
+static int dp_port_fill_info(struct dp_port *port)
+{
+	struct rte_eth_dev_info info;
+	struct rte_pci_device *pci;
+	const char *busname;
+
+	if (DP_FAILED(rte_eth_dev_info_get(port->port_id, &info)))
+		return DP_ERROR;
+
+	busname = info.device->bus->name;
+	if (!busname || strncmp(busname, "pci", 4) != 0)
+		return DP_ERROR;
+
+	pci = RTE_DEV_TO_PCI(info.device);
+	port->pci_addr = pci->addr;
+	return DP_OK;
+}
+
 int dp_port_start(uint16_t port_id)
 {
 	struct dp_port *port;
@@ -462,6 +481,10 @@ int dp_port_start(uint16_t port_id)
 				return DP_ERROR;
 		}
 	}
+
+	// do not fail here, just optional info
+	if (DP_FAILED(dp_port_fill_info(port)))
+		DPS_LOG_WARNING("Cannot get port device info", DP_LOG_PORTID(port_id));
 
 	return DP_OK;
 }
