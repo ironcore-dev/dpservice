@@ -129,7 +129,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
-	/* This will be an uni-directional traffic. So prepare the flag to offload immediately */
+	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
+	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
 	if (offload_mode_enabled
 		&& (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, m->port, DP_VNF_MATCH_ALL_PORT_ID))
