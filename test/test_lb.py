@@ -99,10 +99,12 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	# cannot be run twice in a row, since the flows need to age-out
 
 
-def test_nat_to_lb_nat(prepare_ipv4, grpc_client, port_redundancy):
+def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported for NAT <-> LB+NAT test")
+	if request.config.getoption("--hw"):
+		pytest.skip("Hardware testing is not supported for NAT <-> LB+NAT test")
 
 	# Create a VM on VNI1 under a loadbalancer and NAT
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")

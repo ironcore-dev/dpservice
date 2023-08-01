@@ -450,6 +450,9 @@ int dp_port_start(uint16_t port_id)
 
 	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
 		if (dp_conf_is_offload_enabled()) {
+#ifdef ENABLE_PYTEST
+			if (port->peer_pf_port_id != dp_port_get_pf1_id())
+#endif
 			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 				return DP_ERROR;
 		}
