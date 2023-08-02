@@ -110,6 +110,11 @@ static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_fl
 		df->flags.offload_decision = df->conntrack->offload_flags.orig;
 	else
 		df->flags.offload_decision = df->conntrack->offload_flags.reply;
+
+	if (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL) {
+		prev_key = NULL;
+		prev_flow_val = NULL;
+	}
 }
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
