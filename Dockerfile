@@ -86,6 +86,8 @@ COPY test/ test/
 COPY hack/* hack/
 COPY proto/ proto/
 COPY tools/ tools/
+# Needed for version extraction by meson
+COPY .git/ .git/
 
 RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
 RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
