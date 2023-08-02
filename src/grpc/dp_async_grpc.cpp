@@ -200,7 +200,7 @@ int IsVniInUseCall::Proceed()
 			break;
 		}
 		request.vni_in_use.vni = request_.vni();
-		DPGRPC_LOG_INFO("Checking VNI usage", DP_LOG_VNI(request.vni_in_use.vni),
+		DPGRPC_LOG_DEBUG("Checking VNI usage", DP_LOG_VNI(request.vni_in_use.vni),
 						DP_LOG_VNI_TYPE(request.vni_in_use.type));
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
@@ -440,7 +440,7 @@ int GetLBCall::Proceed()
 		new GetLBCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Getting loadbalancer info",
+		DPGRPC_LOG_DEBUG("Getting loadbalancer info",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()));
 		snprintf(request.get_lb.lb_id, sizeof(request.get_lb.lb_id), "%s",
 				 request_.loadbalancerid().c_str());
@@ -599,7 +599,7 @@ int GetLBVIPBackendsCall::Proceed()
 		new GetLBVIPBackendsCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing loadbalancer targets",
+		DPGRPC_LOG_DEBUG("Listing loadbalancer targets",
 						DP_LOG_LBID(request_.loadbalancerid().c_str()));
 		snprintf(request.list_lbtrgt.lb_id, sizeof(request.list_lbtrgt.lb_id), "%s",
 				 request_.loadbalancerid().c_str());
@@ -747,7 +747,7 @@ int ListPfxCall::Proceed()
 		new ListPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing alias prefixes",
+		DPGRPC_LOG_DEBUG("Listing alias prefixes",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		snprintf(request.list_pfx.iface_id, sizeof(request.list_pfx.iface_id),
 				 "%s", request_.interfaceid().c_str());
@@ -895,7 +895,7 @@ int ListLBTargetPfxCall::Proceed()
 		new ListLBTargetPfxCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing loadbalancer target prefixes",
+		DPGRPC_LOG_DEBUG("Listing loadbalancer target prefixes",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		snprintf(request.list_lbpfx.iface_id, sizeof(request.list_lbpfx.iface_id),
 				 "%s", request_.interfaceid().c_str());
@@ -1012,7 +1012,7 @@ int GetVIPCall::Proceed()
 		new GetVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Getting virtual IP",
+		DPGRPC_LOG_DEBUG("Getting virtual IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		snprintf(request.get_vip.iface_id, sizeof(request.get_vip.iface_id),
 				 "%s", request_.interfaceid().c_str());
@@ -1168,7 +1168,7 @@ int GetInterfaceCall::Proceed()
 		new GetInterfaceCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Getting interface info",
+		DPGRPC_LOG_DEBUG("Getting interface info",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		snprintf(request.get_iface.iface_id, sizeof(request.get_iface.iface_id),
 				 "%s", request_.interfaceid().c_str());
@@ -1362,7 +1362,7 @@ int ListRoutesCall::Proceed()
 		new ListRoutesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing routes",
+		DPGRPC_LOG_DEBUG("Listing routes",
 						DP_LOG_VNI(request_.vni()));
 		request.list_route.vni = request_.vni();
 		request.list_route.type = DP_VNI_BOTH;
@@ -1452,7 +1452,7 @@ int GetNATVIPCall::Proceed()
 		new GetNATVIPCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Getting NAT IP",
+		DPGRPC_LOG_DEBUG("Getting NAT IP",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		snprintf(request.get_vip.iface_id, sizeof(request.get_vip.iface_id),
 				 "%s", request_.interfaceid().c_str());
@@ -1654,7 +1654,7 @@ int ListInterfacesCall::Proceed()
 		new ListInterfacesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing interfaces");
+		DPGRPC_LOG_DEBUG("Listing interfaces");
 		dp_send_to_worker(&request);  // TODO can fail
 		status_ = AWAIT_MSG;
 		return -1;
@@ -1718,7 +1718,7 @@ int GetNATInfoCall::Proceed()
 		new GetNATInfoCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Getting NAT info",
+		DPGRPC_LOG_DEBUG("Getting NAT info",
 						DP_LOG_NATINFOTYPE(request_.natinfotype()),
 						DP_LOG_IPV4STR(request_.natvipip().address().c_str()));
 
@@ -1865,7 +1865,7 @@ int GetFirewallRuleCall::Proceed()
 		new GetFirewallRuleCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Getting firewall rule info",
+		DPGRPC_LOG_DEBUG("Getting firewall rule info",
 						DP_LOG_IFACE(request_.interfaceid().c_str()),
 						DP_LOG_FWRULE(request_.ruleid().c_str()));
 		snprintf(request.get_fwrule.iface_id, sizeof(request.get_fwrule.iface_id),
@@ -1916,7 +1916,7 @@ int ListFirewallRulesCall::Proceed()
 		new ListFirewallRulesCall(service_, cq_);
 		if (InitCheck() == INITCHECK)
 			return -1;
-		DPGRPC_LOG_INFO("Listing firewall rules",
+		DPGRPC_LOG_DEBUG("Listing firewall rules",
 						DP_LOG_IFACE(request_.interfaceid().c_str()));
 		snprintf(request.list_fwrule.iface_id, sizeof(request.list_fwrule.iface_id),
 				 "%s", request_.interfaceid().c_str());
