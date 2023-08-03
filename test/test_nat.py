@@ -45,7 +45,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	assert dst_ip == neigh_vni1_ul_ipv6 and dport == 510, \
 		f"Wrong network-nat relayed packet (outer dst ipv6: {dst_ip}, dport: {dport})"
 
-	localspec = { 'nat_ip': nat_vip, 'underlay_route': nat_ul_ipv6, 'min_port': nat_local_min_port, 'max_port': nat_local_max_port }
+	localspec = { 'nat_ip': nat_vip, 'underlay_route': nat_ul_ipv6, 'min_port': nat_local_min_port, 'max_port': nat_local_max_port, 'vni': 0 }
 	spec = grpc_client.getnat(VM1.name)
 	assert spec == localspec, \
 		"Failed to add NAT properly"
@@ -96,7 +96,7 @@ def test_network_nat_vip_co_existence_on_same_vm(prepare_ifaces, grpc_client):
 	vip_ul_ipv6 = grpc_client.addvip(VM1.name, vip_vip)
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
-	natspec = { 'nat_ip': nat_vip, 'underlay_route': nat_ul_ipv6, 'min_port': nat_local_min_port, 'max_port': nat_local_max_port }
+	natspec = { 'nat_ip': nat_vip, 'underlay_route': nat_ul_ipv6, 'min_port': nat_local_min_port, 'max_port': nat_local_max_port, 'vni': 0 }
 	spec = grpc_client.getnat(VM1.name)
 	assert spec == natspec, \
 		"Failed to add NAT properly"

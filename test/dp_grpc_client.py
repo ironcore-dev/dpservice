@@ -204,7 +204,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		match = re.search(r'Received NAT IP ([0-9\.]+) with min port: ([0-9]+) and max port: ([0-9]+) underlay ([a-f0-9:]+)', output)
-		return { 'nat_ip': match.group(1), 'underlay_route': match.group(4), 'min_port': int(match.group(2)), 'max_port': int(match.group(3)) }
+		return { 'nat_ip': match.group(1), 'underlay_route': match.group(4), 'min_port': int(match.group(2)), 'max_port': int(match.group(3)), 'vni': 0 }
 
 	def delnat(self, vm_name):
 		self._call(f"--delnat {vm_name}", "NAT deleted")

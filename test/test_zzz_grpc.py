@@ -57,7 +57,7 @@ def test_grpc_list_delroutes(prepare_ifaces, grpc_client):
 def test_grpc_add_NAT_and_VIP_same_IP(prepare_ifaces, grpc_client):
 	# Try to add NAT, delete and add VIP with same IP
 	nat_ul_ipv6 = grpc_client.addnat(VM2.name, vip_vip, nat_local_min_port, nat_local_max_port)
-	natspec = { "nat_ip": vip_vip, "min_port": nat_local_min_port, "max_port": nat_local_max_port, "underlay_route": nat_ul_ipv6 }
+	natspec = { "nat_ip": vip_vip, "min_port": nat_local_min_port, "max_port": nat_local_max_port, "underlay_route": nat_ul_ipv6, "vni": 0 }
 	spec = grpc_client.getnat(VM2.name)
 	assert spec == natspec, \
 		"NAT not added properly"
