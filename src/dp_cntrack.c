@@ -91,24 +91,22 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 
 	if (df->flags.dir == DP_FLOW_DIR_ORG) {
 
-		if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD)
+		/* Despite the incoming flow is offloaded to one of the pf ports, pkts can arrive on another one */
+		/* So we need to check if the incoming flow is offloaded on the current port, */
+		/* if not, we do another offloading */
+		if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD ||
+			(df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check))
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL) {
-			/* Despite the incoming flow is offloaded to one of the pf ports, pkts can arrive on another one */
-			/* So we need to check if the incoming flow is offloaded on the current port, if not, we hold the change of offload flags and do another offloading */
-			if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check)
-				return;
+		else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
-		}
+
 	} else if (df->flags.dir == DP_FLOW_DIR_REPLY) {
 
-		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
+		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD ||
+			(df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check))
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL) {
-				if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check)
-				return;
+		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
-		}
 	}
 }
 
