@@ -303,7 +303,7 @@ uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
 
 	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	uint16_t old_identifier = DP_IP_ICMP_ID_INVALID;
+	rte_be16_t old_identifier = DP_IP_ICMP_ID_INVALID;
 	uint32_t cksum;
 
 	df = dp_get_flow_ptr(m);
@@ -314,7 +314,7 @@ uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
 	if (df->l4_type == DP_IP_PROTO_ICMP) {
 		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
 		old_identifier = icmp_hdr->icmp_ident;
-		icmp_hdr->icmp_ident = RTE_BE16(new_identifier);
+		icmp_hdr->icmp_ident = htons(new_identifier);
 		
 		// the approach of adding up vectors from icmp_hdr one by one is not durable since data field is not
 		// provided in struct rte_icmp_hdr

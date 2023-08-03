@@ -61,84 +61,84 @@ struct dhcpv6_packet {
 };
 
 struct dhcpv6_option {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	uint8_t data[];
 };
 
 // client id can be of any type, this is the maximum size allowed
 struct dhcpv6_opt_client_id {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	uint8_t id[128];
 };
 
 struct dhcpv6_ia_na {
-	uint32_t iaid;
-	uint32_t t1;
-	uint32_t t2;
+	rte_be32_t iaid;
+	rte_be32_t t1;
+	rte_be32_t t2;
 	struct dhcpv6_option options[];
 };
 
 struct dhcpv6_opt_ia_na {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	struct dhcpv6_ia_na ia_na;
 };
 
 struct dhcpv6_ia_addr {
 	uint8_t  ipv6[16];
-	uint32_t preferred_lifetime;
-	uint32_t valid_lifetime;
+	rte_be32_t preferred_lifetime;
+	rte_be32_t valid_lifetime;
 	struct dhcpv6_option options[];
 };
 
 struct dhcpv6_opt_ia_addr {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	struct dhcpv6_ia_addr addr;
 };
 
 struct dhcpv6_opt_status_code {
-	uint16_t op_code;
-	uint16_t op_len;
-	uint16_t status;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
+	rte_be16_t status;
 };
 
 struct dhcpv6_duid_ll {
-	uint16_t type;
-	uint16_t hw_type;
+	rte_be16_t type;
+	rte_be16_t hw_type;
 	struct rte_ether_addr mac;
 };
 
 // Specific definitions for easier work with options in dp-service
 
 struct dhcpv6_opt_server_id_ll {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	struct dhcpv6_duid_ll id;
 };
 
 struct dhcpv6_ia_addr_status {
 	uint8_t  ipv6[16];
-	uint32_t preferred_lifetime;
-	uint32_t valid_lifetime;
+	rte_be32_t preferred_lifetime;
+	rte_be32_t valid_lifetime;
 	struct dhcpv6_opt_status_code options[1];
 };
 struct dhcpv6_opt_ia_addr_status {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	struct dhcpv6_ia_addr_status addr;
 };
 struct dhcpv6_ia_na_single_addr_status {
-	uint32_t iaid;
-	uint32_t t1;
-	uint32_t t2;
+	rte_be32_t iaid;
+	rte_be32_t t1;
+	rte_be32_t t2;
 	struct dhcpv6_opt_ia_addr_status options[1];
 };
 struct dhcpv6_opt_ia_na_single_addr_status {
-	uint16_t op_code;
-	uint16_t op_len;
+	rte_be16_t op_code;
+	rte_be16_t op_len;
 	struct dhcpv6_ia_na_single_addr_status ia_na;
 };
 

@@ -52,6 +52,7 @@ void dp_free_jhash_table(struct rte_hash *table);
 
 
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
+// network byte-order!
 #define DP_IPV4_PRINT_FMT       "%u.%u.%u.%u"
 #define DP_IPV4_PRINT_BYTES(ip) (ip) & 0xFF, \
 								((ip) >> 8) & 0xFF, \

@@ -19,11 +19,11 @@ int arp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 }
 
 // constant after init, precompute
-static rte_be32_t gateway_ipv4_nl;
+static rte_be32_t gateway_ipv4;
 
 static int arp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-	gateway_ipv4_nl = htonl(dp_get_gw_ip4());
+	gateway_ipv4 = htonl(dp_get_gw_ip4());
 	return DP_OK;
 }
 
@@ -43,7 +43,7 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	}
 
 	// unless ARP request for gateway, ignore
-	if (ntohs(incoming_arp_hdr->arp_opcode) != DP_ARP_REQUEST || requested_ip != gateway_ipv4_nl)
+	if (ntohs(incoming_arp_hdr->arp_opcode) != DP_ARP_REQUEST || requested_ip != gateway_ipv4)
 		return false;
 
 	// respond back to origin address from this address (reuse the packet)

@@ -23,12 +23,12 @@ int dhcp_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 
 // constant after init, precompute them
 static uint32_t dhcp_lease = DP_DHCP_INFINITE;
-static uint32_t server_ip;
+static rte_be32_t server_ip;
 static uint32_t net_mask = DP_DHCP_MASK_NL;
-static uint16_t iface_mtu;
-static uint16_t udp_hdr_dst_port;
-static uint16_t udp_hdr_src_port;
-static uint32_t dhcp_hdr_magic;
+static rte_be16_t iface_mtu;
+static rte_be16_t udp_hdr_dst_port;
+static rte_be16_t udp_hdr_src_port;
+static rte_be32_t dhcp_hdr_magic;
 
 // list of (mask/address -> address):
 //   169.254.0.0/16 -> 0.0.0.0
@@ -171,7 +171,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	// TODO(gg): Once PXE is tested, possibly remove 'static' if not needed
 	static enum dp_pxe_mode pxe_mode = DP_PXE_MODE_NONE;
-	uint32_t pxe_srv_ip;
+	rte_be32_t pxe_srv_ip;
 	char pxe_srv_ip_str[INET_ADDRSTRLEN];
 	uint8_t response_type;
 

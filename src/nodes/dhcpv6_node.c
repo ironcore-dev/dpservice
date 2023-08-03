@@ -83,12 +83,12 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 		 i += sizeof(struct dhcpv6_option) + op_len
 	) {
 		opt = (const struct dhcpv6_option *)&options[i];
+		op_code = ntohs(opt->op_code);
 		op_len = ntohs(opt->op_len);
 		if (i + op_len > options_len) {
-			DPS_LOG_WARNING("Malformed DHCPv6 option", DP_LOG_VALUE(ntohs(opt->op_code)));
+			DPS_LOG_WARNING("Malformed DHCPv6 option", DP_LOG_VALUE(op_code));
 			return DP_ERROR;
 		}
-		op_code = ntohs(opt->op_code);
 		switch (op_code) {
 		case DHCPV6_OPT_CLIENTID:
 			if (op_len > sizeof(reply_options->opt_cid.id)) {
@@ -218,20 +218,20 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	// create reply with options
 	switch (dhcp_pkt->msg_type) {
-		case DHCPV6_SOLICIT:
-			dhcp_pkt->msg_type = DHCPV6_ADVERTISE;
-			reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
-			break;
-		case DHCPV6_REQUEST:
-			dhcp_pkt->msg_type = DHCPV6_REPLY;
-			reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
-			break;
-		case DHCPV6_CONFIRM:
-			dhcp_pkt->msg_type = DHCPV6_REPLY;
-			reply_options_len = strip_options(m, req_options_len);
-			break;
-		default:
-			return DHCPV6_NEXT_DROP;
+	case DHCPV6_SOLICIT:
+		dhcp_pkt->msg_type = DHCPV6_ADVERTISE;
+		reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
+		break;
+	case DHCPV6_REQUEST:
+		dhcp_pkt->msg_type = DHCPV6_REPLY;
+		reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
+		break;
+	case DHCPV6_CONFIRM:
+		dhcp_pkt->msg_type = DHCPV6_REPLY;
+		reply_options_len = strip_options(m, req_options_len);
+		break;
+	default:
+		return DHCPV6_NEXT_DROP;
 	}
 	if (DP_FAILED(reply_options_len))
 		return DHCPV6_NEXT_DROP;

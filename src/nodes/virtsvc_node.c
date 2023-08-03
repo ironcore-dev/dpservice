@@ -86,7 +86,6 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	}
 	m->packet_type = (m->packet_type & RTE_PTYPE_L4_MASK) | RTE_PTYPE_L3_IPV6;
 
-	// TODO(plague): discuss a PR for endian-dependent definitions
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->proto = proto;

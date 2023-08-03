@@ -2,6 +2,7 @@
 #define __INCLUDE_DHCP_NODE_H__
 
 #include <stdint.h>
+#include <rte_byteorder.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,17 +60,17 @@ struct dp_dhcp_header {
 	uint8_t		htype;
 	uint8_t		hlen;
 	uint8_t		hops;
-	uint32_t	xid;
-	uint16_t	secs;
-	uint16_t	flags;
-	uint32_t	ciaddr;
-	uint32_t	yiaddr;
-	uint32_t	siaddr;
-	uint32_t	giaddr;
+	rte_be32_t	xid;
+	rte_be16_t	secs;
+	rte_be16_t	flags;
+	rte_be32_t	ciaddr;
+	rte_be32_t	yiaddr;
+	rte_be32_t	siaddr;
+	rte_be32_t	giaddr;
 	uint8_t		chaddr[16];
 	char		sname[64];
 	char		file[128];
-	uint32_t	magic;
+	rte_be32_t	magic;
 	uint8_t		options[1];
 };
 
