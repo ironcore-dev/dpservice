@@ -57,7 +57,7 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
 												NULL, 0, NULL, 0,
-												rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6));
+												htons(RTE_ETHER_TYPE_IPV6));
 
 	// create flow match patterns -- ipv6
 	struct rte_flow_item_ipv6 ipv6_spec;
@@ -107,7 +107,7 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
 												NULL, 0, NULL, 0,
-												rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6));
+												htons(RTE_ETHER_TYPE_IPV6));
 
 	// create flow match patterns -- ipv6
 	struct rte_flow_item_ipv6 ipv6_spec;

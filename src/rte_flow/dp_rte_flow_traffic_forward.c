@@ -386,7 +386,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
-	uint32_t actual_ol_ipv4_addr;
+	rte_be32_t actual_ol_ipv4_addr;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
@@ -656,8 +656,8 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
-	uint32_t actual_ol_ipv4_src_addr = 0;
-	uint32_t actual_ol_ipv4_dst_addr = 0;
+	rte_be32_t actual_ol_ipv4_src_addr = 0;
+	rte_be32_t actual_ol_ipv4_dst_addr = 0;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
@@ -828,7 +828,6 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	struct rte_flow_item_ipv4 ol_ipv4_spec;
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
-	// uint32_t actual_ol_ipv4_addr;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,

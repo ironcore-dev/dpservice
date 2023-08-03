@@ -11,7 +11,7 @@ extern "C" {
 
 #ifdef ENABLE_VIRTSVC
 struct dp_conf_virtsvc {
-	uint16_t   proto;
+	uint8_t    proto;
 	rte_be32_t virtual_addr;
 	rte_be16_t virtual_port;
 	uint8_t    service_addr[16];

@@ -60,7 +60,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (extract_inner_l4_header(m, ipv4_hdr + 1, 0) < 0)
 		return CONNTRACK_NEXT_DROP;
 
-	if (df->l4_type == DP_IP_PROTO_UDP && ntohs(df->l4_info.trans_port.dst_port) == DP_BOOTP_SRV_PORT)
+	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return CONNTRACK_NEXT_DNAT;
 
 	if (!dp_conf_is_conntrack_enabled())

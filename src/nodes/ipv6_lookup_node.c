@@ -39,7 +39,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return IPV6_LOOKUP_NEXT_DROP;
 
 	// TODO: add broadcast routes when machine is added
-	if (df->l4_type == DP_IP_PROTO_UDP && ntohs(df->l4_info.trans_port.dst_port) == DHCPV6_SERVER_PORT)
+	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
 	dst_port = dp_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));

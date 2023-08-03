@@ -163,7 +163,7 @@ static int add_dhcp_dns(const char *str)
 }
 
 #ifdef ENABLE_VIRTSVC
-static int add_virtsvc(uint16_t proto, const char *str)
+static int add_virtsvc(uint8_t proto, const char *str)
 {
 	struct dp_conf_virtsvc *tmp;
 	unsigned long longport;

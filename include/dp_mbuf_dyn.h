@@ -36,26 +36,26 @@ struct dp_flow {
 	} flags;
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	union {
-		uint32_t	dst_addr;
+		rte_be32_t	dst_addr;
 		uint8_t		dst_addr6[16];
 	} dst;
 	union {
-		uint32_t	src_addr;
+		rte_be32_t	src_addr;
 		uint8_t		src_addr6[16];
 	} src;
-	uint32_t	nat_addr;
+	rte_be32_t	nat_addr;
 	uint16_t	nat_port;
 
 	uint8_t					l4_type;
 	union {
 		struct {
-			uint16_t		dst_port;
-			uint16_t		src_port;
+			rte_be16_t		dst_port;
+			rte_be16_t		src_port;
 		} trans_port;
 		struct {
 			uint8_t			icmp_type;
 			uint8_t			icmp_code;
-			uint16_t		icmp_identifier;
+			rte_be16_t		icmp_identifier;
 		} icmp_field;
 	} l4_info;
 
@@ -64,10 +64,8 @@ struct dp_flow {
 	struct {
 		uint8_t		ul_src_addr6[16];
 		uint8_t		ul_dst_addr6[16];
-		uint16_t 	l3_type;	//layer-3 type in ethernet header of outter packets
-		uint8_t		proto_id;	//proto_id in outter ipv6 header
-		uint16_t	src_port;	//src_port in outter udp header
-		uint16_t	dst_port;	//dst_port in outter udp header
+		uint16_t 	l3_type;	//layer-3 type in ethernet header of outer packets
+		uint8_t		proto_id;	//proto_id in outer ipv6 header
 		uint32_t	dst_vni;
 	} tun_info;
 	uint8_t					vnf_type;

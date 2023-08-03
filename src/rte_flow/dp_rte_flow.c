@@ -27,7 +27,7 @@ uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 	return df->l3_type;
 }
 
-uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt)
+uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt)
 {
 
 	struct rte_ether_hdr *eth_hdr;
@@ -40,7 +40,7 @@ uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt)
 
 	// mac address can be also extracted here, but I don't need them now
 
-	return df->l3_type;
+	return df->tun_info.l3_type;
 }
 
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
@@ -408,8 +408,8 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
-								uint32_t *src, size_t nr_src_mask_len,
-								uint32_t *dst, size_t nr_dst_mask_len,
+								rte_be32_t *src, size_t nr_src_mask_len,
+								rte_be32_t *dst, size_t nr_dst_mask_len,
 								uint8_t proto)
 {
 
@@ -440,7 +440,7 @@ int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_udp *udp_spec,
 							 struct rte_flow_item_udp *udp_mask,
-							 uint16_t src_port, uint16_t dst_port)
+							 rte_be16_t src_port, rte_be16_t dst_port)
 {
 
 	memset(udp_spec, 0, sizeof(struct rte_flow_item_udp));
@@ -467,7 +467,7 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_tcp *tcp_spec,
 							 struct rte_flow_item_tcp *tcp_mask,
-							 uint16_t src_port, uint16_t dst_port,
+							 rte_be16_t src_port, rte_be16_t dst_port,
 							 uint8_t tcp_flags)
 {
 
@@ -658,7 +658,7 @@ int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
 
 int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_set_ipv4 *ipv4_action,
-						   uint32_t ipv4, bool dir)
+						   rte_be32_t ipv4, bool dir)
 {
 	ipv4_action->ipv4_addr = ipv4;
 

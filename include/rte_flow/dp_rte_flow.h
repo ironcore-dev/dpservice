@@ -44,7 +44,7 @@ typedef struct dp_icmp_err_ip_info {
 } dp_icmp_err_ip_info;
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
-uint16_t extract_outter_ethernet_header(struct rte_mbuf *pkt);
+uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt);
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, ipv4/ipv6 header
 int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset,  tcp/udp/icmp header
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
@@ -80,19 +80,19 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
-								uint32_t *src, size_t nr_src_mask_len,
-								uint32_t *dst, size_t nr_dst_mask_len,
+								rte_be32_t *src, size_t nr_src_mask_len,
+								rte_be32_t *dst, size_t nr_dst_mask_len,
 								uint8_t proto);
 
 int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_udp *udp_spec,
 								struct rte_flow_item_udp *udp_mask,
-								uint16_t src_port, uint16_t dst_port);
+								rte_be16_t src_port, rte_be16_t dst_port);
 
 int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
 								struct rte_flow_item_tcp *tcp_mask,
-								uint16_t src_port, uint16_t dst_port,
+								rte_be16_t src_port, rte_be16_t dst_port,
 								uint8_t tcp_flags);
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
@@ -141,7 +141,7 @@ int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
 
 int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_set_ipv4 *ipv4_action,
-						   uint32_t ipv4, bool dir);
+						   rte_be32_t ipv4, bool dir);
 
 int create_ipv6_set_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_set_ipv6 *ipv6_action,

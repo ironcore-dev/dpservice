@@ -38,7 +38,7 @@ struct dp_virtsvc {
 	uint8_t    service_addr[16];
 	rte_be16_t virtual_port;
 	rte_be16_t service_port;
-	uint16_t   proto;
+	uint8_t    proto;
 	uint16_t   last_assigned_port;
 	struct rte_hash *open_ports;
 	struct dp_virtsvc_conn connections[DP_VIRTSVC_PORTCOUNT];
@@ -54,8 +54,8 @@ const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv4_tree(void);
 const struct dp_virtsvc_lookup_entry *dp_virtsvc_get_ipv6_tree(void);
 
 static __rte_always_inline
-int dp_virtsvc_ipv4_cmp(uint16_t proto1, rte_be32_t addr1, rte_be16_t port1,
-						uint16_t proto2, rte_be32_t addr2, rte_be16_t port2)
+int dp_virtsvc_ipv4_cmp(uint8_t proto1, rte_be32_t addr1, rte_be16_t port1,
+						uint8_t proto2, rte_be32_t addr2, rte_be16_t port2)
 {
 	int diff;
 	// this creates a diff between two Network-Byte-Order numbers
@@ -75,8 +75,8 @@ int dp_virtsvc_ipv4_cmp(uint16_t proto1, rte_be32_t addr1, rte_be16_t port1,
 }
 
 static __rte_always_inline
-int dp_virtsvc_ipv6_cmp(uint16_t proto1, const uint8_t addr1[16], rte_be16_t port1,
-						uint16_t proto2, const uint8_t addr2[16], rte_be16_t port2)
+int dp_virtsvc_ipv6_cmp(uint8_t proto1, const uint8_t addr1[16], rte_be16_t port1,
+						uint8_t proto2, const uint8_t addr2[16], rte_be16_t port2)
 {
 	int diff;
 	// dtto, see above

@@ -28,7 +28,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	bool nxt_hop_is_pf;
 
 	// TODO: add broadcast routes when machine is added
-	if (df->l4_type == DP_IP_PROTO_UDP && ntohs(df->l4_info.trans_port.dst_port) == DP_BOOTP_SRV_PORT)
+	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		// the ethernet header cannot be removed is due to dhcp node needs mac info
 		// TODO: extract mac info in cls node
 		return IPV4_LOOKUP_NEXT_DHCP;
