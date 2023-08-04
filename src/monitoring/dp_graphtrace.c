@@ -13,10 +13,11 @@ static enum dp_graphtrace_loglevel graphtrace_loglevel;
 #endif
 
 static struct dp_graphtrace graphtrace;
+bool _dp_graphtrace_send_flag = false;
 
-
-int dp_graphtrace_init(void)
+static int dp_graphtrace_init_memzone(void)
 {
+
 	// DPDK recommendation for mempool size: power of 2 minus one for best memory utilization
 	// So using ringbuffer size minus one, when the ring buffer is (almost) full, allocation will start failing
 	// (this is intentional, see below)
@@ -36,6 +37,80 @@ int dp_graphtrace_init(void)
 		rte_mempool_free(graphtrace.mempool);
 		return DP_ERROR;
 	}
+
+	DPS_LOG_DEBUG("successfully created graphtrace ring buffer", DP_LOG_MEMPOOL_SIZE(rte_mempool_avail_count(graphtrace.mempool)),
+					DP_LOG_RING_SIZE(rte_ring_free_count(graphtrace.ringbuf)));
+
+	return DP_OK;
+}
+
+static int dp_graphtrace_free_memzone(void)
+{
+	if (graphtrace.ringbuf != NULL)
+		rte_ring_free(graphtrace.ringbuf);
+	graphtrace.ringbuf = NULL;
+	if (graphtrace.mempool != NULL)
+		rte_mempool_free(graphtrace.mempool);
+	graphtrace.mempool = NULL;
+
+	DPS_LOG_DEBUG("successfully freed graphtrace ring buffer");
+
+	return DP_OK;
+}
+
+static int dp_handle_mp_graphtrace_action(const struct rte_mp_msg *mp_msg, const void *peer)
+{
+	struct rte_mp_msg mp_reply;
+	const struct dp_graphtrace_mp_request *mp_request;
+	struct dp_graphtrace_mp_reply *reply = (struct dp_graphtrace_mp_reply *)mp_reply.param;
+
+	if (mp_msg->len_param != sizeof(struct dp_graphtrace_mp_request)) {
+		DPS_LOG_ERR("Invalid graphtrace request message size %u", mp_msg->len_param);
+		reply->error_code = 1;
+		return DP_ERROR;
+	} else {
+		mp_request = (const struct dp_graphtrace_mp_request *)mp_msg->param;
+		if (mp_request->action == DP_GRAPHTRACE_ACTION_TYPE_START) {
+			if (DP_FAILED(dp_graphtrace_init_memzone())) {
+				reply->error_code = 1;
+				return DP_ERROR;
+			}
+
+			dp_change_graphtrace_enable_flag(1);
+		} else if (mp_request->action == DP_GRAPHTRACE_ACTION_TYPE_STOP) {
+			dp_change_graphtrace_enable_flag(0);
+
+			if (DP_FAILED(dp_graphtrace_free_memzone())) {
+				reply->error_code = 1;
+				return DP_ERROR;
+			}
+		}
+	}
+
+	reply->mempool = graphtrace.mempool;
+	reply->ringbuf = graphtrace.ringbuf;
+	reply->error_code = 0;
+
+	rte_strscpy(mp_reply.name, DP_MP_ACTION_GRAPHTRACE, sizeof(mp_reply.name));
+	mp_reply.len_param = sizeof(struct dp_graphtrace_mp_reply);
+	mp_reply.num_fds = 0;
+	if (DP_FAILED(rte_mp_reply(&mp_reply, peer))) {
+		DPS_LOG_ERR("Cannot reply to graphtrace request", DP_LOG_RET(rte_errno));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+int dp_graphtrace_init(void)
+{
+	int ret = rte_mp_action_register(DP_MP_ACTION_GRAPHTRACE, dp_handle_mp_graphtrace_action);
+
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot register graphtrace action", DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
 #ifdef ENABLE_PYTEST
 	graphtrace_loglevel = dp_conf_get_graphtrace_loglevel();
 #endif
@@ -44,8 +119,14 @@ int dp_graphtrace_init(void)
 
 void dp_graphtrace_free(void)
 {
-	rte_ring_free(graphtrace.ringbuf);
-	rte_mempool_free(graphtrace.mempool);
+	int ret;
+	/* it is called again in case that the memzone is not freed successfully when handling the mp request */
+	/* it is protected by null-pointer check */
+	ret = dp_graphtrace_free_memzone();
+	if (DP_FAILED(ret))
+		DPS_LOG_ERR("Cannot free graphtrace memzone", DP_LOG_RET(ret));
+
+	rte_mp_action_unregister(DP_MP_ACTION_GRAPHTRACE); // no return value
 }
 
 

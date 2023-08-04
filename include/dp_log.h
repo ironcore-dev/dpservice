@@ -48,6 +48,8 @@ extern "C" {
 #define DP_LOG_SOCKID(VALUE) _DP_LOG_UINT("socket_id", VALUE)
 #define DP_LOG_IFNAME(VALUE) _DP_LOG_STR("interface_name", VALUE)
 #define DP_LOG_LCORE(VALUE) _DP_LOG_UINT("lcore_id", VALUE)
+#define DP_LOG_MEMPOOL_SIZE(VALUE) _DP_LOG_UINT("mempool_size", VALUE)
+#define DP_LOG_RING_SIZE(VALUE) _DP_LOG_UINT("ring_size", VALUE)
 // networking stack
 #define DP_LOG_IPV4(VALUE) _DP_LOG_IPV4("ipv4", VALUE)
 #define DP_LOG_IPV6(VALUE) _DP_LOG_IPV6("ipv6", VALUE)
