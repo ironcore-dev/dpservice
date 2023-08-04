@@ -39,8 +39,8 @@ extern "C"
 
 typedef struct dp_icmp_err_ip_info {
 	struct rte_ipv4_hdr *err_ipv4_hdr;
-	uint16_t	l4_src_port;
-	uint16_t	l4_dst_port;
+	rte_be16_t	l4_src_port;
+	rte_be16_t	l4_dst_port;
 } dp_icmp_err_ip_info;
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
@@ -53,12 +53,10 @@ struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
 struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset);
 struct rte_icmp_hdr *dp_get_icmp_hdr(struct rte_mbuf *m, uint16_t offset);
 void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info);
-void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t src_port_v);
 
-uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, rte_be16_t new_val);
-
-#define DP_IP_ICMP_ID_INVALID 0xFFFF
-uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier);
+void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t new_val);
+void dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val);
+void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val);
 
 // functions to craft actions/patterns are added later
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer);

@@ -233,101 +233,69 @@ void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_
 	}
 }
 
-void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t src_port_v)
+void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info, uint16_t new_val)
 {
-	struct dp_flow *df;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_icmp_hdr *icmp_hdr;
-	uint16_t src_port = src_port_v;
+	rte_be16_t new_src_port = htons(new_val);
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
-	df = dp_get_flow_ptr(m);
+	icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
 
-	if (df->l4_type == DP_IP_PROTO_ICMP) {
-		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
+	if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+		err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr + 1);
+		if (err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP
+			|| err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
 
-		if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
-			err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr+1);
-			if (err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP
-				|| err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_UDP) {
-
-				rte_memcpy((char *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, &src_port, 2);
-			}
+			rte_memcpy((char *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, &new_src_port, sizeof(new_src_port));
 		}
 	}
 }
 
-uint16_t dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, rte_be16_t new_val)
+void dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val)
 {
-
-	struct dp_flow *df;
+	struct dp_flow *df = dp_get_flow_ptr(m);
+	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 	struct rte_udp_hdr *udp_hdr;
-	struct rte_ipv4_hdr *ipv4_hdr;
-	uint16_t old_val = 0;
+	rte_be16_t new_port = htons(new_val);
 
-	df = dp_get_flow_ptr(m);
-
-	// TODO(tao?) this is always true due to the fact the caller is checking it already
-	// making the subsequent caller's check for failure unnecessary
-	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		ipv4_hdr = dp_get_ipv4_hdr(m);
-		if (df->l4_type == DP_IP_PROTO_TCP) {
-			tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr+1);
-			if (port_type == DP_L4_PORT_DIR_SRC) {
-				old_val = tcp_hdr->src_port;
-				tcp_hdr->src_port = new_val;
-			} else {
-				old_val = tcp_hdr->dst_port;
-				tcp_hdr->dst_port = new_val;
-			}
-		} else {
-			udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr+1);
-			if (port_type == DP_L4_PORT_DIR_SRC) {
-				old_val = udp_hdr->src_port;
-				udp_hdr->src_port = new_val;
-			} else {
-				old_val = udp_hdr->dst_port;
-				udp_hdr->dst_port = new_val;
-			}
-		}
-
+	ipv4_hdr = dp_get_ipv4_hdr(m);
+	if (df->l4_type == DP_IP_PROTO_TCP) {
+		tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr + 1);
+		if (port_type == DP_L4_PORT_DIR_SRC)
+			tcp_hdr->src_port = new_port;
+		else
+			tcp_hdr->dst_port = new_port;
+	} else {
+		udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr + 1);
+		if (port_type == DP_L4_PORT_DIR_SRC)
+			udp_hdr->src_port = new_port;
+		else
+			udp_hdr->dst_port = new_port;
 	}
-	return old_val;
 }
 
-uint16_t dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_identifier)
+void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val)
 {
-	struct dp_flow *df;
-
 	struct rte_icmp_hdr *icmp_hdr;
-	struct rte_ipv4_hdr *ipv4_hdr;
-	rte_be16_t old_identifier = DP_IP_ICMP_ID_INVALID;
+	rte_be16_t old_identifier;
 	uint32_t cksum;
 
-	df = dp_get_flow_ptr(m);
-	ipv4_hdr = dp_get_ipv4_hdr(m);
-	
-	// TODO(tao?): this actually is always guarded by the caller,
-	// making the subsequent caller's check for failure unnecessary
-	if (df->l4_type == DP_IP_PROTO_ICMP) {
-		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
-		old_identifier = icmp_hdr->icmp_ident;
-		icmp_hdr->icmp_ident = htons(new_identifier);
-		
-		// the approach of adding up vectors from icmp_hdr one by one is not durable since data field is not
-		// provided in struct rte_icmp_hdr
-		cksum = (~(icmp_hdr->icmp_cksum)) & 0xffff;
-		cksum += (~old_identifier) & 0xffff;
-		cksum += icmp_hdr->icmp_ident & 0xffff;
-		cksum = (cksum & 0xffff) + (cksum >> 16);
-		cksum = (cksum & 0xffff) + (cksum >> 16);
-		
-		icmp_hdr->icmp_cksum = (~cksum) & 0xffff;
-	}
+	icmp_hdr = (struct rte_icmp_hdr *)(dp_get_ipv4_hdr(m) + 1);
+	old_identifier = icmp_hdr->icmp_ident;
+	icmp_hdr->icmp_ident = htons(new_val);
 
-	return ntohs(old_identifier);
+	// the approach of adding up vectors from icmp_hdr one by one is not durable since data field is not
+	// provided in struct rte_icmp_hdr
+	cksum = (~(icmp_hdr->icmp_cksum)) & 0xffff;
+	cksum += (~old_identifier) & 0xffff;
+	cksum += icmp_hdr->icmp_ident & 0xffff;
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+
+	icmp_hdr->icmp_cksum = (~cksum) & 0xffff;
 }
 
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer)

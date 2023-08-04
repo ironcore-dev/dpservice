@@ -89,7 +89,7 @@ bool GrpcToDpFwallDirection(const TrafficDirection& grpc_dir, enum dp_fwall_dire
 	}
 }
 
-const char* Ipv4ToStr(uint32_t ipv4)
+const char *Ipv4ToStr(uint32_t ipv4)
 {
 	struct in_addr addr = {
 		.s_addr = htonl(ipv4)

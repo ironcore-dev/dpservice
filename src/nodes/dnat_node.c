@@ -15,7 +15,7 @@
 	NEXT(DNAT_NEXT_PACKET_RELAY, "packet_relay")
 DP_NODE_REGISTER_NOINIT(DNAT, dnat, NEXT_NODES);
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
@@ -111,29 +111,19 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == DP_IP_PROTO_ICMP) {
 				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
-					if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst) == DP_IP_ICMP_ID_INVALID) {
-						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
-						return DNAT_NEXT_DROP;
-					}
-				}
-				if (df->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {
+					dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
+				} else if (df->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {
 					memset(&icmp_err_ip_info, 0, sizeof(icmp_err_ip_info));
 					dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 					if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port)
 						return DNAT_NEXT_DROP;
-
 					icmp_err_ip_info.err_ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
 					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nf_info.icmp_err_ip_cksum;
-					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
+					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 				}
-				
 			} else {
-				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, htons(cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src)) == 0) {
-					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's dst port");
-					return DNAT_NEXT_DROP;
-				}
+				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 			}
-
 		}
 		df->flags.nat = DP_NAT_CHG_DST_IP;
 		df->nat_addr = df->dst.dst_addr; // record nat IP

@@ -55,18 +55,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);
 
 				if (df->l4_type == DP_IP_PROTO_ICMP) {
-					if (dp_change_icmp_identifier(m, nat_port) == DP_IP_ICMP_ID_INVALID) {
-						DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
-						return SNAT_NEXT_DROP;
-					}
+					dp_change_icmp_identifier(m, nat_port);
 					cntrack->offload_flags.orig = DP_FLOW_OFFLOADED;
 					cntrack->offload_flags.reply = DP_FLOW_OFFLOADED;
 					df->flags.offload_decision = DP_FLOW_NON_OFFLOAD;
 				} else {
-					if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(nat_port)) == 0) {
-						DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port");
-						return SNAT_NEXT_DROP;
-					}
+					dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port);
 				}
 
 				cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
@@ -100,19 +94,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-			if (df->l4_type == DP_IP_PROTO_ICMP) {
-				if (dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst) == DP_IP_ICMP_ID_INVALID) {
-					DPNODE_LOG_WARNING(node, "Cannot replace ICMP header's identifier");
-					return SNAT_NEXT_DROP;
-				}
-			} else {
-				if (dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, htons(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst)) == 0) {
-					DPNODE_LOG_WARNING(node, "Cannot replace L4 header's src port");
-					return SNAT_NEXT_DROP;
-				}
-			}
-
 			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
+			if (df->l4_type == DP_IP_PROTO_ICMP)
+				dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
+			else
+				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
 		}
 
 		df->flags.nat = DP_NAT_CHG_SRC_IP;
