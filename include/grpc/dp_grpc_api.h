@@ -118,7 +118,7 @@ struct dpgrpc_nat {
 };
 
 struct dpgrpc_lb_port {
-	uint16_t				protocol;
+	uint8_t					protocol;
 	uint16_t				port;
 };
 

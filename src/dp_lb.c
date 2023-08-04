@@ -63,7 +63,7 @@ int dp_create_lb(struct dpgrpc_lb *lb, uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
-		.ip = ntohl(lb->addr.ipv4),
+		.ip = lb->addr.ipv4,
 		.vni = lb->vni
 	};
 
@@ -82,7 +82,7 @@ int dp_create_lb(struct dpgrpc_lb *lb, uint8_t *ul_ip)
 
 	rte_memcpy(lb_val->lb_ul_addr, ul_ip, DP_VNF_IPV6_ADDR_SIZE);
 	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
-		lb_val->ports[i].port = ntohs(lb->lbports[i].port);
+		lb_val->ports[i].port = htons(lb->lbports[i].port);
 		lb_val->ports[i].protocol = lb->lbports[i].protocol;
 	}
 	return DP_GRPC_OK;
@@ -107,11 +107,11 @@ int dp_get_lb(void *id_key, struct dpgrpc_lb *out_lb)
 
 	out_lb->vni = lb_k->vni;
 	out_lb->addr.ip_type = RTE_ETHER_TYPE_IPV4;
-	out_lb->addr.ipv4 = htonl(lb_k->ip);
+	out_lb->addr.ipv4 = lb_k->ip;
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
-		out_lb->lbports[i].port = htons(lb_val->ports[i].port);
+		out_lb->lbports[i].port = ntohs(lb_val->ports[i].port);
 		out_lb->lbports[i].protocol = lb_val->ports[i].protocol;
 	}
 
@@ -194,7 +194,7 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
 	return false;
 }
 
-static int dp_lb_rr_backend(struct lb_value *val, struct dpgrpc_lb_port *lb_port)
+static int dp_lb_rr_backend(struct lb_value *val, struct lb_port *lb_port)
 {
 	int ret = -1, k;
 
@@ -223,14 +223,14 @@ static int dp_lb_rr_backend(struct lb_value *val, struct dpgrpc_lb_port *lb_port
 	return ret;
 }
 
-uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, uint16_t port, uint16_t proto)
+uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, rte_be16_t port, uint8_t proto)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
 		.ip = v_ip,
 		.vni = vni
 	};
-	struct dpgrpc_lb_port lb_port;
+	struct lb_port lb_port;
 	int pos;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
