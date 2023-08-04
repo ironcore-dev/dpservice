@@ -77,6 +77,11 @@ uint64_t dp_timers_get_manage_interval_cycles(void)
 	return dp_timer_manage_interval_cycles;
 }
 
+uint8_t dp_timers_get_flow_aging_interval(void)
+{
+	return TIMER_FLOW_AGING_INTERVAL;
+}
+
 static inline int dp_timers_add(struct rte_timer *timer, int period, rte_timer_cb_t callback)
 {
 	uint64_t cycles = period * rte_get_timer_hz();
