@@ -1,9 +1,12 @@
+#include <rte_cycles.h>
+
 #include "dp_cntrack.h"
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_conf.h"
 
 
 static struct flow_key first_key = {0};
@@ -11,6 +14,7 @@ static struct flow_key second_key = {0};
 static struct flow_key *prev_key = NULL, *curr_key = &first_key;
 static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+static uint64_t fast_path_timestamp = 0;
 static bool offload_mode_enabled = 0;
 
 void dp_cntrack_init(void)
@@ -110,11 +114,6 @@ static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_fl
 		df->flags.offload_decision = df->conntrack->offload_flags.orig;
 	else
 		df->flags.offload_decision = df->conntrack->offload_flags.reply;
-
-	if (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL) {
-		prev_key = NULL;
-		prev_flow_val = NULL;
-	}
 }
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
@@ -218,6 +217,7 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	struct flow_key *key = NULL;
 	bool same_key;
 	int ret;
+	uint64_t timer_hz = rte_get_timer_hz();
 
 	#ifdef ENABLE_PYTEST
 		flow_timeout = dp_conf_get_flow_timeout();
@@ -230,6 +230,12 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 
 	if (unlikely(DP_FAILED(dp_build_flow_key(key, m))))
 		return DP_ERROR;
+
+	// clean up temp vars in case a (same) flow expires and is removed from the flow table
+	if (rte_rdtsc() - fast_path_timestamp > (DP_FLOW_DEFAULT_TIMEOUT - 3) * timer_hz) {
+		prev_key = NULL;
+		prev_flow_val = NULL;
+	}
 
 	same_key = prev_key && dp_test_next_n_bytes_identical((const unsigned char *)prev_key,
 															  (const unsigned char *)curr_key,
@@ -267,6 +273,7 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	}
 
 	flow_val->timestamp = rte_rdtsc();
+	fast_path_timestamp = flow_val->timestamp;
 
 	if (df->l4_type == IPPROTO_TCP && !dp_get_pkt_mark(m)->flags.is_recirc) {
 		tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
