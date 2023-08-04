@@ -6,7 +6,6 @@
 #include "dp_log.h"
 #include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
-#include "dp_conf.h"
 
 
 static struct flow_key first_key = {0};
@@ -14,12 +13,14 @@ static struct flow_key second_key = {0};
 static struct flow_key *prev_key = NULL, *curr_key = &first_key;
 static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
-static uint64_t fast_path_timestamp = 0;
+static uint64_t last_fast_path_timestamp, pkt_timestamp = 0;
+static uint64_t fast_path_vars_timeout = 0;
 static bool offload_mode_enabled = 0;
 
 void dp_cntrack_init(void)
 {
 	offload_mode_enabled = dp_conf_is_offload_enabled();
+	fast_path_vars_timeout = (DP_FLOW_DEFAULT_TIMEOUT - dp_timers_get_flow_aging_interval() - 1) * rte_get_timer_hz();
 }
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
@@ -217,7 +218,6 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	struct flow_key *key = NULL;
 	bool same_key;
 	int ret;
-	uint64_t timer_hz = rte_get_timer_hz();
 
 	#ifdef ENABLE_PYTEST
 		flow_timeout = dp_conf_get_flow_timeout();
@@ -231,8 +231,10 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	if (unlikely(DP_FAILED(dp_build_flow_key(key, m))))
 		return DP_ERROR;
 
+	pkt_timestamp = rte_rdtsc();
+
 	// clean up temp vars in case a (same) flow expires and is removed from the flow table
-	if (rte_rdtsc() - fast_path_timestamp > (DP_FLOW_DEFAULT_TIMEOUT - 3) * timer_hz) {
+	if ((pkt_timestamp - last_fast_path_timestamp) > fast_path_vars_timeout) {
 		prev_key = NULL;
 		prev_flow_val = NULL;
 	}
@@ -272,8 +274,8 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 		dp_set_flow_offload_flag(m, flow_val, df);
 	}
 
-	flow_val->timestamp = rte_rdtsc();
-	fast_path_timestamp = flow_val->timestamp;
+	flow_val->timestamp = pkt_timestamp;
+	last_fast_path_timestamp = pkt_timestamp;
 
 	if (df->l4_type == IPPROTO_TCP && !dp_get_pkt_mark(m)->flags.is_recirc) {
 		tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);

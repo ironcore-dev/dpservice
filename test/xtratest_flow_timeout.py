@@ -98,3 +98,40 @@ def test_virtsvc_tcp_timeout(request, prepare_ipv4, fast_flow_timeout):
 	tester.client_port = 12350
 	tester.server_pkt_check = tcp_server_virtsvc_pkt_check_first_port
 	tester.request_rst()
+
+
+def send_bounce_pkt_to_pf(ipv6_lb):
+	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
+				 IPv6(dst=ipv6_lb, src=local_ul_ipv6, nh=4) /
+				 IP(dst=lb_ip, src=public_ip) /
+				 TCP(sport=8989, dport=80))
+	delayed_sendp(bouce_pkt, PF0.tap)
+
+def sniff_lb_pkt(dst_ipv6):
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
+	dst_ip = pkt[IPv6].dst
+	assert dst_ip == dst_ipv6, \
+		f"Wrong network-lb relayed packet (outer dst ipv6: {dst_ip})"
+
+def test_external_lb_relay_timeout(prepare_ipv4, grpc_client, fast_flow_timeout):
+
+	if not fast_flow_timeout:
+		pytest.skip("Fast flow timeout needs to be enabled")
+
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+	grpc_client.addlbtarget(lb_name, neigh_ul_ipv6)
+
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	sniff_lb_pkt(neigh_ul_ipv6)
+
+	age_out_flows()
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	sniff_lb_pkt(neigh_ul_ipv6)
+
+	age_out_flows()
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	sniff_lb_pkt(neigh_ul_ipv6)
+
+
+	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
+	grpc_client.dellb(lb_name)
