@@ -19,7 +19,7 @@ static uint32_t pfx_counter = 1;
 
 static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_IPV6_ADDR_SIZE])
 {
-	uint32_t local = htonl(pfx_counter);
+	rte_be32_t local = htonl(pfx_counter);
 	uint8_t random_byte;
 
 	srand(time(NULL));

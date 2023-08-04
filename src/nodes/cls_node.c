@@ -46,9 +46,9 @@ static __rte_always_inline int is_arp(struct rte_mbuf *m)
 	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_arp_hdr *req_arp_hdr = (struct rte_arp_hdr *)(req_eth_hdr + 1);
 
-	return req_arp_hdr->arp_hardware == ntohs(RTE_ARP_HRD_ETHER)
+	return req_arp_hdr->arp_hardware == htons(RTE_ARP_HRD_ETHER)
 		&& req_arp_hdr->arp_hlen == RTE_ETHER_ADDR_LEN
-		&& req_arp_hdr->arp_protocol == ntohs(RTE_ETHER_TYPE_IPV4)
+		&& req_arp_hdr->arp_protocol == htons(RTE_ETHER_TYPE_IPV4)
 		&& req_arp_hdr->arp_plen == 4
 		;
 } 

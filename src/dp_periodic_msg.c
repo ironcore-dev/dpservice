@@ -121,7 +121,7 @@ void trigger_nd_unsol_adv(void)
 	ipv6_hdr->hop_limits = 255;
 	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));
 	rte_memcpy(ipv6_hdr->dst_addr, dp_mc_ipv6, sizeof(ipv6_hdr->dst_addr));
-	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr) + sizeof(struct in6_addr));		
+	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr) + sizeof(struct in6_addr));
 	
 	icmp6_hdr = &(ns_msg->icmph);
 	memset(icmp6_hdr, 0, sizeof(struct icmp6hdr));

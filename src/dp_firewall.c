@@ -80,7 +80,6 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	uint32_t r_dest_ip = rule->dest_ip;
 	uint32_t r_src_ip = rule->src_ip;
 	uint8_t protocol = df->l4_type;
-	uint8_t r_icmp_type, r_icmp_code;
 	uint16_t dest_port = 0;
 	uint16_t src_port = 0;
 
@@ -96,12 +95,10 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	case IPPROTO_ICMP:
 		if ((rule->protocol != IPPROTO_ICMP) && (rule->protocol != DP_FWALL_MATCH_ANY_PROTOCOL))
 			return false;
-		r_icmp_type = ntohl(rule->filter.icmp.icmp_type);
-		r_icmp_code = ntohl(rule->filter.icmp.icmp_code);
 		if (((rule->filter.icmp.icmp_type == DP_FWALL_MATCH_ANY_ICMP_TYPE) ||
-			(df->l4_info.icmp_field.icmp_type == r_icmp_type)) &&
+			(df->l4_info.icmp_field.icmp_type == rule->filter.icmp.icmp_type)) &&
 			((rule->filter.icmp.icmp_code == DP_FWALL_MATCH_ANY_ICMP_CODE) ||
-			(df->l4_info.icmp_field.icmp_code == r_icmp_code)) &&
+			(df->l4_info.icmp_field.icmp_code == rule->filter.icmp.icmp_code)) &&
 			((rule->protocol == DP_FWALL_MATCH_ANY_PROTOCOL) || (rule->protocol == protocol)))
 			return true;
 		break;
