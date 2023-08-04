@@ -14,9 +14,18 @@
 // DPDK requirement: power of 2 and less than INT32_MAX
 #define DP_GRAPHTRACE_RINGBUF_SIZE 65536
 
+#define DP_MP_ACTION_GRAPHTRACE		"dp_mp_graphtrace"
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+enum {
+	DP_GRAPHTRACE_ACTION_TYPE_NULL,
+	DP_GRAPHTRACE_ACTION_TYPE_START,
+	DP_GRAPHTRACE_ACTION_TYPE_STOP,
+};
 
 struct dp_graphtrace {
 	struct rte_mempool	*mempool;
@@ -27,6 +36,17 @@ struct dp_graphtrace_pktinfo {
 	uint32_t pktid;
 	struct rte_node *node;
 	struct rte_node *next_node;
+};
+
+struct dp_graphtrace_mp_request {
+	uint8_t action;
+	uint8_t dump_type;
+};
+
+struct dp_graphtrace_mp_reply {
+	struct rte_mempool *mempool;
+	struct rte_ring *ringbuf;
+	uint8_t error_code;
 };
 
 static inline struct dp_graphtrace_pktinfo *dp_get_graphtrace_pktinfo(struct rte_mbuf *pkt)
