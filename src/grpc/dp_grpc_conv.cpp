@@ -14,8 +14,14 @@ Status* CreateStatus(uint32_t grpc_errcode)
 
 bool StrToIpv4(const std::string& str, uint32_t *dst)
 {
+	struct in_addr addr;
+
 	// man(3) inet_aton: 'inet_aton() returns nonzero if the address is valid, zero if not.'
-	return inet_aton(str.c_str(), (in_addr*)dst) != 0;
+	if (inet_aton(str.c_str(), &addr) == 0)
+		return false;
+
+	*dst = ntohl(addr.s_addr);
+	return true;
 }
 
 bool StrToIpv6(const std::string& str, uint8_t *dst)
@@ -83,6 +89,16 @@ bool GrpcToDpFwallDirection(const TrafficDirection& grpc_dir, enum dp_fwall_dire
 	}
 }
 
+const char* Ipv4ToStr(uint32_t ipv4)
+{
+	struct in_addr addr = {
+		.s_addr = htonl(ipv4)
+	};
+
+	// cannot fail, the range is known and fully defined and the buffer is static
+	return inet_ntoa(addr);
+}
+
 uint32_t Ipv4PrefixLenToMask(uint32_t prefix_length)
 {
 	return prefix_length == DP_FWALL_MATCH_ANY_LENGTH
@@ -93,11 +109,9 @@ uint32_t Ipv4PrefixLenToMask(uint32_t prefix_length)
 
 void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface)
 {
-	struct in_addr addr;
 	char strbuf[INET6_ADDRSTRLEN];
 
-	addr.s_addr = htonl(dp_iface->ip4_addr);
-	grpc_iface->set_primary_ipv4(inet_ntoa(addr));
+	grpc_iface->set_primary_ipv4(GrpcConv::Ipv4ToStr(dp_iface->ip4_addr));
 	inet_ntop(AF_INET6, dp_iface->ip6_addr, strbuf, sizeof(strbuf));
 	grpc_iface->set_primary_ipv6(strbuf);
 	grpc_iface->set_id(dp_iface->iface_id);
@@ -113,7 +127,6 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 	ProtocolFilter *filter;
 	TcpFilter *tcp_filter;
 	UdpFilter *udp_filter;
-	struct in_addr addr;
 	Prefix *src_pfx;
 	Prefix *dst_pfx;
 	IpAddress *src_ip;
@@ -133,8 +146,7 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 
 	src_ip = new IpAddress();
 	src_ip->set_ipver(IpVersion::IPV4);
-	addr.s_addr = dp_rule->src_ip;
-	src_ip->set_address(inet_ntoa(addr));
+	src_ip->set_address(GrpcConv::Ipv4ToStr(dp_rule->src_ip));
 	src_pfx = new Prefix();
 	src_pfx->set_allocated_ip(src_ip);
 	src_pfx->set_length(__builtin_popcount(dp_rule->src_ip_mask));
@@ -142,8 +154,7 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 
 	dst_ip = new IpAddress();
 	dst_ip->set_ipver(IpVersion::IPV4);
-	addr.s_addr = dp_rule->dest_ip;
-	dst_ip->set_address(inet_ntoa(addr));
+	dst_ip->set_address(GrpcConv::Ipv4ToStr(dp_rule->dest_ip));
 	dst_pfx = new Prefix();
 	dst_pfx->set_allocated_ip(dst_ip);
 	dst_pfx->set_length(__builtin_popcount(dp_rule->dest_ip_mask));

@@ -357,15 +357,13 @@ void ListPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 	struct dpgrpc_route *route;
 	Prefix *pfx;
 	IpAddress *pfx_ip;
-	struct in_addr addr;
 	char strbuf[INET6_ADDRSTRLEN];
 
 	FOREACH_MESSAGE(route, reply) {
 		pfx = reply_.add_prefixes();
 		pfx_ip = new IpAddress();
 		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(route->pfx_addr.ipv4);
-			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
 			pfx->set_length(route->pfx_length);
 			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
@@ -427,7 +425,6 @@ void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
 	struct dpgrpc_route *route;
 	Route *grpc_route;
 	IpAddress *nh_ip;
-	struct in_addr addr;
 	Prefix *pfx;
 	IpAddress *pfx_ip;
 	char strbuf[INET6_ADDRSTRLEN];
@@ -438,8 +435,7 @@ void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
 
 		nh_ip = new IpAddress();
 		if (route->trgt_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(route->trgt_addr.ipv4);
-			nh_ip->set_address(inet_ntoa(addr));
+			nh_ip->set_address(GrpcConv::Ipv4ToStr(route->trgt_addr.ipv4));
 			nh_ip->set_ipver(IpVersion::IPV4);
 		} else {
 			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
@@ -450,8 +446,7 @@ void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
 
 		pfx_ip = new IpAddress();
 		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(route->pfx_addr.ipv4);
-			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
 		} else {
 			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
@@ -507,14 +502,12 @@ const char* GetVipCall::FillRequest(struct dpgrpc_request* request)
 }
 void GetVipCall::ParseReply(struct dpgrpc_reply* reply)
 {
-	struct in_addr addr;
 	IpAddress *vip_ip;
 	char strbuf[INET6_ADDRSTRLEN];
 
 	vip_ip = new IpAddress();
 	vip_ip->set_ipver(IpVersion::IPV4);
-	addr.s_addr = reply->vip.addr.ipv4;
-	vip_ip->set_address(inet_ntoa(addr));
+	vip_ip->set_address(GrpcConv::Ipv4ToStr(reply->vip.addr.ipv4));
 	inet_ntop(AF_INET6, reply->vip.ul_addr6, strbuf, sizeof(strbuf));
 	reply_.set_allocated_vip_ip(vip_ip);
 	reply_.set_underlay_route(strbuf);
@@ -558,13 +551,11 @@ const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
 }
 void GetNatCall::ParseReply(struct dpgrpc_reply* reply)
 {
-	struct in_addr addr;
 	IpAddress *nat_ip;
 	char strbuf[INET6_ADDRSTRLEN];
 
 	nat_ip = new IpAddress();
-	addr.s_addr = reply->nat.addr.ipv4;
-	nat_ip->set_address(inet_ntoa(addr));
+	nat_ip->set_address(GrpcConv::Ipv4ToStr(reply->nat.addr.ipv4));
 	nat_ip->set_ipver(IpVersion::IPV4);
 	reply_.set_allocated_nat_ip(nat_ip);
 	reply_.set_max_port(reply->nat.max_port);
@@ -598,14 +589,12 @@ void ListLocalNatsCall::ParseReply(struct dpgrpc_reply* reply)
 	struct dpgrpc_nat *nat;
 	NatEntry *nat_entry;
 	IpAddress *nat_ip;
-	struct in_addr addr;
 
 	FOREACH_MESSAGE(nat, reply) {
 		nat_entry = reply_.add_nat_entries();
 		nat_ip = new IpAddress();
 		nat_ip->set_ipver(IpVersion::IPV4);
-		addr.s_addr = htonl(nat->addr.ipv4);
-		nat_ip->set_address(inet_ntoa(addr));
+		nat_ip->set_address(GrpcConv::Ipv4ToStr(nat->addr.ipv4));
 		nat_entry->set_allocated_nat_ip(nat_ip);
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
@@ -746,15 +735,13 @@ const char* GetLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 }
 void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 {
-	struct in_addr addr;
 	LbPort *lb_port;
 	IpAddress *lb_ip;
 	char strbuf[INET6_ADDRSTRLEN];
 
 	reply_.set_vni(reply->lb.vni);
 	lb_ip = new IpAddress();
-	addr.s_addr = reply->lb.addr.ipv4;
-	lb_ip->set_address(inet_ntoa(addr));
+	lb_ip->set_address(GrpcConv::Ipv4ToStr(reply->lb.addr.ipv4));
 	if (reply->lb.addr.ip_type == RTE_ETHER_TYPE_IPV4)
 		lb_ip->set_ipver(IpVersion::IPV4);
 	else
@@ -879,15 +866,13 @@ void ListLoadBalancerPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 	struct dpgrpc_route *route;
 	Prefix *pfx;
 	IpAddress *pfx_ip;
-	struct in_addr addr;
 	char strbuf[INET6_ADDRSTRLEN];
 
 	FOREACH_MESSAGE(route, reply) {
 		pfx = reply_.add_prefixes();
 		pfx_ip = new IpAddress();
 		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-			addr.s_addr = htonl(route->pfx_addr.ipv4);
-			pfx_ip->set_address(inet_ntoa(addr));
+			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
 			pfx->set_length(route->pfx_length);
 			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
