@@ -4,9 +4,16 @@
 #include "dp_log.h"
 #include "rte_flow/dp_rte_flow.h"
 
+static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
+	.group = 0,
+	.priority = 1,
+	.ingress = 1,
+	.egress = 0,
+	.transfer = 0,
+};
 
 static int create_flow(int port_id,
-					   struct rte_flow_attr *attr,
+					   const struct rte_flow_attr *attr,
 					   struct rte_flow_item *pattern,
 					   struct rte_flow_action *action)
 {
@@ -36,11 +43,6 @@ static int create_flow(int port_id,
 // TODO(plague): retval checking is not finished here, just bare minimum done
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
-	// create flow attributes
-	struct rte_flow_attr attr;
-
-	create_rte_flow_rule_attr(&attr, 0, 1, 1, 0, 0);
-
 	struct rte_flow_item pattern[3];
 	int pattern_cnt = 0;
 	struct rte_flow_action action[2];
@@ -79,17 +81,12 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	return create_flow(port_id, &attr, pattern, action);
+	return create_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action);
 }
 
 #ifdef ENABLE_VIRTSVC
 int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], rte_be16_t svc_port)
 {
-	// create flow attributes
-	struct rte_flow_attr attr;
-
-	create_rte_flow_rule_attr(&attr, 0, 1, 1, 0, 0);
-
 	struct rte_flow_item pattern[4];
 	int pattern_cnt = 0;
 	struct rte_flow_action action[2];
@@ -148,6 +145,6 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	return create_flow(port_id, &attr, pattern, action);
+	return create_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action);
 }
 #endif
