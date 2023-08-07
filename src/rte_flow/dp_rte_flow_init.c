@@ -36,7 +36,6 @@ static int create_flow(int port_id,
 // TODO(plague): retval checking is not finished here, just bare minimum done
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
-
 	// create flow attributes
 	struct rte_flow_attr attr;
 
@@ -86,7 +85,6 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 #ifdef ENABLE_VIRTSVC
 int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], rte_be16_t svc_port)
 {
-
 	// create flow attributes
 	struct rte_flow_attr attr;
 

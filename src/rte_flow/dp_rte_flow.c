@@ -14,7 +14,6 @@ static const uint8_t ipv4_addr_mask[4] = "\xff\xff\xff\xff";
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 {
-
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_flow *df;
 
@@ -29,7 +28,6 @@ uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 
 uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt)
 {
-
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_flow *df;
 
@@ -72,12 +70,11 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		return df->l4_type;
 	}
 
-	return -1;
+	return DP_ERROR;
 }
 
 int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 {
-
 	struct dp_flow *df;
 	struct rte_tcp_hdr *tcp_hdr;
 	struct rte_udp_hdr *udp_hdr;
@@ -94,7 +91,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 
 		df->l4_info.trans_port.dst_port = tcp_hdr->dst_port;
 		df->l4_info.trans_port.src_port = tcp_hdr->src_port;
-		return 0;
+		return DP_OK;
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
 		if (hdr != NULL)
 			udp_hdr = (struct rte_udp_hdr *)hdr;
@@ -103,7 +100,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 
 		df->l4_info.trans_port.dst_port = udp_hdr->dst_port;
 		df->l4_info.trans_port.src_port = udp_hdr->src_port;
-		return 0;
+		return DP_OK;
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
 		if (hdr != NULL)
 			icmp_hdr = (struct rte_icmp_hdr *)hdr;
@@ -113,7 +110,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		df->l4_info.icmp_field.icmp_type = icmp_hdr->icmp_type;
 		df->l4_info.icmp_field.icmp_code = icmp_hdr->icmp_code;
 		df->l4_info.icmp_field.icmp_identifier = icmp_hdr->icmp_ident;
-		return 0;
+		return DP_OK;
 	} else if (df->l4_type == DP_IP_PROTO_ICMPV6) {
 		if (hdr != NULL)
 			icmp6_hdr = (struct icmp6hdr *)hdr;
@@ -121,15 +118,14 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 			icmp6_hdr = rte_pktmbuf_mtod_offset(pkt, struct icmp6hdr *, offset);
 
 		df->l4_info.icmp_field.icmp_type = icmp6_hdr->icmp6_type;
-		return 0;
+		return DP_OK;
 	}
 
-	return -1;
+	return DP_ERROR;
 }
 
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 {
-
 	struct dp_flow *df = dp_get_flow_ptr(pkt);
 	struct rte_ipv6_hdr *ipv6_hdr = NULL;
 
@@ -144,9 +140,6 @@ int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
 	rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
 	df->tun_info.proto_id = ipv6_hdr->proto;
-	// printf("ipv6->proto %#x\n",ipv6_hdr->proto);
-	// printf("ipv6->hop_limits %#x\n",ipv6_hdr->hop_limits);
-	// printf("payload length in arriving ipv6 hdr %#x\n",ipv6_hdr->payload_len);
 	return ipv6_hdr->proto;
 }
 
@@ -298,6 +291,7 @@ void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val)
 	icmp_hdr->icmp_cksum = (~cksum) & 0xffff;
 }
 
+
 void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer)
 {
 
@@ -348,7 +342,6 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  uint8_t *dst, size_t nr_dst_mask_len,
 							  uint8_t proto)
 {
-
 	memset(ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
 	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
 
@@ -380,10 +373,8 @@ int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								rte_be32_t *dst, size_t nr_dst_mask_len,
 								uint8_t proto)
 {
-
 	memset(ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
 	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
-
 
 	if (src) {
 		ipv4_spec->hdr.src_addr = *src;
@@ -410,7 +401,6 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_udp *udp_mask,
 							 rte_be16_t src_port, rte_be16_t dst_port)
 {
-
 	memset(udp_spec, 0, sizeof(struct rte_flow_item_udp));
 	memset(udp_mask, 0, sizeof(struct rte_flow_item_udp));
 
@@ -438,7 +428,6 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 rte_be16_t src_port, rte_be16_t dst_port,
 							 uint8_t tcp_flags)
 {
-
 	memset(tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
 	memset(tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
 
@@ -470,7 +459,6 @@ int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_icmp *icmp_mask,
 							  uint8_t type)
 {
-
 	memset(icmp_spec, 0, sizeof(struct rte_flow_item_icmp));
 	memset(icmp_mask, 0, sizeof(struct rte_flow_item_icmp));
 
@@ -489,7 +477,6 @@ int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp6 *icmp6_mask,
 								uint8_t type)
 {
-
 	memset(icmp6_spec, 0, sizeof(struct rte_flow_item_icmp6));
 	memset(icmp6_mask, 0, sizeof(struct rte_flow_item_icmp6));
 
@@ -508,7 +495,6 @@ int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_
 									struct rte_flow_item_mark *mark_mask,
 									uint32_t marked_id)
 {
-
 	memset(mark_spec, 0, sizeof(struct rte_flow_item_mark));
 	memset(mark_mask, 0, sizeof(struct rte_flow_item_mark));
 
@@ -527,7 +513,6 @@ int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_tag *tag_mask,
 									uint32_t tag_value, uint8_t tag_index)
 {
-
 	memset(tag_spec, 0, sizeof(struct rte_flow_item_tag));
 	memset(tag_mask, 0, sizeof(struct rte_flow_item_tag));
 
@@ -549,7 +534,6 @@ int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							struct rte_flow_item_meta *meta_mask,
 							uint32_t meta_value)
 {
-
 	memset(meta_spec, 0, sizeof(struct rte_flow_item_meta));
 	memset(meta_mask, 0, sizeof(struct rte_flow_item_meta));
 
@@ -564,20 +548,17 @@ int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 	return ++pattern_cnt;
 }
 
-
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt)
 {
-
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
-
 	return ++pattern_cnt;
 }
+
 
 int create_raw_decap_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_raw_decap *raw_decap_action,
 							uint8_t *data_to_decap, size_t data_len)
 {
-
 	raw_decap_action->data = data_to_decap;
 	raw_decap_action->size = data_len;
 
@@ -590,7 +571,6 @@ int create_raw_encap_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_raw_encap *raw_encap_action,
 							uint8_t *data_to_encap, size_t data_len)
 {
-
 	raw_encap_action->data = data_to_encap;
 	raw_encap_action->size = data_len;
 
@@ -604,7 +584,6 @@ int create_dst_mac_set_action(struct rte_flow_action *action, int action_cnt,
 							  struct rte_flow_action_set_mac *dst_mac_set_action,
 							  struct rte_ether_addr *dst_mac)
 {
-
 	rte_ether_addr_copy(dst_mac, (struct rte_ether_addr *)(dst_mac_set_action->mac_addr));
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_DST;
 	action[action_cnt].conf = dst_mac_set_action;
@@ -616,7 +595,6 @@ int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
 							  struct rte_flow_action_set_mac *src_mac_set_action,
 							  struct rte_ether_addr *src_mac)
 {
-
 	rte_ether_addr_copy(src_mac, (struct rte_ether_addr *)src_mac_set_action->mac_addr);
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_SRC;
 	action[action_cnt].conf = src_mac_set_action;
@@ -660,7 +638,6 @@ int create_trans_proto_set_action(struct rte_flow_action *action, int action_cnt
 									struct rte_flow_action_set_tp *tp_action,
 									uint16_t port, bool dir)
 {
-
 	tp_action->port = htons(port);
 
 	if (dir == DP_IS_DST)
@@ -677,7 +654,6 @@ int create_send_to_port_action(struct rte_flow_action *action, int action_cnt,
 							   struct rte_flow_action_port_id *send_to_port_action,
 							   uint32_t port_id)
 {
-
 	send_to_port_action->original = 0; // original???
 	send_to_port_action->reserved = 0;
 	send_to_port_action->id = port_id;
@@ -692,7 +668,6 @@ int create_flow_age_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_age *flow_age_action,
 						   uint32_t timeout, void *age_context)
 {
-
 	flow_age_action->timeout = timeout;
 	flow_age_action->reserved = 0;
 	flow_age_action->context = age_context;
@@ -707,7 +682,6 @@ int create_redirect_queue_action(struct rte_flow_action *action, int action_cnt,
 								 struct rte_flow_action_queue *queue_action,
 								 uint16_t queue_index)
 {
-
 	queue_action->index = queue_index;
 
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_QUEUE;
@@ -720,7 +694,6 @@ int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_mark *mark_action,
 							uint32_t marked_value)
 {
-
 	mark_action->id =  marked_value;
 
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_MARK;
@@ -733,7 +706,6 @@ int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_set_tag *set_tag_action,
 							uint32_t tag_value, __rte_unused uint8_t index)
 {
-
 	set_tag_action->data =  tag_value;
 	set_tag_action->mask =  0xffffffff;
 	set_tag_action->index = 0;  // This function currently only supports one tag per packet
@@ -744,12 +716,10 @@ int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
 	return ++action_cnt;
 }
 
-
 int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 							struct rte_flow_action_set_meta *meta_action,
 							uint32_t meta_value)
 {
-
 	meta_action->data =  meta_value;
 	meta_action->mask = 0xffffffff;
 
@@ -761,10 +731,10 @@ int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
 
 int create_end_action(struct rte_flow_action *action, int action_cnt)
 {
-
 	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_END;
 	return ++action_cnt;
 }
+
 
 // flow aging related config is highly customized, thus put them into a function in case different agectx needs
 // to be configured
@@ -791,14 +761,13 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 }
 
 
-
 struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_attr *attr,
 												const struct rte_flow_item pattern[],
 												const struct rte_flow_action action[])
 {
 	int ret;
-	struct rte_flow *flow = NULL;
+	struct rte_flow *flow;
 	struct rte_flow_error error = {
 		.message = "(no stated reason)",
 	};
@@ -807,33 +776,32 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 	if (ret) {
 		DPS_LOG_ERR("Flow cannot be validated", DP_LOG_FLOW_ERROR(error.message), DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return NULL;
-	} else {
-		flow = rte_flow_create(port_id, attr, pattern, action, &error);
-		if (!flow) {
-			DPS_LOG_ERR("Flow cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
-			return NULL;
-		}
-		DPS_LOG_DEBUG("Installed a flow rule", DP_LOG_PORTID(port_id));
-		return flow;
 	}
+
+	flow = rte_flow_create(port_id, attr, pattern, action, &error);
+	if (!flow) {
+		DPS_LOG_ERR("Flow cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
+		return NULL;
+	}
+	DPS_LOG_DEBUG("Installed a flow rule", DP_LOG_PORTID(port_id));
+	return flow;
 }
 
-int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
-							struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx)
+int dp_create_age_indirect_action(const struct rte_flow_attr *attr, uint16_t port_id,
+								  struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx)
 {
-
 	if (df->l4_type != IPPROTO_TCP)
 		return DP_OK;
 
-	struct rte_flow_indir_action_conf age_indirect_conf;
+	struct rte_flow_indir_action_conf age_indirect_conf = {
+		.ingress = attr->ingress,
+		.egress = attr->egress,
+		.transfer = attr->transfer,
+	};
 	struct rte_flow_error error = {
 		.message = "(no stated reason)",
 	};
-	struct rte_flow_action_handle *result = NULL;
-
-	age_indirect_conf.ingress = attr->ingress;
-	age_indirect_conf.egress = attr->egress;
-	age_indirect_conf.transfer = attr->transfer;
+	struct rte_flow_action_handle *result;
 
 	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
 	if (!result) {
@@ -845,7 +813,6 @@ int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
 		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
 			DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id));
 		DPS_LOG_ERR("Failed to store agectx in conntrack object");
-		result = NULL;
 		return DP_ERROR;
 	}
 

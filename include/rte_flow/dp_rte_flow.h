@@ -46,7 +46,7 @@ typedef struct dp_icmp_err_ip_info {
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
 uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt);
 int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, ipv4/ipv6 header
-int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset,  tcp/udp/icmp header
+int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, tcp/udp/icmp header
 int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m);
 struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
@@ -187,8 +187,8 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 												const struct rte_flow_item pattern[],
 												const struct rte_flow_action action[]);
 
-int dp_create_age_indirect_action(struct rte_flow_attr *attr, uint16_t port_id,
-							struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx);
+int dp_create_age_indirect_action(const struct rte_flow_attr *attr, uint16_t port_id,
+								  struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx);
 
 #ifdef __cplusplus
 }

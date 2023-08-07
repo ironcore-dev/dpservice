@@ -54,10 +54,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	df = dp_get_flow_ptr(m);
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
-	if (extract_inner_l3_header(m, ipv4_hdr, 0) < 0)
+	if (DP_FAILED(extract_inner_l3_header(m, ipv4_hdr, 0)))
 		return CONNTRACK_NEXT_DROP;
 
-	if (extract_inner_l4_header(m, ipv4_hdr + 1, 0) < 0)
+	if (DP_FAILED(extract_inner_l4_header(m, ipv4_hdr + 1, 0)))
 		return CONNTRACK_NEXT_DROP;
 
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
@@ -70,10 +70,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		|| df->l4_type == IPPROTO_UDP
 		|| df->l4_type == IPPROTO_ICMP
 	) {
-
 		if (DP_FAILED(dp_cntrack_handle(node, m, df)))
 			return CONNTRACK_NEXT_DROP;
-
 	} else {
 		return CONNTRACK_NEXT_DROP;
 	}

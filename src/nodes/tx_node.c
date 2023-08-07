@@ -111,7 +111,8 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
 
 			if (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
-				dp_offload_handler(pkt, df);
+				if (DP_FAILED(dp_offload_handler(pkt, df)))
+					DPNODE_LOG_WARNING(node, "Offloading handler failed");
 		}
 	}
 

@@ -32,10 +32,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 										   sizeof(struct rte_ether_hdr));
 	}
 
-	if (extract_inner_l3_header(m, ipv6_hdr, 0) < 0)
+	if (DP_FAILED(extract_inner_l3_header(m, ipv6_hdr, 0)))
 		return IPV6_LOOKUP_NEXT_DROP;
 
-	if (extract_inner_l4_header(m, ipv6_hdr + 1, 0) < 0)
+	if (DP_FAILED(extract_inner_l4_header(m, ipv6_hdr + 1, 0)))
 		return IPV6_LOOKUP_NEXT_DROP;
 
 	// TODO: add broadcast routes when machine is added
