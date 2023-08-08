@@ -761,10 +761,10 @@ void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
 }
 
 
-struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
-												const struct rte_flow_attr *attr,
-												const struct rte_flow_item pattern[],
-												const struct rte_flow_action action[])
+struct rte_flow *dp_install_rte_flow(uint16_t port_id,
+									 const struct rte_flow_attr *attr,
+									 const struct rte_flow_item pattern[],
+									 const struct rte_flow_action action[])
 {
 	int ret;
 	struct rte_flow *flow;
@@ -773,8 +773,8 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 	};
 
 	ret = rte_flow_validate(port_id, attr, pattern, action, &error);
-	if (ret) {
-		DPS_LOG_ERR("Flow cannot be validated", DP_LOG_FLOW_ERROR(error.message), DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Flow cannot be validated", DP_LOG_PORTID(port_id),  DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
 		return NULL;
 	}
 
@@ -783,7 +783,6 @@ struct rte_flow *validate_and_install_rte_flow(uint16_t port_id,
 		DPS_LOG_ERR("Flow cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
 		return NULL;
 	}
-	DPS_LOG_DEBUG("Installed a flow rule", DP_LOG_PORTID(port_id));
 	return flow;
 }
 

@@ -12,34 +12,6 @@ static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
 	.transfer = 0,
 };
 
-static int create_flow(int port_id,
-					   const struct rte_flow_attr *attr,
-					   struct rte_flow_item *pattern,
-					   struct rte_flow_action *action)
-{
-	int ret;
-	struct rte_flow *flow;
-	struct rte_flow_error error = {
-		.message = "(no stated reason)",
-	};
-
-	ret = rte_flow_validate(port_id, attr, pattern, action, &error);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Flow isolation cannot be validated",
-					DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
-		return ret;
-	}
-
-	flow = rte_flow_create(port_id, attr, pattern, action, &error);
-	if (!flow) {
-		DPS_LOG_ERR("Flow isolation cannot be created",
-					DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(rte_errno));
-		return DP_ERROR;
-	}
-
-	return DP_OK;
-}
-
 // TODO(plague): retval checking is not finished here, just bare minimum done
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
@@ -81,7 +53,11 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	return create_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action);
+	if (!dp_install_rte_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action))
+		return DP_ERROR;
+
+	DPS_LOG_DEBUG("Installed IPIP isolation flow rule", DP_LOG_PORTID(port_id));
+	return DP_OK;
 }
 
 #ifdef ENABLE_VIRTSVC
@@ -145,6 +121,10 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	return create_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action);
+	if (!dp_install_rte_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action))
+		return DP_ERROR;
+
+	DPS_LOG_DEBUG("Installed virtsvc isolation flow rule", DP_LOG_PORTID(port_id));
+	return DP_OK;
 }
 #endif

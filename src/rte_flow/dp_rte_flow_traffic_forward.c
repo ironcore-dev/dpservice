@@ -220,12 +220,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 			return DP_ERROR;
 		}
 
-		hairpin_flow = validate_and_install_rte_flow(m->port, &dp_flow_attr_ingress, hairpin_pattern, hairpin_action);
+		hairpin_flow = dp_install_rte_flow(m->port, &dp_flow_attr_ingress, hairpin_pattern, hairpin_action);
 		if (!hairpin_flow) {
 			free_allocated_agectx(hairpin_agectx);
 			DPS_LOG_ERR("Failed to install hairpin queue flow rule on vf", DP_LOG_PORTID(m->port));
 			return DP_ERROR;
 		}
+		DPS_LOG_DEBUG("Installed hairpin queue flow rule", DP_LOG_PORTID(m->port));
 		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
 	}
 
@@ -298,11 +299,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	const struct rte_flow_attr *attr;
 	struct rte_flow *flow;
 
-	if (cross_pf_port) {
+	if (cross_pf_port)
 		attr = &dp_flow_attr_egress;
-	} else {
+	else
 		attr = &dp_flow_attr_transfer;
-	}
 
 	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
 
@@ -312,12 +312,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		return DP_ERROR;
 	}
 
-	flow = validate_and_install_rte_flow(t_port_id, attr, pattern, action);
+	flow = dp_install_rte_flow(t_port_id, attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install encap rule on PF", DP_LOG_PORTID(t_port_id));
+		DPS_LOG_ERR("Failed to install encap flow rule on PF", DP_LOG_PORTID(t_port_id));
 		return DP_ERROR;
 	}
+	DPS_LOG_DEBUG("Installed encap flow rule on PF", DP_LOG_PORTID(t_port_id));
 
 	// config the content of agectx
 	config_allocated_agectx(agectx, t_port_id, df, flow);
@@ -564,11 +565,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	const struct rte_flow_attr *attr;
 	struct rte_flow *flow;
 
-	if (cross_pf_port) {
+	if (cross_pf_port)
 		attr = &dp_flow_attr_ingress;
-	} else {
+	else
 		attr = &dp_flow_attr_transfer;
-	}
 
 	ret = dp_create_age_indirect_action(attr, m->port, df, &action[age_action_index], agectx);
 	if (DP_FAILED(ret)) {
@@ -576,12 +576,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		return DP_ERROR;
 	}
 
-	flow = validate_and_install_rte_flow(m->port, attr, pattern, action);
+	flow = dp_install_rte_flow(m->port, attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install normal decap flow rule on PF", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
 	}
+	DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
 
@@ -616,12 +617,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			return DP_ERROR;
 		}
 
-		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &dp_flow_attr_egress, pattern, hairpin_action);
+		hairpin_flow_P2 = dp_install_rte_flow((uint16_t)df->nxt_hop, &dp_flow_attr_egress, pattern, hairpin_action);
 		if (!hairpin_flow_P2) {
 			free_allocated_agectx(hairpin_agectx);
 			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
 			return DP_ERROR;
 		}
+		DPS_LOG_DEBUG("Installed hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
 		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
 	}
 #endif
@@ -777,12 +779,13 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 		return ret;
 	}
 
-	flow = validate_and_install_rte_flow(m->port, &dp_flow_attr_transfer, pattern, action);
+	flow = dp_install_rte_flow(m->port, &dp_flow_attr_transfer, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to validate and install local rte flow rules");
+		DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
 	}
+	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORTID(m->port));
 
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
@@ -923,12 +926,13 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// validate and install rte flow
 	struct rte_flow *flow = NULL;
 
-	flow = validate_and_install_rte_flow(m->port, &dp_flow_attr_ingress, pattern, action);
+	flow = dp_install_rte_flow(m->port, &dp_flow_attr_ingress, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install in-network decap flow rule on pf", DP_LOG_PORTID(m->port));
+		DPS_LOG_ERR("Failed to install in-network decap flow rule on PF", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
 	}
+	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORTID(m->port));
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
 
