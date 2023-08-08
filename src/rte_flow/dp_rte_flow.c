@@ -751,15 +751,6 @@ void free_allocated_agectx(struct flow_age_ctx *agectx)
 	}
 }
 
-void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
-							struct dp_flow *df, struct rte_flow *flow)
-{
-	agectx->cntrack = df->conntrack;
-	agectx->rte_flow = flow;
-	agectx->port_id = port_id;
-	dp_ref_inc(&agectx->cntrack->ref_count);
-}
-
 
 struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 									 const struct rte_flow_attr *attr,
@@ -786,12 +777,12 @@ struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 	return flow;
 }
 
-int dp_create_age_indirect_action(const struct rte_flow_attr *attr, uint16_t port_id,
-								  struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx)
+int dp_create_age_indirect_action(uint16_t port_id,
+								  const struct rte_flow_attr *attr,
+								  const struct rte_flow_action *age_action,
+								  struct flow_value *conntrack,
+								  struct flow_age_ctx *agectx)
 {
-	if (df->l4_type != IPPROTO_TCP)
-		return DP_OK;
-
 	struct rte_flow_indir_action_conf age_indirect_conf = {
 		.ingress = attr->ingress,
 		.egress = attr->egress,
@@ -808,7 +799,7 @@ int dp_create_age_indirect_action(const struct rte_flow_attr *attr, uint16_t por
 		return DP_ERROR;
 	}
 
-	if (DP_FAILED(dp_add_rte_age_ctx(df->conntrack, agectx))) {
+	if (DP_FAILED(dp_add_rte_age_ctx(conntrack, agectx))) {
 		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
 			DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id));
 		DPS_LOG_ERR("Failed to store agectx in conntrack object");

@@ -31,6 +31,41 @@ static const struct rte_flow_attr dp_flow_attr_transfer = {
 	.transfer = 1,
 };
 
+static __rte_always_inline int dp_install_rte_flow_with_age(uint16_t port_id,
+															const struct rte_flow_attr *attr,
+															const struct rte_flow_item pattern[],
+															const struct rte_flow_action actions[],
+															struct flow_value *conntrack,
+															struct flow_age_ctx *agectx)
+{
+	struct rte_flow *flow;
+
+	flow = dp_install_rte_flow(port_id, attr, pattern, actions);
+	if (!flow)
+		return DP_ERROR;
+
+	agectx->cntrack = conntrack;
+	agectx->rte_flow = flow;
+	agectx->port_id = port_id;
+	dp_ref_inc(&conntrack->ref_count);
+	return DP_OK;
+}
+
+static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_id,
+																 const struct rte_flow_attr *attr,
+																 const struct rte_flow_item pattern[],
+																 const struct rte_flow_action actions[],
+																 const struct rte_flow_action *age_action,
+																 const struct dp_flow *df,
+																 struct flow_age_ctx *agectx)
+{
+	if (df->l4_type == IPPROTO_TCP)
+		if (DP_FAILED(dp_create_age_indirect_action(port_id, attr, age_action, df->conntrack, agectx)))
+			return DP_ERROR;
+
+	return dp_install_rte_flow_with_age(port_id, attr, pattern, actions, df->conntrack, agectx);
+}
+
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
 	struct underlay_conf *u_conf = get_underlay_conf();
@@ -45,8 +80,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int hairpin_action_cnt = 0;
 
-	int age_action_index;
-	int ret;
+	const struct rte_flow_action *age_action;
 
 	memset(pattern, 0, sizeof(pattern));
 	memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
@@ -205,29 +239,21 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 			DPS_LOG_ERR("Failed to allocate cross-port encap age_ctx");
 			return DP_ERROR;
 		}
+		age_action = &hairpin_action[hairpin_action_cnt];
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
 										&flow_age, df->conntrack->timeout_value, hairpin_agectx);
-		age_action_index = hairpin_action_cnt - 1;
+
 		// create flow action -- end
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
 
-		// validate and install rte flow
-		struct rte_flow *hairpin_flow = NULL;
-
-		ret = dp_create_age_indirect_action(&dp_flow_attr_ingress, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
-		if (DP_FAILED(ret)) {
+		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_attr_ingress,
+														hairpin_pattern, hairpin_action,
+														age_action, df, hairpin_agectx))
+		) {
 			free_allocated_agectx(hairpin_agectx);
-			return DP_ERROR;
-		}
-
-		hairpin_flow = dp_install_rte_flow(m->port, &dp_flow_attr_ingress, hairpin_pattern, hairpin_action);
-		if (!hairpin_flow) {
-			free_allocated_agectx(hairpin_agectx);
-			DPS_LOG_ERR("Failed to install hairpin queue flow rule on vf", DP_LOG_PORTID(m->port));
-			return DP_ERROR;
+			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(m->port));
 		}
 		DPS_LOG_DEBUG("Installed hairpin queue flow rule", DP_LOG_PORTID(m->port));
-		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
 	}
 
 	// replace source ip if vip-nat/network-nat is enabled
@@ -281,9 +307,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		DPS_LOG_ERR("Failed to allocate encap age_ctx");
 		return DP_ERROR;
 	}
+	age_action = &action[action_cnt];
 	action_cnt = create_flow_age_action(action, action_cnt,
 										&flow_age, df->conntrack->timeout_value, agectx);
-	age_action_index = action_cnt - 1;
 
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
@@ -297,31 +323,25 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// validate and install rte flow
 	const struct rte_flow_attr *attr;
-	struct rte_flow *flow;
+	uint16_t t_port_id;
 
-	if (cross_pf_port)
+	if (cross_pf_port) {
 		attr = &dp_flow_attr_egress;
-	else
+		t_port_id = dp_port_get_pf1_id();
+	} else {
 		attr = &dp_flow_attr_transfer;
-
-	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
-
-	ret = dp_create_age_indirect_action(attr, t_port_id, df, &action[age_action_index], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return DP_ERROR;
+		t_port_id = m->port;
 	}
 
-	flow = dp_install_rte_flow(t_port_id, attr, pattern, action);
-	if (!flow) {
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(t_port_id, attr,
+													pattern, action,
+													age_action, df, agectx))
+	) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install encap flow rule on PF", DP_LOG_PORTID(t_port_id));
-		return DP_ERROR;
 	}
 	DPS_LOG_DEBUG("Installed encap flow rule on PF", DP_LOG_PORTID(t_port_id));
 
-	// config the content of agectx
-	config_allocated_agectx(agectx, t_port_id, df, flow);
 	return DP_OK;
 }
 
@@ -343,8 +363,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
-	int age_action_index;
-	int ret = 0;
+	const struct rte_flow_action *age_action;
 
 #ifndef ENABLE_DPDK_22_11
 	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
@@ -532,9 +551,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		return DP_ERROR;
 	}
 
+	age_action = &action[action_cnt];
 	action_cnt = create_flow_age_action(action, action_cnt,
 											&flow_age, df->conntrack->timeout_value, agectx);
-	age_action_index = action_cnt - 1;
 
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 	struct rte_flow_action_queue queue_action;
@@ -563,28 +582,17 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	// validate and install rte flow
 	const struct rte_flow_attr *attr;
-	struct rte_flow *flow;
 
-	if (cross_pf_port)
-		attr = &dp_flow_attr_ingress;
-	else
-		attr = &dp_flow_attr_transfer;
+	attr = cross_pf_port ? &dp_flow_attr_ingress : &dp_flow_attr_transfer;
 
-	ret = dp_create_age_indirect_action(attr, m->port, df, &action[age_action_index], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return DP_ERROR;
-	}
-
-	flow = dp_install_rte_flow(m->port, attr, pattern, action);
-	if (!flow) {
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, attr,
+													pattern, action,
+													age_action, df, agectx))
+	) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install normal decap flow rule on PF", DP_LOG_PORTID(m->port));
-		return DP_ERROR;
 	}
 	DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
-	// config the content of agectx
-	config_allocated_agectx(agectx, m->port, df, flow);
 
 #ifndef ENABLE_DPDK_22_11
 	// create flow action -- set dst mac
@@ -602,29 +610,21 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			DPS_LOG_ERR("Cannot allocate hairpin queue flow age_ctx");
 			return DP_ERROR;
 		}
+		age_action = &hairpin_action[hairpin_action_cnt];
 		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
 											&hairpin_flow_age, df->conntrack->timeout_value, hairpin_agectx);
 
-		age_action_index = hairpin_action_cnt - 1;
 		// create flow action -- end
 		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
-		// validate and install rte flow
-		struct rte_flow *hairpin_flow_P2 = NULL;
 
-		ret = dp_create_age_indirect_action(&dp_flow_attr_egress, (uint16_t)df->nxt_hop, df, &hairpin_action[age_action_index], hairpin_agectx);
-		if (DP_FAILED(ret)) {
-			free_allocated_agectx(hairpin_agectx);
-			return DP_ERROR;
-		}
-
-		hairpin_flow_P2 = dp_install_rte_flow((uint16_t)df->nxt_hop, &dp_flow_attr_egress, pattern, hairpin_action);
-		if (!hairpin_flow_P2) {
+		if (DP_FAILED(dp_install_rte_flow_with_indirect(df->nxt_hop, &dp_flow_attr_egress,
+														pattern, hairpin_action,
+														age_action, df, hairpin_agectx))
+		) {
 			free_allocated_agectx(hairpin_agectx);
 			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
-			return DP_ERROR;
 		}
 		DPS_LOG_DEBUG("Installed hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
-		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
 	}
 #endif
 
@@ -637,8 +637,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	int pattern_cnt = 0;
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
-	int ret = 0;
-	int age_action_index;
+	const struct rte_flow_action *age_action;
 
 	memset(pattern, 0, sizeof(pattern));
 	memset(action, 0, sizeof(action));
@@ -756,10 +755,9 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 		DPS_LOG_ERR("Cannot allocate local flow age_ctx");
 		return DP_ERROR;
 	}
-
+	age_action = &action[action_cnt];
 	action_cnt = create_flow_age_action(action, action_cnt,
 										&flow_age, df->conntrack->timeout_value, agectx);
-	age_action_index = action_cnt - 1;
 
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
@@ -769,26 +767,15 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-
-	// TODO: this has not been tested with DPDK 22.11, so maybe this attribute should be ifdef'd too
-	ret = dp_create_age_indirect_action(&dp_flow_attr_transfer, m->port, df, &action[age_action_index], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return ret;
-	}
-
-	flow = dp_install_rte_flow(m->port, &dp_flow_attr_transfer, pattern, action);
-	if (!flow) {
+	// TODO: this attribute has not been tested with DPDK 22.11, so maybe this attribute should be ifdef'd too
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_attr_transfer,
+													pattern, action,
+													age_action, df, agectx))
+	) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORTID(m->port));
-		return DP_ERROR;
 	}
 	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORTID(m->port));
-
-	// config the content of agectx
-	config_allocated_agectx(agectx, m->port, df, flow);
 
 	return DP_OK;
 }
@@ -923,18 +910,14 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// create flow action -- end
 	action_cnt = create_end_action(action, action_cnt);
 
-	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-
-	flow = dp_install_rte_flow(m->port, &dp_flow_attr_ingress, pattern, action);
-	if (!flow) {
+	// bouncing back rule's expiration is taken care of by the rte flow rule expiration mechanism;
+	// no need to perform query to perform checking on expiration status, thus indirect action is not needed
+	if (DP_FAILED(dp_install_rte_flow_with_age(m->port, &dp_flow_attr_ingress, pattern, action, df->conntrack, agectx))) {
 		free_allocated_agectx(agectx);
 		DPS_LOG_ERR("Failed to install in-network decap flow rule on PF", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
 	}
 	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORTID(m->port));
-	// config the content of agectx
-	config_allocated_agectx(agectx, m->port, df, flow);
 
 	return DP_OK;
 }

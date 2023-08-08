@@ -159,9 +159,6 @@ int create_flow_age_action(struct rte_flow_action *action, int action_cnt,
 
 void free_allocated_agectx(struct flow_age_ctx *agectx);
 
-void config_allocated_agectx(struct flow_age_ctx *agectx, uint16_t port_id,
-								struct dp_flow *df, struct rte_flow *flow);
-
 int create_redirect_queue_action(struct rte_flow_action *action, int action_cnt,
 									struct rte_flow_action_queue *queue_action,
 									uint16_t queue_index);
@@ -187,8 +184,11 @@ struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 									 const struct rte_flow_item pattern[],
 									 const struct rte_flow_action action[]);
 
-int dp_create_age_indirect_action(const struct rte_flow_attr *attr, uint16_t port_id,
-								  struct dp_flow *df, struct rte_flow_action *age_action, struct flow_age_ctx *agectx);
+int dp_create_age_indirect_action(uint16_t port_id,
+								  const struct rte_flow_attr *attr,
+								  const struct rte_flow_action *age_action,
+								  struct flow_value *conntrack,
+								  struct flow_age_ctx *agectx);
 
 #ifdef __cplusplus
 }
