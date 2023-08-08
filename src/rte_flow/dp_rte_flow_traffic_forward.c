@@ -570,6 +570,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		attr = &dp_flow_attr_transfer;
 	}
 
+	ret = dp_create_age_indirect_action(attr, m->port, df, &action[age_action_index], agectx);
+	if (DP_FAILED(ret)) {
+		free_allocated_agectx(agectx);
+		return DP_ERROR;
+	}
+
 	flow = validate_and_install_rte_flow(m->port, attr, pattern, action);
 	if (!flow) {
 		free_allocated_agectx(agectx);
@@ -578,12 +584,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	}
 	// config the content of agectx
 	config_allocated_agectx(agectx, m->port, df, flow);
-
-	ret = dp_create_age_indirect_action(attr, m->port, df, &action[age_action_index], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return DP_ERROR;
-	}
 
 #ifndef ENABLE_DPDK_22_11
 	// create flow action -- set dst mac
@@ -636,6 +636,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
 	int action_cnt = 0;
 	int ret = 0;
+	int age_action_index;
 
 	memset(pattern, 0, sizeof(pattern));
 	memset(action, 0, sizeof(action));
@@ -756,13 +757,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	action_cnt = create_flow_age_action(action, action_cnt,
 										&flow_age, df->conntrack->timeout_value, agectx);
-
-	// TODO: this has not been tested with DPDK 22.11, so maybe this attribute should be ifdef'd too
-	ret = dp_create_age_indirect_action(&dp_flow_attr_transfer, m->port, df, &action[action_cnt-1], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return ret;
-	}
+	age_action_index = action_cnt - 1;
 
 	// create flow action -- send to port
 	struct rte_flow_action_port_id send_to_port;
@@ -774,6 +769,13 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	// validate and install rte flow
 	struct rte_flow *flow = NULL;
+
+	// TODO: this has not been tested with DPDK 22.11, so maybe this attribute should be ifdef'd too
+	ret = dp_create_age_indirect_action(&dp_flow_attr_transfer, m->port, df, &action[age_action_index], agectx);
+	if (DP_FAILED(ret)) {
+		free_allocated_agectx(agectx);
+		return ret;
+	}
 
 	flow = validate_and_install_rte_flow(m->port, &dp_flow_attr_transfer, pattern, action);
 	if (!flow) {
