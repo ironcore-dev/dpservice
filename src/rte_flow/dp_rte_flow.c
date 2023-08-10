@@ -292,18 +292,6 @@ void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val)
 }
 
 
-void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint32_t priority, uint32_t ingress, uint32_t egress, uint32_t transfer)
-{
-
-	memset(attr, 0, sizeof(struct rte_flow_attr));
-
-	attr->group = group;
-	attr->ingress = ingress;
-	attr->egress = egress;
-	attr->priority = priority;
-	attr->transfer = transfer;
-}
-
 int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
 								  struct rte_flow_item_eth *eth_mask,
@@ -311,8 +299,6 @@ int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 								  struct rte_ether_addr *dst, size_t nr_dst_mask_len,
 								  rte_be16_t type)
 {
-
-	memset(eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
 
 	if (src) {
@@ -342,7 +328,6 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  uint8_t *dst, size_t nr_dst_mask_len,
 							  uint8_t proto)
 {
-	memset(ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
 	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
 
 	if (src) {
@@ -373,7 +358,6 @@ int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								rte_be32_t *dst, size_t nr_dst_mask_len,
 								uint8_t proto)
 {
-	memset(ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
 	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 
 	if (src) {
@@ -401,7 +385,6 @@ int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_udp *udp_mask,
 							 rte_be16_t src_port, rte_be16_t dst_port)
 {
-	memset(udp_spec, 0, sizeof(struct rte_flow_item_udp));
 	memset(udp_mask, 0, sizeof(struct rte_flow_item_udp));
 
 	// Who is going to match a port that is 0? Let's assume that port>0 is a valid one.
@@ -428,7 +411,6 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 rte_be16_t src_port, rte_be16_t dst_port,
 							 uint8_t tcp_flags)
 {
-	memset(tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
 	memset(tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
 
 	// Who is going to match a port that is 0? Let's assume that port>0 is a valid one.
@@ -442,6 +424,7 @@ int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 		tcp_mask->hdr.dst_port = 0xffff;
 	}
 
+	// TODO does this mean "match these flags and they need to be zero"?
 	if (tcp_flags) {
 		tcp_spec->hdr.tcp_flags = ~tcp_flags;
 		tcp_mask->hdr.tcp_flags = tcp_flags;
@@ -459,7 +442,6 @@ int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_icmp *icmp_mask,
 							  uint8_t type)
 {
-	memset(icmp_spec, 0, sizeof(struct rte_flow_item_icmp));
 	memset(icmp_mask, 0, sizeof(struct rte_flow_item_icmp));
 
 	icmp_spec->hdr.icmp_type = type;
@@ -477,7 +459,6 @@ int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp6 *icmp6_mask,
 								uint8_t type)
 {
-	memset(icmp6_spec, 0, sizeof(struct rte_flow_item_icmp6));
 	memset(icmp6_mask, 0, sizeof(struct rte_flow_item_icmp6));
 
 	icmp6_spec->type = type;
@@ -495,7 +476,6 @@ int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_
 									struct rte_flow_item_mark *mark_mask,
 									uint32_t marked_id)
 {
-	memset(mark_spec, 0, sizeof(struct rte_flow_item_mark));
 	memset(mark_mask, 0, sizeof(struct rte_flow_item_mark));
 
 	mark_spec->id = marked_id;
@@ -513,7 +493,6 @@ int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_tag *tag_mask,
 									uint32_t tag_value, uint8_t tag_index)
 {
-	memset(tag_spec, 0, sizeof(struct rte_flow_item_tag));
 	memset(tag_mask, 0, sizeof(struct rte_flow_item_tag));
 
 	tag_spec->data = tag_value;
@@ -534,7 +513,6 @@ int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							struct rte_flow_item_meta *meta_mask,
 							uint32_t meta_value)
 {
-	memset(meta_spec, 0, sizeof(struct rte_flow_item_meta));
 	memset(meta_mask, 0, sizeof(struct rte_flow_item_meta));
 
 	meta_spec->data = meta_value;
