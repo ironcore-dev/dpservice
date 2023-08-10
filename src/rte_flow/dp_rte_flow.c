@@ -7,9 +7,69 @@
 #include "dp_mbuf_dyn.h"
 #include "nodes/ipv6_nd_node.h"
 
-static const uint8_t ether_addr_mask[RTE_ETHER_ADDR_LEN] = "\xff\xff\xff\xff\xff\xff";
-static const uint8_t ipv6_addr_mask[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
-										  "\xff\xff\xff\xff\xff\xff\xff\xff";
+static const struct rte_flow_item_eth dp_flow_item_eth_mask = {
+	.hdr.ether_type = 0xffff,
+};
+static const struct rte_flow_item_eth dp_flow_item_eth_dst_mask = {
+	.hdr.dst_addr.addr_bytes = "\xff\xff\xff\xff\xff\xff",
+	.hdr.ether_type = 0xffff,
+};
+static const struct rte_flow_item_eth dp_flow_item_eth_src_dst_mask = {
+	.hdr.src_addr.addr_bytes = "\xff\xff\xff\xff\xff\xff",
+	.hdr.dst_addr.addr_bytes = "\xff\xff\xff\xff\xff\xff",
+	.hdr.ether_type = 0xffff,
+};
+
+static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_mask = {
+	.hdr.proto = 0xff,
+};
+static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_src_mask = {
+	.hdr.src_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.proto = 0xff,
+};
+static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_mask = {
+	.hdr.dst_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.proto = 0xff,
+};
+
+static const struct rte_flow_item_ipv4 dp_flow_item_ipv4_dst_mask = {
+	.hdr.dst_addr = 0xffffffff,
+	.hdr.next_proto_id = 0xff,
+};
+static const struct rte_flow_item_ipv4 dp_flow_item_ipv4_src_dst_mask = {
+	.hdr.src_addr = 0xffffffff,
+	.hdr.dst_addr = 0xffffffff,
+	.hdr.next_proto_id = 0xff,
+};
+
+static const struct rte_flow_item_udp dp_flow_item_udp_src_mask = {
+	.hdr.src_port = 0xffff,
+};
+static const struct rte_flow_item_udp dp_flow_item_udp_src_dst_mask = {
+	.hdr.src_port = 0xffff,
+	.hdr.dst_port = 0xffff,
+};
+
+static const struct rte_flow_item_tcp dp_flow_item_tcp_src_mask = {
+	.hdr.src_port = 0xffff,
+};
+static const struct rte_flow_item_tcp dp_flow_item_tcp_src_dst_mask = {
+	.hdr.src_port = 0xffff,
+	.hdr.dst_port = 0xffff,
+};
+static const struct rte_flow_item_tcp dp_flow_item_tcp_src_dst_noctrl_mask = {
+	.hdr.src_port = 0xffff,
+	.hdr.dst_port = 0xffff,
+	.hdr.tcp_flags = DP_TCP_CONTROL_FLAGS,
+};
+
+static const struct rte_flow_item_icmp dp_flow_item_icmp_mask = {
+	.hdr.icmp_type = 0xff,
+};
+
+static const struct rte_flow_item_icmp6 dp_flow_item_icmp6_mask = {
+	.type = 0xff,
+};
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 {
@@ -293,354 +353,255 @@ void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val)
 
 int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
-								  struct rte_flow_item_eth *eth_mask,
 								  rte_be16_t type)
 {
-	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
-
 	eth_spec->type = type;
-	eth_mask->type = htons(0xffff);
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[pattern_cnt].spec = eth_spec;
-	pattern[pattern_cnt].mask = eth_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_eth_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
-								  struct rte_flow_item_eth *eth_mask,
 								  struct rte_ether_addr *dst,
 								  rte_be16_t type)
 {
-	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
-
 	memcpy(&(eth_spec->dst), dst, sizeof(struct rte_ether_addr));
-	memcpy(&(eth_mask->dst), ether_addr_mask, sizeof(struct rte_ether_addr));
-
 	eth_spec->type = type;
-	eth_mask->type = htons(0xffff);
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[pattern_cnt].spec = eth_spec;
-	pattern[pattern_cnt].mask = eth_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_eth_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ethernet_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
-								  struct rte_flow_item_eth *eth_mask,
 								  struct rte_ether_addr *src,
 								  struct rte_ether_addr *dst,
 								  rte_be16_t type)
 {
-	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
-
 	memcpy(&(eth_spec->src), src, sizeof(struct rte_ether_addr));
-	memcpy(&(eth_mask->src), ether_addr_mask, sizeof(struct rte_ether_addr));
-
 	memcpy(&(eth_spec->dst), dst, sizeof(struct rte_ether_addr));
-	memcpy(&(eth_mask->dst), ether_addr_mask, sizeof(struct rte_ether_addr));
-
 	eth_spec->type = type;
-	eth_mask->type = htons(0xffff);
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[pattern_cnt].spec = eth_spec;
-	pattern[pattern_cnt].mask = eth_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_eth_src_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv6 *ipv6_spec,
-							  struct rte_flow_item_ipv6 *ipv6_mask,
 							  uint8_t proto)
 {
-	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
-
 	ipv6_spec->hdr.proto = proto;
-	ipv6_mask->hdr.proto = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 	pattern[pattern_cnt].spec = ipv6_spec;
-	pattern[pattern_cnt].mask = ipv6_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_ipv6_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv6 *ipv6_spec,
-							  struct rte_flow_item_ipv6 *ipv6_mask,
 							  uint8_t *src,
 							  uint8_t proto)
 {
-	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
-
 	memcpy(ipv6_spec->hdr.src_addr, src, 16);
-	memcpy(ipv6_mask->hdr.src_addr, ipv6_addr_mask, 16);
-
 	ipv6_spec->hdr.proto = proto;
-	ipv6_mask->hdr.proto = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 	pattern[pattern_cnt].spec = ipv6_spec;
-	pattern[pattern_cnt].mask = ipv6_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_ipv6_src_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv6 *ipv6_spec,
-							  struct rte_flow_item_ipv6 *ipv6_mask,
 							  uint8_t *dst,
 							  uint8_t proto)
 {
-	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
-
 	memcpy(ipv6_spec->hdr.dst_addr, dst, 16);
-	memcpy(ipv6_mask->hdr.dst_addr, ipv6_addr_mask, 16);
-
 	ipv6_spec->hdr.proto = proto;
-	ipv6_mask->hdr.proto = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
 	pattern[pattern_cnt].spec = ipv6_spec;
-	pattern[pattern_cnt].mask = ipv6_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_ipv6_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
-								struct rte_flow_item_ipv4 *ipv4_mask,
 								rte_be32_t *dst,
 								uint8_t proto)
 {
-	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
-
 	ipv4_spec->hdr.dst_addr = *dst;
-	ipv4_mask->hdr.dst_addr = htonl(0xffffffff);
-
 	ipv4_spec->hdr.next_proto_id = proto;
-	ipv4_mask->hdr.next_proto_id = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
 	pattern[pattern_cnt].spec = ipv4_spec;
-	pattern[pattern_cnt].mask = ipv4_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_ipv4_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_ipv4_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
-								struct rte_flow_item_ipv4 *ipv4_mask,
 								rte_be32_t *src,
 								rte_be32_t *dst,
 								uint8_t proto)
 {
-	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
-
 	ipv4_spec->hdr.src_addr = *src;
-	ipv4_mask->hdr.src_addr = htonl(0xffffffff);
-
 	ipv4_spec->hdr.dst_addr = *dst;
-	ipv4_mask->hdr.dst_addr = htonl(0xffffffff);
-
 	ipv4_spec->hdr.next_proto_id = proto;
-	ipv4_mask->hdr.next_proto_id = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
 	pattern[pattern_cnt].spec = ipv4_spec;
-	pattern[pattern_cnt].mask = ipv4_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_ipv4_src_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_udp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_udp *udp_spec,
-							 struct rte_flow_item_udp *udp_mask,
 							 rte_be16_t src_port)
 {
-	memset(udp_mask, 0, sizeof(struct rte_flow_item_udp));
-
 	udp_spec->hdr.src_port = src_port;
-	udp_mask->hdr.src_port = 0xffff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
 	pattern[pattern_cnt].spec = udp_spec;
-	pattern[pattern_cnt].mask = udp_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_udp_src_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_udp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_udp *udp_spec,
-							 struct rte_flow_item_udp *udp_mask,
 							 rte_be16_t src_port, rte_be16_t dst_port)
 {
-	memset(udp_mask, 0, sizeof(struct rte_flow_item_udp));
-
 	udp_spec->hdr.src_port = src_port;
-	udp_mask->hdr.src_port = 0xffff;
-
 	udp_spec->hdr.dst_port = dst_port;
-	udp_mask->hdr.dst_port = 0xffff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
 	pattern[pattern_cnt].spec = udp_spec;
-	pattern[pattern_cnt].mask = udp_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_udp_src_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_tcp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_tcp *tcp_spec,
-							 struct rte_flow_item_tcp *tcp_mask,
 							 rte_be16_t src_port)
 {
-	memset(tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
-
 	tcp_spec->hdr.src_port = src_port;
-	tcp_mask->hdr.src_port = 0xffff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
 	pattern[pattern_cnt].spec = tcp_spec;
-	pattern[pattern_cnt].mask = tcp_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_tcp_src_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_tcp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_tcp *tcp_spec,
-							 struct rte_flow_item_tcp *tcp_mask,
 							 rte_be16_t src_port, rte_be16_t dst_port)
 {
-	memset(tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
-
 	tcp_spec->hdr.src_port = src_port;
-	tcp_mask->hdr.src_port = 0xffff;
-
 	tcp_spec->hdr.dst_port = dst_port;
-	tcp_mask->hdr.dst_port = 0xffff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
 	pattern[pattern_cnt].spec = tcp_spec;
-	pattern[pattern_cnt].mask = tcp_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_tcp_src_dst_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_tcp_src_dst_noctrl_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							 struct rte_flow_item_tcp *tcp_spec,
-							 struct rte_flow_item_tcp *tcp_mask,
 							 rte_be16_t src_port, rte_be16_t dst_port)
 {
-	memset(tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
-
 	tcp_spec->hdr.src_port = src_port;
-	tcp_mask->hdr.src_port = 0xffff;
-
 	tcp_spec->hdr.dst_port = dst_port;
-	tcp_mask->hdr.dst_port = 0xffff;
-
 	tcp_spec->hdr.tcp_flags = ~DP_TCP_CONTROL_FLAGS;
-	tcp_mask->hdr.tcp_flags = DP_TCP_CONTROL_FLAGS;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
 	pattern[pattern_cnt].spec = tcp_spec;
-	pattern[pattern_cnt].mask = tcp_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_tcp_src_dst_noctrl_mask;;
 
 	return ++pattern_cnt;
 }
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_icmp *icmp_spec,
-							  struct rte_flow_item_icmp *icmp_mask,
 							  uint8_t type)
 {
-	memset(icmp_mask, 0, sizeof(struct rte_flow_item_icmp));
-
 	icmp_spec->hdr.icmp_type = type;
-	icmp_spec->hdr.icmp_type = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP;
 	pattern[pattern_cnt].spec = icmp_spec;
-	pattern[pattern_cnt].mask = icmp_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_icmp_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp6 *icmp6_spec,
-								struct rte_flow_item_icmp6 *icmp6_mask,
 								uint8_t type)
 {
-	memset(icmp6_mask, 0, sizeof(struct rte_flow_item_icmp6));
-
 	icmp6_spec->type = type;
-	icmp6_mask->type = 0xff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP6;
 	pattern[pattern_cnt].spec = icmp6_spec;
-	pattern[pattern_cnt].mask = icmp6_mask;
+	pattern[pattern_cnt].mask = &dp_flow_item_icmp6_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_mark *mark_spec,
-									struct rte_flow_item_mark *mark_mask,
 									uint32_t marked_id)
 {
-	memset(mark_mask, 0, sizeof(struct rte_flow_item_mark));
-
 	mark_spec->id = marked_id;
-	mark_mask->id = rte_flow_item_mark_mask.id;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_MARK;
 	pattern[pattern_cnt].spec = mark_spec;
-	pattern[pattern_cnt].mask = mark_mask;
+	pattern[pattern_cnt].mask = &rte_flow_item_mark_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_tag *tag_spec,
-									struct rte_flow_item_tag *tag_mask,
 									uint32_t tag_value, uint8_t tag_index)
 {
-	memset(tag_mask, 0, sizeof(struct rte_flow_item_tag));
-
 	tag_spec->data = tag_value;
 	tag_spec->index = tag_index;
 
-	tag_mask->data = rte_flow_item_tag_mask.data;
-	tag_mask->index = rte_flow_item_tag_mask.index;
-
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TAG;
 	pattern[pattern_cnt].spec = tag_spec;
-	pattern[pattern_cnt].mask = tag_mask;
+	pattern[pattern_cnt].mask = &rte_flow_item_tag_mask;
 
 	return ++pattern_cnt;
 }
 
 int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							struct rte_flow_item_meta *meta_spec,
-							struct rte_flow_item_meta *meta_mask,
 							uint32_t meta_value)
 {
-	memset(meta_mask, 0, sizeof(struct rte_flow_item_meta));
-
 	meta_spec->data = meta_value;
-
-	meta_mask->data = 0xffffffff;
 
 	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_META;
 	pattern[pattern_cnt].spec = meta_spec;
-	pattern[pattern_cnt].mask = meta_mask;
+	pattern[pattern_cnt].mask = &rte_flow_item_meta_mask;
 
 	return ++pattern_cnt;
 }

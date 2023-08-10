@@ -25,18 +25,16 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 
 	// create flow match patterns -- eth
 	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-												&eth_spec, &eth_mask,
+												&eth_spec,
 												htons(RTE_ETHER_TYPE_IPV6));
 
 	// create flow match patterns -- ipv6
 	struct rte_flow_item_ipv6 ipv6_spec;
-	struct rte_flow_item_ipv6 ipv6_mask;
 
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-											&ipv6_spec, &ipv6_mask,
+											&ipv6_spec,
 											proto_id);
 
 	// create flow match patterns -- end
@@ -71,34 +69,30 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 
 	// create flow match patterns -- eth
 	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-												&eth_spec, &eth_mask,
+												&eth_spec,
 												htons(RTE_ETHER_TYPE_IPV6));
 
 	// create flow match patterns -- ipv6
 	struct rte_flow_item_ipv6 ipv6_spec;
-	struct rte_flow_item_ipv6 ipv6_mask;
 
 	pattern_cnt = insert_ipv6_src_match_pattern(pattern, pattern_cnt,
-											&ipv6_spec, &ipv6_mask,
+											&ipv6_spec,
 											svc_ipv6,
 											proto_id);
 
 	// create flow match patterns -- L4
 	struct rte_flow_item_tcp tcp_spec;
-	struct rte_flow_item_tcp tcp_mask;
 	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
 
 	if (proto_id == DP_IP_PROTO_TCP) {
 		pattern_cnt = insert_tcp_src_match_pattern(pattern, pattern_cnt,
-											   &tcp_spec, &tcp_mask,
+											   &tcp_spec,
 											   svc_port);
 	} else if (proto_id == DP_IP_PROTO_UDP) {
 		pattern_cnt = insert_udp_src_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
+											   &udp_spec,
 											   svc_port);
 	} else {
 		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));

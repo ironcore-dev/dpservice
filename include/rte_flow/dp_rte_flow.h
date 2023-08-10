@@ -60,100 +60,82 @@ void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint3
 
 int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_eth *eth_spec,
-									struct rte_flow_item_eth *eth_mask,
 									rte_be16_t type);
 
 int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_eth *eth_spec,
-									struct rte_flow_item_eth *eth_mask,
 									struct rte_ether_addr *dst,
 									rte_be16_t type);
 
 int insert_ethernet_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_eth *eth_spec,
-									struct rte_flow_item_eth *eth_mask,
 									struct rte_ether_addr *src,
 									struct rte_ether_addr *dst,
 									rte_be16_t type);
 
 int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv6 *ipv6_spec,
-								struct rte_flow_item_ipv6 *ipv6_mask,
 								uint8_t proto);
 
 int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv6 *ipv6_spec,
-								struct rte_flow_item_ipv6 *ipv6_mask,
 								uint8_t *src,
 								uint8_t proto);
 
 int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv6 *ipv6_spec,
-								struct rte_flow_item_ipv6 *ipv6_mask,
 								uint8_t *dst,
 								uint8_t proto);
 
 int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
-								struct rte_flow_item_ipv4 *ipv4_mask,
 								rte_be32_t *dst,
 								uint8_t proto);
 
 int insert_ipv4_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
-								struct rte_flow_item_ipv4 *ipv4_mask,
 								rte_be32_t *src,
 								rte_be32_t *dst,
 								uint8_t proto);
 
 int insert_udp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_udp *udp_spec,
-								struct rte_flow_item_udp *udp_mask,
 								rte_be16_t src_port);
 
 int insert_udp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_udp *udp_spec,
-								struct rte_flow_item_udp *udp_mask,
 								rte_be16_t src_port, rte_be16_t dst_port);
 
 int insert_tcp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
-								struct rte_flow_item_tcp *tcp_mask,
 								rte_be16_t src_port);
 
 int insert_tcp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
-								struct rte_flow_item_tcp *tcp_mask,
 								rte_be16_t src_port, rte_be16_t dst_port);
 
 int insert_tcp_src_dst_noctrl_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
-								struct rte_flow_item_tcp *tcp_mask,
 								rte_be16_t src_port, rte_be16_t dst_port);
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp *icmp_spec,
-								struct rte_flow_item_icmp *icmp_mask,
 								uint8_t type);
 
 int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp6 *icmp6_spec,
-								struct rte_flow_item_icmp6 *icmp6_mask,
 								uint8_t type);
 
 int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_mark *mark_spec,
-									struct rte_flow_item_mark *mark_mask,
 									uint32_t marked_id);
 
 int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_tag *tag_spec,
-									struct rte_flow_item_tag *tag_mask,
 									uint32_t tag_value, uint8_t tag_index);
 
 int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							struct rte_flow_item_meta *meta_spec,
-							struct rte_flow_item_meta *meta_mask,
 							uint32_t meta_value);
 
 int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt);
