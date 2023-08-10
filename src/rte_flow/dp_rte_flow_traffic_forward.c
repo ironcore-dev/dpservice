@@ -99,7 +99,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	if (cross_pf_port)
 		hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 												&ol_eth_spec, &ol_eth_mask,
-												NULL, 0, NULL, 0,
 												htons(df->l3_type));
 
 	// create flow match patterns -- eth, for matching modified vf packets embedded with vni info
@@ -110,14 +109,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	memcpy(modified_eth_dst_addr.addr_bytes, vni_in_mac_addr, sizeof(struct rte_ether_addr));
 
 	if (cross_pf_port)
-		pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ethernet_dst_match_pattern(pattern, pattern_cnt,
 													&eth_spec, &eth_mask,
-													NULL, 0, &modified_eth_dst_addr, sizeof(struct rte_ether_addr),
+													&modified_eth_dst_addr, sizeof(struct rte_ether_addr),
 													htons(df->l3_type));
 	else
 		pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 													&eth_spec, &eth_mask,
-													NULL, 0, NULL, 0,
 													htons(df->l3_type));
 
 	// create flow match patterns -- inner packet, ipv6 or ipv4
@@ -127,15 +125,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
 												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 												df->l4_type);
 	} else {
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv4_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
 												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
 												df->l4_type);
 	}
@@ -154,12 +150,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_item_icmp6 icmp6_mask;
 
 	if (df->l4_type == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_tcp_src_dst_noctrl_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   DP_RTE_TCP_CNTL_FLAGS);
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_udp_src_dst_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
@@ -224,15 +219,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// replace source ip if vip-nat/network-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->nat_addr, DP_IS_SRC);
+		action_cnt = create_ipv4_set_src_action(action, action_cnt,
+										    &set_ipv4, df->nat_addr);
 
 	// replace source port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
 
 	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
-		action_cnt = create_trans_proto_set_action(action, action_cnt,
-										    &set_tp, df->nat_port, DP_IS_SRC);
+		action_cnt = create_trans_proto_set_src_action(action, action_cnt,
+										    &set_tp, df->nat_port);
 
 	// create flow action -- raw decap
 	struct rte_flow_action_raw_decap raw_decap;
@@ -352,7 +347,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item_eth ol_eth_mask;
 
 	if (cross_pf_port)
-		hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
+		hairpin_pattern_cnt = insert_ethernet_src_dst_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 														&ol_eth_spec, &ol_eth_mask,
 														&new_eth_hdr->src_addr, sizeof(struct rte_ether_addr),
 														&new_eth_hdr->dst_addr, sizeof(struct rte_ether_addr),
@@ -364,7 +359,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
 												htons(df->tun_info.l3_type));
 
 	// create flow match patterns -- ipv6
@@ -375,9 +369,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	if (dp_get_pkt_mark(m)->flags.is_recirc)
 		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
 
-	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+	pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											NULL, 0,
 											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
 											df->tun_info.proto_id);
 
@@ -389,9 +382,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	rte_be32_t actual_ol_ipv4_addr;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
 												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 												df->l4_type);
 	} else {
@@ -401,9 +393,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		else
 			actual_ol_ipv4_addr = df->dst.dst_addr;
 
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv4_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
 												&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
 												df->l4_type);
 	}
@@ -422,12 +413,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_item_icmp6 icmp6_mask;
 
 	if (df->l4_type == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_tcp_src_dst_noctrl_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   DP_RTE_TCP_CNTL_FLAGS);
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_udp_src_dst_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
@@ -463,15 +453,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	// replace dst ip if vip-nat/network-nat is enabled
 	struct rte_flow_action_set_ipv4 set_ipv4;
 	if (df->flags.nat == DP_NAT_CHG_DST_IP)
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
+		action_cnt = create_ipv4_set_dst_action(action, action_cnt,
+										    &set_ipv4, df->dst.dst_addr);
 
 	// replace dst port if network-nat is enabled
 	struct rte_flow_action_set_tp set_tp;
 
 	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
-		action_cnt = create_trans_proto_set_action(action, action_cnt,
-										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
+		action_cnt = create_trans_proto_set_dst_action(action, action_cnt,
+										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 
 	// create flow action -- age
 	struct rte_flow_action_age flow_age;
@@ -579,7 +569,6 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
 												htons(df->l3_type));
 
 	// create flow match patterns -- inner packet, ipv6 or ipv4
@@ -591,9 +580,8 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	rte_be32_t actual_ol_ipv4_dst_addr;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
 												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 												df->l4_type);
 	} else {
@@ -605,7 +593,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 		actual_ol_ipv4_src_addr = df->src.src_addr;
 
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv4_src_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
 												&actual_ol_ipv4_src_addr, sizeof(actual_ol_ipv4_src_addr),
 												&actual_ol_ipv4_dst_addr, sizeof(actual_ol_ipv4_dst_addr),
@@ -623,12 +611,11 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct rte_flow_item_icmp6 icmp6_mask;
 
 	if (df->l4_type == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_tcp_src_dst_noctrl_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   DP_RTE_TCP_CNTL_FLAGS);
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_udp_src_dst_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
@@ -660,12 +647,12 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct rte_flow_action_set_ipv4 set_ipv4;
 
 	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
+		action_cnt = create_ipv4_set_dst_action(action, action_cnt,
+										    &set_ipv4, df->dst.dst_addr);
 	} else if (df->flags.nat == DP_NAT_CHG_SRC_IP) {
 		// there should be more strict condition to only apply to VIP nat pkt
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->nat_addr, DP_IS_SRC);
+		action_cnt = create_ipv4_set_src_action(action, action_cnt,
+										    &set_ipv4, df->nat_addr);
 	}
 
 	// create flow action -- age
@@ -720,7 +707,6 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
 												htons(df->tun_info.l3_type));
 
 	// create flow match patterns -- ipv6
@@ -728,9 +714,8 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	struct rte_flow_item_ipv6 ipv6_mask;
 
 	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt
-	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+	pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											NULL, 0,
 											df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_src_addr6),
 											df->tun_info.proto_id);
 
@@ -743,15 +728,13 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	struct rte_flow_item_ipv4 ol_ipv4_mask;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
 												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
 												df->l4_type);
 	} else {
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_ipv4_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
 												&df->dst.dst_addr, sizeof(df->dst.dst_addr),
 												df->l4_type);
 	}
@@ -767,11 +750,11 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	struct rte_flow_item_icmp6 icmp6_mask;
 
 	if (df->l4_type == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_tcp_src_dst_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 0);
+											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_udp_src_dst_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
 											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
@@ -800,8 +783,8 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// create flow action -- set ipv6
 	struct rte_flow_action_set_ipv6 set_ipv6;
 
-	action_cnt = create_ipv6_set_action(action, action_cnt,
-									&set_ipv6, df->tun_info.ul_dst_addr6, DP_IS_DST);
+	action_cnt = create_ipv6_set_dst_action(action, action_cnt,
+									&set_ipv6, df->tun_info.ul_dst_addr6);
 
 	// create flow action -- age
 	struct rte_flow_action_age flow_age;

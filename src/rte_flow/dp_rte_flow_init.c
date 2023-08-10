@@ -29,7 +29,6 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
 												htons(RTE_ETHER_TYPE_IPV6));
 
 	// create flow match patterns -- ipv6
@@ -38,7 +37,6 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 
 	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											NULL, 0, NULL, 0,
 											proto_id);
 
 	// create flow match patterns -- end
@@ -77,16 +75,15 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 
 	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
 												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
 												htons(RTE_ETHER_TYPE_IPV6));
 
 	// create flow match patterns -- ipv6
 	struct rte_flow_item_ipv6 ipv6_spec;
 	struct rte_flow_item_ipv6 ipv6_mask;
 
-	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
+	pattern_cnt = insert_ipv6_src_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											svc_ipv6, 16, NULL, 0,
+											svc_ipv6, 16,
 											proto_id);
 
 	// create flow match patterns -- L4
@@ -96,14 +93,13 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 	struct rte_flow_item_udp udp_mask;
 
 	if (proto_id == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_tcp_src_match_pattern(pattern, pattern_cnt,
 											   &tcp_spec, &tcp_mask,
-											   svc_port, 0,
-											   0);
+											   svc_port);
 	} else if (proto_id == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
+		pattern_cnt = insert_udp_src_match_pattern(pattern, pattern_cnt,
 											   &udp_spec, &udp_mask,
-											   svc_port, 0);
+											   svc_port);
 	} else {
 		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));
 		return DP_ERROR;

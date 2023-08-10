@@ -22,9 +22,6 @@ extern "C"
 #define DP_FLOW_WEST_EAST		0
 #define DP_FLOW_SOUTH_NORTH		1
 
-#define DP_IS_SRC false
-#define DP_IS_DST true
-
 #define DP_L4_PORT_DIR_SRC 1
 #define DP_L4_PORT_DIR_DST 2
 
@@ -34,7 +31,7 @@ extern "C"
 #define DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE 3
 #define DP_IP_ICMP_CODE_FRAGMENT_NEEDED 4
 
-#define DP_RTE_TCP_CNTL_FLAGS \
+#define DP_TCP_CONTROL_FLAGS \
 	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
 
 typedef struct dp_icmp_err_ip_info {
@@ -64,6 +61,17 @@ void create_rte_flow_rule_attr(struct rte_flow_attr *attr, uint32_t group, uint3
 int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_eth *eth_spec,
 									struct rte_flow_item_eth *eth_mask,
+									rte_be16_t type);
+
+int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_eth *eth_spec,
+									struct rte_flow_item_eth *eth_mask,
+									struct rte_ether_addr *dst, size_t nr_dst_mask_len,
+									rte_be16_t type);
+
+int insert_ethernet_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+									struct rte_flow_item_eth *eth_spec,
+									struct rte_flow_item_eth *eth_mask,
 									struct rte_ether_addr *src, size_t nr_src_mask_len,
 									struct rte_ether_addr *dst, size_t nr_dst_mask_len,
 									rte_be16_t type);
@@ -71,27 +79,57 @@ int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv6 *ipv6_spec,
 								struct rte_flow_item_ipv6 *ipv6_mask,
+								uint8_t proto);
+
+int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+								struct rte_flow_item_ipv6 *ipv6_spec,
+								struct rte_flow_item_ipv6 *ipv6_mask,
 								uint8_t *src, size_t nr_src_mask_len,
+								uint8_t proto);
+
+int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+								struct rte_flow_item_ipv6 *ipv6_spec,
+								struct rte_flow_item_ipv6 *ipv6_mask,
 								uint8_t *dst, size_t nr_dst_mask_len,
 								uint8_t proto);
 
-int insert_ipv4_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+								struct rte_flow_item_ipv4 *ipv4_spec,
+								struct rte_flow_item_ipv4 *ipv4_mask,
+								rte_be32_t *dst, size_t nr_dst_mask_len,
+								uint8_t proto);
+
+int insert_ipv4_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
 								rte_be32_t *src, size_t nr_src_mask_len,
 								rte_be32_t *dst, size_t nr_dst_mask_len,
 								uint8_t proto);
 
-int insert_udp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+int insert_udp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+								struct rte_flow_item_udp *udp_spec,
+								struct rte_flow_item_udp *udp_mask,
+								rte_be16_t src_port);
+
+int insert_udp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_udp *udp_spec,
 								struct rte_flow_item_udp *udp_mask,
 								rte_be16_t src_port, rte_be16_t dst_port);
 
-int insert_tcp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+int insert_tcp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_tcp *tcp_spec,
 								struct rte_flow_item_tcp *tcp_mask,
-								rte_be16_t src_port, rte_be16_t dst_port,
-								uint8_t tcp_flags);
+								rte_be16_t src_port);
+
+int insert_tcp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+								struct rte_flow_item_tcp *tcp_spec,
+								struct rte_flow_item_tcp *tcp_mask,
+								rte_be16_t src_port, rte_be16_t dst_port);
+
+int insert_tcp_src_dst_noctrl_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+								struct rte_flow_item_tcp *tcp_spec,
+								struct rte_flow_item_tcp *tcp_mask,
+								rte_be16_t src_port, rte_be16_t dst_port);
 
 int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_icmp *icmp_spec,
@@ -137,17 +175,29 @@ int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
 							  struct rte_flow_action_set_mac *src_mac_set_action,
 							  struct rte_ether_addr *src_mac);
 
-int create_ipv4_set_action(struct rte_flow_action *action, int action_cnt,
+int create_ipv4_set_src_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_set_ipv4 *ipv4_action,
-						   rte_be32_t ipv4, bool dir);
+						   rte_be32_t ipv4);
 
-int create_ipv6_set_action(struct rte_flow_action *action, int action_cnt,
+int create_ipv4_set_dst_action(struct rte_flow_action *action, int action_cnt,
+						   struct rte_flow_action_set_ipv4 *ipv4_action,
+						   rte_be32_t ipv4);
+
+int create_ipv6_set_src_action(struct rte_flow_action *action, int action_cnt,
 						   struct rte_flow_action_set_ipv6 *ipv6_action,
-						   uint8_t *ipv6, bool dir);
+						   uint8_t *ipv6);
 
-int create_trans_proto_set_action(struct rte_flow_action *action, int action_cnt,
+int create_ipv6_set_dst_action(struct rte_flow_action *action, int action_cnt,
+						   struct rte_flow_action_set_ipv6 *ipv6_action,
+						   uint8_t *ipv6);
+
+int create_trans_proto_set_src_action(struct rte_flow_action *action, int action_cnt,
 									struct rte_flow_action_set_tp *tp_action,
-									uint16_t port, bool dir);
+									uint16_t port);
+
+int create_trans_proto_set_dst_action(struct rte_flow_action *action, int action_cnt,
+									struct rte_flow_action_set_tp *tp_action,
+									uint16_t port);
 
 int create_send_to_port_action(struct rte_flow_action *action, int action_cnt,
 								struct rte_flow_action_port_id *send_to_port_action,
