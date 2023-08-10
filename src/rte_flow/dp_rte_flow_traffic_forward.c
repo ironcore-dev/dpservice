@@ -111,7 +111,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	if (cross_pf_port)
 		pattern_cnt = insert_ethernet_dst_match_pattern(pattern, pattern_cnt,
 													&eth_spec, &eth_mask,
-													&modified_eth_dst_addr, sizeof(struct rte_ether_addr),
+													&modified_eth_dst_addr,
 													htons(df->l3_type));
 	else
 		pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
@@ -127,12 +127,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
+												df->dst.dst_addr6,
 												df->l4_type);
 	} else {
 		pattern_cnt = insert_ipv4_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
+												&df->dst.dst_addr,
 												df->l4_type);
 	}
 
@@ -349,8 +349,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	if (cross_pf_port)
 		hairpin_pattern_cnt = insert_ethernet_src_dst_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
 														&ol_eth_spec, &ol_eth_mask,
-														&new_eth_hdr->src_addr, sizeof(struct rte_ether_addr),
-														&new_eth_hdr->dst_addr, sizeof(struct rte_ether_addr),
+														&new_eth_hdr->src_addr,
+														&new_eth_hdr->dst_addr,
 														new_eth_hdr->ether_type);
 
 	// create flow match patterns -- eth
@@ -371,7 +371,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
+											df->tun_info.ul_dst_addr6,
 											df->tun_info.proto_id);
 
 	// create flow match patterns -- inner packet, ipv6 or ipv4
@@ -384,7 +384,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
+												df->dst.dst_addr6,
 												df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
@@ -395,7 +395,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 		pattern_cnt = insert_ipv4_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
+												&actual_ol_ipv4_addr,
 												df->l4_type);
 	}
 
@@ -582,7 +582,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
+												df->dst.dst_addr6,
 												df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
@@ -595,8 +595,8 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 		pattern_cnt = insert_ipv4_src_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												&actual_ol_ipv4_src_addr, sizeof(actual_ol_ipv4_src_addr),
-												&actual_ol_ipv4_dst_addr, sizeof(actual_ol_ipv4_dst_addr),
+												&actual_ol_ipv4_src_addr,
+												&actual_ol_ipv4_dst_addr,
 												df->l4_type);
 	}
 
@@ -716,7 +716,7 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt
 	pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_src_addr6),
+											df->tun_info.ul_src_addr6,
 											df->tun_info.proto_id);
 
 	// pattern_cnt_before_inner_hdr = pattern_cnt;
@@ -730,12 +730,12 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		pattern_cnt = insert_ipv6_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv6_spec, &ol_ipv6_mask,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
+												df->dst.dst_addr6,
 												df->l4_type);
 	} else {
 		pattern_cnt = insert_ipv4_dst_match_pattern(pattern, pattern_cnt,
 												&ol_ipv4_spec, &ol_ipv4_mask,
-												&df->dst.dst_addr, sizeof(df->dst.dst_addr),
+												&df->dst.dst_addr,
 												df->l4_type);
 	}
 

@@ -66,14 +66,14 @@ int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_eth *eth_spec,
 									struct rte_flow_item_eth *eth_mask,
-									struct rte_ether_addr *dst, size_t nr_dst_mask_len,
+									struct rte_ether_addr *dst,
 									rte_be16_t type);
 
 int insert_ethernet_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 									struct rte_flow_item_eth *eth_spec,
 									struct rte_flow_item_eth *eth_mask,
-									struct rte_ether_addr *src, size_t nr_src_mask_len,
-									struct rte_ether_addr *dst, size_t nr_dst_mask_len,
+									struct rte_ether_addr *src,
+									struct rte_ether_addr *dst,
 									rte_be16_t type);
 
 int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
@@ -84,26 +84,26 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv6 *ipv6_spec,
 								struct rte_flow_item_ipv6 *ipv6_mask,
-								uint8_t *src, size_t nr_src_mask_len,
+								uint8_t *src,
 								uint8_t proto);
 
 int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv6 *ipv6_spec,
 								struct rte_flow_item_ipv6 *ipv6_mask,
-								uint8_t *dst, size_t nr_dst_mask_len,
+								uint8_t *dst,
 								uint8_t proto);
 
 int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
-								rte_be32_t *dst, size_t nr_dst_mask_len,
+								rte_be32_t *dst,
 								uint8_t proto);
 
 int insert_ipv4_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
-								rte_be32_t *src, size_t nr_src_mask_len,
-								rte_be32_t *dst, size_t nr_dst_mask_len,
+								rte_be32_t *src,
+								rte_be32_t *dst,
 								uint8_t proto);
 
 int insert_udp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,

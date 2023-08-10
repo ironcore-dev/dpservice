@@ -10,7 +10,6 @@
 static const uint8_t ether_addr_mask[RTE_ETHER_ADDR_LEN] = "\xff\xff\xff\xff\xff\xff";
 static const uint8_t ipv6_addr_mask[16] = "\xff\xff\xff\xff\xff\xff\xff\xff"
 										  "\xff\xff\xff\xff\xff\xff\xff\xff";
-static const uint8_t ipv4_addr_mask[4] = "\xff\xff\xff\xff";
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt)
 {
@@ -312,13 +311,13 @@ int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
 								  struct rte_flow_item_eth *eth_mask,
-								  struct rte_ether_addr *dst, size_t nr_dst_mask_len,
+								  struct rte_ether_addr *dst,
 								  rte_be16_t type)
 {
 	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
 
-	memcpy(&(eth_spec->dst), dst, nr_dst_mask_len);
-	memcpy(&(eth_mask->dst), ether_addr_mask, nr_dst_mask_len);
+	memcpy(&(eth_spec->dst), dst, sizeof(struct rte_ether_addr));
+	memcpy(&(eth_mask->dst), ether_addr_mask, sizeof(struct rte_ether_addr));
 
 	eth_spec->type = type;
 	eth_mask->type = htons(0xffff);
@@ -333,17 +332,17 @@ int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern
 int insert_ethernet_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								  struct rte_flow_item_eth *eth_spec,
 								  struct rte_flow_item_eth *eth_mask,
-								  struct rte_ether_addr *src, size_t nr_src_mask_len,
-								  struct rte_ether_addr *dst, size_t nr_dst_mask_len,
+								  struct rte_ether_addr *src,
+								  struct rte_ether_addr *dst,
 								  rte_be16_t type)
 {
 	memset(eth_mask, 0, sizeof(struct rte_flow_item_eth));
 
-	memcpy(&(eth_spec->src), src, nr_src_mask_len);
-	memcpy(&(eth_mask->src), ether_addr_mask, nr_src_mask_len);
+	memcpy(&(eth_spec->src), src, sizeof(struct rte_ether_addr));
+	memcpy(&(eth_mask->src), ether_addr_mask, sizeof(struct rte_ether_addr));
 
-	memcpy(&(eth_spec->dst), dst, nr_dst_mask_len);
-	memcpy(&(eth_mask->dst), ether_addr_mask, nr_dst_mask_len);
+	memcpy(&(eth_spec->dst), dst, sizeof(struct rte_ether_addr));
+	memcpy(&(eth_mask->dst), ether_addr_mask, sizeof(struct rte_ether_addr));
 
 	eth_spec->type = type;
 	eth_mask->type = htons(0xffff);
@@ -375,13 +374,13 @@ int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv6 *ipv6_spec,
 							  struct rte_flow_item_ipv6 *ipv6_mask,
-							  uint8_t *src, size_t nr_src_mask_len,
+							  uint8_t *src,
 							  uint8_t proto)
 {
 	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
 
-	memcpy(ipv6_spec->hdr.src_addr, src, nr_src_mask_len);
-	memcpy(ipv6_mask->hdr.src_addr, ipv6_addr_mask, nr_src_mask_len);
+	memcpy(ipv6_spec->hdr.src_addr, src, 16);
+	memcpy(ipv6_mask->hdr.src_addr, ipv6_addr_mask, 16);
 
 	ipv6_spec->hdr.proto = proto;
 	ipv6_mask->hdr.proto = 0xff;
@@ -396,13 +395,13 @@ int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 							  struct rte_flow_item_ipv6 *ipv6_spec,
 							  struct rte_flow_item_ipv6 *ipv6_mask,
-							  uint8_t *dst, size_t nr_dst_mask_len,
+							  uint8_t *dst,
 							  uint8_t proto)
 {
 	memset(ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
 
-	memcpy(ipv6_spec->hdr.dst_addr, dst, nr_dst_mask_len);
-	memcpy(ipv6_mask->hdr.dst_addr, ipv6_addr_mask, nr_dst_mask_len);
+	memcpy(ipv6_spec->hdr.dst_addr, dst, 16);
+	memcpy(ipv6_mask->hdr.dst_addr, ipv6_addr_mask, 16);
 
 	ipv6_spec->hdr.proto = proto;
 	ipv6_mask->hdr.proto = 0xff;
@@ -417,13 +416,13 @@ int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
-								rte_be32_t *dst, size_t nr_dst_mask_len,
+								rte_be32_t *dst,
 								uint8_t proto)
 {
 	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 
 	ipv4_spec->hdr.dst_addr = *dst;
-	memcpy(&ipv4_mask->hdr.dst_addr, ipv4_addr_mask, nr_dst_mask_len);
+	ipv4_mask->hdr.dst_addr = htonl(0xffffffff);
 
 	ipv4_spec->hdr.next_proto_id = proto;
 	ipv4_mask->hdr.next_proto_id = 0xff;
@@ -438,17 +437,17 @@ int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt
 int insert_ipv4_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
 								struct rte_flow_item_ipv4 *ipv4_spec,
 								struct rte_flow_item_ipv4 *ipv4_mask,
-								rte_be32_t *src, size_t nr_src_mask_len,
-								rte_be32_t *dst, size_t nr_dst_mask_len,
+								rte_be32_t *src,
+								rte_be32_t *dst,
 								uint8_t proto)
 {
 	memset(ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
 
 	ipv4_spec->hdr.src_addr = *src;
-	memcpy(&ipv4_mask->hdr.src_addr, ipv4_addr_mask, nr_src_mask_len);
+	ipv4_mask->hdr.src_addr = htonl(0xffffffff);
 
 	ipv4_spec->hdr.dst_addr = *dst;
-	memcpy(&ipv4_mask->hdr.dst_addr, ipv4_addr_mask, nr_dst_mask_len);
+	ipv4_mask->hdr.dst_addr = htonl(0xffffffff);
 
 	ipv4_spec->hdr.next_proto_id = proto;
 	ipv4_mask->hdr.next_proto_id = 0xff;

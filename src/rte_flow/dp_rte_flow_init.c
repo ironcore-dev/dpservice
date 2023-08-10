@@ -83,7 +83,7 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 
 	pattern_cnt = insert_ipv6_src_match_pattern(pattern, pattern_cnt,
 											&ipv6_spec, &ipv6_mask,
-											svc_ipv6, 16,
+											svc_ipv6,
 											proto_id);
 
 	// create flow match patterns -- L4
