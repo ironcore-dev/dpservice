@@ -351,470 +351,402 @@ void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val)
 }
 
 
-int insert_ethernet_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								  struct rte_flow_item_eth *eth_spec,
-								  rte_be16_t type)
+void dp_set_eth_flow_item(struct rte_flow_item *item,
+						  struct rte_flow_item_eth *eth_spec,
+						  rte_be16_t type)
 {
-	eth_spec->type = type;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
-	pattern[pattern_cnt].spec = eth_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_eth_mask;
-
-	return ++pattern_cnt;
+	eth_spec->hdr.ether_type = type;
+	item->type = RTE_FLOW_ITEM_TYPE_ETH;
+	item->spec = eth_spec;
+	item->mask = &dp_flow_item_eth_mask;
+	item->last = NULL;
 }
 
-int insert_ethernet_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								  struct rte_flow_item_eth *eth_spec,
-								  struct rte_ether_addr *dst,
-								  rte_be16_t type)
+void dp_set_eth_dst_flow_item(struct rte_flow_item *item,
+							  struct rte_flow_item_eth *eth_spec,
+							  const struct rte_ether_addr *dst,
+							  rte_be16_t type)
 {
-	memcpy(&(eth_spec->dst), dst, sizeof(struct rte_ether_addr));
-	eth_spec->type = type;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
-	pattern[pattern_cnt].spec = eth_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_eth_dst_mask;
-
-	return ++pattern_cnt;
+	memcpy(&(eth_spec->hdr.dst_addr), dst, sizeof(struct rte_ether_addr));
+	eth_spec->hdr.ether_type = type;
+	item->type = RTE_FLOW_ITEM_TYPE_ETH;
+	item->spec = eth_spec;
+	item->mask = &dp_flow_item_eth_dst_mask;
+	item->last = NULL;
 }
 
-int insert_ethernet_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
+
+void dp_set_eth_src_dst_flow_item(struct rte_flow_item *item,
 								  struct rte_flow_item_eth *eth_spec,
-								  struct rte_ether_addr *src,
-								  struct rte_ether_addr *dst,
+								  const struct rte_ether_addr *src,
+								  const struct rte_ether_addr *dst,
 								  rte_be16_t type)
 {
-	memcpy(&(eth_spec->src), src, sizeof(struct rte_ether_addr));
-	memcpy(&(eth_spec->dst), dst, sizeof(struct rte_ether_addr));
-	eth_spec->type = type;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ETH;
-	pattern[pattern_cnt].spec = eth_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_eth_src_dst_mask;
-
-	return ++pattern_cnt;
+	memcpy(&(eth_spec->hdr.src_addr), src, sizeof(struct rte_ether_addr));
+	memcpy(&(eth_spec->hdr.dst_addr), dst, sizeof(struct rte_ether_addr));
+	eth_spec->hdr.ether_type = type;
+	item->type = RTE_FLOW_ITEM_TYPE_ETH;
+	item->spec = eth_spec;
+	item->mask = &dp_flow_item_eth_src_dst_mask;
+	item->last = NULL;
 }
 
-int insert_ipv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							  struct rte_flow_item_ipv6 *ipv6_spec,
-							  uint8_t proto)
+void dp_set_ipv6_flow_item(struct rte_flow_item *item,
+						   struct rte_flow_item_ipv6 *ipv6_spec,
+						   uint8_t proto)
 {
 	ipv6_spec->hdr.proto = proto;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
-	pattern[pattern_cnt].spec = ipv6_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_ipv6_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
+	item->spec = ipv6_spec;
+	item->mask = &dp_flow_item_ipv6_mask;
+	item->last = NULL;
 }
 
-int insert_ipv6_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							  struct rte_flow_item_ipv6 *ipv6_spec,
-							  uint8_t *src,
-							  uint8_t proto)
+void dp_set_ipv6_src_flow_item(struct rte_flow_item *item,
+							   struct rte_flow_item_ipv6 *ipv6_spec,
+							   const uint8_t *src,
+							   uint8_t proto)
 {
 	memcpy(ipv6_spec->hdr.src_addr, src, 16);
 	ipv6_spec->hdr.proto = proto;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
-	pattern[pattern_cnt].spec = ipv6_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_ipv6_src_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
+	item->spec = ipv6_spec;
+	item->mask = &dp_flow_item_ipv6_src_mask;
+	item->last = NULL;
 }
 
-int insert_ipv6_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							  struct rte_flow_item_ipv6 *ipv6_spec,
-							  uint8_t *dst,
-							  uint8_t proto)
+void dp_set_ipv6_dst_flow_item(struct rte_flow_item *item,
+							   struct rte_flow_item_ipv6 *ipv6_spec,
+							   const uint8_t *dst,
+							   uint8_t proto)
 {
 	memcpy(ipv6_spec->hdr.dst_addr, dst, 16);
 	ipv6_spec->hdr.proto = proto;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV6;
-	pattern[pattern_cnt].spec = ipv6_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_ipv6_dst_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
+	item->spec = ipv6_spec;
+	item->mask = &dp_flow_item_ipv6_dst_mask;
+	item->last = NULL;
 }
 
-int insert_ipv4_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								struct rte_flow_item_ipv4 *ipv4_spec,
-								rte_be32_t *dst,
-								uint8_t proto)
+void dp_set_ipv4_dst_flow_item(struct rte_flow_item *item,
+							   struct rte_flow_item_ipv4 *ipv4_spec,
+							   rte_be32_t dst,
+							   uint8_t proto)
 {
-	ipv4_spec->hdr.dst_addr = *dst;
+	ipv4_spec->hdr.dst_addr = dst;
 	ipv4_spec->hdr.next_proto_id = proto;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
-	pattern[pattern_cnt].spec = ipv4_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_ipv4_dst_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV4;
+	item->spec = ipv4_spec;
+	item->mask = &dp_flow_item_ipv4_dst_mask;
+	item->last = NULL;
 }
 
-int insert_ipv4_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								struct rte_flow_item_ipv4 *ipv4_spec,
-								rte_be32_t *src,
-								rte_be32_t *dst,
-								uint8_t proto)
+void dp_set_ipv4_src_dst_flow_item(struct rte_flow_item *item,
+								   struct rte_flow_item_ipv4 *ipv4_spec,
+								   rte_be32_t src,
+								   rte_be32_t dst,
+								   uint8_t proto)
 {
-	ipv4_spec->hdr.src_addr = *src;
-	ipv4_spec->hdr.dst_addr = *dst;
+	ipv4_spec->hdr.src_addr = src;
+	ipv4_spec->hdr.dst_addr = dst;
 	ipv4_spec->hdr.next_proto_id = proto;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_IPV4;
-	pattern[pattern_cnt].spec = ipv4_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_ipv4_src_dst_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV4;
+	item->spec = ipv4_spec;
+	item->mask = &dp_flow_item_ipv4_src_dst_mask;
+	item->last = NULL;
 }
 
-int insert_udp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							 struct rte_flow_item_udp *udp_spec,
-							 rte_be16_t src_port)
+void dp_set_udp_src_flow_item(struct rte_flow_item *item,
+							  struct rte_flow_item_udp *udp_spec,
+							  rte_be16_t src_port)
 {
 	udp_spec->hdr.src_port = src_port;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
-	pattern[pattern_cnt].spec = udp_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_udp_src_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_UDP;
+	item->spec = udp_spec;
+	item->mask = &dp_flow_item_udp_src_mask;
+	item->last = NULL;
 }
 
-int insert_udp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							 struct rte_flow_item_udp *udp_spec,
-							 rte_be16_t src_port, rte_be16_t dst_port)
+void dp_set_udp_src_dst_flow_item(struct rte_flow_item *item,
+								  struct rte_flow_item_udp *udp_spec,
+								  rte_be16_t src_port,
+								  rte_be16_t dst_port)
 {
 	udp_spec->hdr.src_port = src_port;
 	udp_spec->hdr.dst_port = dst_port;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_UDP;
-	pattern[pattern_cnt].spec = udp_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_udp_src_dst_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_UDP;
+	item->spec = udp_spec;
+	item->mask = &dp_flow_item_udp_src_dst_mask;
+	item->last = NULL;
 }
 
-int insert_tcp_src_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							 struct rte_flow_item_tcp *tcp_spec,
-							 rte_be16_t src_port)
+void dp_set_tcp_src_flow_item(struct rte_flow_item *item,
+							  struct rte_flow_item_tcp *tcp_spec,
+							  rte_be16_t src_port)
 {
 	tcp_spec->hdr.src_port = src_port;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
-	pattern[pattern_cnt].spec = tcp_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_tcp_src_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_TCP;
+	item->spec = tcp_spec;
+	item->mask = &dp_flow_item_tcp_src_mask;
+	item->last = NULL;
 }
 
-int insert_tcp_src_dst_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							 struct rte_flow_item_tcp *tcp_spec,
-							 rte_be16_t src_port, rte_be16_t dst_port)
+void dp_set_tcp_src_dst_flow_item(struct rte_flow_item *item,
+								  struct rte_flow_item_tcp *tcp_spec,
+								  rte_be16_t src_port,
+								  rte_be16_t dst_port)
 {
 	tcp_spec->hdr.src_port = src_port;
 	tcp_spec->hdr.dst_port = dst_port;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
-	pattern[pattern_cnt].spec = tcp_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_tcp_src_dst_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_TCP;
+	item->spec = tcp_spec;
+	item->mask = &dp_flow_item_tcp_src_dst_mask;
+	item->last = NULL;
 }
 
-int insert_tcp_src_dst_noctrl_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							 struct rte_flow_item_tcp *tcp_spec,
-							 rte_be16_t src_port, rte_be16_t dst_port)
+void dp_set_tcp_src_dst_noctrl_flow_item(struct rte_flow_item *item,
+										 struct rte_flow_item_tcp *tcp_spec,
+										 rte_be16_t src_port,
+										 rte_be16_t dst_port)
 {
 	tcp_spec->hdr.src_port = src_port;
 	tcp_spec->hdr.dst_port = dst_port;
 	tcp_spec->hdr.tcp_flags = ~DP_TCP_CONTROL_FLAGS;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TCP;
-	pattern[pattern_cnt].spec = tcp_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_tcp_src_dst_noctrl_mask;;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_TCP;
+	item->spec = tcp_spec;
+	item->mask = &dp_flow_item_tcp_src_dst_noctrl_mask;
+	item->last = NULL;
 }
 
-int insert_icmp_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							  struct rte_flow_item_icmp *icmp_spec,
-							  uint8_t type)
+void dp_set_icmp_flow_item(struct rte_flow_item *item,
+						   struct rte_flow_item_icmp *icmp_spec,
+						   uint8_t type)
 {
 	icmp_spec->hdr.icmp_type = type;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP;
-	pattern[pattern_cnt].spec = icmp_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_icmp_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_ICMP;
+	item->spec = icmp_spec;
+	item->mask = &dp_flow_item_icmp_mask;
+	item->last = NULL;
 }
 
-int insert_icmpv6_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-								struct rte_flow_item_icmp6 *icmp6_spec,
-								uint8_t type)
+void dp_set_icmp6_flow_item(struct rte_flow_item *item,
+						    struct rte_flow_item_icmp6 *icmp6_spec,
+						    uint8_t type)
 {
 	icmp6_spec->type = type;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_ICMP6;
-	pattern[pattern_cnt].spec = icmp6_spec;
-	pattern[pattern_cnt].mask = &dp_flow_item_icmp6_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_ICMP6;
+	item->spec = icmp6_spec;
+	item->mask = &dp_flow_item_icmp6_mask;
+	item->last = NULL;
 }
 
-int insert_packet_mark_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-									struct rte_flow_item_mark *mark_spec,
-									uint32_t marked_id)
+void dp_set_mark_flow_item(struct rte_flow_item *item,
+						   struct rte_flow_item_mark *mark_spec,
+						   uint32_t marked_id)
 {
 	mark_spec->id = marked_id;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_MARK;
-	pattern[pattern_cnt].spec = mark_spec;
-	pattern[pattern_cnt].mask = &rte_flow_item_mark_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_MARK;
+	item->spec = mark_spec;
+	item->mask = &rte_flow_item_mark_mask;
+	item->last = NULL;
 }
 
-int insert_tag_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-									struct rte_flow_item_tag *tag_spec,
-									uint32_t tag_value, uint8_t tag_index)
+void dp_set_tag_flow_item(struct rte_flow_item *item,
+						  struct rte_flow_item_tag *tag_spec,
+						  uint32_t tag_value,
+						  uint8_t tag_index)
 {
 	tag_spec->data = tag_value;
 	tag_spec->index = tag_index;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_TAG;
-	pattern[pattern_cnt].spec = tag_spec;
-	pattern[pattern_cnt].mask = &rte_flow_item_tag_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_TAG;
+	item->spec = tag_spec;
+	item->mask = &rte_flow_item_tag_mask;
+	item->last = NULL;
 }
 
-int insert_meta_match_pattern(struct rte_flow_item *pattern, int pattern_cnt,
-							struct rte_flow_item_meta *meta_spec,
-							uint32_t meta_value)
+void dp_set_meta_flow_item(struct rte_flow_item *item,
+						   struct rte_flow_item_meta *meta_spec,
+						   uint32_t meta_value)
 {
 	meta_spec->data = meta_value;
-
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_META;
-	pattern[pattern_cnt].spec = meta_spec;
-	pattern[pattern_cnt].mask = &rte_flow_item_meta_mask;
-
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_META;
+	item->spec = meta_spec;
+	item->mask = &rte_flow_item_meta_mask;
+	item->last = NULL;
 }
 
-int insert_end_match_pattern(struct rte_flow_item *pattern, int pattern_cnt)
+void dp_set_end_flow_item(struct rte_flow_item *item)
 {
-	pattern[pattern_cnt].type = RTE_FLOW_ITEM_TYPE_END;
-	return ++pattern_cnt;
+	item->type = RTE_FLOW_ITEM_TYPE_END;
+	item->spec = NULL;
+	item->mask = NULL;
+	item->last = NULL;
 }
 
 
-int create_raw_decap_action(struct rte_flow_action *action, int action_cnt,
-							struct rte_flow_action_raw_decap *raw_decap_action,
-							uint8_t *data_to_decap, size_t data_len)
+void dp_set_raw_decap_action(struct rte_flow_action *action,
+							 struct rte_flow_action_raw_decap *raw_decap_action,
+							 uint8_t *data_to_decap, size_t data_len)
 {
 	raw_decap_action->data = data_to_decap;
 	raw_decap_action->size = data_len;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_DECAP;
-	action[action_cnt].conf = raw_decap_action;
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_RAW_DECAP;
+	action->conf = raw_decap_action;
 }
 
-int create_raw_encap_action(struct rte_flow_action *action, int action_cnt,
-							struct rte_flow_action_raw_encap *raw_encap_action,
-							uint8_t *data_to_encap, size_t data_len)
+void dp_set_raw_encap_action(struct rte_flow_action *action,
+							 struct rte_flow_action_raw_encap *raw_encap_action,
+							 uint8_t *data_to_encap, size_t data_len)
 {
 	raw_encap_action->data = data_to_encap;
 	raw_encap_action->size = data_len;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_RAW_ENCAP;
-	action[action_cnt].conf = raw_encap_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_RAW_ENCAP;
+	action->conf = raw_encap_action;
 }
 
-int create_dst_mac_set_action(struct rte_flow_action *action, int action_cnt,
-							  struct rte_flow_action_set_mac *dst_mac_set_action,
-							  struct rte_ether_addr *dst_mac)
+void dp_set_dst_mac_set_action(struct rte_flow_action *action,
+							   struct rte_flow_action_set_mac *dst_mac_set_action,
+							   struct rte_ether_addr *dst_mac)
 {
+	// TODO
 	rte_ether_addr_copy(dst_mac, (struct rte_ether_addr *)(dst_mac_set_action->mac_addr));
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_DST;
-	action[action_cnt].conf = dst_mac_set_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_MAC_DST;
+	action->conf = dst_mac_set_action;
 }
 
-int create_src_mac_set_action(struct rte_flow_action *action, int action_cnt,
-							  struct rte_flow_action_set_mac *src_mac_set_action,
-							  struct rte_ether_addr *src_mac)
+void dp_set_src_mac_set_action(struct rte_flow_action *action,
+							   struct rte_flow_action_set_mac *src_mac_set_action,
+							   struct rte_ether_addr *src_mac)
 {
+	// TODO
 	rte_ether_addr_copy(src_mac, (struct rte_ether_addr *)src_mac_set_action->mac_addr);
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_MAC_SRC;
-	action[action_cnt].conf = src_mac_set_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_MAC_SRC;
+	action->conf = src_mac_set_action;
 }
 
-int create_ipv4_set_src_action(struct rte_flow_action *action, int action_cnt,
-						   struct rte_flow_action_set_ipv4 *ipv4_action,
-						   rte_be32_t ipv4)
+void dp_set_ipv4_set_src_action(struct rte_flow_action *action,
+								struct rte_flow_action_set_ipv4 *ipv4_action,
+								rte_be32_t ipv4)
 {
 	ipv4_action->ipv4_addr = ipv4;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV4_SRC;
-	action[action_cnt].conf = ipv4_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV4_SRC;
+	action->conf = ipv4_action;
 }
 
-int create_ipv4_set_dst_action(struct rte_flow_action *action, int action_cnt,
-						   struct rte_flow_action_set_ipv4 *ipv4_action,
-						   rte_be32_t ipv4)
+void dp_set_ipv4_set_dst_action(struct rte_flow_action *action,
+								struct rte_flow_action_set_ipv4 *ipv4_action,
+								rte_be32_t ipv4)
 {
 	ipv4_action->ipv4_addr = ipv4;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV4_DST;
-	action[action_cnt].conf = ipv4_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV4_DST;
+	action->conf = ipv4_action;
 }
 
-int create_ipv6_set_src_action(struct rte_flow_action *action, int action_cnt,
-						   struct rte_flow_action_set_ipv6 *ipv6_action,
-						   uint8_t *ipv6)
+void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
+								struct rte_flow_action_set_ipv6 *ipv6_action,
+								uint8_t *ipv6)
 {
+	// TODO
 	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV6_SRC;
-	action[action_cnt].conf = ipv6_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_SRC;
+	action->conf = ipv6_action;
 }
 
-int create_ipv6_set_dst_action(struct rte_flow_action *action, int action_cnt,
-						   struct rte_flow_action_set_ipv6 *ipv6_action,
-						   uint8_t *ipv6)
+void dp_set_ipv6_set_dst_action(struct rte_flow_action *action,
+								struct rte_flow_action_set_ipv6 *ipv6_action,
+								uint8_t *ipv6)
 {
+	// TODO
 	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_IPV6_DST;
-	action[action_cnt].conf = ipv6_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_DST;
+	action->conf = ipv6_action;
 }
 
-int create_trans_proto_set_src_action(struct rte_flow_action *action, int action_cnt,
-									struct rte_flow_action_set_tp *tp_action,
-									uint16_t port)
+void dp_set_trans_proto_set_src_action(struct rte_flow_action *action,
+									   struct rte_flow_action_set_tp *tp_action,
+									   uint16_t port)
 {
+	// TODO
 	tp_action->port = htons(port);
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TP_SRC;
-	action[action_cnt].conf = tp_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_TP_SRC;
+	action->conf = tp_action;
 }
 
-int create_trans_proto_set_dst_action(struct rte_flow_action *action, int action_cnt,
-									struct rte_flow_action_set_tp *tp_action,
-									uint16_t port)
+void dp_set_trans_proto_set_dst_action(struct rte_flow_action *action,
+									   struct rte_flow_action_set_tp *tp_action,
+									   uint16_t port)
 {
+	// TODO
 	tp_action->port = htons(port);
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TP_DST;
-	action[action_cnt].conf = tp_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_TP_DST;
+	action->conf = tp_action;
 }
 
-int create_send_to_port_action(struct rte_flow_action *action, int action_cnt,
-							   struct rte_flow_action_port_id *send_to_port_action,
-							   uint32_t port_id)
+void dp_set_send_to_port_action(struct rte_flow_action *action,
+								struct rte_flow_action_port_id *send_to_port_action,
+								uint32_t port_id)
 {
 	send_to_port_action->original = 0; // original???
 	send_to_port_action->reserved = 0;
 	send_to_port_action->id = port_id;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_PORT_ID;
-	action[action_cnt].conf = send_to_port_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_PORT_ID;
+	action->conf = send_to_port_action;
 }
 
-int create_flow_age_action(struct rte_flow_action *action, int action_cnt,
-						   struct rte_flow_action_age *flow_age_action,
-						   uint32_t timeout, void *age_context)
+void dp_set_flow_age_action(struct rte_flow_action *action,
+							struct rte_flow_action_age *flow_age_action,
+							uint32_t timeout, void *age_context)
 {
 	flow_age_action->timeout = timeout;
 	flow_age_action->reserved = 0;
 	flow_age_action->context = age_context;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_AGE;
-	action[action_cnt].conf = flow_age_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_AGE;
+	action->conf = flow_age_action;
 }
 
-int create_redirect_queue_action(struct rte_flow_action *action, int action_cnt,
-								 struct rte_flow_action_queue *queue_action,
-								 uint16_t queue_index)
+void dp_set_redirect_queue_action(struct rte_flow_action *action,
+								  struct rte_flow_action_queue *queue_action,
+								  uint16_t queue_index)
 {
 	queue_action->index = queue_index;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_QUEUE;
-	action[action_cnt].conf = queue_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	action->conf = queue_action;
 }
 
-int create_packet_mark_action(struct rte_flow_action *action, int action_cnt,
-							struct rte_flow_action_mark *mark_action,
-							uint32_t marked_value)
+void dp_set_packet_mark_action(struct rte_flow_action *action,
+							   struct rte_flow_action_mark *mark_action,
+							   uint32_t marked_value)
 {
-	mark_action->id =  marked_value;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_MARK;
-	action[action_cnt].conf = mark_action;
-
-	return ++action_cnt;
+	mark_action->id = marked_value;
+	action->type = RTE_FLOW_ACTION_TYPE_MARK;
+	action->conf = mark_action;
 }
 
-int create_set_tag_action(struct rte_flow_action *action, int action_cnt,
-							struct rte_flow_action_set_tag *set_tag_action,
-							uint32_t tag_value, __rte_unused uint8_t index)
+void dp_set_set_tag_action(struct rte_flow_action *action,
+						   struct rte_flow_action_set_tag *set_tag_action,
+						   uint32_t tag_value, __rte_unused uint8_t index)
 {
-	set_tag_action->data =  tag_value;
-	set_tag_action->mask =  0xffffffff;
+	set_tag_action->data = tag_value;
+	set_tag_action->mask = 0xffffffff;
 	set_tag_action->index = 0;  // This function currently only supports one tag per packet
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_TAG;
-	action[action_cnt].conf = set_tag_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_TAG;
+	action->conf = set_tag_action;
 }
 
-int create_set_meta_action(struct rte_flow_action *action, int action_cnt,
+void dp_set_set_meta_action(struct rte_flow_action *action,
 							struct rte_flow_action_set_meta *meta_action,
 							uint32_t meta_value)
 {
-	meta_action->data =  meta_value;
+	meta_action->data = meta_value;
 	meta_action->mask = 0xffffffff;
-
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_SET_META;
-	action[action_cnt].conf = meta_action;
-
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_SET_META;
+	action->conf = meta_action;
 }
 
-int create_end_action(struct rte_flow_action *action, int action_cnt)
+void dp_set_end_action(struct rte_flow_action *action)
 {
-	action[action_cnt].type = RTE_FLOW_ACTION_TYPE_END;
-	return ++action_cnt;
+	action->type = RTE_FLOW_ACTION_TYPE_END;
+	action->conf = NULL;
 }
 
 
