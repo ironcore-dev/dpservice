@@ -26,11 +26,13 @@ Dp-service currently only supports x86 architecture (amd64 instruction set actua
 
 
 ### DPDK
-The dataplane service is built upon the [DPDK library](https://dpdk.org). Currently, the only supported version is 21.x, which most distros do not have in stable trees. Building from source also has the advantage of easier debugging later.
+The dataplane service is built upon the [DPDK library](https://dpdk.org). Currently, the only supported version is 21.x. Unfortunately, some patching is needed, thus it needs to be built from source. Building from source also has the advantage of easier debugging later.
 ```bash
+git clone https://github.com/onmetal/net-dpservice.git
 wget http://fast.dpdk.org/rel/dpdk-21.11.2.tar.xz
 tar xf dpdk-21.11.2.tar.xz
 cd dpdk-stable-21.11.2
+patch -p1 < ../net-dpservice/hack/dpdk_21_11_log.patch
 meson setup build
 ninja -C build
 sudo ninja -C build install
@@ -47,7 +49,6 @@ Some systems do not put the resulting (installed) `pkgconf` directory with DPDK'
 
 ## Building the service
 ```bash
-git clone https://github.com/onmetal/net-dpservice.git
 cd net-dpservice/
 meson setup build
 ninja -C build

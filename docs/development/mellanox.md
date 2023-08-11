@@ -78,3 +78,10 @@ This script uses the IPv6 address assigned to your loopback interface as the und
 
 ## Caveats
 Keep in mind, that many NICs require a working connection on their ports to actually put the ports up, i.e. connect them to a switch before looking for a problem elsewhere.
+
+### MTU
+Because of the fact, that dp-service uses IP-IP tunnel, the VM's MTU must be smaller than the host's to accomodate an IPv6 header. This can be done either by lowering the MTU of all VMs or by using jumbo-frames on the host:
+```bash
+ip link set enp3s0f0np0 mtu 9100
+ip link set enp3s0f1np1 mtu 9100
+```
