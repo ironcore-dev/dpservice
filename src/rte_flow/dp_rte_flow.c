@@ -750,26 +750,10 @@ void dp_set_end_action(struct rte_flow_action *action)
 }
 
 
-// flow aging related config is highly customized, thus put them into a function in case different agectx needs
-// to be configured
-void free_allocated_agectx(struct flow_age_ctx *agectx)
-{
-	struct rte_flow_error error;
-
-	if (agectx) {
-		if (agectx->handle) {
-			if (DP_FAILED(dp_destroy_rte_action_handle(agectx->port_id, agectx->handle, &error)))
-				DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(agectx->port_id));
-		}
-		rte_free(agectx);
-	}
-}
-
-
 struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 									 const struct rte_flow_attr *attr,
 									 const struct rte_flow_item pattern[],
-									 const struct rte_flow_action action[])
+									 const struct rte_flow_action actions[])
 {
 	int ret;
 	struct rte_flow *flow;
@@ -777,13 +761,13 @@ struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 		.message = "(no stated reason)",
 	};
 
-	ret = rte_flow_validate(port_id, attr, pattern, action, &error);
+	ret = rte_flow_validate(port_id, attr, pattern, actions, &error);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Flow cannot be validated", DP_LOG_PORTID(port_id),  DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
 		return NULL;
 	}
 
-	flow = rte_flow_create(port_id, attr, pattern, action, &error);
+	flow = rte_flow_create(port_id, attr, pattern, actions, &error);
 	if (!flow) {
 		DPS_LOG_ERR("Flow cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
 		return NULL;

@@ -192,9 +192,6 @@ void dp_set_flow_age_action(struct rte_flow_action *action,
 							struct rte_flow_action_age *flow_age_action,
 							uint32_t timeout, void *age_context);
 
-// TODO???
-void free_allocated_agectx(struct flow_age_ctx *agectx);
-
 void dp_set_redirect_queue_action(struct rte_flow_action *action,
 								  struct rte_flow_action_queue *queue_action,
 								  uint16_t queue_index);
@@ -219,7 +216,7 @@ int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle
 struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 									 const struct rte_flow_attr *attr,
 									 const struct rte_flow_item pattern[],
-									 const struct rte_flow_action action[]);
+									 const struct rte_flow_action actions[]);
 
 int dp_create_age_indirect_action(uint16_t port_id,
 								  const struct rte_flow_attr *attr,
