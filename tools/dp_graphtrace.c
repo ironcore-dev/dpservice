@@ -50,23 +50,35 @@ static void eal_cleanup(void)
 		free(eal_args_mem[i]);
 }
 
-static int dp_graphtrace_send_client_request_sync(uint8_t action, uint8_t dump_type, struct dp_graphtrace_mp_reply *reply)
+static int dp_graphtrace_find_memzone(struct dp_graphtrace *graphtrace)
+{
+	graphtrace->mempool = rte_mempool_lookup(DP_GRAPHTRACE_MEMPOOL_NAME);
+	if (!graphtrace->mempool)
+		return DP_ERROR;
+
+	graphtrace->ringbuf = rte_ring_lookup(DP_GRAPHTRACE_RINGBUF_NAME);
+	if (!graphtrace->ringbuf)
+		return DP_ERROR;
+
+	return DP_OK;
+}
+
+static int dp_graphtrace_send_client_request_sync(enum dp_graphtrace_action action, uint8_t dump_type, struct dp_graphtrace_mp_reply *reply)
 {
 	struct rte_mp_msg mp_request, *mp_reply;
 	struct rte_mp_reply mp_reply_raw;
 	struct dp_graphtrace_mp_request *request = (struct dp_graphtrace_mp_request *)mp_request.param;
 	struct dp_graphtrace_mp_reply *graphtrace_reply;
-	struct timespec ts = {.tv_sec = 5, .tv_nsec = 0};
+	struct timespec timeout = {.tv_sec = 5, .tv_nsec = 0};
 
 	rte_strscpy(mp_request.name, DP_MP_ACTION_GRAPHTRACE, sizeof(mp_request.name));
 	mp_request.len_param = sizeof(struct dp_graphtrace_mp_request);
 	mp_request.num_fds = 0;
 
 	request->action = action;
-	request->dump_type = dump_type;
 
-	if (rte_mp_request_sync(&mp_request, &mp_reply_raw, &ts) < 0) {
-		fprintf(stderr, "Cannot request graphtrace action due to %s \n", dp_strerror_verbose(rte_errno));
+	if (rte_mp_request_sync(&mp_request, &mp_reply_raw, &timeout) < 0) {
+		fprintf(stderr, "Cannot request graphtrace action due to %s\n", dp_strerror_verbose(rte_errno));
 		return DP_ERROR;
 	}
 
@@ -97,17 +109,6 @@ static int do_graphtrace(struct dp_graphtrace *graphtrace)
 {
 	uint received, available;
 	void *objs[DP_GRAPHTRACE_RINGBUF_SIZE];
-	struct dp_graphtrace_mp_reply reply;
-
-	if (DP_FAILED(dp_graphtrace_send_client_request_sync(DP_GRAPHTRACE_ACTION_TYPE_START, 0, &reply))) {
-		fprintf(stderr, "Cannot request graphtrace\n");
-		return EXIT_FAILURE;
-	}
-
-	graphtrace->mempool = reply.mempool;
-	graphtrace->ringbuf = reply.ringbuf;
-
-	primary_alive = true;
 
 	// dump what's already in the ring buffer
 	// (when full, it actually prevents new packets to enter, thus containing only stale ones)
@@ -126,23 +127,54 @@ static int do_graphtrace(struct dp_graphtrace *graphtrace)
 			usleep(100000);
 	}
 
+	return DP_OK;
+}
+
+static void signal_handler(__rte_unused int signum)
+{
+	interrupt = true;
+}
+
+static int dp_graphtrace_start(void)
+{
+	struct dp_graphtrace_mp_reply reply;
+
+	if (DP_FAILED(dp_graphtrace_send_client_request_sync(DP_GRAPHTRACE_ACTION_START, 0, &reply))) {
+		fprintf(stderr, "Cannot request graphtrace\n");
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(reply.error_code)) {
+		fprintf(stderr, "Cannot start graphtrace\n");
+		return DP_ERROR;
+	}
+
+	primary_alive = true;
+
+	return DP_OK;
+
+}
+
+static int dp_graphtrace_stop(struct dp_graphtrace *graphtrace)
+{
+	struct dp_graphtrace_mp_reply reply;
+
 	if (primary_alive) {
-		if (DP_FAILED(dp_graphtrace_send_client_request_sync(DP_GRAPHTRACE_ACTION_TYPE_STOP, 0, &reply))) {
+		if (DP_FAILED(dp_graphtrace_send_client_request_sync(DP_GRAPHTRACE_ACTION_STOP, 0, &reply))) {
 			fprintf(stderr, "Cannot request graphtrace\n");
-			return EXIT_FAILURE;
+			return DP_ERROR;
+		}
+
+		if (DP_FAILED(reply.error_code)) {
+			fprintf(stderr, "Cannot start graphtrace\n");
+			return DP_ERROR;
 		}
 	}
 
 	graphtrace->mempool = NULL;
 	graphtrace->ringbuf = NULL;
 
-
-	return EXIT_SUCCESS;
-}
-
-static void signal_handler(__rte_unused int signum)
-{
-	interrupt = true;
+	return DP_OK;
 }
 
 static void
@@ -188,6 +220,11 @@ int main(void)
 		return EXIT_FAILURE;
 	}
 
+	if (DP_FAILED(dp_graphtrace_find_memzone(&graphtrace))) {
+		fprintf(stderr, "Failed to find preallocated memzone\n");
+		return EXIT_FAILURE;
+	}
+
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
@@ -197,11 +234,23 @@ int main(void)
 		return EXIT_FAILURE;
 	}
 
+	if (DP_FAILED(dp_graphtrace_start())) {
+		fprintf(stderr, "Failed to request to start pkt dumping\n");
+		return EXIT_FAILURE;
+	}
+
 	ret = do_graphtrace(&graphtrace);
-	if (DP_FAILED(ret))
+	if (DP_FAILED(ret)) {
 		fprintf(stderr, "Cannot dump graphtrace %s\n", dp_strerror_verbose(ret));
+		return EXIT_FAILURE;
+	}
+
+	if (DP_FAILED(dp_graphtrace_stop(&graphtrace))) {
+		fprintf(stderr, "Failed to request to stop pkt dumping\n");
+		return EXIT_FAILURE;
+	}
 
 	eal_cleanup();
 
-	return ret;
+	return EXIT_SUCCESS;
 }

@@ -21,10 +21,10 @@
 extern "C" {
 #endif
 
-enum {
-	DP_GRAPHTRACE_ACTION_TYPE_NULL,
-	DP_GRAPHTRACE_ACTION_TYPE_START,
-	DP_GRAPHTRACE_ACTION_TYPE_STOP,
+enum dp_graphtrace_action {
+	DP_GRAPHTRACE_ACTION_NULL,
+	DP_GRAPHTRACE_ACTION_START,
+	DP_GRAPHTRACE_ACTION_STOP,
 };
 
 struct dp_graphtrace {
@@ -40,13 +40,11 @@ struct dp_graphtrace_pktinfo {
 
 struct dp_graphtrace_mp_request {
 	uint8_t action;
-	uint8_t dump_type;
 };
 
 struct dp_graphtrace_mp_reply {
-	struct rte_mempool *mempool;
-	struct rte_ring *ringbuf;
-	uint8_t error_code;
+	uint8_t action;
+	int error_code;
 };
 
 static inline struct dp_graphtrace_pktinfo *dp_get_graphtrace_pktinfo(struct rte_mbuf *pkt)
