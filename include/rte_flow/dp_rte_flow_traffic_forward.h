@@ -1,21 +1,12 @@
-#ifndef __INCLUDE_DP_RTE_FLOW_TRAFFIC_FORWARD_H
-#define __INCLUDE_DP_RTE_FLOW_TRAFFIC_FORWARD_H
+#ifndef __INCLUDE_DP_RTE_FLOW_TRAFFIC_FORWARD_H__
+#define __INCLUDE_DP_RTE_FLOW_TRAFFIC_FORWARD_H__
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-
-#include <unistd.h>
-#include "rte_malloc.h"
-#include "dp_rte_flow.h"
-#include "nodes/ipv6_nd_node.h"
-
-#define DP_TUNN_OPS_OFFLOAD_MAX_PATTERN 7
-#define DP_TUNN_OPS_OFFLOAD_MAX_ACTION 8
-
-#define DP_TUNN_IPIP_ENCAP_SIZE sizeof(struct rte_ether_hdr)+sizeof(struct rte_ipv6_hdr)
+#include "dp_mbuf_dyn.h"
 
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df);
 
@@ -23,6 +14,4 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df);
 }
 #endif
 
-
-
-#endif /* __INCLUDE_DP_RTE_FLOW_TRAFFIC_FORWARD_H */
+#endif

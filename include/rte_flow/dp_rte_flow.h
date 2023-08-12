@@ -154,11 +154,11 @@ void dp_set_raw_encap_action(struct rte_flow_action *action,
 
 void dp_set_dst_mac_set_action(struct rte_flow_action *action,
 							   struct rte_flow_action_set_mac *dst_mac_set_action,
-							   struct rte_ether_addr *dst_mac);
+							   const struct rte_ether_addr *dst_mac);
 
 void dp_set_src_mac_set_action(struct rte_flow_action *action,
 							   struct rte_flow_action_set_mac *src_mac_set_action,
-							   struct rte_ether_addr *src_mac);
+							   const struct rte_ether_addr *src_mac);
 
 void dp_set_ipv4_set_src_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv4 *ipv4_action,
