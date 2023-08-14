@@ -114,14 +114,10 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct rte_flow_item_eth eth_spec;      // #1
-	struct rte_flow_item_ipv6 ol_ipv6_spec; // #2 (choose one)
-	struct rte_flow_item_ipv4 ol_ipv4_spec; // #2 (choose one)
-	struct rte_flow_item_tcp tcp_spec;      // #3 (choose one)
-	struct rte_flow_item_udp udp_spec;      // #3 (choose one)
-	struct rte_flow_item_icmp icmp_spec;    // #3 (choose one)
-	struct rte_flow_item_icmp6 icmp6_spec;  // #3 (choose one)
-	struct rte_flow_item pattern[4];        // + end
+	struct rte_flow_item_eth eth_spec; // #1
+	union dp_flow_item_l3 l3_spec;     // #2
+	union dp_flow_item_l4 l4_spec;     // #3
+	struct rte_flow_item pattern[4];   // + end
 	int pattern_cnt = 0;
 	// hairpin uses the same items, only with the eth_spec being different
 	struct rte_flow_item_eth hairpin_eth_spec;
@@ -162,26 +158,14 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// encapsulating, there is only overlay addressing
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv6_spec, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	else
-		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv4_spec, df->dst.dst_addr, df->l4_type);
+		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, df->dst.dst_addr, df->l4_type);
 	if (cross_pf_port)
 		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
 
-	if (df->l4_type == DP_IP_PROTO_TCP)
-		dp_set_tcp_src_dst_noctrl_flow_item(&pattern[pattern_cnt++], &tcp_spec,
-											df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_UDP)
-		dp_set_udp_src_dst_flow_item(&pattern[pattern_cnt++], &udp_spec,
-									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_ICMP)
-		dp_set_icmp_flow_item(&pattern[pattern_cnt++], &icmp_spec, df->l4_info.icmp_field.icmp_type);
-	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
-		dp_set_icmp6_flow_item(&pattern[pattern_cnt++], &icmp6_spec, df->l4_info.icmp_field.icmp_type);
-	else {
-		DPS_LOG_ERR("Invalid L4 protocol for encap offloading", DP_LOG_PROTO(df->l4_type));
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
 		return DP_ERROR;
-	}
 	if (cross_pf_port)
 		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
 
@@ -268,15 +252,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct rte_flow_item_eth eth_spec;      // #1
-	struct rte_flow_item_ipv6 ipv6_spec;    // #2
-	struct rte_flow_item_ipv6 ol_ipv6_spec; // #3 (choose one)
-	struct rte_flow_item_ipv4 ol_ipv4_spec; // #3 (choose one)
-	struct rte_flow_item_tcp tcp_spec;      // #4 (choose one)
-	struct rte_flow_item_udp udp_spec;      // #4 (choose one)
-	struct rte_flow_item_icmp icmp_spec;    // #4 (choose one)
-	struct rte_flow_item_icmp6 icmp6_spec;  // #4 (choose one)
-	struct rte_flow_item pattern[5];        // + end
+	struct rte_flow_item_eth eth_spec;   // #1
+	struct rte_flow_item_ipv6 ipv6_spec; // #2
+	union dp_flow_item_l3 l3_spec;       // #3
+	union dp_flow_item_l4 l4_spec;       // #4
+	struct rte_flow_item pattern[5];     // + end
 	int pattern_cnt = 0;
 	struct rte_flow_action_raw_decap raw_decap;  // #1
 	struct rte_flow_action_raw_encap raw_encap;  // #2
@@ -284,9 +264,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_action_set_tp set_tp;        // #4 (optional)
 	struct rte_flow_action_age flow_age;         // #5
 #ifndef ENABLE_DPDK_22_11
-	struct rte_flow_action_queue redirect_queue; // #6 (choose one)
+	struct rte_flow_action_queue redirect_queue; // #6 (replaces send_to_port)
 #endif
-	struct rte_flow_action_port_id send_to_port; // #6 (choose one)
+	struct rte_flow_action_port_id send_to_port; // #6
 	struct rte_flow_action actions[7];            // + end
 	int action_cnt = 0;
 	struct flow_age_ctx *agectx;
@@ -299,7 +279,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	int hairpin_pattern_cnt = 0;
 	struct rte_flow_action_set_mac set_dst_mac;  // #1
 	struct rte_flow_action_age hairpin_flow_age; // #2
-	struct rte_flow_action hairpin_actions[3];    // + end
+	struct rte_flow_action hairpin_actions[3];   // + end
 	int hairpin_action_cnt = 0;
 	struct flow_age_ctx *hairpin_agectx;
 	struct dp_port *port;
@@ -335,33 +315,21 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, df->tun_info.ul_dst_addr6, df->tun_info.proto_id);
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv6_spec, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
 		actual_ol_ipv4_addr = df->flags.nat == DP_NAT_CHG_DST_IP
 								? df->nat_addr
 								: df->dst.dst_addr;
-		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv4_spec, actual_ol_ipv4_addr, df->l4_type);
+		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, actual_ol_ipv4_addr, df->l4_type);
 	}
 #ifndef ENABLE_DPDK_22_11
 	if (cross_pf_port)
 		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
 #endif
 
-	if (df->l4_type == DP_IP_PROTO_TCP)
-		dp_set_tcp_src_dst_noctrl_flow_item(&pattern[pattern_cnt++], &tcp_spec,
-											df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_UDP)
-		dp_set_udp_src_dst_flow_item(&pattern[pattern_cnt++], &udp_spec,
-									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_ICMP)
-		dp_set_icmp_flow_item(&pattern[pattern_cnt++], &icmp_spec, df->l4_info.icmp_field.icmp_type);
-	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
-		dp_set_icmp6_flow_item(&pattern[pattern_cnt++], &icmp6_spec, df->l4_info.icmp_field.icmp_type);
-	else {
-		DPS_LOG_ERR("Invalid L4 protocol for encap offloading", DP_LOG_PROTO(df->l4_type));
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
 		return DP_ERROR;
-	}
 #ifndef ENABLE_DPDK_22_11
 	if (cross_pf_port)
 		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
@@ -459,14 +427,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct rte_flow_item_eth eth_spec;      // #1
-	struct rte_flow_item_ipv6 ol_ipv6_spec; // #2 (choose one)
-	struct rte_flow_item_ipv4 ol_ipv4_spec; // #2 (choose one)
-	struct rte_flow_item_tcp tcp_spec;      // #3 (choose one)
-	struct rte_flow_item_udp udp_spec;      // #3 (choose one)
-	struct rte_flow_item_icmp icmp_spec;    // #3 (choose one)
-	struct rte_flow_item_icmp6 icmp6_spec;  // #3 (choose one)
-	struct rte_flow_item pattern[4];        // + end
+	struct rte_flow_item_eth eth_spec; // #1
+	union dp_flow_item_l3 l3_spec;     // #2
+	union dp_flow_item_l4 l4_spec;     // #3
+	struct rte_flow_item pattern[4];   // + end
 	int pattern_cnt = 0;
 	struct rte_flow_action_set_mac set_dst_mac;  // #1
 	struct rte_flow_action_set_mac set_src_mac;  // #2
@@ -483,33 +447,21 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv6_spec, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
 		actual_ol_ipv4_dst_addr = df->flags.nat == DP_NAT_CHG_DST_IP
 									? df->nat_addr
 									: df->dst.dst_addr;
 		dp_set_ipv4_src_dst_flow_item(&pattern[pattern_cnt++],
-									  &ol_ipv4_spec,
+									  &l3_spec.ipv4,
 									  df->src.src_addr,
 									  actual_ol_ipv4_dst_addr,
 									  df->l4_type);
 	}
 
-	if (df->l4_type == DP_IP_PROTO_TCP)
-		dp_set_tcp_src_dst_noctrl_flow_item(&pattern[pattern_cnt++], &tcp_spec,
-											df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_UDP)
-		dp_set_udp_src_dst_flow_item(&pattern[pattern_cnt++], &udp_spec,
-									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_ICMP)
-		dp_set_icmp_flow_item(&pattern[pattern_cnt++], &icmp_spec, df->l4_info.icmp_field.icmp_type);
-	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
-		dp_set_icmp6_flow_item(&pattern[pattern_cnt++], &icmp6_spec, df->l4_info.icmp_field.icmp_type);
-	else {
-		DPS_LOG_ERR("Invalid L4 protocol for local offloading", DP_LOG_PROTO(df->l4_type));
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
 		return DP_ERROR;
-	}
 
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
@@ -554,15 +506,11 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct rte_flow_item_eth eth_spec;      // #1
-	struct rte_flow_item_ipv6 ipv6_spec;    // #2
-	struct rte_flow_item_ipv6 ol_ipv6_spec; // #3 (choose one)
-	struct rte_flow_item_ipv4 ol_ipv4_spec; // #3 (choose one)
-	struct rte_flow_item_tcp tcp_spec;      // #4 (choose one)
-	struct rte_flow_item_udp udp_spec;      // #4 (choose one)
-	struct rte_flow_item_icmp icmp_spec;    // #4 (choose one)
-	struct rte_flow_item_icmp6 icmp6_spec;  // #4 (choose one)
-	struct rte_flow_item pattern[5];        // + end
+	struct rte_flow_item_eth eth_spec;   // #1
+	struct rte_flow_item_ipv6 ipv6_spec; // #2
+	union dp_flow_item_l3 l3_spec;       // #3
+	union dp_flow_item_l4 l4_spec;       // #4
+	struct rte_flow_item pattern[5];     // + end
 	int pattern_cnt = 0;
 	struct rte_flow_action_set_mac set_src_mac;  // #1
 	struct rte_flow_action_set_mac set_dst_mac;  // #2
@@ -581,24 +529,12 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	// inner packet matching (L3+L4)
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv6_spec, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	else
-		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &ol_ipv4_spec, df->dst.dst_addr, df->l4_type);
+		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, df->dst.dst_addr, df->l4_type);
 
-	if (df->l4_type == DP_IP_PROTO_TCP)
-		dp_set_tcp_src_dst_flow_item(&pattern[pattern_cnt++], &tcp_spec,
-									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_UDP)
-		dp_set_udp_src_dst_flow_item(&pattern[pattern_cnt++], &udp_spec,
-									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_ICMP)
-		dp_set_icmp_flow_item(&pattern[pattern_cnt++], &icmp_spec, df->l4_info.icmp_field.icmp_type);
-	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
-		dp_set_icmp6_flow_item(&pattern[pattern_cnt++], &icmp6_spec, df->l4_info.icmp_field.icmp_type);
-	else {
-		DPS_LOG_ERR("Invalid L4 protocol for in-network offloading", DP_LOG_PROTO(df->l4_type));
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
 		return DP_ERROR;
-	}
 
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 

@@ -34,11 +34,23 @@ extern "C"
 #define DP_TCP_CONTROL_FLAGS \
 	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
 
-typedef struct dp_icmp_err_ip_info {
+struct dp_icmp_err_ip_info {
 	struct rte_ipv4_hdr *err_ipv4_hdr;
 	rte_be16_t	l4_src_port;
 	rte_be16_t	l4_dst_port;
-} dp_icmp_err_ip_info;
+};
+
+union dp_flow_item_l3 {
+	struct rte_flow_item_ipv4 ipv4;
+	struct rte_flow_item_ipv6 ipv6;
+};
+
+union dp_flow_item_l4 {
+	struct rte_flow_item_tcp tcp;
+	struct rte_flow_item_udp udp;
+	struct rte_flow_item_icmp icmp;
+	struct rte_flow_item_icmp6 icmp6;
+};
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
 uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt);
@@ -142,6 +154,10 @@ void dp_set_meta_flow_item(struct rte_flow_item *item,
 						   uint32_t meta_value);
 
 void dp_set_end_flow_item(struct rte_flow_item *item);
+
+int dp_set_l4_flow_item(struct rte_flow_item *item,
+						union dp_flow_item_l4 *l4_spec,
+						const struct dp_flow *df);
 
 
 void dp_set_raw_decap_action(struct rte_flow_action *action,

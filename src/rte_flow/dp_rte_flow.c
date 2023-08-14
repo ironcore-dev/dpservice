@@ -583,6 +583,28 @@ void dp_set_end_flow_item(struct rte_flow_item *item)
 	item->last = NULL;
 }
 
+int dp_set_l4_flow_item(struct rte_flow_item *item,
+						union dp_flow_item_l4 *l4_spec,
+						const struct dp_flow *df)
+{
+	if (df->l4_type == DP_IP_PROTO_TCP)
+		dp_set_tcp_src_dst_noctrl_flow_item(item, &l4_spec->tcp,
+											df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
+	else if (df->l4_type == DP_IP_PROTO_UDP)
+		dp_set_udp_src_dst_flow_item(item, &l4_spec->udp,
+									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
+	else if (df->l4_type == DP_IP_PROTO_ICMP)
+		dp_set_icmp_flow_item(item, &l4_spec->icmp, df->l4_info.icmp_field.icmp_type);
+	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
+		dp_set_icmp6_flow_item(item, &l4_spec->icmp6, df->l4_info.icmp_field.icmp_type);
+	else {
+		DPS_LOG_ERR("Invalid L4 protocol", DP_LOG_PROTO(df->l4_type));
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
+
 
 void dp_set_raw_decap_action(struct rte_flow_action *action,
 							 struct rte_flow_action_raw_decap *raw_decap_action,
