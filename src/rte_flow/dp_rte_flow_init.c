@@ -2,7 +2,7 @@
 
 #include "dp_error.h"
 #include "dp_log.h"
-#include "rte_flow/dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow_helpers.h"
 
 static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
 	.group = 0,

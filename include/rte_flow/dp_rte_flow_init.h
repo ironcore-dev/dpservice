@@ -1,5 +1,5 @@
-#ifndef __INCLUDE_DP_RTE_FLOW_INIT_H
-#define __INCLUDE_DP_RTE_FLOW_INIT_H
+#ifndef __INCLUDE_DP_RTE_FLOW_INIT_H__
+#define __INCLUDE_DP_RTE_FLOW_INIT_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,4 +16,4 @@ int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_
 }
 #endif
 
-#endif /* __INCLUDE_DP_RTE_FLOW_INIT_H */
+#endif

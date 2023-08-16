@@ -4,7 +4,7 @@
 #include "dp_lpm.h"
 #include "dp_nat.h"
 #include "nodes/ipv6_nd_node.h"
-#include "rte_flow/dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow_helpers.h"
 
 #define DP_IPIP_ENCAP_HEADER_SIZE (sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr))
 
@@ -586,14 +586,14 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 	} else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		ret = dp_offload_handle_tunnel_decap_traffic(m, df);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));  // on PF?
+			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
 	} else if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 		) {
 			ret = dp_offload_handle_in_network_traffic(m, df);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret)); // on PF?
+				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
 		} else {
 			ret = dp_offload_handle_tunnel_encap_traffic(m, df);
 			if (DP_FAILED(ret))
