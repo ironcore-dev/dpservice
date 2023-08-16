@@ -630,7 +630,6 @@ void dp_set_dst_mac_set_action(struct rte_flow_action *action,
 							   struct rte_flow_action_set_mac *dst_mac_set_action,
 							   const struct rte_ether_addr *dst_mac)
 {
-	// TODO
 	rte_ether_addr_copy(dst_mac, (struct rte_ether_addr *)(dst_mac_set_action->mac_addr));
 	action->type = RTE_FLOW_ACTION_TYPE_SET_MAC_DST;
 	action->conf = dst_mac_set_action;
@@ -640,7 +639,6 @@ void dp_set_src_mac_set_action(struct rte_flow_action *action,
 							   struct rte_flow_action_set_mac *src_mac_set_action,
 							   const struct rte_ether_addr *src_mac)
 {
-	// TODO
 	rte_ether_addr_copy(src_mac, (struct rte_ether_addr *)src_mac_set_action->mac_addr);
 	action->type = RTE_FLOW_ACTION_TYPE_SET_MAC_SRC;
 	action->conf = src_mac_set_action;
@@ -666,9 +664,8 @@ void dp_set_ipv4_set_dst_action(struct rte_flow_action *action,
 
 void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
-								uint8_t *ipv6)
+								const uint8_t *ipv6)
 {
-	// TODO
 	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
 	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_SRC;
 	action->conf = ipv6_action;
@@ -676,9 +673,8 @@ void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
 
 void dp_set_ipv6_set_dst_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
-								uint8_t *ipv6)
+								const uint8_t *ipv6)
 {
-	// TODO
 	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
 	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_DST;
 	action->conf = ipv6_action;
@@ -686,20 +682,18 @@ void dp_set_ipv6_set_dst_action(struct rte_flow_action *action,
 
 void dp_set_trans_proto_set_src_action(struct rte_flow_action *action,
 									   struct rte_flow_action_set_tp *tp_action,
-									   uint16_t port)
+									   rte_be16_t port)
 {
-	// TODO
-	tp_action->port = htons(port);
+	tp_action->port = port;
 	action->type = RTE_FLOW_ACTION_TYPE_SET_TP_SRC;
 	action->conf = tp_action;
 }
 
 void dp_set_trans_proto_set_dst_action(struct rte_flow_action *action,
 									   struct rte_flow_action_set_tp *tp_action,
-									   uint16_t port)
+									   rte_be16_t port)
 {
-	// TODO
-	tp_action->port = htons(port);
+	tp_action->port = port;
 	action->type = RTE_FLOW_ACTION_TYPE_SET_TP_DST;
 	action->conf = tp_action;
 }
@@ -746,7 +740,7 @@ void dp_set_packet_mark_action(struct rte_flow_action *action,
 
 void dp_set_set_tag_action(struct rte_flow_action *action,
 						   struct rte_flow_action_set_tag *set_tag_action,
-						   uint32_t tag_value, __rte_unused uint8_t index)
+						   uint32_t tag_value)
 {
 	set_tag_action->data = tag_value;
 	set_tag_action->mask = 0xffffffff;

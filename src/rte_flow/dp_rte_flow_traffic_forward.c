@@ -205,7 +205,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		dp_set_ipv4_set_src_action(&actions[action_cnt++], &set_ipv4, df->nat_addr);
 		// also replace source port if network-nat is enabled
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
-			dp_set_trans_proto_set_src_action(&actions[action_cnt++], &set_tp, df->nat_port);
+			dp_set_trans_proto_set_src_action(&actions[action_cnt++], &set_tp, htons(df->nat_port));
 	}
 
 	// standard actions do not have the power to do what needs to be done here
@@ -351,7 +351,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		// also replace dst port if NAT enabled
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
 			dp_set_trans_proto_set_dst_action(&actions[action_cnt++], &set_tp,
-											  df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
+											  htons(df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
 	}
 
 	// make flow aging work

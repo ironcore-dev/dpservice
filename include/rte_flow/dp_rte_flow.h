@@ -186,19 +186,19 @@ void dp_set_ipv4_set_dst_action(struct rte_flow_action *action,
 
 void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
-								uint8_t *ipv6);
+								const uint8_t *ipv6);
 
 void dp_set_ipv6_set_dst_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
-								uint8_t *ipv6);
+								const uint8_t *ipv6);
 
 void dp_set_trans_proto_set_src_action(struct rte_flow_action *action,
 									   struct rte_flow_action_set_tp *tp_action,
-									   uint16_t port);
+									   rte_be16_t port);
 
 void dp_set_trans_proto_set_dst_action(struct rte_flow_action *action,
 									   struct rte_flow_action_set_tp *tp_action,
-									   uint16_t port);
+									   rte_be16_t port);
 
 void dp_set_send_to_port_action(struct rte_flow_action *action,
 								struct rte_flow_action_port_id *send_to_port_action,
@@ -218,7 +218,7 @@ void dp_set_packet_mark_action(struct rte_flow_action *action,
 
 void dp_set_set_tag_action(struct rte_flow_action *action,
 						   struct rte_flow_action_set_tag *set_tag_action,
-						   uint32_t tag_value, uint8_t index);
+						   uint32_t tag_value);
 
 void dp_set_set_meta_action(struct rte_flow_action *action,
 							struct rte_flow_action_set_meta *meta_action,
