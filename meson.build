@@ -46,9 +46,6 @@ add_project_arguments(cflags, language : 'c')
 add_project_arguments(cxxflags, language : 'cpp')
 
 add_global_arguments('-DDEBUG=true', language: ['c', 'cpp'])
-if get_option('enable_graphtrace')
-  add_global_arguments('-DENABLE_GRAPHTRACE', language: 'c')
-endif
 if get_option('enable_virtual_services')
   add_global_arguments('-DENABLE_VIRTSVC', language: ['c', 'cpp'])
 endif

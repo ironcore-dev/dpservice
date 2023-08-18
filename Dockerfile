@@ -91,7 +91,7 @@ COPY .git/ .git/
 
 RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
 RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
-RUN rm -rf build && meson build -Denable_graphtrace=true && cd ./build && ninja
+RUN rm -rf build && meson build && cd ./build && ninja
 
 FROM debian:11-slim
 
@@ -110,8 +110,7 @@ gawk \
 
 WORKDIR /
 COPY --from=builder /workspace/build/src/dp_service .
-# The asterisk is there to make the copy of dp_graphtrace "conditional" (do not copy when not present)
-COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_gr*aphtrace .
+COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_graphtrace .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/

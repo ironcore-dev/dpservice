@@ -31,10 +31,8 @@ bool dp_conf_is_stats_enabled(void);
 bool dp_conf_is_conntrack_enabled(void);
 bool dp_conf_is_ipv6_overlay_enabled(void);
 bool dp_conf_is_offload_enabled(void);
-#ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
 int dp_conf_get_graphtrace_loglevel(void);
-#endif
 #endif
 enum dp_conf_color dp_conf_get_color(void);
 enum dp_conf_log_format dp_conf_get_log_format(void);

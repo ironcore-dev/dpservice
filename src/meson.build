@@ -6,6 +6,8 @@ dp_sources = [
   'grpc/dp_grpc_service.cpp',
   'grpc/dp_grpc_thread.cpp',
   'monitoring/dp_event.c',
+  'monitoring/dp_graphtrace.c',
+  'monitoring/dp_graphtrace_shared.c',
   'monitoring/dp_monitoring.c',
   'nodes/arp_node.c',
   'nodes/arp_node.c',
@@ -41,6 +43,7 @@ dp_sources = [
   'dp_lb.c',
   'dp_log.c',
   'dp_lpm.c',
+  'dp_mbuf_dyn.c',
   'dp_multi_path.c',
   'dp_nat.c',
   'dp_netlink.c',
@@ -60,13 +63,6 @@ if get_option('enable_virtual_services')
   dp_sources += [
     'nodes/virtsvc_node.c',
     'dp_virtsvc.c',
-  ]
-endif
-if get_option('enable_graphtrace')
-  dp_sources += [
-    'dp_mbuf_dyn.c',
-    'monitoring/dp_graphtrace.c',
-    'monitoring/dp_graphtrace_shared.c',
   ]
 endif
 

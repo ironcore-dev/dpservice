@@ -31,10 +31,6 @@ As the TUN/TAP driver uses signals, it is recommended to use `handle signal SIG3
 
 
 ## Debugging graph nodes
-To provide a rudimentary packet analysis while the packet is being processed inside dp-service, there is a meson feature `enable_graphtrace` that compiles-in an extra command-line option `--graphtrace`. This allows you to see packet data as it travels through the DPDK graph (as opposed to nly seeing ingress/egress packets using `tcpdump`).
-
-To enable this feature, you need to configure it in meson: `meson setup --reconfigure -Denable_graphtrace=true build/`. Then you can add `--graphtrace=<level>` to actually enable logging at run-time. The parameter `level` is an integer, higher level will cause more verbosity.
-
-> Currently the exact verbosity of a given number can change as this feature is still being worked on.
+To provide a rudimentary packet analysis while the packet is being processed inside dp-service, there is a command-line tool provided by the repository called `dp_graphtrace`. This allows you to see packet data as it travels through the DPDK graph (as opposed to only seeing ingress/egress packets using `tcpdump`).
 
 Be aware that this will produce large amounts of logs, so only use it for debugging and if possible, on a prepared traffic flow.
