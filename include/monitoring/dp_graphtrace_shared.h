@@ -14,8 +14,7 @@
 // DPDK requirement: power of 2 and less than INT32_MAX
 #define DP_GRAPHTRACE_RINGBUF_SIZE 65536
 
-#define DP_MP_ACTION_GRAPHTRACE		"dp_mp_graphtrace"
-
+#define DP_MP_ACTION_GRAPHTRACE "dp_mp_graphtrace"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +42,6 @@ struct dp_graphtrace_mp_request {
 };
 
 struct dp_graphtrace_mp_reply {
-	uint8_t action;
 	int error_code;
 };
 

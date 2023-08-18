@@ -13,7 +13,7 @@ static enum dp_graphtrace_loglevel graphtrace_loglevel;
 #endif
 
 static struct dp_graphtrace graphtrace;
-bool dp_graphtrace_enabled = false;
+bool _dp_graphtrace_enabled = false;
 
 static int dp_graphtrace_init_memzone(void)
 {
@@ -41,41 +41,47 @@ static int dp_graphtrace_init_memzone(void)
 	return DP_OK;
 }
 
-static int dp_graphtrace_free_memzone(void)
+static void dp_graphtrace_free_memzone(void)
 {
-	if (graphtrace.ringbuf != NULL)
-		rte_ring_free(graphtrace.ringbuf);
+	rte_ring_free(graphtrace.ringbuf);
 	graphtrace.ringbuf = NULL;
-	if (graphtrace.mempool != NULL)
-		rte_mempool_free(graphtrace.mempool);
+	rte_mempool_free(graphtrace.mempool);
 	graphtrace.mempool = NULL;
+}
 
-	return DP_OK;
+static __rte_always_inline
+void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_graphtrace_mp_reply *reply)
+{
+	const struct dp_graphtrace_mp_request *request = (const struct dp_graphtrace_mp_request *)mp_msg->param;
+
+	if (mp_msg->len_param != sizeof(struct dp_graphtrace_mp_request)) {
+		DPS_LOG_WARNING("Invalid graphtrace request message size", DP_LOG_VALUE(mp_msg->len_param));
+		reply->error_code = -EMSGSIZE;
+		return;
+	}
+
+	switch ((enum dp_graphtrace_action)request->action) {
+	case DP_GRAPHTRACE_ACTION_START:
+		dp_graphtrace_enable();
+		reply->error_code = DP_OK;
+		return;
+	case DP_GRAPHTRACE_ACTION_STOP:
+		dp_graphtrace_disable();
+		reply->error_code = DP_OK;
+		return;
+	case DP_GRAPHTRACE_ACTION_NULL:
+	default:
+		DPS_LOG_WARNING("Unknown graphtrace request action", DP_LOG_VALUE(request->action));
+		reply->error_code = -EINVAL;
+		return;
+	}
 }
 
 static int dp_handle_mp_graphtrace_action(const struct rte_mp_msg *mp_msg, const void *peer)
 {
 	struct rte_mp_msg mp_reply;
-	const struct dp_graphtrace_mp_request *mp_request;
-	struct dp_graphtrace_mp_reply *reply = (struct dp_graphtrace_mp_reply *)mp_reply.param;
 
-	if (mp_msg->len_param != sizeof(struct dp_graphtrace_mp_request)) {
-		DPS_LOG_ERR("Invalid graphtrace request message size %u", mp_msg->len_param);
-		reply->error_code = DP_ERROR;
-		return DP_ERROR;
-	} else {
-		mp_request = (const struct dp_graphtrace_mp_request *)mp_msg->param;
-		if (mp_request->action == DP_GRAPHTRACE_ACTION_START)
-			dp_change_graphtrace_enable_flag(1);
-		else if (mp_request->action == DP_GRAPHTRACE_ACTION_STOP)
-			dp_change_graphtrace_enable_flag(0);
-		else {
-			DPS_LOG_ERR("Unknown graphtrace request action %u", mp_request->action);
-			return DP_ERROR;
-		}
-	}
-
-	reply->error_code = DP_OK;
+	dp_handle_graphtrace_request(mp_msg, (struct dp_graphtrace_mp_reply *)mp_reply.param);
 
 	rte_strscpy(mp_reply.name, DP_MP_ACTION_GRAPHTRACE, sizeof(mp_reply.name));
 	mp_reply.len_param = sizeof(struct dp_graphtrace_mp_reply);
@@ -92,15 +98,16 @@ int dp_graphtrace_init(void)
 {
 	int ret;
 
-	ret = rte_mp_action_register(DP_MP_ACTION_GRAPHTRACE, dp_handle_mp_graphtrace_action);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot register graphtrace action", DP_LOG_RET(ret));
-		return DP_ERROR;
-	}
-
 	ret = dp_graphtrace_init_memzone();
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to init memzone for dp graphtrace", DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	ret = rte_mp_action_register(DP_MP_ACTION_GRAPHTRACE, dp_handle_mp_graphtrace_action);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot register graphtrace action", DP_LOG_RET(ret));
+		dp_graphtrace_free_memzone();
 		return DP_ERROR;
 	}
 
@@ -112,13 +119,8 @@ int dp_graphtrace_init(void)
 
 void dp_graphtrace_free(void)
 {
-	int ret;
-	/* it is protected by null-pointer check */
-	ret = dp_graphtrace_free_memzone();
-	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot free graphtrace memzone", DP_LOG_RET(ret));
-
-	rte_mp_action_unregister(DP_MP_ACTION_GRAPHTRACE); // no return value
+	rte_mp_action_unregister(DP_MP_ACTION_GRAPHTRACE);
+	dp_graphtrace_free_memzone();
 }
 
 
