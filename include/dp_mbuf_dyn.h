@@ -4,9 +4,7 @@
 #include <assert.h>
 #include <rte_common.h>
 #include <rte_flow.h>
-#ifdef ENABLE_GRAPHTRACE
-#	include <rte_atomic.h>
-#endif
+#include <rte_atomic.h>
 #include "dp_flow.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
@@ -78,9 +76,7 @@ struct dp_flow {
 };
 
 struct dp_pkt_mark {
-#ifdef ENABLE_GRAPHTRACE
 	uint32_t id;
-#endif
 	struct {
 		uint32_t is_recirc : 1;
 	} flags;
@@ -95,9 +91,7 @@ static_assert(sizeof(((struct dp_flow *)0)->periodic_type) == 1,
 static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORTS,
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
 
-#ifdef ENABLE_GRAPHTRACE
 extern rte_atomic32_t dp_pkt_id_counter;
-#endif
 
 static __rte_always_inline struct dp_flow *dp_get_flow_ptr(struct rte_mbuf *m)
 {
@@ -123,9 +117,7 @@ static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
 {
 	struct dp_pkt_mark *mark = dp_get_pkt_mark(m);
 
-#ifdef ENABLE_GRAPHTRACE
 	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
-#endif
 	mark->flags.is_recirc = false;
 }
 

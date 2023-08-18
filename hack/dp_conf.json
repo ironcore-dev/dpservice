@@ -115,7 +115,7 @@
     "var": "graphtrace_loglevel",
     "type": "int",
     "default": "0",
-    "ifdef": [ "ENABLE_GRAPHTRACE", "ENABLE_PYTEST" ]
+    "ifdef": [ "ENABLE_PYTEST" ]
   },
   {
     "lgopt": "color",

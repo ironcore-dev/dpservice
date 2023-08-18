@@ -1,14 +1,6 @@
 #ifndef __INCLUDE_DP_GRAPHTRACE_H__
 #define __INCLUDE_DP_GRAPHTRACE_H__
 
-#ifndef ENABLE_GRAPHTRACE
-#	define dp_graphtrace_node(node, obj)
-#	define dp_graphtrace_node_burst(node, objs, nb_objs)
-#	define dp_graphtrace_next(node, obj, next_index)
-#	define dp_graphtrace_next_burst(node, objs, nb_objs, next_index)
-#	define dp_graphtrace_tx_burst(node, objs, nb_objs, port_id)
-#else
-
 #include <rte_graph.h>
 
 #include "dp_graphtrace_shared.h"
@@ -37,11 +29,11 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 	void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index);
 	void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id);
 #else
-#	define _dp_graphtrace_log_node(NODE, OBJ)
-#	define _dp_graphtrace_log_node_burst(NODE, OBJS, NUM)
-#	define _dp_graphtrace_log_next(NODE, OBJ, NEXT)
-#	define _dp_graphtrace_log_next_burst(NODE, OBJS, NUM, NEXT)
-#	define _dp_graphtrace_log_tx_burst(NODE, OBJS, NUM, PORTID)
+#	define _dp_graphtrace_log_node(NODE, OBJ) (void)0
+#	define _dp_graphtrace_log_node_burst(NODE, OBJS, NUM) (void)0
+#	define _dp_graphtrace_log_next(NODE, OBJ, NEXT) (void)0
+#	define _dp_graphtrace_log_next_burst(NODE, OBJS, NUM, NEXT) (void)0
+#	define _dp_graphtrace_log_tx_burst(NODE, OBJS, NUM, PORTID) (void)0
 #endif
 
 // Currently "node entered" events are only being logged, not sent out
@@ -85,7 +77,5 @@ static __rte_always_inline void dp_graphtrace_disable(void)
 #ifdef __cplusplus
 }
 #endif
-
-#endif  /* ENABLE_GRAPHTRACE */
 
 #endif

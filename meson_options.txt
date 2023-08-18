@@ -2,8 +2,6 @@ option('enable_usermode', type: 'boolean', value: false, description:
        'Make the resulting binary runnable without root (requires sudo during build)')
 option('enable_tests', type: 'boolean', value: false, description:
        'Make sure automated testing has all prerequisities')
-option('enable_graphtrace', type: 'boolean', value: false, description:
-       'Build with verbose logging of packet travel over the graph framework (--graphtrace option)')
 option('enable_dpdk_22_11_support', type: 'boolean', value: false, description:
        'Enable compatibility code for dpdk version 22.11')
 option('enable_virtual_services', type: 'boolean', value: false, description:

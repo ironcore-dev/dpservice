@@ -27,10 +27,8 @@ _OPT_SHOPT_MAX = 255,
 	OPT_NO_CONNTRACK,
 	OPT_ENABLE_IPV6_OVERLAY,
 	OPT_NO_OFFLOAD,
-#ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
 	OPT_GRAPHTRACE_LOGLEVEL,
-#endif
 #endif
 	OPT_COLOR,
 	OPT_LOG_FORMAT,
@@ -65,10 +63,8 @@ static const struct option longopts[] = {
 	{ "no-conntrack", 0, 0, OPT_NO_CONNTRACK },
 	{ "enable-ipv6-overlay", 0, 0, OPT_ENABLE_IPV6_OVERLAY },
 	{ "no-offload", 0, 0, OPT_NO_OFFLOAD },
-#ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
 	{ "graphtrace-loglevel", 1, 0, OPT_GRAPHTRACE_LOGLEVEL },
-#endif
 #endif
 	{ "color", 1, 0, OPT_COLOR },
 	{ "log-format", 1, 0, OPT_LOG_FORMAT },
@@ -118,10 +114,8 @@ static void print_help_args(FILE *outfile)
 		"     --no-conntrack                     disable connection tracking\n"
 		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
 		"     --no-offload                       disable traffic offloading\n"
-#ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
 		"     --graphtrace-loglevel=LEVEL        verbosity level of packet traversing the graph framework\n"
-#endif
 #endif
 		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
 		"     --log-format=FORMAT                set the format of individual log lines (on standard output): 'text' (default) or 'json'\n"
@@ -142,10 +136,8 @@ static bool stats_enabled = true;
 static bool conntrack_enabled = true;
 static bool ipv6_overlay_enabled = false;
 static bool offload_enabled = true;
-#ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
 static int graphtrace_loglevel = 0;
-#endif
 #endif
 static enum dp_conf_color color = DP_CONF_COLOR_NEVER;
 static enum dp_conf_log_format log_format = DP_CONF_LOG_FORMAT_TEXT;
@@ -204,14 +196,12 @@ bool dp_conf_is_offload_enabled(void)
 	return offload_enabled;
 }
 
-#ifdef ENABLE_GRAPHTRACE
 #ifdef ENABLE_PYTEST
 int dp_conf_get_graphtrace_loglevel(void)
 {
 	return graphtrace_loglevel;
 }
 
-#endif
 #endif
 enum dp_conf_color dp_conf_get_color(void)
 {
