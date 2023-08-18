@@ -77,7 +77,7 @@ uint64_t dp_timers_get_manage_interval_cycles(void)
 	return dp_timer_manage_interval_cycles;
 }
 
-uint8_t dp_timers_get_flow_aging_interval(void)
+int dp_timers_get_flow_aging_interval(void)
 {
 	return TIMER_FLOW_AGING_INTERVAL;
 }

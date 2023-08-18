@@ -10,17 +10,27 @@
 
 static struct flow_key first_key = {0};
 static struct flow_key second_key = {0};
-static struct flow_key *prev_key = NULL, *curr_key = &first_key;
+static struct flow_key *prev_key = NULL;
+static struct flow_key *curr_key = &first_key;
 static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
-static uint64_t last_fast_path_timestamp, pkt_timestamp = 0;
+static uint64_t last_fast_path_timestamp = 0;
+static uint64_t pkt_timestamp = 0;
 static uint64_t fast_path_vars_timeout = 0;
 static bool offload_mode_enabled = 0;
 
 void dp_cntrack_init(void)
 {
+	int fast_timeout;
+
 	offload_mode_enabled = dp_conf_is_offload_enabled();
-	fast_path_vars_timeout = (DP_FLOW_DEFAULT_TIMEOUT - dp_timers_get_flow_aging_interval() - 1) * rte_get_timer_hz();
+#ifdef ENABLE_PYTEST
+	flow_timeout = dp_conf_get_flow_timeout();
+#endif
+	fast_timeout = flow_timeout - dp_timers_get_flow_aging_interval() - 1;
+	if (fast_timeout < 1)
+		fast_timeout = 1;
+	fast_path_vars_timeout = fast_timeout * rte_get_timer_hz();
 }
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
@@ -233,10 +243,6 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	struct flow_key *key = NULL;
 	bool same_key;
 	int ret;
-
-	#ifdef ENABLE_PYTEST
-		flow_timeout = dp_conf_get_flow_timeout();
-	#endif
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 
