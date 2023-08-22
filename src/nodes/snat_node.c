@@ -46,7 +46,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				ret = dp_allocate_network_snat_port(df, vni);
 				if (DP_FAILED(ret)) {
 					DPNODE_LOG_WARNING(node, "Failed to allocate new NAT port for connection",
-									   DP_LOG_IPV4(src_ip), DP_LOG_PORT(ntohs(df->l4_info.trans_port.src_port)));
+									   DP_LOG_IPV4(snat_data->network_nat_ip),
+									   DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(src_ip),
+									   DP_LOG_SRC_PORT(ntohs(df->l4_info.trans_port.src_port)));
 					return SNAT_NEXT_DROP;
 				}
 				nat_port = (uint16_t)ret;
