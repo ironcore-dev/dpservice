@@ -272,11 +272,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct flow_age_ctx *agectx;
 	struct rte_flow_action *age_action;
 #ifndef ENABLE_DPDK_22_11
-	struct rte_flow_item_eth hairpin_eth_spec;       // #1
-	// hairpin reuses ol_ipvX_spec from normal flow  // #2
-	// hairpin reuses L4 specs from normal flow      // #3
-	struct rte_flow_item hairpin_pattern[4];         // + end
-	int hairpin_pattern_cnt = 0;
 	struct rte_flow_action_set_mac set_dst_mac;  // #1
 	struct rte_flow_action_age hairpin_flow_age; // #2
 	struct rte_flow_action hairpin_actions[3];   // + end
@@ -304,14 +299,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	// create flow match patterns
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
-#ifndef ENABLE_DPDK_22_11
-	if (cross_pf_port)
-		dp_set_eth_src_dst_flow_item(&hairpin_pattern[hairpin_pattern_cnt++],
-									 &hairpin_eth_spec,
-									 &new_eth_hdr.src_addr,
-									 &new_eth_hdr.dst_addr,
-									 new_eth_hdr.ether_type);
-#endif
+
 	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, df->tun_info.ul_dst_addr6, df->tun_info.proto_id);
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
@@ -323,23 +311,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 								: df->dst.dst_addr;
 		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, actual_ol_ipv4_addr, df->l4_type);
 	}
-#ifndef ENABLE_DPDK_22_11
-	if (cross_pf_port)
-		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
-#endif
 
 	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
 		return DP_ERROR;
-#ifndef ENABLE_DPDK_22_11
-	if (cross_pf_port)
-		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
-#endif
 
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
-#ifndef ENABLE_DPDK_22_11
-	if (cross_pf_port)
-		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
-#endif
 
 	// remove the IPIP header and replace it with a standard Ethernet header
 	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, DP_IPIP_ENCAP_HEADER_SIZE);
@@ -394,34 +370,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	}
 
 	DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
-#ifndef ENABLE_DPDK_22_11
-	/* This redundant action is needed to make hairpin work */
-	if (cross_pf_port) {
-		dp_set_dst_mac_set_action(&hairpin_actions[hairpin_action_cnt++], &set_dst_mac, &new_eth_hdr.dst_addr);
-		// make flow aging work
-		hairpin_agectx = allocate_agectx();
-		if (!hairpin_agectx)
-			// TODO(Tao): what to do about the already installed flow rule?
-			return DP_ERROR;
 
-		age_action = &hairpin_actions[hairpin_action_cnt++];
-		dp_set_flow_age_action(age_action, &hairpin_flow_age, df->conntrack->timeout_value, hairpin_agectx);
-
-		dp_set_end_action(&hairpin_actions[hairpin_action_cnt++]);
-
-		// TODO(Tao): unless this uses hairpin_pattern, the pattern is never used
-		if (DP_FAILED(dp_install_rte_flow_with_indirect(df->nxt_hop, &dp_flow_attr_egress,
-														pattern, hairpin_actions,
-														age_action, df, hairpin_agectx))
-		) {
-			free_agectx(hairpin_agectx);
-			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
-			// TODO(Tao): what to do about the already installed flow rule?
-			return DP_ERROR;
-		}
-		DPS_LOG_DEBUG("Installed hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
-	}
-#endif
 	return DP_OK;
 }
 
