@@ -114,16 +114,19 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
+	// match pattern for outgoing VF packets
 	struct rte_flow_item_eth eth_spec; // #1
 	union dp_flow_item_l3 l3_spec;     // #2
 	union dp_flow_item_l4 l4_spec;     // #3
 	struct rte_flow_item pattern[4];   // + end
 	int pattern_cnt = 0;
-	// hairpin uses the same items, only with the eth_spec being different
+
+	// hairpin uses the same items as above, only with the eth_spec being different
 	struct rte_flow_item_eth hairpin_eth_spec;
 	struct rte_flow_item hairpin_pattern[4];
 	int hairpin_pattern_cnt = 0;
-	// actions on the other hand are not shared
+
+	// tunnel encap action steps
 	struct rte_flow_action_set_ipv4 set_ipv4;    // #1 (optional)
 	struct rte_flow_action_set_tp set_tp;        // #2 (optional)
 	struct rte_flow_action_raw_decap raw_decap;  // #3
@@ -132,11 +135,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_action_port_id send_to_port; // #6 (optional)
 	struct rte_flow_action actions[7];            // + end
 	int action_cnt = 0;
+
+	// hairpin action is different - redirects the flow
 	struct rte_flow_action_set_mac hairpin_set_mac; // #1
 	struct rte_flow_action_queue hairpin_redirect;  // #2
 	struct rte_flow_action_age hairpin_flow_age;    // #3
 	struct rte_flow_action hairpin_actions[4];       // + end
 	int hairpin_action_cnt = 0;
+
+	// misc variables needed to create the flow
 	struct rte_ether_addr vni_in_mac_addr;
 	struct rte_flow_action *age_action;
 	struct rte_flow_action *hairpin_age_action;
@@ -145,7 +152,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	uint8_t raw_encap_hdr[DP_IPIP_ENCAP_HEADER_SIZE];
 	const struct rte_flow_attr *attr;
 	uint16_t t_port_id;
-	bool cross_pf_port = df->nxt_hop != dp_port_get_pf0_id();
+	bool cross_pf_port;
+
+	cross_pf_port = df->nxt_hop != dp_port_get_pf0_id();
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
 	if (cross_pf_port) {
@@ -252,12 +261,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
+	// match pattern for incoming tunneled packets
 	struct rte_flow_item_eth eth_spec;   // #1
 	struct rte_flow_item_ipv6 ipv6_spec; // #2
 	union dp_flow_item_l3 l3_spec;       // #3
 	union dp_flow_item_l4 l4_spec;       // #4
 	struct rte_flow_item pattern[5];     // + end
 	int pattern_cnt = 0;
+
+	// tunnel decap action steps
 	struct rte_flow_action_raw_decap raw_decap;  // #1
 	struct rte_flow_action_raw_encap raw_encap;  // #2
 	struct rte_flow_action_set_ipv4 set_ipv4;    // #3 (optional)
@@ -269,20 +281,18 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_action_port_id send_to_port; // #6
 	struct rte_flow_action actions[7];            // + end
 	int action_cnt = 0;
+
+	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
 	struct rte_flow_action *age_action;
 #ifndef ENABLE_DPDK_22_11
-	struct rte_flow_action_set_mac set_dst_mac;  // #1
-	struct rte_flow_action_age hairpin_flow_age; // #2
-	struct rte_flow_action hairpin_actions[3];   // + end
-	int hairpin_action_cnt = 0;
-	struct flow_age_ctx *hairpin_agectx;
 	struct dp_port *port;
 #endif
 	struct rte_ether_hdr new_eth_hdr;
 	rte_be32_t actual_ol_ipv4_addr;
-	bool cross_pf_port = m->port != dp_port_get_pf0_id();
+	bool cross_pf_port;
 
+	cross_pf_port = m->port != dp_port_get_pf0_id();
 	if (cross_pf_port)
 		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
 	else
@@ -370,17 +380,19 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	}
 
 	DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
-
 	return DP_OK;
 }
 
 static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
+	// match local traffic packets
 	struct rte_flow_item_eth eth_spec; // #1
 	union dp_flow_item_l3 l3_spec;     // #2
 	union dp_flow_item_l4 l4_spec;     // #3
 	struct rte_flow_item pattern[4];   // + end
 	int pattern_cnt = 0;
+
+	// action steps to send to the right VM
 	struct rte_flow_action_set_mac set_dst_mac;  // #1
 	struct rte_flow_action_set_mac set_src_mac;  // #2
 	struct rte_flow_action_set_ipv4 set_ipv4;    // #3 (optional)
@@ -388,6 +400,8 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct rte_flow_action_port_id send_to_port; // #5
 	struct rte_flow_action actions[6];           // + end
 	int action_cnt = 0;
+
+	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
 	struct rte_flow_action *age_action;
 	rte_be32_t actual_ol_ipv4_dst_addr;
@@ -455,12 +469,15 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
+	// match in-network underlay packets
 	struct rte_flow_item_eth eth_spec;   // #1
 	struct rte_flow_item_ipv6 ipv6_spec; // #2
 	union dp_flow_item_l3 l3_spec;       // #3
 	union dp_flow_item_l4 l4_spec;       // #4
 	struct rte_flow_item pattern[5];     // + end
 	int pattern_cnt = 0;
+
+	// action steps to send to the right underlay target
 	struct rte_flow_action_set_mac set_src_mac;  // #1
 	struct rte_flow_action_set_mac set_dst_mac;  // #2
 	struct rte_flow_action_set_ipv6 set_ipv6;    // #3
@@ -468,6 +485,8 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	struct rte_flow_action_queue redirect_queue; // #5
 	struct rte_flow_action actions[6];           // + end
 	int action_cnt = 0;
+
+	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
 
 	// create match pattern based on dp_flow
