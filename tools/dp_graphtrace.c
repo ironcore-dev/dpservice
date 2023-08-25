@@ -181,6 +181,9 @@ static void dp_graphtrace_monitor_primary(void *arg __rte_unused)
 {
 	int ret;
 
+	// Reference code from DPDK's pdump primary process monitor uses atomic operations on the variabls
+	// for synchronization. We use direct assignment here as no negative impact is observed so far.
+
 	// already terminating
 	if (interrupt)
 		return;
