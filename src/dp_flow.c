@@ -2,6 +2,7 @@
 
 #include <rte_icmp.h>
 
+#include "dp_cntrack.h"
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
@@ -190,10 +191,11 @@ int dp_add_flow(struct flow_key *key)
 	return DP_OK;
 }
 
-void dp_delete_flow_key(struct flow_key *key)
+static void dp_delete_flow_key_no_flush(struct flow_key *key)
 {
-	int ret = rte_hash_del_key(ipv4_flow_tbl, key);
-	
+	int ret;
+
+	ret = rte_hash_del_key(ipv4_flow_tbl, key);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY(key));
@@ -203,6 +205,14 @@ void dp_delete_flow_key(struct flow_key *key)
 	}
 
 	DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY(key));
+}
+
+void dp_delete_flow_key(struct flow_key *key)
+{
+	dp_delete_flow_key_no_flush(key);
+	// removed a flow, purge the cache to be safe
+	// (could only remove this key from cache, but that would need matching, which takes time)
+	dp_cntrack_flush_cache();
 }
 
 int dp_add_flow_data(struct flow_key *key, void *data)
@@ -248,8 +258,9 @@ void dp_free_flow(struct dp_ref *ref)
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
 
 	dp_free_network_nat_port(cntrack);
-	dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_ORG]);
-	dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+	dp_delete_flow_key_no_flush(&cntrack->flow_key[DP_FLOW_DIR_ORG]);
+	dp_delete_flow_key_no_flush(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+	dp_cntrack_flush_cache();
 
 	rte_free(cntrack);
 }

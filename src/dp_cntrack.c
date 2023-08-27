@@ -7,20 +7,34 @@
 #include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
 
+static struct flow_key key_cache[2];
+static int key_cache_index = 0;
+static struct flow_key *prev_key = NULL;
+static struct flow_key *curr_key = &key_cache[0];
+static struct flow_value *cached_flow_val = NULL;
 
-static struct flow_key first_key = {0};
-static struct flow_key second_key = {0};
-static struct flow_key *prev_key = NULL, *curr_key = &first_key;
-static struct flow_value *prev_flow_val = NULL;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
-static uint64_t last_fast_path_timestamp, pkt_timestamp = 0;
-static uint64_t fast_path_vars_timeout = 0;
 static bool offload_mode_enabled = 0;
 
 void dp_cntrack_init(void)
 {
 	offload_mode_enabled = dp_conf_is_offload_enabled();
-	fast_path_vars_timeout = (DP_FLOW_DEFAULT_TIMEOUT - dp_timers_get_flow_aging_interval() - 1) * rte_get_timer_hz();
+#ifdef ENABLE_PYTEST
+	flow_timeout = dp_conf_get_flow_timeout();
+#endif
+}
+
+void dp_cntrack_flush_cache(void)
+{
+	prev_key = NULL;
+	cached_flow_val = NULL;
+}
+
+static __rte_always_inline void dp_cache_flow_val(struct flow_value *flow_val)
+{
+	prev_key = curr_key;
+	curr_key = &key_cache[++key_cache_index % RTE_DIM(key_cache)];
+	cached_flow_val = flow_val;
 }
 
 static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
@@ -184,17 +198,6 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 }
 
 
-static __rte_always_inline bool dp_test_next_n_bytes_identical(const unsigned char *first_val, const unsigned char *second_val, uint8_t nr_bytes)
-{
-
-	for (uint8_t i = 0; i < nr_bytes; i++) {
-		if ((first_val[i] ^ second_val[i]) > 0)
-			return false;
-	}
-
-	return true;
-}
-
 static __rte_always_inline void dp_set_pkt_flow_direction(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
 
@@ -226,75 +229,69 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 	}
 }
 
-int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flow *df, struct flow_value **p_flow_val)
 {
-	struct flow_value *flow_val = NULL;
-	struct rte_ipv4_hdr *ipv4_hdr;
-	struct rte_tcp_hdr *tcp_hdr;
-	struct flow_key *key = NULL;
-	bool same_key;
 	int ret;
 
-	#ifdef ENABLE_PYTEST
-		flow_timeout = dp_conf_get_flow_timeout();
-	#endif
+	// TODO(plague): discuss making DP_FAILED() unlikely by default
+	ret = dp_build_flow_key(curr_key, m);
+	if (unlikely(DP_FAILED(ret)))
+		return ret;
 
-	ipv4_hdr = dp_get_ipv4_hdr(m);
-
-	key = curr_key;
-	memset(key, 0, sizeof(struct flow_key));
-
-	if (unlikely(DP_FAILED(dp_build_flow_key(key, m))))
-		return DP_ERROR;
-
-	pkt_timestamp = rte_rdtsc();
-
-	// clean up temp vars in case a (same) flow expires and is removed from the flow table
-	if ((pkt_timestamp - last_fast_path_timestamp) > fast_path_vars_timeout) {
-		prev_key = NULL;
-		prev_flow_val = NULL;
+	// highly optimized comparator for a specific key size
+	static_assert(sizeof(struct flow_key) == 18, "struct flow_key changed size");
+	if (prev_key
+		&& ((const uint64_t *)curr_key)[0] == ((const uint64_t *)prev_key)[0]
+		&& ((const uint64_t *)curr_key)[1] == ((const uint64_t *)prev_key)[1]
+		&& ((const uint16_t *)curr_key)[8] == ((const uint16_t *)prev_key)[8]
+	) {
+		// flow is the same as it was for the previous packet
+		*p_flow_val = cached_flow_val;
+		dp_set_pkt_flow_direction(curr_key, cached_flow_val, df);
+		dp_set_flow_offload_flag(m, cached_flow_val, df);
+		return DP_OK;
 	}
 
-	same_key = prev_key && dp_test_next_n_bytes_identical((const unsigned char *)prev_key,
-															  (const unsigned char *)curr_key,
-															  sizeof(struct flow_key));
-
-	if (!same_key) {
-		ret = dp_get_flow_data(key, (void **)&flow_val);
-		if (unlikely(DP_FAILED(ret))) {
-			if (likely(ret == -ENOENT)) {
-				flow_val = flow_table_insert_entry(key, df, m);
-				if (unlikely(!flow_val)) {
-					DPNODE_LOG_WARNING(node, "Failed to allocate a new flow table entry");
-					return DP_ERROR;
-				}
-			} else {
-				DPNODE_LOG_WARNING(node, "Flow table key search failed", DP_LOG_RET(ret));
-				return DP_ERROR;
-			}
-		} else {
-			dp_set_pkt_flow_direction(key, flow_val, df);
-			dp_set_flow_offload_flag(m, flow_val, df);
-
+	// cache miss, try the flow table
+	ret = dp_get_flow_data(curr_key, (void **)p_flow_val);
+	if (unlikely(DP_FAILED(ret))) {
+		if (unlikely(ret != -ENOENT)) {
+			DPS_LOG_WARNING("Flow table key search failed", DP_LOG_RET(ret));
+			return ret;
 		}
-		prev_key = curr_key;
-		if (curr_key == &first_key)
-			curr_key = &second_key;
-		else
-			curr_key = &first_key;
-
-		prev_flow_val = flow_val;
-	} else {
-		flow_val = prev_flow_val;
-		dp_set_pkt_flow_direction(key, flow_val, df);
-		dp_set_flow_offload_flag(m, flow_val, df);
+		// create new flow if needed
+		*p_flow_val = flow_table_insert_entry(curr_key, df, m);
+		if (unlikely(!*p_flow_val)) {
+			DPS_LOG_WARNING("Failed to allocate a new flow table entry");
+			return DP_ERROR;
+		}
+		dp_cache_flow_val(*p_flow_val);
+		return DP_OK;
 	}
 
-	flow_val->timestamp = pkt_timestamp;
-	last_fast_path_timestamp = pkt_timestamp;
+	// already established flow found
+	dp_set_pkt_flow_direction(curr_key, *p_flow_val, df);
+	dp_set_flow_offload_flag(m, *p_flow_val, df);
+	dp_cache_flow_val(*p_flow_val);
+	return DP_OK;
+}
+
+int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df)
+{
+	struct flow_value *flow_val;
+	struct rte_tcp_hdr *tcp_hdr;
+	int ret;
+
+	ret = dp_get_flow_val(m, df, &flow_val);
+	if (DP_FAILED(ret)) {
+		DPNODE_LOG_WARNING(node, "Cannot establish flow value", DP_LOG_RET(ret));
+		return ret;
+	}
+
+	flow_val->timestamp = rte_rdtsc();
 
 	if (df->l4_type == IPPROTO_TCP && df->vnf_type != DP_VNF_TYPE_LB) {
-		tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
+		tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv4_hdr(m) + 1);
 		dp_cntrack_tcp_state(flow_val, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}

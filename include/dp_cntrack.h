@@ -1,8 +1,6 @@
 #ifndef __INCLUDE_DP_CNTRACK_H__
 #define __INCLUDE_DP_CNTRACK_H__
 
-#include <rte_common.h>
-#include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 
@@ -13,8 +11,10 @@ extern "C" {
 #endif
 
 void dp_cntrack_init(void);
+
 int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df);
 
+void dp_cntrack_flush_cache(void);
 
 #ifdef __cplusplus
 }
