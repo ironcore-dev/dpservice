@@ -52,7 +52,6 @@ void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_in
 void dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_val);
 void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val);
 
-int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error);
 int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx);
 
 struct rte_flow *dp_install_rte_flow(uint16_t port_id,

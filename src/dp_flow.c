@@ -279,17 +279,6 @@ void dp_free_network_nat_port(struct flow_value *cntrack)
 	}
 }
 
-int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error)
-{
-	int ret;
-
-	ret = rte_flow_action_handle_destroy(port_id, handle, error);
-	if (DP_FAILED(ret))
-		DPS_LOG_WARNING("Failed to destroy flow action handle",
-						DP_LOG_FLOW_ERROR(error->message), DP_LOG_RET(ret));
-	return ret;
-}
-
 int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx)
 {
 	struct rte_flow_error error;
@@ -299,7 +288,7 @@ int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx)
 		return DP_OK;
 
 	if (agectx->handle) {
-		ret = dp_destroy_rte_action_handle(agectx->port_id, agectx->handle, &error);
+		ret = rte_flow_action_handle_destroy(agectx->port_id, agectx->handle, &error);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Failed to remove an indirect action", DP_LOG_PORTID(agectx->port_id),
 							DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));

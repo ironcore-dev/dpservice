@@ -80,6 +80,7 @@ static __rte_always_inline int dp_create_age_indirect_action(uint16_t port_id,
 	};
 	struct rte_flow_error error;
 	struct rte_flow_action_handle *result;
+	int ret;
 
 	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
 	if (!result) {
@@ -88,9 +89,11 @@ static __rte_always_inline int dp_create_age_indirect_action(uint16_t port_id,
 	}
 
 	if (DP_FAILED(dp_add_rte_age_ctx(conntrack, agectx))) {
-		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
-			DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id));
 		DPS_LOG_ERR("Failed to store agectx in conntrack object");
+		ret = rte_flow_action_handle_destroy(port_id, result, &error);
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("Failed to remove an indirect action",
+						DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -119,7 +122,7 @@ static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_i
 		if (df->l4_type == IPPROTO_TCP) {
 			// ignore errors, just added this
 			dp_del_rte_age_ctx(df->conntrack, agectx);
-			dp_destroy_rte_action_handle(port_id, agectx->handle, &error);
+			rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
 		}
 	}
 	return ret;
