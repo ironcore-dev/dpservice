@@ -15,7 +15,7 @@ extern "C" {
 
 #define FLOW_MAX						(1*1024*1024UL)
 
-#define DP_FLOW_VAL_MAX_AGE_STORE		5
+#define DP_FLOW_VAL_AGE_CTX_CAPACITY	5
 
 #define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
@@ -42,7 +42,7 @@ extern "C" {
 enum {
 	DP_FLOW_DIR_ORG,
 	DP_FLOW_DIR_REPLY,
-	DP_FLOW_DIR_MAX,
+	DP_FLOW_DIR_CAPACITY,
 };
 
 enum {
@@ -105,14 +105,14 @@ struct flow_nf_info {
 
 
 struct flow_value {
-	struct flow_key	flow_key[DP_FLOW_DIR_MAX];
-	struct flow_age_ctx *rte_age_ctxs[DP_FLOW_VAL_MAX_AGE_STORE];
+	struct flow_key	flow_key[DP_FLOW_DIR_CAPACITY];
+	struct flow_age_ctx *rte_age_ctxs[DP_FLOW_VAL_AGE_CTX_CAPACITY];
 	struct flow_nf_info	nf_info;
 	uint64_t		timestamp;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
 	uint8_t			flow_status; // record if a flow has status associated with it
-	uint8_t			fwall_action[DP_FLOW_DIR_MAX];
+	uint8_t			fwall_action[DP_FLOW_DIR_CAPACITY];
 	struct {
 		uint8_t orig : 4;
 		uint8_t reply : 4;
