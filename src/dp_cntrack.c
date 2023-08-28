@@ -215,8 +215,9 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	} else {
 
-		// recirc pkt shall not change flow's state because its ancestor has already done
-		if (dp_get_pkt_mark(m)->flags.is_recirc)
+		// after introducing vnf_type as part of the flow key, recirc pkt shall perform offload state changing
+		// instead of its ancestor pkt. Its ancestor pkt's flow still resides as before, but its state is not changing
+		if (df->vnf_type == DP_VNF_TYPE_LB)
 			return;
 
 		// when to offload reply pkt of a tcp flow is determined in dp_cntrack_set_timeout_tcp_flow
@@ -292,7 +293,7 @@ int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow 
 	flow_val->timestamp = pkt_timestamp;
 	last_fast_path_timestamp = pkt_timestamp;
 
-	if (df->l4_type == IPPROTO_TCP && !dp_get_pkt_mark(m)->flags.is_recirc) {
+	if (df->l4_type == IPPROTO_TCP && df->vnf_type != DP_VNF_TYPE_LB) {
 		tcp_hdr = (struct rte_tcp_hdr *) (ipv4_hdr + 1);
 		dp_cntrack_tcp_state(flow_val, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
