@@ -154,6 +154,8 @@ void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct dp_ref *ref);
 void dp_free_network_nat_port(struct flow_value *cntrack);
+void dp_remove_nat_flows(uint16_t port_id, int nat_type);  // TODO create proper enum!
+void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key);
 

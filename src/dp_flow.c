@@ -419,7 +419,11 @@ void dp_process_aged_flows_non_offload(void)
 	uint64_t timer_hz = rte_get_timer_hz();
 	int	ret;
 
-	while (rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter) >= 0) {
+	while ((ret = rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Iterating flow table failed while aging flows", DP_LOG_RET(ret));
+			return;
+		}
 		// NOTE: possible optimization in moving a runtime constant 'timer_hz *' into 'timeout_value' directly
 		// But it would require enlarging the flow_val member, thus this needs performance analysis first
 		if (offload_mode_enabled) {
@@ -429,6 +433,51 @@ void dp_process_aged_flows_non_offload(void)
 		}
 
 		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value) && (!flow_val->aged)) {
+			flow_val->aged = 1;
+			dp_ref_dec(&flow_val->ref_count);
+		}
+	}
+}
+
+// TODO: while ((ret = rte_hash_iterate(ipv4_snat_tbl, (const void **)&nkey, (void **)&data, &index)) != -ENOENT) {
+// TODO: inline for aged+ref_dec
+// TODO: offload_mode_enabled
+// TODO VIRTSVC!! (machine only?)
+void dp_remove_nat_flows(uint16_t port_id, int nat_type)
+{
+	struct flow_value *flow_val = NULL;
+	const void *next_key;
+	uint32_t iter = 0;
+	int ret;
+
+	while ((ret = rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
+			return;
+		}
+		// NAT/VIP are in 1:1 relation to a VM (port_id), no need to check IP:port
+		if (flow_val->created_port_id == port_id && flow_val->nf_info.nat_type == nat_type) {
+			flow_val->aged = 1;
+			dp_ref_dec(&flow_val->ref_count);
+		}
+	}
+}
+
+void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port)
+{
+	struct flow_value *flow_val = NULL;
+	const struct flow_key *next_key;
+	uint32_t iter = 0;
+	int ret;
+
+	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
+			return;
+		}
+		if (next_key->vni == vni && next_key->ip_dst == ipv4
+			&& next_key->port_dst >= min_port && next_key->port_dst < max_port
+		) {
 			flow_val->aged = 1;
 			dp_ref_dec(&flow_val->ref_count);
 		}

@@ -1,6 +1,7 @@
 #include "grpc/dp_grpc_impl.h"
 #include <time.h>
 #include "dp_error.h"
+#include "dp_flow.h"
 #include "dp_lb.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
@@ -320,7 +321,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	// because 1:1 VIP is not shared with anything
 	dp_del_dnat_ip(s_data->vip_ip, vm_vni);
 	dp_del_vm_snat_ip(vm_ip, vm_vni);
-
+	dp_remove_nat_flows(port_id, DP_FLOW_NAT_TYPE_VIP);
 	return DP_GRPC_OK;
 }
 
@@ -700,6 +701,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->network_nat_ip;
 	dp_del_vip_from_dnat(s_data->network_nat_ip, vm_vni);
+	dp_remove_nat_flows(port_id, DP_FLOW_NAT_TYPE_NETWORK_LOCAL);
 	return dp_del_vm_network_snat_ip(vm_ip, vm_vni);
 }
 
@@ -764,6 +766,7 @@ static int dp_process_delete_neighnat(struct dp_grpc_responder *responder)
 			return ret;
 
 		dp_del_vip_from_dnat(request->addr.ipv4, request->vni);
+		dp_remove_neighnat_flows(request->addr.ipv4, request->vni, request->min_port, request->max_port);
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 
