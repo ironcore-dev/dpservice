@@ -132,9 +132,9 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 	struct rte_mbuf *dups[nb_objs];
 	struct rte_mbuf *dup;
 	struct dp_graphtrace_pktinfo *pktinfo;
-	uint sent;
+	uint32_t sent;
 
-	for (uint i = 0; i < nb_objs; ++i) {
+	for (uint32_t i = 0; i < nb_objs; ++i) {
 		dup = rte_pktmbuf_copy(objs[i], graphtrace.mempool, 0, UINT32_MAX);
 		if (likely(!dup)) {
 			// allocation (pool size) is designed to fail when the ringbuffer is (almost) full
@@ -189,7 +189,7 @@ void _dp_graphtrace_log_node(struct rte_node *node, void *obj)
 void _dp_graphtrace_log_node_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
-		for (uint i = 0; i < nb_objs; ++i)
+		for (uint32_t i = 0; i < nb_objs; ++i)
 			dp_graphtrace_log(objs[i], "%-14s: %3u                  : ",
 						   node->name, dp_get_pkt_mark(objs[i])->id);
 }
@@ -204,7 +204,7 @@ void _dp_graphtrace_log_next(struct rte_node *node, void *obj, rte_edge_t next_i
 void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
-		for (uint i = 0; i < nb_objs; ++i)
+		for (uint32_t i = 0; i < nb_objs; ++i)
 			dp_graphtrace_log(objs[i], "%-11s #%u: %3u -> %-14s: ",
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, node->nodes[next_index]->name);
 }
@@ -212,7 +212,7 @@ void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t 
 void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
-		for (uint i = 0; i < nb_objs; ++i)
+		for (uint32_t i = 0; i < nb_objs; ++i)
 			dp_graphtrace_log(objs[i], "%-11s #%u: %3u >> PORT %-9u: ",
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, port_id);
 }
