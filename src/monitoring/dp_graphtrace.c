@@ -64,10 +64,12 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 	case DP_GRAPHTRACE_ACTION_START:
 		dp_graphtrace_enable();
 		reply->error_code = DP_OK;
+		DPS_LOG_INFO("Graphtrace enabled");
 		return;
 	case DP_GRAPHTRACE_ACTION_STOP:
 		dp_graphtrace_disable();
 		reply->error_code = DP_OK;
+		DPS_LOG_INFO("Graphtrace disabled");
 		return;
 	case DP_GRAPHTRACE_ACTION_NULL:
 	default:
