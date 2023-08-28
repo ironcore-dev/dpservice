@@ -290,7 +290,7 @@ int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle
 	return ret;
 }
 
-static int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx)
+int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx)
 {
 	struct rte_flow_error error;
 	int ret;
@@ -488,23 +488,15 @@ hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
 
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 {
-	size_t index;
-
-	for (index = 0; index < RTE_DIM(cntrack->rte_age_ctxs); index++) {
-		if (!cntrack->rte_age_ctxs[index]) {
-			cntrack->rte_age_ctxs[index] = ctx;
-			ctx->ref_index_in_cntrack = index;
-			break;
+	for (size_t i = 0; i < sizeof(cntrack->rte_age_ctxs); ++i) {
+		if (!cntrack->rte_age_ctxs[i]) {
+			cntrack->rte_age_ctxs[i] = ctx;
+			ctx->ref_index_in_cntrack = i;
+			return DP_OK;
 		}
 	}
-
-	if (index >= RTE_DIM(cntrack->rte_age_ctxs)) {
-		DPS_LOG_ERR("Cannot add agectx to conntrack storage, at capacity",
-					DP_LOG_VALUE(index), DP_LOG_MAX(RTE_DIM(cntrack->rte_age_ctxs)));
-		return DP_ERROR;
-	}
-
-	return DP_OK;
+	DPS_LOG_ERR("Cannot add agectx to conntrack storage, at capacity", DP_LOG_MAX(sizeof(cntrack->rte_age_ctxs)));
+	return DP_ERROR;
 }
 
 int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)

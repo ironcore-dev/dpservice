@@ -53,17 +53,12 @@ void dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_v
 void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val);
 
 int dp_destroy_rte_action_handle(uint16_t port_id, struct rte_flow_action_handle *handle, struct rte_flow_error *error);
+int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx);
 
 struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 									 const struct rte_flow_attr *attr,
 									 const struct rte_flow_item pattern[],
 									 const struct rte_flow_action actions[]);
-
-int dp_create_age_indirect_action(uint16_t port_id,
-								  const struct rte_flow_attr *attr,
-								  const struct rte_flow_action *age_action,
-								  struct flow_value *conntrack,
-								  struct flow_age_ctx *agectx);
 
 #ifdef __cplusplus
 }

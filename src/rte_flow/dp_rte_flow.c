@@ -294,9 +294,7 @@ struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 {
 	int ret;
 	struct rte_flow *flow;
-	struct rte_flow_error error = {
-		.message = "(no stated reason)",
-	};
+	struct rte_flow_error error;
 
 	ret = rte_flow_validate(port_id, attr, pattern, actions, &error);
 	if (DP_FAILED(ret)) {
@@ -310,37 +308,4 @@ struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 		return NULL;
 	}
 	return flow;
-}
-
-int dp_create_age_indirect_action(uint16_t port_id,
-								  const struct rte_flow_attr *attr,
-								  const struct rte_flow_action *age_action,
-								  struct flow_value *conntrack,
-								  struct flow_age_ctx *agectx)
-{
-	struct rte_flow_indir_action_conf age_indirect_conf = {
-		.ingress = attr->ingress,
-		.egress = attr->egress,
-		.transfer = attr->transfer,
-	};
-	struct rte_flow_error error = {
-		.message = "(no stated reason)",
-	};
-	struct rte_flow_action_handle *result;
-
-	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
-	if (!result) {
-		DPS_LOG_ERR("Flow's age cannot be configured as indirect", DP_LOG_FLOW_ERROR(error.message));
-		return DP_ERROR;
-	}
-
-	if (DP_FAILED(dp_add_rte_age_ctx(conntrack, agectx))) {
-		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
-			DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id));
-		DPS_LOG_ERR("Failed to store agectx in conntrack object");
-		return DP_ERROR;
-	}
-
-	agectx->handle = result;
-	return DP_OK;
 }

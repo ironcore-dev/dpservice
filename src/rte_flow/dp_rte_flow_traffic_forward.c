@@ -47,18 +47,6 @@ static __rte_always_inline struct flow_age_ctx *allocate_agectx(void)
 	return agectx;
 }
 
-static void free_agectx(struct flow_age_ctx *agectx)
-{
-	struct rte_flow_error error;
-
-	if (agectx->handle) {
-		if (DP_FAILED(dp_destroy_rte_action_handle(agectx->port_id, agectx->handle, &error)))
-			DPS_LOG_ERR("Failed to remove an indirect action",
-						DP_LOG_PORTID(agectx->port_id), DP_LOG_FLOW_ERROR(error.message));
-	}
-	rte_free(agectx);
-}
-
 static __rte_always_inline int dp_install_rte_flow_with_age(uint16_t port_id,
 															const struct rte_flow_attr *attr,
 															const struct rte_flow_item pattern[],
@@ -79,6 +67,37 @@ static __rte_always_inline int dp_install_rte_flow_with_age(uint16_t port_id,
 	return DP_OK;
 }
 
+static __rte_always_inline int dp_create_age_indirect_action(uint16_t port_id,
+															 const struct rte_flow_attr *attr,
+															 const struct rte_flow_action *age_action,
+															 struct flow_value *conntrack,
+															 struct flow_age_ctx *agectx)
+{
+	struct rte_flow_indir_action_conf age_indirect_conf = {
+		.ingress = attr->ingress,
+		.egress = attr->egress,
+		.transfer = attr->transfer,
+	};
+	struct rte_flow_error error;
+	struct rte_flow_action_handle *result;
+
+	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
+	if (!result) {
+		DPS_LOG_ERR("Flow's age cannot be configured as indirect", DP_LOG_FLOW_ERROR(error.message));
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_add_rte_age_ctx(conntrack, agectx))) {
+		if (DP_FAILED(dp_destroy_rte_action_handle(port_id, result, &error)))
+			DPS_LOG_ERR("Failed to remove an indirect action", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to store agectx in conntrack object");
+		return DP_ERROR;
+	}
+
+	agectx->handle = result;
+	return DP_OK;
+}
+
 static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_id,
 																 const struct rte_flow_attr *attr,
 																 const struct rte_flow_item pattern[],
@@ -87,11 +106,23 @@ static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_i
 																 const struct dp_flow *df,
 																 struct flow_age_ctx *agectx)
 {
+	struct rte_flow_error error;
+	int ret;
+
 	if (df->l4_type == IPPROTO_TCP)
 		if (DP_FAILED(dp_create_age_indirect_action(port_id, attr, age_action, df->conntrack, agectx)))
 			return DP_ERROR;
 
-	return dp_install_rte_flow_with_age(port_id, attr, pattern, actions, df->conntrack, agectx);
+	ret = dp_install_rte_flow_with_age(port_id, attr, pattern, actions, df->conntrack, agectx);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to install aging rte flow", DP_LOG_RET(ret));
+		if (df->l4_type == IPPROTO_TCP) {
+			// ignore errors, just added this
+			dp_del_rte_age_ctx(df->conntrack, agectx);
+			dp_destroy_rte_action_handle(port_id, agectx->handle, &error);
+		}
+	}
+	return ret;
 }
 
 static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_IPIP_ENCAP_HEADER_SIZE],
@@ -202,7 +233,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 														hairpin_pattern, hairpin_actions,
 														hairpin_age_action, df, hairpin_agectx))
 		) {
-			free_agectx(hairpin_agectx);
+			dp_destroy_rte_flow_agectx(hairpin_agectx);
 			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(m->port));
 			return DP_ERROR;
 		}
@@ -225,9 +256,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// make flow aging work
 	agectx = allocate_agectx();
-	if (!agectx)
-		// TODO(Tao): what to do when a hairpin rule is already installed? (accessible via hairpin_agectx->rte_flow)
+	if (!agectx) {
+		dp_destroy_rte_flow_agectx(hairpin_agectx);
 		return DP_ERROR;
+	}
 
 	age_action = &actions[action_cnt++];
 	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
@@ -250,8 +282,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 													pattern, actions,
 													age_action, df, agectx))
 	) {
-		free_agectx(agectx);
-		// TODO(Tao): what to do when a hairpin rule is already installed? (accessible via hairpin_agectx->rte_flow)
+		dp_destroy_rte_flow_agectx(agectx);
+		dp_destroy_rte_flow_agectx(hairpin_agectx);
 		return DP_ERROR;
 	}
 
@@ -353,14 +385,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 		port = dp_port_get_vf((uint16_t)df->nxt_hop);
 		if (!port) {
-			// TODO(Tao): shouldn't this function rather fail here?
-			DPS_LOG_WARNING("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
-			dp_set_redirect_queue_action(&actions[action_cnt++], &redirect_queue, 0);
-		} else {
-			// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
-			dp_set_redirect_queue_action(&actions[action_cnt++], &redirect_queue,
-										 DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset);
+			DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
+			dp_destroy_rte_flow_agectx(agectx);
+			return DP_ERROR;
 		}
+		// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
+		dp_set_redirect_queue_action(&actions[action_cnt++], &redirect_queue,
+									 DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset);
 	} else
 #endif
 		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
@@ -375,7 +406,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 													pattern, actions,
 													age_action, df, agectx))
 	) {
-		free_agectx(agectx);
+		dp_destroy_rte_flow_agectx(agectx);
 		return DP_ERROR;
 	}
 
@@ -459,7 +490,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 													pattern, actions,
 													age_action, df, agectx))
 	) {
-		free_agectx(agectx);
+		dp_destroy_rte_flow_agectx(agectx);
 		return DP_ERROR;
 	}
 
@@ -521,8 +552,14 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	if (!agectx)
 		return DP_ERROR;
 
-	// TODO define timeout?
-	dp_set_flow_age_action(&actions[action_cnt++], &flow_age, 30, agectx);
+	dp_set_flow_age_action(&actions[action_cnt++],
+						   &flow_age,
+#ifdef ENABLE_PYTEST
+						   dp_conf_get_flow_timeout(),
+#else
+						   DP_FLOW_DEFAULT_TIMEOUT,
+#endif
+						   agectx);
 
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 	// queue_index is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
@@ -534,7 +571,7 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// no need to perform query to perform checking on expiration status, thus an indirect action is not needed
 
 	if (DP_FAILED(dp_install_rte_flow_with_age(m->port, &dp_flow_attr_ingress, pattern, actions, df->conntrack, agectx))) {
-		free_agectx(agectx);
+		dp_destroy_rte_flow_agectx(agectx);
 		return DP_ERROR;
 	}
 
