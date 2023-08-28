@@ -182,7 +182,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	struct rte_flow_action *age_action;
 	struct rte_flow_action *hairpin_age_action;
 	struct flow_age_ctx *agectx;
-	struct flow_age_ctx *hairpin_agectx;
+	struct flow_age_ctx *hairpin_agectx = NULL;
 	uint8_t raw_encap_hdr[DP_IPIP_ENCAP_HEADER_SIZE];
 	const struct rte_flow_attr *attr;
 	uint16_t t_port_id;
@@ -260,7 +260,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// make flow aging work
 	agectx = allocate_agectx();
 	if (!agectx) {
-		dp_destroy_rte_flow_agectx(hairpin_agectx);
+		if (hairpin_agectx)
+			dp_destroy_rte_flow_agectx(hairpin_agectx);
 		return DP_ERROR;
 	}
 
@@ -286,7 +287,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 													age_action, df, agectx))
 	) {
 		dp_destroy_rte_flow_agectx(agectx);
-		dp_destroy_rte_flow_agectx(hairpin_agectx);
+		if (hairpin_agectx)
+			dp_destroy_rte_flow_agectx(hairpin_agectx);
 		return DP_ERROR;
 	}
 
