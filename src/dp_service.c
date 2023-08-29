@@ -113,6 +113,24 @@ static void signal_handler(int signum)
 	}
 }
 
+static int setup_sighandlers(void)
+{
+	struct sigaction old_action;
+	struct sigaction sig_action = {
+		.sa_handler = signal_handler,
+		.sa_flags = SA_RESETHAND,  // second Ctrl+C will terminate forcefully
+	};
+
+	// man(2): 'sigaction() returns 0 on success <...> errno is set to indicate the error.'
+	if (sigaction(SIGINT, &sig_action, &old_action)
+		|| sigaction(SIGTERM, &sig_action, &old_action)
+	) {
+		DPS_LOG_ERR("Cannot setup signal handling", DP_LOG_RET(errno));
+		return DP_ERROR;
+	}
+	return DP_OK;
+}
+
 static int init_interfaces(void)
 {
 	int pf0_socket;
@@ -212,14 +230,8 @@ static int run_service(void)
 	DPS_LOG_INFO("Starting DP Service version " DP_SERVICE_VERSION);
 	// from this point on, only DPS_LOG should be used
 
-	if (signal(SIGINT, signal_handler) == SIG_ERR
-		|| signal(SIGTERM, signal_handler) == SIG_ERR
-	) {
-		DPS_LOG_ERR("Cannot setup signal handling", DP_LOG_RET(errno));
-		return DP_ERROR;
-	}
-
-	if (DP_FAILED(dp_dpdk_layer_init()))
+	if (DP_FAILED(setup_sighandlers())
+		|| DP_FAILED(dp_dpdk_layer_init()))
 		return DP_ERROR;
 
 	result = run_dpdk_service();
