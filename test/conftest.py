@@ -34,6 +34,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--dpgrpc", action="store_true", help="Use C++ gRPC client"
 	)
+	parser.addoption(
+		"--graphtrace", action="store_true", help="Log graph tracing messages"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -61,7 +64,8 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout,
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
-						   offloading = request.config.getoption("--offloading"))
+						   offloading = request.config.getoption("--offloading"),
+						   graphtrace = request.config.getoption("--graphtrace"))
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")

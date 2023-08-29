@@ -14,7 +14,8 @@ class DpService:
 
 	DP_SERVICE_CONF = "/tmp/dp_service.conf"
 
-	def __init__(self, build_path, port_redundancy, fast_flow_timeout, gdb=False, test_virtsvc=False, hardware=False, offloading=False):
+	def __init__(self, build_path, port_redundancy, fast_flow_timeout,
+				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
@@ -49,6 +50,8 @@ class DpService:
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 f' --grpc-port={grpc_port}'
 					  ' --no-stats')
+		if graphtrace:
+			self.cmd += ' --graphtrace-loglevel=1'
 		if not offloading:
 			self.cmd += ' --no-offload'
 

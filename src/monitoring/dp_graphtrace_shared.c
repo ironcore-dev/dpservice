@@ -10,6 +10,41 @@
 					##__VA_ARGS__); \
 } while (0)
 
+static const char *tcp_strflags[256] = {
+	"",       "F",      "S",      "FS",      "R",      "FR",      "SR",      "FSR",
+	"P",      "FP",     "SP",     "FSP",     "RP",     "FRP",     "SRP",     "FSRP",
+	"A",      "FA",     "SA",     "FSA",     "RA",     "FRA",     "SRA",     "FSRA",
+	"PA",     "FPA",    "SPA",    "FSPA",    "RPA",    "FRPA",    "SRPA",    "APRSF",
+	"U",      "FU",     "SU",     "FSU",     "RU",     "FRU",     "SRU",     "FSRU",
+	"PU",     "FPU",    "SPU",    "FSPU",    "RPU",    "FRPU",    "SRPU",    "UPRSF",
+	"AU",     "FAU",    "SAU",    "FSAU",    "RAU",    "FRAU",    "SRAU",    "UARSF",
+	"PAU",    "FPAU",   "SPAU",   "FSPAU",   "UAPR",   "FRPAU",   "SRPAU",   "FSRPAU",
+	"E",      "FE",     "SE",     "FSE",     "RE",     "FRE",     "SRE",     "FSRE",
+	"PE",     "FPE",    "SPE",    "FSPE",    "RPE",    "FRPE",    "SRPE",    "EPRSF",
+	"AE",     "FAE",    "SAE",    "FSAE",    "RAE",    "FRAE",    "SRAE",    "EARSF",
+	"PAE",    "FPAE",   "SPAE",   "FSPAE",   "EAPR",   "FRPAE",   "SRPAE",   "FSRPAE",
+	"UE",     "FUE",    "SUE",    "FSUE",    "RUE",    "FRUE",    "SRUE",    "EURSF",
+	"PUE",    "FPUE",   "SPUE",   "FSPUE",   "EUPR",   "FRPUE",   "SRPUE",   "FSRPUE",
+	"AUE",    "FAUE",   "SAUE",   "FSAUE",   "EUAR",   "FRAUE",   "SRAUE",   "FSRAUE",
+	"PAUE",   "FPAUE",  "SPAUE",  "FSPAUE",  "RPAUE",  "FRPAUE",  "SRPAUE",  "FSRPAUE",
+	"C",      "FC",     "SC",     "FSC",     "RC",     "FRC",     "SRC",     "FSRC",
+	"PC",     "FPC",    "SPC",    "FSPC",    "RPC",    "FRPC",    "SRPC",    "CPRSF",
+	"AC",     "FAC",    "SAC",    "FSAC",    "RAC",    "FRAC",    "SRAC",    "CARSF",
+	"PAC",    "FPAC",   "SPAC",   "FSPAC",   "CAPR",   "FRPAC",   "SRPAC",   "FSRPAC",
+	"UC",     "FUC",    "SUC",    "FSUC",    "RUC",    "FRUC",    "SRUC",    "CURSF",
+	"PUC",    "FPUC",   "SPUC",   "FSPUC",   "CUPR",   "FRPUC",   "SRPUC",   "FSRPUC",
+	"AUC",    "FAUC",   "SAUC",   "FSAUC",   "CUAR",   "FRAUC",   "SRAUC",   "FSRAUC",
+	"PAUC",   "FPAUC",  "SPAUC",  "FSPAUC",  "RPAUC",  "FRPAUC",  "SRPAUC",  "FSRPAUC",
+	"EC",     "FEC",    "SEC",    "FSEC",    "REC",    "FREC",    "SREC",    "CERSF",
+	"PEC",    "FPEC",   "SPEC",   "FSPEC",   "CEPR",   "FRPEC",   "SRPEC",   "FSRPEC",
+	"AEC",    "FAEC",   "SAEC",   "FSAEC",   "CEAR",   "FRAEC",   "SRAEC",   "FSRAEC",
+	"PAEC",   "FPAEC",  "SPAEC",  "FSPAEC",  "RPAEC",  "FRPAEC",  "SRPAEC",  "FSRPAEC",
+	"UEC",    "FUEC",   "SUEC",   "FSUEC",   "CEUR",   "FRUEC",   "SRUEC",   "FSRUEC",
+	"PUEC",   "FPUEC",  "SPUEC",  "FSPUEC",  "RPUEC",  "FRPUEC",  "SRPUEC",  "FSRPUEC",
+	"AUEC",   "FAUEC",  "SAUEC",  "FSAUEC",  "RAUEC",  "FRAUEC",  "SRAUEC",  "FSRAUEC",
+	"PAUEC",  "FPAUEC", "SPAUEC", "FSPAUEC", "RPAUEC", "FRPAUEC", "SRPAUEC", "FSRPAUEC",
+};
+
 static void dp_graphtrace_sprint_ether(void **p_pkt_data, size_t *p_pos, char *buf, size_t bufsize)
 {
 	struct rte_ether_hdr *ether_hdr = (struct rte_ether_hdr *)*p_pkt_data;
@@ -61,8 +96,10 @@ static void dp_graphtrace_sprint_tcp(void **p_pkt_data, size_t *p_pos, char *buf
 	struct rte_tcp_hdr *tcp_hdr = (struct rte_tcp_hdr *)*p_pkt_data;
 
 	PRINT_LAYER(p_pos, buf, bufsize,
-		"TCP %u -> %u seq %u ack %u",
-		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port), ntohl(tcp_hdr->sent_seq), ntohl(tcp_hdr->recv_ack));
+		"TCP %u -> %u [%s] seq %u ack %u",
+		ntohs(tcp_hdr->src_port), ntohs(tcp_hdr->dst_port),
+		tcp_strflags[tcp_hdr->tcp_flags],
+		ntohl(tcp_hdr->sent_seq), ntohl(tcp_hdr->recv_ack));
 
 	*p_pkt_data = tcp_hdr + 1;
 }
