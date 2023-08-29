@@ -185,7 +185,9 @@ static inline int run_dpdk_service(void)
 
 	result = dp_dpdk_main_loop();
 
-	if (DP_FAILED(dp_grpc_thread_join()))
+	// Proper shutdown of gRPC server does not work
+	// thus calling cancel() instead of join() here
+	if (DP_FAILED(dp_grpc_thread_cancel()))
 		result = DP_ERROR;
 
 end:

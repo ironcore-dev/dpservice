@@ -7,6 +7,8 @@
 #include "grpc/dp_grpc_service.h"
 
 static pthread_t grpc_thread_id;
+// pthread_t is opaque, must use another value for checking
+static bool grpc_thread_started = false;
 
 static void *dp_grpc_main_loop(__rte_unused void *arg)
 {
@@ -21,7 +23,7 @@ static void *dp_grpc_main_loop(__rte_unused void *arg)
 
 	// we are in a thread, proper teardown would be complicated here, so exit instead
 	if (!grpc_svc->run(addr))
-		rte_exit(EXIT_FAILURE, "Cannot run without working GRPC server\n");
+		rte_exit(EXIT_FAILURE, "Cannot run without working gRPC server\n");
 
 	GRPCService::Cleanup();
 	return NULL;
@@ -29,31 +31,37 @@ static void *dp_grpc_main_loop(__rte_unused void *arg)
 
 int dp_grpc_thread_start(void)
 {
-	int ret = rte_ctrl_thread_create(&grpc_thread_id, "grpc-thread", NULL, dp_grpc_main_loop, NULL);
+	int ret;
 
-	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot create grpc thread", DP_LOG_RET(ret));
-	return ret;
-}
-
-int dp_grpc_thread_join(void)
-{
-	int ret = pthread_join(grpc_thread_id, NULL);  // returns errno on failure
-
-	if (ret) {
-		DPS_LOG_ERR("Cannot join grpc thread", DP_LOG_RET(ret));
+	if (grpc_thread_started) {
+		DPS_LOG_WARNING("gRPC thread already started");
 		return DP_ERROR;
 	}
+
+	ret = rte_ctrl_thread_create(&grpc_thread_id, "grpc-thread", NULL, dp_grpc_main_loop, NULL);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot create gRPC thread", DP_LOG_RET(ret));
+		return ret;
+	}
+
+	grpc_thread_started = true;
 	return DP_OK;
 }
 
 int dp_grpc_thread_cancel(void)
 {
-	int ret = pthread_cancel(grpc_thread_id);  // returns errno on failure
+	int ret;
 
+	// no warning here, this is used for force-quitting
+	if (!grpc_thread_started)
+		return DP_OK;
+
+	ret = pthread_cancel(grpc_thread_id);  // returns errno on failure
 	if (ret) {
-		DPS_LOG_ERR("Cannot cancel grpc thread", DP_LOG_RET(ret));
-		return DP_ERROR;
+		DPS_LOG_ERR("Cannot cancel gRPC thread", DP_LOG_RET(ret));
+		return ret;
 	}
+
+	grpc_thread_started = false;
 	return DP_OK;
 }

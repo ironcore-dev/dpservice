@@ -94,7 +94,6 @@ void dp_force_quit(void)
 {
 	DPS_LOG_INFO("Stopping service...");
 	force_quit = true;
-	dp_grpc_thread_cancel();
 }
 
 
