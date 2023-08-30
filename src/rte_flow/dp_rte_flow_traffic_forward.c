@@ -1,955 +1,617 @@
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
-#include "dp_nat.h"
-#include "dp_log.h"
 #include "dp_error.h"
+#include "dp_log.h"
+#include "dp_lpm.h"
+#include "dp_nat.h"
+#include "nodes/ipv6_nd_node.h"
+#include "rte_flow/dp_rte_flow_helpers.h"
+
+#define DP_IPIP_ENCAP_HEADER_SIZE (sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr))
+
+static const struct rte_flow_attr dp_flow_attr_ingress = {
+	.group = 0,
+	.priority = 0,
+	.ingress = 1,
+	.egress = 0,
+	.transfer = 0,
+};
+
+static const struct rte_flow_attr dp_flow_attr_egress = {
+	.group = 0,
+	.priority = 0,
+	.ingress = 0,
+	.egress = 1,
+	.transfer = 0,
+};
+
+static const struct rte_flow_attr dp_flow_attr_transfer = {
+	.group = 0,
+	.priority = 0,
+#ifdef ENABLE_DPDK_22_11
+	.ingress = 0,
+#else
+	.ingress = 1,
+#endif
+	.egress = 0,
+	.transfer = 1,
+};
+
+static __rte_always_inline struct flow_age_ctx *allocate_agectx(void)
+{
+	struct flow_age_ctx *agectx;
+
+	agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
+	if (!agectx)
+		DPS_LOG_ERR("Failed to allocate age context");
+
+	return agectx;
+}
+
+static __rte_always_inline int dp_install_rte_flow_with_age(uint16_t port_id,
+															const struct rte_flow_attr *attr,
+															const struct rte_flow_item pattern[],
+															const struct rte_flow_action actions[],
+															struct flow_value *conntrack,
+															struct flow_age_ctx *agectx)
+{
+	struct rte_flow *flow;
+
+	flow = dp_install_rte_flow(port_id, attr, pattern, actions);
+	if (!flow)
+		return DP_ERROR;
+
+	agectx->cntrack = conntrack;
+	agectx->rte_flow = flow;
+	agectx->port_id = port_id;
+	dp_ref_inc(&conntrack->ref_count);
+	return DP_OK;
+}
+
+static __rte_always_inline int dp_create_age_indirect_action(uint16_t port_id,
+															 const struct rte_flow_attr *attr,
+															 const struct rte_flow_action *age_action,
+															 struct flow_value *conntrack,
+															 struct flow_age_ctx *agectx)
+{
+	struct rte_flow_indir_action_conf age_indirect_conf = {
+		.ingress = attr->ingress,
+		.egress = attr->egress,
+		.transfer = attr->transfer,
+	};
+	struct rte_flow_error error;
+	struct rte_flow_action_handle *result;
+	int ret;
+
+	result = rte_flow_action_handle_create(port_id, &age_indirect_conf, age_action, &error);
+	if (!result) {
+		DPS_LOG_ERR("Flow's age cannot be configured as indirect", DP_LOG_FLOW_ERROR(error.message));
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_add_rte_age_ctx(conntrack, agectx))) {
+		DPS_LOG_ERR("Failed to store agectx in conntrack object");
+		ret = rte_flow_action_handle_destroy(port_id, result, &error);
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("Failed to remove an indirect action",
+						DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	agectx->handle = result;
+	return DP_OK;
+}
+
+static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_id,
+																 const struct rte_flow_attr *attr,
+																 const struct rte_flow_item pattern[],
+																 const struct rte_flow_action actions[],
+																 const struct rte_flow_action *age_action,
+																 const struct dp_flow *df,
+																 struct flow_age_ctx *agectx)
+{
+	struct rte_flow_error error;
+	int ret;
+
+	if (df->l4_type == IPPROTO_TCP)
+		if (DP_FAILED(dp_create_age_indirect_action(port_id, attr, age_action, df->conntrack, agectx)))
+			return DP_ERROR;
+
+	ret = dp_install_rte_flow_with_age(port_id, attr, pattern, actions, df->conntrack, agectx);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to install aging rte flow", DP_LOG_RET(ret));
+		if (df->l4_type == IPPROTO_TCP) {
+			// ignore errors, just added this
+			dp_del_rte_age_ctx(df->conntrack, agectx);
+			rte_flow_action_handle_destroy(port_id, agectx->handle, &error);
+		}
+	}
+	return ret;
+}
+
+static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_IPIP_ENCAP_HEADER_SIZE],
+															const struct dp_flow *df)
+{
+	struct rte_ether_hdr *encap_eth_hdr = (struct rte_ether_hdr *)raw_hdr;
+	struct rte_ipv6_hdr *encap_ipv6_hdr = (struct rte_ipv6_hdr *)(&raw_hdr[sizeof(struct rte_ether_hdr)]);
+
+	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &encap_eth_hdr->dst_addr);
+	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &encap_eth_hdr->src_addr);
+	encap_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
+
+	encap_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
+	encap_ipv6_hdr->payload_len = 0;
+	encap_ipv6_hdr->proto = df->tun_info.proto_id;
+	encap_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
+	rte_memcpy(encap_ipv6_hdr->src_addr, get_underlay_conf()->src_ip6, sizeof(encap_ipv6_hdr->src_addr));
+	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
+}
 
 static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct underlay_conf *u_conf = get_underlay_conf();
-	bool cross_pf_port = df->nxt_hop == dp_port_get_pf0_id() ? false : true;
-
-	struct rte_flow_attr attr;
-
-	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
+	// match pattern for outgoing VF packets
+	struct rte_flow_item_eth eth_spec; // #1
+	union dp_flow_item_l3 l3_spec;     // #2
+	union dp_flow_item_l4 l4_spec;     // #3
+	struct rte_flow_item pattern[4];   // + end
 	int pattern_cnt = 0;
-	struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
+
+	// hairpin uses the same items as above, only with the eth_spec being different
+	struct rte_flow_item_eth hairpin_eth_spec;
+	struct rte_flow_item hairpin_pattern[4];
 	int hairpin_pattern_cnt = 0;
-	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
+
+	// tunnel encap action steps
+	struct rte_flow_action_set_ipv4 set_ipv4;    // #1 (optional)
+	struct rte_flow_action_set_tp set_tp;        // #2 (optional)
+	struct rte_flow_action_raw_decap raw_decap;  // #3
+	struct rte_flow_action_raw_encap raw_encap;  // #4
+	struct rte_flow_action_age flow_age;         // #5
+	struct rte_flow_action_port_id send_to_port; // #6 (optional)
+	struct rte_flow_action actions[7];            // + end
 	int action_cnt = 0;
-	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
+
+	// hairpin action is different - redirects the flow
+	struct rte_flow_action_set_mac hairpin_set_mac; // #1
+	struct rte_flow_action_queue hairpin_redirect;  // #2
+	struct rte_flow_action_age hairpin_flow_age;    // #3
+	struct rte_flow_action hairpin_actions[4];       // + end
 	int hairpin_action_cnt = 0;
 
-	int age_action_index;
-	int ret;
+	// misc variables needed to create the flow
+	struct rte_ether_addr vni_in_mac_addr;
+	struct rte_flow_action *age_action;
+	struct rte_flow_action *hairpin_age_action;
+	struct flow_age_ctx *agectx;
+	struct flow_age_ctx *hairpin_agectx = NULL;
+	uint8_t raw_encap_hdr[DP_IPIP_ENCAP_HEADER_SIZE];
+	const struct rte_flow_attr *attr;
+	uint16_t t_port_id;
+	bool cross_pf_port;
 
-	memset(pattern, 0, sizeof(pattern));
-	memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
-	memset(action, 0, sizeof(action));
-	memset(hairpin_action, 0, sizeof(hairpin_action));
+	cross_pf_port = df->nxt_hop != dp_port_get_pf0_id();
 
-	uint8_t vni_in_mac_addr[RTE_ETHER_ADDR_LEN];
-
-	memset(vni_in_mac_addr, 0, sizeof(vni_in_mac_addr));
-	memcpy(vni_in_mac_addr, &df->tun_info.dst_vni, 4);
-
-	// create flow match patterns -- eth, for maching vf packets
-	struct rte_flow_item_eth ol_eth_spec;
-	struct rte_flow_item_eth ol_eth_mask;
-
-	if (cross_pf_port)
-		hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-												&ol_eth_spec, &ol_eth_mask,
-												NULL, 0, NULL, 0,
-												htons(df->l3_type));
-
-
-	// create flow match patterns -- eth, for maching modified vf packets embedded with vni info
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
-	struct rte_ether_addr modified_eth_dst_addr;
-
-	memcpy(modified_eth_dst_addr.addr_bytes, vni_in_mac_addr, sizeof(struct rte_ether_addr));
-
-	if (cross_pf_port)
-		pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-													&eth_spec, &eth_mask,
-													NULL, 0, &modified_eth_dst_addr, sizeof(struct rte_ether_addr),
-													htons(df->l3_type));
-	else
-		pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-													&eth_spec, &eth_mask,
-													NULL, 0, NULL, 0,
-													htons(df->l3_type));
-
-	// create flow match patterns -- inner packet, ipv6 or ipv4
-	struct rte_flow_item_ipv6 ol_ipv6_spec;
-	struct rte_flow_item_ipv6 ol_ipv6_mask;
-
-	struct rte_flow_item_ipv4 ol_ipv4_spec;
-	struct rte_flow_item_ipv4 ol_ipv4_mask;
-
-	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_ipv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&ol_ipv6_spec, &ol_ipv6_mask,
-													NULL, 0,
-													df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-													df->l4_type);
-
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-												df->l4_type);
-	} else {
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_ipv4_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&ol_ipv4_spec, &ol_ipv4_mask,
-													NULL, 0,
-													&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
-													df->l4_type);
-
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
-												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
-												&df->dst.dst_addr, sizeof(ol_ipv4_spec.hdr.dst_addr),
-												df->l4_type);
-	}
-
-	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
-	struct rte_flow_item_tcp tcp_spec;
-	struct rte_flow_item_tcp tcp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_TCP) {
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&tcp_spec, &tcp_mask,
-													df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-													DP_RTE_TCP_CNTL_FLAGS);
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
-											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   DP_RTE_TCP_CNTL_FLAGS);
-	}
-
-	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_UDP) {
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_udp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-												&udp_spec, &udp_mask,
-												df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	}
-
-	struct rte_flow_item_icmp icmp_spec;
-	struct rte_flow_item_icmp icmp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMP) {
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_icmp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&icmp_spec, &icmp_mask,
-													df->l4_info.icmp_field.icmp_type);
-		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
-												&icmp_spec, &icmp_mask,
-												df->l4_info.icmp_field.icmp_type);
-	}
-
-	struct rte_flow_item_icmp6 icmp6_spec;
-	struct rte_flow_item_icmp6 icmp6_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMPV6) {
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_icmpv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&icmp6_spec, &icmp6_mask,
-													df->l4_info.icmp_field.icmp_type);
-		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
-												  &icmp6_spec, &icmp6_mask,
-												  df->l4_info.icmp_field.icmp_type);
-	}
-
-	// create flow match patterns -- end
-	if (cross_pf_port)
-		hairpin_pattern_cnt = insert_end_match_pattern(hairpin_pattern, hairpin_pattern_cnt);
-
-	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
-
-
-	/*Firstly install a flow rule to modify mac addr to embed vni info and move packet to hairpin rxq*/
+	// Match vf packets (and possibly modified vf packets embedded with vni info)
 	if (cross_pf_port) {
-		struct rte_flow_action_set_mac set_mac_action;
-		struct rte_flow_action_queue queue_action;
-		struct rte_flow_action_age flow_age;
-		struct rte_ether_addr	e_addr;
+		dp_set_eth_flow_item(&hairpin_pattern[hairpin_pattern_cnt++], &hairpin_eth_spec, htons(df->l3_type));
+		memset(vni_in_mac_addr.addr_bytes, 0, sizeof(vni_in_mac_addr));
+		memcpy(vni_in_mac_addr.addr_bytes, &df->tun_info.dst_vni, 4);
+		dp_set_eth_dst_flow_item(&pattern[pattern_cnt++], &eth_spec, &vni_in_mac_addr, htons(df->l3_type));
+	} else
+		dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
 
-		memcpy(e_addr.addr_bytes, vni_in_mac_addr, sizeof(RTE_ETHER_ADDR_LEN));
-		uint16_t hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES;
+	// encapsulating, there is only overlay addressing
+	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
+	else
+		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, df->dst.dst_addr, df->l4_type);
+	if (cross_pf_port)
+		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
 
-		// create flow action -- set mac
-		hairpin_action_cnt = create_dst_mac_set_action(hairpin_action, hairpin_action_cnt, &set_mac_action, &e_addr);
-		// create flow action -- move pkt to rx hairpin queue
-		hairpin_action_cnt = create_redirect_queue_action(hairpin_action, hairpin_action_cnt, &queue_action, hairpin_rx_queue_id);
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
+		return DP_ERROR;
+	if (cross_pf_port)
+		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
 
-		// create flow action -- age
-		struct flow_age_ctx *hairpin_agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
+	if (cross_pf_port)
+		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
 
+
+	/* First, install a flow rule to modify mac address to embed vni info and move packet to hairpin rxq */
+	if (cross_pf_port) {
+		// set proper ethernet address
+		dp_set_dst_mac_set_action(&hairpin_actions[hairpin_action_cnt++], &hairpin_set_mac, &vni_in_mac_addr);
+		// move packet to hairpin rx queue
+		dp_set_redirect_queue_action(&hairpin_actions[hairpin_action_cnt++], &hairpin_redirect, DP_NR_STD_RX_QUEUES);
+		// make flow aging work
+		hairpin_agectx = allocate_agectx();
 		if (!hairpin_agectx)
-			return 0;
-		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
-										&flow_age, df->conntrack->timeout_value, hairpin_agectx);
-		age_action_index = hairpin_action_cnt - 1;
-		// create flow action -- end
-		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
+			return DP_ERROR;
+		hairpin_age_action = &hairpin_actions[hairpin_action_cnt++];
+		dp_set_flow_age_action(hairpin_age_action, &hairpin_flow_age, df->conntrack->timeout_value, hairpin_agectx);
 
-		// validate and install rte flow
-		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
-		struct rte_flow *hairpin_flow = NULL;
+		dp_set_end_action(&hairpin_actions[hairpin_action_cnt++]);
 
-		ret = dp_create_age_indirect_action(&attr, m->port, df, &hairpin_action[age_action_index], hairpin_agectx);
-		if (DP_FAILED(ret)) {
-			free_allocated_agectx(hairpin_agectx);
-			return 0;
+		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_attr_ingress,
+														hairpin_pattern, hairpin_actions,
+														hairpin_age_action, df, hairpin_agectx))
+		) {
+			dp_destroy_rte_flow_agectx(hairpin_agectx);
+			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(m->port));
+			return DP_ERROR;
 		}
-
-		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, hairpin_pattern, hairpin_action);
-		if (!hairpin_flow) {
-			free_allocated_agectx(hairpin_agectx);
-			DPS_LOG_ERR("Failed to install hairpin queue flow rule on vf", DP_LOG_PORTID(m->port));
-			return 0;
-		}
-		config_allocated_agectx(hairpin_agectx, m->port, df, hairpin_flow);
+		DPS_LOG_DEBUG("Installed hairpin queue flow rule", DP_LOG_PORTID(m->port));
 	}
-
 
 	// replace source ip if vip-nat/network-nat is enabled
-	struct rte_flow_action_set_ipv4 set_ipv4;
-	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->nat_addr, DP_IS_SRC);
+	if (df->flags.nat == DP_NAT_CHG_SRC_IP) {
+		dp_set_ipv4_set_src_action(&actions[action_cnt++], &set_ipv4, df->nat_addr);
+		// also replace source port if network-nat is enabled
+		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
+			dp_set_trans_proto_set_src_action(&actions[action_cnt++], &set_tp, htons(df->nat_port));
+	}
 
-	// replace source port if network-nat is enabled
-	struct rte_flow_action_set_tp set_tp;
+	// standard actions do not have the power to do what needs to be done here
+	// thus a raw decap (to get a 'naked' packet) and raw encap is used
+	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, sizeof(struct rte_ether_hdr));
+	dp_create_ipip_encap_header(raw_encap_hdr, df);
+	dp_set_raw_encap_action(&actions[action_cnt++], &raw_encap, raw_encap_hdr, sizeof(raw_encap_hdr));
 
-	if (df->flags.nat == DP_NAT_CHG_SRC_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
-		action_cnt = create_trans_proto_set_action(action, action_cnt,
-										    &set_tp, df->nat_port, DP_IS_SRC);
+	// make flow aging work
+	agectx = allocate_agectx();
+	if (!agectx) {
+		if (hairpin_agectx)
+			dp_destroy_rte_flow_agectx(hairpin_agectx);
+		return DP_ERROR;
+	}
 
-	// create flow action -- raw decap
-	struct rte_flow_action_raw_decap raw_decap;
+	age_action = &actions[action_cnt++];
+	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
 
-	action_cnt = create_raw_decap_action(action, action_cnt,
-										 &raw_decap, NULL, sizeof(struct rte_ether_hdr));
-
-
-	// create flow action -- raw encap
-	uint8_t encap_hdr[DP_TUNN_IPIP_ENCAP_SIZE];
-
-	memset(encap_hdr, 0, DP_TUNN_IPIP_ENCAP_SIZE);
-
-	struct rte_flow_action_raw_encap raw_encap;
-
-	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)encap_hdr;
-
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
-	new_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
-
-	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encap_hdr[sizeof(struct rte_ether_hdr)]);
-
-	new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
-	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	new_ipv6_hdr->proto = df->tun_info.proto_id;
-	rte_memcpy(new_ipv6_hdr->src_addr, u_conf->src_ip6, sizeof(new_ipv6_hdr->src_addr));
-	rte_memcpy(new_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(new_ipv6_hdr->dst_addr));
-
-	action_cnt = create_raw_encap_action(action, action_cnt,
-										 &raw_encap, encap_hdr, DP_TUNN_IPIP_ENCAP_SIZE);
-
-
-	// create flow action -- age
-	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-	struct rte_flow_action_age flow_age;
-
-	if (!agectx)
-		return 0;
-	action_cnt = create_flow_age_action(action, action_cnt,
-										&flow_age, df->conntrack->timeout_value, agectx);
-	age_action_index = action_cnt - 1;
-
-	// create flow action -- send to port
-	struct rte_flow_action_port_id send_to_port;
-
+	// send to the right port (unless already handled by the hairpin)
 	if (!cross_pf_port)
-		action_cnt = create_send_to_port_action(action, action_cnt,
-												&send_to_port, df->nxt_hop);
+		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
 
+	dp_set_end_action(&actions[action_cnt++]);
 
-	// create flow action -- end
-	action_cnt = create_end_action(action, action_cnt);
-
-	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-
-	if (cross_pf_port)
-		create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
-	else {
-		#ifdef ENABLE_DPDK_22_11
-			create_rte_flow_rule_attr(&attr, 0, 0, 0, 0, 1);
-		#else
-			create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
-		#endif
+	// install rte flow to the right port
+	if (cross_pf_port) {
+		attr = &dp_flow_attr_egress;
+		t_port_id = dp_port_get_pf1_id();
+	} else {
+		attr = &dp_flow_attr_transfer;
+		t_port_id = m->port;
+	}
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(t_port_id, attr,
+													pattern, actions,
+													age_action, df, agectx))
+	) {
+		dp_destroy_rte_flow_agectx(agectx);
+		if (hairpin_agectx)
+			dp_destroy_rte_flow_agectx(hairpin_agectx);
+		return DP_ERROR;
 	}
 
-
-	uint16_t t_port_id = cross_pf_port ? dp_port_get_pf1_id() : m->port;
-
-	ret = dp_create_age_indirect_action(&attr, t_port_id, df, &action[age_action_index], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return 0;
-	}
-
-	flow = validate_and_install_rte_flow(t_port_id, &attr, pattern, action);
-	if (!flow) {
-		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install encap rule on PF", DP_LOG_PORTID(t_port_id));
-		return 0;
-	}
-
-	// config the content of agectx
-	config_allocated_agectx(agectx, t_port_id, df, flow);
-	return 1;
+	DPS_LOG_DEBUG("Installed encap flow rule on PF", DP_LOG_PORTID(t_port_id));
+	return DP_OK;
 }
 
 static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
+	// match pattern for incoming tunneled packets
+	struct rte_flow_item_eth eth_spec;   // #1
+	struct rte_flow_item_ipv6 ipv6_spec; // #2
+	union dp_flow_item_l3 l3_spec;       // #3
+	union dp_flow_item_l4 l4_spec;       // #4
+	struct rte_flow_item pattern[5];     // + end
+	int pattern_cnt = 0;
+
+	// tunnel decap action steps
+	struct rte_flow_action_raw_decap raw_decap;  // #1
+	struct rte_flow_action_raw_encap raw_encap;  // #2
+	struct rte_flow_action_set_ipv4 set_ipv4;    // #3 (optional)
+	struct rte_flow_action_set_tp set_tp;        // #4 (optional)
+	struct rte_flow_action_age flow_age;         // #5
+#ifndef ENABLE_DPDK_22_11
+	struct rte_flow_action_queue redirect_queue; // #6 (replaces send_to_port)
+#endif
+	struct rte_flow_action_port_id send_to_port; // #6
+	struct rte_flow_action actions[7];            // + end
+	int action_cnt = 0;
+
+	// misc variables needed to create the flow
+	struct flow_age_ctx *agectx;
+	struct rte_flow_action *age_action;
+#ifndef ENABLE_DPDK_22_11
+	struct dp_port *port;
+#endif
+	struct rte_ether_hdr new_eth_hdr;
+	rte_be32_t actual_ol_ipv4_addr;
 	bool cross_pf_port;
 
-	if (m->port == dp_port_get_pf0_id()) {
-		cross_pf_port = false;
-		df->conntrack->incoming_flow_offloaded_flag.pf0 = true;
-	} else {
-		cross_pf_port = true;
-		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
-	}
-
-	struct rte_flow_attr attr;
-	int hairpin_pattern_cnt = 0;
-	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
-	int pattern_cnt = 0;
-	struct rte_flow_item hairpin_pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
-	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
-	int action_cnt = 0;
-	int age_action_index;
-	int ret = 0;
-
-	#if !defined(ENABLE_DPDK_22_11)
-	struct rte_flow_action hairpin_action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
-	int hairpin_action_cnt = 0;
-
-	memset(hairpin_pattern, 0, sizeof(hairpin_pattern));
-	memset(hairpin_action, 0, sizeof(hairpin_action));
-	#endif
-
-	memset(pattern, 0, sizeof(pattern));
-	memset(action, 0, sizeof(action));
-
-
-	uint8_t eth_hdr[sizeof(struct rte_ether_hdr)];
-	struct rte_ether_hdr *new_eth_hdr = (struct rte_ether_hdr *)eth_hdr;
-
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr->src_addr);
-	new_eth_hdr->ether_type = htons(df->l3_type);
-
-	struct rte_flow_item_eth ol_eth_spec;
-	struct rte_flow_item_eth ol_eth_mask;
-
+	cross_pf_port = m->port != dp_port_get_pf0_id();
 	if (cross_pf_port)
-		hairpin_pattern_cnt = insert_ethernet_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-														&ol_eth_spec, &ol_eth_mask,
-														&new_eth_hdr->src_addr, sizeof(struct rte_ether_addr),
-														&new_eth_hdr->dst_addr, sizeof(struct rte_ether_addr),
-														new_eth_hdr->ether_type);
+		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
+	else
+		df->conntrack->incoming_flow_offloaded_flag.pf0 = true;
 
-
-	// create flow match patterns -- eth
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
-
-	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
-												htons(df->tun_info.l3_type));
-
-	// create flow match patterns -- ipv6
-	struct rte_flow_item_ipv6 ipv6_spec;
-	struct rte_flow_item_ipv6 ipv6_mask;
+	// prepare the new ethernet header to replace the IPIP one
+	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr.dst_addr);
+	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr.src_addr);
+	new_eth_hdr.ether_type = htons(df->l3_type);
 
 	// restore the actual incoming pkt's ipv6 dst addr
 	if (dp_get_pkt_mark(m)->flags.is_recirc)
 		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
 
+	// create flow match patterns
+	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
 
-	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-											&ipv6_spec, &ipv6_mask,
-											NULL, 0,
-											df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6),
-											df->tun_info.proto_id);
-
-	// create flow match patterns -- inner packet, ipv6 or ipv4
-	struct rte_flow_item_ipv6 ol_ipv6_spec;
-	struct rte_flow_item_ipv6 ol_ipv6_mask;
-
-	struct rte_flow_item_ipv4 ol_ipv4_spec;
-	struct rte_flow_item_ipv4 ol_ipv4_mask;
-	rte_be32_t actual_ol_ipv4_addr;
+	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, df->tun_info.ul_dst_addr6, df->tun_info.proto_id);
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-												df->l4_type);
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_ipv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&ol_ipv6_spec, &ol_ipv6_mask,
-													NULL, 0,
-													df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-													df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
-		if (df->flags.nat == DP_NAT_CHG_DST_IP)
-			actual_ol_ipv4_addr = df->nat_addr;
-		else
-			actual_ol_ipv4_addr = df->dst.dst_addr;
-
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
-												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
-												&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
-												df->l4_type);
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_ipv4_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&ol_ipv4_spec, &ol_ipv4_mask,
-													NULL, 0,
-													&actual_ol_ipv4_addr, sizeof(actual_ol_ipv4_addr),
-													df->l4_type);
+		actual_ol_ipv4_addr = df->flags.nat == DP_NAT_CHG_DST_IP
+								? df->nat_addr
+								: df->dst.dst_addr;
+		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, actual_ol_ipv4_addr, df->l4_type);
 	}
 
-	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
-	struct rte_flow_item_tcp tcp_spec;
-	struct rte_flow_item_tcp tcp_mask;
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
+		return DP_ERROR;
 
-	if (df->l4_type == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
-											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   DP_RTE_TCP_CNTL_FLAGS);
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_tcp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-												&tcp_spec, &tcp_mask,
-												df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-												DP_RTE_TCP_CNTL_FLAGS);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
+	// remove the IPIP header and replace it with a standard Ethernet header
+	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, DP_IPIP_ENCAP_HEADER_SIZE);
+	dp_set_raw_encap_action(&actions[action_cnt++], &raw_encap, (uint8_t *)&new_eth_hdr, sizeof(new_eth_hdr));
+
+	// replace dst ip if VIP/NAT enabled
+	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
+		dp_set_ipv4_set_dst_action(&actions[action_cnt++], &set_ipv4, df->dst.dst_addr);
+		// also replace dst port if NAT enabled
+		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
+			dp_set_trans_proto_set_dst_action(&actions[action_cnt++], &set_tp,
+											  htons(df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src));
 	}
 
-	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_udp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-												&udp_spec, &udp_mask,
-												df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	}
-
-	struct rte_flow_item_icmp icmp_spec;
-	struct rte_flow_item_icmp icmp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMP) {
-		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
-												&icmp_spec, &icmp_mask,
-												df->l4_info.icmp_field.icmp_type);
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_icmp_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&icmp_spec, &icmp_mask,
-													df->l4_info.icmp_field.icmp_type);
-	}
-
-	struct rte_flow_item_icmp6 icmp6_spec;
-	struct rte_flow_item_icmp6 icmp6_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMPV6) {
-		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
-												  &icmp6_spec, &icmp6_mask,
-												  df->l4_info.icmp_field.icmp_type);
-		if (cross_pf_port)
-			hairpin_pattern_cnt = insert_icmpv6_match_pattern(hairpin_pattern, hairpin_pattern_cnt,
-													&icmp6_spec, &icmp6_mask,
-													df->l4_info.icmp_field.icmp_type);
-	}
-
-	// create flow match patterns -- end
-	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
-	if (cross_pf_port)
-		hairpin_pattern_cnt = insert_end_match_pattern(hairpin_pattern, hairpin_pattern_cnt);
-
-
-	// create flow action -- raw decap
-	struct rte_flow_action_raw_decap raw_decap;
-
-	action_cnt = create_raw_decap_action(action, action_cnt, &raw_decap, NULL, DP_TUNN_IPIP_ENCAP_SIZE);
-
-	// create flow action -- raw encap
-	struct rte_flow_action_raw_encap raw_encap;
-
-	action_cnt = create_raw_encap_action(action, action_cnt,
-										 &raw_encap, eth_hdr, sizeof(struct rte_ether_hdr));
-
-	// replace dst ip if vip-nat/network-nat is enabled
-	struct rte_flow_action_set_ipv4 set_ipv4;
-	if (df->flags.nat == DP_NAT_CHG_DST_IP)
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
-
-	// replace dst port if network-nat is enabled
-	struct rte_flow_action_set_tp set_tp;
-
-	if (df->flags.nat == DP_NAT_CHG_DST_IP && df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
-		action_cnt = create_trans_proto_set_action(action, action_cnt,
-										    &set_tp, df->conntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src, DP_IS_DST);
-
-
-	// create flow action -- age
-	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-	struct rte_flow_action_age flow_age;
-
+	// make flow aging work
+	agectx = allocate_agectx();
 	if (!agectx)
-		return 0;
+		return DP_ERROR;
 
-	action_cnt = create_flow_age_action(action, action_cnt,
-											&flow_age, df->conntrack->timeout_value, agectx);
-	age_action_index = action_cnt - 1;
+	age_action = &actions[action_cnt++];
+	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
 
-	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
-	struct rte_flow_action_queue queue_action;
-	struct rte_flow_action_port_id send_to_port;
-
+#ifndef ENABLE_DPDK_22_11
 	if (cross_pf_port) {
-		struct dp_port *port = dp_port_get_vf((uint16_t)df->nxt_hop);
-		uint16_t hairpin_rx_queue_id;
-
+		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
+		port = dp_port_get_vf((uint16_t)df->nxt_hop);
 		if (!port) {
-			DPS_LOG_WARNING("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
-			hairpin_rx_queue_id = 0;
-		} else {
-			// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
-			hairpin_rx_queue_id = DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
+			DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
+			dp_destroy_rte_flow_agectx(agectx);
+			return DP_ERROR;
 		}
-		action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
-	} else {
-		// create flow action -- send to port
-		action_cnt = create_send_to_port_action(action, action_cnt,
-											&send_to_port, df->nxt_hop);
+		// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
+		dp_set_redirect_queue_action(&actions[action_cnt++], &redirect_queue,
+									 DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset);
+	} else
+#endif
+		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
+
+	dp_set_end_action(&actions[action_cnt++]);
+
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port,
+#ifndef ENABLE_DPDK_22_11
+													cross_pf_port ? &dp_flow_attr_ingress :
+#endif
+													&dp_flow_attr_transfer,
+													pattern, actions,
+													age_action, df, agectx))
+	) {
+		dp_destroy_rte_flow_agectx(agectx);
+		return DP_ERROR;
 	}
 
-	// create flow action -- end
-	action_cnt = create_end_action(action, action_cnt);
-
-	// validate and install rte flow
-	if (cross_pf_port) {
-		create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
-		struct rte_flow *hairpin_flow = NULL;
-
-		hairpin_flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
-		if (!hairpin_flow) {
-			free_allocated_agectx(agectx);
-			return 0;
-		}
-		// config the content of agectx
-		config_allocated_agectx(agectx, m->port, df, hairpin_flow);
-	} else {
-		#ifdef ENABLE_DPDK_22_11
-			create_rte_flow_rule_attr(&attr, 0, 0, 0, 0, 1);
-		#else
-			create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
-		#endif
-
-		struct rte_flow *flow = NULL;
-
-		flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
-		if (!flow) {
-			free_allocated_agectx(agectx);
-			DPS_LOG_ERR("Failed to install normal decap flow rule on PF", DP_LOG_PORTID(m->port));
-			return 0;
-		}
-		// config the content of agectx
-		config_allocated_agectx(agectx, m->port, df, flow);
-	}
-
-
-	ret = dp_create_age_indirect_action(&attr, m->port, df, &action[age_action_index], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return 0;
-	}
-
-	#if !defined(ENABLE_DPDK_22_11)
-	// create flow action -- set dst mac
-	/* This redundant action is needed to make hairpin work*/
-	struct rte_flow_action_set_mac set_dst_mac;
-	struct rte_flow_action_age hairpin_flow_age;
-
-	if (cross_pf_port) {
-		hairpin_action_cnt = create_dst_mac_set_action(hairpin_action, hairpin_action_cnt,
-											&set_dst_mac, &new_eth_hdr->dst_addr);
-		// create flow action -- age
-		struct flow_age_ctx *hairpin_agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-
-		if (!hairpin_agectx)
-			return 0;
-		hairpin_action_cnt = create_flow_age_action(hairpin_action, hairpin_action_cnt,
-											&hairpin_flow_age, df->conntrack->timeout_value, hairpin_agectx);
-
-		age_action_index = hairpin_action_cnt - 1;
-		// create flow action -- end
-		hairpin_action_cnt = create_end_action(hairpin_action, hairpin_action_cnt);
-		// validate and install rte flow
-		struct rte_flow *hairpin_flow_P2 = NULL;
-
-		create_rte_flow_rule_attr(&attr, 0, 0, 0, 1, 0);
-
-
-		ret = dp_create_age_indirect_action(&attr, (uint16_t)df->nxt_hop, df, &hairpin_action[age_action_index], hairpin_agectx);
-		if (DP_FAILED(ret)) {
-			free_allocated_agectx(hairpin_agectx);
-			return 0;
-		}
-
-		hairpin_flow_P2 = validate_and_install_rte_flow((uint16_t)df->nxt_hop, &attr, pattern, hairpin_action);
-		if (!hairpin_flow_P2) {
-			free_allocated_agectx(hairpin_agectx);
-			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(df->nxt_hop));
-			return 0;
-		}
-		config_allocated_agectx(hairpin_agectx, df->nxt_hop, df, hairpin_flow_P2);
-	}
-	#endif
-
-	return 1;
+	DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
+	return DP_OK;
 }
 
 static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct rte_flow_attr attr;
-
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 1);
-
-	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
+	// match local traffic packets
+	struct rte_flow_item_eth eth_spec; // #1
+	union dp_flow_item_l3 l3_spec;     // #2
+	union dp_flow_item_l4 l4_spec;     // #3
+	struct rte_flow_item pattern[4];   // + end
 	int pattern_cnt = 0;
-	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
+
+	// action steps to send to the right VM
+	struct rte_flow_action_set_mac set_dst_mac;  // #1
+	struct rte_flow_action_set_mac set_src_mac;  // #2
+	struct rte_flow_action_set_ipv4 set_ipv4;    // #3 (optional)
+	struct rte_flow_action_age flow_age;         // #4
+	struct rte_flow_action_port_id send_to_port; // #5
+	struct rte_flow_action actions[6];           // + end
 	int action_cnt = 0;
-	int ret = 0;
 
-	memset(pattern, 0, sizeof(pattern));
-	memset(action, 0, sizeof(action));
+	// misc variables needed to create the flow
+	struct flow_age_ctx *agectx;
+	struct rte_flow_action *age_action;
+	rte_be32_t actual_ol_ipv4_dst_addr;
 
-	// create flow match patterns -- eth
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
-
-	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
-												htons(df->l3_type));
-
-	// create flow match patterns -- inner packet, ipv6 or ipv4
-	struct rte_flow_item_ipv6 ol_ipv6_spec;
-	struct rte_flow_item_ipv6 ol_ipv6_mask;
-
-	struct rte_flow_item_ipv4 ol_ipv4_spec;
-	struct rte_flow_item_ipv4 ol_ipv4_mask;
-	rte_be32_t actual_ol_ipv4_src_addr = 0;
-	rte_be32_t actual_ol_ipv4_dst_addr = 0;
+	// create local flow match pattern
+	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-												df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	} else {
-
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
-		if (df->flags.nat == DP_NAT_CHG_DST_IP)
-			actual_ol_ipv4_dst_addr = df->nat_addr;
-		else
-			actual_ol_ipv4_dst_addr = df->dst.dst_addr;
-
-		actual_ol_ipv4_src_addr = df->src.src_addr;
-
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
-												&ol_ipv4_spec, &ol_ipv4_mask,
-												&actual_ol_ipv4_src_addr, sizeof(actual_ol_ipv4_src_addr),
-												&actual_ol_ipv4_dst_addr, sizeof(actual_ol_ipv4_dst_addr),
-												df->l4_type);
+		actual_ol_ipv4_dst_addr = df->flags.nat == DP_NAT_CHG_DST_IP
+									? df->nat_addr
+									: df->dst.dst_addr;
+		dp_set_ipv4_src_dst_flow_item(&pattern[pattern_cnt++],
+									  &l3_spec.ipv4,
+									  df->src.src_addr,
+									  actual_ol_ipv4_dst_addr,
+									  df->l4_type);
 	}
 
-	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
-	struct rte_flow_item_tcp tcp_spec;
-	struct rte_flow_item_tcp tcp_mask;
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
+		return DP_ERROR;
 
-	if (df->l4_type == DP_IP_PROTO_TCP) {
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
-											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port,
-											   DP_RTE_TCP_CNTL_FLAGS);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
+
+	// set proper ethernet addresses
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, dp_get_neigh_mac(df->nxt_hop));
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, dp_get_mac(df->nxt_hop));
+
+	// replace IPv4 address in overlay if VIP/NAT enabled
+	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
+		dp_set_ipv4_set_dst_action(&actions[action_cnt++], &set_ipv4, df->dst.dst_addr);
+	} else if (df->flags.nat == DP_NAT_CHG_SRC_IP) {
+		// there should be more strict condition to only apply to VIP nat pkt
+		dp_set_ipv4_set_src_action(&actions[action_cnt++], &set_ipv4, df->nat_addr);
 	}
 
-	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_UDP) {
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	}
-
-	struct rte_flow_item_icmp icmp_spec;
-	struct rte_flow_item_icmp icmp_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMP) {
-		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
-												&icmp_spec, &icmp_mask,
-												df->l4_info.icmp_field.icmp_type);
-	}
-
-	struct rte_flow_item_icmp6 icmp6_spec;
-	struct rte_flow_item_icmp6 icmp6_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMPV6) {
-		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
-												  &icmp6_spec, &icmp6_mask,
-												  df->l4_info.icmp_field.icmp_type);
-	}
-
-	// create flow match patterns -- end
-	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
-
-	// create flow action -- set dst mac
-	struct rte_flow_action_set_mac set_dst_mac;
-
-	action_cnt = create_dst_mac_set_action(action, action_cnt,
-										   &set_dst_mac, dp_get_neigh_mac(df->nxt_hop));
-
-	// create flow action -- set src mac
-	struct rte_flow_action_set_mac set_src_mac;
-
-	action_cnt = create_src_mac_set_action(action, action_cnt,
-										   &set_src_mac, dp_get_mac(df->nxt_hop));
-
-	// create flow action -- replace ipv4 address in overlay if vip nat is enabled
-	struct rte_flow_action_set_ipv4 set_ipv4;
-	if (df->flags.nat == DP_NAT_CHG_DST_IP)
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->dst.dst_addr, DP_IS_DST);
-
-	// there should be more strict condition to only apply to VIP nat pkt
-	if (df->flags.nat == DP_NAT_CHG_SRC_IP)
-		action_cnt = create_ipv4_set_action(action, action_cnt,
-										    &set_ipv4, df->nat_addr, DP_IS_SRC);
-
-	// create flow action -- age
-	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-	struct rte_flow_action_age flow_age;
-
+	// make flow aging work
+	agectx = allocate_agectx();
 	if (!agectx)
-		return 0;
+		return DP_ERROR;
 
-	action_cnt = create_flow_age_action(action, action_cnt,
-										&flow_age, df->conntrack->timeout_value, agectx);
+	age_action = &actions[action_cnt++];
+	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
 
-	ret = dp_create_age_indirect_action(&attr, m->port, df, &action[action_cnt-1], agectx);
-	if (DP_FAILED(ret)) {
-		free_allocated_agectx(agectx);
-		return 0;
+	// send to the right port
+	dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
+
+	dp_set_end_action(&actions[action_cnt++]);
+
+	// TODO: this attribute has not been tested with DPDK 22.11,
+	// so maybe 'dp_flow_attr_transfer' should be ifdef'd too
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_attr_transfer,
+													pattern, actions,
+													age_action, df, agectx))
+	) {
+		dp_destroy_rte_flow_agectx(agectx);
+		return DP_ERROR;
 	}
 
-	// create flow action -- send to port
-	struct rte_flow_action_port_id send_to_port;
-
-	action_cnt = create_send_to_port_action(action, action_cnt,
-											&send_to_port, df->nxt_hop);
-	// create flow action -- end
-	action_cnt = create_end_action(action, action_cnt);
-
-	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-
-	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
-	if (!flow) {
-		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to validate and install rte flow rules");
-		return 0;
-	}
-
-	// config the content of agectx
-	config_allocated_agectx(agectx, m->port, df, flow);
-
-	return 1;
+	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORTID(m->port));
+	return DP_OK;
 }
 
 static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
 {
-	struct rte_flow_attr attr;
-	struct rte_flow_item pattern[DP_TUNN_OPS_OFFLOAD_MAX_PATTERN];
+	// match in-network underlay packets
+	struct rte_flow_item_eth eth_spec;   // #1
+	struct rte_flow_item_ipv6 ipv6_spec; // #2
+	union dp_flow_item_l3 l3_spec;       // #3
+	union dp_flow_item_l4 l4_spec;       // #4
+	struct rte_flow_item pattern[5];     // + end
 	int pattern_cnt = 0;
-	struct rte_flow_action action[DP_TUNN_OPS_OFFLOAD_MAX_ACTION];
+
+	// action steps to send to the right underlay target
+	struct rte_flow_action_set_mac set_src_mac;  // #1
+	struct rte_flow_action_set_mac set_dst_mac;  // #2
+	struct rte_flow_action_set_ipv6 set_ipv6;    // #3
+	struct rte_flow_action_age flow_age;         // #4
+	struct rte_flow_action_queue redirect_queue; // #5
+	struct rte_flow_action actions[6];           // + end
 	int action_cnt = 0;
 
-	memset(pattern, 0, sizeof(pattern));
-	memset(action, 0, sizeof(action));
+	// misc variables needed to create the flow
+	struct flow_age_ctx *agectx;
 
-	// in network traffic has to be set via the other pf port via hairpin
-	df->nxt_hop = m->port == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
-
-	// create flow match patterns -- eth
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
-
-	pattern_cnt = insert_ethernet_match_pattern(pattern, pattern_cnt,
-												&eth_spec, &eth_mask,
-												NULL, 0, NULL, 0,
-												htons(df->tun_info.l3_type));
-
-	// create flow match patterns -- ipv6
-	struct rte_flow_item_ipv6 ipv6_spec;
-	struct rte_flow_item_ipv6 ipv6_mask;
+	// create match pattern based on dp_flow
+	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
 
 	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt
-	pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-											&ipv6_spec, &ipv6_mask,
-											NULL, 0,
-											df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_src_addr6),
-											df->tun_info.proto_id);
+	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, df->tun_info.ul_src_addr6, df->tun_info.proto_id);
 
-	// pattern_cnt_before_inner_hdr = pattern_cnt;
-
-	// create flow match patterns -- inner packet, ipv6 or ipv4
-	struct rte_flow_item_ipv6 ol_ipv6_spec;
-	struct rte_flow_item_ipv6 ol_ipv6_mask;
-
-	struct rte_flow_item_ipv4 ol_ipv4_spec;
-	struct rte_flow_item_ipv4 ol_ipv4_mask;
-
+	// inner packet matching (L3+L4)
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-		pattern_cnt = insert_ipv6_match_pattern(pattern, pattern_cnt,
-												&ol_ipv6_spec, &ol_ipv6_mask,
-												NULL, 0,
-												df->dst.dst_addr6, sizeof(ol_ipv6_spec.hdr.dst_addr),
-												df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	else
-		pattern_cnt = insert_ipv4_match_pattern(pattern, pattern_cnt,
-												&ol_ipv4_spec, &ol_ipv4_mask,
-												NULL, 0,
-												&df->dst.dst_addr, sizeof(df->dst.dst_addr),
-												df->l4_type);
+		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, df->dst.dst_addr, df->l4_type);
 
-	// create flow match patterns -- inner packet, tcp, udp or icmp/icmpv6
-	struct rte_flow_item_tcp tcp_spec;
-	struct rte_flow_item_tcp tcp_mask;
+	if (DP_FAILED(dp_set_l4_flow_item(&pattern[pattern_cnt++], &l4_spec, df)))
+		return DP_ERROR;
 
-	if (df->l4_type == DP_IP_PROTO_TCP)
-		pattern_cnt = insert_tcp_match_pattern(pattern, pattern_cnt,
-											   &tcp_spec, &tcp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port, 0);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
-	struct rte_flow_item_udp udp_spec;
-	struct rte_flow_item_udp udp_mask;
 
-	if (df->l4_type == DP_IP_PROTO_UDP)
-		pattern_cnt = insert_udp_match_pattern(pattern, pattern_cnt,
-											   &udp_spec, &udp_mask,
-											   df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
+	// set proper ethernet addresses
+	// in network traffic has to be set via the other pf port via hairpin
+	df->nxt_hop = m->port == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : m->port;
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, dp_get_mac(df->nxt_hop));
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, dp_get_neigh_mac(df->nxt_hop));
 
-	struct rte_flow_item_icmp icmp_spec;
-	struct rte_flow_item_icmp icmp_mask;
+	// set the right underlay address
+	dp_set_ipv6_set_dst_action(&actions[action_cnt++], &set_ipv6, df->tun_info.ul_dst_addr6);
 
-	if (df->l4_type == DP_IP_PROTO_ICMP)
-		pattern_cnt = insert_icmp_match_pattern(pattern, pattern_cnt,
-												&icmp_spec, &icmp_mask,
-												df->l4_info.icmp_field.icmp_type);
-
-	struct rte_flow_item_icmp6 icmp6_spec;
-	struct rte_flow_item_icmp6 icmp6_mask;
-
-	if (df->l4_type == DP_IP_PROTO_ICMPV6)
-		pattern_cnt = insert_icmpv6_match_pattern(pattern, pattern_cnt,
-												  &icmp6_spec, &icmp6_mask,
-												  df->l4_info.icmp_field.icmp_type);
-
-	// create flow match patterns -- end
-	pattern_cnt = insert_end_match_pattern(pattern, pattern_cnt);
-
-	// create flow action -- set src mac
-	struct rte_flow_action_set_mac set_src_mac_action;
-
-	action_cnt = create_src_mac_set_action(action, action_cnt, &set_src_mac_action, dp_get_mac(df->nxt_hop));
-
-	// create flow action -- set dst mac
-	struct rte_flow_action_set_mac set_dst_mac_action;
-
-	action_cnt = create_dst_mac_set_action(action, action_cnt, &set_dst_mac_action, dp_get_neigh_mac(df->nxt_hop));
-
-	// create flow action -- set ipv6
-	struct rte_flow_action_set_ipv6 set_ipv6;
-
-	action_cnt = create_ipv6_set_action(action, action_cnt,
-									&set_ipv6, df->tun_info.ul_dst_addr6, DP_IS_DST);
-
-	// create flow action -- age
-	struct flow_age_ctx *agectx = rte_zmalloc("age_ctx", sizeof(struct flow_age_ctx), RTE_CACHE_LINE_SIZE);
-	struct rte_flow_action_age flow_age;
-
+	// make flow aging work
+	agectx = allocate_agectx();
 	if (!agectx)
-		return 0;
+		return DP_ERROR;
 
-	action_cnt = create_flow_age_action(action, action_cnt,
-											&flow_age, 30, agectx);
+	dp_set_flow_age_action(&actions[action_cnt++],
+						   &flow_age,
+#ifdef ENABLE_PYTEST
+						   dp_conf_get_flow_timeout(),
+#else
+						   DP_FLOW_DEFAULT_TIMEOUT,
+#endif
+						   agectx);
 
-
-	// create flow action -- queue
 	// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
-	struct rte_flow_action_queue queue_action;
-	// it is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
-	uint16_t hairpin_rx_queue_id = DP_NR_STD_RX_QUEUES;
+	// queue_index is the 1st hairpin rx queue of pf, which is paired with another hairpin tx queue of pf
+	dp_set_redirect_queue_action(&actions[action_cnt++], &redirect_queue, DP_NR_STD_RX_QUEUES);
 
-	action_cnt = create_redirect_queue_action(action, action_cnt, &queue_action, hairpin_rx_queue_id);
+	dp_set_end_action(&actions[action_cnt++]);
 
-	// create flow action -- end
-	action_cnt = create_end_action(action, action_cnt);
+	// bouncing back rule's expiration is taken care of by the rte flow rule expiration mechanism;
+	// no need to perform query to perform checking on expiration status, thus an indirect action is not needed
 
-	// validate and install rte flow
-	struct rte_flow *flow = NULL;
-
-	create_rte_flow_rule_attr(&attr, 0, 0, 1, 0, 0);
-
-	flow = validate_and_install_rte_flow(m->port, &attr, pattern, action);
-	if (!flow) {
-		free_allocated_agectx(agectx);
-		DPS_LOG_ERR("Failed to install in-network decap flow rule on pf", DP_LOG_PORTID(m->port));
-		return 0;
+	if (DP_FAILED(dp_install_rte_flow_with_age(m->port, &dp_flow_attr_ingress, pattern, actions, df->conntrack, agectx))) {
+		dp_destroy_rte_flow_agectx(agectx);
+		return DP_ERROR;
 	}
-	// config the content of agectx
-	config_allocated_agectx(agectx, m->port, df, flow);
 
-	return 1;
+	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORTID(m->port));
+	return DP_OK;
 }
 
-// TODO maybe pass node for better logging
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
+	int ret;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL)
-		return dp_offload_handle_local_traffic(m, df);
-
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		return dp_offload_handle_tunnel_decap_traffic(m, df);
-
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
+	// TODO(plague): think about using enum for flow_type
+	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL) {
+		ret = dp_offload_handle_local_traffic(m, df);
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+	} else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+		ret = dp_offload_handle_tunnel_decap_traffic(m, df);
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+	} else if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
-				|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD)
-			return dp_offload_handle_in_network_traffic(m, df);
-		else
-			return dp_offload_handle_tunnel_encap_traffic(m, df);
+			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
+		) {
+			ret = dp_offload_handle_in_network_traffic(m, df);
+			if (DP_FAILED(ret))
+				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+		} else {
+			ret = dp_offload_handle_tunnel_encap_traffic(m, df);
+			if (DP_FAILED(ret))
+				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+		}
+	} else {
+		DPS_LOG_ERR("Invalid flow type to offload", DP_LOG_PORTID(m->port), DP_LOG_VALUE(df->flags.flow_type));
+		ret = DP_ERROR;
 	}
-
-	return 0;
+	return ret;
 }
