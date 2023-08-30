@@ -2,7 +2,7 @@ import threading
 import pytest
 
 from helpers import *
-from tcp_tester import TCPTester
+from tcp_tester import TCPTesterVirtsvc
 
 udp_used_port = 0
 
@@ -63,14 +63,10 @@ def test_virtsvc_tcp(request, prepare_ipv4, port_redundancy):
 	if not request.config.getoption("--virtsvc"):
 		pytest.skip("Virtual services not enabled")
 
-	tester = TCPTester(client_vm=VM1, client_port=12345, client_ul_ipv6=router_ul_ipv6, pf_name=PF0.tap,
-					   server_ip=virtsvc_tcp_virtual_ip, server_port=virtsvc_tcp_virtual_port,
-					   server_pkt_check=tcp_server_virtsvc_pkt_check,
-					   encaped=False)
+	tester = TCPTesterVirtsvc(VM1, 12345, PF0, virtsvc_tcp_virtual_ip, virtsvc_tcp_virtual_port, server_pkt_check=tcp_server_virtsvc_pkt_check)
 	tester.communicate()
 
 	# port number chosen so that they cause the right redirection
 	if port_redundancy:
-		tester.client_port = 54321
-		tester.pf_name = PF1.tap
+		tester = TCPTesterVirtsvc(VM1, 54321, PF1, virtsvc_tcp_virtual_ip, virtsvc_tcp_virtual_port, server_pkt_check=tcp_server_virtsvc_pkt_check)
 		tester.communicate()

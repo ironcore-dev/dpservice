@@ -3,7 +3,8 @@ import threading
 import time
 
 from helpers import *
-from tcp_tester import TCPTester
+from tcp_tester import TCPTesterLocal
+from tcp_tester import TCPTesterPublic
 
 nat_only_port = 1024
 
@@ -26,22 +27,19 @@ def test_nat_table_flush(prepare_ipv4, grpc_client):
 	# NAT with one port
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_only_port, nat_only_port+1)
 
-	tester = TCPTester(client_vm=VM1, client_port=12345, client_ul_ipv6=nat_ul_ipv6, pf_name=PF0.tap,
-					   server_ip=public_ip, server_port=443,
-					   server_pkt_check=tcp_server_nat_pkt_check)
+	tester = TCPTesterPublic(VM1, 12345, nat_ul_ipv6, PF0, public_ip, 443, server_pkt_check=tcp_server_nat_pkt_check)
 	tester.communicate()
 
 	# Re-create the NAT with a different port range
 	grpc_client.delnat(VM1.name)
 	nat_only_port = 1025
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_only_port, nat_only_port+1)
-	tester.client_ul_ipv6 = nat_ul_ipv6
+	tester.nat_ul_ipv6 = nat_ul_ipv6
 
 	# Keep the client port the same, this will cause an established flow to re-use the old NAT port
 	tester.communicate()
 
 	grpc_client.delnat(VM1.name)
-
 
 
 def send_bounce_pkt_to_pf(ipv6_nat):
@@ -57,9 +55,7 @@ def test_neighnat_table_flush(prepare_ipv4, grpc_client):
 
 	global nat_only_port
 	nat_only_port = nat_local_min_port
-	tester = TCPTester(client_vm=VM1, client_port=12345, client_ul_ipv6=nat_ul_ipv6, pf_name=PF0.tap,
-					   server_ip=public_ip, server_port=443,
-					   server_pkt_check=tcp_server_nat_pkt_check)
+	tester = TCPTesterPublic(VM1, 12345, nat_ul_ipv6, PF0, public_ip, 443, server_pkt_check=tcp_server_nat_pkt_check)
 	tester.communicate()
 
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
@@ -96,9 +92,7 @@ def test_neighnat_table_flush(prepare_ipv4, grpc_client):
 		f"Packet still being relayed!"
 
 	nat_only_port = nat_neigh_min_port
-	tester = TCPTester(client_vm=VM1, client_port=12345, client_ul_ipv6=nat_ul_ipv6, pf_name=PF0.tap,
-					   server_ip=public_ip, server_port=443,
-					   server_pkt_check=tcp_server_nat_pkt_check)
+	tester = TCPTesterPublic(VM1, 12345, nat_ul_ipv6, PF0, public_ip, 443, server_pkt_check=tcp_server_nat_pkt_check)
 	tester.communicate()
 
 	grpc_client.delnat(VM1.name)

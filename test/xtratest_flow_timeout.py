@@ -2,7 +2,8 @@ import pytest
 
 from config import *
 from helpers import *
-from tcp_tester import TCPTester
+from tcp_tester import TCPTesterPublic
+from tcp_tester import TCPTesterVirtsvc
 
 
 def tcp_server_nat_pkt_check(pkt):
@@ -25,9 +26,7 @@ def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client, fast_flow_t
 	# Only allow one port for this test, so the next call would normally fail (NAT runs out of free ports)
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_min_port+1)
 
-	tester = TCPTester(client_vm=VM1, client_port=12344, client_ul_ipv6=nat_ul_ipv6, pf_name=PF0.tap,
-					   server_ip=public_ip, server_port=443,
-					   server_pkt_check=tcp_server_nat_pkt_check)
+	tester = TCPTesterPublic(VM1, 12344, nat_ul_ipv6, PF0, public_ip, 443, server_pkt_check=tcp_server_nat_pkt_check)
 	tester.communicate()
 
 	age_out_flows()
@@ -71,10 +70,8 @@ def test_virtsvc_tcp_timeout(request, prepare_ipv4, fast_flow_timeout):
 	if not fast_flow_timeout:
 		pytest.skip("Fast flow timeout needs to be enabled")
 
-	tester = TCPTester(client_vm=VM1, client_port=12345, client_ul_ipv6=router_ul_ipv6, pf_name=PF0.tap,
-					   server_ip=virtsvc_tcp_virtual_ip, server_port=virtsvc_tcp_virtual_port,
-					   server_pkt_check=tcp_server_virtsvc_pkt_check_first_port,
-					   encaped=False)
+	tester = TCPTesterVirtsvc(VM1, 12345, PF0, virtsvc_tcp_virtual_ip, virtsvc_tcp_virtual_port,
+							  server_pkt_check=tcp_server_virtsvc_pkt_check_first_port)
 	tester.communicate()
 
 	# Following connection should be given another port
