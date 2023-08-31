@@ -98,7 +98,7 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 								uint16_t cnt)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
-	uint16_t n_pkts;
+	uint16_t n_pkts = 0;
 
 	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 

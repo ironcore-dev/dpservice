@@ -12,6 +12,8 @@ extern "C"
 {
 #endif
 
+#define DP_PKT_OFFLOAD_MARK 1
+
 #define DP_TCP_CONTROL_FLAGS \
 	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
 
@@ -90,6 +92,15 @@ static const struct rte_flow_item_icmp dp_flow_item_icmp_mask = {
 static const struct rte_flow_item_icmp6 dp_flow_item_icmp6_mask = {
 	.type = 0xff,
 };
+
+static __rte_always_inline
+void dp_set_eth_match_all_item(struct rte_flow_item *item)
+{
+	item->type = RTE_FLOW_ITEM_TYPE_ETH;
+	item->spec = NULL;
+	item->mask = NULL;
+	item->last = NULL;
+}
 
 static __rte_always_inline
 void dp_set_eth_flow_item(struct rte_flow_item *item,
@@ -531,6 +542,28 @@ void dp_set_set_meta_action(struct rte_flow_action *action,
 	meta_action->mask = 0xffffffff;
 	action->type = RTE_FLOW_ACTION_TYPE_SET_META;
 	action->conf = meta_action;
+}
+
+static __rte_always_inline
+void dp_set_sample_action(struct rte_flow_action *action,
+						  struct rte_flow_action_sample *sample_action,
+						  uint32_t sample_ratio, struct rte_flow_action *sub_action)
+{
+	sample_action->ratio = sample_ratio;
+	if (sub_action)
+		sample_action->actions = sub_action;
+	action->type = RTE_FLOW_ACTION_TYPE_SAMPLE;
+	action->conf = sample_action;
+}
+
+static __rte_always_inline
+void dp_set_jump_group_action(struct rte_flow_action *action,
+							  struct rte_flow_action_jump *jump_action,
+							  uint32_t group_id)
+{
+	jump_action->group = group_id;
+	action->type = RTE_FLOW_ACTION_TYPE_JUMP;
+	action->conf = jump_action;
 }
 
 static __rte_always_inline
