@@ -93,7 +93,36 @@ RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
 RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
 RUN rm -rf build && meson build && cd ./build && ninja
 
-FROM debian:11-slim
+FROM debian:11-slim as tester
+
+RUN apt-get update && apt-get install -y --no-install-recommends ON \
+libibverbs-dev \
+numactl \
+libnuma1 \
+pciutils \
+procps \
+libuuid1 \
+libgrpc++1 \
+iproute2 \
+udev \
+gawk \
+python3 \
+python3-pytest \
+python3-scapy \
+&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /
+COPY --from=builder /workspace/test ./test
+COPY --from=builder /workspace/build/src/dp_service ./build/src/dp_service
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /lib/* /lib/
+COPY --from=builder /workspace/client/github.com/onmetal/* ./build
+RUN ldconfig
+
+WORKDIR /test
+ENTRYPOINT ["pytest-3", "-x", "-v"]
+
+FROM debian:11-slim as production
 
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \

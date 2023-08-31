@@ -1,4 +1,4 @@
-name: Build and Publish Docker Image
+name: Build and Publish Docker Tester Image
 
 env:
   platforms: linux/amd64
@@ -9,7 +9,7 @@ on:
       - published
   push:
     branches:
-      - main
+      - master
     tags:
       - v*
     paths-ignore:
@@ -31,7 +31,7 @@ jobs:
         id: meta
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/dp-service
+            ghcr.io/${{ github.repository_owner }}/dp-service-tester
           tags: |
             type=semver,pattern={{version}}
             type=schedule
@@ -65,7 +65,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
+      - name: Build and push tester
         timeout-minutes: 60
         uses: docker/build-push-action@v4
         with:
@@ -74,6 +74,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          target: production
+          target: tester
           secrets: |
             "github_token=${{ secrets.BOT_PAT }}"
