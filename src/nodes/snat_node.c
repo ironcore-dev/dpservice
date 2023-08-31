@@ -15,7 +15,7 @@
 	NEXT(SNAT_NEXT_FIREWALL, "firewall")
 DP_NODE_REGISTER_NOINIT(SNAT, snat, NEXT_NODES);
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
@@ -43,14 +43,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 			}
 			if (snat_data->network_nat_ip != 0) {
-				ret = dp_allocate_network_snat_port(df, vni);
-				if (DP_FAILED(ret)) {
-					DPNODE_LOG_WARNING(node, "Failed to allocate new NAT port for connection",
-									   DP_LOG_IPV4(snat_data->network_nat_ip),
-									   DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(src_ip),
-									   DP_LOG_SRC_PORT(ntohs(df->l4_info.trans_port.src_port)));
+				ret = dp_allocate_network_snat_port(snat_data, df, vni);
+				if (DP_FAILED(ret))
 					return SNAT_NEXT_DROP;
-				}
 				nat_port = (uint16_t)ret;
 				ipv4_hdr->src_addr = htonl(snat_data->network_nat_ip);
 

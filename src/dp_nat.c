@@ -67,10 +67,14 @@ struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni)
 		.ip = vm_ip,
 		.vni = vni
 	};
+	int ret;
 
-	// this can actually only fail on -ENOENT, because arguments will always be valid
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data)))
+	ret = rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data);
+	if (DP_FAILED(ret)) {
+		if (ret != -ENOENT)
+			DPS_LOG_ERR("Cannot lookup snat data", DP_LOG_RET(ret));
 		return NULL;
+	}
 
 	return data;
 }
@@ -405,10 +409,8 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 	return NULL;
 }
 
-int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
+int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni)
 {
-	struct nat_key nkey;
-	struct snat_data *data;
 	struct netnat_portoverload_tbl_key portoverload_tbl_key;
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portmap_data *portmap_data;
@@ -419,25 +421,11 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 	uint32_t vm_ip = ntohl(df->src.src_addr);
 	uint16_t vm_port = ntohs(df->l4_info.trans_port.src_port);
 
-	nkey.ip = vm_ip;
-	nkey.vni = vni;
-
-	ret = rte_hash_lookup_data(ipv4_snat_tbl, &nkey, (void **)&data);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot lookup ipv4 snat key", DP_LOG_RET(ret));
-		return ret;
-	}
-
-	if (data->network_nat_ip == 0) {
-		DPS_LOG_ERR("Snat ipv4 lookup data invalid");
-		return DP_ERROR;
-	}
-
 	portmap_key.vm_src_ip = vm_ip;
 	portmap_key.vni = vni;
 	portmap_key.vm_src_port = vm_port;
 
-	portoverload_tbl_key.nat_ip = data->network_nat_ip;
+	portoverload_tbl_key.nat_ip = snat_data->network_nat_ip;
 	portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
 	portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 	portoverload_tbl_key.l4_type = df->l4_type;
@@ -463,8 +451,8 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 	}
 
 	if (need_to_find_new_port) {
-		min_port = data->network_nat_port_range[0];
-		max_port = data->network_nat_port_range[1];
+		min_port = snat_data->network_nat_port_range[0];
+		max_port = snat_data->network_nat_port_range[1];
 
 		vm_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, &portmap_key);
 
@@ -482,7 +470,10 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 		}
 
 		if (!allocated_port) {
-			DPS_LOG_ERR("No usable ipv4 port found for natting");
+			DPS_LOG_WARNING("No usable ipv4 port found for natting",
+							DP_LOG_IPV4(snat_data->network_nat_ip),
+							DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(vm_ip),
+							DP_LOG_SRC_PORT(vm_port));
 			return DP_ERROR;
 		}
 
@@ -496,7 +487,7 @@ int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni)
 
 	if (need_to_find_new_port) {
 		portmap_data = rte_zmalloc("netnat_portmap_val", sizeof(struct netnat_portmap_data), RTE_CACHE_LINE_SIZE);
-		portmap_data->nat_ip = data->network_nat_ip;
+		portmap_data->nat_ip = snat_data->network_nat_ip;
 		portmap_data->nat_port = allocated_port;
 		portmap_data->flow_cnt++;
 

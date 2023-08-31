@@ -110,7 +110,7 @@ uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
 							  uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
 int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
-int dp_allocate_network_snat_port(struct dp_flow *df, uint32_t vni);
+int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni);
 const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(struct flow_value *cntrack);
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);
