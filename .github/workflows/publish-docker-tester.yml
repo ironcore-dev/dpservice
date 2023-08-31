@@ -9,7 +9,7 @@ on:
       - published
   push:
     branches:
-      - master
+      - main
     tags:
       - v*
     paths-ignore:
