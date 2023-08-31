@@ -14,6 +14,8 @@
 #include "grpc/dp_grpc_responder.h"
 #include "rte_flow/dp_rte_flow.h"
 
+#define DP_NAT_FULL_LOG_DELAY 5  /* seconds */
+
 TAILQ_HEAD(network_nat_head, network_nat_entry);
 
 static struct rte_hash *ipv4_dnat_tbl = NULL;
@@ -22,6 +24,8 @@ static struct rte_hash *ipv4_snat_tbl = NULL;
 static struct rte_hash *ipv4_netnat_portmap_tbl = NULL;
 static struct rte_hash *ipv4_netnat_portoverload_tbl = NULL;
 static struct network_nat_head nat_headp;
+
+static uint64_t dp_nat_full_log_delay;
 
 int dp_nat_init(int socket_id)
 {
@@ -48,6 +52,8 @@ int dp_nat_init(int socket_id)
 		return DP_ERROR;
 
 	TAILQ_INIT(&nat_headp);
+
+	dp_nat_full_log_delay = rte_get_timer_hz() * DP_NAT_FULL_LOG_DELAY;
 
 	return DP_OK;
 }
@@ -420,6 +426,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	bool need_to_find_new_port = true;
 	uint32_t vm_ip = ntohl(df->src.src_addr);
 	uint16_t vm_port = ntohs(df->l4_info.trans_port.src_port);
+	uint64_t timestamp;
 
 	portmap_key.vm_src_ip = vm_ip;
 	portmap_key.vni = vni;
@@ -470,10 +477,16 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		}
 
 		if (!allocated_port) {
-			DPS_LOG_WARNING("No usable ipv4 port found for natting",
-							DP_LOG_IPV4(snat_data->network_nat_ip),
-							DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(vm_ip),
-							DP_LOG_SRC_PORT(vm_port));
+			// This is normal once the port range gets saturated, but still helpful in logs.
+			// Therefore the log must be present, just rate-limited (per interface).
+			timestamp = rte_rdtsc();
+			if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
+				snat_data->log_timestamp = timestamp;
+				DPS_LOG_WARNING("NAT portmap range is full",
+								DP_LOG_IPV4(snat_data->network_nat_ip),
+								DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(vm_ip),
+								DP_LOG_SRC_PORT(vm_port));
+			}
 			return DP_ERROR;
 		}
 
