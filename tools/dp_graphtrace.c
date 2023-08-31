@@ -104,12 +104,25 @@ static void print_packet(struct rte_mbuf *pkt)
 	struct dp_graphtrace_pktinfo *pktinfo = dp_get_graphtrace_pktinfo(pkt);
 
 	dp_graphtrace_sprint(pkt, printbuf, sizeof(printbuf));
-	printf("%u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
-		   pktinfo->pktid,
-		   pktinfo->node->name,
-		   pktinfo->next_node ? "->" : "  ",
-		   pktinfo->next_node ? pktinfo->next_node->name : "",
-		   printbuf);
+
+	if (pktinfo->pkt_type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE) {
+		dp_graphtrace_sprint(pkt, printbuf, sizeof(printbuf));
+		printf("%u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
+		pktinfo->pktid,
+		pktinfo->node->name,
+		pktinfo->next_node ? "->" : "  ",
+		pktinfo->next_node ? pktinfo->next_node->name : "",
+		printbuf);
+	} else if (pktinfo->pkt_type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD) {
+		printf("%u:  captured offload packet : %s\n",
+		pktinfo->pktid,
+		printbuf);
+	} else {
+		printf("%u: " NODENAME_FMT ": unknown packet type %u\n",
+		pktinfo->pktid,
+		pktinfo->node->name,
+		pktinfo->pkt_type);
+	}
 }
 
 static int dp_graphtrace_dump(struct dp_graphtrace *graphtrace)

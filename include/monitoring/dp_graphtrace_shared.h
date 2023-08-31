@@ -26,12 +26,19 @@ enum dp_graphtrace_action {
 	DP_GRAPHTRACE_ACTION_STOP,
 };
 
+enum {
+	DP_GRAPHTRACE_PKT_TYPE_UNKNOWN = 0,
+	DP_GRAPHTRACE_PKT_TYPE_SOFTWARE,
+	DP_GRAPHTRACE_PKT_TYPE_OFFLOAD,
+};
+
 struct dp_graphtrace {
 	struct rte_mempool	*mempool;
 	struct rte_ring		*ringbuf;
 };
 
 struct dp_graphtrace_pktinfo {
+	uint8_t pkt_type;
 	uint32_t pktid;
 	struct rte_node *node;
 	struct rte_node *next_node;

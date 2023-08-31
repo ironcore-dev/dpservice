@@ -12,6 +12,30 @@ static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
 	.transfer = 0,
 };
 
+static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
+	.group = DP_RTE_FLOW_DEFAULT_GROUP,
+	.priority = 1,
+	.ingress = 1,
+	.egress = 0,
+	.transfer = 1,
+};
+
+static const struct rte_flow_attr dp_flow_attr_default_monitoring_ingress = {
+	.group = DP_RTE_FLOW_MONITORING_GROUP,
+	.priority = 3,
+	.ingress = 1,
+	.egress = 0,
+	.transfer = 1,
+};
+
+static const struct rte_flow_attr dp_flow_attr_default_capture_ingress = {
+	.group = DP_RTE_FLOW_VNET_GROUP,
+	.priority = 3,
+	.ingress = 1,
+	.egress = 0,
+	.transfer = 0,
+};
+
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
 	struct rte_flow_item_eth eth_spec;   // #1
@@ -35,6 +59,114 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 		return DP_ERROR;
 
 	DPS_LOG_DEBUG("Installed IPIP isolation flow rule", DP_LOG_PORTID(port_id));
+	return DP_OK;
+}
+
+int dp_install_jump_rule_int_default_group(uint16_t port_id, uint32_t dst_group)
+{
+	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
+	int pattern_cnt = 0;
+
+	// jump action from default group to monitoring group
+	struct rte_flow_action_jump jump_action; // #1
+	struct rte_flow_action action[2];	// + end
+	int action_cnt = 0;
+
+	struct rte_flow *flow;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	// all ethernet packets
+	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
+
+	// create actions that jump from the default group
+	// create jump action
+	dp_set_jump_group_action(&action[action_cnt++], &jump_action, dst_group);
+
+	// end actions
+	dp_set_end_action(&action[action_cnt++]);
+
+	// validate and install flow rule
+	flow = dp_install_rte_flow(port_id, &dp_flow_attr_default_jump_ingress, pattern, action);
+
+	if (!flow)
+		return DP_ERROR;
+
+	DPS_LOG_DEBUG("Installed the default jumping flow rule that destinated to group", DP_LOG_PORTID(port_id), DP_LOG_RTE_GROUP(dst_group));
+	return DP_OK;
+}
+
+int dp_install_default_rule_in_monitoring_group(uint16_t port_id)
+{
+
+	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
+	int pattern_cnt = 0;
+
+	struct rte_flow_action_sample sample_action; // 1
+	struct rte_flow_action_jump jump_action;	// 2
+	struct rte_flow_action action[3];			// + end
+	int action_cnt = 0;
+	
+	struct rte_flow *flow;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	// all ethernet packets
+	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
+
+	// create actions 
+	// create sampling action
+	dp_set_sample_action(&action[action_cnt++], &sample_action, 1, NULL); // mirror all packets, without explicite sub sample action
+
+	// create jump group action
+	dp_set_jump_group_action(&action[action_cnt++], &jump_action, DP_RTE_FLOW_VNET_GROUP); // jump to group DP_RTE_FLOW_VNET_GROUP
+
+	// end actions
+	dp_set_end_action(&action[action_cnt++]);
+
+	// validate and install flow rule
+	flow = dp_install_rte_flow(port_id, &dp_flow_attr_default_monitoring_ingress, pattern, action);
+
+	if (!flow)
+		return DP_ERROR;
+
+	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORTID(port_id));
+	return DP_OK;
+
+}
+
+int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id)
+{
+
+	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
+	int pattern_cnt = 0;
+
+	struct rte_flow_action_queue queue_action;	// 1
+	struct rte_flow_action action[2];		// + end
+	int action_cnt = 0;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	// all ethernet packets
+	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
+	dp_set_end_flow_item(&pattern[pattern_cnt++]);
+
+	// create actions
+	// create flow action -- queue, send to default software handling queue
+	dp_set_redirect_queue_action(&action[action_cnt++], &queue_action, 0);
+	// create flow action -- end
+	dp_set_end_action(&action[action_cnt++]);
+	
+
+	if (!dp_install_rte_flow(port_id, &dp_flow_attr_default_capture_ingress, pattern, action))
+		return DP_ERROR;
+
+	DPS_LOG_DEBUG("Installed the default capture flow rule", DP_LOG_PORTID(port_id));
 	return DP_OK;
 }
 

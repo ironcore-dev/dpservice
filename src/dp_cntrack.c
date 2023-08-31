@@ -6,6 +6,8 @@
 #include "dp_log.h"
 #include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow_helpers.h"
+#include "monitoring/dp_graphtrace.h"
 
 static struct flow_key key_cache[2];
 static int key_cache_index = 0;
@@ -72,6 +74,21 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		}
 
 	}
+
+}
+
+static __rte_always_inline int dp_capture_offloaded_pkts(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
+{
+
+	printf("flow_val->offload_flags.orig = %d, flow_val->offload_flags.reply = %d\n", flow_val->offload_flags.orig, flow_val->offload_flags.reply);
+	if (!offload_mode_enabled ||
+			flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD || flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
+		return 0;
+
+	dp_graphtrace_capture_offload_pkt(m);
+	df->flags.offload_mark = DP_PKT_OFFLOAD_MARK;
+	printf("offloaded pkt captured\n");
+	return 1;
 
 }
 
@@ -247,6 +264,8 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 	) {
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;
+		if (dp_capture_offloaded_pkts(m, *p_flow_val, df))
+				return DP_ERROR;	// it is not really an error, but we need to stop processing this pkt
 		dp_set_pkt_flow_direction(curr_key, cached_flow_val, df);
 		dp_set_flow_offload_flag(m, cached_flow_val, df);
 		return DP_OK;
@@ -269,6 +288,9 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		return DP_OK;
 	}
 
+	if (dp_capture_offloaded_pkts(m, *p_flow_val, df))
+		return DP_ERROR;	// it is not really an error, but we need to stop processing this pkt
+
 	// already established flow found
 	dp_set_pkt_flow_direction(curr_key, *p_flow_val, df);
 	dp_set_flow_offload_flag(m, *p_flow_val, df);
@@ -283,7 +305,9 @@ int dp_cntrack_handle(__rte_unused struct rte_node *node, struct rte_mbuf *m, st
 	int ret;
 
 	ret = dp_get_flow_val(m, df, &flow_val);
-	if (DP_FAILED(ret))
+	if (DP_FAILED(ret)) {
+		if (!df->flags.offload_mark)
+			DPNODE_LOG_WARNING(node, "Cannot establish flow value", DP_LOG_RET(ret));
 		return ret;
 
 	flow_val->timestamp = rte_rdtsc();

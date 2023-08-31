@@ -31,6 +31,12 @@ extern "C"
 #define DP_IP_ICMP_CODE_DST_PORT_UNREACHABLE 3
 #define DP_IP_ICMP_CODE_FRAGMENT_NEEDED 4
 
+enum {
+	DP_RTE_FLOW_DEFAULT_GROUP,
+	DP_RTE_FLOW_MONITORING_GROUP,
+	DP_RTE_FLOW_VNET_GROUP,
+};
+
 struct dp_icmp_err_ip_info {
 	struct rte_ipv4_hdr *err_ipv4_hdr;
 	rte_be16_t	l4_src_port;
