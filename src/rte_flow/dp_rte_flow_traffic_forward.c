@@ -129,7 +129,8 @@ static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_i
 }
 
 static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_IPIP_ENCAP_HEADER_SIZE],
-															const struct dp_flow *df)
+															const struct dp_flow *df,
+															const uint8_t *src_ip6)
 {
 	struct rte_ether_hdr *encap_eth_hdr = (struct rte_ether_hdr *)raw_hdr;
 	struct rte_ipv6_hdr *encap_ipv6_hdr = (struct rte_ipv6_hdr *)(&raw_hdr[sizeof(struct rte_ether_hdr)]);
@@ -142,7 +143,7 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 	encap_ipv6_hdr->payload_len = 0;
 	encap_ipv6_hdr->proto = df->tun_info.proto_id;
 	encap_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	rte_memcpy(encap_ipv6_hdr->src_addr, get_underlay_conf()->src_ip6, sizeof(encap_ipv6_hdr->src_addr));
+	rte_memcpy(encap_ipv6_hdr->src_addr, src_ip6, sizeof(encap_ipv6_hdr->src_addr));
 	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
 }
 
@@ -254,7 +255,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// standard actions do not have the power to do what needs to be done here
 	// thus a raw decap (to get a 'naked' packet) and raw encap is used
 	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, sizeof(struct rte_ether_hdr));
-	dp_create_ipip_encap_header(raw_encap_hdr, df);
+	dp_create_ipip_encap_header(raw_encap_hdr, df, dp_get_vm_ul_ip6(m->port));
 	dp_set_raw_encap_action(&actions[action_cnt++], &raw_encap, raw_encap_hdr, sizeof(raw_encap_hdr));
 
 	// make flow aging work
