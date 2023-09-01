@@ -79,6 +79,11 @@ static __rte_always_inline void dp_graphtrace_disable(void)
 	_dp_graphtrace_enabled = false;
 }
 
+static __rte_always_inline bool dp_graphtrace_is_enabled(void)
+{
+	return _dp_graphtrace_enabled;
+}
+
 #ifdef __cplusplus
 }
 #endif

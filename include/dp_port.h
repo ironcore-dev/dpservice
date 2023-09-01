@@ -37,6 +37,7 @@ struct dp_port {
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
 	enum dp_vf_port_attach_status	attach_status;
+	struct rte_flow					*default_flow;
 };
 
 struct dp_ports {

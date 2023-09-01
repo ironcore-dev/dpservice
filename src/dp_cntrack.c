@@ -79,15 +79,12 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 
 static __rte_always_inline int dp_capture_offloaded_pkts(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
-
-	printf("flow_val->offload_flags.orig = %d, flow_val->offload_flags.reply = %d\n", flow_val->offload_flags.orig, flow_val->offload_flags.reply);
 	if (!offload_mode_enabled ||
 			flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD || flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
 		return 0;
 
 	dp_graphtrace_capture_offload_pkt(m);
 	df->flags.offload_mark = DP_PKT_OFFLOAD_MARK;
-	printf("offloaded pkt captured\n");
 	return 1;
 
 }
