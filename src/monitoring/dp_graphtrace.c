@@ -6,6 +6,8 @@
 #include "dp_log.h"
 #include "dpdk_layer.h"
 #include "monitoring/dp_graphtrace_shared.h"
+#include "rte_flow/dp_rte_flow_init.h"
+#include "rte_flow/dp_rte_flow.h"
 
 #ifdef ENABLE_PYTEST
 #	include "dp_conf.h"
@@ -14,6 +16,7 @@ static enum dp_graphtrace_loglevel graphtrace_loglevel;
 
 static struct dp_graphtrace graphtrace;
 bool _dp_graphtrace_enabled = false;
+static bool _offload_enabled;
 
 static int dp_graphtrace_init_memzone(void)
 {
@@ -37,6 +40,7 @@ static int dp_graphtrace_init_memzone(void)
 		return DP_ERROR;
 	}
 
+	_offload_enabled = dp_conf_is_offload_enabled();
 
 	return DP_OK;
 }
@@ -50,9 +54,22 @@ static void dp_graphtrace_free_memzone(void)
 }
 
 static __rte_always_inline
+int dp_graphtrace_turn_on_vf_offload_tracing(void)
+{
+	return dp_change_all_vf_default_jump_rte_flow_group(DP_RTE_FLOW_MONITORING_GROUP);
+}
+
+static __rte_always_inline
+int dp_graphtrace_turn_off_vf_offload_tracing(void)
+{
+	return dp_change_all_vf_default_jump_rte_flow_group(DP_RTE_FLOW_VNET_GROUP);
+}
+
+static __rte_always_inline
 void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_graphtrace_mp_reply *reply)
 {
 	const struct dp_graphtrace_mp_request *request = (const struct dp_graphtrace_mp_request *)mp_msg->param;
+	int ret;
 
 	if (mp_msg->len_param != sizeof(struct dp_graphtrace_mp_request)) {
 		DPS_LOG_WARNING("Invalid graphtrace request message size", DP_LOG_VALUE(mp_msg->len_param));
@@ -63,11 +80,27 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 	switch ((enum dp_graphtrace_action)request->action) {
 	case DP_GRAPHTRACE_ACTION_START:
 		dp_graphtrace_enable();
+		if (_offload_enabled) {
+			ret = dp_graphtrace_turn_on_vf_offload_tracing();
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Cannot turn on offload tracing", DP_LOG_RET(ret));
+				reply->error_code = ret;
+				return;
+			}
+		}
 		reply->error_code = DP_OK;
 		DPS_LOG_INFO("Graphtrace enabled");
 		return;
 	case DP_GRAPHTRACE_ACTION_STOP:
 		dp_graphtrace_disable();
+		if (_offload_enabled) {
+			ret = dp_graphtrace_turn_off_vf_offload_tracing();
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Cannot turn off offload tracing", DP_LOG_RET(ret));
+				reply->error_code = ret;
+				return;
+			}
+		}
 		reply->error_code = DP_OK;
 		DPS_LOG_INFO("Graphtrace disabled");
 		return;

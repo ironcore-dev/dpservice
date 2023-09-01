@@ -12,6 +12,7 @@
 #include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "monitoring/dp_graphtrace.h"
 
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
@@ -433,6 +434,7 @@ int dp_port_start(uint16_t port_id)
 {
 	struct dp_port *port;
 	int ret;
+	bool graphtrace_enabled = dp_graphtrace_is_enabled();
 
 	port = dp_port_get(port_id);
 	if (!port)
@@ -466,7 +468,10 @@ int dp_port_start(uint16_t port_id)
 
 
 		if (port->port_type == DP_PORT_VF) {
-			dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
+			if (graphtrace_enabled)
+				dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
+			else
+				dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
 			dp_install_default_rule_in_monitoring_group(port_id);
 			dp_install_default_capture_rule_in_vnet_group(port_id);
 		}

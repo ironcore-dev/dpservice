@@ -9,7 +9,7 @@
 #define DP_IPIP_ENCAP_HEADER_SIZE (sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr))
 
 static const struct rte_flow_attr dp_flow_pf_attr_ingress = {
-	.group = 0,
+	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
 	.ingress = 1,
 	.egress = 0,
@@ -25,7 +25,7 @@ static const struct rte_flow_attr dp_flow_vf_attr_ingress = {
 };
 
 static const struct rte_flow_attr dp_flow_attr_egress = {
-	.group = 0,
+	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
 	.ingress = 0,
 	.egress = 1,
@@ -33,7 +33,7 @@ static const struct rte_flow_attr dp_flow_attr_egress = {
 };
 
 static const struct rte_flow_attr dp_flow_pf_attr_transfer = {
-	.group = 0,
+	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
 #ifdef ENABLE_DPDK_22_11
 	.ingress = 0,
