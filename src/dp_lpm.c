@@ -14,6 +14,8 @@ static struct rte_hash *vm_handle_tbl = NULL;
 static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
 
+static const struct underlay_conf *u_conf;
+
 int dp_lpm_init(int socket_id)
 {
 	vm_handle_tbl = dp_create_jhash_table(DP_MAX_PORTS, VM_IFACE_ID_MAX_LEN,
@@ -21,9 +23,7 @@ int dp_lpm_init(int socket_id)
 	if (!vm_handle_tbl)
 		return DP_ERROR;
 
-	// TODO needs a comment (and optimization) and dp_get_vm_ul_ip6() needs a new name!
-	dp_set_vm_ul_ip6(dp_port_get_pf0_id(), get_underlay_conf()->src_ip6);
-	dp_set_vm_ul_ip6(dp_port_get_pf1_id(), get_underlay_conf()->src_ip6);
+	u_conf = get_underlay_conf();
 
 	return DP_OK;
 }
@@ -229,6 +229,14 @@ uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].ul_ipv6;
+}
+
+const uint8_t *dp_get_port_ul_ip6(uint16_t portid)
+{
+	RTE_VERIFY(portid < DP_MAX_PORTS);
+	const struct vm_entry *entry = &vm_table[portid];
+
+	return entry->vm_ready ? entry->ul_ipv6 : u_conf->src_ip6;
 }
 
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,

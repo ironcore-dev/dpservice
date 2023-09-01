@@ -255,7 +255,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// standard actions do not have the power to do what needs to be done here
 	// thus a raw decap (to get a 'naked' packet) and raw encap is used
 	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, sizeof(struct rte_ether_hdr));
-	dp_create_ipip_encap_header(raw_encap_hdr, df, dp_get_vm_ul_ip6(m->port));
+	dp_create_ipip_encap_header(raw_encap_hdr, df, dp_get_port_ul_ip6(m->port));
 	dp_set_raw_encap_action(&actions[action_cnt++], &raw_encap, raw_encap_hdr, sizeof(raw_encap_hdr));
 
 	// make flow aging work
