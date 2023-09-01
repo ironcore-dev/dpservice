@@ -21,6 +21,10 @@ int dp_lpm_init(int socket_id)
 	if (!vm_handle_tbl)
 		return DP_ERROR;
 
+	// TODO needs a comment (and optimization) and dp_get_vm_ul_ip6() needs a new name!
+	dp_set_vm_ul_ip6(dp_port_get_pf0_id(), get_underlay_conf()->src_ip6);
+	dp_set_vm_ul_ip6(dp_port_get_pf1_id(), get_underlay_conf()->src_ip6);
+
 	return DP_OK;
 }
 
