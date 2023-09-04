@@ -555,11 +555,16 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	struct dpgrpc_iface_id *request = &responder->request.del_iface;
 
 	int port_id;
+	uint32_t ipv4;
+	uint32_t vni;
 	int ret = DP_GRPC_OK;
 
 	port_id = dp_get_portid_with_vm_handle(request->iface_id);
 	if (DP_FAILED(port_id))
 		return DP_GRPC_ERR_NOT_FOUND;
+
+	ipv4 = dp_get_dhcp_range_ip4(port_id);
+	vni = dp_get_vm_vni(port_id);
 
 	dp_del_vnf_with_vnf_key(dp_get_vm_ul_ip6(port_id));
 	if (DP_FAILED(dp_port_stop(port_id)))
@@ -570,6 +575,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_del_vm(port_id);
 #endif
+	dp_remove_vm_flows(port_id, ipv4, vni);
 	return ret;
 }
 
