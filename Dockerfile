@@ -52,6 +52,7 @@ COPY hack/*.patch hack/
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_log.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_xstats_mem_leak.patch
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_graph_alloc.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
