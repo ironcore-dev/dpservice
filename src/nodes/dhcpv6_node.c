@@ -170,19 +170,19 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	if (DP_FAILED(resize_packet(m, reply_options_len - options_len)))
 		return DP_ERROR;
 
-	rte_memcpy(options, &opt_sid, sizeof(opt_sid));
+	// had to use memcpy() here, because GCC's array-bounds check fails for rte_memcpy (using XMM optimization)
+	memcpy(options, &opt_sid, sizeof(opt_sid));
 	options += sizeof(opt_sid);
 	if (reply_options.opt_cid_len) {
-		rte_memcpy(options, &reply_options.opt_cid, reply_options.opt_cid_len);
+		memcpy(options, (void *)&reply_options.opt_cid, reply_options.opt_cid_len);
 		options += reply_options.opt_cid_len;
 	}
 	if (reply_options.opt_iana_len) {
-		rte_memcpy(options, &reply_options.opt_iana, reply_options.opt_iana_len);
+		memcpy(options, (void *)&reply_options.opt_iana, reply_options.opt_iana_len);
 		options += reply_options.opt_iana_len;
 	}
 	if (reply_options.opt_rapid_len)
-		// had to use the direct value here, because GCC's array-bounds check fails here (granted, the structure is hard to parse)
-		rte_memcpy(options, &reply_options.opt_rapid, sizeof(struct dhcpv6_option));
+		memcpy(options, &reply_options.opt_rapid, reply_options.opt_rapid_len);
 
 	return reply_options_len;
 }
