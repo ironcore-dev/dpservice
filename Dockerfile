@@ -1,11 +1,11 @@
-FROM debian:11-slim as builder
+FROM debian:12-slim as builder
 
 ARG DPDK_VER=21.11
 
 WORKDIR /workspace
 
 # Install prerequisite packages
-RUN apt-get update && apt-get install -y --no-install-recommends ON \
+RUN apt-get update && apt-get upgrade && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
 libmnl-dev \
 libnuma-dev \
@@ -36,7 +36,7 @@ curl \
 build-essential \
 pkg-config \
 protobuf-compiler-grpc \
-libgrpc++1 \
+libgrpc++1.51 \
 libgrpc++-dev \
 linux-headers-${OSARCH} \
 && rm -rf /var/lib/apt/lists/*
@@ -49,13 +49,14 @@ ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
 # Copy DPDK patches
 COPY hack/*.patch hack/
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_gcc12.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_log.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_xstats_mem_leak.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_graph_alloc.patch
 
 # Compile DPDK
-RUN cd $DPDK_DIR && meson -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
+RUN cd $DPDK_DIR && meson setup -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
 common/cpt,common/iavf,\
 common/octeontx,common/octeontx2,common/cnxk,common/qat,regex/octeontx2,net/cnxk,dma/cnxk,\
 common/sfc_efx,common/auxiliary,common/dpaa,common/fslmc,common/ifpga,common/vdev,common/vmbus,\
@@ -90,11 +91,11 @@ COPY tools/ tools/
 # Needed for version extraction by meson
 COPY .git/ .git/
 
-RUN CC=clang CXX=clang++ meson build && cd ./build && ninja
-RUN rm -rf build && meson build --buildtype=release && cd ./build && ninja
-RUN rm -rf build && meson build && cd ./build && ninja
+RUN CC=clang CXX=clang++ meson setup build && cd ./build && ninja
+RUN rm -rf build && meson setup build --buildtype=release && cd ./build && ninja
+RUN rm -rf build && meson setup build && cd ./build && ninja
 
-FROM debian:11-slim as tester
+FROM debian:12-slim as tester
 
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
@@ -103,7 +104,7 @@ libnuma1 \
 pciutils \
 procps \
 libuuid1 \
-libgrpc++1 \
+libgrpc++1.51 \
 iproute2 \
 udev \
 gawk \
@@ -116,23 +117,22 @@ WORKDIR /
 COPY --from=builder /workspace/test ./test
 COPY --from=builder /workspace/build/src/dp_service ./build/src/dp_service
 COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /lib/* /lib/
 COPY --from=builder /workspace/client/github.com/onmetal/* ./build
 RUN ldconfig
 
 WORKDIR /test
 ENTRYPOINT ["pytest-3", "-x", "-v"]
 
-FROM debian:11-slim as production
+FROM debian:12-slim as production
 
-RUN apt-get update && apt-get install -y --no-install-recommends ON \
+RUN apt-get update && apt-get upgrade && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
 numactl \
 libnuma1 \
 pciutils \
 procps \
 libuuid1 \
-libgrpc++1 \
+libgrpc++1.51 \
 iproute2 \
 udev \
 gawk \
@@ -143,7 +143,6 @@ COPY --from=builder /workspace/build/src/dp_service .
 COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_graphtrace .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /lib/* /lib/
 COPY --from=builder /workspace/exporter/* /workspace/client/github.com/onmetal/* .
 RUN ldconfig
 
