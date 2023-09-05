@@ -38,7 +38,7 @@ static int dp_graphtrace_init_memzone(void)
 	}
 
 
-	return DP_OK;
+	return 0;
 }
 
 static void dp_graphtrace_free_memzone(void)
