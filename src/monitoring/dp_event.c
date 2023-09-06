@@ -5,6 +5,7 @@
 #include "dp_log.h"
 #include "dp_port.h"
 #include "monitoring/dp_monitoring.h"
+#include "rte_flow/dp_rte_flow_init.h"
 
 
 static int dp_send_event_msg(struct dp_event_msg *msg)
@@ -38,8 +39,7 @@ static int dp_send_event_link_msg(uint16_t port_id, uint8_t status)
 {
 	struct dp_event_msg link_status_msg = {
 		.msg_head = {
-			.type = DP_STATUS_TYPE_LINK,
-			.scope = DP_STATUS_SCOPE_LOCAL,
+			.type = DP_EVENT_TYPE_LINK_STATUS,
 		},
 		.event_entry = {
 			.link_status = {
@@ -81,18 +81,50 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 		DPS_LOG_WARNING("Cannot set link status", DP_LOG_PORTID(port_id), DP_LOG_VALUE(status));
 }
 
+void dp_process_event_hardware_capture_start_msg(__rte_unused struct rte_mbuf *m)
+{
+	if (DP_FAILED(dp_turn_on_vf_offload_tracing()))
+		DPS_LOG_WARNING("Cannot turn on offload tracing");
+}
+
+void dp_process_event_hardware_capture_stop_msg(__rte_unused struct rte_mbuf *m)
+{
+	if (DP_FAILED(dp_turn_off_vf_offload_tracing()))
+		DPS_LOG_WARNING("Cannot turn off offload tracing");
+}
+
 // Flow-aging message - sent periodically to age-out conntracked flows
 
 int dp_send_event_flow_aging_msg(void)
 {
 	struct dp_event_msg flow_aging_msg = {
 		.msg_head = {
-			.type = DP_STATUS_TYPE_FLOW_AGING,
-			.scope = DP_STATUS_SCOPE_LOCAL,
+			.type = DP_EVENT_TYPE_FLOW_AGING,
 		},
 	};
 	return dp_send_event_msg(&flow_aging_msg);
 }
+
+int dp_send_event_hardware_capture_start_msg(void)
+{
+	struct dp_event_msg graphtrace_start_msg = {
+		.msg_head = {
+			.type = DP_EVENT_TYPE_HARDWARE_CAPTURE_START,
+		},
+	};
+	return dp_send_event_msg(&graphtrace_start_msg);
+}
+
+int dp_send_event_hardware_capture_stop_msg(void)
+{
+	struct dp_event_msg graphtrace_start_msg = {
+		.msg_head = {
+			.type = DP_EVENT_TYPE_HARDWARE_CAPTURE_STOP,
+		},
+	};
+	return dp_send_event_msg(&graphtrace_start_msg);
+}
+
 
 void dp_process_event_flow_aging_msg(__rte_unused struct rte_mbuf *m)
 {

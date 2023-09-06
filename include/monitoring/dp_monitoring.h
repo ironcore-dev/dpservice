@@ -8,20 +8,16 @@
 extern "C" {
 #endif
 
-enum dp_status_type {
-	DP_STATUS_TYPE_UNKNOWN,
-	DP_STATUS_TYPE_LINK,
-	DP_STATUS_TYPE_FLOW_AGING,
-};
-
-enum dp_status_scope {
-	DP_STATUS_SCOPE_LOCAL,
-	DP_STATUS_SCOPE_REMOTE,
+enum dp_event_type {
+	DP_EVENT_TYPE_UNKNOWN,
+	DP_EVENT_TYPE_LINK_STATUS,
+	DP_EVENT_TYPE_FLOW_AGING,
+	DP_EVENT_TYPE_HARDWARE_CAPTURE_START,
+	DP_EVENT_TYPE_HARDWARE_CAPTURE_STOP,
 };
 
 struct dp_event_msg_head {
-	enum dp_status_type type;
-	enum dp_status_scope scope;
+	enum dp_event_type type;
 };
 
 struct dp_link_status {

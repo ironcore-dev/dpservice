@@ -8,6 +8,7 @@
 #include "monitoring/dp_graphtrace_shared.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "monitoring/dp_event.h"
 
 #ifdef ENABLE_PYTEST
 #	include "dp_conf.h"
@@ -53,17 +54,6 @@ static void dp_graphtrace_free_memzone(void)
 	graphtrace.mempool = NULL;
 }
 
-static __rte_always_inline
-int dp_graphtrace_turn_on_vf_offload_tracing(void)
-{
-	return dp_change_all_vf_default_jump_rte_flow_group(DP_RTE_FLOW_MONITORING_GROUP);
-}
-
-static __rte_always_inline
-int dp_graphtrace_turn_off_vf_offload_tracing(void)
-{
-	return dp_change_all_vf_default_jump_rte_flow_group(DP_RTE_FLOW_VNET_GROUP);
-}
 
 static __rte_always_inline
 void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_graphtrace_mp_reply *reply)
@@ -81,10 +71,9 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 	case DP_GRAPHTRACE_ACTION_START:
 		dp_graphtrace_enable();
 		if (_offload_enabled) {
-			ret = dp_graphtrace_turn_on_vf_offload_tracing();
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot turn on offload tracing", DP_LOG_RET(ret));
-				reply->error_code = ret;
+			if (DP_FAILED(dp_send_event_hardware_capture_start_msg())) {
+				DPS_LOG_ERR("Cannot send hardware capture start message");
+				reply->error_code = DP_ERROR;
 				return;
 			}
 		}
@@ -94,10 +83,9 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 	case DP_GRAPHTRACE_ACTION_STOP:
 		dp_graphtrace_disable();
 		if (_offload_enabled) {
-			ret = dp_graphtrace_turn_off_vf_offload_tracing();
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot turn off offload tracing", DP_LOG_RET(ret));
-				reply->error_code = ret;
+			if (DP_FAILED(dp_send_event_hardware_capture_stop_msg())) {
+				DPS_LOG_ERR("Cannot send hardware capture stop message");
+				reply->error_code = DP_ERROR;
 				return;
 			}
 		}

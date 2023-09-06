@@ -177,6 +177,7 @@ int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id)
 	return DP_OK;
 }
 
+static __rte_always_inline
 int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
 {
 	struct dp_ports *ports = get_dp_ports();
@@ -203,6 +204,17 @@ int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
 
 	return DP_OK;
 }
+
+int dp_turn_on_vf_offload_tracing(void)
+{
+	return dp_change_all_vf_default_jump_rte_flow_group(DP_RTE_FLOW_MONITORING_GROUP);
+}
+
+int dp_turn_off_vf_offload_tracing(void)
+{
+	return dp_change_all_vf_default_jump_rte_flow_group(DP_RTE_FLOW_VNET_GROUP);
+}
+
 
 #ifdef ENABLE_VIRTSVC
 int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], rte_be16_t svc_port)
