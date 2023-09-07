@@ -276,17 +276,15 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 	return DP_OK;
 }
 
-int dp_cntrack_handle(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df)
+int dp_cntrack_handle(__rte_unused struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df)
 {
 	struct flow_value *flow_val;
 	struct rte_tcp_hdr *tcp_hdr;
 	int ret;
 
 	ret = dp_get_flow_val(m, df, &flow_val);
-	if (DP_FAILED(ret)) {
-		DPNODE_LOG_WARNING(node, "Cannot establish flow value", DP_LOG_RET(ret));
+	if (DP_FAILED(ret))
 		return ret;
-	}
 
 	flow_val->timestamp = rte_rdtsc();
 

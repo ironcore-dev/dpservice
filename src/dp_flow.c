@@ -47,7 +47,7 @@ void dp_flow_free(void)
 	dp_free_jhash_table(ipv4_flow_tbl);
 }
 
-static int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
+static __rte_always_inline int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
 
