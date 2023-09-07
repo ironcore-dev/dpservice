@@ -24,9 +24,11 @@ enum dp_graphtrace_action {
 	DP_GRAPHTRACE_ACTION_NULL,
 	DP_GRAPHTRACE_ACTION_START,
 	DP_GRAPHTRACE_ACTION_STOP,
+	DP_GRAPHTRACE_ACTION_ENABLE_HW_CAPTURE,
+	DP_GRAPHTRACE_ACTION_DISABLE_HW_CAPTURE,
 };
 
-enum {
+enum dp_graphtrace_pkt_type {
 	DP_GRAPHTRACE_PKT_TYPE_UNKNOWN = 0,
 	DP_GRAPHTRACE_PKT_TYPE_SOFTWARE,
 	DP_GRAPHTRACE_PKT_TYPE_OFFLOAD,
@@ -38,7 +40,7 @@ struct dp_graphtrace {
 };
 
 struct dp_graphtrace_pktinfo {
-	uint8_t pkt_type;
+	enum dp_graphtrace_pkt_type pkt_type;
 	uint32_t pktid;
 	struct rte_node *node;
 	struct rte_node *next_node;

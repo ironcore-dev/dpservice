@@ -17,7 +17,7 @@ static enum dp_graphtrace_loglevel graphtrace_loglevel;
 
 static struct dp_graphtrace graphtrace;
 bool _dp_graphtrace_enabled = false;
-static bool _offload_enabled;
+static bool offload_enabled;
 
 static int dp_graphtrace_init_memzone(void)
 {
@@ -41,7 +41,7 @@ static int dp_graphtrace_init_memzone(void)
 		return DP_ERROR;
 	}
 
-	_offload_enabled = dp_conf_is_offload_enabled();
+	offload_enabled = dp_conf_is_offload_enabled();
 
 	return DP_OK;
 }
@@ -70,7 +70,16 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 	switch ((enum dp_graphtrace_action)request->action) {
 	case DP_GRAPHTRACE_ACTION_START:
 		dp_graphtrace_enable();
-		if (_offload_enabled) {
+		reply->error_code = DP_OK;
+		DPS_LOG_INFO("Graphtrace enabled");
+		return;
+	case DP_GRAPHTRACE_ACTION_STOP:
+		dp_graphtrace_disable();
+		reply->error_code = DP_OK;
+		DPS_LOG_INFO("Graphtrace disabled");
+		return;
+	case DP_GRAPHTRACE_ACTION_ENABLE_HW_CAPTURE:
+		if (offload_enabled) {
 			if (DP_FAILED(dp_send_event_hardware_capture_start_msg())) {
 				DPS_LOG_ERR("Cannot send hardware capture start message");
 				reply->error_code = DP_ERROR;
@@ -78,11 +87,10 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 			}
 		}
 		reply->error_code = DP_OK;
-		DPS_LOG_INFO("Graphtrace enabled");
+		DPS_LOG_INFO("Hardware capture enabled");
 		return;
-	case DP_GRAPHTRACE_ACTION_STOP:
-		dp_graphtrace_disable();
-		if (_offload_enabled) {
+	case DP_GRAPHTRACE_ACTION_DISABLE_HW_CAPTURE:
+		if (offload_enabled) {
 			if (DP_FAILED(dp_send_event_hardware_capture_stop_msg())) {
 				DPS_LOG_ERR("Cannot send hardware capture stop message");
 				reply->error_code = DP_ERROR;
@@ -90,7 +98,7 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 			}
 		}
 		reply->error_code = DP_OK;
-		DPS_LOG_INFO("Graphtrace disabled");
+		DPS_LOG_INFO("Hardware capture disabled");
 		return;
 	case DP_GRAPHTRACE_ACTION_NULL:
 	default:
@@ -147,7 +155,7 @@ void dp_graphtrace_free(void)
 }
 
 
-void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs, int type)
+void _dp_graphtrace_send(int type, struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs)
 {
 	uint16_t nb_dups = 0;
 	struct rte_mbuf *dups[nb_objs];
@@ -165,13 +173,13 @@ void _dp_graphtrace_send(struct rte_node *node, struct rte_node *next_node, void
 			dups[nb_dups++] = dup;
 			pktinfo = dp_get_graphtrace_pktinfo(dup);
 			pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
-			if (type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE) {
+			if (type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE)
 				pktinfo->pkt_type = DP_GRAPHTRACE_PKT_TYPE_SOFTWARE;
-				pktinfo->node = node;
-				pktinfo->next_node = next_node;
-			} else if (type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD) {
+			else if (type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD)
 				pktinfo->pkt_type = DP_GRAPHTRACE_PKT_TYPE_OFFLOAD;
-			}
+
+			pktinfo->node = node;
+			pktinfo->next_node = next_node;
 		}
 	}
 

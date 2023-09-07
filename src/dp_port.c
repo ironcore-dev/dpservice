@@ -469,11 +469,26 @@ int dp_port_start(uint16_t port_id)
 
 		if (port->port_type == DP_PORT_VF) {
 			if (graphtrace_enabled)
-				dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
+				ret = dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
 			else
-				dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
-			dp_install_default_rule_in_monitoring_group(port_id);
-			dp_install_default_capture_rule_in_vnet_group(port_id);
+				ret = dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
+
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+				return DP_ERROR;
+			}
+
+			ret = dp_install_default_rule_in_monitoring_group(port_id);
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+				return DP_ERROR;
+			}
+
+			ret = dp_install_default_capture_rule_in_vnet_group(port_id);
+			if (DP_FAILED(ret)) {
+				DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+				return DP_ERROR;
+			}
 		}
 	}
 
