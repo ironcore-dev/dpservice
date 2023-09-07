@@ -75,9 +75,6 @@ int dp_install_jump_rule_int_default_group(uint16_t port_id, uint32_t dst_group)
 	struct rte_flow *flow;
 	struct dp_port *port = dp_port_get_vf(port_id);
 
-	memset(pattern, 0, sizeof(pattern));
-	memset(action, 0, sizeof(action));
-
 	// all ethernet packets
 	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
@@ -117,10 +114,6 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id)
 
 	struct rte_flow *flow;
 
-	memset(pattern, 0, sizeof(pattern));
-	memset(action, 0, sizeof(action));
-	memset(sub_action, 0, sizeof(sub_action));
-
 	// all ethernet packets
 	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
@@ -157,9 +150,6 @@ int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id)
 	struct rte_flow_action action[2];		// + end
 	int action_cnt = 0;
 
-	memset(pattern, 0, sizeof(pattern));
-	memset(action, 0, sizeof(action));
-
 	// all ethernet packets
 	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
@@ -177,8 +167,7 @@ int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id)
 	return DP_OK;
 }
 
-static __rte_always_inline
-int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
+static int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
 {
 	struct dp_ports *ports = get_dp_ports();
 	struct dp_port *port;
@@ -191,13 +180,13 @@ int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
 				ret = rte_flow_destroy(port->port_id, port->default_flow, &error);
 
 			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Failed to destroy default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
-				return DP_ERROR;
+				DPS_LOG_WARNING("Failed to destroy default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+				continue;
 			}
 
 			if (DP_FAILED(dp_install_jump_rule_int_default_group(port->port_id, dst_group))) {
-				DPS_LOG_ERR("Failed to install default jump flow", DP_LOG_PORTID(port->port_id));
-				return DP_ERROR;
+				DPS_LOG_WARNING("Failed to install default jump flow", DP_LOG_PORTID(port->port_id));
+				continue;
 			}
 		}
 	}

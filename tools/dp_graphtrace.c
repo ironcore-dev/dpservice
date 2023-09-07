@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <rte_eal.h>
 #include <rte_alarm.h>
+#include <getopt.h>
 
 #include "dp_error.h"
 #include "dp_log.h"
@@ -31,6 +32,24 @@ static const char *eal_arg_strings[] = {
 	"--no-pci",						// do not try to use any hardware
 	"--log-level=6",				// hide DPDK's informational messages (level 7)
 };
+
+enum {
+	DP_GRAPHTRACE_OPT_NONE,
+	DP_GRAPHTRACE_OPT_HELP,
+	DP_GRAPHTRACE_OPT_CAPTURE_HW_PKT,
+} cmd_opt_type;
+
+static bool capture_hw_pkt = false;
+
+#define OPTSTRING \
+	"h" /* help */
+
+static const struct option longopts[] = {
+	{ "help", 0, 0, DP_GRAPHTRACE_OPT_HELP },
+	{ "capture-hw-pkt", 0, 0, DP_GRAPHTRACE_OPT_CAPTURE_HW_PKT },
+};
+
+
 static char *eal_args_mem[RTE_DIM(eal_arg_strings)];
 static char *eal_args[RTE_DIM(eal_args_mem)];
 
@@ -194,6 +213,26 @@ static int dp_graphtrace_stop(void)
 	return dp_graphtrace_request(DP_GRAPHTRACE_ACTION_STOP, &reply);
 }
 
+static int dp_graphtrace_enable_hw_capture(void)
+{
+	struct dp_graphtrace_mp_reply reply;
+
+	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_ENABLE_HW_CAPTURE, &reply)))
+		return DP_ERROR;
+
+	return DP_OK;
+}
+
+static int dp_graphtrace_disable_hw_capture(void)
+{
+	struct dp_graphtrace_mp_reply reply;
+
+	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_DISABLE_HW_CAPTURE, &reply)))
+		return DP_ERROR;
+
+	return DP_OK;
+}
+
 static void dp_graphtrace_monitor_primary(void *arg __rte_unused)
 {
 	int ret;
@@ -240,7 +279,22 @@ static int do_graphtrace(struct dp_graphtrace *graphtrace)
 		return DP_ERROR;
 	}
 
+	if (capture_hw_pkt) {
+		if (DP_FAILED(dp_graphtrace_enable_hw_capture())) {
+			fprintf(stderr, "Failed to enable hardware packet capture\n");
+			rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
+			return DP_ERROR;
+		}
+	}
+
 	ret = dp_graphtrace_dump(graphtrace);
+
+	if (capture_hw_pkt) {
+		 if (DP_FAILED(dp_graphtrace_disable_hw_capture())) {
+			fprintf(stderr, "Failed to disable hardware packet capture\n");
+			ret = DP_ERROR;
+		}
+	}
 
 	if (DP_FAILED(dp_graphtrace_stop())) {
 		fprintf(stderr, "Failed to request graph tracing termination\n");
@@ -256,11 +310,53 @@ static void signal_handler(__rte_unused int signum)
 	interrupt = true;
 }
 
-int main(void)
+static void dp_print_usage(const char *prgname)
+{
+	fprintf(stderr,
+		" --help                        show this help message and exit\n"
+		" --capture-hw-pkt              capture pkts after offloading rules are installed (experimental feature, only vf's pkts are supported)\n",
+		prgname);
+}
+
+static int parse_args(int argc, char **argv)
+{
+	int opt;
+	char *prgname = argv[0];
+
+	while ((opt = getopt_long(argc, argv, OPTSTRING, longopts, NULL)) != -1) {
+		switch (opt) {
+		case 'h':
+		case DP_GRAPHTRACE_OPT_HELP:
+			dp_print_usage(prgname);
+			return DP_CONF_RUNMODE_EXIT;
+		case DP_GRAPHTRACE_OPT_CAPTURE_HW_PKT:
+			capture_hw_pkt = true;
+			break;
+		default:
+			dp_print_usage(prgname);
+			return DP_CONF_RUNMODE_ERROR;
+		}
+	}
+
+	return DP_CONF_RUNMODE_NORMAL;
+}
+
+int main(int argc, char **argv)
 {
 	struct dp_graphtrace graphtrace;
 	int retcode;
 	int ret;
+
+	ret = parse_args(argc, argv);
+	switch (ret) {
+	case DP_CONF_RUNMODE_ERROR:
+		fprintf(stderr, "Cannot parse cmd options %s\n", dp_strerror_verbose(ret));
+		return EXIT_FAILURE;
+	case DP_CONF_RUNMODE_EXIT:
+		return EXIT_SUCCESS;
+	case DP_CONF_RUNMODE_NORMAL:
+		break;
+	}
 
 	ret = eal_init();
 	if (DP_FAILED(ret)) {

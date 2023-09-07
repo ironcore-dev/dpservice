@@ -550,8 +550,7 @@ void dp_set_sample_action(struct rte_flow_action *action,
 						  uint32_t sample_ratio, struct rte_flow_action *sub_action)
 {
 	sample_action->ratio = sample_ratio;
-	if (sub_action)
-		sample_action->actions = sub_action;
+	sample_action->actions = sub_action; // it seems that driver does not support null sub action
 	action->type = RTE_FLOW_ACTION_TYPE_SAMPLE;
 	action->conf = sample_action;
 }
