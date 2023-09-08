@@ -469,9 +469,9 @@ int dp_port_start(uint16_t port_id)
 
 		if (port->port_type == DP_PORT_VF) {
 			if (graphtrace_enabled)
-				ret = dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
+				ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
 			else
-				ret = dp_install_jump_rule_int_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
+				ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
 
 			if (DP_FAILED(ret)) {
 				DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
