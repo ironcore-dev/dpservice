@@ -9,7 +9,7 @@ extern "C" {
 
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id);
 
-int dp_install_jump_rule_int_default_group(uint16_t port_id, uint32_t group_id);
+int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t group_id);
 int dp_install_default_rule_in_monitoring_group(uint16_t port_id);
 int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id);
 

@@ -82,6 +82,7 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 		if (offload_enabled) {
 			if (DP_FAILED(dp_send_event_hardware_capture_start_msg())) {
 				DPS_LOG_ERR("Cannot send hardware capture start message");
+				dp_graphtrace_disable(); // roll back if failed on this side, and error code cannot be sent back
 				reply->error_code = DP_ERROR;
 				return;
 			}
@@ -155,7 +156,7 @@ void dp_graphtrace_free(void)
 }
 
 
-void _dp_graphtrace_send(int type, struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs)
+void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type, struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs)
 {
 	uint16_t nb_dups = 0;
 	struct rte_mbuf *dups[nb_objs];
@@ -173,11 +174,7 @@ void _dp_graphtrace_send(int type, struct rte_node *node, struct rte_node *next_
 			dups[nb_dups++] = dup;
 			pktinfo = dp_get_graphtrace_pktinfo(dup);
 			pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
-			if (type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE)
-				pktinfo->pkt_type = DP_GRAPHTRACE_PKT_TYPE_SOFTWARE;
-			else if (type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD)
-				pktinfo->pkt_type = DP_GRAPHTRACE_PKT_TYPE_OFFLOAD;
-
+			pktinfo->pkt_type = type;
 			pktinfo->node = node;
 			pktinfo->next_node = next_node;
 		}

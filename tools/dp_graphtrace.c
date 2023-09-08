@@ -46,7 +46,7 @@ static bool capture_hw_pkt = false;
 
 static const struct option longopts[] = {
 	{ "help", 0, 0, DP_GRAPHTRACE_OPT_HELP },
-	{ "capture-hw-pkt", 0, 0, DP_GRAPHTRACE_OPT_CAPTURE_HW_PKT },
+	{ "hw-packet", 0, 0, DP_GRAPHTRACE_OPT_CAPTURE_HW_PKT },
 };
 
 
@@ -181,7 +181,7 @@ static int dp_graphtrace_request(enum dp_graphtrace_action action, struct dp_gra
 	if (DP_FAILED(ret)) {
 		fprintf(stderr, "Cannot send graphtrace request %s\n", dp_strerror_verbose(ret));
 		return DP_ERROR;
-	}
+	} 
 
 	if (DP_FAILED(reply->error_code)) {
 		fprintf(stderr, "Graphtrace request failed %s\n", dp_strerror_verbose(reply->error_code));
@@ -195,8 +195,10 @@ static int dp_graphtrace_start(void)
 {
 	struct dp_graphtrace_mp_reply reply;
 
-	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_START, &reply)))
+	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_START, &reply))) {
+		fprintf(stderr, "Failed to request graph tracing\n");
 		return DP_ERROR;
+	}
 
 	primary_alive = true;
 	return DP_OK;
@@ -210,15 +212,22 @@ static int dp_graphtrace_stop(void)
 	if (!primary_alive)
 		return DP_OK;
 
-	return dp_graphtrace_request(DP_GRAPHTRACE_ACTION_STOP, &reply);
+	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_STOP, &reply))) {
+		fprintf(stderr, "Failed to request graph tracing termination\n");
+		return DP_ERROR;
+	}
+
+	return DP_OK;
 }
 
 static int dp_graphtrace_enable_hw_capture(void)
 {
 	struct dp_graphtrace_mp_reply reply;
 
-	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_ENABLE_HW_CAPTURE, &reply)))
+	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_ENABLE_HW_CAPTURE, &reply))) {
+		fprintf(stderr, "Failed to enable hardware packet capture\n");
 		return DP_ERROR;
+	}
 
 	return DP_OK;
 }
@@ -227,8 +236,10 @@ static int dp_graphtrace_disable_hw_capture(void)
 {
 	struct dp_graphtrace_mp_reply reply;
 
-	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_DISABLE_HW_CAPTURE, &reply)))
+	if (DP_FAILED(dp_graphtrace_request(DP_GRAPHTRACE_ACTION_DISABLE_HW_CAPTURE, &reply))) {
+		fprintf(stderr, "Failed to disable hardware packet capture\n");
 		return DP_ERROR;
+	}
 
 	return DP_OK;
 }
@@ -257,6 +268,20 @@ static void dp_graphtrace_monitor_primary(void *arg __rte_unused)
 		fprintf(stderr, "Warning: Cannot re-schedule primary process monitor %s\n", dp_strerror_verbose(ret));
 }
 
+static int dp_graphtrace_init_hw_pkt_capture(struct dp_graphtrace *graphtrace)
+{
+	if (!capture_hw_pkt)
+		return DP_OK;
+
+	if (DP_FAILED(dp_graphtrace_enable_hw_capture())) {
+		fprintf(stderr, "Failed to enable hardware packet capture\n");
+		rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
 static int do_graphtrace(struct dp_graphtrace *graphtrace)
 {
 	int ret;
@@ -274,34 +299,28 @@ static int do_graphtrace(struct dp_graphtrace *graphtrace)
 	}
 
 	if (DP_FAILED(dp_graphtrace_start())) {
-		fprintf(stderr, "Failed to request graph tracing\n");
 		rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
 		return DP_ERROR;
 	}
 
-	if (capture_hw_pkt) {
-		if (DP_FAILED(dp_graphtrace_enable_hw_capture())) {
-			fprintf(stderr, "Failed to enable hardware packet capture\n");
-			rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
-			return DP_ERROR;
-		}
+	if (DP_FAILED(dp_graphtrace_init_hw_pkt_capture(graphtrace))) {
+		if (dp_graphtrace_stop())	// rollback if failed
+			fprintf(stderr, "Failed to stop graph tracing after failing to init hw pkt capture\n");
+		rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
+		return DP_ERROR;
 	}
 
 	ret = dp_graphtrace_dump(graphtrace);
 
-	if (capture_hw_pkt) {
-		 if (DP_FAILED(dp_graphtrace_disable_hw_capture())) {
-			fprintf(stderr, "Failed to disable hardware packet capture\n");
+	if (capture_hw_pkt)
+		 if (DP_FAILED(dp_graphtrace_disable_hw_capture()))
 			ret = DP_ERROR;
-		}
-	}
 
-	if (DP_FAILED(dp_graphtrace_stop())) {
-		fprintf(stderr, "Failed to request graph tracing termination\n");
+	if (DP_FAILED(dp_graphtrace_stop()))
 		ret = DP_ERROR;
-	}
 
 	rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
+	
 	return ret;
 }
 
@@ -314,7 +333,7 @@ static void dp_print_usage(const char *prgname)
 {
 	fprintf(stderr,
 		" --help                        show this help message and exit\n"
-		" --capture-hw-pkt              capture pkts after offloading rules are installed (experimental feature, only vf's pkts are supported)\n",
+		" --hw-packet           capture pkts after offloading rules are installed (experimental feature, only VF's outgoing packets are supported)\n",
 		prgname);
 }
 
@@ -350,7 +369,7 @@ int main(int argc, char **argv)
 	ret = parse_args(argc, argv);
 	switch (ret) {
 	case DP_CONF_RUNMODE_ERROR:
-		fprintf(stderr, "Cannot parse cmd options %s\n", dp_strerror_verbose(ret));
+		fprintf(stderr, "Cannot parse command-line options %s\n", dp_strerror_verbose(ret));
 		return EXIT_FAILURE;
 	case DP_CONF_RUNMODE_EXIT:
 		return EXIT_SUCCESS;

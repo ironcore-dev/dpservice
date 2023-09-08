@@ -19,7 +19,7 @@ enum dp_graphtrace_loglevel {
 int dp_graphtrace_init(void);
 void dp_graphtrace_free(void);
 
-void _dp_graphtrace_send(int type, struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs);
+void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type, struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs);
 
 // Logging the trace for debugging
 #ifdef ENABLE_PYTEST
