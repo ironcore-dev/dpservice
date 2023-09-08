@@ -430,11 +430,40 @@ static int dp_port_bind_port_hairpins(struct dp_port *port)
 	return DP_OK;
 }
 
+static int dp_install_vf_init_rte_rules(uint32_t port_id)
+{
+	bool graphtrace_enabled = dp_graphtrace_is_enabled();
+	int ret;
+
+	if (graphtrace_enabled)
+		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
+	else
+		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
+
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	ret = dp_install_default_rule_in_monitoring_group(port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	ret = dp_install_default_capture_rule_in_vnet_group(port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
 int dp_port_start(uint16_t port_id)
 {
 	struct dp_port *port;
 	int ret;
-	bool graphtrace_enabled = dp_graphtrace_is_enabled();
 
 	port = dp_port_get(port_id);
 	if (!port)
@@ -468,27 +497,9 @@ int dp_port_start(uint16_t port_id)
 
 
 		if (port->port_type == DP_PORT_VF) {
-			if (graphtrace_enabled)
-				ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
-			else
-				ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
-
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-				return DP_ERROR;
-			}
-
-			ret = dp_install_default_rule_in_monitoring_group(port_id);
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-				return DP_ERROR;
-			}
-
-			ret = dp_install_default_capture_rule_in_vnet_group(port_id);
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-				return DP_ERROR;
-			}
+			ret = dp_install_vf_init_rte_rules(port_id);
+			if (DP_FAILED(ret))
+				assert(0); // if any flow rule failed, stop process running due to possible hw/driver failure
 		}
 	}
 

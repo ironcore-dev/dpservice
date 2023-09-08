@@ -21,15 +21,16 @@ extern "C" {
 #endif
 
 enum dp_graphtrace_action {
-	DP_GRAPHTRACE_ACTION_NULL,
 	DP_GRAPHTRACE_ACTION_START,
 	DP_GRAPHTRACE_ACTION_STOP,
-	DP_GRAPHTRACE_ACTION_ENABLE_HW_CAPTURE,
-	DP_GRAPHTRACE_ACTION_DISABLE_HW_CAPTURE,
+};
+
+enum dp_graphtrace_op_type {
+	DP_GRAPHTRACE_OP_TYPE_SOFTWARE,
+	DP_GRAPHTRACE_OP_TYPE_OFFLOAD,
 };
 
 enum dp_graphtrace_pkt_type {
-	DP_GRAPHTRACE_PKT_TYPE_UNKNOWN = 0,
 	DP_GRAPHTRACE_PKT_TYPE_SOFTWARE,
 	DP_GRAPHTRACE_PKT_TYPE_OFFLOAD,
 };
@@ -47,7 +48,10 @@ struct dp_graphtrace_pktinfo {
 };
 
 struct dp_graphtrace_mp_request {
-	uint8_t action;
+	enum dp_graphtrace_action action;
+	union {
+		enum dp_graphtrace_op_type op_type;
+	} action_params;
 };
 
 struct dp_graphtrace_mp_reply {

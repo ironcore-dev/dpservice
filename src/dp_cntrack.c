@@ -262,7 +262,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;
 		if (dp_capture_offloaded_pkts(m, *p_flow_val, df))
-				return DP_IS_CAPTURED_HW_PKT;	// it is not really an error, but we need to stop processing this pkt
+				return DP_IS_CAPTURED_HW_PKT;
 		dp_set_pkt_flow_direction(curr_key, cached_flow_val, df);
 		dp_set_flow_offload_flag(m, cached_flow_val, df);
 		return DP_OK;
@@ -286,7 +286,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 	}
 
 	if (dp_capture_offloaded_pkts(m, *p_flow_val, df))
-		return DP_IS_CAPTURED_HW_PKT;	// it is not really an error, but we need to stop processing this pkt
+		return DP_IS_CAPTURED_HW_PKT;
 
 	// already established flow found
 	dp_set_pkt_flow_direction(curr_key, *p_flow_val, df);
@@ -302,11 +302,8 @@ int dp_cntrack_handle(__rte_unused struct rte_node *node, struct rte_mbuf *m, st
 	int ret;
 
 	ret = dp_get_flow_val(m, df, &flow_val);
-	if (DP_FAILED(ret)) {
-		DPNODE_LOG_WARNING(node, "Cannot establish flow value", DP_LOG_RET(ret));
-		return ret;
-	} else if (ret == DP_IS_CAPTURED_HW_PKT)
-		return ret;
+	if (DP_FAILED(ret) || ret == DP_IS_CAPTURED_HW_PKT)
+		return ret;	// it is not really an error when ret == DP_IS_CAPTURED_HW_PKT, but we need to stop processing this pkt
 
 	flow_val->timestamp = rte_rdtsc();
 
