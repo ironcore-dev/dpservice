@@ -170,18 +170,19 @@ int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id)
 static int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
 {
 	struct dp_ports *ports = get_dp_ports();
-	struct dp_port *port;
 	struct rte_flow_error error;
 	int ret;
 
+
 	DP_FOREACH_PORT(ports, port) {
 		if (port->port_type == DP_PORT_VF && port->allocated) {
-			if (port->default_flow)
+			if (port->default_flow) {
 				ret = rte_flow_destroy(port->port_id, port->default_flow, &error);
 
-			if (DP_FAILED(ret)) {
-				DPS_LOG_WARNING("Failed to destroy default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
-				continue;
+				if (DP_FAILED(ret)) {
+					DPS_LOG_WARNING("Failed to destroy default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+					continue;
+				}
 			}
 
 			if (DP_FAILED(dp_install_jump_rule_in_default_group(port->port_id, dst_group))) {
