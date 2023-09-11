@@ -17,6 +17,7 @@ if [ "$#" -lt 4 ]; then
 fi
 
 # Process parameters
+STRIPTAR="0"
 for i in "$@"
 do
 case $i in
@@ -38,6 +39,10 @@ case $i in
 	;;
 	-release=*)
 	RELEASE="${i#*=}"
+	shift
+	;;
+	-strip=*)
+	STRIPTAR="${i#*=}"
 	shift
 	;;
 	*)
@@ -69,7 +74,7 @@ fi
 # Use curl to download the asset using the asset ID.
 curl -s -L -H "Accept: application/octet-stream" -H "Authorization: Bearer $PAT" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/assets/$ASSET_ID -o $DIRECTORY/$DIRECTORY.tar.gz
 
-tar -xzf $DIRECTORY/$DIRECTORY.tar.gz -C $DIRECTORY
+tar -xzf $DIRECTORY/$DIRECTORY.tar.gz -C $DIRECTORY --strip-components $STRIPTAR
 rm $DIRECTORY/$DIRECTORY.tar.gz
 rm -rf $DIRECTORY/LICENSE*
 rm -rf $DIRECTORY/README.md

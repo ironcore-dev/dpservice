@@ -78,7 +78,7 @@ COPY hack/rel_download.sh hack/rel_download.sh
 RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
 sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; else echo ""; fi) \
 && ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=$GITHUB_TOKEN \
-&& ./hack/rel_download.sh -dir=client -owner=onmetal -repo=dpservice-cli -pat=$GITHUB_TOKEN \'
+&& ./hack/rel_download.sh -dir=client -owner=onmetal -repo=dpservice-cli -strip=2 -pat=$GITHUB_TOKEN'
 
 # Now copy the rest to enable DPDK layer caching
 COPY meson.build meson.build
@@ -119,8 +119,8 @@ python3-scapy \
 WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
 COPY --from=testbuilder /workspace/build/src/dp_service ./build/src/dp_service
+COPY --from=testbuilder /workspace/client/* ./build
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
-COPY --from=testbuilder /workspace/client/github.com/onmetal/* ./build
 RUN ldconfig
 
 WORKDIR /test
@@ -139,14 +139,21 @@ libgrpc++1.51 \
 iproute2 \
 udev \
 gawk \
+bash-completion \
 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
-COPY --from=builder /workspace/build/src/dp_service .
-COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dump/dpservice-dump .
-COPY --from=builder /workspace/hack/prepare.sh .
+COPY --from=builder /workspace/build/src/dp_service \
+					/workspace/build/tools/dp_grpc_client \
+					/workspace/build/tools/dump/dpservice-dump \
+					/workspace/client/* \
+					/workspace/exporter/* \
+					/workspace/hack/prepare.sh \
+					/usr/local/bin
 COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /workspace/exporter/* /workspace/client/github.com/onmetal/* .
 RUN ldconfig
 
-ENTRYPOINT ["/dp_service"]
+# Ensure bash-completion is working in operations
+RUN echo 'PATH=${PATH}:/\nsource /etc/bash_completion\nsource <(dpservice-cli completion bash)' >> /root/.bashrc
+
+ENTRYPOINT ["dp_service"]

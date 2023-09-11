@@ -22,7 +22,8 @@ spec:
       - name: init-dp-service
         image: dp-service
         imagePullPolicy: IfNotPresent
-        command: ['/prepare.sh']
+        command:
+        - prepare.sh
         volumeMounts:
         - mountPath: /dev
           name: hugepages
@@ -58,8 +59,9 @@ spec:
         livenessProbe:
           exec:
             command:
-            - /dp_grpc_client
-            - --is_initialized
+            - dpservice-cli
+            - get
+            - init
           initialDelaySeconds: 10
           periodSeconds: 10
       - name: prometheus-agent
@@ -78,7 +80,7 @@ spec:
           name: https
           protocol: TCP
         command:
-        - /prometheus-dpdk-exporter
+        - prometheus-dpdk-exporter
         resources: {}
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
