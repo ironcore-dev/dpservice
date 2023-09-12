@@ -402,6 +402,12 @@ int dp_ports_init(void)
 
 void dp_ports_free(void)
 {
+	// without stopping started ports, DPDK complains
+	DP_FOREACH_PORT(&dp_ports, port) {
+		// TODO(plague): PR to create proper rollback in dp_port_start()
+		if (port->allocated)
+			 rte_eth_dev_stop(port->port_id);
+	}
 	free(dp_ports.ports);
 }
 

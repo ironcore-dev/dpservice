@@ -191,7 +191,6 @@ static void free_interfaces(void)
 	dp_lb_free();
 	dp_nat_free();
 	dp_flow_free();
-	// ports seem to be stopped by DPDK at the end
 	dp_telemetry_free();
 	dp_graph_free();
 #ifdef ENABLE_VIRTSVC
