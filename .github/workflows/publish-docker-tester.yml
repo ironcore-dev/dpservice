@@ -54,7 +54,7 @@ jobs:
           docker context create builders-tester
       - name: Set up Docker Buildx
         timeout-minutes: 5
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           version: latest
           endpoint: builders-tester # self-hosted
