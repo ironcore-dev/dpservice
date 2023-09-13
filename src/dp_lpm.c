@@ -246,7 +246,6 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route4_table(vni, socketid);
@@ -279,7 +278,6 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t ip, uint8_t depth, int 
 	struct rte_rib *root;
 	uint64_t next_hop;
 
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route4_table(vni, socketid);
@@ -352,9 +350,6 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 	struct rte_rib *root;
 	int ret;
 
-	// TODO(plague): look into this globally
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
-
 	root = dp_get_vni_route4_table(vni, socketid);
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
@@ -385,7 +380,6 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route6_table(vni, socketid);
@@ -417,7 +411,6 @@ int dp_del_route6(uint16_t portid, uint32_t vni, uint8_t *ipv6, uint8_t depth, i
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	root = dp_get_vni_route6_table(vni, socketid);
@@ -432,17 +425,15 @@ int dp_del_route6(uint16_t portid, uint32_t vni, uint8_t *ipv6, uint8_t depth, i
 	return DP_GRPC_OK;
 }
 
-void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth, int socketid)
+void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth)
 {
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	vm_table[portid].info.own_ip = ip;
 	vm_table[portid].info.depth = depth;
 }
 
-void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip, int socketid)
+void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip)
 {
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	vm_table[portid].info.pxe_ip = ip;
 }
@@ -453,10 +444,9 @@ uint32_t dp_get_vm_pxe_ip4(uint16_t portid)
 	return vm_table[portid].info.pxe_ip;
 }
 
-void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t *ipv6, uint8_t depth, int socketid)
+void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t *ipv6, uint8_t depth)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	rte_memcpy(&vm_table[portid].info.dhcp_ipv6, ipv6, 16);
 	vm_table[portid].info.depth = depth;
 }
@@ -497,9 +487,8 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 	return &vm_table[portid].info.neigh_mac;
 }
 
-int dp_setup_vm(int port_id, int vni, const int socketid)
+int dp_setup_vm(int port_id, int vni, int socketid)
 {
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
 	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid)))
@@ -511,9 +500,8 @@ int dp_setup_vm(int port_id, int vni, const int socketid)
 	return DP_OK;
 }
 
-int dp_setup_vm6(int port_id, int vni, const int socketid)
+int dp_setup_vm6(int port_id, int vni, int socketid)
 {
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
 	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid)))
@@ -587,7 +575,6 @@ int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_
 
 void dp_del_vm(int portid, int socketid)
 {
-	RTE_VERIFY(socketid < DP_NB_SOCKETS);
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 
 	dp_del_route(portid, vm_table[portid].vni, vm_table[portid].info.own_ip, 32, socketid);

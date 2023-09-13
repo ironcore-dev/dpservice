@@ -137,17 +137,25 @@ static int init_interfaces(void)
 
 	dp_multipath_init();
 
+	if (DP_FAILED(dp_ports_init()))
+		return DP_ERROR;
+
+	// TODO(plague): this is called many times, PR for putting the socket of a port into dp_port.c
+	//               (also socket_id is always passed along with port_id)
 	pf0_socket = rte_eth_dev_socket_id(dp_port_get_pf0_id());
 	if (DP_FAILED(pf0_socket)) {
-		DPS_LOG_ERR("Cannot get numa socket for pf0", DP_LOG_PORTID(dp_port_get_pf0_id()), DP_LOG_RET(pf0_socket));
-		return pf0_socket;
+		if (pf0_socket == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket for pf0", DP_LOG_PORTID(dp_port_get_pf0_id()));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket for pf0", DP_LOG_PORTID(dp_port_get_pf0_id()), DP_LOG_RET(rte_errno));
+			return pf0_socket;
+		}
 	}
-
-	if (DP_FAILED(dp_ports_init())
 #ifdef ENABLE_VIRTSVC
-		|| DP_FAILED(dp_virtsvc_init(pf0_socket))
+	if (DP_FAILED(dp_virtsvc_init(pf0_socket)))
+		return DP_ERROR;
 #endif
-		|| DP_FAILED(dp_graph_init())
+	if (DP_FAILED(dp_graph_init())
 		|| DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
 

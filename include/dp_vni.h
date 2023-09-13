@@ -21,13 +21,17 @@ extern struct rte_hash *vni_handle_tbl;
 #define DP_IP_PROTO_IPV4		DP_IP_PROTO_IPv4_ENCAP
 #define DP_IP_PROTO_IPV6		DP_IP_PROTO_IPv6_ENCAP
 
+// Protect array access
+// Also, when NUMA is not available, DPDK uses SOCKET_ID_ANY (-1)
+#define DP_SOCKETID(SOCKETID) (unlikely((unsigned int)(SOCKETID) >= DP_NB_SOCKETS) ? 0 : (SOCKETID))
+
 // TODO: packing?
 struct dp_vni_key {
 	int vni;
 	int type;
 };
 
-struct dp_vni_value {
+struct dp_vni_data {
 	struct rte_rib	*ipv4[DP_NB_SOCKETS];
 	struct rte_rib6	*ipv6[DP_NB_SOCKETS];
 	struct dp_ref	ref_count;
@@ -35,57 +39,51 @@ struct dp_vni_value {
 	int				vni;
 };
 
-static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int socketid)
+static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int socket_id)
 {
-	struct dp_vni_value *temp_val = NULL;
+	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
 		.type = DP_IP_PROTO_IPV4,
 		.vni = vni
 	};
 	int ret;
 
-	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
+	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&vni_data);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
 			DPS_LOG_ERR("VNI lookup error", DP_LOG_VNI(vni), DP_LOG_VNI_TYPE(DP_IP_PROTO_IPV4));
 		return NULL;
 	}
 
-	if (!temp_val->ipv4[socketid])
-		return NULL;
-
-	return temp_val->ipv4[socketid];
+	return vni_data->ipv4[DP_SOCKETID(socket_id)];
 }
 
-static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int socketid)
+static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int socket_id)
 {
-	struct dp_vni_value *temp_val = NULL;
+	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
 		.type = DP_IP_PROTO_IPV6,
 		.vni = vni
 	};
 	int ret;
 
-	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&temp_val);
+	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&vni_data);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
 			DPS_LOG_ERR("VNI lookup error", DP_LOG_VNI(vni), DP_LOG_VNI_TYPE(DP_IP_PROTO_IPV6));
 		return NULL;
 	}
 
-	if (!temp_val->ipv6[socketid])
-		return NULL;
-
-	return temp_val->ipv6[socketid];
+	return vni_data->ipv6[DP_SOCKETID(socket_id)];
 }
 
 int dp_vni_init(int socket_id);
 void dp_vni_free(void);
-bool dp_is_vni_route_tbl_available(int vni, int type, int socketid);
-int dp_create_vni_route_table(int vni, int type, int socketid);
+bool dp_is_vni_route_tbl_available(int vni, int type, int socket_id);
+int dp_create_vni_route_table(int vni, int type, int socket_id);
 int dp_delete_vni_route_table(int vni, int type);
-int dp_reset_vni_route_table(int vni, int type, int socketid);
-int dp_reset_vni_all_route_tables(int socketid);
+int dp_reset_vni_route_table(int vni, int type, int socket_id);
+int dp_reset_vni_all_route_tables(int socket_id);
 
 #ifdef __cplusplus
 }

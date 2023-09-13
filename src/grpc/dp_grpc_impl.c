@@ -508,10 +508,10 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_VNI_INIT6;
 		goto vm_err;
 	}
-	dp_set_dhcp_range_ip4(port_id, request->ip4_addr, DP_LPM_DHCP_IP_DEPTH, socket_id);
-	dp_set_vm_pxe_ip4(port_id, request->ip4_pxe_addr, socket_id);
+	dp_set_dhcp_range_ip4(port_id, request->ip4_addr, DP_LPM_DHCP_IP_DEPTH);
+	dp_set_vm_pxe_ip4(port_id, request->ip4_pxe_addr);
 	dp_set_vm_pxe_str(port_id, request->pxe_str);
-	dp_set_dhcp_range_ip6(port_id, request->ip6_addr, DP_LPM_DHCP_IP6_DEPTH, socket_id);
+	dp_set_dhcp_range_ip6(port_id, request->ip6_addr, DP_LPM_DHCP_IP6_DEPTH);
 	ret = dp_add_route(port_id, request->vni, 0, request->ip4_addr, NULL, 32, socket_id);
 	if (DP_FAILED(ret))
 		goto vm_err;
