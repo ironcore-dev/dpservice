@@ -1,6 +1,6 @@
 FROM debian:12-slim as builder
 
-ARG DPDK_VER=21.11
+ARG DPDK_VER=22.11
 ARG DPSERVICE_FEATURES=""
 
 WORKDIR /workspace
@@ -50,11 +50,8 @@ ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
 # Copy DPDK patches
 COPY hack/*.patch hack/
-RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_gcc12.patch
-RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_clang.patch
-RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_log.patch
-RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_xstats_mem_leak.patch
-RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_21_11_graph_alloc.patch
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_22_11_gcc12.patch
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_22_11_log.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson setup -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\

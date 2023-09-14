@@ -2,7 +2,7 @@ diff --git a/lib/eal/common/eal_common_log.c b/lib/eal/common/eal_common_log.c
 index 1be35f5397..159beb63ab 100644
 --- a/lib/eal/common/eal_common_log.c
 +++ b/lib/eal/common/eal_common_log.c
-@@ -29,11 +29,14 @@ static struct rte_logs {
+@@ -28,11 +28,14 @@ static struct rte_logs {
  	uint32_t type;  /**< Bitfield with enabled logs. */
  	uint32_t level; /**< Log level. */
  	FILE *file;     /**< Output file set by rte_openlog_stream, or NULL. */
@@ -17,7 +17,7 @@ index 1be35f5397..159beb63ab 100644
  };
  
  struct rte_eal_opt_loglevel {
-@@ -78,6 +81,13 @@ rte_openlog_stream(FILE *f)
+@@ -77,6 +80,13 @@ rte_openlog_stream(FILE *f)
  	return 0;
  }
  
@@ -31,7 +31,7 @@ index 1be35f5397..159beb63ab 100644
  FILE *
  rte_log_get_stream(void)
  {
-@@ -500,7 +510,7 @@ rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
+@@ -499,7 +509,7 @@ rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
  	RTE_PER_LCORE(log_cur_msg).loglevel = level;
  	RTE_PER_LCORE(log_cur_msg).logtype = logtype;
  
@@ -44,7 +44,7 @@ diff --git a/lib/eal/include/rte_log.h b/lib/eal/include/rte_log.h
 index 319e4044a5..ee17cf93a0 100644
 --- a/lib/eal/include/rte_log.h
 +++ b/lib/eal/include/rte_log.h
-@@ -88,6 +88,18 @@ extern "C" {
+@@ -87,6 +87,18 @@ extern "C" {
   */
  int rte_openlog_stream(FILE *f);
  
@@ -67,7 +67,7 @@ diff --git a/lib/eal/version.map b/lib/eal/version.map
 index ab28c22791..72c8a18111 100644
 --- a/lib/eal/version.map
 +++ b/lib/eal/version.map
-@@ -141,6 +141,7 @@ DPDK_22 {
+@@ -155,6 +155,7 @@ DPDK_23 {
  	rte_log_set_level;
  	rte_log_set_level_pattern;
  	rte_log_set_level_regexp;
