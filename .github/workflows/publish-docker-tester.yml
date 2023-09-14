@@ -4,9 +4,6 @@ env:
   platforms: linux/amd64
 
 on:
-  release:
-    types:
-      - published
   push:
     branches:
       - main
