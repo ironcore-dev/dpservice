@@ -251,10 +251,6 @@ void CreateInterfaceCall::ParseReply(struct dpgrpc_reply* reply)
 
 	vf = new VirtualFunction();
 	vf->set_name(reply->vf_pci.name);
-	vf->set_bus(reply->vf_pci.bus);
-	vf->set_domain(reply->vf_pci.domain);
-	vf->set_slot(reply->vf_pci.slot);
-	vf->set_function(reply->vf_pci.function);
 	reply_.set_allocated_vf(vf);
 	inet_ntop(AF_INET6, reply->vf_pci.ul_addr6, strbuf, sizeof(strbuf));
 	reply_.set_underlay_route(strbuf);

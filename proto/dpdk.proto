@@ -80,6 +80,7 @@ message PxeConfig {
 
 message VirtualFunction {
 	string name = 1;      // Linux VF NIC device name
+	// TODO: Not available anymore, remove in next breaking change
 	uint32 domain = 2;    // PCIe Domain
 	uint32 bus = 3;       // PCIe Bus
 	uint32 slot = 4;      // PCIe Slot

@@ -524,13 +524,8 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	}
 	// should never fail as we just created it
 	dp_port = dp_port_get(port_id);
-	if (dp_port) {
+	if (dp_port)
 		snprintf(reply->name, sizeof(reply->name), "%s", dp_port->vf_name);
-		reply->domain = dp_port->pci_addr.domain;
-		reply->bus = dp_port->pci_addr.bus;
-		reply->slot = dp_port->pci_addr.devid;
-		reply->function = dp_port->pci_addr.function;
-	}
 
 	rte_memcpy(dp_get_vm_ul_ip6(port_id), ul_addr6, sizeof(ul_addr6));
 	rte_memcpy(reply->ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(reply->ul_addr6));

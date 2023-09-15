@@ -203,10 +203,6 @@ struct dpgrpc_request {
 
 struct dpgrpc_vf_pci {
 	char		name[RTE_ETH_NAME_MAX_LEN];
-	uint32_t	domain;
-	uint32_t	bus;
-	uint32_t	slot;
-	uint32_t	function;
 	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 };
 
