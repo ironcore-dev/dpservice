@@ -21,7 +21,7 @@ on:
       - '**/*.md'
 
 jobs:
-  buildAndPush:
+  buildAndPushTester:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=ref,event=pr
-            type=sha
+            type=sha,prefix=,format=long
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
       - name: Set up QEMU
@@ -51,13 +51,15 @@ jobs:
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
-          docker context create builders-tester
+          CONTEXT_NAME="builders-tester-${GITHUB_RUN_ID}"
+          docker context create $CONTEXT_NAME
+          echo "CONTEXT_NAME=$CONTEXT_NAME" >> $GITHUB_ENV
       - name: Set up Docker Buildx
         timeout-minutes: 5
         uses: docker/setup-buildx-action@v3
         with:
           version: latest
-          endpoint: builders-tester # self-hosted
+          endpoint: ${{ env.CONTEXT_NAME }} # self-hosted
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -77,3 +79,10 @@ jobs:
           target: tester
           secrets: |
             "github_token=${{ secrets.BOT_PAT }}"
+  test:
+    runs-on: [ self-hosted, dpdk ]
+    needs: buildAndPushTester
+    steps:
+    - name: Run tests
+      run: |
+        docker run --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/onmetal/dp-service-tester:${{ github.sha }}
