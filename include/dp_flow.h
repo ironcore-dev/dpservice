@@ -13,7 +13,8 @@
 extern "C" {
 #endif
 
-#define FLOW_MAX						(1*1024*1024UL)
+// arbitrary big number
+#define FLOW_MAX						850000
 
 #define DP_FLOW_VAL_AGE_CTX_CAPACITY	5
 
@@ -32,11 +33,11 @@ extern "C" {
 #define DP_IS_FLOW_STATUS_FLAG_NONE(flag)		(!(flag))
 #define DP_IS_FLOW_STATUS_FLAG_SRC_NAT(flag)	((flag) & DP_FLOW_STATUS_FLAG_SRC_NAT)
 #define DP_IS_FLOW_STATUS_FLAG_DST_NAT(flag)	((flag) & DP_FLOW_STATUS_FLAG_DST_NAT)
-#define DP_IS_FLOW_STATUS_FLAG_DST_LB(flag)	((flag) & DP_FLOW_STATUS_FLAG_DST_LB)
+#define DP_IS_FLOW_STATUS_FLAG_DST_LB(flag)		((flag) & DP_FLOW_STATUS_FLAG_DST_LB)
 #define DP_IS_FLOW_STATUS_FLAG_FIREWALL(flag)	((flag) & DP_FLOW_STATUS_FLAG_FIREWALL)
 #define DP_IS_FLOW_STATUS_FLAG_DEFAULT(flag)	((flag) & DP_FLOW_STATUS_FLAG_DEFAULT)
 
- #define DP_IS_FLOW_STATUS_FLAG_NF(flag)		((flag) & DP_FLOW_STATUS_FLAG_NF)
+#define DP_IS_FLOW_STATUS_FLAG_NF(flag)		((flag) & DP_FLOW_STATUS_FLAG_NF)
 
 
 enum {

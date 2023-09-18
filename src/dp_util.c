@@ -10,6 +10,9 @@
 #define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"
 #define DP_SYSFS_MAX_PATH 256
 
+// makes sure there is enough space to prevent collisions
+#define DP_JHASH_MARGIN_COEF(ENTRIES) ((ENTRIES)*1.20)
+
 int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IFNAMSIZ])
 {
 	int ret;
@@ -148,7 +151,7 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 
 	struct rte_hash_parameters params = {
 		.name = full_name,
-		.entries = entries,
+		.entries = DP_JHASH_MARGIN_COEF(entries),
 		.key_len = key_len,
 		.hash_func = hash_func,
 		.hash_func_init_val = 0xfee1900d,  // "random" IV
