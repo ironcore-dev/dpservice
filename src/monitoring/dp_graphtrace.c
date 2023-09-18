@@ -64,7 +64,7 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 {
 	int ret;
 
-	switch ((enum dp_graphtrace_op_type)request->action_params.op_type) {
+	switch (request->action_params.op_type) {
 	case DP_GRAPHTRACE_OP_TYPE_SOFTWARE:
 		dp_graphtrace_enable();
 		DPS_LOG_INFO("Graphtrace enabled only for software path");
@@ -90,7 +90,7 @@ static int dp_handle_graphtrace_stop(const struct dp_graphtrace_mp_request *requ
 {
 	int ret;
 
-	switch ((enum dp_graphtrace_op_type)request->action_params.op_type) {
+	switch (request->action_params.op_type) {
 	case DP_GRAPHTRACE_OP_TYPE_SOFTWARE:
 		dp_graphtrace_disable();
 		DPS_LOG_INFO("Graphtrace disabled only for software path");
@@ -124,7 +124,7 @@ void dp_handle_graphtrace_request(const struct rte_mp_msg *mp_msg, struct dp_gra
 		return;
 	}
 
-	switch ((enum dp_graphtrace_action)request->action) {
+	switch (request->action) {
 	case DP_GRAPHTRACE_ACTION_START:
 		ret = dp_handle_graphtrace_start(request);
 		reply->error_code = ret;

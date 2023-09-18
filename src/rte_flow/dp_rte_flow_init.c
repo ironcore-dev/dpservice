@@ -173,7 +173,6 @@ static int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
 	struct rte_flow_error error;
 	int ret;
 
-
 	DP_FOREACH_PORT(ports, port) {
 		if (port->port_type == DP_PORT_VF && port->allocated) {
 			if (port->default_flow) {

@@ -430,11 +430,33 @@ static int dp_port_bind_port_hairpins(struct dp_port *port)
 	return DP_OK;
 }
 
+static int dp_vf_init_monitoring_rule_rollback(uint32_t port_id)
+{
+	struct dp_port *port = dp_port_get_vf(port_id);
+	struct rte_flow_error error;
+
+	if (DP_FAILED(rte_flow_destroy(port->port_id, port->default_flow, &error))) {
+		DPS_LOG_ERR("Failed to destroy default flow while rollback from vf init monitoring rule installation", \
+			DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_install_jump_rule_in_default_group(port->port_id, DP_RTE_FLOW_VNET_GROUP))) {
+		DPS_LOG_ERR("Failed to install default jump flow rule while rollback from vf init monitoring rule installation", \
+			DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
+	
+	return DP_OK;
+}
+
 static int dp_install_vf_init_rte_rules(uint32_t port_id)
 {
 	bool graphtrace_enabled = dp_graphtrace_is_enabled();
 	int ret;
 
+	// at least one rule must be there, otherwise new packets cannot be delivered to software path
+	// same as the isolation rule on pf
 	if (graphtrace_enabled)
 		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
 	else
@@ -445,16 +467,22 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 		return DP_ERROR;
 	}
 
-	ret = dp_install_default_rule_in_monitoring_group(port_id);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-		return DP_ERROR;
-	}
-
+	// this rule must be there, otherwise new packets cannot be delivered to software path, making communication failure
 	ret = dp_install_default_capture_rule_in_vnet_group(port_id);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
+	}
+
+	if (graphtrace_enabled) {
+		ret = dp_install_default_rule_in_monitoring_group(port_id);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_WARNING("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+			if (DP_FAILED(dp_vf_init_monitoring_rule_rollback(port_id))) {
+				DPS_LOG_ERR("Cannot rollback from the monitoring rule installation on vf", DP_LOG_PORTID(port_id));
+				return DP_ERROR;
+			}
+		}
 	}
 
 	return DP_OK;
