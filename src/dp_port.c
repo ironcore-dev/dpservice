@@ -474,14 +474,12 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 		return DP_ERROR;
 	}
 
-	if (graphtrace_enabled) {
-		ret = dp_install_default_rule_in_monitoring_group(port_id);
-		if (DP_FAILED(ret)) {
-			DPS_LOG_WARNING("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-			if (DP_FAILED(dp_vf_init_monitoring_rule_rollback(port_id))) {
-				DPS_LOG_ERR("Cannot rollback from the monitoring rule installation on vf", DP_LOG_PORTID(port_id));
-				return DP_ERROR;
-			}
+	ret = dp_install_default_rule_in_monitoring_group(port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		if (DP_FAILED(dp_vf_init_monitoring_rule_rollback(port_id))) {
+			DPS_LOG_ERR("Cannot rollback from the monitoring rule installation on vf", DP_LOG_PORTID(port_id));
+			return DP_ERROR;
 		}
 	}
 
