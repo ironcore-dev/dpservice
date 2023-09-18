@@ -72,7 +72,7 @@ int dp_lpm_reset_route_tables(int vni, int socketid)
 	int ret;
 
 	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid))) {
-		DPS_LOG_ERR("Resetting vni route table failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
+		DPS_LOG_ERR("Resetting vni route table  failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
 		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
