@@ -72,13 +72,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 			/* Expect the new destination in this conntrack object */
 			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_SRC_NAT;
-			dp_delete_flow_key(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
 			if (snat_data->network_nat_ip != 0)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 
-			dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-			dp_add_flow_data(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
+			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
+				return SNAT_NEXT_DROP;
 		}
 		// it is deleted due the case where an init packet/request is sent twice, and no action is done if it is returned here
 		// it has to continue to the follow-up code

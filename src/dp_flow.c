@@ -157,13 +157,10 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
 {
-
 	inv_key->ip_src = key->ip_dst;
 	inv_key->ip_dst = key->ip_src;
-
 	inv_key->vni = key->vni;
 	inv_key->vnf = key->vnf;
-
 	inv_key->proto = key->proto;
 
 	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
@@ -173,25 +170,17 @@ void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key 
 		inv_key->port_dst = key->port_dst;
 		if (key->src.type_src == RTE_IP_ICMP_ECHO_REPLY)
 			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
-		if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
+		else if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
 			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
+		else
+			inv_key->src.type_src = 0;
+	} else {
+		inv_key->port_dst = 0;
+		inv_key->src.port_src = 0;
 	}
 }
 
-int dp_add_flow(struct flow_key *key)
-{
-	int ret = rte_hash_add_key(ipv4_flow_tbl, key);
-
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add key to flow table", DP_LOG_RET(ret));
-		return ret;
-	}
-
-	DPS_LOG_DEBUG("Successfully added a hash key", DP_LOG_FLOW_KEY(key));
-	return DP_OK;
-}
-
-static void dp_delete_flow_key_no_flush(struct flow_key *key)
+static void dp_delete_flow_no_flush(struct flow_key *key)
 {
 	int ret;
 
@@ -207,17 +196,17 @@ static void dp_delete_flow_key_no_flush(struct flow_key *key)
 	DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY(key));
 }
 
-void dp_delete_flow_key(struct flow_key *key)
+void dp_delete_flow(struct flow_key *key)
 {
-	dp_delete_flow_key_no_flush(key);
+	dp_delete_flow_no_flush(key);
 	// removed a flow, purge the cache to be safe
 	// (could only remove this key from cache, but that would need matching, which takes time)
 	dp_cntrack_flush_cache();
 }
 
-int dp_add_flow_data(struct flow_key *key, void *data)
+int dp_add_flow(struct flow_key *key, struct flow_value *flow_val)
 {
-	int ret = rte_hash_add_key_data(ipv4_flow_tbl, key, data);
+	int ret = rte_hash_add_key_data(ipv4_flow_tbl, key, flow_val);
 
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add data to flow table", DP_LOG_RET(ret));
@@ -226,20 +215,17 @@ int dp_add_flow_data(struct flow_key *key, void *data)
 	return DP_OK;
 }
 
-int dp_get_flow_data(struct flow_key *key, void **data)
+int dp_get_flow(struct flow_key *key, struct flow_value **p_flow_val)
 {
-	int result = rte_hash_lookup_data(ipv4_flow_tbl, key, data);
-
-	if (DP_FAILED(result))
-		*data = NULL;
+	int ret = rte_hash_lookup_data(ipv4_flow_tbl, key, (void **)p_flow_val);
 
 #ifdef ENABLE_PYTEST
-	if (*data != NULL)
-		DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY(key));
-	else
+	if (DP_FAILED(ret))
 		DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY(key));
+	else
+		DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY(key));
 #endif
-	return result;
+	return ret;
 }
 
 bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
@@ -258,8 +244,8 @@ void dp_free_flow(struct dp_ref *ref)
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
 
 	dp_free_network_nat_port(cntrack);
-	dp_delete_flow_key_no_flush(&cntrack->flow_key[DP_FLOW_DIR_ORG]);
-	dp_delete_flow_key_no_flush(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+	dp_delete_flow_no_flush(&cntrack->flow_key[DP_FLOW_DIR_ORG]);
+	dp_delete_flow_no_flush(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 	dp_cntrack_flush_cache();
 
 	rte_free(cntrack);

@@ -1,8 +1,5 @@
-#include <rte_cycles.h>
-
 #include "dp_cntrack.h"
 #include "dp_error.h"
-#include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -118,7 +115,6 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 	}
 
 	if (df->flags.dir == DP_FLOW_DIR_ORG) {
-
 		/* Despite the incoming flow is offloaded to one of the pf ports, pkts can arrive on another one */
 		/* So we need to check if the incoming flow is offloaded on the current port, */
 		/* if not, we do another offloading */
@@ -129,7 +125,6 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 
 	} else if (df->flags.dir == DP_FLOW_DIR_REPLY) {
-
 		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD ||
 			(df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check))
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
@@ -144,12 +139,12 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct rte_mbuf 
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
-	} else if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_FINWAIT
-			|| flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN) {
-		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
+	} else {
 		flow_val->timeout_value = flow_timeout;
-	} else
-		flow_val->timeout_value = flow_timeout;
+		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_FINWAIT
+			|| flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN)
+			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
+	}
 }
 
 static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_flow *df)
@@ -162,20 +157,24 @@ static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_fl
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
 {
-	struct flow_value *flow_val = NULL;
-	struct flow_key inverted_key = {0};
-	struct dp_vnf_value vnf_val;
+	struct flow_value *flow_val;
+	struct flow_key inverted_key;
+	struct dp_vnf_value vnf_val = {
+		.alias_pfx.ip = key->ip_dst,
+		.alias_pfx.length = 32,
+	};
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
-	if (!flow_val)
-		return flow_val;
+	if (!flow_val) {
+		DPS_LOG_ERR("Failed to allocate new flow value");
+		goto error_alloc;
+	}
 
-	vnf_val.alias_pfx.ip = key->ip_dst;
-	vnf_val.alias_pfx.length = 32;
-	/* Add original direction to conntrack table */
-	dp_add_flow(key);
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
+	flow_val->timeout_value = flow_timeout;
+	flow_val->created_port_id = m->port;
+
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
 	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
@@ -187,9 +186,6 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	else
 		flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 
-	flow_val->timeout_value = flow_timeout;
-	flow_val->created_port_id = m->port;
-
 	df->flags.dir = DP_FLOW_DIR_ORG;
 
 	dp_cntrack_init_flow_offload_flags(flow_val, df);
@@ -198,7 +194,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NONE;
 
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
-	dp_add_flow_data(key, flow_val);
+	if (DP_FAILED(dp_add_flow(key, flow_val)))
+		goto error_add;
 
 	// Only the original flow (outgoing)'s hash value is recorded
 	// Implicit casting from hash_sig_t to uint32_t!
@@ -206,15 +203,22 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 
 	dp_invert_flow_key(key, &inverted_key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = inverted_key;
-	dp_add_flow(&inverted_key);
-	dp_add_flow_data(&inverted_key, flow_val);
+	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
+		goto error_add_inv;
+
 	return flow_val;
+
+error_add_inv:
+	dp_delete_flow(key);
+error_add:
+	rte_free(flow_val);
+error_alloc:
+	return NULL;
 }
 
 
 static __rte_always_inline void dp_set_pkt_flow_direction(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
-
 	if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY]))
 		df->flags.dir = DP_FLOW_DIR_REPLY;
 
@@ -227,16 +231,15 @@ static __rte_always_inline void dp_set_pkt_flow_direction(struct flow_key *key, 
 static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
 	if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
-			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
-			|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC) {
-			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
+		|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
+		|| flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC
+	) {
+		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	} else {
-
 		// after introducing vnf_type as part of the flow key, recirc pkt shall perform offload state changing
 		// instead of its ancestor pkt. Its ancestor pkt's flow still resides as before, but its state is not changing
 		if (df->vnf_type == DP_VNF_TYPE_LB)
 			return;
-
 		// when to offload reply pkt of a tcp flow is determined in dp_cntrack_set_timeout_tcp_flow
 		if (df->l4_type != IPPROTO_TCP)
 			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
@@ -269,7 +272,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 	}
 
 	// cache miss, try the flow table
-	ret = dp_get_flow_data(curr_key, (void **)p_flow_val);
+	ret = dp_get_flow(curr_key, p_flow_val);
 	if (unlikely(DP_FAILED(ret))) {
 		if (unlikely(ret != -ENOENT)) {
 			DPS_LOG_WARNING("Flow table key search failed", DP_LOG_RET(ret));
@@ -278,7 +281,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		// create new flow if needed
 		*p_flow_val = flow_table_insert_entry(curr_key, df, m);
 		if (unlikely(!*p_flow_val)) {
-			DPS_LOG_WARNING("Failed to allocate a new flow table entry");
+			DPS_LOG_WARNING("Failed to create a new flow table entry");
 			return DP_ERROR;
 		}
 		dp_cache_flow_val(*p_flow_val);
