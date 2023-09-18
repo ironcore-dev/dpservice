@@ -446,7 +446,7 @@ static int dp_vf_init_monitoring_rule_rollback(uint32_t port_id)
 			DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
-	
+
 	return DP_OK;
 }
 
