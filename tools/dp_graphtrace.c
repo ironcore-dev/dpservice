@@ -99,7 +99,6 @@ static void dp_graphtrace_config_start_stop_parameters(struct dp_graphtrace_mp_r
 		graphtrace_request->action_params.op_type = DP_GRAPHTRACE_OP_TYPE_SOFTWARE;
 }
 
-
 static int dp_graphtrace_send_request(enum dp_graphtrace_action action, struct dp_graphtrace_mp_reply *reply)
 {
 	struct rte_mp_msg mp_request;
@@ -119,7 +118,6 @@ static int dp_graphtrace_send_request(enum dp_graphtrace_action action, struct d
 		dp_graphtrace_config_start_stop_parameters(graphtrace_request);
 		break;
 	case DP_GRAPHTRACE_ACTION_STOP:
-		dp_graphtrace_config_start_stop_parameters(graphtrace_request);
 		break;
 	}
 
