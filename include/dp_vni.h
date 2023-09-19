@@ -28,7 +28,6 @@ extern struct rte_hash *vni_handle_tbl;
 // TODO: packing?
 struct dp_vni_key {
 	int vni;
-	int type;
 };
 
 struct dp_vni_data {
@@ -43,7 +42,6 @@ static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni, int 
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
-		.type = DP_IP_PROTO_IPV4,
 		.vni = vni
 	};
 	int ret;
@@ -62,7 +60,6 @@ static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
-		.type = DP_IP_PROTO_IPV6,
 		.vni = vni
 	};
 	int ret;

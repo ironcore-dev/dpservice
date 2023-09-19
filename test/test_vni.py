@@ -43,3 +43,30 @@ def test_vni_reset(prepare_ipv4, grpc_client):
 		"Resetting a vni tainted another vni"
 
 	grpc_client.delinterface(VM4.name)
+
+
+def test_vni_neighnats(prepare_ipv4, grpc_client):
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 1000, 200)
+	nat2_ipv6 = grpc_client.addnat(VM2.name, nat_vip, 2000, 3000)
+
+	grpc_client.addneighnat(nat_vip, vni1, 3000, 4000, neigh_vni1_ul_ipv6)
+	grpc_client.addneighnat(nat_vip, vni1, 4000, 5000, neigh_vni1_ul_ipv6)
+	neighnats = grpc_client.listneighnats(nat_vip)
+	assert len(neighnats) == 2, \
+		"List of neighbor NATs is not complete"
+
+	grpc_client.delnat(VM2.name)
+	grpc_client.delnat(VM1.name)
+	grpc_client.delinterface(VM2.name)
+	grpc_client.delinterface(VM1.name)
+	neighnats = grpc_client.listneighnats(nat_vip)
+	assert len(neighnats) == 2, \
+		"Neighbor NATs removed prematurely"
+
+	# Need to add the VMs back before removing the LB otherwise the VNI will get cleaned up
+	VM1.ul_ipv6 = grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
+	VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
+
+	grpc_client.dellb(lb_name)
+

@@ -24,7 +24,6 @@ bool dp_is_vni_route_tbl_available(int vni, int type, int socket_id)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
-		.type = type,
 		.vni = vni
 	};
 	int ret;
@@ -46,7 +45,7 @@ static void dp_free_vni_value(struct dp_ref *ref)
 	struct dp_vni_data *vni_value = container_of(ref, struct dp_vni_data, ref_count);
 	int dp_socketid = DP_SOCKETID(vni_value->socketid);
 
-	DPS_LOG_DEBUG("Freeing route table", DP_LOG_VNI(vni_value->vni));
+	DPS_LOG_DEBUG("Freeing VNI", DP_LOG_VNI(vni_value->vni));
 	rte_rib_free(vni_value->ipv4[dp_socketid]);
 	rte_rib6_free(vni_value->ipv6[dp_socketid]);
 
@@ -102,7 +101,6 @@ int dp_create_vni_route_table(int vni, int type, int socket_id)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
-		.type = type,
 		.vni = vni
 	};
 	int ret;
@@ -157,7 +155,6 @@ int dp_delete_vni_route_table(int vni, int type)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
-		.type = type,
 		.vni = vni
 	};
 	int ret;
@@ -171,7 +168,7 @@ int dp_delete_vni_route_table(int vni, int type)
 	if (dp_ref_dec_and_chk_freed(&vni_data->ref_count)) {
 		ret = rte_hash_del_key(vni_handle_tbl, &vni_key);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot delete VNU key", DP_LOG_RET(ret));
+			DPS_LOG_ERR("Cannot delete VNI key", DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -183,7 +180,6 @@ int dp_reset_vni_route_table(int vni, int type, int socket_id)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
-		.type = type,
 		.vni = vni
 	};
 	int ret;
