@@ -85,9 +85,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 		ret = dp_create_lb(request, ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
-		if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4,
-					  rte_eth_dev_socket_id(dp_port_get_pf0_id())))
-		) {
+		if (DP_FAILED(dp_create_vni_route_tables(vni, rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
 			ret = DP_GRPC_ERR_VNI_INIT4;
 			goto err_lb;
 		}
@@ -122,7 +120,7 @@ static int dp_process_delete_lb(struct dp_grpc_responder *responder)
 	if (DP_FAILED(ret))
 		return ret;
 
-	if (DP_FAILED(dp_delete_vni_route_table(lb.vni, DP_IP_PROTO_IPV4)))
+	if (DP_FAILED(dp_delete_vni_route_tables(lb.vni)))
 		return DP_GRPC_ERR_VNI_FREE4;
 
 	return DP_GRPC_OK;
@@ -168,9 +166,9 @@ static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
 	struct dpgrpc_vni_in_use *reply = dp_grpc_single_reply(responder);
 
 	if (request->type == DP_VNI_IPV4) {
-		reply->in_use = dp_is_vni_route_tbl_available(request->vni,
-													  DP_IP_PROTO_IPV4,
-													  rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+		reply->in_use = dp_is_vni_route_table_available(request->vni,
+														DP_IP_PROTO_IPV4,
+														rte_eth_dev_socket_id(dp_port_get_pf0_id()));
 	} else
 		return DP_GRPC_ERR_WRONG_TYPE;
 
@@ -503,10 +501,6 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	if (DP_FAILED(dp_setup_vm(port_id, request->vni, socket_id))) {
 		ret = DP_GRPC_ERR_VNI_INIT4;
 		goto handle_err;
-	}
-	if (DP_FAILED(dp_setup_vm6(port_id, request->vni, socket_id))) {
-		ret = DP_GRPC_ERR_VNI_INIT6;
-		goto vm_err;
 	}
 	dp_set_dhcp_range_ip4(port_id, request->ip4_addr, DP_LPM_DHCP_IP_DEPTH);
 	dp_set_vm_pxe_ip4(port_id, request->ip4_pxe_addr);

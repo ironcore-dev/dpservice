@@ -64,8 +64,7 @@ struct vm_route {
 
 };
 
-int dp_setup_vm(int port_id, int vni, int socketid);
-int dp_setup_vm6(int port_id, int vni, int socketid);
+int dp_setup_vm(int port_id, int vni, int socket_id);
 int dp_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
 						struct vm_route *r, uint32_t *route_key, uint64_t *dst_port_id);
 int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
@@ -100,7 +99,7 @@ struct rte_ether_addr *dp_get_mac(uint16_t portid);
 void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr *neigh);
 struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_arp_cycle_needed(uint16_t portid);
-void dp_del_vm(int portid, int socketid);
+void dp_del_vm(int port_id, int socket_id);
 int dp_get_active_vm_ports(int *act_ports);
 uint8_t *dp_get_vm_machineid(uint16_t portid);
 uint32_t dp_get_vm_vni(uint16_t portid);

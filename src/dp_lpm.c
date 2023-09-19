@@ -53,7 +53,7 @@ int dp_lpm_reset_all_route_tables(int socketid)
 {
 	int ret;
 
-	if (DP_FAILED(dp_reset_vni_all_route_tables(socketid)))
+	if (DP_FAILED(dp_reset_all_vni_route_tables(socketid)))
 		return DP_GRPC_ERR_ROUTE_RESET;
 
 	for (int i = 0; i < DP_MAX_PORTS; ++i) {
@@ -71,13 +71,8 @@ int dp_lpm_reset_route_tables(int vni, int socketid)
 {
 	int ret;
 
-	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid))) {
-		DPS_LOG_ERR("Resetting vni route table failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
-		return DP_GRPC_ERR_ROUTE_RESET;
-	}
-
-	if (DP_FAILED(dp_reset_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid))) {
-		DPS_LOG_ERR("Resetting vni route table failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
+	if (DP_FAILED(dp_reset_vni_route_tables(vni, socketid))) {
+		DPS_LOG_ERR("Resetting vni route tables failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
 		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
@@ -487,26 +482,14 @@ struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 	return &vm_table[portid].info.neigh_mac;
 }
 
-int dp_setup_vm(int port_id, int vni, int socketid)
+int dp_setup_vm(int port_id, int vni, int socket_id)
 {
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
-	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV4, socketid)))
+	if (DP_FAILED(dp_create_vni_route_tables(vni, socket_id)))
 		return DP_ERROR;
 
 	dp_init_firewall_rules_list(port_id);
-	vm_table[port_id].vni = vni;
-	vm_table[port_id].vm_ready = 1;
-	return DP_OK;
-}
-
-int dp_setup_vm6(int port_id, int vni, int socketid)
-{
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-
-	if (DP_FAILED(dp_create_vni_route_table(vni, DP_IP_PROTO_IPV6, socketid)))
-		return DP_ERROR;
-
 	vm_table[port_id].vni = vni;
 	vm_table[port_id].vm_ready = 1;
 	return DP_OK;
@@ -573,22 +556,20 @@ int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_
 	return next_hop;
 }
 
-void dp_del_vm(int portid, int socketid)
+void dp_del_vm(int port_id, int socket_id)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
+	RTE_VERIFY(port_id < DP_MAX_PORTS);
 
-	dp_del_route(portid, vm_table[portid].vni, vm_table[portid].info.own_ip, 32, socketid);
-	dp_del_route6(portid, vm_table[portid].vni, vm_table[portid].info.dhcp_ipv6, 128, socketid);
+	dp_del_route(port_id, vm_table[port_id].vni, vm_table[port_id].info.own_ip, 32, socket_id);
+	dp_del_route6(port_id, vm_table[port_id].vni, vm_table[port_id].info.dhcp_ipv6, 128, socket_id);
 
-	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV4)))
-		DPS_LOG_WARNING("Unable to delete route table", DP_LOG_VNI(vm_table[portid].vni), DP_LOG_PROTO(DP_IP_PROTO_IPV4));
-	if (DP_FAILED(dp_delete_vni_route_table(vm_table[portid].vni, DP_IP_PROTO_IPV6)))
-		DPS_LOG_WARNING("Unable to delete route table", DP_LOG_VNI(vm_table[portid].vni), DP_LOG_PROTO(DP_IP_PROTO_IPV6));
+	if (DP_FAILED(dp_delete_vni_route_tables(vm_table[port_id].vni)))
+		DPS_LOG_WARNING("Unable to delete route tables", DP_LOG_VNI(vm_table[port_id].vni));
 
-	dp_del_all_firewall_rules(portid);
-	memset(&vm_table[portid], 0, sizeof(vm_table[portid]));
+	dp_del_all_firewall_rules(port_id);
+	memset(&vm_table[port_id], 0, sizeof(vm_table[port_id]));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
-	dp_set_mac(portid);
+	dp_set_mac(port_id);
 }
 
 struct dp_fwall_head *dp_get_fwall_head(int port_id)

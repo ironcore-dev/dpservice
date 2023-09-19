@@ -34,7 +34,7 @@ struct dp_vni_data {
 	struct rte_rib	*ipv4[DP_NB_SOCKETS];
 	struct rte_rib6	*ipv6[DP_NB_SOCKETS];
 	struct dp_ref	ref_count;
-	int				socketid;
+	int				socket_id;
 	int				vni;
 };
 
@@ -76,11 +76,11 @@ static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni, int
 
 int dp_vni_init(int socket_id);
 void dp_vni_free(void);
-bool dp_is_vni_route_tbl_available(int vni, int type, int socket_id);
-int dp_create_vni_route_table(int vni, int type, int socket_id);
-int dp_delete_vni_route_table(int vni, int type);
-int dp_reset_vni_route_table(int vni, int type, int socket_id);
-int dp_reset_vni_all_route_tables(int socket_id);
+bool dp_is_vni_route_table_available(int vni, int type, int socket_id);
+int dp_create_vni_route_tables(int vni, int socket_id);
+int dp_delete_vni_route_tables(int vni);
+int dp_reset_vni_route_tables(int vni, int socket_id);
+int dp_reset_all_vni_route_tables(int socket_id);
 
 #ifdef __cplusplus
 }
