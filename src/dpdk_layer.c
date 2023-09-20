@@ -11,11 +11,6 @@ static volatile bool force_quit;
 
 static struct dp_dpdk_layer dp_layer;
 
-static struct underlay_conf gen_conf = {
-	.service_ul_ip = {0},
-};
-
-
 static inline int ring_init(const char *name, struct rte_ring **p_ring)
 {
 	*p_ring = rte_ring_create(name, DP_INTERNAL_Q_SIZE, rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
@@ -167,18 +162,6 @@ int dp_dpdk_main_loop(void)
 	/* Launch timer loop on main core */
 	return main_core_loop();
 }
-
-
-__rte_always_inline struct underlay_conf *get_underlay_conf(void)
-{
-	return &gen_conf;
-}
-
-__rte_always_inline void set_underlay_conf(struct underlay_conf *u_conf)
-{
-	gen_conf = *u_conf;
-}
-
 
 struct dp_dpdk_layer *get_dpdk_layer(void)
 {

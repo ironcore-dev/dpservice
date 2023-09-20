@@ -128,6 +128,7 @@ static void print_help_args(FILE *outfile)
 
 static char pf0_name[IFNAMSIZ];
 static char pf1_name[IFNAMSIZ];
+static uint8_t underlay_ip[16];
 static char vf_pattern[IFNAMSIZ];
 static int dhcp_mtu = 1500;
 static double wcmp_frac = 1.0;
@@ -154,6 +155,11 @@ const char *dp_conf_get_pf0_name(void)
 const char *dp_conf_get_pf1_name(void)
 {
 	return pf1_name;
+}
+
+const uint8_t *dp_conf_get_underlay_ip(void)
+{
+	return underlay_ip;
 }
 
 const char *dp_conf_get_vf_pattern(void)

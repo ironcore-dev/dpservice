@@ -122,9 +122,9 @@ static int opt_str_to_ipv6(void *dst, const char *arg)
 	return DP_OK;
 }
 
-static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], uint choice_count)
+static int opt_str_to_enum(int *dst, const char *arg, const char *choices[], size_t choice_count)
 {
-	for (uint i = 0; i < choice_count; ++i) {
+	for (size_t i = 0; i < choice_count; ++i) {
 		if (!strcmp(choices[i], arg)) {
 			*dst = i;
 			return DP_OK;
@@ -270,7 +270,7 @@ static int parse_opt(int opt, const char *arg)
 	case OPT_VF_PATTERN:
 		return opt_strcpy(vf_pattern, arg, sizeof(vf_pattern));
 	case OPT_IPV6:
-		return opt_str_to_ipv6(get_underlay_conf()->service_ul_ip, arg);
+		return opt_str_to_ipv6(underlay_ip, arg);
 	case OPT_NIC_TYPE:
 		return opt_str_to_enum((int *)&nic_type, arg, nic_type_choices, RTE_DIM(nic_type_choices));
 	case OPT_DHCP_MTU:

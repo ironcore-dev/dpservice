@@ -23,6 +23,7 @@ enum dp_conf_log_format {
 
 const char *dp_conf_get_pf0_name(void);
 const char *dp_conf_get_pf1_name(void);
+const uint8_t *dp_conf_get_underlay_ip(void);
 const char *dp_conf_get_vf_pattern(void);
 int dp_conf_get_dhcp_mtu(void);
 double dp_conf_get_wcmp_frac(void);

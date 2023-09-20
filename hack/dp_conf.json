@@ -28,7 +28,10 @@
   {
     "lgopt": "ipv6",
     "arg": "ADDR6",
-    "help": "IPv6 underlay address"
+    "help": "IPv6 underlay address",
+    "var": "underlay_ip",
+    "type": "uint8_t",
+    "array_size": "16"
   },
   {
     "lgopt": "vf-pattern",

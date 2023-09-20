@@ -24,7 +24,7 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 	uint8_t random_byte;
 
 	/* First 8 bytes for host */
-	rte_memcpy(route, get_underlay_conf()->service_ul_ip, DP_VNF_IPV6_ADDR_SIZE);
+	rte_memcpy(route, dp_conf_get_underlay_ip(), DP_VNF_IPV6_ADDR_SIZE);
 	/* Following 2 bytes for kernel routing and 1 byte reserved */
 	memset(route + 8, 0, 3);
 

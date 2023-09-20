@@ -14,7 +14,7 @@ static struct rte_hash *vm_handle_tbl = NULL;
 static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
 
-static const struct underlay_conf *u_conf;
+static const uint8_t *service_ul_ip;
 
 int dp_lpm_init(int socket_id)
 {
@@ -23,7 +23,7 @@ int dp_lpm_init(int socket_id)
 	if (!vm_handle_tbl)
 		return DP_ERROR;
 
-	u_conf = get_underlay_conf();
+	service_ul_ip = dp_conf_get_underlay_ip();
 
 	return DP_OK;
 }
@@ -231,7 +231,7 @@ const uint8_t *dp_get_port_ul_ip6(uint16_t portid)
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	const struct vm_entry *entry = &vm_table[portid];
 
-	return entry->vm_ready ? entry->ul_ipv6 : u_conf->service_ul_ip;
+	return entry->vm_ready ? entry->ul_ipv6 : service_ul_ip;
 }
 
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
