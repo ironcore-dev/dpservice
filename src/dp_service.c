@@ -225,6 +225,8 @@ static int run_service(void)
 {
 	int result;
 
+	srand(time(NULL));
+
 	// pre-init sanity checks
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
 		DP_EARLY_ERR("Disabled conntrack requires disabled offloading");

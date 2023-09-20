@@ -23,24 +23,19 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 	rte_be32_t local = htonl(pfx_counter);
 	uint8_t random_byte;
 
-	srand(time(NULL));
-	random_byte = rand() % 256;
-
 	/* First 8 bytes for host */
 	rte_memcpy(route, get_underlay_conf()->src_ip6, DP_VNF_IPV6_ADDR_SIZE);
 	/* Following 2 bytes for kernel routing and 1 byte reserved */
 	memset(route + 8, 0, 3);
 
 #ifdef ENABLE_STATIC_UNDERLAY_IP
-	/* 1 byte static value */
-	uint8_t static_byte = 0x01;
-
-	rte_memcpy(route + 11, &static_byte, 1);
-	RTE_SET_USED(random_byte);
+	random_byte = 1;
 #else
+	random_byte = rand() % 256;
+#endif
+
 	/* 1 byte random value */
 	rte_memcpy(route + 11, &random_byte, 1);
-#endif
 
 	/* 4 byte counter */
 	rte_memcpy(route + 12, &local, 4);
