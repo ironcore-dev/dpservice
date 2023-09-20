@@ -231,7 +231,7 @@ const uint8_t *dp_get_port_ul_ip6(uint16_t portid)
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	const struct vm_entry *entry = &vm_table[portid];
 
-	return entry->vm_ready ? entry->ul_ipv6 : u_conf->src_ip6;
+	return entry->vm_ready ? entry->ul_ipv6 : u_conf->service_ul_ip;
 }
 
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,

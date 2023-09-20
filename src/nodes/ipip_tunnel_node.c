@@ -22,12 +22,8 @@ int ipip_tunnel_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
 	return dp_node_append_pf_tx(DP_NODE_GET_SELF(ipip_tunnel), next_tx_index, port_id, tx_node_name);
 }
 
-// runtime constant, precompute
-static struct underlay_conf *u_conf;
-
 static int ipip_tunnel_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-	u_conf = get_underlay_conf();
 	return DP_OK;
 }
 

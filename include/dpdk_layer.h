@@ -41,21 +41,7 @@ struct dp_dpdk_layer {
 };
 
 struct underlay_conf {
-	uint16_t dst_port;
-	uint16_t src_port;
-	// TODO(plague) this is not supported anymore, but removal could break it, look into it
-	uint8_t vni[3];
-	uint8_t rsvd1;
-	/* Virtual IP */
-	union {
-		uint32_t	src_ip4;
-		uint8_t		src_ip6[16];
-	};
-	union {
-		uint32_t	trgt_ip4;
-		uint8_t		trgt_ip6[16];
-	};
-	uint16_t default_port;
+	uint8_t service_ul_ip[16];
 };
 
 int dp_dpdk_layer_init(void);

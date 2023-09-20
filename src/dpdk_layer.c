@@ -10,15 +10,9 @@
 static volatile bool force_quit;
 
 static struct dp_dpdk_layer dp_layer;
-/*TODO these shouldnt be hardcoded */
+
 static struct underlay_conf gen_conf = {
-	.dst_port = 6081,
-	.src_port = 6081,
-	.rsvd1 = 0,
-	.vni = {0},
-	.trgt_ip6 = {0},
-	.src_ip6 = {0},
-	.default_port = 443,
+	.service_ul_ip = {0},
 };
 
 

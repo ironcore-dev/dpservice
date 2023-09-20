@@ -90,7 +90,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->proto = proto;
 	ipv6_hdr->hop_limits = ttl;
-	rte_memcpy(ipv6_hdr->src_addr, underlay_conf->src_ip6, sizeof(ipv6_hdr->src_addr));
+	rte_memcpy(ipv6_hdr->src_addr, underlay_conf->service_ul_ip, sizeof(ipv6_hdr->src_addr));
 	rte_memcpy(ipv6_hdr->dst_addr, virtsvc->service_addr, sizeof(virtsvc->service_addr));
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6;
 	m->tx_offload = 0;

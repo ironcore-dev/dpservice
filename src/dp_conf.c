@@ -270,7 +270,7 @@ static int parse_opt(int opt, const char *arg)
 	case OPT_VF_PATTERN:
 		return opt_strcpy(vf_pattern, arg, sizeof(vf_pattern));
 	case OPT_IPV6:
-		return opt_str_to_ipv6(get_underlay_conf()->src_ip6, arg);
+		return opt_str_to_ipv6(get_underlay_conf()->service_ul_ip, arg);
 	case OPT_NIC_TYPE:
 		return opt_str_to_enum((int *)&nic_type, arg, nic_type_choices, RTE_DIM(nic_type_choices));
 	case OPT_DHCP_MTU:
