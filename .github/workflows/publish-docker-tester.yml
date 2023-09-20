@@ -27,6 +27,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Determine SHA for Docker Image
+        id: get_sha
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            echo "DOCKER_IMAGE_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+           echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
+          fi
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -35,10 +44,11 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=schedule
+            type=raw,${{ env.DOCKER_IMAGE_SHA }}
             type=ref,event=branch
             type=ref,event=tag
             type=ref,event=pr
-            type=sha,prefix=,format=long
+            type=sha
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
       - name: Set up QEMU
@@ -83,6 +93,15 @@ jobs:
     runs-on: [ self-hosted, dpdk ]
     needs: buildAndPushTester
     steps:
-    - name: Run tests
-      run: |
-        docker run --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/onmetal/dp-service-tester:${{ github.sha }}
+      - name: Determine SHA for Docker Image
+        id: get_sha
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            echo "DOCKER_IMAGE_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+            echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
+          fi
+      - name: Run tests
+        id: run_tests
+        run: |
+          docker run --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/onmetal/dp-service-tester:${{ env.DOCKER_IMAGE_SHA }}
