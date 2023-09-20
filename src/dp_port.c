@@ -400,13 +400,30 @@ int dp_ports_init(void)
 	return DP_OK;
 }
 
+static int dp_stop_eth_port(uint16_t port_id)
+{
+	int ret, ret2;
+
+	// TODO(Tao): look into tearing down hairpins
+
+	// error already logged
+	ret = rx_node_set_enabled(port_id, false);
+
+	ret2 = rte_eth_dev_stop(port_id);
+	if (DP_FAILED(ret2)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret2));
+		ret = ret2;
+	}
+
+	return ret;
+}
+
 void dp_ports_free(void)
 {
 	// without stopping started ports, DPDK complains
 	DP_FOREACH_PORT(&dp_ports, port) {
-		// TODO(plague): PR to create proper rollback in dp_port_start()
 		if (port->allocated)
-			 rte_eth_dev_stop(port->port_id);
+			 dp_stop_eth_port(port->port_id);
 	}
 	free(dp_ports.ports);
 }
@@ -492,6 +509,34 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 	return DP_OK;
 }
 
+static int dp_init_port(struct dp_port *port)
+{
+	if (DP_FAILED(rx_node_set_enabled(port->port_id, true)))
+		return DP_ERROR;
+
+	// TAP devices do not support offloading/isolation
+	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+		return DP_OK;
+
+	if (port->port_type == DP_PORT_PF)
+		if (DP_FAILED(dp_port_install_isolated_mode(port->port_id)))
+			return DP_ERROR;
+
+	if (dp_conf_is_offload_enabled()) {
+#ifdef ENABLE_PYTEST
+		if (port->peer_pf_port_id != dp_port_get_pf1_id())
+#endif
+		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
+			return DP_ERROR;
+
+		if (port->port_type == DP_PORT_VF)
+			if (DP_FAILED(dp_install_vf_init_rte_rules(port->port_id)))
+				assert(false);  // if any flow rule failed, stop process running due to possible hw/driver failure
+	}
+
+	return DP_OK;
+}
+
 int dp_port_start(uint16_t port_id)
 {
 	struct dp_port *port;
@@ -504,63 +549,30 @@ int dp_port_start(uint16_t port_id)
 	ret = rte_eth_dev_start(port_id);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-		return DP_ERROR;
+		return ret;
 	}
 
-	if (DP_FAILED(rx_node_set_enabled(port_id, true)))
-		return DP_ERROR;
+	ret = dp_init_port(port);
+	if (DP_FAILED(ret)) {
+		dp_stop_eth_port(port->port_id);
+		return ret;
+	}
 
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
-
-	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
-		if (dp_conf_is_offload_enabled()) {
-#ifdef ENABLE_PYTEST
-			if (port->peer_pf_port_id != dp_port_get_pf1_id())
-#endif
-			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
-				return DP_ERROR;
-		}
-
-		if (port->port_type == DP_PORT_PF) {
-			if (DP_FAILED(dp_port_install_isolated_mode(port_id)))
-				return DP_ERROR;
-		}
-
-
-		if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled()) {
-			ret = dp_install_vf_init_rte_rules(port_id);
-			if (DP_FAILED(ret))
-				assert(0); // if any flow rule failed, stop process running due to possible hw/driver failure
-		}
-	}
-
 	return DP_OK;
 }
 
 int dp_port_stop(uint16_t port_id)
 {
 	struct dp_port *port;
-	int ret;
 
 	port = dp_port_get(port_id);
 	if (!port)
 		return DP_ERROR;
 
-	// TODO(plague): research - no need to tear down hairpins?
-
-	if (DP_FAILED(rx_node_set_enabled(port_id, false)))
+	if (DP_FAILED(dp_stop_eth_port(port_id)))
 		return DP_ERROR;
-
-	/* Tap interfaces in test environment can not be stopped */
-	/* due to a bug in dpdk tap device library. */
-	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
-		ret = rte_eth_dev_stop(port_id);
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-			return DP_ERROR;
-		}
-	}
 
 	port->allocated = false;
 	return DP_OK;
