@@ -84,9 +84,10 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 		return DP_OK;
 	}
 
+	return -EINVAL;
 }
 
-static int dp_handle_graphtrace_stop()
+static int dp_handle_graphtrace_stop(void)
 {
 	int ret;
 
