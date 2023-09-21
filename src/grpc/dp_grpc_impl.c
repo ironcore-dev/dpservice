@@ -16,11 +16,11 @@
 #include "grpc/dp_grpc_api.h"
 #include "grpc/dp_grpc_responder.h"
 
-static uint32_t pfx_counter = 1;
+static uint32_t pfx_counter = 0;
 
 static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_IPV6_ADDR_SIZE])
 {
-	rte_be32_t local = htonl(pfx_counter);
+	rte_be32_t local;
 	uint8_t random_byte;
 
 	/* First 8 bytes for host */
@@ -37,10 +37,18 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 	/* 1 byte random value */
 	rte_memcpy(route + 11, &random_byte, 1);
 
+#ifndef ENABLE_STATIC_UNDERLAY_IP
+	/* Start the counter from a random value as well to increase the randomness of the address */
+	if (pfx_counter == 0)
+		pfx_counter = rand() % 256;
+#endif
+
+	pfx_counter++;
+	local = htonl(pfx_counter);
+
 	/* 4 byte counter */
 	rte_memcpy(route + 12, &local, 4);
 
-	pfx_counter++;
 }
 
 static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
