@@ -66,7 +66,7 @@ net/octeontx_ep,net/pcap,net/pfe,net/qede,net/sfc,net/softnic,net/thunderx,net/t
 net/vdev_ntsvc,net/vhost,net/virtio,net/vmxnet3,net/bnx2x,net/netsvc,net/vdev_netsvc,\
 crypto/dpaa_sec,crypto/bcmfs,crypto/caam_jr,crypto/cnxk,dpaa_sec,crypto/dpaa2_sec,crypto/nitrox,\
 crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddisable_libs=power,\
-vhost,gpudev build
+vhost,gpudev build -Ddisable_apps="*" -Dtests=false
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
 

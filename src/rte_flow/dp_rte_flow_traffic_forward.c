@@ -395,7 +395,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	age_action = &actions[action_cnt++];
 	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
 
-	// TODO: this branch has not been tested with DPDK 22.11
 	if (cross_pf_port) {
 		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 		port = dp_port_get_vf((uint16_t)df->nxt_hop);
