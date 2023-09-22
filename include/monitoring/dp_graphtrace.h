@@ -41,6 +41,7 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type, struct rte_node *node
 #define dp_graphtrace_node_burst(NODE, OBJS, NUM) _dp_graphtrace_log_node_burst(NODE, OBJS, NUM)
 
 extern bool _dp_graphtrace_enabled;
+extern bool _dp_graphtrace_hw_enabled;
 
 static __rte_always_inline void dp_graphtrace_next(struct rte_node *node, void *obj, rte_edge_t next_index)
 {
@@ -66,17 +67,8 @@ static __rte_always_inline void dp_graphtrace_tx_burst(struct rte_node *node, vo
 
 static __rte_always_inline void dp_graphtrace_capture_offload_pkt(void *obj)
 {
-	_dp_graphtrace_send(DP_GRAPHTRACE_PKT_TYPE_OFFLOAD, NULL, NULL, &obj, 1);
-}
-
-static __rte_always_inline void dp_graphtrace_enable(void)
-{
-	_dp_graphtrace_enabled = true;
-}
-
-static __rte_always_inline void dp_graphtrace_disable(void)
-{
-	_dp_graphtrace_enabled = false;
+	if (_dp_graphtrace_hw_enabled)
+		_dp_graphtrace_send(DP_GRAPHTRACE_PKT_TYPE_OFFLOAD, NULL, NULL, &obj, 1);
 }
 
 static __rte_always_inline bool dp_graphtrace_is_enabled(void)

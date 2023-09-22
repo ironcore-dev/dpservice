@@ -156,6 +156,7 @@ static void print_packet(struct rte_mbuf *pkt)
 			printbuf);
 		break;
 	}
+	fflush(stdout);
 }
 
 static int dp_graphtrace_dump(struct dp_graphtrace *graphtrace)

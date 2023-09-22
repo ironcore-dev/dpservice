@@ -15,7 +15,11 @@ static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
 static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 1,
+#ifdef ENABLE_DPDK_22_11
+	.ingress = 0,
+#else
 	.ingress = 1,
+#endif
 	.egress = 0,
 	.transfer = 1,
 };
@@ -23,7 +27,11 @@ static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
 static const struct rte_flow_attr dp_flow_attr_default_monitoring_ingress = {
 	.group = DP_RTE_FLOW_MONITORING_GROUP,
 	.priority = 3,
+#ifdef ENABLE_DPDK_22_11
+	.ingress = 0,
+#else
 	.ingress = 1,
+#endif
 	.egress = 0,
 	.transfer = 1,
 };
