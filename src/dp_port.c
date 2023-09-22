@@ -522,7 +522,7 @@ int dp_port_start(uint16_t port_id)
 		}
 
 
-		if (port->port_type == DP_PORT_VF) {
+		if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled()) {
 			ret = dp_install_vf_init_rte_rules(port_id);
 			if (DP_FAILED(ret))
 				assert(0); // if any flow rule failed, stop process running due to possible hw/driver failure
