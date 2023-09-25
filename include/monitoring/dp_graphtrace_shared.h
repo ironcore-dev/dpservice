@@ -25,11 +25,6 @@ enum dp_graphtrace_action {
 	DP_GRAPHTRACE_ACTION_STOP,
 };
 
-enum dp_graphtrace_op_type {
-	DP_GRAPHTRACE_OP_TYPE_SOFTWARE,
-	DP_GRAPHTRACE_OP_TYPE_OFFLOAD,
-};
-
 enum dp_graphtrace_pkt_type {
 	DP_GRAPHTRACE_PKT_TYPE_SOFTWARE,
 	DP_GRAPHTRACE_PKT_TYPE_OFFLOAD,
@@ -47,11 +42,15 @@ struct dp_graphtrace_pktinfo {
 	struct rte_node *next_node;
 };
 
+struct dp_graphtrace_params_start {
+	bool hw;
+};
+
 struct dp_graphtrace_mp_request {
 	enum dp_graphtrace_action action;
 	union {
-		enum dp_graphtrace_op_type op_type;
-	} action_params;
+		struct dp_graphtrace_params_start start;
+	} params;
 };
 
 struct dp_graphtrace_mp_reply {

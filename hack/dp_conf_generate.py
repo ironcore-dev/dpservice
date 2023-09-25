@@ -210,6 +210,7 @@ if __name__ == "__main__":
 	parser.add_argument("--source", action="store", default=f"{script_path}/../src/dp_conf_opts.c")
 	parser.add_argument("--header", action="store", default=f"{script_path}/../include/dp_conf_opts.h")
 	parser.add_argument("--markdown", action="store", default=f"{script_path}/../docs/deployment/commandline.md")
+	parser.add_argument("--no-markdown", action="store_true")
 	args = parser.parse_args()
 
 	with open(args.specs, "r") as infile:
@@ -231,8 +232,9 @@ if __name__ == "__main__":
 			print_warning()
 			generate_h(options)
 
-		with open(args.markdown, "w") as outfile:
-			sys.stdout = outfile
-			generate_md(options)
+		if not args.no_markdown:
+			with open(args.markdown, "w") as outfile:
+				sys.stdout = outfile
+				generate_md(options)
 
 		sys.stdout = stdout

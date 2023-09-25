@@ -60,12 +60,7 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 {
 	int ret;
 
-	switch (request->action_params.op_type) {
-	case DP_GRAPHTRACE_OP_TYPE_SOFTWARE:
-		_dp_graphtrace_enabled = true;
-		DPS_LOG_INFO("Graphtrace enabled only for software path");
-		return DP_OK;
-	case DP_GRAPHTRACE_OP_TYPE_OFFLOAD:
+	if (request->params.start.hw) {
 		if (!offload_enabled)
 			return -EPERM;
 
@@ -74,30 +69,30 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 			DPS_LOG_ERR("Cannot send hardware capture start message");
 			return ret;
 		}
-		_dp_graphtrace_enabled = true;
+
 		_dp_graphtrace_hw_enabled = true;
-		DPS_LOG_INFO("Graphtrace enabled for software and offload paths");
-		return DP_OK;
+		DPS_LOG_INFO("Offloaded packet tracing enabled");
 	}
 
-	return -EINVAL;
+	_dp_graphtrace_enabled = true;
+	DPS_LOG_INFO("Graphtrace enabled");
+	return DP_OK;
 }
 
 static int dp_handle_graphtrace_stop(void)
 {
-	int ret;
-
-	_dp_graphtrace_enabled = false;
+	if (_dp_graphtrace_enabled) {
+		_dp_graphtrace_enabled = false;
+		DPS_LOG_INFO("Graphtrace disabled");
+	}
 	if (_dp_graphtrace_hw_enabled) {
-		ret = dp_send_event_hardware_capture_stop_msg();
 		if (DP_FAILED(dp_send_event_hardware_capture_stop_msg())) {
 			DPS_LOG_ERR("Cannot send hardware capture stop message");
-			return ret;
+			return DP_ERROR;
 		}
 		_dp_graphtrace_hw_enabled = false;
-		DPS_LOG_INFO("Graphtrace reconfigured to stop hw capturing");
+		DPS_LOG_INFO("Offloaded packet tracing disabled");
 	}
-	DPS_LOG_INFO("Graphtrace disabled");
 	return DP_OK;
 }
 

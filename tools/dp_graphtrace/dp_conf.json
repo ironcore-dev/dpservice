@@ -1,0 +1,26 @@
+[
+  {
+    "shopt": "h",
+    "lgopt": "help",
+    "help": "display this help and exit"
+  },
+  {
+    "shopt": "v",
+    "lgopt": "version",
+    "help": "display dp-service version and exit"
+  },
+  {
+    "lgopt": "hw",
+    "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
+    "var": "offload_enabled",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "lgopt": "stop",
+    "help": "do nothing, only make sure tracing is disabled in dp-service",
+    "var": "stop_mode",
+    "type": "bool",
+    "default": "false"
+  }
+]

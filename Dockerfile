@@ -140,7 +140,7 @@ gawk \
 
 WORKDIR /
 COPY --from=builder /workspace/build/src/dp_service .
-COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_graphtrace .
+COPY --from=builder /workspace/build/tools/dp_grpc_client /workspace/build/tools/dp_graphtrace/dp_graphtrace .
 COPY --from=builder /workspace/hack/prepare.sh .
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /lib/* /lib/
