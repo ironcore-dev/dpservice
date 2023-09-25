@@ -20,7 +20,7 @@ extern "C" {
 					 DP_NR_PF_HAIRPIN_RX_TX_QUEUES)
 
 #define DP_NR_VF_HAIRPIN_RX_TX_QUEUES	1
-#define MEMPOOL_CACHE_SIZE	256
+#define DP_MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		2
 #define DP_INTERNAL_Q_SIZE	32
 #define DP_GRPC_Q_SIZE		64
@@ -28,11 +28,9 @@ extern "C" {
 // there are three periodic messages (ARP, ND, ND-RA) that could be sent at once
 #define DP_PERIODIC_Q_SIZE	(DP_MAX_PORTS * 3)
 
-#define NB_MBUF(nports)                  \
-	RTE_MAX((2 * 1 * 1024 +              \
-		 2 * 1 * RTE_GRAPH_BURST_SIZE +  \
-		 2 * 1 * 1024 +                  \
-		 1 * MEMPOOL_CACHE_SIZE), 29184u)
+// 40Gb/s with 1500B packets means ~9M packets/s
+// assuming 0.1s delay in processing means ~900k mbufs needed
+#define DP_MBUF_POOL_SIZE	(900*1024)
 
 struct dp_dpdk_layer {
 	struct rte_mempool	*rte_mempool;

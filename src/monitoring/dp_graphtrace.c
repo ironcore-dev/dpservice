@@ -27,7 +27,7 @@ static int dp_graphtrace_init_memzone(void)
 	// So using ringbuffer size minus one, when the ring buffer is (almost) full, allocation will start failing
 	// (this is intentional, see below)
 	graphtrace.mempool = rte_pktmbuf_pool_create(DP_GRAPHTRACE_MEMPOOL_NAME, DP_GRAPHTRACE_RINGBUF_SIZE-1,
-											 MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE + sizeof(struct dp_graphtrace_pktinfo),
+											 DP_MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE + sizeof(struct dp_graphtrace_pktinfo),
 											 RTE_MBUF_DEFAULT_BUF_SIZE,
 											 rte_socket_id());
 	if (!graphtrace.mempool) {
