@@ -15,7 +15,7 @@ extern "C" {
 
 #define DP_MAX_PF_PORTS 2
 #define DP_MAX_VF_PORTS 126
-#define DP_MAX_PORTS    (DP_MAX_PF_PORTS * DP_MAX_VF_PORTS)
+#define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS)
 
 enum dp_port_type {
 	DP_PORT_PF,

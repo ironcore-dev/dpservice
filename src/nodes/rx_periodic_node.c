@@ -39,8 +39,8 @@ static int rx_periodic_node_init(__rte_unused const struct rte_graph *graph, __r
 
 static __rte_always_inline void handle_nongraph_queues(void)
 {
-	struct rte_mbuf *mbufs[DP_INTERNAL_Q_SIZE];
-	uint count, i;
+	struct rte_mbuf *mbufs[RTE_MAX(DP_INTERNAL_Q_SIZE, DP_GRPC_Q_SIZE)];
+	unsigned int count, i;
 
 	count = rte_ring_sc_dequeue_burst(monitoring_rx_queue, (void **)mbufs, RTE_DIM(mbufs), NULL);
 	for (i = 0; i < count; ++i)

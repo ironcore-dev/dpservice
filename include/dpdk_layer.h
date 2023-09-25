@@ -23,7 +23,10 @@ extern "C" {
 #define MEMPOOL_CACHE_SIZE	256
 #define DP_NB_SOCKETS		2
 #define DP_INTERNAL_Q_SIZE	32
-#define DP_GRPC_REPLY_ARR_SIZE	((DP_INTERNAL_Q_SIZE / 4) * 3)
+#define DP_GRPC_Q_SIZE		64
+#define DP_GRPC_REPLY_ARR_SIZE	((DP_GRPC_Q_SIZE / 4) * 3)
+// there are three periodic messages (ARP, ND, ND-RA) that could be sent at once
+#define DP_PERIODIC_Q_SIZE	(DP_MAX_PORTS * 3)
 
 #define NB_MBUF(nports)                  \
 	RTE_MAX((2 * 1 * 1024 +              \
