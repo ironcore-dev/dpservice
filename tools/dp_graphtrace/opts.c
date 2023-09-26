@@ -9,6 +9,8 @@ enum {
 	OPT_HELP = 'h',
 	OPT_VERSION = 'v',
 _OPT_SHOPT_MAX = 255,
+	OPT_DROPS,
+	OPT_NODES,
 	OPT_HW,
 	OPT_STOP,
 };
@@ -20,6 +22,8 @@ _OPT_SHOPT_MAX = 255,
 static const struct option longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
+	{ "drops", 0, 0, OPT_DROPS },
+	{ "nodes", 0, 0, OPT_NODES },
 	{ "hw", 0, 0, OPT_HW },
 	{ "stop", 0, 0, OPT_STOP },
 	{ NULL, 0, 0, 0 }
@@ -30,13 +34,27 @@ static void print_help_args(FILE *outfile)
 	fprintf(outfile, "%s",
 		" -h, --help     display this help and exit\n"
 		" -v, --version  display dp-service version and exit\n"
+		"     --drops    show dropped packets\n"
+		"     --nodes    show graph node traversal\n"
 		"     --hw       capture offloaded packets (only outgoing VF->PF packets supported)\n"
 		"     --stop     do nothing, only make sure tracing is disabled in dp-service\n"
 	);
 }
 
+static bool showing_drops = false;
+static bool showing_nodes = false;
 static bool offload_enabled = false;
 static bool stop_mode = false;
+
+bool dp_conf_is_showing_drops(void)
+{
+	return showing_drops;
+}
+
+bool dp_conf_is_showing_nodes(void)
+{
+	return showing_nodes;
+}
 
 bool dp_conf_is_offload_enabled(void)
 {

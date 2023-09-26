@@ -10,6 +10,20 @@
     "help": "display dp-service version and exit"
   },
   {
+    "lgopt": "drops",
+    "help": "show dropped packets",
+    "var": "showing_drops",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "lgopt": "nodes",
+    "help": "show graph node traversal",
+    "var": "showing_nodes",
+    "type": "bool",
+    "default": "false"
+  },
+  {
     "lgopt": "hw",
     "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
     "var": "offload_enabled",

@@ -15,6 +15,7 @@
 static enum dp_graphtrace_loglevel graphtrace_loglevel;
 #endif
 
+int _dp_graphtrace_flags;
 bool _dp_graphtrace_enabled = false;
 bool _dp_graphtrace_hw_enabled = false;
 
@@ -73,6 +74,12 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 		_dp_graphtrace_hw_enabled = true;
 		DPS_LOG_INFO("Offloaded packet tracing enabled");
 	}
+
+	_dp_graphtrace_flags = 0;
+	if (request->params.start.drops)
+		_dp_graphtrace_flags |= DP_GRAPHTRACE_FLAG_DROPS;
+	if (request->params.start.nodes)
+		_dp_graphtrace_flags |= DP_GRAPHTRACE_FLAG_NODES;
 
 	_dp_graphtrace_enabled = true;
 	DPS_LOG_INFO("Graphtrace enabled");
@@ -171,7 +178,10 @@ void dp_graphtrace_free(void)
 }
 
 
-void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type, struct rte_node *node, struct rte_node *next_node, void **objs, uint16_t nb_objs)
+void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
+						 struct rte_node *node, struct rte_node *next_node,
+						 void **objs, uint16_t nb_objs,
+						 uint16_t dst_port_id)
 {
 	uint16_t nb_dups = 0;
 	struct rte_mbuf *dups[nb_objs];
@@ -192,6 +202,7 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type, struct rte_node *node
 			pktinfo->pkt_type = type;
 			pktinfo->node = node;
 			pktinfo->next_node = next_node;
+			pktinfo->dst_port_id = dst_port_id;
 		}
 	}
 
@@ -255,12 +266,12 @@ void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t 
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, node->nodes[next_index]->name);
 }
 
-void _dp_graphtrace_log_rx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
+void _dp_graphtrace_log_rx_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint32_t i = 0; i < nb_objs; ++i)
 			dp_graphtrace_log(objs[i], "PORT %-9u: %3u >> %-11s #%u: ",
-						   port_id, dp_get_pkt_mark(objs[i])->id, node->name, i);
+						   ((struct rte_mbuf *)objs[i])->port, dp_get_pkt_mark(objs[i])->id, node->name, i);
 }
 
 void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
@@ -269,5 +280,13 @@ void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb
 		for (uint32_t i = 0; i < nb_objs; ++i)
 			dp_graphtrace_log(objs[i], "%-11s #%u: %3u >> PORT %-9u: ",
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, port_id);
+}
+
+void _dp_graphtrace_log_drop_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
+{
+	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
+		for (uint32_t i = 0; i < nb_objs; ++i)
+			dp_graphtrace_log(objs[i], "%-11s #%u: %3u >> DROP %-9s: ",
+						   node->name, i, dp_get_pkt_mark(objs[i])->id, "");
 }
 #endif  // ENABLE_PYTEST

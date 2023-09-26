@@ -40,9 +40,12 @@ struct dp_graphtrace_pktinfo {
 	uint32_t pktid;
 	struct rte_node *node;
 	struct rte_node *next_node;
+	uint16_t dst_port_id;
 };
 
 struct dp_graphtrace_params_start {
+	bool drops;
+	bool nodes;
 	bool hw;
 };
 

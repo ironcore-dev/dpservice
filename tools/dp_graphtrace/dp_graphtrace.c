@@ -88,33 +88,40 @@ static void print_packet(struct rte_mbuf *pkt)
 	char next_node_buf[16];
 	const char *node;
 	const char *next_node;
+	const char *arrow;
 
 	dp_graphtrace_sprint(pkt, printbuf, sizeof(printbuf));
 
 	switch (pktinfo->pkt_type) {
 	case DP_GRAPHTRACE_PKT_TYPE_SOFTWARE:
+		arrow = "->";
 		if (pktinfo->node) {
 			node = pktinfo->node->name;
 		} else {
+			arrow = ">>";
 			snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
 			node = node_buf;
 		}
 		if (pktinfo->next_node) {
 			next_node = pktinfo->next_node->name;
 		} else {
-			snprintf(next_node_buf, sizeof(next_node_buf), "PORT %u", pkt->port);
-			next_node = next_node_buf;
+			arrow = ">>";
+			if (pktinfo->dst_port_id == (uint16_t)-1) {
+				next_node = "DROP";
+			} else {
+				snprintf(next_node_buf, sizeof(next_node_buf), "PORT %u", pktinfo->dst_port_id);
+				next_node = next_node_buf;
+			}
 		}
+		printf("%u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
+			pktinfo->pktid, node, arrow, next_node, printbuf);
 		break;
 	case DP_GRAPHTRACE_PKT_TYPE_OFFLOAD:
-		node = "Offloaded";
-		snprintf(next_node_buf, sizeof(next_node_buf), "PORT %u", pkt->port);
-		next_node = next_node_buf;
+		snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
+		printf("%u: " NODENAME_FMT " at " NODENAME_FMT ": %s\n",
+			pktinfo->pktid, "Offloaded", node_buf, printbuf);
 		break;
 	}
-
-	printf("%u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
-			pktinfo->pktid, node, "->", next_node, printbuf);
 
 	fflush(stdout);
 }
@@ -178,6 +185,8 @@ static int dp_graphtrace_start(void)
 	struct dp_graphtrace_mp_reply reply;
 	struct dp_graphtrace_mp_request request = {
 		.action = DP_GRAPHTRACE_ACTION_START,
+		.params.start.drops = dp_conf_is_showing_drops(),
+		.params.start.nodes = dp_conf_is_showing_nodes(),
 		.params.start.hw = dp_conf_is_offload_enabled(),
 	};
 
@@ -297,6 +306,12 @@ static inline void print_usage(const char *progname, FILE *outfile)
 static int parse_opt(int opt, __rte_unused const char *arg)
 {
 	switch (opt) {
+	case OPT_DROPS:
+		showing_drops = true;
+		return DP_OK;
+	case OPT_NODES:
+		showing_nodes = true;
+		return DP_OK;
 	case OPT_HW:
 		offload_enabled = true;
 		return DP_OK;

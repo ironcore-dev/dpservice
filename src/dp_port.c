@@ -452,12 +452,11 @@ static int dp_vf_init_monitoring_rule_rollback(uint32_t port_id)
 
 static int dp_install_vf_init_rte_rules(uint32_t port_id)
 {
-	bool graphtrace_enabled = dp_graphtrace_is_enabled();
 	int ret;
 
 	// at least one rule must be there, otherwise new packets cannot be delivered to software path
 	// same as the isolation rule on pf
-	if (graphtrace_enabled)
+	if (dp_is_graphtrace_hw_enabled())
 		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
 	else
 		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);

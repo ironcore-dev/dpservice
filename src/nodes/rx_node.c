@@ -114,7 +114,7 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	for (uint16_t i = 0; i < n_pkts; ++i)
 		dp_init_pkt_mark((struct rte_mbuf *)objs[i]);
 
-	dp_graphtrace_rx_burst(node, objs, n_pkts, ctx->port_id);
+	dp_graphtrace_rx_burst(node, objs, n_pkts);
 
 	dp_graphtrace_next_burst(node, objs, n_pkts, RX_NEXT_CLS);
 
