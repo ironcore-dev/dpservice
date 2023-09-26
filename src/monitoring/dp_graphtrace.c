@@ -255,6 +255,14 @@ void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t 
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, node->nodes[next_index]->name);
 }
 
+void _dp_graphtrace_log_rx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
+{
+	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
+		for (uint32_t i = 0; i < nb_objs; ++i)
+			dp_graphtrace_log(objs[i], "PORT %-9u: %3u >> %-11s #%u: ",
+						   port_id, dp_get_pkt_mark(objs[i])->id, node->name, i);
+}
+
 void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)

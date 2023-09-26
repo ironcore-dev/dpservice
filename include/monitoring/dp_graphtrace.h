@@ -27,12 +27,14 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type, struct rte_node *node
 	void _dp_graphtrace_log_node_burst(struct rte_node *node, void **objs, uint16_t nb_objs);
 	void _dp_graphtrace_log_next(struct rte_node *node, void *obj, rte_edge_t next_index);
 	void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index);
+	void _dp_graphtrace_log_rx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id);
 	void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id);
 #else
 #	define _dp_graphtrace_log_node(NODE, OBJ) (void)0
 #	define _dp_graphtrace_log_node_burst(NODE, OBJS, NUM) (void)0
 #	define _dp_graphtrace_log_next(NODE, OBJ, NEXT) (void)0
 #	define _dp_graphtrace_log_next_burst(NODE, OBJS, NUM, NEXT) (void)0
+#	define _dp_graphtrace_log_rx_burst(NODE, OBJS, NUM, PORTID) (void)0
 #	define _dp_graphtrace_log_tx_burst(NODE, OBJS, NUM, PORTID) (void)0
 #endif
 
@@ -55,6 +57,14 @@ static __rte_always_inline void dp_graphtrace_next_burst(struct rte_node *node, 
 	if (_dp_graphtrace_enabled)
 		_dp_graphtrace_send(DP_GRAPHTRACE_PKT_TYPE_SOFTWARE, node, node->nodes[next_index], objs, nb_objs);
 	_dp_graphtrace_log_next_burst(node, objs, nb_objs, next_index);
+}
+
+static __rte_always_inline void dp_graphtrace_rx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
+{
+	if (_dp_graphtrace_enabled)
+		_dp_graphtrace_send(DP_GRAPHTRACE_PKT_TYPE_SOFTWARE, NULL, node, objs, nb_objs);
+	RTE_SET_USED(port_id);
+	_dp_graphtrace_log_rx_burst(node, objs, nb_objs, port_id);
 }
 
 static __rte_always_inline void dp_graphtrace_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)

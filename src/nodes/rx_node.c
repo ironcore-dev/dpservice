@@ -86,12 +86,6 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	return DP_OK;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
-{
-	dp_init_pkt_mark(m);
-	return RX_NEXT_CLS;
-}
-
 static uint16_t rx_node_process(struct rte_graph *graph,
 								struct rte_node *node,
 								void **objs,
@@ -114,7 +108,17 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 
 	node->idx = n_pkts;
 
-	dp_foreach_graph_packet(graph, node, objs, n_pkts, RX_NEXT_CLS, get_next_index);
+	// Rx node only ever leads to CLS node (can move all packets at once)
+	// also packet tracing in Rx node needs to also cover the ingress itself
+	// thus not using dp_foreach_graph_packet() here
+	for (uint16_t i = 0; i < n_pkts; ++i)
+		dp_init_pkt_mark((struct rte_mbuf *)objs[i]);
+
+	dp_graphtrace_rx_burst(node, objs, n_pkts, ctx->port_id);
+
+	dp_graphtrace_next_burst(node, objs, n_pkts, RX_NEXT_CLS);
+
+	rte_node_next_stream_move(graph, node, RX_NEXT_CLS);
 
 	return n_pkts;
 }
