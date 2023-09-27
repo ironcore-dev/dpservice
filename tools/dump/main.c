@@ -34,7 +34,7 @@ static const struct timespec connect_timeout = {
 // EAL needs writable arguments (both the string and the array!)
 // therefore convert them from literals and remember them for freeing later
 static const char *eal_arg_strings[] = {
-	"dp_graphtrace",				// this binary (not used, can actually be any string)
+	"dpservice-dump",				// this binary (not used, can actually be any string)
 	"--proc-type=secondary",		// connect to the primary process (dp_service) instead
 	"--no-pci",						// do not try to use any hardware
 	"--log-level=6",				// hide DPDK's informational messages (level 7)

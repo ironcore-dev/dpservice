@@ -31,6 +31,6 @@ As the TUN/TAP driver uses signals, it is recommended to use `handle signal SIG3
 
 
 ## Debugging graph nodes
-To provide a rudimentary packet analysis while the packet is being processed inside dp-service, there is a command-line tool provided by the repository called `dp_graphtrace`. This allows you to see packet data as it travels through the DPDK graph (as opposed to only seeing ingress/egress packets using `tcpdump`).
+To provide a rudimentary packet analysis while the packet is being processed inside dp-service, there is a command-line tool provided by the repository called `dpservice-dump`. This allows you to see packet data as it travels through the DPDK graph (as opposed to only seeing ingress/egress packets using `tcpdump`).
 
 Be aware that this will produce large amounts of logs, so only use it for debugging and if possible, on a prepared traffic flow.
