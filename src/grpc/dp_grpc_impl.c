@@ -1,5 +1,6 @@
 #include "grpc/dp_grpc_impl.h"
 #include <time.h>
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_lb.h"

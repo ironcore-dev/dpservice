@@ -9,3 +9,11 @@ bool dp_conf_is_showing_drops(void);
 bool dp_conf_is_showing_nodes(void);
 bool dp_conf_is_offload_enabled(void);
 bool dp_conf_is_stop_mode(void);
+
+enum dp_conf_runmode {
+	DP_CONF_RUNMODE_NORMAL, /**< Start normally */
+	DP_CONF_RUNMODE_EXIT,   /**< End succesfully (e.g. for --help etc.) */
+	DP_CONF_RUNMODE_ERROR,  /**< Error parsing arguments */
+};
+
+enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv);

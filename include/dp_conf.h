@@ -29,14 +29,6 @@ struct dp_conf_dhcp_dns {
 	uint8_t *array;
 };
 
-enum dp_conf_runmode {
-	DP_CONF_RUNMODE_NORMAL,	/**< Start dp_service normally */
-	DP_CONF_RUNMODE_EXIT,	/**< End succesfully (e.g. for --help etc.) */
-	DP_CONF_RUNMODE_ERROR	/**< Error parsing arguments */
-};
-
-enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv);
-
 int dp_conf_parse_file(const char *filename);
 
 void dp_conf_free(void);
@@ -48,6 +40,7 @@ void dp_conf_free(void);
 int dp_conf_is_wcmp_enabled(void);
 const char *dp_conf_get_eal_a_pf0(void);
 const char *dp_conf_get_eal_a_pf1(void);
+const uint8_t *dp_conf_get_underlay_ip(void);
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void);
 #ifdef ENABLE_VIRTSVC
 const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void);

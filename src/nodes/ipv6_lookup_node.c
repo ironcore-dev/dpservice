@@ -3,6 +3,7 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"

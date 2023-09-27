@@ -3,6 +3,7 @@
 #include <rte_ether.h>
 #include <rte_graph.h>
 #include <rte_mbuf.h>
+#include "dp_conf.h"
 #include "dp_lpm.h"
 #include "dp_port.h"
 #include "nodes/common_node.h"

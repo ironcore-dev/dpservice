@@ -23,10 +23,9 @@ enum dp_conf_log_format {
 
 const char *dp_conf_get_pf0_name(void);
 const char *dp_conf_get_pf1_name(void);
-const uint8_t *dp_conf_get_underlay_ip(void);
 const char *dp_conf_get_vf_pattern(void);
 int dp_conf_get_dhcp_mtu(void);
-double dp_conf_get_wcmp_frac(void);
+int dp_conf_get_wcmp_perc(void);
 enum dp_conf_nic_type dp_conf_get_nic_type(void);
 bool dp_conf_is_stats_enabled(void);
 bool dp_conf_is_conntrack_enabled(void);
@@ -41,3 +40,11 @@ int dp_conf_get_grpc_port(void);
 #ifdef ENABLE_PYTEST
 int dp_conf_get_flow_timeout(void);
 #endif
+
+enum dp_conf_runmode {
+	DP_CONF_RUNMODE_NORMAL, /**< Start normally */
+	DP_CONF_RUNMODE_EXIT,   /**< End succesfully (e.g. for --help etc.) */
+	DP_CONF_RUNMODE_ERROR,  /**< Error parsing arguments */
+};
+
+enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv);

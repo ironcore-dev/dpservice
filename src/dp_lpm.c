@@ -1,5 +1,6 @@
 #include "dp_lpm.h"
 #include <rte_errno.h>
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_firewall.h"
 #include "dp_flow.h"

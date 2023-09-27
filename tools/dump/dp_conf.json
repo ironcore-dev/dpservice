@@ -1,40 +1,35 @@
-[
-  {
-    "shopt": "h",
-    "lgopt": "help",
-    "help": "display this help and exit"
-  },
-  {
-    "shopt": "v",
-    "lgopt": "version",
-    "help": "display dp-service version and exit"
-  },
-  {
-    "lgopt": "drops",
-    "help": "show dropped packets",
-    "var": "showing_drops",
-    "type": "bool",
-    "default": "false"
-  },
-  {
-    "lgopt": "nodes",
-    "help": "show graph node traversal",
-    "var": "showing_nodes",
-    "type": "bool",
-    "default": "false"
-  },
-  {
-    "lgopt": "hw",
-    "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
-    "var": "offload_enabled",
-    "type": "bool",
-    "default": "false"
-  },
-  {
-    "lgopt": "stop",
-    "help": "do nothing, only make sure tracing is disabled in dp-service",
-    "var": "stop_mode",
-    "type": "bool",
-    "default": "false"
-  }
-]
+{
+  "header": "opts.h",
+  "source": "opts.c",
+  "markdown": "../../docs/deployment/help_dpservice-dump.md",
+  "options": [
+    {
+      "lgopt": "drops",
+      "help": "show dropped packets",
+      "var": "showing_drops",
+      "type": "bool",
+      "default": "false"
+    },
+    {
+      "lgopt": "nodes",
+      "help": "show graph node traversal",
+      "var": "showing_nodes",
+      "type": "bool",
+      "default": "false"
+    },
+    {
+      "lgopt": "hw",
+      "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
+      "var": "offload_enabled",
+      "type": "bool",
+      "default": "false"
+    },
+    {
+      "lgopt": "stop",
+      "help": "do nothing, only make sure tracing is disabled in dp-service",
+      "var": "stop_mode",
+      "type": "bool",
+      "default": "false"
+    }
+  ]
+}

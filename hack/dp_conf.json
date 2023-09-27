@@ -1,158 +1,160 @@
-[
-  {
-    "shopt": "h",
-    "lgopt": "help",
-    "help": "display this help and exit"
-  },
-  {
-    "shopt": "v",
-    "lgopt": "version",
-    "help": "display version and exit"
-  },
-  {
-    "lgopt": "pf0",
-    "arg": "IFNAME",
-    "help": "first physical interface (e.g. eth0)",
-    "var": "pf0_name",
-    "type": "char",
-    "array_size": "IFNAMSIZ"
-  },
-  {
-    "lgopt": "pf1",
-    "arg": "IFNAME",
-    "help": "second physical interface (e.g. eth1)",
-    "var": "pf1_name",
-    "type": "char",
-    "array_size": "IFNAMSIZ"
-  },
-  {
-    "lgopt": "ipv6",
-    "arg": "ADDR6",
-    "help": "IPv6 underlay address",
-    "var": "underlay_ip",
-    "type": "uint8_t",
-    "array_size": "16"
-  },
-  {
-    "lgopt": "vf-pattern",
-    "arg": "PATTERN",
-    "help": "virtual interface name pattern (e.g. 'eth1vf')",
-    "var": "vf_pattern",
-    "type": "char",
-    "array_size": "IFNAMSIZ"
-  },
-  {
-    "lgopt": "dhcp-mtu",
-    "arg": "SIZE",
-    "help": "set the mtu field in DHCP responses (68 - 1500)",
-    "var": "dhcp_mtu",
-    "type": "int",
-    "default": 1500
-  },
-  {
-    "lgopt": "dhcp-dns",
-    "arg": "IPv4",
-    "help": "set the domain name server field in DHCP responses (can be used multiple times)"
-  },
-  {
-    "lgopt": "udp-virtsvc",
-    "arg": "IPv4,port,IPv6,port",
-    "help": "map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service",
-    "ifdef": "ENABLE_VIRTSVC"
-  },
-  {
-    "lgopt": "tcp-virtsvc",
-    "arg": "IPv4,port,IPv6,port",
-    "help": "map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service",
-    "ifdef": "ENABLE_VIRTSVC"
-  },
-  {
-    "lgopt": "wcmp-fraction",
-    "arg": "FRACTION",
-    "help": "weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)",
-    "var": "wcmp_frac",
-    "type": "double",
-    "default": "1.0"
-  },
-  {
-    "lgopt": "nic-type",
-    "arg": "NICTYPE",
-    "help": "NIC type to use",
-    "var": "nic_type",
-    "type": "enum",
-    "choices": [ "hw", "tap" ],
-    "default": "hw"
-  },
-  {
-    "lgopt": "no-stats",
-    "help": "do not print periodic statistics to stdout",
-    "var": "stats_enabled",
-    "type": "bool",
-    "default": "true"
-  },
-  {
-    "lgopt": "no-conntrack",
-    "help": "disable connection tracking",
-    "var": "conntrack_enabled",
-    "type": "bool",
-    "default": "true"
-  },
-  {
-    "lgopt": "enable-ipv6-overlay",
-    "help": "enable IPv6 overlay addresses",
-    "var": "ipv6_overlay_enabled",
-    "type": "bool",
-    "default": "false"
-  },
-  {
-    "lgopt": "no-offload",
-    "help": "disable traffic offloading",
-    "var": "offload_enabled",
-    "type": "bool",
-    "default": "true"
-  },
-  {
-    "lgopt": "graphtrace-loglevel",
-    "arg": "LEVEL",
-    "help": "verbosity level of packet traversing the graph framework",
-    "var": "graphtrace_loglevel",
-    "type": "int",
-    "default": "0",
-    "ifdef": [ "ENABLE_PYTEST" ]
-  },
-  {
-    "lgopt": "color",
-    "arg": "MODE",
-    "help": "output colorization mode",
-    "var": "color",
-    "type": "enum",
-    "choices": [ "never", "always", "auto" ],
-    "default": "never"
-  },
-  {
-    "lgopt": "log-format",
-    "arg": "FORMAT",
-    "help": "set the format of individual log lines (on standard output)",
-    "var": "log_format",
-    "type": "enum",
-    "choices": [ "text", "json" ],
-    "default": "text"
-  },
-  {
-    "lgopt": "grpc-port",
-    "arg": "PORT",
-    "help": "listen for gRPC clients on this port",
-    "var": "grpc_port",
-    "type": "int",
-    "default": 1337
-  },
-  {
-    "lgopt": "flow-timeout",
-    "arg": "SECONDS",
-    "help": "inactive flow timeout (except TCP established flows)",
-    "var": "flow_timeout",
-    "type": "int",
-    "default": "DP_FLOW_DEFAULT_TIMEOUT",
-    "ifdef": "ENABLE_PYTEST"
-  }
-]
+{
+  "header": "../include/dp_conf_opts.h",
+  "source": "../src/dp_conf_opts.c",
+  "markdown": "../docs/deployment/help_dpservice-bin.md",
+  "options": [
+    {
+      "lgopt": "pf0",
+      "arg": "IFNAME",
+      "help": "first physical interface (e.g. eth0)",
+      "var": "pf0_name",
+      "type": "char",
+      "array_size": "IF_NAMESIZE"
+    },
+    {
+      "lgopt": "pf1",
+      "arg": "IFNAME",
+      "help": "second physical interface (e.g. eth1)",
+      "var": "pf1_name",
+      "type": "char",
+      "array_size": "IF_NAMESIZE"
+    },
+    {
+      "lgopt": "ipv6",
+      "arg": "ADDR6",
+      "help": "IPv6 underlay address"
+    },
+    {
+      "lgopt": "vf-pattern",
+      "arg": "PATTERN",
+      "help": "virtual interface name pattern (e.g. 'eth1vf')",
+      "var": "vf_pattern",
+      "type": "char",
+      "array_size": "IF_NAMESIZE"
+    },
+    {
+      "lgopt": "dhcp-mtu",
+      "arg": "SIZE",
+      "help": "set the mtu field in DHCP responses (68 - 1500)",
+      "var": "dhcp_mtu",
+      "type": "int",
+      "min": 68,
+      "max": 1500,
+      "default": 1500
+    },
+    {
+      "lgopt": "dhcp-dns",
+      "arg": "IPv4",
+      "help": "set the domain name server field in DHCP responses (can be used multiple times)"
+    },
+    {
+      "lgopt": "udp-virtsvc",
+      "arg": "IPv4,port,IPv6,port",
+      "help": "map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service",
+      "ifdef": "ENABLE_VIRTSVC"
+    },
+    {
+      "lgopt": "tcp-virtsvc",
+      "arg": "IPv4,port,IPv6,port",
+      "help": "map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service",
+      "ifdef": "ENABLE_VIRTSVC"
+    },
+    {
+      "lgopt": "wcmp",
+      "arg": "PERCENTAGE",
+      "help": "weighted-cost-multipath percentage for pf0 (0 - 100)",
+      "var": "wcmp_perc",
+      "type": "int",
+      "min": 0,
+      "max": 100,
+      "default": 100
+    },
+    {
+      "lgopt": "nic-type",
+      "arg": "NICTYPE",
+      "help": "NIC type to use",
+      "var": "nic_type",
+      "type": "enum",
+      "choices": [ "hw", "tap" ],
+      "default": "hw"
+    },
+    {
+      "lgopt": "no-stats",
+      "help": "do not print periodic statistics to stdout",
+      "var": "stats_enabled",
+      "type": "bool",
+      "default": "true"
+    },
+    {
+      "lgopt": "no-conntrack",
+      "help": "disable connection tracking",
+      "var": "conntrack_enabled",
+      "type": "bool",
+      "default": "true"
+    },
+    {
+      "lgopt": "enable-ipv6-overlay",
+      "help": "enable IPv6 overlay addresses",
+      "var": "ipv6_overlay_enabled",
+      "type": "bool",
+      "default": "false"
+    },
+    {
+      "lgopt": "no-offload",
+      "help": "disable traffic offloading",
+      "var": "offload_enabled",
+      "type": "bool",
+      "default": "true"
+    },
+    {
+      "lgopt": "graphtrace-loglevel",
+      "arg": "LEVEL",
+      "help": "verbosity level of packet traversing the graph framework",
+      "var": "graphtrace_loglevel",
+      "type": "int",
+      "min": 0,
+      "max": "DP_GRAPHTRACE_LOGLEVEL_MAX",
+      "default": 0,
+      "ifdef": [ "ENABLE_PYTEST" ]
+    },
+    {
+      "lgopt": "color",
+      "arg": "MODE",
+      "help": "output colorization mode",
+      "var": "color",
+      "type": "enum",
+      "choices": [ "never", "always", "auto" ],
+      "default": "never"
+    },
+    {
+      "lgopt": "log-format",
+      "arg": "FORMAT",
+      "help": "set the format of individual log lines (on standard output)",
+      "var": "log_format",
+      "type": "enum",
+      "choices": [ "text", "json" ],
+      "default": "text"
+    },
+    {
+      "lgopt": "grpc-port",
+      "arg": "PORT",
+      "help": "listen for gRPC clients on this port",
+      "var": "grpc_port",
+      "type": "int",
+      "min": 1024,
+      "max": 65535,
+      "default": 1337
+    },
+    {
+      "lgopt": "flow-timeout",
+      "arg": "SECONDS",
+      "help": "inactive flow timeout (except TCP established flows)",
+      "var": "flow_timeout",
+      "type": "int",
+      "min": 1,
+      "max": 300,
+      "default": "DP_FLOW_DEFAULT_TIMEOUT",
+      "ifdef": "ENABLE_PYTEST"
+    }
+  ]
+}

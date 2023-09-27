@@ -3,6 +3,7 @@
 #include <rte_icmp.h>
 
 #include "dp_cntrack.h"
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"

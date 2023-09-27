@@ -21,13 +21,12 @@ void dp_multipath_init(void)
 	if (!dp_conf_is_wcmp_enabled())
 		return;
 
-	double frac = dp_conf_get_wcmp_frac();
-	int round_frac = RTE_MIN(lround(frac * 10), PORT_SELECT_TABLE_SIZE);
+	int frac = (int)lround(dp_conf_get_wcmp_perc() / (100.0/PORT_SELECT_TABLE_SIZE));
 
-	for (int i = 0; i < round_frac; ++i)
+	for (int i = 0; i < frac; ++i)
 		pf0_egress_select_table[i] = OWNER_PORT;
 
-	for (int i = round_frac; i < PORT_SELECT_TABLE_SIZE; ++i)
+	for (int i = frac; i < PORT_SELECT_TABLE_SIZE; ++i)
 		pf0_egress_select_table[i] = PEER_PORT;
 }
 

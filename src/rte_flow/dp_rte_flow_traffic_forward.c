@@ -1,4 +1,5 @@
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"

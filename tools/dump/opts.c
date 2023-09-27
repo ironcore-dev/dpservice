@@ -5,6 +5,12 @@
 /* Please edit dp_conf.json and re-run the script to update this file. */
 /***********************************************************************/
 
+#include "dp_argparse.h"
+
+#ifndef ARRAY_SIZE
+#	define ARRAY_SIZE(ARRAY) (sizeof(ARRAY) / sizeof((ARRAY)[0]))
+#endif
+
 enum {
 	OPT_HELP = 'h',
 	OPT_VERSION = 'v',
@@ -15,11 +21,9 @@ _OPT_SHOPT_MAX = 255,
 	OPT_STOP,
 };
 
-#define OPTSTRING \
-	"h" \
-	"v" \
+#define OPTSTRING ":hv" \
 
-static const struct option longopts[] = {
+static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
 	{ "drops", 0, 0, OPT_DROPS },
@@ -28,18 +32,6 @@ static const struct option longopts[] = {
 	{ "stop", 0, 0, OPT_STOP },
 	{ NULL, 0, 0, 0 }
 };
-
-static void print_help_args(FILE *outfile)
-{
-	fprintf(outfile, "%s",
-		" -h, --help     display this help and exit\n"
-		" -v, --version  display dp-service version and exit\n"
-		"     --drops    show dropped packets\n"
-		"     --nodes    show graph node traversal\n"
-		"     --hw       capture offloaded packets (only outgoing VF->PF packets supported)\n"
-		"     --stop     do nothing, only make sure tracing is disabled in dp-service\n"
-	);
-}
 
 static bool showing_drops = false;
 static bool showing_nodes = false;
@@ -64,5 +56,78 @@ bool dp_conf_is_offload_enabled(void)
 bool dp_conf_is_stop_mode(void)
 {
 	return stop_mode;
+}
+
+
+
+/* These functions need to be implemented by the user of this generated code */
+static void dp_argparse_version(void);
+
+
+static inline void dp_argparse_help(const char *progname, FILE *outfile)
+{
+	fprintf(outfile, "Usage: %s [options]\n"
+		" -h, --help     display this help and exit\n"
+		" -v, --version  display version and exit\n"
+		"     --drops    show dropped packets\n"
+		"     --nodes    show graph node traversal\n"
+		"     --hw       capture offloaded packets (only outgoing VF->PF packets supported)\n"
+		"     --stop     do nothing, only make sure tracing is disabled in dp-service\n"
+	, progname);
+}
+
+static int dp_conf_parse_arg(int opt, const char *arg)
+{
+	(void)arg;  // if no option uses an argument, this would be unused
+	switch (opt) {
+	case OPT_DROPS:
+		return dp_argparse_store_true(&showing_drops);
+	case OPT_NODES:
+		return dp_argparse_store_true(&showing_nodes);
+	case OPT_HW:
+		return dp_argparse_store_true(&offload_enabled);
+	case OPT_STOP:
+		return dp_argparse_store_true(&stop_mode);
+	default:
+		fprintf(stderr, "Unimplemented option %d\n", opt);
+		return DP_ERROR;
+	}
+}
+
+enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
+{
+	const char *progname = argv[0];
+	int option_index = -1;
+	int opt;
+
+	while ((opt = getopt_long(argc, argv, OPTSTRING, dp_conf_longopts, &option_index)) != -1) {
+		switch (opt) {
+		case OPT_HELP:
+			dp_argparse_help(progname, stdout);
+			return DP_CONF_RUNMODE_EXIT;
+		case OPT_VERSION:
+			dp_argparse_version();
+			return DP_CONF_RUNMODE_EXIT;
+		case ':':
+			fprintf(stderr, "Missing argument for '%s'\n", argv[optind-1]);
+			return DP_CONF_RUNMODE_ERROR;
+		case '?':
+			if (optopt > 0)
+				fprintf(stderr, "Unknown option '-%c'\n", optopt);
+			else
+				fprintf(stderr, "Unknown option '%s'\n", argv[optind-1]);
+			return DP_CONF_RUNMODE_ERROR;
+		default:
+			if (DP_FAILED(dp_conf_parse_arg(opt, optarg))) {
+				if (option_index >= 0)
+					fprintf(stderr, "Invalid argument for '--%s'\n", dp_conf_longopts[option_index].name);
+				else
+					fprintf(stderr, "Invalid argument for '-%c'\n", opt);
+				return DP_CONF_RUNMODE_ERROR;
+			}
+		}
+		option_index = -1;
+	}
+	return DP_CONF_RUNMODE_NORMAL;
 }
 

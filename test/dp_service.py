@@ -56,7 +56,7 @@ class DpService:
 			self.cmd += ' --no-offload'
 
 		if self.port_redundancy:
-			self.cmd += ' --wcmp-fraction=0.5'
+			self.cmd += ' --wcmp=50'
 		if fast_flow_timeout:
 			self.cmd += f' --flow-timeout={flow_timeout}'
 		if test_virtsvc:

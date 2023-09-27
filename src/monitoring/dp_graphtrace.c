@@ -2,6 +2,7 @@
 
 #include <rte_mbuf.h>
 
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dpdk_layer.h"

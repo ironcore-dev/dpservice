@@ -297,55 +297,9 @@ static int stop_graphtrace(void)
 	return DP_OK;
 }
 
-static inline void print_usage(const char *progname, FILE *outfile)
+static void dp_argparse_version(void)
 {
-	fprintf(outfile, "Usage: %s [options]\n", progname);
-	print_help_args(outfile);
-}
-
-static int parse_opt(int opt, __rte_unused const char *arg)
-{
-	switch (opt) {
-	case OPT_DROPS:
-		showing_drops = true;
-		return DP_OK;
-	case OPT_NODES:
-		showing_nodes = true;
-		return DP_OK;
-	case OPT_HW:
-		offload_enabled = true;
-		return DP_OK;
-	case OPT_STOP:
-		stop_mode = true;
-		return DP_OK;
-	default:
-		fprintf(stderr, "Unimplemented option %d", opt);
-		return DP_ERROR;
-	}
-}
-
-enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
-{
-	const char *progname = argv[0];
-	int opt;
-
-	while ((opt = getopt_long(argc, argv, OPTSTRING, longopts, NULL)) != -1) {
-		switch (opt) {
-		case OPT_HELP:
-			print_usage(progname, stdout);
-			return DP_CONF_RUNMODE_EXIT;
-		case OPT_VERSION:
-			printf("DP Service version %s\n", DP_SERVICE_VERSION);
-			return DP_CONF_RUNMODE_EXIT;
-		case '?':
-			print_usage(progname, stderr);
-			return DP_CONF_RUNMODE_ERROR;
-		default:
-			if (DP_FAILED(parse_opt(opt, optarg)))
-				return DP_CONF_RUNMODE_ERROR;
-		}
-	}
-	return DP_CONF_RUNMODE_NORMAL;
+	printf("DP Service version %s\n", DP_SERVICE_VERSION);
 }
 
 int main(int argc, char **argv)

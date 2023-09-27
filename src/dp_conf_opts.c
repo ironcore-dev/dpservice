@@ -5,6 +5,12 @@
 /* Please edit dp_conf.json and re-run the script to update this file. */
 /***********************************************************************/
 
+#include "dp_argparse.h"
+
+#ifndef ARRAY_SIZE
+#	define ARRAY_SIZE(ARRAY) (sizeof(ARRAY) / sizeof((ARRAY)[0]))
+#endif
+
 enum {
 	OPT_HELP = 'h',
 	OPT_VERSION = 'v',
@@ -21,7 +27,7 @@ _OPT_SHOPT_MAX = 255,
 #ifdef ENABLE_VIRTSVC
 	OPT_TCP_VIRTSVC,
 #endif
-	OPT_WCMP_FRACTION,
+	OPT_WCMP,
 	OPT_NIC_TYPE,
 	OPT_NO_STATS,
 	OPT_NO_CONNTRACK,
@@ -38,11 +44,9 @@ _OPT_SHOPT_MAX = 255,
 #endif
 };
 
-#define OPTSTRING \
-	"h" \
-	"v" \
+#define OPTSTRING ":hv" \
 
-static const struct option longopts[] = {
+static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
 	{ "pf0", 1, 0, OPT_PF0 },
@@ -57,7 +61,7 @@ static const struct option longopts[] = {
 #ifdef ENABLE_VIRTSVC
 	{ "tcp-virtsvc", 1, 0, OPT_TCP_VIRTSVC },
 #endif
-	{ "wcmp-fraction", 1, 0, OPT_WCMP_FRACTION },
+	{ "wcmp", 1, 0, OPT_WCMP },
 	{ "nic-type", 1, 0, OPT_NIC_TYPE },
 	{ "no-stats", 0, 0, OPT_NO_STATS },
 	{ "no-conntrack", 0, 0, OPT_NO_CONNTRACK },
@@ -91,47 +95,11 @@ static const char *log_format_choices[] = {
 	"json",
 };
 
-static void print_help_args(FILE *outfile)
-{
-	fprintf(outfile, "%s",
-		" -h, --help                             display this help and exit\n"
-		" -v, --version                          display version and exit\n"
-		"     --pf0=IFNAME                       first physical interface (e.g. eth0)\n"
-		"     --pf1=IFNAME                       second physical interface (e.g. eth1)\n"
-		"     --ipv6=ADDR6                       IPv6 underlay address\n"
-		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
-		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
-		"     --dhcp-dns=IPv4                    set the domain name server field in DHCP responses (can be used multiple times)\n"
-#ifdef ENABLE_VIRTSVC
-		"     --udp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service\n"
-#endif
-#ifdef ENABLE_VIRTSVC
-		"     --tcp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service\n"
-#endif
-		"     --wcmp-fraction=FRACTION           weighted-cost-multipath coefficient for pf0 (0.0 - 1.0)\n"
-		"     --nic-type=NICTYPE                 NIC type to use: 'hw' (default) or 'tap'\n"
-		"     --no-stats                         do not print periodic statistics to stdout\n"
-		"     --no-conntrack                     disable connection tracking\n"
-		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
-		"     --no-offload                       disable traffic offloading\n"
-#ifdef ENABLE_PYTEST
-		"     --graphtrace-loglevel=LEVEL        verbosity level of packet traversing the graph framework\n"
-#endif
-		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
-		"     --log-format=FORMAT                set the format of individual log lines (on standard output): 'text' (default) or 'json'\n"
-		"     --grpc-port=PORT                   listen for gRPC clients on this port\n"
-#ifdef ENABLE_PYTEST
-		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
-#endif
-	);
-}
-
-static char pf0_name[IFNAMSIZ];
-static char pf1_name[IFNAMSIZ];
-static uint8_t underlay_ip[16];
-static char vf_pattern[IFNAMSIZ];
+static char pf0_name[IF_NAMESIZE];
+static char pf1_name[IF_NAMESIZE];
+static char vf_pattern[IF_NAMESIZE];
 static int dhcp_mtu = 1500;
-static double wcmp_frac = 1.0;
+static int wcmp_perc = 100;
 static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_HW;
 static bool stats_enabled = true;
 static bool conntrack_enabled = true;
@@ -157,11 +125,6 @@ const char *dp_conf_get_pf1_name(void)
 	return pf1_name;
 }
 
-const uint8_t *dp_conf_get_underlay_ip(void)
-{
-	return underlay_ip;
-}
-
 const char *dp_conf_get_vf_pattern(void)
 {
 	return vf_pattern;
@@ -172,9 +135,9 @@ int dp_conf_get_dhcp_mtu(void)
 	return dhcp_mtu;
 }
 
-double dp_conf_get_wcmp_frac(void)
+int dp_conf_get_wcmp_perc(void)
 {
-	return wcmp_frac;
+	return wcmp_perc;
 }
 
 enum dp_conf_nic_type dp_conf_get_nic_type(void)
@@ -231,3 +194,145 @@ int dp_conf_get_flow_timeout(void)
 }
 
 #endif
+
+
+/* These functions need to be implemented by the user of this generated code */
+static void dp_argparse_version(void);
+static int dp_argparse_opt_ipv6(const char *arg);
+static int dp_argparse_opt_dhcp_dns(const char *arg);
+#ifdef ENABLE_VIRTSVC
+static int dp_argparse_opt_udp_virtsvc(const char *arg);
+#endif
+#ifdef ENABLE_VIRTSVC
+static int dp_argparse_opt_tcp_virtsvc(const char *arg);
+#endif
+
+
+static inline void dp_argparse_help(const char *progname, FILE *outfile)
+{
+	fprintf(outfile, "Usage: %s [options]\n"
+		" -h, --help                             display this help and exit\n"
+		" -v, --version                          display version and exit\n"
+		"     --pf0=IFNAME                       first physical interface (e.g. eth0)\n"
+		"     --pf1=IFNAME                       second physical interface (e.g. eth1)\n"
+		"     --ipv6=ADDR6                       IPv6 underlay address\n"
+		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
+		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
+		"     --dhcp-dns=IPv4                    set the domain name server field in DHCP responses (can be used multiple times)\n"
+#ifdef ENABLE_VIRTSVC
+		"     --udp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service\n"
+#endif
+#ifdef ENABLE_VIRTSVC
+		"     --tcp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service\n"
+#endif
+		"     --wcmp=PERCENTAGE                  weighted-cost-multipath percentage for pf0 (0 - 100)\n"
+		"     --nic-type=NICTYPE                 NIC type to use: 'hw' (default) or 'tap'\n"
+		"     --no-stats                         do not print periodic statistics to stdout\n"
+		"     --no-conntrack                     disable connection tracking\n"
+		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
+		"     --no-offload                       disable traffic offloading\n"
+#ifdef ENABLE_PYTEST
+		"     --graphtrace-loglevel=LEVEL        verbosity level of packet traversing the graph framework\n"
+#endif
+		"     --color=MODE                       output colorization mode: 'never' (default), 'always' or 'auto'\n"
+		"     --log-format=FORMAT                set the format of individual log lines (on standard output): 'text' (default) or 'json'\n"
+		"     --grpc-port=PORT                   listen for gRPC clients on this port\n"
+#ifdef ENABLE_PYTEST
+		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
+#endif
+	, progname);
+}
+
+static int dp_conf_parse_arg(int opt, const char *arg)
+{
+	(void)arg;  // if no option uses an argument, this would be unused
+	switch (opt) {
+	case OPT_PF0:
+		return dp_argparse_string(arg, pf0_name, ARRAY_SIZE(pf0_name));
+	case OPT_PF1:
+		return dp_argparse_string(arg, pf1_name, ARRAY_SIZE(pf1_name));
+	case OPT_IPV6:
+		return dp_argparse_opt_ipv6(arg);
+	case OPT_VF_PATTERN:
+		return dp_argparse_string(arg, vf_pattern, ARRAY_SIZE(vf_pattern));
+	case OPT_DHCP_MTU:
+		return dp_argparse_int(arg, &dhcp_mtu, 68, 1500);
+	case OPT_DHCP_DNS:
+		return dp_argparse_opt_dhcp_dns(arg);
+#ifdef ENABLE_VIRTSVC
+	case OPT_UDP_VIRTSVC:
+		return dp_argparse_opt_udp_virtsvc(arg);
+#endif
+#ifdef ENABLE_VIRTSVC
+	case OPT_TCP_VIRTSVC:
+		return dp_argparse_opt_tcp_virtsvc(arg);
+#endif
+	case OPT_WCMP:
+		return dp_argparse_int(arg, &wcmp_perc, 0, 100);
+	case OPT_NIC_TYPE:
+		return dp_argparse_enum(arg, (int *)&nic_type, nic_type_choices, ARRAY_SIZE(nic_type_choices));
+	case OPT_NO_STATS:
+		return dp_argparse_store_false(&stats_enabled);
+	case OPT_NO_CONNTRACK:
+		return dp_argparse_store_false(&conntrack_enabled);
+	case OPT_ENABLE_IPV6_OVERLAY:
+		return dp_argparse_store_true(&ipv6_overlay_enabled);
+	case OPT_NO_OFFLOAD:
+		return dp_argparse_store_false(&offload_enabled);
+#ifdef ENABLE_PYTEST
+	case OPT_GRAPHTRACE_LOGLEVEL:
+		return dp_argparse_int(arg, &graphtrace_loglevel, 0, DP_GRAPHTRACE_LOGLEVEL_MAX);
+#endif
+	case OPT_COLOR:
+		return dp_argparse_enum(arg, (int *)&color, color_choices, ARRAY_SIZE(color_choices));
+	case OPT_LOG_FORMAT:
+		return dp_argparse_enum(arg, (int *)&log_format, log_format_choices, ARRAY_SIZE(log_format_choices));
+	case OPT_GRPC_PORT:
+		return dp_argparse_int(arg, &grpc_port, 1024, 65535);
+#ifdef ENABLE_PYTEST
+	case OPT_FLOW_TIMEOUT:
+		return dp_argparse_int(arg, &flow_timeout, 1, 300);
+#endif
+	default:
+		fprintf(stderr, "Unimplemented option %d\n", opt);
+		return DP_ERROR;
+	}
+}
+
+enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
+{
+	const char *progname = argv[0];
+	int option_index = -1;
+	int opt;
+
+	while ((opt = getopt_long(argc, argv, OPTSTRING, dp_conf_longopts, &option_index)) != -1) {
+		switch (opt) {
+		case OPT_HELP:
+			dp_argparse_help(progname, stdout);
+			return DP_CONF_RUNMODE_EXIT;
+		case OPT_VERSION:
+			dp_argparse_version();
+			return DP_CONF_RUNMODE_EXIT;
+		case ':':
+			fprintf(stderr, "Missing argument for '%s'\n", argv[optind-1]);
+			return DP_CONF_RUNMODE_ERROR;
+		case '?':
+			if (optopt > 0)
+				fprintf(stderr, "Unknown option '-%c'\n", optopt);
+			else
+				fprintf(stderr, "Unknown option '%s'\n", argv[optind-1]);
+			return DP_CONF_RUNMODE_ERROR;
+		default:
+			if (DP_FAILED(dp_conf_parse_arg(opt, optarg))) {
+				if (option_index >= 0)
+					fprintf(stderr, "Invalid argument for '--%s'\n", dp_conf_longopts[option_index].name);
+				else
+					fprintf(stderr, "Invalid argument for '-%c'\n", opt);
+				return DP_CONF_RUNMODE_ERROR;
+			}
+		}
+		option_index = -1;
+	}
+	return DP_CONF_RUNMODE_NORMAL;
+}
+

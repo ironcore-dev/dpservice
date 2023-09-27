@@ -2,9 +2,10 @@
 
 #include <rte_jhash.h>
 
-#include "rte_flow/dp_rte_flow.h"
-#include "dp_log.h"
+#include "dp_conf.h"
 #include "dp_error.h"
+#include "dp_log.h"
+#include "rte_flow/dp_rte_flow.h"
 
 #define DP_SYSFS_PREFIX_MLX_VF_COUNT	"/sys/class/net/"
 #define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"

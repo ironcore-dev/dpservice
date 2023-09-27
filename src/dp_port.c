@@ -1,5 +1,6 @@
 #include "dp_error.h"
 #include <rte_bus_pci.h>
+#include "dp_conf.h"
 #include "dp_hairpin.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
