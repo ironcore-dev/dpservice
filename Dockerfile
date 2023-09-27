@@ -115,7 +115,7 @@ python3-scapy \
 
 WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
-COPY --from=testbuilder /workspace/build/src/dp_service ./build/src/dp_service
+COPY --from=testbuilder /workspace/build/src/dpservice-bin ./build/src/dpservice-bin
 COPY --from=testbuilder /workspace/client/* ./build
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
@@ -140,8 +140,7 @@ bash-completion \
 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
-COPY --from=builder /workspace/build/src/dp_service \
-					/workspace/build/tools/dp_grpc_client \
+COPY --from=builder /workspace/build/src/dpservice-bin \
 					/workspace/build/tools/dump/dpservice-dump \
 					/workspace/client/* \
 					/workspace/exporter/* \
@@ -153,4 +152,4 @@ RUN ldconfig
 # Ensure bash-completion is working in operations
 RUN echo 'PATH=${PATH}:/\nsource /etc/bash_completion\nsource <(dpservice-cli completion bash)' >> /root/.bashrc
 
-ENTRYPOINT ["dp_service"]
+ENTRYPOINT ["dpservice-bin"]

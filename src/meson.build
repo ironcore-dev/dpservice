@@ -67,17 +67,17 @@ if get_option('enable_virtual_services')
   ]
 endif
 
-exe = executable('dp_service',
+exe = executable('dpservice-bin',
   sources: [ dp_sources, grpc_generated ],
   include_directories: [ includes ],
   dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep ]
 )
 
 if get_option('enable_usermode')
-  custom_target('dp_service_user',
+  custom_target('dpservice-user',
     depends: exe,
     input: exe,
-    output: 'dp_service_user',
+    output: 'dpservice-user',
     command: [ '../hack/set_cap.sh', '@INPUT@', '@OUTPUT@' ],
     build_by_default: true,
     console: true

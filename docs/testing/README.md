@@ -23,13 +23,13 @@ Running that command will show you full test output for reporting or fixing the 
 ### Pytest
 Developers might consider running `pytest` directly in the `test/` directory to see more detailed information (via `-v` or even full output (via `-s`). With no positional arguments, all tests will run, specify individual unit-test files for making the testing set smaller. When multiple tests are broken, consider using the stop-at-first-error argument `-x`.
 
-Since one test-run only applies to a specific set of options for `dp_service`, argument specifying the type of underlay tunnel (`--tun-opt`, default `ipip`) and whether or not port redundancy should be utilized (`--port-redundancy`) are needed to fully test all code paths.
+Since one test-run only applies to a specific set of options for `dpservice-bin`, argument specifying the type of underlay tunnel (`--tun-opt`, default `ipip`) and whether or not port redundancy should be utilized (`--port-redundancy`) are needed to fully test all code paths.
 
-If one should want to instead run your own `dp_service` instance (e.g. for running under a debugger), the `--attach` argument connects to an already running service instead of starting its own. This comes with the caveat of ensuring the right arguments are passed to the service at startup.
+If one should want to instead run your own `dpservice-bin` instance (e.g. for running under a debugger), the `--attach` argument connects to an already running service instead of starting its own. This comes with the caveat of ensuring the right arguments are passed to the service at startup.
 
 
 ## GRPC test client
-If you want to do some manual testing, you need to use GRPC to communicate with the `dp_service` process. A simple client is provided by this repository. For more information about the client, see [this section](grpc_client.md).
+If you want to do some manual testing, you need to use GRPC to communicate with the `dpservice-bin` process. A simple client is provided by this repository. For more information about the client, see [this section](grpc_client.md).
 
 
 ## Mellanox test setup

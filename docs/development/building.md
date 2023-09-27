@@ -57,7 +57,7 @@ ninja -C build
 Now you can try [running the service](running.md).
 
 ### Usermode dpservice
-For [easier debugging](debugging.md) you can configure meson to build additional `dp_service_user` binary that does not require root privileges to run.
+For [easier debugging](debugging.md) you can configure meson to build additional `dpservice-user` binary that does not require root privileges to run.
 ```bash
 meson setup --reconfigure -Denable_usermode=true build
 ninja -C build

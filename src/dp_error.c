@@ -44,7 +44,7 @@ const char *dp_strerror(int error)
 	else if (error >= -_DP_GRPC_ERRCODES)
 		return dp_grpc_strerror(error+_DP_GRPC_ERRCODES);
 	else
-		return "General dp_service error";
+		return "General dpservice error";
 }
 
 const char *dp_strerror_verbose(int error)

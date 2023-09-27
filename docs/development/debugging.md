@@ -14,9 +14,9 @@ You can use a pattern, like `*:8` for all debug messages (including DPDK). To on
 
 
 ## Run the service as a user
-There is an option in the [build system](building#usermode-dpservice) to generate an additional binary `dp_service_user` that can be run as user instead of root. This is not only a safer way to debug, but enables you to easily use any GUI on top of `gdb` just like any other program.
+There is an option in the [build system](building#usermode-dpservice) to generate an additional binary `dpservice-user` that can be run as user instead of root. This is not only a safer way to debug, but enables you to easily use any GUI on top of `gdb` just like any other program.
 
-The drawback here is that you need to put the same capabilites to the `gdb` process as the `dp_service_user` binary has. For the most current list of capabilities please see the `hack/set_cap.sh` helper script.
+The drawback here is that you need to put the same capabilites to the `gdb` process as the `dpservice-user` binary has. For the most current list of capabilities please see the `hack/set_cap.sh` helper script.
 
 
 ## Debugging the test-suite

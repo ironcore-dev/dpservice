@@ -87,15 +87,15 @@ Isolating CPU core that is used by DPDK application and removing it from Linux s
 This approach does not bring observable performance enhancement. It is possibly due to it is experimented on a machine with few tasks.
 
 ## Compilation optimization
-By default, DPDK library is configured to compile as the release mode. dp-service needs to be configured in the release mode as well using `meson build --buildtype=release`.
+By default, DPDK library is configured to compile as the release mode. dp-service needs to be configured in the release mode as well using `meson setup --buildtype=release build`.
 
 This brings observable performance enhancement.
 
-Additional flags (-march=native -mcpu=native -mtune=native) to compile source code for the native platform can be also added into meson build file. 
+Additional flags (`-march=native`, `-mcpu=native`, `-mtune=native`) to compile source code for the native platform can be also added into meson build file.
 ```
-project('dp_service', 'c', 'cpp',
-  default_options: ['c_args=-Wno-deprecated-declarations -march=native -mcpu=native -mtune=native -Werror -Wno-format-truncation', 'cpp_args=-fpermissive'],
-  ...
+perfflags = [ '-march=native', '-mcpu=native', '-mtune=native' ]
+cflags += perfflags
+cxxflags += perfflags
 ```
 
 This does not bring observable performance enhancement.

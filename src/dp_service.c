@@ -63,7 +63,7 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 		return DP_ERROR;
 	}
 
-	// add original dp_service args
+	// add original dpservice args
 	if (argend >= 0) {
 		for (int j = argend; j < argc; ++j)
 			dp_argv[curarg++] = argv[j];

@@ -1,6 +1,6 @@
 # Dataplane Service GRPC Client
 
-To communicate with the `dp_service` process, you need to use GRPC (running on localhost at default port 1337).
+To communicate with the `dpservice-bin` process, you need to use GRPC (running on localhost at default port 1337).
 
 There is a golang command-line client [dpservice-cli](https://github.com/onmetal/dpservice-cli/), with full [command-line documentation](https://github.com/onmetal/dpservice-cli/tree/osc-main/docs/commands#dpservice-cli-commands).
 

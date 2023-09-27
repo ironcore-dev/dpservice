@@ -37,7 +37,7 @@ If you want to use this timer in your DPDK-based programs, enable `CONFIG_HPET` 
 
 
 ## FS capabilities
-To run `dp_service` as a user, [linux capabilites](https://man7.org/linux/man-pages/man7/capabilities.7.html) are employed. For that to happen, your filesystem needs to support security labels. For Ext4, the right option is `CONFIG_EXT4_FS_SECURITY`. Other filesystems should have a similar option available.
+To run `dpservice-bin` as a user, [linux capabilites](https://man7.org/linux/man-pages/man7/capabilities.7.html) are employed. For that to happen, your filesystem needs to support security labels. For Ext4, the right option is `CONFIG_EXT4_FS_SECURITY`. Other filesystems should have a similar option available.
 
 
 ## Caveats

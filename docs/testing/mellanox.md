@@ -4,7 +4,7 @@ As dp-service is intended as a virtual router for hosting VMs, testing on real h
 It is also possible to run the whole set of tests that `meson test` runs using `pytest`. See below for details.
 
 ## Hardware setup
-To simplify starting `dp_service`, it accepts a configuration file (currently hardcoded `/tmp/dp_service.conf`) so that most command-line arguments concerning hardware options are not needed.
+To simplify starting `dpservice-bin`, it accepts a configuration file (currently hardcoded `/tmp/dp_service.conf`) so that most command-line arguments concerning hardware options are not needed.
 
 This file is generated for you by calling a shell script, `hack/prepare.sh`.
 
@@ -14,12 +14,12 @@ This script also sets up hugepages, Mellanox's virtual functions (VFs), and eswi
 ## Virtual machines
 For a VM to use a VF, that VF must use VFIO driver. Let the address of an available VF be `01:00.2`. Then the easiest way to do this is via `dpdk-devbind -b vfio-pci 01:00.2`. KVM should then be able to bind to a VF using vfio: `-net none -device vfio-pci,host=01:00.02`.
 
-If running `dp_service_user`, don't forget to adjust privileges for the appropriate `/dev/vfio/?` devices.
+If running `dpservice-user`, don't forget to adjust privileges for the appropriate `/dev/vfio/?` devices.
 
 You can then register the VM in the running service via [grpc](grpc_client.md):
 ```bash
-./dp_grpc_client --init
-./dp_grpc_client --addmachine test10 --vm_pci 0000:01:00.0_representor_vf0 --vni 123 --ipv4 192.168.123.10 --ipv6 2001::10
+dpservice-cli init
+dpservice-cli add interface --id test10 --device 0000:01:00.0_representor_vf0 --vni 123 --ipv4 192.168.123.10 --ipv6 2001::10
 ```
 
 If you set two VMs like this, they should be able to connect to each other (ping, netcat, ...).
