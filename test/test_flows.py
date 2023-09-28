@@ -20,7 +20,10 @@ def tcp_server_nat_pkt_check(pkt):
 	assert pkt[TCP].sport == nat_only_port, \
 		"Failed to use NAT's only single port"
 
-def test_nat_table_flush(prepare_ipv4, grpc_client):
+def test_nat_table_flush(prepare_ipv4, grpc_client, port_redundancy):
+
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported for ipv6 in ipv6")
 
 	global nat_only_port
 
@@ -49,7 +52,10 @@ def send_bounce_pkt_to_pf(ipv6_nat):
 				 TCP(sport=8989, dport=510))
 	delayed_sendp(bouce_pkt, PF0.tap)
 
-def test_neighnat_table_flush(prepare_ipv4, grpc_client):
+def test_neighnat_table_flush(prepare_ipv4, grpc_client, port_redundancy):
+
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported for ipv6 in ipv6")
 
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
