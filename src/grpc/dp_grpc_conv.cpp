@@ -89,6 +89,23 @@ bool GrpcToDpFwallDirection(const TrafficDirection& grpc_dir, enum dp_fwall_dire
 	}
 }
 
+bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type)
+{
+	switch (grpc_type) {
+	case CaptureInterfaceType::ALL:
+		*dp_capture_iface_type = DP_CAPTURE_IFACE_TYPE_ALL;
+		return true;
+	case CaptureInterfaceType::SINGLE_PF:
+		*dp_capture_iface_type = DP_CAPTURE_IFACE_TYPE_SINGLE_PF;
+		return true;
+	case CaptureInterfaceType::SINGLE_VF:
+		*dp_capture_iface_type = DP_CAPTURE_IFACE_TYPE_SINGLE_VF;
+		return true;
+	default:
+		return false;
+	}
+}
+
 const char *Ipv4ToStr(uint32_t ipv4)
 {
 	struct in_addr addr = {
