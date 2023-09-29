@@ -525,6 +525,8 @@ const char* CreateNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid min_port";
 	if (request_.max_port() > UINT16_MAX)
 		return "Invalid max_port";
+	if (request_.min_port() >= request_.max_port())
+		return "Invalid port range";
 	request->add_nat.min_port = request_.min_port();
 	request->add_nat.max_port = request_.max_port();
 	return NULL;
@@ -612,6 +614,8 @@ const char* CreateNeighborNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid min_port";
 	if (request_.max_port() > UINT16_MAX)
 		return "Invalid max_port";
+	if (request_.min_port() >= request_.max_port())
+		return "Invalid port range";
 	request->add_neighnat.min_port = request_.min_port();
 	request->add_neighnat.max_port = request_.max_port();
 	request->add_neighnat.vni = request_.vni();
@@ -636,6 +640,8 @@ const char* DeleteNeighborNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid min_port";
 	if (request_.max_port() > UINT16_MAX)
 		return "Invalid max_port";
+	if (request_.min_port() >= request_.max_port())
+		return "Invalid port range";
 	request->del_neighnat.min_port = request_.min_port();
 	request->del_neighnat.max_port = request_.max_port();
 	request->del_neighnat.vni = request_.vni();
@@ -883,7 +889,9 @@ void ListLoadBalancerPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 {
 	const FirewallRule& grpc_rule = request_.rule();
+	const ProtocolFilter& grpc_filter = grpc_rule.protocol_filter();
 	struct dp_fwall_rule *dp_rule = &request->add_fwrule.rule;
+	struct dp_port_filter *dp_ports = &dp_rule->filter.tcp_udp;
 
 	DPGRPC_LOG_INFO("Adding firewall rule",
 					DP_LOG_IFACE(request_.interface_id().c_str()),
@@ -903,11 +911,15 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid source_prefix.ip.ipver";
 	if (!GrpcConv::StrToIpv4(grpc_rule.source_prefix().ip().address(), &dp_rule->src_ip))
 		return "Invalid source_prefix.ip";
+	if (grpc_rule.source_prefix().length() > 32)
+		return "Invalid source_prefix.length";
 	dp_rule->src_ip_mask = GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length());
 	if (grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV4)
 		return "Invalid destination_prefix.ip.ipver";
 	if (!GrpcConv::StrToIpv4(grpc_rule.destination_prefix().ip().address(), &dp_rule->dest_ip))
 		return "Invalid destination_prefix.ip";
+	if (grpc_rule.destination_prefix().length() > 32)
+		return "Invalid destination_prefix.length";
 	dp_rule->dest_ip_mask = GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length());
 	if (!GrpcConv::GrpcToDpFwallDirection(grpc_rule.direction(), &dp_rule->dir))
 		return "Invalid direction";
@@ -917,53 +929,73 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid priority";
 	dp_rule->priority = grpc_rule.priority();
 
-	switch (grpc_rule.protocol_filter().filter_case()) {
+	switch (grpc_filter.filter_case()) {
 	case ProtocolFilter::kTcpFieldNumber:
 		DPGRPC_LOG_INFO("Adding firewall rule filter",
 						DP_LOG_FWRULE(grpc_rule.id().c_str()),
-						DP_LOG_FWPROTO(dp_rule->protocol),
-						DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
-						DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
-						DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
-						DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
+						DP_LOG_FWPROTO(IPPROTO_TCP),
+						DP_LOG_FWSPORTFROM(grpc_filter.tcp().src_port_lower()),
+						DP_LOG_FWSPORTTO(grpc_filter.tcp().src_port_upper()),
+						DP_LOG_FWDPORTFROM(grpc_filter.tcp().dst_port_lower()),
+						DP_LOG_FWDPORTTO(grpc_filter.tcp().dst_port_upper()));
 		dp_rule->protocol = IPPROTO_TCP;
-		dp_rule->filter.tcp_udp.src_port.lower = grpc_rule.protocol_filter().tcp().src_port_lower();
-		dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule.protocol_filter().tcp().dst_port_lower();
-		dp_rule->filter.tcp_udp.src_port.upper = grpc_rule.protocol_filter().tcp().src_port_upper();
-		dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule.protocol_filter().tcp().dst_port_upper();
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.tcp().src_port_lower(), &dp_ports->src_port.lower))
+			return "Invalid tcp.src_port_lower";
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.tcp().dst_port_lower(), &dp_ports->dst_port.lower))
+			return "Invalid tcp.dst_port_lower";
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.tcp().src_port_upper(), &dp_ports->src_port.upper))
+			return "Invalid tcp.src_port_upper";
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.tcp().dst_port_upper(), &dp_ports->dst_port.upper))
+			return "Invalid tcp.dst_port_upper";
+		if (dp_ports->src_port.lower != DP_FWALL_MATCH_ANY_PORT && dp_ports->src_port.upper < dp_ports->src_port.lower)
+			return "Invalid tcp.src_port range";
+		if (dp_ports->dst_port.lower != DP_FWALL_MATCH_ANY_PORT && dp_ports->dst_port.upper < dp_ports->dst_port.lower)
+			return "Invalid tcp.dst_port range";
 		break;
 	case ProtocolFilter::kUdpFieldNumber:
 		DPGRPC_LOG_INFO("Adding firewall rule filter",
 						DP_LOG_FWRULE(grpc_rule.id().c_str()),
-						DP_LOG_FWPROTO(dp_rule->protocol),
-						DP_LOG_FWSPORTFROM(dp_rule->filter.tcp_udp.src_port.lower),
-						DP_LOG_FWSPORTTO(dp_rule->filter.tcp_udp.src_port.upper),
-						DP_LOG_FWDPORTFROM(dp_rule->filter.tcp_udp.dst_port.lower),
-						DP_LOG_FWDPORTTO(dp_rule->filter.tcp_udp.dst_port.upper));
+						DP_LOG_FWPROTO(IPPROTO_UDP),
+						DP_LOG_FWSPORTFROM(grpc_filter.udp().src_port_lower()),
+						DP_LOG_FWSPORTTO(grpc_filter.udp().src_port_upper()),
+						DP_LOG_FWDPORTFROM(grpc_filter.udp().dst_port_lower()),
+						DP_LOG_FWDPORTTO(grpc_filter.udp().dst_port_upper()));
 		dp_rule->protocol = IPPROTO_UDP;
-		dp_rule->filter.tcp_udp.src_port.lower = grpc_rule.protocol_filter().udp().src_port_lower();
-		dp_rule->filter.tcp_udp.dst_port.lower = grpc_rule.protocol_filter().udp().dst_port_lower();
-		dp_rule->filter.tcp_udp.src_port.upper = grpc_rule.protocol_filter().udp().src_port_upper();
-		dp_rule->filter.tcp_udp.dst_port.upper = grpc_rule.protocol_filter().udp().dst_port_upper();
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.udp().src_port_lower(), &dp_ports->src_port.lower))
+			return "Invalid udp.src_port_lower";
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.udp().dst_port_lower(), &dp_ports->dst_port.lower))
+			return "Invalid udp.dst_port_lower";
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.udp().src_port_upper(), &dp_ports->src_port.upper))
+			return "Invalid udp.src_port_upper";
+		if (!GrpcConv::GrpcToDpFwallPort(grpc_filter.udp().dst_port_upper(), &dp_ports->dst_port.upper))
+			return "Invalid udp.dst_port_upper";
+		if (dp_ports->src_port.lower != DP_FWALL_MATCH_ANY_PORT && dp_ports->src_port.upper < dp_ports->src_port.lower)
+			return "Invalid udp.src_port range";
+		if (dp_ports->dst_port.lower != DP_FWALL_MATCH_ANY_PORT && dp_ports->dst_port.upper < dp_ports->dst_port.lower)
+			return "Invalid udp.dst_port range";
 		break;
 	case ProtocolFilter::kIcmpFieldNumber:
 		DPGRPC_LOG_INFO("Adding firewall rule filter",
 						DP_LOG_FWRULE(grpc_rule.id().c_str()),
-						DP_LOG_FWPROTO(dp_rule->protocol),
-						DP_LOG_FWICMPTYPE(dp_rule->filter.icmp.icmp_type),
-						DP_LOG_FWICMPCODE(dp_rule->filter.icmp.icmp_code));
+						DP_LOG_FWPROTO(IPPROTO_ICMP),
+						DP_LOG_FWICMPTYPE(grpc_filter.icmp().icmp_type()),
+						DP_LOG_FWICMPCODE(grpc_filter.icmp().icmp_code()));
 		dp_rule->protocol = IPPROTO_ICMP;
-		dp_rule->filter.icmp.icmp_type = grpc_rule.protocol_filter().icmp().icmp_type();
-		dp_rule->filter.icmp.icmp_code = grpc_rule.protocol_filter().icmp().icmp_code();
+		dp_rule->filter.icmp.icmp_type = grpc_filter.icmp().icmp_type();
+		dp_rule->filter.icmp.icmp_code = grpc_filter.icmp().icmp_code();
+		if (dp_rule->filter.icmp.icmp_type != DP_FWALL_MATCH_ANY_ICMP_TYPE && dp_rule->filter.icmp.icmp_type > UINT8_MAX)
+			return "Invalid icmp.icmp_type";
+		if (dp_rule->filter.icmp.icmp_code != DP_FWALL_MATCH_ANY_ICMP_CODE && dp_rule->filter.icmp.icmp_code > UINT8_MAX)
+			return "Invalid icmp.icmp_code";
 		break;
 	case ProtocolFilter::FILTER_NOT_SET:
 	default:
 		DPGRPC_LOG_INFO("Adding firewall rule filter",
 						DP_LOG_FWRULE(grpc_rule.id().c_str()),
-						DP_LOG_FWPROTO(dp_rule->protocol));
+						DP_LOG_FWPROTO(DP_FWALL_MATCH_ANY_PROTOCOL));
 		dp_rule->protocol = DP_FWALL_MATCH_ANY_PROTOCOL;
-		dp_rule->filter.tcp_udp.src_port.lower = DP_FWALL_MATCH_ANY_PORT;
-		dp_rule->filter.tcp_udp.dst_port.lower = DP_FWALL_MATCH_ANY_PORT;
+		dp_ports->src_port.lower = DP_FWALL_MATCH_ANY_PORT;
+		dp_ports->dst_port.lower = DP_FWALL_MATCH_ANY_PORT;
 	}
 	return NULL;
 }

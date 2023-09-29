@@ -47,7 +47,7 @@ def test_vni_reset(prepare_ipv4, grpc_client):
 
 def test_vni_neighnats(prepare_ipv4, grpc_client):
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 1000, 200)
+	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 1000, 2000)
 	nat2_ipv6 = grpc_client.addnat(VM2.name, nat_vip, 2000, 3000)
 
 	grpc_client.addneighnat(nat_vip, vni1, 3000, 4000, neigh_vni1_ul_ipv6)

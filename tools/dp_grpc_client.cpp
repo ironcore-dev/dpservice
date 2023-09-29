@@ -117,8 +117,8 @@ static int vni;
 static int t_vni;
 static int length, src_length, dst_length;
 static bool pfx_lb_enabled = false;
-static int min_port, src_port_min, dst_port_min, icmp_code;
-static int max_port, src_port_max, dst_port_max, icmp_type;
+static int min_port, src_port_min = -1, dst_port_min = -1, icmp_code = -1;
+static int max_port, src_port_max = -1, dst_port_max = -1, icmp_type = -1;
 static uint32_t priority = 1000;
 
 #define CMD_LINE_OPT_INIT			"init"

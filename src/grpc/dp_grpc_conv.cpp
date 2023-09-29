@@ -89,6 +89,16 @@ bool GrpcToDpFwallDirection(const TrafficDirection& grpc_dir, enum dp_fwall_dire
 	}
 }
 
+bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port)
+{
+	uint32_t port = (uint32_t)grpc_port;
+
+	if (port != DP_FWALL_MATCH_ANY_PORT && port > UINT16_MAX)
+		return false;
+	*dp_port = port;
+	return true;
+}
+
 const char *Ipv4ToStr(uint32_t ipv4)
 {
 	struct in_addr addr = {
