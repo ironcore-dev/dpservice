@@ -541,6 +541,71 @@ void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
 	reply_.set_underlay_route(strbuf);
 }
 
+const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Start packet capture",
+				DP_LOG_IPV6STR(request_.sink_node_ip().c_str()),
+				DP_LOG_PORT(request_.udp_src_port()),
+				DP_LOG_PORT(request_.udp_dst_port()));
+
+	if (!GrpcConv::StrToIpv6(request_.sink_node_ip(), request->start_capture.dst_addr6))
+		return "Invalid sink_node_ip";
+	if (request_.udp_src_port() > UINT16_MAX)
+		return "Invalid udp_src_port";
+	if (request_.udp_dst_port() > UINT16_MAX)
+		return "Invalid udp_dst_port";
+	
+	request->start_capture.udp_src_port = request_.udp_src_port();
+	request->start_capture.udp_dst_port = request_.udp_dst_port();
+	return NULL;
+}
+void CaptureStartCall::ParseReply(struct dpgrpc_reply* reply)
+{
+}
+
+const char* CaptureStopCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Stop packet capture");
+
+	return NULL;
+}
+void CaptureStopCall::ParseReply(struct dpgrpc_reply* reply)
+{
+}
+
+const char* CaptureInterfaceSetCall::FillRequest(struct dpgrpc_request* request)
+{
+	if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interface_type(), &request->set_capture_interface.type))
+		return "Invalid interface_type";
+
+	switch (request->set_capture_interface.type) {
+	case DP_CAPTURE_IFACE_TYPE_ALL:
+		DPGRPC_LOG_INFO("Set packet capture interface",
+						DP_LOG_PORT_TYPE(request_.interface_type()));
+		break;
+	case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
+		DPGRPC_LOG_INFO("Set packet capture interface",
+						DP_LOG_PORT_TYPE(request_.interface_type()),
+						DP_LOG_IFACE(request_.interface_id().c_str()));
+		if (SNPRINTF_FAILED(request->set_capture_interface.interface_info.iface_id, request_.interface_id()))
+			return "Invalid interface_id";
+		break;
+	case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
+		DPGRPC_LOG_INFO("Set packet capture interface",
+						DP_LOG_PORT_TYPE(request_.interface_type()),
+						DP_LOG_IFACE(request_.interface_id().c_str()));
+		request->set_capture_interface.interface_info.pf_index = request_.interface_index();
+		break;
+
+	}
+	return NULL;
+}
+
+void CaptureInterfaceSetCall::ParseReply(struct dpgrpc_reply* reply)
+{
+}
+
+
 const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Getting NAT IP",

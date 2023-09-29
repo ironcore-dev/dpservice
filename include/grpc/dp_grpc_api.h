@@ -54,6 +54,9 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_ListFirewallRules,
 	DP_REQ_TYPE_CheckVniInUse,
 	DP_REQ_TYPE_ResetVni,
+	DP_REQ_TYPE_CaptureStart,
+	DP_REQ_TYPE_CaptureStop,
+	DP_REQ_TYPE_CaptureInterfaceSet,
 };
 
 // in sync with dpdk proto!
@@ -61,6 +64,12 @@ enum dpgrpc_vni_type {
 	DP_VNI_IPV4,
 	DP_VNI_IPV6,
 	DP_VNI_BOTH,
+};
+
+enum dpgrpc_capture_iface_type {
+	DP_CAPTURE_IFACE_TYPE_ALL,
+	DP_CAPTURE_IFACE_TYPE_SINGLE_PF,
+	DP_CAPTURE_IFACE_TYPE_SINGLE_VF,
 };
 
 struct dpgrpc_iface {
@@ -160,6 +169,20 @@ struct dpgrpc_versions {
 	char					app[DP_GRPC_VERSION_MAX_LEN];
 };
 
+struct dpgrpc_capture_config {
+	uint8_t			dst_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint32_t		udp_src_port;
+	uint32_t		udp_dst_port;
+};
+
+struct dpgrpc_capture_interface {
+	enum dpgrpc_capture_iface_type	type;
+	union {
+		char	iface_id[VM_IFACE_ID_MAX_LEN];
+		uint8_t pf_index;
+	} interface_info;
+};
+
 struct dpgrpc_request {
 	uint16_t 					type;  // enum dpgrpc_request_type
 	union {
@@ -198,6 +221,9 @@ struct dpgrpc_request {
 		struct dpgrpc_vni		vni_in_use;
 		struct dpgrpc_vni		vni_reset;
 		struct dpgrpc_versions	get_version;
+		struct dpgrpc_capture_config	start_capture;
+		struct dpgrpc_capture_config	stop_capture;
+		struct dpgrpc_capture_interface	set_capture_interface;
 	};
 };
 
