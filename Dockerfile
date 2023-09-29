@@ -1,6 +1,7 @@
 FROM debian:11-slim as builder
 
 ARG DPDK_VER=21.11
+ARG DPSERVICE_FEATURES=""
 
 WORKDIR /workspace
 
@@ -90,11 +91,11 @@ COPY tools/ tools/
 # Needed for version extraction by meson
 COPY .git/ .git/
 
-RUN meson setup build && cd ./build && ninja
+RUN meson setup build $DPSERVICE_FEATURES && cd ./build && ninja
 
 FROM builder AS testbuilder
-RUN rm -rf build && meson setup build --buildtype=release && cd ./build && ninja
-RUN rm -rf build && CC=clang CXX=clang++ meson setup build && cd ./build && ninja
+RUN rm -rf build && meson setup build $DPSERVICE_FEATURES --buildtype=release && cd ./build && ninja
+RUN rm -rf build && CC=clang CXX=clang++ meson setup build $DPSERVICE_FEATURES && cd ./build && ninja
 
 FROM debian:11-slim as tester
 
