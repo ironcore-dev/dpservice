@@ -49,6 +49,7 @@ extern "C" {
 #define DP_LOG_IFNAME(VALUE) _DP_LOG_STR("interface_name", VALUE)
 #define DP_LOG_LCORE(VALUE) _DP_LOG_UINT("lcore_id", VALUE)
 #define DP_LOG_RTE_GROUP(VALUE) _DP_LOG_UINT("rte_group", VALUE)
+#define DP_LOG_PORT_TYPE(VALUE) _DP_LOG_UINT("port_type", VALUE)
 // networking stack
 #define DP_LOG_IPV4(VALUE) _DP_LOG_IPV4("ipv4", VALUE)
 #define DP_LOG_IPV6(VALUE) _DP_LOG_IPV6("ipv6", VALUE)
