@@ -30,7 +30,11 @@ extern "C" {
 
 // 40Gb/s with 1500B packets means ~9M packets/s
 // assuming 0.1s delay in processing means ~900k mbufs needed
+#ifdef ENABLE_PYTEST
+#define DP_MBUF_POOL_SIZE	(200*1024)
+#else
 #define DP_MBUF_POOL_SIZE	(900*1024)
+#endif
 
 struct dp_dpdk_layer {
 	struct rte_mempool	*rte_mempool;
