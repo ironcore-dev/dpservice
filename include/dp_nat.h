@@ -26,11 +26,10 @@ enum {
 	DP_LB_RECIRC,
 };
 
-// TODO: key packing?
 struct nat_key {
 	uint32_t	ip;
 	uint32_t	vni;
-};
+} __rte_packed;
 
 typedef struct network_nat_entry {
 	union {
@@ -60,7 +59,7 @@ struct netnat_portmap_key {
 	uint32_t	vm_src_ip;
 	uint32_t	vni;
 	uint16_t	vm_src_port;
-};
+} __rte_packed;
 
 struct netnat_portmap_data {
 	uint32_t	nat_ip;
@@ -74,7 +73,7 @@ struct netnat_portoverload_tbl_key {
 	uint32_t dst_ip;
 	uint16_t dst_port;
 	uint8_t	l4_type;
-};
+} __rte_packed;
 
 struct nat_check_result {
 	bool	is_vip_natted;

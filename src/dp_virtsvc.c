@@ -27,13 +27,11 @@
 	_DP_LOG_UINT("service_port", ntohs((SERVICE)->service_port)), \
 	DP_LOG_PROTO((SERVICE)->proto)
 
-#pragma pack(push, 1)
 // packed, because hashing would include padding otherwise
 struct dp_virtsvc_conn_key {
 	uint16_t vf_port_id;
 	rte_be16_t vf_l4_port;
-};
-#pragma pack(pop)
+} __rte_packed;
 
 static struct dp_virtsvc *dp_virtservices;
 static struct dp_virtsvc *dp_virtservices_end;

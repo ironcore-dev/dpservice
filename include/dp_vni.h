@@ -25,10 +25,9 @@ extern struct rte_hash *vni_handle_tbl;
 // Also, when NUMA is not available, DPDK uses SOCKET_ID_ANY (-1)
 #define DP_SOCKETID(SOCKETID) (unlikely((unsigned int)(SOCKETID) >= DP_NB_SOCKETS) ? 0 : (SOCKETID))
 
-// TODO: packing?
 struct dp_vni_key {
 	int vni;
-};
+} __rte_packed;
 
 struct dp_vni_data {
 	struct rte_rib	*ipv4[DP_NB_SOCKETS];
