@@ -528,36 +528,32 @@ int dp_remove_network_snat_port(struct flow_value *cntrack)
 	portoverload_tbl_key.dst_port = cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst;
 	portoverload_tbl_key.l4_type = cntrack->flow_key[DP_FLOW_DIR_ORG].proto;
 
-	ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, (const void *)&portoverload_tbl_key);
-	if (!DP_FAILED(ret)) {
-		ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot delete portoverload key", DP_LOG_RET(ret));
-			return DP_ERROR;
-		}
-	} else if (ret != -ENOENT)
+	// forcefully delete, if it was never there, it's fine
+	ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
+	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
 	portmap_key.vm_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
 	portmap_key.vm_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 
-	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void **)&portmap_data);
+	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
+	if (DP_FAILED(ret))
+		return ret == -ENOENT ? DP_OK : ret;
 
-	if (!DP_FAILED(ret)) {
-		portmap_data->flow_cnt--;
-		if (!portmap_data->flow_cnt) {
-			rte_free(portmap_data);
-			ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key);
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Cannot delete portmap key", DP_LOG_RET(ret));
-				return DP_ERROR;
-			}
+	portmap_data->flow_cnt--;
+	if (portmap_data->flow_cnt == 0) {
+		ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key);
+		if (DP_FAILED(ret)) {
+			portmap_data->flow_cnt++;
+			DPS_LOG_ERR("Cannot delete portmap key", DP_LOG_RET(ret));
+			return DP_ERROR;
 		}
-		DP_STATS_NAT_DEC_USED_PORT_CNT(cntrack->created_port_id);
-		return DP_OK;
+		rte_free(portmap_data);
 	}
-	return ret == -ENOENT ? DP_OK : ret;
+
+	DP_STATS_NAT_DEC_USED_PORT_CNT(cntrack->created_port_id);
+	return DP_OK;
 }
 
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
