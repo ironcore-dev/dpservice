@@ -34,7 +34,7 @@ static bool offload_mode_enabled = 0;
 int dp_flow_init(int socket_id)
 {
 	ipv4_flow_tbl = dp_create_jhash_table(FLOW_MAX, sizeof(struct flow_key),
-										  "ipv4_flow_table", socket_id);
+										  "ipv4_flow__table", socket_id);
 	if (!ipv4_flow_tbl)
 		return DP_ERROR;
 
