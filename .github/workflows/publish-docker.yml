@@ -19,7 +19,9 @@ on:
 
 jobs:
   buildAndPush:
-    runs-on: self-hosted
+    runs-on:
+      labels: self-hosted
+      group: organization/default
     steps:
       - uses: actions/checkout@v4
         with:
