@@ -46,10 +46,10 @@ def test_virtsvc_udp(request, prepare_ipv4, port_redundancy):
 	if not request.config.getoption("--virtsvc"):
 		pytest.skip("Virtual services not enabled")
 	# port numbers chosen so that they cause the right redirection
-	for port in [ 12345, 12346, 12348, 12349, 12350 ]:
+	for port in [ 12345, 12346, 12347, 12349, 12350 ]:
 		request_udp(port, PF0.tap)
 	if port_redundancy:
-		for port in [ 12347, 12351, 12354, 12355, 12356 ]:
+		for port in [ 12348, 12351, 12354, 12355, 12357 ]:
 			request_udp(port, PF1.tap)
 
 
@@ -68,5 +68,5 @@ def test_virtsvc_tcp(request, prepare_ipv4, port_redundancy):
 
 	# port number chosen so that they cause the right redirection
 	if port_redundancy:
-		tester = TCPTesterVirtsvc(VM1, 54321, PF1, virtsvc_tcp_virtual_ip, virtsvc_tcp_virtual_port, server_pkt_check=tcp_server_virtsvc_pkt_check)
+		tester = TCPTesterVirtsvc(VM1, 12348, PF1, virtsvc_tcp_virtual_ip, virtsvc_tcp_virtual_port, server_pkt_check=tcp_server_virtsvc_pkt_check)
 		tester.communicate()

@@ -31,6 +31,7 @@
 struct dp_virtsvc_conn_key {
 	uint16_t vf_port_id;
 	rte_be16_t vf_l4_port;
+	rte_be32_t vf_ip;
 } __rte_packed;
 
 static struct dp_virtsvc *dp_virtservices;
@@ -268,8 +269,7 @@ static __rte_always_inline int dp_virtsvc_get_free_port(struct dp_virtsvc *virts
 
 static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *virtsvc,
 															struct dp_virtsvc_conn_key *key,
-															hash_sig_t sig,
-															rte_be32_t vf_ip)
+															hash_sig_t sig)
 {
 	struct dp_virtsvc_conn_key delete_key;
 	struct dp_virtsvc_conn *conn;
@@ -286,6 +286,7 @@ static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *v
 	if (conn->last_pkt_timestamp) {
 		delete_key.vf_port_id = conn->vf_port_id;
 		delete_key.vf_l4_port = conn->vf_l4_port;
+		delete_key.vf_ip = conn->vf_ip;
 		ret = rte_hash_del_key(virtsvc->open_ports, &delete_key);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Cannot delete virtual service NAT entry", DP_LOG_RET(ret),
@@ -296,7 +297,7 @@ static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *v
 	if (DP_FAILED(ret))
 		return ret;
 
-	conn->vf_ip = vf_ip;
+	conn->vf_ip = key->vf_ip;
 	conn->vf_l4_port = key->vf_l4_port;
 	conn->vf_port_id = key->vf_port_id;
 	conn->state = DP_VIRTSVC_CONN_TRANSIENT;
@@ -328,14 +329,15 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 {
 	struct dp_virtsvc_conn_key key = {
 		.vf_port_id = vf_port_id,
-		.vf_l4_port = vf_l4_port
+		.vf_l4_port = vf_l4_port,
+		.vf_ip = vf_ip,
 	};
 	hash_sig_t key_hash = rte_hash_hash(virtsvc->open_ports, &key);
 	int ret;
 
 	ret = dp_virstvc_get_connection(virtsvc, &key, key_hash);
 	if (ret == -ENOENT)
-		ret = dp_virtsvc_create_connection(virtsvc, &key, key_hash, vf_ip);
+		ret = dp_virtsvc_create_connection(virtsvc, &key, key_hash);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Cannot create virtsvc connection", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
 		return ret;
@@ -367,6 +369,7 @@ void dp_virtsvc_del_vm(uint16_t port_id)
 				conn->last_pkt_timestamp = 0;
 				delete_key.vf_port_id = conn->vf_port_id;
 				delete_key.vf_l4_port = conn->vf_l4_port;
+				delete_key.vf_ip = conn->vf_ip;
 				ret = rte_hash_del_key(service->open_ports, &delete_key);
 				if (DP_FAILED(ret))
 					DPS_LOG_WARNING("Cannot delete virtual service NAT entry", DP_LOG_RET(ret),
