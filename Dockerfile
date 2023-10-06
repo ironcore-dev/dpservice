@@ -52,6 +52,7 @@ ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 COPY hack/*.patch hack/
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_22_11_gcc12.patch
 RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_22_11_log.patch
+RUN cd $DPDK_DIR && patch -p1 < ../hack/dpdk_22_11_telemetry_key.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson setup -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\

@@ -12,6 +12,17 @@ Status* CreateStatus(uint32_t grpc_errcode)
 	return err_status;
 }
 
+bool IsInterfaceIdValid(const std::string& id)
+{
+	for (std::string::const_iterator i = id.begin(); i != id.end(); ++i) {
+		char c = *i;
+		// alphanumeric and underscore (allowed by standard DPDK) and '-' for GUID (dp-service extension)
+		if (!(c == '-' || c == '_' || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+			return false;
+	}
+	return true;
+}
+
 bool StrToIpv4(const std::string& str, uint32_t *dst)
 {
 	struct in_addr addr;

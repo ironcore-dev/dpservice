@@ -11,6 +11,8 @@ namespace GrpcConv
 {
 	Status* CreateStatus(uint32_t grpc_errcode);
 
+	bool IsInterfaceIdValid(const std::string& id);
+
 	bool StrToIpv4(const std::string& str, uint32_t *dst);
 	bool StrToIpv6(const std::string& str, uint8_t *dst);
 

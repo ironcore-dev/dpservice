@@ -161,25 +161,10 @@ static int dp_telemetry_handle_nat_used_port_count(const char *cmd,
 												  __rte_unused const char *params,
 												  struct rte_tel_data *data)
 {
-
-	int ret;
-
-	ret = dp_telemetry_start_dict(data, cmd);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to init telemetry data to get interface's used nat port cnt",
-						DP_LOG_TELEMETRY_CMD(cmd), DP_LOG_RET(ret));
+	if (DP_FAILED(dp_telemetry_start_dict(data, cmd))
+		|| DP_FAILED(dp_nat_get_used_ports_telemetry(data)))
 		return DP_ERROR;
-	}
-
-	ret = dp_nat_get_used_ports_telemetry(data);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to get used nat ports' telemetry data",
-						DP_LOG_TELEMETRY_CMD(cmd), DP_LOG_RET(ret));
-		return DP_ERROR;
-	}
-
 	return DP_OK;
-
 }
 
 //
@@ -218,7 +203,7 @@ int dp_telemetry_init(void)
 	}
 #endif
 
-	for (uint i = 0; i < RTE_DIM(commands); ++i) {
+	for (size_t i = 0; i < RTE_DIM(commands); ++i) {
 		ret = rte_telemetry_register_cmd(commands[i].command, commands[i].callback, commands[i].description);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to register telemetry command", DP_LOG_TELEMETRY_CMD(commands[i].command), DP_LOG_RET(ret));

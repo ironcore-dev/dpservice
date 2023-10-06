@@ -223,6 +223,8 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_IPV4STR(request_.ipv4_config().primary_address().c_str()),
 					DP_LOG_IPV6STR(request_.ipv6_config().primary_address().c_str()),
 					DP_LOG_PCI(request_.device_name().c_str()));
+	if (!GrpcConv::IsInterfaceIdValid(request_.interface_id()))
+		return "Invalid interface_id";
 	request->add_iface.vni = request_.vni();
 	if (!GrpcConv::StrToIpv4(request_.ipv4_config().primary_address(), &request->add_iface.ip4_addr))
 		return "Invalid ipv4_config.primary_address";

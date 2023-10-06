@@ -1,0 +1,17 @@
+diff --git a/lib/telemetry/telemetry_data.c b/lib/telemetry/telemetry_data.c
+index 34366ecee3..71fd48376f 100644
+--- a/lib/telemetry/telemetry_data.c
++++ b/lib/telemetry/telemetry_data.c
+@@ -101,11 +101,10 @@ static bool
+ valid_name(const char *name)
+ {
+ 	char allowed[128] = {
+-			['0' ... '9'] = 1,
++			['-' ... ':'] = 1,  // - . / 0-9 :
+ 			['A' ... 'Z'] = 1,
+ 			['a' ... 'z'] = 1,
+ 			['_'] = 1,
+-			['/'] = 1,
+ 	};
+ 	while (*name != '\0') {
+ 		if ((size_t)*name >= RTE_DIM(allowed) || allowed[(int)*name] == 0)

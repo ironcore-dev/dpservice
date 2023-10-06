@@ -34,6 +34,7 @@ tar xf dpdk-22.11.3.tar.xz
 cd dpdk-stable-22.11.3
 patch -p1 < ../net-dpservice/hack/dpdk_22_11_gcc12.patch
 patch -p1 < ../net-dpservice/hack/dpdk_22_11_log.patch
+patch -p1 < ../net-dpservice/hack/dpdk_22_11_telemetry_key.patch
 meson setup build
 ninja -C build
 sudo ninja -C build install
