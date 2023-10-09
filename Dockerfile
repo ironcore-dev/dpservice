@@ -6,7 +6,7 @@ ARG DPSERVICE_FEATURES=""
 WORKDIR /workspace
 
 # Install prerequisite packages
-RUN apt-get update && apt-get upgrade && apt-get install -y --no-install-recommends ON \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
 libmnl-dev \
 libnuma-dev \
@@ -126,7 +126,7 @@ ENTRYPOINT ["pytest-3", "-x", "-v"]
 
 FROM debian:12-slim as production
 
-RUN apt-get update && apt-get upgrade && apt-get install -y --no-install-recommends ON \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
 numactl \
 libnuma1 \
