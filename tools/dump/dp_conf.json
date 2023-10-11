@@ -25,6 +25,11 @@
       "default": "false"
     },
     {
+      "lgopt": "pcap",
+      "help": "write packets into a PCAP file",
+      "arg": "FILE"
+    },
+    {
       "lgopt": "stop",
       "help": "do nothing, only make sure tracing is disabled in dp-service",
       "var": "stop_mode",

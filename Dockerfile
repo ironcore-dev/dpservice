@@ -40,6 +40,7 @@ pkg-config \
 protobuf-compiler-grpc \
 libgrpc++1.51 \
 libgrpc++-dev \
+libpcap0.8-dev \
 linux-headers-${OSARCH}
 
 # Download DPDK

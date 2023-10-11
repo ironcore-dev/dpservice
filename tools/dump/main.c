@@ -1,15 +1,18 @@
+#include <fcntl.h>
+#include <getopt.h>
+#include <pcap/pcap.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <rte_eal.h>
 #include <rte_alarm.h>
-#include <getopt.h>
 
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_version.h"
 #include "monitoring/dp_graphtrace_shared.h"
+#include "monitoring/dp_pcap.h"
 #include "rte_flow/dp_rte_flow.h"
 
 // generated definitions for getopt(),
@@ -43,8 +46,15 @@ static const char *eal_arg_strings[] = {
 static char *eal_args_mem[RTE_DIM(eal_arg_strings)];
 static char *eal_args[RTE_DIM(eal_args_mem)];
 
+static const char *pcap_path = NULL;
+static struct dp_pcap dp_pcap;
+
 static bool interrupt = false;
 static bool primary_alive = false;
+
+// optimization to prevent 'if (pcap) pcap_dump(); else print_packet();' in a loop
+static void print_packet(struct dp_pcap *dp_pcap, struct rte_mbuf *m, struct timeval *timestamp);
+static void (*dump_func)(struct dp_pcap *dp_pcap, struct rte_mbuf *m, struct timeval *timestamp) = print_packet;
 
 static int eal_init(void)
 {
@@ -80,9 +90,10 @@ static int dp_graphtrace_connect(struct dp_graphtrace *graphtrace)
 	return DP_OK;
 }
 
-static void print_packet(struct rte_mbuf *pkt)
+static void print_packet(__rte_unused struct dp_pcap *context, struct rte_mbuf *pkt, struct timeval *timestamp)
 {
 	struct dp_graphtrace_pktinfo *pktinfo = dp_get_graphtrace_pktinfo(pkt);
+	struct tm *tm;
 	char printbuf[512];
 	char node_buf[16];
 	char next_node_buf[16];
@@ -92,8 +103,13 @@ static void print_packet(struct rte_mbuf *pkt)
 
 	dp_graphtrace_sprint(pkt, printbuf, sizeof(printbuf));
 
-	switch (pktinfo->pkt_type) {
-	case DP_GRAPHTRACE_PKT_TYPE_SOFTWARE:
+	if (pktinfo->pkt_type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD) {
+		snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
+		node = "Offloaded";
+		arrow = "at";
+		next_node = node_buf;
+	} else {
+		assert(pktinfo->pkt_type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE);
 		arrow = "->";
 		if (pktinfo->node) {
 			node = pktinfo->node->name;
@@ -113,15 +129,12 @@ static void print_packet(struct rte_mbuf *pkt)
 				next_node = next_node_buf;
 			}
 		}
-		printf("%u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
-			pktinfo->pktid, node, arrow, next_node, printbuf);
-		break;
-	case DP_GRAPHTRACE_PKT_TYPE_OFFLOAD:
-		snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
-		printf("%u: " NODENAME_FMT " at " NODENAME_FMT ": %s\n",
-			pktinfo->pktid, "Offloaded", node_buf, printbuf);
-		break;
 	}
+
+	tm = gmtime(&timestamp->tv_sec);
+	printf("%02d:%02d:%02d.%03d %u: " NODENAME_FMT " %s " NODENAME_FMT ": %s\n",
+		   tm->tm_hour, tm->tm_min, tm->tm_sec, (int)(timestamp->tv_usec/1000),
+		   pktinfo->pktid, node, arrow, next_node, printbuf);
 
 	fflush(stdout);
 }
@@ -130,6 +143,7 @@ static int dp_graphtrace_dump(struct dp_graphtrace *graphtrace)
 {
 	unsigned int received, available;
 	void *objs[DP_GRAPHTRACE_RINGBUF_SIZE];
+	struct timeval timestamp;
 
 	// dump what's already in the ring buffer
 	// (when full, it actually prevents new packets to enter, thus containing only stale ones)
@@ -140,8 +154,11 @@ static int dp_graphtrace_dump(struct dp_graphtrace *graphtrace)
 	while (!interrupt) {
 		received = rte_ring_dequeue_burst(graphtrace->ringbuf, objs, RTE_DIM(objs), &available);
 		if (received > 0) {
+			// TODO timestamp should be sent by dpservice
+			// ignoring failure for speed
+			gettimeofday(&timestamp, NULL);
 			for (unsigned int i = 0; i < received; ++i)
-				print_packet((struct rte_mbuf *)objs[i]);
+				dump_func(&dp_pcap, (struct rte_mbuf *)objs[i], &timestamp);
 			rte_mempool_put_bulk(graphtrace->mempool, objs, received);
 		}
 		if (available == 0)
@@ -241,7 +258,7 @@ static void signal_handler(__rte_unused int signum)
 	interrupt = true;
 }
 
-static int do_graphtrace(void)
+static int dp_graphtrace_main(void)
 {
 	struct dp_graphtrace graphtrace;
 	int ret;
@@ -285,6 +302,27 @@ static int do_graphtrace(void)
 	return ret;
 }
 
+static int do_graphtrace(void)
+{
+	int ret;
+
+	if (pcap_path) {
+		ret = dp_pcap_init(&dp_pcap, pcap_path);
+		if (DP_FAILED(ret)) {
+			fprintf(stderr, "Cannot initialize pcap: %s %s\n", dp_pcap.error,
+					ret == DP_ERROR ? "" : dp_strerror_verbose(ret));
+			return ret;
+		}
+	}
+
+	ret = dp_graphtrace_main();
+
+	if (pcap_path)
+		dp_pcap_free(&dp_pcap);
+
+	return ret;
+}
+
 static int stop_graphtrace(void)
 {
 	// without this, nothing gets sent
@@ -300,6 +338,13 @@ static int stop_graphtrace(void)
 static void dp_argparse_version(void)
 {
 	printf("DP Service version %s\n", DP_SERVICE_VERSION);
+}
+
+static int dp_argparse_opt_pcap(const char *arg)
+{
+	pcap_path = arg;
+	dump_func = dp_pcap_dump;
+	return DP_OK;
 }
 
 int main(int argc, char **argv)

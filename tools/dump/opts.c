@@ -18,6 +18,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_DROPS,
 	OPT_NODES,
 	OPT_HW,
+	OPT_PCAP,
 	OPT_STOP,
 };
 
@@ -29,6 +30,7 @@ static const struct option dp_conf_longopts[] = {
 	{ "drops", 0, 0, OPT_DROPS },
 	{ "nodes", 0, 0, OPT_NODES },
 	{ "hw", 0, 0, OPT_HW },
+	{ "pcap", 1, 0, OPT_PCAP },
 	{ "stop", 0, 0, OPT_STOP },
 	{ NULL, 0, 0, 0 }
 };
@@ -62,17 +64,19 @@ bool dp_conf_is_stop_mode(void)
 
 /* These functions need to be implemented by the user of this generated code */
 static void dp_argparse_version(void);
+static int dp_argparse_opt_pcap(const char *arg);
 
 
 static inline void dp_argparse_help(const char *progname, FILE *outfile)
 {
 	fprintf(outfile, "Usage: %s [options]\n"
-		" -h, --help     display this help and exit\n"
-		" -v, --version  display version and exit\n"
-		"     --drops    show dropped packets\n"
-		"     --nodes    show graph node traversal\n"
-		"     --hw       capture offloaded packets (only outgoing VF->PF packets supported)\n"
-		"     --stop     do nothing, only make sure tracing is disabled in dp-service\n"
+		" -h, --help       display this help and exit\n"
+		" -v, --version    display version and exit\n"
+		"     --drops      show dropped packets\n"
+		"     --nodes      show graph node traversal\n"
+		"     --hw         capture offloaded packets (only outgoing VF->PF packets supported)\n"
+		"     --pcap=FILE  write packets into a PCAP file\n"
+		"     --stop       do nothing, only make sure tracing is disabled in dp-service\n"
 	, progname);
 }
 
@@ -86,6 +90,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_store_true(&showing_nodes);
 	case OPT_HW:
 		return dp_argparse_store_true(&offload_enabled);
+	case OPT_PCAP:
+		return dp_argparse_opt_pcap(arg);
 	case OPT_STOP:
 		return dp_argparse_store_true(&stop_mode);
 	default:
