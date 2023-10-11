@@ -29,7 +29,7 @@ def pytest_addoption(parser):
 		"--hw", action="store_true", help="Test on actual hardware NIC instead of virtual TAPs"
 	)
 	parser.addoption(
-		"--offloading", action="store_true", help="Test with offloadin enabled (HW only)"
+		"--offloading", action="store_true", help="Test with offloading enabled (HW only)"
 	)
 	parser.addoption(
 		"--dpgrpc", action="store_true", help="Use C++ gRPC client"

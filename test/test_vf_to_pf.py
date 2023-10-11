@@ -153,13 +153,13 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 		request_icmperr(500, PF1.tap, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)
 
-def test_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
+def test_vf_to_pf_firewall_tcp_block(prepare_ipv4, grpc_client):
 	pytest.skip("Skipping till firewall gets fully enabled")
 	sniff_tcp_data = {}
-	negated=True
+	negated = True
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data, negated))
 	resp_thread.start()
-	#Allow only tcp packets to leave the VM with destination port 453
+	# Allow only tcp packets leaving the VM with destination port 453
 	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=453, dst_port_max=453, direction="egress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
@@ -167,17 +167,17 @@ def test_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client):
 	delayed_sendp(tcp_pkt, VM1.tap)
 
 	resp_thread.join()
-	#It should not arrive at the PF0, as firewall filters it
-	assert sniff_tcp_data["pkt"] == None
+	assert sniff_tcp_data["pkt"] == None, \
+		"Packet should have been filtered"
 	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
 
-def test2_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client, port_redundancy):
+def test_vf_to_pf_firewall_tcp_allow(prepare_ipv4, grpc_client, port_redundancy):
 	if port_redundancy:
 		pytest.skip()
 	sniff_tcp_data = {}
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data,))
 	resp_thread.start()
-	#Allow only tcp packets to leave the VM with destination port 453
+	# Allow only tcp packets leaving the VM with destination port 453
 	grpc_client.addfwallrule(VM1.name, "fw1-vm1", proto="tcp", dst_port_min=453, dst_port_max=453, direction="egress")
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
@@ -185,6 +185,6 @@ def test2_vf_to_pf_firewall_tcp(prepare_ipv4, grpc_client, port_redundancy):
 	delayed_sendp(tcp_pkt, VM1.tap)
 
 	resp_thread.join()
-	#It should arrive at the PF0 or PF1, as firewall allows it
-	assert sniff_tcp_data["pkt"] != None
+	assert sniff_tcp_data["pkt"] != None, \
+		"Packet should not have been filtered"
 	grpc_client.delfwallrule(VM1.name, "fw1-vm1")

@@ -78,9 +78,6 @@ subdir('proto')
 subdir('include')
 subdir('src')
 subdir('tools')
-if get_option('enable_tests')
-  subdir('test')
-endif
 
 cppcheck = find_program('cppcheck', required: false)
 if cppcheck.found()

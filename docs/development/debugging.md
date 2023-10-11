@@ -20,11 +20,11 @@ The drawback here is that you need to put the same capabilites to the `gdb` proc
 
 
 ## Debugging the test-suite
-Normally, tests are run via the `meson test` command. For easier debugging once the tests fails, direct call to `pytest` in `test/` directory is recommended. Even only running the appropriate `test_*.py` can be better.
+Normally, tests are run via the `runtest.py` command. For easier debugging once the tests fails, direct call to `pytest` in `test/` directory is recommended. Even only running the appropriate `test_*.py` can be better.
 
 Additionally, `pytest` supports the `--attach` argument, which makes it not start its own service process and instead attaches to an already running one (instead of using the provided wrapper script `dp_service.py` to run it). This is a way for the developer to run a service under debugger and then let the tests run on it.
 
-Of course, you need to use the same command-line arguments as the test-suite would use. For that, run the test once with `pytest -s` and then look at the output. The service command-line will be there.
+Of course, you need to use the same command-line arguments as the test-suite would use. For that, run the test once with `pytest -s` (or even `pytest -s --graphtrace` if enabled) and then look at the output. The service command-line will be there.
 
 ### GDB Signal handler
 As the TUN/TAP driver uses signals, it is recommended to use `handle signal SIG35 nostop pass noprint` while debugging the test-suite (as this is just the first of real-time signal values used, you may need to add more).

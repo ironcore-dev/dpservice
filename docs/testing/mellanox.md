@@ -1,7 +1,7 @@
 # Testing Dataplane Service with Mellanox cards
 As dp-service is intended as a virtual router for hosting VMs, testing on real hardware is a bit tricky since it requires SR-IOV to use virtual functions. In practice this means that you cannot directly communicate with VFs, instead a running VM is needed.
 
-It is also possible to run the whole set of tests that `meson test` runs using `pytest`. See below for details.
+It is also possible to run the whole set of tests that `runtest.py` runs using `pytest`. See below for details.
 
 ## Hardware setup
 To simplify starting `dpservice-bin`, it accepts a configuration file (currently hardcoded `/tmp/dp_service.conf`) so that most command-line arguments concerning hardware options are not needed.
