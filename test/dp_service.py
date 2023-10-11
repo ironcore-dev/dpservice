@@ -49,7 +49,8 @@ class DpService:
 					 f' --dhcp-mtu={dhcp_mtu}'
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 f' --grpc-port={grpc_port}'
-					  ' --no-stats')
+					  ' --no-stats'
+					  ' --color=auto')
 		if graphtrace:
 			self.cmd += ' --graphtrace-loglevel=1'
 		if not offloading:

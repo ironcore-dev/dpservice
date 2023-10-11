@@ -35,6 +35,9 @@ To solve this, you have a few options:
 """, file=sys.stderr)
 				raise RuntimeError("no gRPC client")
 
+	def getClientVersion(self):
+		return subprocess.check_output([self.cmd, '-v']).decode('utf-8').strip()
+
 	def expect_error(self, errcode):
 		self.expectedError = errcode
 		return self

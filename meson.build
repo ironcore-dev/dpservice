@@ -52,6 +52,9 @@ endif
 if get_option('enable_static_underlay_ip')
   add_global_arguments('-DENABLE_STATIC_UNDERLAY_IP', language: 'c')
 endif
+if get_option('enable_tests')
+  add_global_arguments('-DENABLE_PYTEST', language: 'c')
+endif
 
 dpdk_dep = dependency('libdpdk', version: '>=21.11.0')
 proto_dep = dependency('protobuf')
@@ -62,11 +65,6 @@ libuuid_dep = dependency('uuid')
 
 protoc = find_program('protoc')
 grpc_cpp = find_program('grpc_cpp_plugin')
-if get_option('enable_tests')
-  pytest = find_program('pytest', 'pytest-3')
-  scapy = find_program('scapy')
-  add_global_arguments('-DENABLE_PYTEST', language: 'c')
-endif
 if get_option('enable_usermode')
   sudo = find_program('sudo')
   setcap = find_program('setcap', '/usr/sbin/setcap')
@@ -78,9 +76,6 @@ subdir('proto')
 subdir('include')
 subdir('src')
 subdir('tools')
-if get_option('enable_tests')
-  subdir('test')
-endif
 
 cppcheck = find_program('cppcheck', required: false)
 if cppcheck.found()

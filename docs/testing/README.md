@@ -4,28 +4,37 @@ Dataplane service comes with a set of tests to verify basic functionality. Runni
 
 The test infrastructure uses [pytest](https://docs.pytest.org/) and [scapy](https://scapy.net/), meson build system will check for them being installed during configuration phase if the option is set, use `meson setup -Denable_tests=true build` or `meson setup --reconfigure -Denable_tests=true build` on an existing build directory.
 
+Enabling tests via meson also adds some compiled-in testing code, which is beyond the scope of this document. Automated tests already utilize this feature.
+
 
 ## Running tests
 
-The easiest way to run unit tests is through **meson**:
+The easiest way to run unit tests is through `test/runtest.py`.
 ```bash
-cd build
-sudo meson test
+cd test
+sudo ./runtest.py
 ```
 
-If a test fails, meson will print out the right command to re-run the failing test:
-```bash
-1/2 Base tests             FAIL           13.94s   exit status 1
->>> MALLOC_PERTURB_=101 /usr/bin/pytest --build-path=/home/onmetal/git/net-dpservice/build --tun-opt=ipip /home/onmetal/git/net-dpservice/test
+The script prints out all `pytest` commands it uses, so in case of a failure, you can easily re-run it manually:
 ```
-Running that command will show you full test output for reporting or fixing the problem (don't forget you need to run it as root).
+TEST 1/3 - base tests:
+pytest-3 -x -v --build-path=/home/plague/git/net-dpservice/test/../build --virtsvc /home/plague/git/net-dpservice/test
+...
+(error output here)
+...
+TEST FAILED with returncode 1
+pytest-3 -x -v --build-path=/home/plague/git/net-dpservice/test/../build --virtsvc /home/plague/git/net-dpservice/test
+```
 
 ### Pytest
-Developers might consider running `pytest` directly in the `test/` directory to see more detailed information (via `-v` or even full output (via `-s`). With no positional arguments, all tests will run, specify individual unit-test files for making the testing set smaller. When multiple tests are broken, consider using the stop-at-first-error argument `-x`.
+When running `pytest` directly in the `test/` directory, only a specific set of options for `dpservice-bin` is used. Arguments specifying whether or not port redundancy should be utilized (`--port-redundancy`) or if a shortened flow timeout should be used (`--fast-flow-timeout`) are needed to fully test all code paths. This is done automatically by `runtest.py`.
 
-Since one test-run only applies to a specific set of options for `dpservice-bin`, argument specifying the type of underlay tunnel (`--tun-opt`, default `ipip`) and whether or not port redundancy should be utilized (`--port-redundancy`) are needed to fully test all code paths.
+If one should want to instead run your own `dpservice-bin` instance (e.g. for running under a debugger), the `--attach` argument connects to an already running service instead of starting its own (which in turn can be started via a helper `dp_service.py` script). This comes with the caveat of ensuring the right arguments are passed to the service at startup.
 
-If one should want to instead run your own `dpservice-bin` instance (e.g. for running under a debugger), the `--attach` argument connects to an already running service instead of starting its own. This comes with the caveat of ensuring the right arguments are passed to the service at startup.
+## Docker
+There is a tester image provided by this repo, simply build it using this repo's `Dockerfile` and use `--target tester`. For fully working images a GitHub PAT is needed: `docker build --secret=id=github_token,src=<path/to/github_token> --target tester .`
+
+To run the image, you need to provide more arguments for privileged access: `sudo docker run -it --rm --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages <image>`.
 
 
 ## GRPC test client

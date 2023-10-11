@@ -1,4 +1,5 @@
-FROM debian:12-slim as builder
+# Build image with DPDK, etc.
+FROM debian:12-slim AS builder
 
 ARG DPDK_VER=22.11
 ARG DPSERVICE_FEATURES=""
@@ -39,8 +40,7 @@ pkg-config \
 protobuf-compiler-grpc \
 libgrpc++1.51 \
 libgrpc++-dev \
-linux-headers-${OSARCH} \
-&& rm -rf /var/lib/apt/lists/*
+linux-headers-${OSARCH}
 
 # Download DPDK
 RUN wget http://git.dpdk.org/dpdk/snapshot/dpdk-${DPDK_VER}.zip
@@ -71,14 +71,7 @@ vhost,gpudev build -Ddisable_apps="*" -Dtests=false
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
 
-# Copy additional repo's tools
-COPY hack/rel_download.sh hack/rel_download.sh
-RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
-sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; else echo ""; fi) \
-&& ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=$GITHUB_TOKEN \
-&& ./hack/rel_download.sh -dir=client -owner=onmetal -repo=dpservice-cli -strip=2 -pat=$GITHUB_TOKEN'
-
-# Now copy the rest to enable DPDK layer caching
+# Prepare tools and sources
 COPY meson.build meson.build
 COPY meson_options.txt meson_options.txt
 COPY src/ src/
@@ -90,13 +83,27 @@ COPY tools/ tools/
 # Needed for version extraction by meson
 COPY .git/ .git/
 
-RUN meson setup build $DPSERVICE_FEATURES && cd ./build && ninja
+# TODO this is here and not before dpservice-bin because the tool repos are not public
+# therefore downloading using 'ADD' is not possible
+RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
+sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; else echo ""; fi) \
+&& ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=$GITHUB_TOKEN \
+&& ./hack/rel_download.sh -dir=client -owner=onmetal -repo=dpservice-cli -strip=2 -pat=$GITHUB_TOKEN'
 
+# Compile dpservice-bin itself
+RUN meson setup build $DPSERVICE_FEATURES && ninja -C build
+
+
+# Extended build image for test-image
 FROM builder AS testbuilder
-RUN rm -rf build && meson setup build $DPSERVICE_FEATURES --buildtype=release && cd ./build && ninja
-RUN rm -rf build && CC=clang CXX=clang++ meson setup build $DPSERVICE_FEATURES && cd ./build && ninja
+ARG DPSERVICE_FEATURES=""
+RUN meson setup release_build $DPSERVICE_FEATURES --buildtype=release && ninja -C release_build
+RUN CC=clang CXX=clang++ meson setup clang_build $DPSERVICE_FEATURES && ninja -C clang_build
+RUN meson setup xtratest_build $DPSERVICE_FEATURES -Denable_tests=true && ninja -C xtratest_build
 
-FROM debian:12-slim as tester
+
+# Test-image to run pytest
+FROM debian:12-slim AS tester
 
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
@@ -118,13 +125,18 @@ WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
 COPY --from=testbuilder /workspace/build/src/dpservice-bin ./build/src/dpservice-bin
 COPY --from=testbuilder /workspace/client/* ./build
+COPY --from=testbuilder /workspace/xtratest_build/src/dpservice-bin ./xtratest_build/src/dpservice-bin
+COPY --from=testbuilder /workspace/client/* ./xtratest_build
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
 
 WORKDIR /test
-ENTRYPOINT ["pytest-3", "-x", "-v"]
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["./runtest.py", "../build", "../xtratest_build"]
 
-FROM debian:12-slim as production
+
+# Deployed pod image itself
+FROM debian:12-slim AS production
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
