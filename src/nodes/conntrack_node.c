@@ -47,7 +47,7 @@ static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
 }
 
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct dp_flow *df;
@@ -72,7 +72,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		|| df->l4_type == IPPROTO_UDP
 		|| df->l4_type == IPPROTO_ICMP
 	) {
-		ret = dp_cntrack_handle(node, m, df);
+		ret = dp_cntrack_handle(m, df);
 		if (DP_FAILED(ret) || (ret == DP_IS_CAPTURED_HW_PKT))
 			return CONNTRACK_NEXT_DROP;
 	} else {

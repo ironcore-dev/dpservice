@@ -45,9 +45,9 @@ struct dp_icmp_err_ip_info {
 
 uint16_t extract_inner_ethernet_header(struct rte_mbuf *pkt);
 uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt);
-int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, ipv4/ipv6 header
-int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset); // offset, tcp/udp/icmp header
-int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset);
+int extract_inner_l3_header(struct rte_mbuf *pkt, const void *hdr, uint16_t offset); // offset, ipv4/ipv6 header
+int extract_inner_l4_header(struct rte_mbuf *pkt, const void *hdr, uint16_t offset); // offset, tcp/udp/icmp header
+int extract_outer_ipv6_header(struct rte_mbuf *pkt, const void *hdr, uint16_t offset);
 struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m);
 struct rte_tcp_hdr *dp_get_tcp_hdr(struct rte_mbuf *m, uint16_t offset);
 struct rte_udp_hdr *dp_get_udp_hdr(struct rte_mbuf *m, uint16_t offset);

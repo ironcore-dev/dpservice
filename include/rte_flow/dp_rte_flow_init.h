@@ -17,7 +17,7 @@ int dp_turn_on_vf_offload_tracing(void);
 int dp_turn_off_vf_offload_tracing(void);
 
 #ifdef ENABLE_VIRTSVC
-int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], uint16_t svc_port);
+int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, const uint8_t svc_ipv6[16], uint16_t svc_port);
 #endif
 
 #ifdef __cplusplus

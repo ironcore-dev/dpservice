@@ -10,7 +10,7 @@ void dp_init_firewall_rules_list(int port_id)
 	TAILQ_INIT(dp_get_fwall_head(port_id));
 }
 
-int dp_add_firewall_rule(struct dp_fwall_rule *new_rule, int port_id)
+int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, int port_id)
 {
 	struct dp_fwall_rule *rule = rte_zmalloc("firewall_rule", sizeof(struct dp_fwall_rule), RTE_CACHE_LINE_SIZE);
 
@@ -24,7 +24,7 @@ int dp_add_firewall_rule(struct dp_fwall_rule *new_rule, int port_id)
 }
 
 
-int dp_delete_firewall_rule(char *rule_id, int port_id)
+int dp_delete_firewall_rule(const char *rule_id, int port_id)
 {
 	struct dp_fwall_head *fwall_head = dp_get_fwall_head(port_id);
 	struct dp_fwall_rule *rule, *next_rule;
@@ -41,7 +41,7 @@ int dp_delete_firewall_rule(char *rule_id, int port_id)
 	return DP_ERROR;
 }
 
-struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id)
+struct dp_fwall_rule *dp_get_firewall_rule(const char *rule_id, int port_id)
 {
 	struct dp_fwall_rule *rule;
 
@@ -70,8 +70,7 @@ int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder)
 }
 
 static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *rule,
-													struct dp_flow *df,
-													__rte_unused struct rte_ipv4_hdr *ipv4_hdr)
+													const struct dp_flow *df)
 {
 	uint32_t dest_ip = ntohl(df->dst.dst_addr);
 	uint32_t src_ip = ntohl(df->src.src_addr);
@@ -122,9 +121,8 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 		((rule->protocol == DP_FWALL_MATCH_ANY_PROTOCOL) || (rule->protocol == protocol)));
 }
 
-static __rte_always_inline struct dp_fwall_rule *dp_is_matched_in_fwall_list(struct dp_flow *df,
-																	  struct rte_ipv4_hdr *ipv4_hdr,
-																	  struct dp_fwall_head *fwall_head,
+static __rte_always_inline struct dp_fwall_rule *dp_is_matched_in_fwall_list(const struct dp_flow *df,
+																	  const struct dp_fwall_head *fwall_head,
 																	  enum dp_fwall_direction dir,
 																	  uint32_t *egress_rule_count)
 {
@@ -133,7 +131,7 @@ static __rte_always_inline struct dp_fwall_rule *dp_is_matched_in_fwall_list(str
 	TAILQ_FOREACH(rule, fwall_head, next_rule) {
 		if (rule->dir == DP_FWALL_EGRESS)
 			(*egress_rule_count)++;
-		if ((dir == rule->dir) && dp_is_rule_matching(rule, df, ipv4_hdr))
+		if ((dir == rule->dir) && dp_is_rule_matching(rule, df))
 			return rule;
 	}
 
@@ -143,13 +141,13 @@ static __rte_always_inline struct dp_fwall_rule *dp_is_matched_in_fwall_list(str
 /* Egress default for the traffic originating from VFs is "Accept", when no rule matches. If there is at least one */
 /* Egress rule than the default action becomes drop, if there is no rule matching */
 /* Another approach here could be to install a default egress rule for each interface which allows everything */
-static __rte_always_inline enum dp_fwall_action dp_get_egress_action(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
-																	 struct dp_fwall_head *fwall_head)
+static __rte_always_inline enum dp_fwall_action dp_get_egress_action(const struct dp_flow *df,
+																	 const struct dp_fwall_head *fwall_head)
 {
 	uint32_t egress_rule_count = 0;
 	struct dp_fwall_rule *rule;
 
-	rule = dp_is_matched_in_fwall_list(df, ipv4_hdr, fwall_head, DP_FWALL_EGRESS, &egress_rule_count);
+	rule = dp_is_matched_in_fwall_list(df, fwall_head, DP_FWALL_EGRESS, &egress_rule_count);
 
 	if (rule)
 		return rule->action;
@@ -159,21 +157,23 @@ static __rte_always_inline enum dp_fwall_action dp_get_egress_action(struct dp_f
 		return DP_FWALL_DROP;
 }
 
-enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr, int sender_port_id)
+enum dp_fwall_action dp_get_firewall_action(struct rte_mbuf *m)
 {
+	uint16_t sender_port_id = m->port;
+	struct dp_flow *df = dp_get_flow_ptr(m);
 	enum dp_fwall_action egress_action = DP_FWALL_DROP, ingress_action = DP_FWALL_DROP;
 	struct dp_fwall_head *fwall_head_sender = dp_get_fwall_head(sender_port_id);
 	struct dp_fwall_rule *rule;
 
 	if (dp_port_is_pf(df->nxt_hop)) { /* Outgoing traffic to PF (VF Egress, PF Ingress), PF has no Ingress rules */
-		return dp_get_egress_action(df, ipv4_hdr, fwall_head_sender);
+		return dp_get_egress_action(df, fwall_head_sender);
 	} else { /* Incoming traffic */
-		if (dp_port_is_pf(sender_port_id))/* Incoming from PF, PF has no Egress rules */
+		if (dp_port_is_pf(sender_port_id)) /* Incoming from PF, PF has no Egress rules */
 			egress_action = DP_FWALL_ACCEPT;
-		else/* Incoming from VF. Check originating VF's Egress rules */
-			egress_action = dp_get_egress_action(df, ipv4_hdr, fwall_head_sender);
+		else /* Incoming from VF. Check originating VF's Egress rules */
+			egress_action = dp_get_egress_action(df, fwall_head_sender);
 
-		rule = dp_is_matched_in_fwall_list(df, ipv4_hdr, dp_get_fwall_head(df->nxt_hop), DP_FWALL_INGRESS, NULL);
+		rule = dp_is_matched_in_fwall_list(df, dp_get_fwall_head(df->nxt_hop), DP_FWALL_INGRESS, NULL);
 		if (rule)
 			ingress_action = rule->action;
 

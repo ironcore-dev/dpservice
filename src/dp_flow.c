@@ -48,7 +48,7 @@ void dp_flow_free(void)
 	dp_free_jhash_table(ipv4_flow_tbl);
 }
 
-static __rte_always_inline int dp_build_icmp_flow_key(struct dp_flow *df, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
+static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
 
@@ -156,7 +156,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	return ret;
 }
 
-void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
+void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
 {
 	inv_key->ip_src = key->ip_dst;
 	inv_key->ip_dst = key->ip_src;
@@ -181,7 +181,7 @@ void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key 
 	}
 }
 
-static void dp_delete_flow_no_flush(struct flow_key *key)
+static void dp_delete_flow_no_flush(const struct flow_key *key)
 {
 	int ret;
 
@@ -197,7 +197,7 @@ static void dp_delete_flow_no_flush(struct flow_key *key)
 	DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY(key));
 }
 
-void dp_delete_flow(struct flow_key *key)
+void dp_delete_flow(const struct flow_key *key)
 {
 	dp_delete_flow_no_flush(key);
 	// removed a flow, purge the cache to be safe
@@ -205,7 +205,7 @@ void dp_delete_flow(struct flow_key *key)
 	dp_cntrack_flush_cache();
 }
 
-int dp_add_flow(struct flow_key *key, struct flow_value *flow_val)
+int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val)
 {
 	int ret = rte_hash_add_key_data(ipv4_flow_tbl, key, flow_val);
 
@@ -216,7 +216,7 @@ int dp_add_flow(struct flow_key *key, struct flow_value *flow_val)
 	return DP_OK;
 }
 
-int dp_get_flow(struct flow_key *key, struct flow_value **p_flow_val)
+int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 {
 	int ret = rte_hash_lookup_data(ipv4_flow_tbl, key, (void **)p_flow_val);
 
@@ -229,7 +229,7 @@ int dp_get_flow(struct flow_key *key, struct flow_value **p_flow_val)
 	return ret;
 }
 
-bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2)
+bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2)
 {
 	return key1->proto == key2->proto
 		&& key1->ip_src == key2->ip_src
@@ -252,7 +252,7 @@ void dp_free_flow(struct dp_ref *ref)
 	rte_free(cntrack);
 }
 
-void dp_free_network_nat_port(struct flow_value *cntrack)
+void dp_free_network_nat_port(const struct flow_value *cntrack)
 {
 	int ret;
 
@@ -478,7 +478,7 @@ void dp_remove_vm_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 }
 
 
-hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key)
+hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key)
 {
 	//It is not necessary to first test if this key exists, since for now, this function
 	// is always called after either a flow is checked or added in the firewall node.
@@ -498,7 +498,7 @@ int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 	return DP_ERROR;
 }
 
-int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
+int dp_del_rte_age_ctx(struct flow_value *cntrack, const struct flow_age_ctx *ctx)
 {
 	if (ctx->ref_index_in_cntrack >= RTE_DIM(cntrack->rte_age_ctxs)) {
 		DPS_LOG_ERR("Cannot delete agectx from conntrack storage, invalid index",

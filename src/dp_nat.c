@@ -117,7 +117,7 @@ static void dp_delete_vm_snat_data(uint32_t vm_ip, uint32_t vni, struct snat_dat
 		DPS_LOG_WARNING("Failed to delete SNAT key");
 }
 
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
@@ -135,7 +135,7 @@ int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint8_t ul_ip
 }
 
 int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port,
-							  uint16_t max_port, uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+							  uint16_t max_port, const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
@@ -288,18 +288,18 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 }
 
 
-static __rte_always_inline bool dp_is_network_nat_ip(struct network_nat_entry *entry,
+static __rte_always_inline bool dp_is_network_nat_ip(const struct network_nat_entry *entry,
 													 uint32_t nat_ipv4,
-													 uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni)
+													 const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni)
 {
 	return entry->vni == vni
 			&& ((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
 				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0));
 }
 
-static __rte_always_inline bool dp_is_network_nat_entry(struct network_nat_entry *entry,
+static __rte_always_inline bool dp_is_network_nat_entry(const struct network_nat_entry *entry,
 														uint32_t nat_ipv4,
-														uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
+														const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
 														uint16_t min_port, uint16_t max_port)
 {
 	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
@@ -308,9 +308,9 @@ static __rte_always_inline bool dp_is_network_nat_entry(struct network_nat_entry
 }
 
 // check if a port falls into the range of external nat's port range
-static __rte_always_inline bool dp_is_network_nat_port(struct network_nat_entry *entry,
+static __rte_always_inline bool dp_is_network_nat_port(const struct network_nat_entry *entry,
 													   uint32_t nat_ipv4,
-													   uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
+													   const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
 													   uint16_t port)
 {
 	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
@@ -331,9 +331,9 @@ void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
 	dp_del_dnat_ip(d_ip, vni);
 }
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
+int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
-								uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+								const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	network_nat_entry *next, *new_entry;
 
@@ -369,8 +369,8 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADD
 
 }
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
-								uint32_t vni, uint16_t min_port, uint16_t max_port)
+int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
+							 uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *item, *tmp_item;
 
@@ -385,7 +385,7 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADD
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
+const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 											  uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *current;
@@ -515,7 +515,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	return allocated_port;
 }
 
-int dp_remove_network_snat_port(struct flow_value *cntrack)
+int dp_remove_network_snat_port(const struct flow_value *cntrack)
 {
 	struct netnat_portmap_key portmap_key = {0};
 	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};

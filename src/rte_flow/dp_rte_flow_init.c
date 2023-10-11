@@ -206,7 +206,7 @@ int dp_turn_off_vf_offload_tracing(void)
 
 
 #ifdef ENABLE_VIRTSVC
-int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, uint8_t svc_ipv6[16], rte_be16_t svc_port)
+int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, const uint8_t svc_ipv6[16], rte_be16_t svc_port)
 {
 	struct rte_flow_item_eth eth_spec;   // #1
 	struct rte_flow_item_ipv6 ipv6_spec; // #2

@@ -36,7 +36,7 @@ void dp_lb_free(void)
 	dp_free_jhash_table(ipv4_lb_tbl);
 }
 
-static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value *l_val)
+static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, struct lb_value *l_val)
 {
 	struct lb_key *lb_k;
 	int ret;
@@ -59,7 +59,7 @@ static int dp_map_lb_handle(void *id_key, struct lb_key *l_key, struct lb_value 
 	return DP_OK;
 }
 
-int dp_create_lb(struct dpgrpc_lb *lb, uint8_t *ul_ip)
+int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
@@ -93,7 +93,7 @@ err:
 	return DP_GRPC_ERR_OUT_OF_MEMORY;
 }
 
-int dp_get_lb(void *id_key, struct dpgrpc_lb *out_lb)
+int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
@@ -118,7 +118,7 @@ int dp_get_lb(void *id_key, struct dpgrpc_lb *out_lb)
 	return DP_GRPC_OK;
 }
 
-int dp_delete_lb(void *id_key)
+int dp_delete_lb(const void *id_key)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
@@ -174,7 +174,7 @@ static int dp_lb_last_free_pos(struct lb_value *val)
 	return ret;
 }
 
-static int dp_lb_delete_back_ip(struct lb_value *val, uint8_t *b_ip)
+static int dp_lb_delete_back_ip(struct lb_value *val, const uint8_t *b_ip)
 {
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
 		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[i][0], b_ip)) {
@@ -186,7 +186,7 @@ static int dp_lb_delete_back_ip(struct lb_value *val, uint8_t *b_ip)
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
+static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const uint8_t *b_ip)
 {
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i)
 		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[i][0], b_ip))
@@ -194,7 +194,7 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, uint8_t *b_ip)
 	return false;
 }
 
-static int dp_lb_rr_backend(struct lb_value *val, struct lb_port *lb_port)
+static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
 {
 	int ret = -1, k;
 
@@ -250,7 +250,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, rte_be16_t port, uint
 	return (uint8_t *)&lb_val->back_end_ips[pos][0];
 }
 
-int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
+int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 {
 	struct lb_key *lb_k;
 	struct lb_value *lb_val;
@@ -276,7 +276,7 @@ int dp_get_lb_back_ips(void *id_key, struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-int dp_add_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size)
+int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip, uint8_t ip_size)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
@@ -301,7 +301,7 @@ int dp_add_lb_back_ip(void *id_key, uint8_t *back_ip, uint8_t ip_size)
 	return DP_GRPC_OK;
 }
 
-int dp_del_lb_back_ip(void *id_key, uint8_t *back_ip)
+int dp_del_lb_back_ip(const void *id_key, const uint8_t *back_ip)
 {
 	struct lb_value *lb_val;
 	struct lb_key *lb_k;

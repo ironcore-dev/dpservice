@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-int dp_hairpin_setup(struct dp_port *port);
-int dp_hairpin_bind(struct dp_port *port);
+int dp_hairpin_setup(const struct dp_port *port);
+int dp_hairpin_bind(const struct dp_port *port);
 
 #ifdef __cplusplus
 }

@@ -525,7 +525,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	if (dp_port)
 		snprintf(reply->name, sizeof(reply->name), "%s", dp_port->vf_name);
 
-	rte_memcpy(dp_get_vm_ul_ip6(port_id), ul_addr6, sizeof(ul_addr6));
+	dp_set_vm_ul_ip6(port_id, ul_addr6);
 	rte_memcpy(reply->ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 

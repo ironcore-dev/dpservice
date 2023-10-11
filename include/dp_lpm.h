@@ -72,45 +72,44 @@ int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_
 
 int dp_lpm_init(int socket_id);
 void dp_lpm_free(void);
-int dp_map_vm_handle(void *key, uint16_t portid);
-int dp_get_portid_with_vm_handle(void *key);
-void dp_del_portid_with_vm_handle(void *key);
+int dp_map_vm_handle(const void *key, uint16_t portid);
+int dp_get_portid_with_vm_handle(const void *key);
+void dp_del_portid_with_vm_handle(const void *key);
 
 uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);
 uint32_t dp_get_dhcp_range_ip4(uint16_t portid);
-uint8_t *dp_get_dhcp_range_ip6(uint16_t portid);
-uint8_t *dp_get_vm_ip6(uint16_t portid);
-uint8_t *dp_get_vm_ul_ip6(uint16_t portid);
+const uint8_t *dp_get_dhcp_range_ip6(uint16_t portid);
+const uint8_t *dp_get_vm_ip6(uint16_t portid);
+const uint8_t *dp_get_vm_ul_ip6(uint16_t portid);
 const uint8_t *dp_get_port_ul_ip6(uint16_t portid);
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 uint8_t *ip6, uint8_t depth, int socketid);
+				 const uint8_t *ip6, uint8_t depth, int socketid);
 int dp_del_route(uint16_t portid, uint32_t vni, uint32_t ip, uint8_t depth, int socketid);
-int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
-				  uint8_t *ext_ip6, uint8_t depth, int socketid);
-int dp_del_route6(uint16_t portid, uint32_t vni, uint8_t *ipv6, uint8_t depth, int socketid);
+int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
+				  const uint8_t *ext_ip6, uint8_t depth, int socketid);
+int dp_del_route6(uint16_t portid, uint32_t vni, const uint8_t *ipv6, uint8_t depth, int socketid);
 int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes, struct dp_grpc_responder *responder);
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth);
-void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t *ipv6, uint8_t depth);
-void dp_set_vm_ip6(uint16_t portid, uint8_t *ipv6);
-void dp_set_vm_ul_ip6(uint16_t portid, uint8_t *ipv6);
+void dp_set_dhcp_range_ip6(uint16_t portid, const uint8_t *ipv6, uint8_t depth);
+void dp_set_vm_ip6(uint16_t portid, const uint8_t *ipv6);
+void dp_set_vm_ul_ip6(uint16_t portid, const uint8_t *ipv6);
 void dp_set_mac(uint16_t portid);
-struct rte_ether_addr *dp_get_mac(uint16_t portid);
-void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr *neigh);
-struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
+const struct rte_ether_addr *dp_get_mac(uint16_t portid);
+void dp_set_neigh_mac(uint16_t portid, const struct rte_ether_addr *neigh);
+const struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid);
 bool dp_arp_cycle_needed(uint16_t portid);
 void dp_del_vm(int port_id, int socket_id);
 int dp_get_active_vm_ports(int *act_ports);
-uint8_t *dp_get_vm_machineid(uint16_t portid);
+const uint8_t *dp_get_vm_machineid(uint16_t portid);
 uint32_t dp_get_vm_vni(uint16_t portid);
 uint32_t dp_get_vm_pxe_ip4(uint16_t portid);
 void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip);
-char *dp_get_vm_pxe_str(uint16_t portid);
-void dp_set_vm_pxe_str(uint16_t portid, char *p_str);
+const char *dp_get_vm_pxe_str(uint16_t portid);
+void dp_set_vm_pxe_str(uint16_t portid, const char *p_str);
 int dp_lpm_reset_all_route_tables(int socketid);
 int dp_lpm_reset_route_tables(int vni, int socketid);
 struct dp_fwall_head *dp_get_fwall_head(int port_id);
-void dp_set_fwall_head(int port_id, struct dp_fwall_head *fwall_head);
 #ifdef __cplusplus
 }
 #endif

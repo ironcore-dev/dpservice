@@ -63,7 +63,7 @@ static int setup_hairpin_rx_tx_queues(uint16_t port_id,
 	return DP_OK;
 }
 
-int dp_hairpin_setup(struct dp_port *port)
+int dp_hairpin_setup(const struct dp_port *port)
 {
 
 	uint16_t hairpin_queue_id = 0;
@@ -98,7 +98,7 @@ int dp_hairpin_setup(struct dp_port *port)
 	return DP_OK;
 }
 
-int dp_hairpin_bind(struct dp_port *port)
+int dp_hairpin_bind(const struct dp_port *port)
 {
 	uint16_t port_id = port->port_id;
 	uint16_t peer_pf_port = port->peer_pf_port_id;

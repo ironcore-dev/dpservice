@@ -38,12 +38,12 @@ struct dp_vnf_value {
 
 int dp_vnf_init(int socket_id);
 void dp_vnf_free(void);
-int dp_set_vnf_value(void *key, struct dp_vnf_value *val);
-struct dp_vnf_value *dp_get_vnf_value_with_key(void *key);
-int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type);
-int dp_del_vnf_with_vnf_key(void *key);
-int dp_del_vnf_with_value(struct dp_vnf_value *val);
-int dp_find_vnf_with_value(struct dp_vnf_value *val);
+int dp_set_vnf_value(const void *key, const struct dp_vnf_value *val);
+struct dp_vnf_value *dp_get_vnf_value_with_key(const void *key);
+int dp_get_portid_with_vnf_key(const void *key, enum vnf_type v_type);
+int dp_del_vnf_with_vnf_key(const void *key);
+int dp_del_vnf_with_value(const struct dp_vnf_value *val);
+int dp_find_vnf_with_value(const struct dp_vnf_value *val);
 int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid, bool match_all);
 int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder);
 

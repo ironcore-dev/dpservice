@@ -38,8 +38,8 @@ struct dp_graphtrace {
 struct dp_graphtrace_pktinfo {
 	enum dp_graphtrace_pkt_type pkt_type;
 	uint32_t pktid;
-	struct rte_node *node;
-	struct rte_node *next_node;
+	const struct rte_node *node;
+	const struct rte_node *next_node;
 	uint16_t dst_port_id;
 };
 
@@ -65,7 +65,7 @@ static inline struct dp_graphtrace_pktinfo *dp_get_graphtrace_pktinfo(struct rte
 	return (struct dp_graphtrace_pktinfo *)(dp_get_flow_ptr(pkt) + 1);
 }
 
-void dp_graphtrace_sprint(struct rte_mbuf *pkt, char *buf, size_t bufsize);
+void dp_graphtrace_sprint(const struct rte_mbuf *pkt, char *buf, size_t bufsize);
 
 #ifdef __cplusplus
 }

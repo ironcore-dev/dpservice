@@ -8,7 +8,7 @@
 #include "rte_flow/dp_rte_flow_init.h"
 
 
-static int dp_send_event_msg(struct dp_event_msg *msg)
+static int dp_send_event_msg(const struct dp_event_msg *msg)
 {
 	struct rte_mbuf *m;
 	struct dp_event_msg *mbuf_msg;

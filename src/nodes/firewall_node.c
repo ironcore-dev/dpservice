@@ -18,7 +18,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	enum dp_fwall_action action;
 
 	if (!DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
-		action = dp_get_firewall_action(df, dp_get_ipv4_hdr(m), m->port);
+		action = dp_get_firewall_action(m);
 		cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
 		cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
 	}

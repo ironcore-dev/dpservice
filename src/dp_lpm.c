@@ -89,7 +89,7 @@ int dp_lpm_reset_route_tables(int vni, int socketid)
 	return DP_GRPC_OK;
 }
 
-int dp_map_vm_handle(void *key, uint16_t portid)
+int dp_map_vm_handle(const void *key, uint16_t portid)
 {
 	uint16_t *p_port_id;
 	int ret;
@@ -125,7 +125,7 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_portid_with_vm_handle(void *key)
+int dp_get_portid_with_vm_handle(const void *key)
 {
 	uint16_t *p_port_id;
 	int ret;
@@ -137,7 +137,7 @@ int dp_get_portid_with_vm_handle(void *key)
 	return *p_port_id;
 }
 
-void dp_del_portid_with_vm_handle(void *key)
+void dp_del_portid_with_vm_handle(const void *key)
 {
 	uint16_t *p_port_id = NULL;
 
@@ -156,14 +156,14 @@ const uint8_t *dp_get_gw_ip6(void)
 	return dp_router_gw_ip6;
 }
 
-void dp_set_vm_pxe_str(uint16_t portid, char *p_str)
+void dp_set_vm_pxe_str(uint16_t portid, const char *p_str)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(vm_table[portid].info.pxe_str, p_str,
 			   sizeof(vm_table[portid].info.pxe_str));
 }
 
-char *dp_get_vm_pxe_str(uint16_t portid)
+const char *dp_get_vm_pxe_str(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return (char *)vm_table[portid].info.pxe_str;
@@ -197,13 +197,13 @@ uint32_t dp_get_dhcp_range_ip4(uint16_t portid)
 	return vm_table[portid].info.own_ip;
 }
 
-uint8_t *dp_get_dhcp_range_ip6(uint16_t portid)
+const uint8_t *dp_get_dhcp_range_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.dhcp_ipv6;
 }
 
-uint8_t *dp_get_vm_machineid(uint16_t portid)
+const uint8_t *dp_get_vm_machineid(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].machineid;
@@ -215,13 +215,13 @@ uint32_t dp_get_vm_vni(uint16_t portid)
 	return vm_table[portid].vni;
 }
 
-uint8_t *dp_get_vm_ip6(uint16_t portid)
+const uint8_t *dp_get_vm_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].info.vm_ipv6;
 }
 
-uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
+const uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].ul_ipv6;
@@ -236,7 +236,7 @@ const uint8_t *dp_get_port_ul_ip6(uint16_t portid)
 }
 
 int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 uint8_t *ip6, uint8_t depth, int socketid)
+				 const uint8_t *ip6, uint8_t depth, int socketid)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
@@ -293,7 +293,7 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t ip, uint8_t depth, int 
 	return DP_GRPC_OK;
 }
 
-static __rte_always_inline bool dp_route_in_dhcp_range(struct rte_rib_node *node, uint16_t portid)
+static __rte_always_inline bool dp_route_in_dhcp_range(const struct rte_rib_node *node, uint16_t portid)
 {
 	uint32_t ipv4 = 0;
 	uint8_t depth = 0;
@@ -369,8 +369,8 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 	return DP_GRPC_OK;
 }
 
-int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
-				  uint8_t *ext_ip6, uint8_t depth, int socketid)
+int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
+				  const uint8_t *ext_ip6, uint8_t depth, int socketid)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
@@ -402,7 +402,7 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, uint8_t *ipv6,
 	return DP_GRPC_OK;
 }
 
-int dp_del_route6(uint16_t portid, uint32_t vni, uint8_t *ipv6, uint8_t depth, int socketid)
+int dp_del_route6(uint16_t portid, uint32_t vni, const uint8_t *ipv6, uint8_t depth, int socketid)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -440,20 +440,20 @@ uint32_t dp_get_vm_pxe_ip4(uint16_t portid)
 	return vm_table[portid].info.pxe_ip;
 }
 
-void dp_set_dhcp_range_ip6(uint16_t portid, uint8_t *ipv6, uint8_t depth)
+void dp_set_dhcp_range_ip6(uint16_t portid, const uint8_t *ipv6, uint8_t depth)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(&vm_table[portid].info.dhcp_ipv6, ipv6, 16);
 	vm_table[portid].info.depth = depth;
 }
 
-void dp_set_vm_ip6(uint16_t portid, uint8_t *ipv6)
+void dp_set_vm_ip6(uint16_t portid, const uint8_t *ipv6)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(&vm_table[portid].info.vm_ipv6, ipv6, 16);
 }
 
-void dp_set_vm_ul_ip6(uint16_t portid, uint8_t *ipv6)
+void dp_set_vm_ul_ip6(uint16_t portid, const uint8_t *ipv6)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(&vm_table[portid].ul_ipv6, ipv6, 16);
@@ -465,19 +465,19 @@ void dp_set_mac(uint16_t portid)
 	rte_eth_macaddr_get(portid, &vm_table[portid].info.own_mac);
 }
 
-struct rte_ether_addr *dp_get_mac(uint16_t portid)
+const struct rte_ether_addr *dp_get_mac(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return &vm_table[portid].info.own_mac;
 }
 
-void dp_set_neigh_mac(uint16_t portid, struct rte_ether_addr *neigh)
+void dp_set_neigh_mac(uint16_t portid, const struct rte_ether_addr *neigh)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_ether_addr_copy(neigh,  &vm_table[portid].info.neigh_mac);
 }
 
-struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
+const struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 {
 	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return &vm_table[portid].info.neigh_mac;
@@ -577,10 +577,4 @@ struct dp_fwall_head *dp_get_fwall_head(int port_id)
 {
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 	return &vm_table[port_id].fwall_head;
-}
-
-void dp_set_fwall_head(int port_id, struct dp_fwall_head *fwall_head)
-{
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-	vm_table[port_id].fwall_head = *fwall_head;
 }

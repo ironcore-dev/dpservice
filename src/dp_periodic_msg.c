@@ -11,7 +11,7 @@ static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
 static uint8_t dp_mc_mac[6] = {0x33,0x33,0x00,0x00,0x00,0x01};
 
 
-void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type)
+void send_to_all_vfs(const struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type)
 {
 	struct dp_flow *df;
 	struct rte_ether_hdr *eth_hdr;
@@ -19,7 +19,7 @@ void send_to_all_vfs(struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint1
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	struct dp_ports *ports = get_dp_ports();
 	struct rte_mbuf *clone_buf;
-	struct rte_ether_addr *mac;
+	const struct rte_ether_addr *mac;
 	int ret;
 
 	DP_FOREACH_PORT(ports, port) {

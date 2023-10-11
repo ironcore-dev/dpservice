@@ -125,9 +125,9 @@ static inline void dp_graphtrace_sprint_l4(int proto, void **p_pkt_data, size_t 
 		dp_graphtrace_sprint_icmp(p_pkt_data, p_pos, buf, bufsize);
 }
 
-void dp_graphtrace_sprint(struct rte_mbuf *pkt, char *buf, size_t bufsize)
+void dp_graphtrace_sprint(const struct rte_mbuf *pkt, char *buf, size_t bufsize)
 {
-	void *pkt_data = rte_pktmbuf_mtod((struct rte_mbuf *)pkt, void *);
+	void *pkt_data = rte_pktmbuf_mtod((const struct rte_mbuf *)pkt, void *);
 	uint32_t inner_l3_type = pkt->packet_type & RTE_PTYPE_INNER_L3_MASK;
 	size_t pos = 0;
 	int proto = 0;

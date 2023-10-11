@@ -56,10 +56,10 @@ struct dp_fwall_rule {
 struct dp_grpc_responder;
 
 void dp_init_firewall_rules_list(int port_id);
-int dp_add_firewall_rule(struct dp_fwall_rule *new_rule, int port_id);
-int dp_delete_firewall_rule(char *rule_id, int port_id);
-struct dp_fwall_rule *dp_get_firewall_rule(char *rule_id, int port_id);
-enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr, int sender_port_id);
+int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, int port_id);
+int dp_delete_firewall_rule(const char *rule_id, int port_id);
+struct dp_fwall_rule *dp_get_firewall_rule(const char *rule_id, int port_id);
+enum dp_fwall_action dp_get_firewall_action(struct rte_mbuf *m);
 int dp_list_firewall_rules(int port_id, struct dp_grpc_responder *responder);
 void dp_del_all_firewall_rules(int port_id);
 

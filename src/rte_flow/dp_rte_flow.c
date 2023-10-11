@@ -36,16 +36,16 @@ uint16_t extract_outer_ethernet_header(struct rte_mbuf *pkt)
 	return df->tun_info.l3_type;
 }
 
-int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
+int extract_inner_l3_header(struct rte_mbuf *pkt, const void *hdr, uint16_t offset)
 {
 	struct dp_flow *df;
-	struct rte_ipv4_hdr *ipv4_hdr;
-	struct rte_ipv6_hdr *ipv6_hdr;
+	const struct rte_ipv4_hdr *ipv4_hdr;
+	const struct rte_ipv6_hdr *ipv6_hdr;
 
 	df = dp_get_flow_ptr(pkt);
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		if (hdr)
-			ipv4_hdr = (struct rte_ipv4_hdr *)hdr;
+			ipv4_hdr = (const struct rte_ipv4_hdr *)hdr;
 		else
 			ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, offset);
 
@@ -55,7 +55,7 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		return df->l4_type;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		if (hdr)
-			ipv6_hdr = (struct rte_ipv6_hdr *)hdr;
+			ipv6_hdr = (const struct rte_ipv6_hdr *)hdr;
 		else
 			ipv6_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv6_hdr *, offset);
 
@@ -68,19 +68,18 @@ int extract_inner_l3_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	return DP_ERROR;
 }
 
-int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
+int extract_inner_l4_header(struct rte_mbuf *pkt, const void *hdr, uint16_t offset)
 {
 	struct dp_flow *df;
-	struct rte_tcp_hdr *tcp_hdr;
-	struct rte_udp_hdr *udp_hdr;
-
-	struct rte_icmp_hdr *icmp_hdr;
-	struct icmp6hdr *icmp6_hdr;
+	const struct rte_tcp_hdr *tcp_hdr;
+	const struct rte_udp_hdr *udp_hdr;
+	const struct rte_icmp_hdr *icmp_hdr;
+	const struct icmp6hdr *icmp6_hdr;
 
 	df = dp_get_flow_ptr(pkt);
 	if (df->l4_type == DP_IP_PROTO_TCP) {
 		if (hdr != NULL)
-			tcp_hdr = (struct rte_tcp_hdr *)hdr;
+			tcp_hdr = (const struct rte_tcp_hdr *)hdr;
 		else
 			tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, offset);
 
@@ -89,7 +88,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		return DP_OK;
 	} else if (df->l4_type == DP_IP_PROTO_UDP) {
 		if (hdr != NULL)
-			udp_hdr = (struct rte_udp_hdr *)hdr;
+			udp_hdr = (const struct rte_udp_hdr *)hdr;
 		else
 			udp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_udp_hdr *, offset);
 
@@ -98,7 +97,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		return DP_OK;
 	} else if (df->l4_type == DP_IP_PROTO_ICMP) {
 		if (hdr != NULL)
-			icmp_hdr = (struct rte_icmp_hdr *)hdr;
+			icmp_hdr = (const struct rte_icmp_hdr *)hdr;
 		else
 			icmp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_icmp_hdr *, offset);
 
@@ -108,7 +107,7 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 		return DP_OK;
 	} else if (df->l4_type == DP_IP_PROTO_ICMPV6) {
 		if (hdr != NULL)
-			icmp6_hdr = (struct icmp6hdr *)hdr;
+			icmp6_hdr = (const struct icmp6hdr *)hdr;
 		else
 			icmp6_hdr = rte_pktmbuf_mtod_offset(pkt, struct icmp6hdr *, offset);
 
@@ -119,19 +118,20 @@ int extract_inner_l4_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
 	return DP_ERROR;
 }
 
-int extract_outer_ipv6_header(struct rte_mbuf *pkt, void *hdr, uint16_t offset)
+int extract_outer_ipv6_header(struct rte_mbuf *pkt, const void *hdr, uint16_t offset)
 {
-	struct dp_flow *df = dp_get_flow_ptr(pkt);
-	struct rte_ipv6_hdr *ipv6_hdr = NULL;
+	struct dp_flow *df;
+	const struct rte_ipv6_hdr *ipv6_hdr;
 
 	if (hdr != NULL)
-		ipv6_hdr = (struct rte_ipv6_hdr *)hdr;
+		ipv6_hdr = (const struct rte_ipv6_hdr *)hdr;
 	else
 		ipv6_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv6_hdr *, offset);
 
 	if (!ipv6_hdr)
 		return DP_ERROR;
 
+	df = dp_get_flow_ptr(pkt);
 	rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
 	rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
 	df->tun_info.proto_id = ipv6_hdr->proto;

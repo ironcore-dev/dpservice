@@ -22,7 +22,7 @@ void dp_vnf_free(void)
 	dp_free_jhash_table(vnf_handle_tbl);
 }
 
-int dp_set_vnf_value(void *key, struct dp_vnf_value *val)
+int dp_set_vnf_value(const void *key, const struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val;
 	int ret;
@@ -58,7 +58,7 @@ int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t po
 	return dp_find_vnf_with_value(val);
 }
 
-int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type)
+int dp_get_portid_with_vnf_key(const void *key, enum vnf_type v_type)
 {
 	struct dp_vnf_value *temp_val;
 	uint16_t ret_val;
@@ -74,7 +74,7 @@ int dp_get_portid_with_vnf_key(void *key, enum vnf_type v_type)
 	return ret_val;
 }
 
-struct dp_vnf_value *dp_get_vnf_value_with_key(void *key)
+struct dp_vnf_value *dp_get_vnf_value_with_key(const void *key)
 {
 	struct dp_vnf_value *temp_val;
 
@@ -84,7 +84,7 @@ struct dp_vnf_value *dp_get_vnf_value_with_key(void *key)
 	return temp_val;
 }
 
-int dp_del_vnf_with_vnf_key(void *key)
+int dp_del_vnf_with_vnf_key(const void *key)
 {
 	struct dp_vnf_value *temp_val;
 	int ret;
@@ -106,7 +106,7 @@ int dp_del_vnf_with_vnf_key(void *key)
 	return DP_OK;
 }
 
-static __rte_always_inline bool dp_vnf_equal(struct dp_vnf_value *val1, struct dp_vnf_value *val2)
+static __rte_always_inline bool dp_vnf_equal(const struct dp_vnf_value *val1, const struct dp_vnf_value *val2)
 {
 	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_ID_VALUE) || (val1->portid == val2->portid))
 		&& val1->alias_pfx.ip == val2->alias_pfx.ip
@@ -114,7 +114,7 @@ static __rte_always_inline bool dp_vnf_equal(struct dp_vnf_value *val1, struct d
 		&& val1->v_type == val2->v_type;
 }
 
-int dp_find_vnf_with_value(struct dp_vnf_value *val)
+int dp_find_vnf_with_value(const struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
@@ -131,7 +131,7 @@ int dp_find_vnf_with_value(struct dp_vnf_value *val)
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-int dp_del_vnf_with_value(struct dp_vnf_value *val)
+int dp_del_vnf_with_value(const struct dp_vnf_value *val)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;

@@ -180,7 +180,8 @@ void dp_graphtrace_free(void)
 
 
 void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
-						 struct rte_node *node, struct rte_node *next_node,
+						 const struct rte_node *node,
+						 const struct rte_node *next_node,
 						 void **objs, uint16_t nb_objs,
 						 uint16_t dst_port_id)
 {
@@ -222,7 +223,7 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
 
 #ifdef ENABLE_PYTEST
 __rte_format_printf(2, 3)
-static void dp_graphtrace_log(void *obj, const char *format, ...)
+static void dp_graphtrace_log(const void *obj, const char *format, ...)
 {
 	char buf[1024];
 	va_list args;
@@ -237,14 +238,14 @@ static void dp_graphtrace_log(void *obj, const char *format, ...)
 	DP_STRUCTURED_LOG(DEBUG, GRAPH, buf);
 }
 
-void _dp_graphtrace_log_node(struct rte_node *node, void *obj)
+void _dp_graphtrace_log_node(const struct rte_node *node, void *obj)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
 		dp_graphtrace_log(obj, "%-14s: %3u                  : ",
 					   node->name, dp_get_pkt_mark(obj)->id);
 }
 
-void _dp_graphtrace_log_node_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
+void _dp_graphtrace_log_node_burst(const struct rte_node *node, void **objs, uint16_t nb_objs)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_RECV)
 		for (uint32_t i = 0; i < nb_objs; ++i)
@@ -252,14 +253,14 @@ void _dp_graphtrace_log_node_burst(struct rte_node *node, void **objs, uint16_t 
 						   node->name, dp_get_pkt_mark(objs[i])->id);
 }
 
-void _dp_graphtrace_log_next(struct rte_node *node, void *obj, rte_edge_t next_index)
+void _dp_graphtrace_log_next(const struct rte_node *node, void *obj, rte_edge_t next_index)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		dp_graphtrace_log(obj, "%-14s: %3u -> %-14s: ",
 					   node->name, dp_get_pkt_mark(obj)->id, node->nodes[next_index]->name);
 }
 
-void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index)
+void _dp_graphtrace_log_next_burst(const struct rte_node *node, void **objs, uint16_t nb_objs, rte_edge_t next_index)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint32_t i = 0; i < nb_objs; ++i)
@@ -267,7 +268,7 @@ void _dp_graphtrace_log_next_burst(struct rte_node *node, void **objs, uint16_t 
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, node->nodes[next_index]->name);
 }
 
-void _dp_graphtrace_log_rx_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
+void _dp_graphtrace_log_rx_burst(const struct rte_node *node, void **objs, uint16_t nb_objs)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint32_t i = 0; i < nb_objs; ++i)
@@ -275,7 +276,7 @@ void _dp_graphtrace_log_rx_burst(struct rte_node *node, void **objs, uint16_t nb
 						   ((struct rte_mbuf *)objs[i])->port, dp_get_pkt_mark(objs[i])->id, node->name, i);
 }
 
-void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
+void _dp_graphtrace_log_tx_burst(const struct rte_node *node, void **objs, uint16_t nb_objs, uint16_t port_id)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint32_t i = 0; i < nb_objs; ++i)
@@ -283,7 +284,7 @@ void _dp_graphtrace_log_tx_burst(struct rte_node *node, void **objs, uint16_t nb
 						   node->name, i, dp_get_pkt_mark(objs[i])->id, port_id);
 }
 
-void _dp_graphtrace_log_drop_burst(struct rte_node *node, void **objs, uint16_t nb_objs)
+void _dp_graphtrace_log_drop_burst(const struct rte_node *node, void **objs, uint16_t nb_objs)
 {
 	if (graphtrace_loglevel >= DP_GRAPHTRACE_LOGLEVEL_NEXT)
 		for (uint32_t i = 0; i < nb_objs; ++i)

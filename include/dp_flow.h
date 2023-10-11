@@ -140,26 +140,26 @@ struct flow_age_ctx {
 
 };
 
-bool dp_are_flows_identical(struct flow_key *key1, struct flow_key *key2);
-int dp_get_flow(struct flow_key *key, struct flow_value **p_flow_val);
-int dp_add_flow(struct flow_key *key, struct flow_value *flow_val);
-void dp_delete_flow(struct flow_key *key);
+bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2);
+int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val);
+int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val);
+void dp_delete_flow(const struct flow_key *key);
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
-void dp_invert_flow_key(struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
+void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
 int dp_flow_init(int socket_id);
 void dp_flow_free(void);
 void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct dp_ref *ref);
-void dp_free_network_nat_port(struct flow_value *cntrack);
+void dp_free_network_nat_port(const struct flow_value *cntrack);
 void dp_remove_nat_flows(uint16_t port_id, int nat_type);  // TODO create proper enum!
 void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port);
 void dp_remove_vm_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni);
 
-hash_sig_t dp_get_conntrack_flow_hash_value(struct flow_key *key);
+hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key);
 
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
-int dp_del_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
+int dp_del_rte_age_ctx(struct flow_value *cntrack, const struct flow_age_ctx *ctx);
 
 
 #ifdef __cplusplus

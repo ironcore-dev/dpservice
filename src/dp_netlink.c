@@ -12,7 +12,7 @@
 #include "dp_util.h"
 
 static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *neigh,
-						 struct rte_ether_addr *own_mac)
+						 const struct rte_ether_addr *own_mac)
 {
 	struct rtattr *rt_attr;
 	struct ndmsg *rt_msg;
@@ -63,7 +63,7 @@ static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bu
 	return msg_len;
 }
 
-int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr* neigh, struct rte_ether_addr* own_mac)
+int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac)
 { 
 	struct sockaddr_nl sa = {
 		.nl_family = AF_NETLINK,
