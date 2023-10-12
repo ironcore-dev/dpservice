@@ -76,7 +76,7 @@ def testDpService(build_path, print_header):
 
 	to_run = [ suite for suite in suites if not args.suite or args.suite.lower() == suite.label.lower() ]
 	for i, suite in enumerate(to_run):
-		print(f"\n{print_header}: TEST {i+1}/{len(to_run)} ({suite.label} tests):")
+		print(f"\n{print_header} TEST {i+1}/{len(to_run)}: {suite.label} tests")
 		command = ['pytest-3', '-x', '-v'] + suite.args + suite.files
 		print(' '.join(command))
 		result = subprocess.run(command, env=env)
@@ -98,4 +98,4 @@ if __name__ == '__main__':
 	parser.add_argument("build_dirs", nargs="*", default=[f"{script_path}/../build"], help="Path(s) to dpservice-bin build directory")
 	args = parser.parse_args()
 	for i, build_dir in enumerate(args.build_dirs):
-		testDpService(build_dir, f"DIR {i+1}/{len(args.build_dirs)}")
+		testDpService(build_dir, f"[{i+1}/{len(args.build_dirs)}]")
