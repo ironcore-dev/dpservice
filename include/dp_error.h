@@ -61,6 +61,7 @@ const char *dp_strerror_verbose(int error);
 	ERR(NO_BACKIP,							421) \
 	ERR(NO_LB,								422) \
 	ERR(NO_DROP_SUPPORT,					441) \
+	ERR(PARTIAL_CAPTURE,					442) \
 
 #define _DP_GRPC_ERROR_ENUM(NAME, NUMBER) \
 	DP_GRPC_ERR_##NAME = _DP_GRPC_ERRCODES - NUMBER,

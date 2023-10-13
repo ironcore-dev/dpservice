@@ -16,6 +16,8 @@
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_api.h"
 #include "grpc/dp_grpc_responder.h"
+#include "monitoring/dp_monitoring.h"
+#include "rte_flow/dp_rte_flow_init.h"
 
 static uint32_t pfx_counter = 0;
 
@@ -882,6 +884,57 @@ static int dp_process_get_version(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
+static int dp_process_capture_start(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_capture_config *request = &responder->request.start_capture;
+	struct dpgrpc_capture_stat	*reply = dp_grpc_single_reply(responder);
+	int port_id, count = 0;
+
+	dp_set_capture_node_ipv6_addr(request->dst_addr6);
+	dp_set_capture_udp_src_port(request->udp_src_port);
+	dp_set_capture_udp_dst_port(request->udp_dst_port);
+
+	dp_set_capture_enabled(true);
+
+	for (int i = 0; i < request->filled_interface_info_count; ++i) {
+		switch (request->interfaces[i].type) {
+		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
+			port_id = dp_get_portid_with_vm_handle(request->interfaces[i].interface_info.iface_id);
+			if (DP_FAILED(port_id))
+				continue;
+			break;
+		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
+			//index check is done on the grpc client side
+			port_id = request->interfaces[i].interface_info.pf_index == 0 ? dp_port_get_pf0_id() : dp_port_get_pf1_id();
+			break;
+		}
+
+		if (DP_FAILED(dp_turn_on_offload_pkt_capture_on_single_iface(port_id)))
+			continue;
+
+		count ++;
+	}
+
+	reply->iface_cnt = count;
+
+	if (count < request->filled_interface_info_count)
+		return DP_GRPC_ERR_PARTIAL_CAPTURE;
+
+	return DP_GRPC_OK;
+}
+
+static int dp_process_capture_stop(struct dp_grpc_responder *responder)
+{
+	// struct dpgrpc_capture_config *request = &responder->request.stop_capture;
+	// int port_id;
+
+	//todo: add error check here, and roll back
+	dp_turn_off_offload_pkt_capture_on_all_ifaces();
+
+	return DP_GRPC_OK;
+}
+
+
 void dp_process_request(struct rte_mbuf *m)
 {
 	struct dp_grpc_responder responder;
@@ -1001,6 +1054,12 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_ResetVni:
 		ret = dp_process_reset_vni(&responder);
+		break;
+	case DP_REQ_TYPE_CaptureStart:
+		ret = dp_process_capture_start(&responder);
+		break;
+	case DP_REQ_TYPE_CaptureStop:
+		ret = dp_process_capture_stop(&responder);
 		break;
 	// DP_REQ_TYPE_CheckInitialized is handled by the gRPC thread
 	default:
