@@ -33,10 +33,23 @@ static const struct rte_flow_attr dp_flow_attr_egress = {
 	.transfer = 0,
 };
 
-static const struct rte_flow_attr dp_flow_pf_attr_transfer = {
+static const struct rte_flow_attr dp_flow_pf_attr_transfer_special = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
 	.ingress = 0,
+	.egress = 0,
+	.transfer = 1,
+};
+
+
+static const struct rte_flow_attr dp_flow_pf_attr_transfer = {
+	.group = DP_RTE_FLOW_VNET_GROUP,
+	.priority = 0,
+#ifdef ENABLE_DPDK_22_11
+	.ingress = 0,
+#else
+	.ingress = 1,
+#endif
 	.egress = 0,
 	.transfer = 1,
 };
@@ -331,6 +344,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_action actions[7];            // + end
 	int action_cnt = 0;
 
+	struct rte_flow_action_jump jump_action; // 1
+	struct rte_flow_action special_moni_action[2];
+	int special_moni_action_cnt = 0;
+
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
 	struct rte_flow_action *age_action;
@@ -373,6 +390,19 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		return DP_ERROR;
 
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
+
+	// create special actions
+	dp_set_jump_group_action(&special_moni_action[special_moni_action_cnt++], &jump_action, DP_RTE_FLOW_MONITORING_GROUP);
+	dp_set_end_action(&special_moni_action[special_moni_action_cnt++]);
+	struct rte_flow *sp_flow;
+
+	sp_flow = dp_install_rte_flow(m->port, &dp_flow_pf_attr_transfer_special, pattern, special_moni_action);
+	if (!sp_flow) {
+		printf("special moni rule failed \n");
+		return DP_ERROR;
+	} else {
+		printf("special moni rule success \n");
+	}
 
 	// remove the IPIP header and replace it with a standard Ethernet header
 	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, DP_IPIP_ENCAP_HEADER_SIZE);

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "dp_util.h"
 #include "dp_firewall.h"
+#include "monitoring/dp_monitoring.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +57,6 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_ResetVni,
 	DP_REQ_TYPE_CaptureStart,
 	DP_REQ_TYPE_CaptureStop,
-	DP_REQ_TYPE_CaptureInterfaceSet,
 };
 
 // in sync with dpdk proto!
@@ -67,7 +67,7 @@ enum dpgrpc_vni_type {
 };
 
 enum dpgrpc_capture_iface_type {
-	DP_CAPTURE_IFACE_TYPE_ALL,
+	DP_CAPTURE_IFACE_TYPE_UNKNOWN,
 	DP_CAPTURE_IFACE_TYPE_SINGLE_PF,
 	DP_CAPTURE_IFACE_TYPE_SINGLE_VF,
 };
@@ -169,18 +169,25 @@ struct dpgrpc_versions {
 	char					app[DP_GRPC_VERSION_MAX_LEN];
 };
 
-struct dpgrpc_capture_config {
-	uint8_t			dst_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	uint32_t		udp_src_port;
-	uint32_t		udp_dst_port;
-};
-
 struct dpgrpc_capture_interface {
 	enum dpgrpc_capture_iface_type	type;
+	uint8_t							status;
 	union {
 		char	iface_id[VM_IFACE_ID_MAX_LEN];
 		uint8_t pf_index;
 	} interface_info;
+};
+
+struct dpgrpc_capture_config {
+	uint8_t			dst_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t			filled_interface_info_count;
+	uint32_t		udp_src_port;
+	uint32_t		udp_dst_port;
+	struct dpgrpc_capture_interface interfaces[DP_CAPTURE_MAX_PORT_NUM];
+};
+
+struct dpgrpc_capture_stat {
+	uint8_t			iface_cnt;
 };
 
 struct dpgrpc_request {
@@ -222,8 +229,8 @@ struct dpgrpc_request {
 		struct dpgrpc_vni		vni_reset;
 		struct dpgrpc_versions	get_version;
 		struct dpgrpc_capture_config	start_capture;
-		struct dpgrpc_capture_config	stop_capture;
-		struct dpgrpc_capture_interface	set_capture_interface;
+		// struct dpgrpc_capture_config	stop_capture;
+		// struct dpgrpc_capture_interface	set_capture_interface;
 	};
 };
 
@@ -261,6 +268,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_fwrule_info	fwrule;
 		struct dpgrpc_vni_in_use	vni_in_use;
 		struct dpgrpc_versions		versions;
+		struct dpgrpc_capture_stat 	capture_stat;
 	};
 };
 

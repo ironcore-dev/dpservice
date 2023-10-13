@@ -541,28 +541,6 @@ void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
 	reply_.set_underlay_route(strbuf);
 }
 
-const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
-{
-	DPGRPC_LOG_INFO("Start packet capture",
-				DP_LOG_IPV6STR(request_.sink_node_ip().c_str()),
-				DP_LOG_PORT(request_.udp_src_port()),
-				DP_LOG_PORT(request_.udp_dst_port()));
-
-	if (!GrpcConv::StrToIpv6(request_.sink_node_ip(), request->start_capture.dst_addr6))
-		return "Invalid sink_node_ip";
-	if (request_.udp_src_port() > UINT16_MAX)
-		return "Invalid udp_src_port";
-	if (request_.udp_dst_port() > UINT16_MAX)
-		return "Invalid udp_dst_port";
-	
-	request->start_capture.udp_src_port = request_.udp_src_port();
-	request->start_capture.udp_dst_port = request_.udp_dst_port();
-	return NULL;
-}
-void CaptureStartCall::ParseReply(struct dpgrpc_reply* reply)
-{
-}
-
 const char* CaptureStopCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Stop packet capture");
@@ -573,35 +551,59 @@ void CaptureStopCall::ParseReply(struct dpgrpc_reply* reply)
 {
 }
 
-const char* CaptureInterfaceSetCall::FillRequest(struct dpgrpc_request* request)
+const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 {
-	if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interface_type(), &request->set_capture_interface.type))
-		return "Invalid interface_type";
 
-	switch (request->set_capture_interface.type) {
-	case DP_CAPTURE_IFACE_TYPE_ALL:
-		DPGRPC_LOG_INFO("Set packet capture interface",
-						DP_LOG_PORT_TYPE(request_.interface_type()));
-		break;
-	case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
-		DPGRPC_LOG_INFO("Set packet capture interface",
-						DP_LOG_PORT_TYPE(request_.interface_type()),
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		if (SNPRINTF_FAILED(request->set_capture_interface.interface_info.iface_id, request_.interface_id()))
-			return "Invalid interface_id";
-		break;
-	case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
-		DPGRPC_LOG_INFO("Set packet capture interface",
-						DP_LOG_PORT_TYPE(request_.interface_type()),
-						DP_LOG_IFACE(request_.interface_id().c_str()));
-		request->set_capture_interface.interface_info.pf_index = request_.interface_index();
-		break;
+	DPGRPC_LOG_INFO("Start packet capture",
+				DP_LOG_IPV6STR(request_.sink_node_ip().address().c_str()),
+				DP_LOG_PORT(request_.udp_src_port()),
+				DP_LOG_PORT(request_.udp_dst_port()));
 
+	if (!GrpcConv::StrToIpv6(request_.sink_node_ip().address(), request->start_capture.dst_addr6))
+		return "Invalid sink_node_ip";
+	if (request_.udp_src_port() > UINT16_MAX)
+		return "Invalid udp_src_port";
+	if (request_.udp_dst_port() > UINT16_MAX)
+		return "Invalid udp_dst_port";
+	
+	request->start_capture.udp_src_port = request_.udp_src_port();
+	request->start_capture.udp_dst_port = request_.udp_dst_port();
+
+	if (request_.interfaces_size() > DP_CAPTURE_MAX_PORT_NUM)
+		return "Too many interfaces to be captured";
+	
+	request->start_capture.filled_interface_info_count = 0;
+	for (int i = 0; i < request_.interfaces_size(); ++i) {
+		if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interfaces(i).interface_type(), &request->start_capture.interfaces[i].type)) {
+			request->start_capture.interfaces[i].type = DP_CAPTURE_IFACE_TYPE_UNKNOWN;
+			continue;
+		}
+
+		switch (request->start_capture.interfaces[i].type) {
+		case DP_CAPTURE_IFACE_TYPE_UNKNOWN:
+			continue;
+		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
+			DPGRPC_LOG_INFO("Set packet capture interface vf",
+							DP_LOG_PORT_TYPE(request_.interfaces(i).interface_type()),
+							DP_LOG_IFACE(request_.interfaces(i).interface_id().c_str()));
+			if (SNPRINTF_FAILED(request->start_capture.interfaces[i].interface_info.iface_id, request_.interfaces(i).interface_id()))
+				request->start_capture.interfaces[i].type = DP_CAPTURE_IFACE_TYPE_UNKNOWN;
+			break;
+		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
+			DPGRPC_LOG_INFO("Set packet capture interface pf",
+							DP_LOG_PORT_TYPE(request_.interfaces(i).interface_type()),
+							DP_LOG_IFACE_INDEX(request_.interfaces(i).interface_index()));
+			// TODO: maybe a validity check here for indexes
+			request->start_capture.interfaces[i].interface_info.pf_index = request_.interfaces(i).interface_index();
+			break;
+		}
+
+		request->start_capture.filled_interface_info_count++;
 	}
 	return NULL;
 }
 
-void CaptureInterfaceSetCall::ParseReply(struct dpgrpc_reply* reply)
+void CaptureStartCall::ParseReply(struct dpgrpc_reply* reply)
 {
 }
 

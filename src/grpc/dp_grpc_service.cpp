@@ -115,6 +115,8 @@ void GRPCService::HandleRpcs()
 	new CheckVniInUseCall();
 	new ResetVniCall();
 	new GetVersionCall();
+	new CaptureStartCall();
+	new CaptureStopCall();
 
 	while (cq_->Next(&tag, &ok) && ok) {
 		call = static_cast<BaseCall*>(tag);

@@ -25,6 +25,7 @@ namespace GrpcConv
 	bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port);
 
 	bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type);
+	CaptureInterfaceType CaptureInterfaceTypeToGrpc(enum dpgrpc_capture_iface_type dp_capture_iface_type);
 
 	const char *Ipv4ToStr(uint32_t ipv4);
 

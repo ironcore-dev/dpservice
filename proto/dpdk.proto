@@ -39,15 +39,9 @@ enum VniType {
 	VNI_BOTH = 2;
 }
 
-enum PhysicalInterfaceIndex {
-	PF0 = 0;
-	PF1 = 1;
-}
-
 enum CaptureInterfaceType {
-	ALL = 0;
-	SINGLE_PF = 1;
-	SINGLE_VF = 2;
+	SINGLE_PF = 0;
+	SINGLE_VF = 1;
 }
 
 //// STRUCTURES
@@ -536,26 +530,25 @@ message DeleteFirewallRuleResponse {
 	Status status = 1;
 }
 
+message CapturedInterface {
+	CaptureInterfaceType interface_type = 1;
+	oneof interface_info {
+		bytes interface_id = 2;
+		uint32 interface_index = 3;
+	}
+
+}
+
 message CaptureStartRequest {
-	bytes sink_node_ip = 1;
+	IpAddress sink_node_ip = 1;
 	uint32 udp_src_port = 2;
 	uint32 udp_dst_port = 3;
+	repeated CapturedInterface interfaces = 4;
 }
 
 message CaptureStartResponse {
 	Status status = 1;
-}
-
-message CaptureInterfaceSetRequest {
-	CaptureInterfaceType interface_type = 1;
-	oneof interface_info {
-		bytes interface_id = 2;
-		PhysicalInterfaceIndex interface_index = 3;
-	}
-}
-
-message CaptureInterfaceSetResponse {
-	Status status = 1;
+	uint32 captured_interface_cnt = 2;
 }
 
 message CaptureStopRequest {
@@ -563,6 +556,7 @@ message CaptureStopRequest {
 
 message CaptureStopResponse {
 	Status status = 1;
+	uint32 captured_interface_cnt = 2;
 }
 
 service DPDKonmetal {
@@ -655,6 +649,5 @@ service DPDKonmetal {
 
 	//// PACKET CAPTURE
 	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}
-	rpc CaptureInterfaceSet(CaptureInterfaceSetRequest) returns (CaptureInterfaceSetResponse) {}
 	rpc CaptureStop(CaptureStopRequest) returns (CaptureStopResponse) {}
 }

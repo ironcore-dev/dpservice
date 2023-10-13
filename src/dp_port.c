@@ -459,7 +459,7 @@ static int dp_vf_init_monitoring_rule_rollback(uint32_t port_id)
 	struct dp_port *port = dp_port_get_vf(port_id);
 	struct rte_flow_error error;
 
-	if (DP_FAILED(rte_flow_destroy(port->port_id, port->default_flow, &error))) {
+	if (DP_FAILED(rte_flow_destroy(port->port_id, port->default_jump_flow, &error))) {
 		DPS_LOG_ERR("Failed to destroy default flow while rollback from vf init monitoring rule installation", \
 			DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;
@@ -480,10 +480,11 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 
 	// at least one rule must be there, otherwise new packets cannot be delivered to software path
 	// same as the isolation rule on pf
-	if (dp_is_graphtrace_hw_enabled())
-		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
-	else
-		ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
+	// if (dp_is_graphtrace_hw_enabled())
+	// 	ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
+	// else
+	ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
+	// ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
 
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
@@ -491,17 +492,41 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 	}
 
 	// this rule must be there, otherwise new packets cannot be delivered to software path, making communication failure
-	ret = dp_install_default_capture_rule_in_vnet_group(port_id);
+	// ret = dp_install_default_capture_rule_in_vnet_group(port_id);
+	// if (DP_FAILED(ret)) {
+	// 	DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+	// 	return DP_ERROR;
+	// }
+
+	// ret = dp_install_default_rule_in_monitoring_group(port_id, true);
+	// if (DP_FAILED(ret)) {
+	// 	DPS_LOG_WARNING("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+	// 	if (DP_FAILED(dp_vf_init_monitoring_rule_rollback(port_id))) {
+	// 		DPS_LOG_ERR("Cannot rollback from the monitoring rule installation on vf", DP_LOG_PORTID(port_id));
+	// 		return DP_ERROR;
+	// 	}
+	// }
+
+	return DP_OK;
+}
+
+
+static int dp_install_pf_init_rte_rules(uint32_t port_id)
+{
+	int ret;
+
+	// this rule must be installed before any other rules
+	ret = dp_port_install_isolated_mode(port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot install default isolation rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
-	ret = dp_install_default_rule_in_monitoring_group(port_id);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-		if (DP_FAILED(dp_vf_init_monitoring_rule_rollback(port_id))) {
-			DPS_LOG_ERR("Cannot rollback from the monitoring rule installation on vf", DP_LOG_PORTID(port_id));
+	if (dp_conf_is_offload_enabled()) {
+		ret = dp_install_default_rule_in_monitoring_group(port_id, false);
+
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -560,6 +585,30 @@ int dp_port_start(uint16_t port_id)
 
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
+
+	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
+		if (dp_conf_is_offload_enabled()) {
+#ifdef ENABLE_PYTEST
+			if (port->peer_pf_port_id != dp_port_get_pf1_id())
+#endif
+			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
+				return DP_ERROR;
+		}
+
+		if (port->port_type == DP_PORT_PF) {
+			ret = dp_install_pf_init_rte_rules(port_id);
+			if (DP_FAILED(ret))
+				assert(0);
+		}
+
+
+		if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled()) {
+			ret = dp_install_vf_init_rte_rules(port_id);
+			if (DP_FAILED(ret))
+				assert(0); // if any flow rule failed, stop process running due to possible hw/driver failure
+		}
+	}
+
 	return DP_OK;
 }
 
