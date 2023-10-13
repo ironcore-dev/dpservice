@@ -83,14 +83,14 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 
 void dp_process_event_hardware_capture_start_msg(__rte_unused struct rte_mbuf *m)
 {
-	if (DP_FAILED(dp_turn_on_vf_offload_tracing()))
-		DPS_LOG_WARNING("Cannot turn on offload tracing");
+	// if (DP_FAILED(dp_turn_on_vf_offload_tracing()))
+	// 	DPS_LOG_WARNING("Cannot turn on offload tracing");
 }
 
 void dp_process_event_hardware_capture_stop_msg(__rte_unused struct rte_mbuf *m)
 {
-	if (DP_FAILED(dp_turn_off_vf_offload_tracing()))
-		DPS_LOG_WARNING("Cannot turn off offload tracing");
+	// if (DP_FAILED(dp_turn_off_vf_offload_tracing()))
+	// 	DPS_LOG_WARNING("Cannot turn off offload tracing");
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows

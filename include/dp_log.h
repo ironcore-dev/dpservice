@@ -70,6 +70,7 @@ extern "C" {
 #define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE), _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
 #define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)
 #define DP_LOG_IFACE(VALUE) _DP_LOG_STR("interface_id", VALUE)
+#define DP_LOG_IFACE_INDEX(VALUE) _DP_LOG_INT("interface_index", VALUE)
 #define DP_LOG_TVNI(VALUE) _DP_LOG_UINT("t_vni", VALUE)
 #define DP_LOG_PCI(VALUE) _DP_LOG_STR("pci", VALUE)
 #define DP_LOG_PXE_SRV(VALUE) _DP_LOG_STR("pxe_server", VALUE)

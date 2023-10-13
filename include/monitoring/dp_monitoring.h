@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+#define DP_CAPTURE_MAX_PORT_NUM 16
+
 enum dp_event_type {
 	DP_EVENT_TYPE_UNKNOWN,
 	DP_EVENT_TYPE_LINK_STATUS,
@@ -33,6 +35,20 @@ struct dp_event_msg {
 };
 
 void dp_process_event_msg(struct rte_mbuf *m);
+
+void dp_set_capture_node_ipv6_addr(uint8_t *addr);
+void dp_set_capture_udp_src_port(uint32_t port);
+
+void dp_set_capture_udp_dst_port(uint32_t port);
+uint8_t *dp_get_capture_node_ipv6_addr(void);
+uint32_t dp_get_capture_udp_src_port(void);
+uint32_t dp_get_capture_udp_dst_port(void);
+
+void dp_set_capture_enabled(bool enabled);
+
+bool dp_get_capture_enabled(void);
+
+
 
 #ifdef __cplusplus
 }
