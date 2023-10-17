@@ -52,14 +52,14 @@ uint8_t *dp_get_capture_node_ipv6_addr(void)
 	return capture_node_ipv6_addr;
 }
 
-uint32_t dp_get_capture_udp_src_port(void)
+uint16_t dp_get_capture_udp_src_port(void)
 {
-	return capture_udp_src_port;
+	return (uint16_t)capture_udp_src_port;
 }
 
-uint32_t dp_get_capture_udp_dst_port(void)
+uint16_t dp_get_capture_udp_dst_port(void)
 {
-	return capture_udp_dst_port;
+	return (uint16_t)capture_udp_dst_port;
 }
 
 void dp_set_capture_enabled(bool enabled)
@@ -71,9 +71,3 @@ bool dp_get_capture_enabled(void)
 {
 	return capture_enabled;
 }
-
-
-
-
-
-

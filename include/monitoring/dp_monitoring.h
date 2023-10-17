@@ -41,13 +41,13 @@ void dp_set_capture_udp_src_port(uint32_t port);
 
 void dp_set_capture_udp_dst_port(uint32_t port);
 uint8_t *dp_get_capture_node_ipv6_addr(void);
-uint32_t dp_get_capture_udp_src_port(void);
-uint32_t dp_get_capture_udp_dst_port(void);
+uint16_t dp_get_capture_udp_src_port(void);
+uint16_t dp_get_capture_udp_dst_port(void);
 
 void dp_set_capture_enabled(bool enabled);
 
 bool dp_get_capture_enabled(void);
-
+ 
 
 
 #ifdef __cplusplus
