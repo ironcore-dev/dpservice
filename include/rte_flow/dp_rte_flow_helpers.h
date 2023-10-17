@@ -67,6 +67,9 @@ static const struct rte_flow_item_ipv4 dp_flow_item_ipv4_src_dst_mask = {
 static const struct rte_flow_item_udp dp_flow_item_udp_src_mask = {
 	.hdr.src_port = 0xffff,
 };
+static const struct rte_flow_item_udp dp_flow_item_udp_dst_mask = {
+	.hdr.dst_port = 0xffff,
+};
 static const struct rte_flow_item_udp dp_flow_item_udp_src_dst_mask = {
 	.hdr.src_port = 0xffff,
 	.hdr.dst_port = 0xffff,
@@ -223,6 +226,18 @@ void dp_set_udp_src_flow_item(struct rte_flow_item *item,
 	item->type = RTE_FLOW_ITEM_TYPE_UDP;
 	item->spec = udp_spec;
 	item->mask = &dp_flow_item_udp_src_mask;
+	item->last = NULL;
+}
+
+static __rte_always_inline
+void dp_set_udp_dst_flow_item(struct rte_flow_item *item,
+							  struct rte_flow_item_udp *udp_spec,
+							  rte_be16_t dst_port)
+{
+	udp_spec->hdr.dst_port = dst_port;
+	item->type = RTE_FLOW_ITEM_TYPE_UDP;
+	item->spec = udp_spec;
+	item->mask = &dp_flow_item_udp_dst_mask;
 	item->last = NULL;
 }
 

@@ -19,6 +19,7 @@ struct rx_node_ctx {
 	uint16_t	port_id;
 	uint16_t	queue_id;
 	bool		enabled;
+	bool		is_pf;
 };
 static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ,
 			  "Rx node context will not fit into the node");
@@ -79,6 +80,8 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 	// save pointer to this node's context for enabling/disabling
 	node_contexts[port_id] = ctx;
 
+
+	ctx->is_pf = dp_port_is_pf(port_id);
 	ctx->port_id = port_id;
 	ctx->queue_id = graph->id;
 	ctx->enabled = false;
