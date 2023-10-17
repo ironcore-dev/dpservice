@@ -180,6 +180,7 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	nr_hairpin_queues = port_type == DP_PORT_VF
 		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
 		: (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs);
+
 	ret = rte_eth_dev_configure(port_id,
 								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
@@ -499,7 +500,7 @@ static int dp_install_pf_init_rte_rules(uint32_t port_id)
 		return DP_ERROR;
 	}
 
-	if (dp_conf_is_offload_enabled()) {
+	if (dp_conf_is_offload_enabled() && port_id == dp_port_get_pf0_id()) {
 		ret = dp_install_default_rule_in_monitoring_group(port_id, false);
 
 		if (DP_FAILED(ret)) {

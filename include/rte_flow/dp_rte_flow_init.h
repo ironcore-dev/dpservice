@@ -25,6 +25,9 @@ int dp_turn_off_offload_pkt_capture_on_single_iface(uint16_t port_id);
 int dp_turn_on_offload_pkt_capture_on_all_ifaces(void);
 int dp_turn_off_offload_pkt_capture_on_all_ifaces(void);
 
+// int dp_pf_install_capture_pkt_isolation_rule(void);
+// int dp_pf_remove_capture_pkt_isolation_rule(void);
+
 void dp_configure_packet_capture_action(uint8_t *encaped_mirror_hdr,
  										struct rte_flow_action_raw_encap *encap_action,
  										struct rte_flow_action_port_id *port_id_action,

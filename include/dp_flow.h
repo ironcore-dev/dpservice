@@ -16,7 +16,7 @@ extern "C" {
 // arbitrary big number
 #define FLOW_MAX						850000
 
-#define DP_FLOW_VAL_AGE_CTX_CAPACITY	5
+#define DP_FLOW_VAL_AGE_CTX_CAPACITY	6
 
 #define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */

@@ -896,6 +896,9 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 
 	dp_set_capture_enabled(true);
 
+	// if (DP_FAILED(dp_pf_install_capture_pkt_isolation_rule()))
+	// 	return DP_GRPC_ERR_CAPTURE_ADD_PF_PICKUP_FLOW;
+
 	for (int i = 0; i < request->filled_interface_info_count; ++i) {
 		switch (request->interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
@@ -918,7 +921,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 	reply->iface_cnt = count;
 
 	if (count < request->filled_interface_info_count)
-		return DP_GRPC_ERR_PARTIAL_CAPTURE;
+		return DP_GRPC_ERR_CAPTURE_INTERFACE_PARTIAL_INIT;
 
 	return DP_GRPC_OK;
 }
@@ -927,6 +930,9 @@ static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 {
 	// struct dpgrpc_capture_config *request = &responder->request.stop_capture;
 	// int port_id;
+
+	// if (DP_FAILED(dp_pf_remove_capture_pkt_isolation_rule()))
+	// 	return DP_GRPC_ERR_CAPTURE_DEL_PF_PICKUP_FLOW;
 
 	//todo: add error check here, and roll back
 	dp_turn_off_offload_pkt_capture_on_all_ifaces();
