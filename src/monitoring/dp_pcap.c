@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include "dp_error.h"
 
-#define DP_PCAP_MTU 1500
+#define DP_PCAP_MTU 9100
 
 int dp_pcap_init(struct dp_pcap *dp_pcap, const char *dump_path)
 {
