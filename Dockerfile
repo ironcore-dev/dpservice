@@ -117,10 +117,15 @@ libgrpc++1.51 \
 iproute2 \
 udev \
 gawk \
-python3 \
 python3-pytest \
 python3-scapy \
+&& apt-get purge g++-12 ipython3 -y \
+&& apt-get autoremove -y \
+&& apt-get clean -y \
 && rm -rf /var/lib/apt/lists/*
+# some packages are for some reason part of python3-scapy installation:
+#   g++-12 with 900MB installed size
+#   ipython3 with 264MB installed size
 
 WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
