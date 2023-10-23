@@ -888,7 +888,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture_config *request = &responder->request.start_capture;
 	struct dpgrpc_capture_stat	*reply = dp_grpc_single_reply(responder);
-	int port_id, count = 0;
+	int port_id, status = DP_GRPC_OK;
 
 	dp_set_capture_node_ipv6_addr(request->dst_addr6);
 	dp_set_capture_udp_src_port(request->udp_src_port);
@@ -896,15 +896,10 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 
 	dp_set_capture_enabled(true);
 
-	// if (DP_FAILED(dp_pf_install_capture_pkt_isolation_rule()))
-	// 	return DP_GRPC_ERR_CAPTURE_ADD_PF_PICKUP_FLOW;
-
 	for (int i = 0; i < request->filled_interface_info_count; ++i) {
 		switch (request->interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
 			port_id = dp_get_portid_with_vm_handle(request->interfaces[i].interface_info.iface_id);
-			if (DP_FAILED(port_id))
-				continue;
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
 			//index check is done on the grpc client side
@@ -912,31 +907,32 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 			break;
 		}
 
-		if (DP_FAILED(dp_turn_on_offload_pkt_capture_on_single_iface(port_id)))
-			continue;
-
-		count ++;
+		if (DP_FAILED(dp_turn_on_offload_pkt_capture_on_single_iface(port_id))) {
+			reply->interface = request->interfaces[i];
+			status = DP_GRPC_ERR_CAPTURE_CANNOT_INIT;
+			break;
+		}
 	}
 
-	reply->iface_cnt = count;
+	if (status == DP_GRPC_ERR_CAPTURE_CANNOT_INIT) {
+		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces())) {
+			status = DP_GRPC_ERR_CAPTURE_INIT_CANNOT_ROLLBACK;
+		}
+	}
 
-	if (count < request->filled_interface_info_count)
-		return DP_GRPC_ERR_CAPTURE_INTERFACE_PARTIAL_INIT;
-
-	return DP_GRPC_OK;
+	return status;
 }
 
 static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 {
-	// struct dpgrpc_capture_config *request = &responder->request.stop_capture;
-	// int port_id;
+	struct dpgrpc_capture_stop	*reply = dp_grpc_single_reply(responder);
+	int ret = dp_turn_off_offload_pkt_capture_on_all_ifaces();
+	
+	if (DP_FAILED(ret)) {
+		return DP_GRPC_ERR_CAPTURE_CANNOT_STOP;
+	}
 
-	// if (DP_FAILED(dp_pf_remove_capture_pkt_isolation_rule()))
-	// 	return DP_GRPC_ERR_CAPTURE_DEL_PF_PICKUP_FLOW;
-
-	//todo: add error check here, and roll back
-	dp_turn_off_offload_pkt_capture_on_all_ifaces();
-
+	reply->port_cnt = ret;
 	return DP_GRPC_OK;
 }
 

@@ -545,6 +545,7 @@ const char* CaptureStopCall::FillRequest(struct dpgrpc_request* request)
 }
 void CaptureStopCall::ParseReply(struct dpgrpc_reply* reply)
 {
+	reply_.set_captured_interface_cnt((uint32_t)reply->capture_stop.port_cnt);
 }
 
 const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
@@ -601,8 +602,12 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 
 void CaptureStartCall::ParseReply(struct dpgrpc_reply* reply)
 {
+	if (reply->capture_stat.interface.type == DP_CAPTURE_IFACE_TYPE_SINGLE_PF) {
+		reply_.set_interface_index(reply->capture_stat.interface.interface_info.pf_index);
+	} else if (reply->capture_stat.interface.type == DP_CAPTURE_IFACE_TYPE_SINGLE_VF) {
+		reply_.set_interface_id(reply->capture_stat.interface.interface_info.iface_id);
+	}
 }
-
 
 const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
 {
@@ -612,6 +617,7 @@ const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid interface_id";
 	return NULL;
 }
+
 void GetNatCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	IpAddress *nat_ip;
