@@ -324,7 +324,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		attr = &dp_flow_attr_egress;
 		t_port_id = dp_port_get_pf1_id();
 	} else {
-		attr = &dp_flow_attr_transfer_single_stage;
+		if (dp_port_get(m->port)->captured)
+			attr = &dp_flow_attr_transfer_multi_stage;
+		else
+			attr = &dp_flow_attr_transfer_single_stage;
 		t_port_id = m->port;
 	}
 	if (DP_FAILED(dp_install_rte_flow_with_indirect(t_port_id, attr,
@@ -416,8 +419,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// create special actions
-	// if ((!cross_pf_port) && dp_port_get(m->port)->captured) {
-	if ((!cross_pf_port) && true) {
+	if ((!cross_pf_port) && dp_port_get(m->port)->captured) {
 		agectx_special = allocate_agectx();
 		if (!agectx_special)
 			return DP_ERROR;

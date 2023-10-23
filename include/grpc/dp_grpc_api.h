@@ -171,7 +171,6 @@ struct dpgrpc_versions {
 
 struct dpgrpc_capture_interface {
 	enum dpgrpc_capture_iface_type	type;
-	uint8_t							status;
 	union {
 		char	iface_id[VM_IFACE_ID_MAX_LEN];
 		uint8_t pf_index;
@@ -187,7 +186,12 @@ struct dpgrpc_capture_config {
 };
 
 struct dpgrpc_capture_stat {
-	uint8_t			iface_cnt;
+	uint8_t							status;
+	struct dpgrpc_capture_interface interface;
+};
+
+struct dpgrpc_capture_stop {
+	uint16_t						port_cnt;
 };
 
 struct dpgrpc_request {
@@ -269,6 +273,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_vni_in_use	vni_in_use;
 		struct dpgrpc_versions		versions;
 		struct dpgrpc_capture_stat 	capture_stat;
+		struct dpgrpc_capture_stop	capture_stop;
 	};
 };
 
