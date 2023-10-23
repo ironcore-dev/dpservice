@@ -372,13 +372,20 @@ static int dp_turn_on_offload_pkt_capture(struct dp_port *port)
 	case DP_PORT_VF:
 		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_MONITORING_GROUP)))
 			return DP_ERROR;
-		if (DP_FAILED(dp_install_vf_default_capture_flow(port)))
+		// rollback flow rules if failed on the second one for VF.
+		if (DP_FAILED(dp_install_vf_default_capture_flow(port))) {
+			if (DP_FAILED(dp_destroy_default_flow(port))) {
+				DPS_LOG_ERR("Failed to recover from turning capturing on by destroying previously installed default rule", DP_LOG_PORTID(port->port_id));
+				return DP_ERROR;
+			}
+			if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_VNET_GROUP)))
+				DPS_LOG_ERR("Failed to recover from turning capturing on by installing default jump rule to the vnet group", DP_LOG_PORTID(port->port_id));
 			return DP_ERROR;
+		}
 		break;
 	}
 
 	port->captured = true;
-
 	return DP_OK;
 }
 
@@ -402,7 +409,6 @@ static int dp_turn_off_offload_pkt_capture(struct dp_port *port)
 	}
 
 	port->captured = false;
-	
 	return DP_OK;
 }
 
@@ -410,8 +416,6 @@ int dp_turn_on_offload_pkt_capture_on_single_iface(uint16_t port_id)
 {
 	struct dp_port *port = dp_port_get(port_id);
 
-	printf("Turn on offload packet capture on port %d \n", port_id);
-	
 	return dp_turn_on_offload_pkt_capture(port);
 }
 
@@ -437,13 +441,16 @@ int dp_turn_on_offload_pkt_capture_on_all_ifaces(void)
 int dp_turn_off_offload_pkt_capture_on_all_ifaces(void)
 {
 	struct dp_ports *ports = get_dp_ports();
+	int count = 0;
 
 	DP_FOREACH_PORT(ports, port) {
-		if (DP_FAILED(dp_turn_off_offload_pkt_capture(port)))
-			return DP_ERROR;
+		if (port->captured) {
+			if (DP_FAILED(dp_turn_off_offload_pkt_capture(port)))
+				return DP_ERROR;
+			count ++;
+		}
 	}
-
-	return DP_OK;
+	return count;
 }
 
 // int dp_pf_remove_capture_pkt_isolation_rule(void)
