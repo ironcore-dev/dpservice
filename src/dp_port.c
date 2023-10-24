@@ -479,34 +479,12 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 {
 	int ret;
 
-	// at least one rule must be there, otherwise new packets cannot be delivered to software path
-	// same as the isolation rule on pf
-	// if (dp_is_graphtrace_hw_enabled())
-	// 	ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
-	// else
+	// too long, thus using a ret variable
 	ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
-	// ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_MONITORING_GROUP);
-
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
-
-	// this rule must be there, otherwise new packets cannot be delivered to software path, making communication failure
-	// ret = dp_install_default_capture_rule_in_vnet_group(port_id);
-	// if (DP_FAILED(ret)) {
-	// 	DPS_LOG_ERR("Cannot install default capture rule in vnet group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-	// 	return DP_ERROR;
-	// }
-
-	// ret = dp_install_default_rule_in_monitoring_group(port_id, true);
-	// if (DP_FAILED(ret)) {
-	// 	DPS_LOG_WARNING("Cannot install default rule in monitoring group", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
-	// 	if (DP_FAILED(dp_vf_init_monitoring_rule_rollback(port_id))) {
-	// 		DPS_LOG_ERR("Cannot rollback from the monitoring rule installation on vf", DP_LOG_PORTID(port_id));
-	// 		return DP_ERROR;
-	// 	}
-	// }
 
 	return DP_OK;
 }
@@ -586,29 +564,6 @@ int dp_port_start(uint16_t port_id)
 
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
-
-	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP) {
-		if (dp_conf_is_offload_enabled()) {
-#ifdef ENABLE_PYTEST
-			if (port->peer_pf_port_id != dp_port_get_pf1_id())
-#endif
-			if (DP_FAILED(dp_port_bind_port_hairpins(port)))
-				return DP_ERROR;
-		}
-
-		if (port->port_type == DP_PORT_PF) {
-			ret = dp_install_pf_init_rte_rules(port_id);
-			if (DP_FAILED(ret))
-				assert(0);
-		}
-
-
-		if (port->port_type == DP_PORT_VF && dp_conf_is_offload_enabled()) {
-			ret = dp_install_vf_init_rte_rules(port_id);
-			if (DP_FAILED(ret))
-				assert(0); // if any flow rule failed, stop process running due to possible hw/driver failure
-		}
-	}
 
 	return DP_OK;
 }

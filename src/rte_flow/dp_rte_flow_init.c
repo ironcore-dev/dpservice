@@ -18,9 +18,10 @@ static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
 	.transfer = 0,
 };
 
+// it is used to install a flow rule in the default group of a VF to switch between the capturing group and vnet group
 static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
-	.priority = 1,
+	.priority = 0,
 	.ingress = 0,
 	.egress = 0,
 	.transfer = 1,
@@ -30,19 +31,11 @@ static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
 // transfer flag is set to allow the port action
 static const struct rte_flow_attr dp_flow_attr_default_monitoring_ingress = {
 	.group = DP_RTE_FLOW_MONITORING_GROUP,
-	.priority = 3,
+	.priority = 0,
 	.ingress = 0,
 	.egress = 0,
 	.transfer = 1,
 };
-
-// static const struct rte_flow_attr dp_flow_attr_default_capture_ingress = {
-// 	.group = DP_RTE_FLOW_VNET_GROUP,
-// 	.priority = 3,
-// 	.ingress = 1,
-// 	.egress = 0,
-// 	.transfer = 0,
-// };
 
 int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 {
@@ -70,46 +63,6 @@ int dp_install_isolated_mode_ipip(int port_id, uint8_t proto_id)
 	return DP_OK;
 }
 
-// static int dp_install_isolate_captured_flow(int port_id)
-// {
-// 	struct rte_flow_item_eth eth_spec;   // #1
-// 	struct rte_flow_item_ipv6 ipv6_spec; // #2
-// 	struct rte_flow_item_udp udp_spec;   // #3
-// 	struct rte_flow_item pattern[4];     // + end
-// 	int pattern_cnt = 0;
-
-// 	struct rte_flow_action_raw_decap raw_decap;  // #1
-// 	struct rte_flow_action_queue queue_action; // #2
-// 	struct rte_flow_action action[3];          // + end
-// 	int action_cnt = 0;
-
-// 	struct rte_flow *flow;
-// 	struct dp_port *port = dp_port_get(port_id);
-
-// 	// set match patterns
-// 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6));
-
-// 	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, dp_conf_get_underlay_ip(), DP_IP_PROTO_UDP);
-
-// 	dp_set_udp_dst_flow_item(&pattern[pattern_cnt++], &udp_spec, htons(dp_get_capture_udp_dst_port()));
-
-// 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
-
-// 	// set actions
-// 	// dp_set_raw_decap_action(&action[action_cnt++], &raw_decap, NULL, DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE);
-// 	dp_set_redirect_queue_action(&action[action_cnt++], &queue_action, 1);
-// 	dp_set_end_action(&action[action_cnt++]);
-
-// 	// validate and install flow rule
-// 	flow = dp_install_rte_flow(port_id, &dp_flow_attr_prio_ingress, pattern, action);
-
-// 	if (!flow)
-// 		return DP_ERROR;
-
-// 	port->default_capture_pkt_isolation_rule = flow;
-
-// 	return DP_OK;
-// }
 
 int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
 {
@@ -157,7 +110,7 @@ void dp_configure_packet_capture_action(uint8_t *encaped_mirror_hdr,
 	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr*)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr)]);
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr*)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)]);
 	int sub_action_cnt = 0;
-	uint32_t dst_port = install_to_port == dp_port_get_pf1_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
+	// uint32_t dst_port = install_to_port == dp_port_get_pf1_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
 
 	rte_ether_addr_copy(dp_get_neigh_mac(0), &encap_eth_hdr->dst_addr);
 	rte_ether_addr_copy(dp_get_mac(0), &encap_eth_hdr->src_addr);
@@ -176,7 +129,7 @@ void dp_configure_packet_capture_action(uint8_t *encaped_mirror_hdr,
 	udp_hdr->dgram_cksum = 0;
 
 	dp_set_raw_encap_action(&sub_action[sub_action_cnt++], encap_action, encaped_mirror_hdr, DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE);
-	dp_set_send_to_port_action(&sub_action[sub_action_cnt++], port_id_action, dst_port); // must be a pf port here
+	dp_set_send_to_port_action(&sub_action[sub_action_cnt++], port_id_action, 0); // must be a pf port here
 	dp_set_end_action(&sub_action[sub_action_cnt++]);
 }
 
@@ -195,7 +148,6 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 	struct rte_flow_action_raw_encap encap_action; // 1
 	struct rte_flow_action_port_id port_id_action; // 2
 	struct rte_flow_action sub_action[3];
-	int sub_action_cnt = 0;
 
 	struct rte_flow *flow;
 	struct dp_port *port = dp_port_get(port_id);
@@ -208,6 +160,7 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 	// create actions
 	// create sampling action
 	if (is_on) {
+		printf("installing default monitoring flow rule on port %d \n", port_id);
 		dp_configure_packet_capture_action(raw_encap_hdr, &encap_action, &port_id_action, sub_action, port_id);
 		dp_set_sample_action(&action[action_cnt++], &sample_action, 1, sub_action); // mirror all packets, without explicite sub sample action
 	}
@@ -227,67 +180,12 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 	}
 	
 
-	// PF's default flow to enable flow mirroring is this default monitoring flow
-	// if (port->port_type == DP_PORT_PF)
 	port->default_capture_flow = flow;
 
 	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORTID(port_id));
 	return DP_OK;
 }
 
-// int dp_install_default_capture_rule_in_vnet_group(uint16_t port_id)
-// {
-
-// 	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
-// 	int pattern_cnt = 0;
-
-// 	struct rte_flow_action_queue queue_action;	// 1
-// 	struct rte_flow_action action[2];		// + end
-// 	int action_cnt = 0;
-
-// 	// all ethernet packets
-// 	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
-// 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
-
-// 	// create actions
-// 	// create flow action -- queue, send to default software handling queue
-// 	dp_set_redirect_queue_action(&action[action_cnt++], &queue_action, 0);
-// 	// create flow action -- end
-// 	dp_set_end_action(&action[action_cnt++]);
-
-// 	if (!dp_install_rte_flow(port_id, &dp_flow_attr_default_capture_ingress, pattern, action))
-// 		return DP_ERROR;
-
-// 	DPS_LOG_DEBUG("Installed the default capture flow rule", DP_LOG_PORTID(port_id));
-// 	return DP_OK;
-// }
-
-// static int dp_change_all_vf_default_jump_rte_flow_group(uint32_t dst_group)
-// {
-// 	struct dp_ports *ports = get_dp_ports();
-// 	struct rte_flow_error error;
-// 	int ret;
-
-// 	DP_FOREACH_PORT(ports, port) {
-// 		if (port->port_type == DP_PORT_VF && port->allocated) {
-// 			if (port->default_flow) {
-// 				ret = rte_flow_destroy(port->port_id, port->default_flow, &error);
-
-// 				if (DP_FAILED(ret)) {
-// 					DPS_LOG_WARNING("Failed to destroy default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
-// 					continue;
-// 				}
-// 			}
-
-// 			if (DP_FAILED(dp_install_jump_rule_in_default_group(port->port_id, dst_group))) {
-// 				DPS_LOG_WARNING("Failed to install default jump flow", DP_LOG_PORTID(port->port_id));
-// 				continue;
-// 			}
-// 		}
-// 	}
-
-// 	return DP_OK;
-// }
 
 static int dp_destroy_default_flow(struct dp_port *port)
 {

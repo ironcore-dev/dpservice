@@ -50,11 +50,7 @@ static const struct rte_flow_attr dp_flow_pf_attr_transfer_special = {
 static const struct rte_flow_attr dp_flow_attr_transfer_multi_stage = {
 	.group = DP_RTE_FLOW_VNET_GROUP,
 	.priority = 0,
-#ifdef ENABLE_DPDK_22_11
 	.ingress = 0,
-#else
-	.ingress = 1,
-#endif
 	.egress = 0,
 	.transfer = 1,
 };
@@ -68,17 +64,6 @@ static const struct rte_flow_attr dp_flow_attr_transfer_single_stage = {
 	.transfer = 1,
 };
 
-// static const struct rte_flow_attr dp_flow_vf_attr_transfer = {
-// 	.group = DP_RTE_FLOW_VNET_GROUP,
-// 	.priority = 0,
-// #ifdef ENABLE_DPDK_22_11
-// 	.ingress = 0,
-// #else
-// 	.ingress = 1,
-// #endif
-// 	.egress = 0,
-// 	.transfer = 1,
-// };
 
 static __rte_always_inline struct flow_age_ctx *allocate_agectx(void)
 {
@@ -233,6 +218,17 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	uint16_t t_port_id;
 	bool cross_pf_port;
 
+
+
+	// struct rte_flow_action_jump jump_action; // 1
+	// struct rte_flow_action_age flow_age_special; 
+	// struct rte_flow_action special_moni_action[3];
+	// int special_moni_action_cnt = 0;
+
+	// // misc variables needed to create the flow
+	// struct flow_age_ctx *agectx_special;
+	// struct rte_flow_action *age_action_special;
+
 	cross_pf_port = df->nxt_hop != dp_port_get_pf0_id();
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
@@ -260,6 +256,31 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 	if (cross_pf_port)
 		hairpin_pattern[hairpin_pattern_cnt++] = pattern[pattern_cnt-1];
+
+		// create special actions
+	// if ((!cross_pf_port) && dp_port_get(m->port)->captured) {
+	// 	agectx_special = allocate_agectx();
+	// 	if (!agectx_special)
+	// 		return DP_ERROR;
+
+	// 	// attr = &dp_flow_attr_transfer_multi_stage;
+
+	// 	age_action_special = &special_moni_action[special_moni_action_cnt++];
+	// 	dp_set_flow_age_action(age_action_special, &flow_age_special, df->conntrack->timeout_value, agectx_special);
+		
+	// 	dp_set_jump_group_action(&special_moni_action[special_moni_action_cnt++], &jump_action, DP_RTE_FLOW_MONITORING_GROUP);
+		
+	// 	dp_set_end_action(&special_moni_action[special_moni_action_cnt++]);
+	// 	// struct rte_flow *sp_flow;
+
+	// 	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_pf_attr_transfer_special,
+	// 												pattern, special_moni_action, age_action_special, df, agectx_special))) {
+	// 		dp_destroy_rte_flow_agectx(agectx_special);
+	// 		return DP_ERROR;
+	// 	}
+
+	// 	DPS_LOG_DEBUG("Installed special flow rule on VF", DP_LOG_PORTID(m->port));
+	// }
 
 
 	/* First, install a flow rule to modify mac address to embed vni info and move packet to hairpin rxq */
@@ -324,10 +345,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		attr = &dp_flow_attr_egress;
 		t_port_id = dp_port_get_pf1_id();
 	} else {
-		if (dp_port_get(m->port)->captured)
+		// if (dp_port_get(m->port)->captured) {
+			printf("multi stage\n");
 			attr = &dp_flow_attr_transfer_multi_stage;
-		else
-			attr = &dp_flow_attr_transfer_single_stage;
+		// }
+		// else
+		// 	attr = &dp_flow_attr_transfer_single_stage;
 		t_port_id = m->port;
 	}
 	if (DP_FAILED(dp_install_rte_flow_with_indirect(t_port_id, attr,

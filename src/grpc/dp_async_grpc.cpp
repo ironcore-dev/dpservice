@@ -545,6 +545,8 @@ const char* CaptureStopCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Stop packet capture");
 
+	RTE_SET_USED(request);
+
 	return NULL;
 }
 void CaptureStopCall::ParseReply(struct dpgrpc_reply* reply)
@@ -576,26 +578,23 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 	request->start_capture.filled_interface_info_count = 0;
 	for (int i = 0; i < request_.interfaces_size(); ++i) {
 		if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interfaces(i).interface_type(), &request->start_capture.interfaces[i].type)) {
-			request->start_capture.interfaces[i].type = DP_CAPTURE_IFACE_TYPE_UNKNOWN;
-			continue;
+			return "Invalid interface_type";
 		}
 
 		switch (request->start_capture.interfaces[i].type) {
-		case DP_CAPTURE_IFACE_TYPE_UNKNOWN:
-			continue;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
 			DPGRPC_LOG_INFO("Set packet capture interface vf",
 							DP_LOG_PORT_TYPE(request_.interfaces(i).interface_type()),
-							DP_LOG_IFACE(request_.interfaces(i).interface_id().c_str()));
-			if (SNPRINTF_FAILED(request->start_capture.interfaces[i].interface_info.iface_id, request_.interfaces(i).interface_id()))
-				request->start_capture.interfaces[i].type = DP_CAPTURE_IFACE_TYPE_UNKNOWN;
+							DP_LOG_IFACE(request_.interfaces(i).vf_name().c_str()));
+			if (SNPRINTF_FAILED(request->start_capture.interfaces[i].interface_info.iface_id, request_.interfaces(i).vf_name()))
+				return "Invalid interface_id";
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
 			DPGRPC_LOG_INFO("Set packet capture interface pf",
 							DP_LOG_PORT_TYPE(request_.interfaces(i).interface_type()),
-							DP_LOG_IFACE_INDEX(request_.interfaces(i).interface_index()));
+							DP_LOG_IFACE_INDEX(request_.interfaces(i).pf_index()));
 			// TODO: maybe a validity check here for indexes
-			request->start_capture.interfaces[i].interface_info.pf_index = request_.interfaces(i).interface_index();
+			request->start_capture.interfaces[i].interface_info.pf_index = request_.interfaces(i).pf_index();
 			break;
 		}
 
@@ -607,9 +606,9 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 void CaptureStartCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	if (reply->capture_stat.interface.type == DP_CAPTURE_IFACE_TYPE_SINGLE_PF) {
-		reply_.set_interface_index(reply->capture_stat.interface.interface_info.pf_index);
+		reply_.set_pf_index(reply->capture_stat.interface.interface_info.pf_index);
 	} else if (reply->capture_stat.interface.type == DP_CAPTURE_IFACE_TYPE_SINGLE_VF) {
-		reply_.set_interface_id(reply->capture_stat.interface.interface_info.iface_id);
+		reply_.set_vf_name(reply->capture_stat.interface.interface_info.iface_id);
 	}
 }
 

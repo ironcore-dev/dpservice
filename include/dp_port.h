@@ -37,8 +37,8 @@ struct dp_port {
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
 	enum dp_vf_port_attach_status	attach_status;
-	struct rte_flow					*default_jump_flow, *default_capture_flow;
-	struct rte_flow					*default_capture_pkt_isolation_rule; // only for pfs
+	struct rte_flow					*default_jump_flow;
+	struct rte_flow					*default_capture_flow;
 	bool							captured;
 };
 

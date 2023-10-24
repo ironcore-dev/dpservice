@@ -67,7 +67,6 @@ enum dpgrpc_vni_type {
 };
 
 enum dpgrpc_capture_iface_type {
-	DP_CAPTURE_IFACE_TYPE_UNKNOWN,
 	DP_CAPTURE_IFACE_TYPE_SINGLE_PF,
 	DP_CAPTURE_IFACE_TYPE_SINGLE_VF,
 };
