@@ -14,7 +14,7 @@ struct dp_grpc_responder {
 	struct dpgrpc_request request;
 	// reply consists of an array of 'packets' (called replies)
 	struct rte_mbuf *replies[DP_GRPC_REPLY_ARR_SIZE];
-	uint repcount;
+	unsigned int repcount;
 	struct rte_mempool *mempool;
 	// each of which can optinally be divided into 'messages'
 	struct dpgrpc_reply *rep;

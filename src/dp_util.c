@@ -14,7 +14,7 @@
 // makes sure there is enough space to prevent collisions
 #define DP_JHASH_MARGIN_COEF(ENTRIES) ((ENTRIES)*1.20)
 
-int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IFNAMSIZ])
+int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IF_NAMESIZE])
 {
 	int ret;
 
@@ -64,7 +64,7 @@ static int get_num_of_vfs_pattern(void)
 {
 	int count = 0;
 	uint16_t port_id;
-	char ifname[IFNAMSIZ] = {0};
+	char ifname[IF_NAMESIZE] = {0};
 	struct rte_eth_dev_info dev_info;
 	const char *pattern = dp_conf_get_vf_pattern();
 

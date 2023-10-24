@@ -66,7 +66,7 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	uint n_pkts;
+	unsigned int n_pkts;
 
 	RTE_SET_USED(nb_objs);  // this is a source node, input data is not present yet
 

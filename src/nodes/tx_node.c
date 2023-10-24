@@ -81,12 +81,11 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	uint16_t new_eth_type;
 	struct rte_mbuf *pkt;
 	struct dp_flow *df;
-	uint i;
 
 	// since this node is emitting packets, dp_forward_* wrapper functions cannot be used
 	// this code should colely resemble the one inside those functions
 
-	for (i = 0; i < nb_objs; ++i) {
+	for (uint16_t i = 0; i < nb_objs; ++i) {
 		pkt = (struct rte_mbuf *)objs[i];
 		df = dp_get_flow_ptr(pkt);
 		// Rewrite ethernet header for all packets except:

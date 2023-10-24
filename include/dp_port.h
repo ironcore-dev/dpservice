@@ -30,10 +30,10 @@ enum dp_vf_port_attach_status {
 struct dp_port {
 	enum dp_port_type				port_type;
 	uint16_t						port_id;
-	char							port_name[IFNAMSIZ];
+	char							port_name[IF_NAMESIZE];
 	uint8_t							link_status;
 	bool							allocated;
-	char							vf_name[IFNAMSIZ];
+	char							vf_name[IF_NAMESIZE];
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
 	enum dp_vf_port_attach_status	attach_status;

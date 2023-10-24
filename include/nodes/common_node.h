@@ -12,7 +12,7 @@ extern "C" {
 #include "dp_port.h"
 #include "monitoring/dp_graphtrace.h"
 
-#define DP_GRAPH_NO_SPECULATED_NODE -1
+#define DP_GRAPH_NO_SPECULATED_NODE (-1)
 
 static __rte_always_inline
 void dp_foreach_graph_packet(struct rte_graph *graph,
@@ -25,7 +25,6 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 {
 	struct rte_mbuf *pkt;
 	rte_edge_t next_index, speculated_next_node_index;
-	uint i;
 	void **to_next, **from;
 	uint16_t last_spec = 0;
 	uint16_t held = 0;
@@ -36,7 +35,7 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 		speculated_next_node_index = (rte_edge_t)speculated_node;
 		from = objs;
 		to_next = rte_node_next_stream_get(graph, node, speculated_next_node_index, nb_objs);
-		for (i = 0; i < nb_objs; ++i) {
+		for (uint16_t i = 0; i < nb_objs; ++i) {
 			pkt = (struct rte_mbuf *)objs[i];
 			rte_prefetch0(objs[i+1]);
 			dp_graphtrace_node(node, pkt);
@@ -66,8 +65,7 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 		rte_memcpy(to_next, from, last_spec * sizeof(from[0]));
 		rte_node_next_stream_put(graph, node, speculated_next_node_index, held);
 	} else {
-
-		for (i = 0; i < nb_objs; ++i) {
+		for (uint16_t i = 0; i < nb_objs; ++i) {
 			pkt = (struct rte_mbuf *)objs[i];
 			// __builtin_prefetch(&objs[i+1]);
 			dp_graphtrace_node(node, pkt);
@@ -75,7 +73,6 @@ void dp_foreach_graph_packet(struct rte_graph *graph,
 			dp_graphtrace_next(node, pkt, next_index);
 			rte_node_enqueue_x1(graph, node, next_index, pkt);
 		}
-
 	}
 }
 
