@@ -533,8 +533,8 @@ message DeleteFirewallRuleResponse {
 message CapturedInterface {
 	CaptureInterfaceType interface_type = 1;
 	oneof interface_info {
-		bytes interface_id = 2;
-		uint32 interface_index = 3;
+		bytes vf_name = 2;
+		uint32 pf_index = 3;
 	}
 }
 
@@ -548,8 +548,8 @@ message CaptureStartRequest {
 message CaptureStartResponse {
 	Status status = 1;
 	oneof interface_info {
-		bytes interface_id = 2;
-		uint32 interface_index = 3;
+		bytes vf_name = 2;
+		uint32 pf_index = 3;
 	}
 }
 

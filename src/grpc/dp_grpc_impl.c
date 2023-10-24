@@ -888,7 +888,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture_config *request = &responder->request.start_capture;
 	struct dpgrpc_capture_stat	*reply = dp_grpc_single_reply(responder);
-	int port_id, status = DP_GRPC_OK;
+	int port_id = -1, status = DP_GRPC_OK;
 
 	dp_set_capture_node_ipv6_addr(request->dst_addr6);
 	dp_set_capture_udp_src_port(request->udp_src_port);
@@ -907,6 +907,12 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 			break;
 		}
 
+		if (DP_FAILED(port_id)) {
+			reply->interface = request->interfaces[i];
+			status = DP_GRPC_ERR_CAPTURE_INIT_INVALID_PORT_ID;
+			break;
+		}
+
 		if (DP_FAILED(dp_turn_on_offload_pkt_capture_on_single_iface(port_id))) {
 			reply->interface = request->interfaces[i];
 			status = DP_GRPC_ERR_CAPTURE_CANNOT_INIT;
@@ -914,7 +920,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 		}
 	}
 
-	if (status == DP_GRPC_ERR_CAPTURE_CANNOT_INIT) {
+	if (status != DP_GRPC_OK) {
 		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces())) {
 			status = DP_GRPC_ERR_CAPTURE_INIT_CANNOT_ROLLBACK;
 		}
