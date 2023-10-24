@@ -142,10 +142,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (RTE_ETH_IS_IPV4_HDR(l3_type)) {
-		/* TODO Drop ipv4 packets coming from PF ports */
+		if (dp_port_is_pf(m->port))
+			return CLS_NEXT_DROP;
 		extract_inner_ethernet_header(m);
 #ifdef ENABLE_VIRTSVC
-		if (virtsvc_present && !dp_port_is_pf(m->port)) {
+		if (virtsvc_present) {
 			virtsvc = get_outgoing_virtsvc(m);
 			if (virtsvc) {
 				df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
