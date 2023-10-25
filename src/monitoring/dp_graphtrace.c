@@ -22,7 +22,6 @@ static enum dp_graphtrace_loglevel graphtrace_loglevel;
 
 int _dp_graphtrace_flags;
 bool _dp_graphtrace_enabled = false;
-bool _dp_graphtrace_hw_enabled = false;
 
 static struct dp_graphtrace graphtrace;
 static bool offload_enabled;
@@ -80,7 +79,6 @@ static void dp_graphtrace_free_memory(void)
 static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *request)
 {
 	struct dp_graphtrace_params *filters = (struct dp_graphtrace_params *)graphtrace.filters->addr;
-	int ret;
 
 	// there are additional parameters in shared memory (cannot fit into the request)
 	if (!DP_IS_NUL_TERMINATED(filters->node_regex)
@@ -100,30 +98,6 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 				regfree(&nodename_re);
 			return -EINVAL;
 		}
-	}
-
-	// not making the error code better since 'start.hw' branch will be removed anyway
-	if (request->params.start.hw) {
-		if (!offload_enabled) {
-			if (nodename_filtered)
-				regfree(&nodename_re);
-			if (bpf_filtered)
-				dp_free_bpf(&bpf);
-			return -EPERM;
-		}
-
-		ret = dp_send_event_hardware_capture_start_msg();
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot send hardware capture start message");
-			if (nodename_filtered)
-				regfree(&nodename_re);
-			if (bpf_filtered)
-				dp_free_bpf(&bpf);
-			return ret;
-		}
-
-		_dp_graphtrace_hw_enabled = true;
-		DPS_LOG_INFO("Offloaded packet tracing enabled");
 	}
 
 	_dp_graphtrace_flags = 0;
@@ -147,14 +121,7 @@ static int dp_handle_graphtrace_stop(void)
 			dp_free_bpf(&bpf);
 		DPS_LOG_INFO("Graphtrace disabled");
 	}
-	if (_dp_graphtrace_hw_enabled) {
-		if (DP_FAILED(dp_send_event_hardware_capture_stop_msg())) {
-			DPS_LOG_ERR("Cannot send hardware capture stop message");
-			return DP_ERROR;
-		}
-		_dp_graphtrace_hw_enabled = false;
-		DPS_LOG_INFO("Offloaded packet tracing disabled");
-	}
+	
 	return DP_OK;
 }
 
@@ -244,8 +211,7 @@ bool dp_is_node_match(regex_t *re, const struct rte_node *node, const struct rte
 		return false;
 }
 
-void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
-						 const struct rte_node *node,
+void _dp_graphtrace_send(const struct rte_node *node,
 						 const struct rte_node *next_node,
 						 void **objs, uint16_t nb_objs,
 						 uint16_t dst_port_id)
@@ -267,10 +233,10 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
 			// this prevent unnecessary copying and immediate freeing after enqueue() fails
 			break;
 		}
+
 		dups[nb_dups++] = dup;
 		pktinfo = dp_get_graphtrace_pktinfo(dup);
 		pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
-		pktinfo->pkt_type = type;
 		pktinfo->node = node;
 		pktinfo->next_node = next_node;
 		pktinfo->dst_port_id = dst_port_id;

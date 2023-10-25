@@ -111,31 +111,23 @@ static void print_packet(__rte_unused struct dp_pcap *context, struct rte_mbuf *
 
 	dp_graphtrace_sprint(pkt, printbuf, sizeof(printbuf));
 
-	if (pktinfo->pkt_type == DP_GRAPHTRACE_PKT_TYPE_OFFLOAD) {
-		snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
-		node = "Offloaded";
-		arrow = "at";
-		next_node = node_buf;
+	arrow = "->";
+	if (pktinfo->node) {
+		node = pktinfo->node->name;
 	} else {
-		assert(pktinfo->pkt_type == DP_GRAPHTRACE_PKT_TYPE_SOFTWARE);
-		arrow = "->";
-		if (pktinfo->node) {
-			node = pktinfo->node->name;
+		arrow = ">>";
+		snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
+		node = node_buf;
+	}
+	if (pktinfo->next_node) {
+		next_node = pktinfo->next_node->name;
+	} else {
+		arrow = ">>";
+		if (pktinfo->dst_port_id == (uint16_t)-1) {
+			next_node = "DROP";
 		} else {
-			arrow = ">>";
-			snprintf(node_buf, sizeof(node_buf), "PORT %u", pkt->port);
-			node = node_buf;
-		}
-		if (pktinfo->next_node) {
-			next_node = pktinfo->next_node->name;
-		} else {
-			arrow = ">>";
-			if (pktinfo->dst_port_id == (uint16_t)-1) {
-				next_node = "DROP";
-			} else {
-				snprintf(next_node_buf, sizeof(next_node_buf), "PORT %u", pktinfo->dst_port_id);
-				next_node = next_node_buf;
-			}
+			snprintf(next_node_buf, sizeof(next_node_buf), "PORT %u", pktinfo->dst_port_id);
+			next_node = next_node_buf;
 		}
 	}
 
@@ -215,7 +207,6 @@ static int dp_graphtrace_start(struct dp_graphtrace *graphtrace)
 		.action = DP_GRAPHTRACE_ACTION_START,
 		.params.start.drops = dp_conf_is_showing_drops(),
 		.params.start.nodes = showing_nodes,
-		.params.start.hw = dp_conf_is_offload_enabled(),
 	};
 	struct dp_graphtrace_params *filters = (struct dp_graphtrace_params *)graphtrace->filters->addr;
 

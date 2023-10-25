@@ -75,17 +75,6 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 
 }
 
-static __rte_always_inline bool dp_capture_offloaded_pkts(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
-{
-	if (!offload_mode_enabled ||
-			flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD || flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD)
-		return false;
-
-	dp_graphtrace_capture_offload_pkt(m);
-	df->flags.offload_mark = DP_PKT_OFFLOAD_MARK;
-	return true;
-
-}
 
 static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_value *flow_val, struct dp_flow *df)
 {
@@ -265,8 +254,6 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 	) {
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;
-		if (dp_capture_offloaded_pkts(m, *p_flow_val, df))
-				return DP_IS_CAPTURED_HW_PKT;
 		dp_set_pkt_flow_direction(curr_key, cached_flow_val, df);
 		dp_set_flow_offload_flag(m, cached_flow_val, df);
 		return DP_OK;
@@ -289,9 +276,6 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		return DP_OK;
 	}
 
-	if (dp_capture_offloaded_pkts(m, *p_flow_val, df))
-		return DP_IS_CAPTURED_HW_PKT;
-
 	// already established flow found
 	dp_set_pkt_flow_direction(curr_key, *p_flow_val, df);
 	dp_set_flow_offload_flag(m, *p_flow_val, df);
@@ -306,8 +290,8 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 	int ret;
 
 	ret = dp_get_flow_val(m, df, &flow_val);
-	if (DP_FAILED(ret) || ret == DP_IS_CAPTURED_HW_PKT)
-		return ret;	// it is not really an error when ret == DP_IS_CAPTURED_HW_PKT, but we need to stop processing this pkt
+	if (DP_FAILED(ret))
+		return ret;
 
 	flow_val->timestamp = rte_rdtsc();
 

@@ -30,11 +30,6 @@ enum dp_graphtrace_action {
 	DP_GRAPHTRACE_ACTION_STOP,
 };
 
-enum dp_graphtrace_pkt_type {
-	DP_GRAPHTRACE_PKT_TYPE_SOFTWARE,
-	DP_GRAPHTRACE_PKT_TYPE_OFFLOAD,
-};
-
 struct dp_graphtrace {
 	struct rte_mempool *mempool;
 	struct rte_ring *ringbuf;
@@ -47,7 +42,6 @@ struct dp_graphtrace_params {
 };
 
 struct dp_graphtrace_pktinfo {
-	enum dp_graphtrace_pkt_type pkt_type;
 	uint32_t pktid;
 	const struct rte_node *node;
 	const struct rte_node *next_node;
@@ -57,7 +51,6 @@ struct dp_graphtrace_pktinfo {
 struct dp_graphtrace_params_start {
 	bool drops;
 	bool nodes;
-	bool hw;
 };
 
 struct dp_graphtrace_mp_request {

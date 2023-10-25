@@ -232,8 +232,6 @@ struct dpgrpc_request {
 		struct dpgrpc_vni		vni_reset;
 		struct dpgrpc_versions	get_version;
 		struct dpgrpc_capture_config	start_capture;
-		// struct dpgrpc_capture_config	stop_capture;
-		// struct dpgrpc_capture_interface	set_capture_interface;
 	};
 };
 
