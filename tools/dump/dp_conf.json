@@ -21,13 +21,6 @@
       "arg": "FILTER"
     },
     {
-      "lgopt": "hw",
-      "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
-      "var": "offload_enabled",
-      "type": "bool",
-      "default": "false"
-    },
-    {
       "lgopt": "pcap",
       "help": "write packets into a PCAP file",
       "arg": "FILE"

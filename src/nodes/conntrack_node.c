@@ -69,7 +69,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		|| df->l4_type == IPPROTO_ICMP
 	) {
 		ret = dp_cntrack_handle(m, df);
-		if (DP_FAILED(ret) || (ret == DP_IS_CAPTURED_HW_PKT))
+		if (DP_FAILED(ret))
 			return CONNTRACK_NEXT_DROP;
 	} else {
 		return CONNTRACK_NEXT_DROP;

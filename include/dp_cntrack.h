@@ -9,8 +9,6 @@
 extern "C" {
 #endif
 
-#define DP_IS_CAPTURED_HW_PKT  5
-
 void dp_cntrack_init(void);
 
 int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df);

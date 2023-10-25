@@ -160,7 +160,6 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 	// create actions
 	// create sampling action
 	if (is_on) {
-		printf("installing default monitoring flow rule on port %d \n", port_id);
 		dp_configure_packet_capture_action(raw_encap_hdr, &encap_action, &port_id_action, sub_action, port_id);
 		dp_set_sample_action(&action[action_cnt++], &sample_action, 1, sub_action); // mirror all packets, without explicite sub sample action
 	}
@@ -260,8 +259,6 @@ static int dp_turn_on_offload_pkt_capture(struct dp_port *port)
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 	
-	printf("destroied default flow on port %d \n", port->port_id);
-
 	switch (port->port_type) {
 	case DP_PORT_PF:
 		if (DP_FAILED(dp_install_pf_default_flow(port, true)))
