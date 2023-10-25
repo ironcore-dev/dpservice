@@ -121,7 +121,7 @@ static int dp_handle_graphtrace_stop(void)
 			dp_free_bpf(&bpf);
 		DPS_LOG_INFO("Graphtrace disabled");
 	}
-	
+
 	return DP_OK;
 }
 

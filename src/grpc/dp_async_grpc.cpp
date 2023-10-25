@@ -568,13 +568,13 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid udp_src_port";
 	if (request_.udp_dst_port() > UINT16_MAX)
 		return "Invalid udp_dst_port";
-	
+
 	request->start_capture.udp_src_port = request_.udp_src_port();
 	request->start_capture.udp_dst_port = request_.udp_dst_port();
 
 	if (request_.interfaces_size() > DP_CAPTURE_MAX_PORT_NUM)
 		return "Too many interfaces to be captured";
-	
+
 	request->start_capture.filled_interface_info_count = 0;
 	for (int i = 0; i < request_.interfaces_size(); ++i) {
 		if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interfaces(i).interface_type(), &request->start_capture.interfaces[i].type)) {
