@@ -38,13 +38,13 @@ static const struct rte_flow_attr dp_flow_attr_egress = {
 
 // it is used during the decap operation on pf to install a redirecting rule
 // to point a specific flow to either capturing rule or vnet rule
-static const struct rte_flow_attr dp_flow_pf_attr_transfer_special = {
+static const struct rte_flow_attr dp_flow_pf_attr_transfer_capture = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
 	.ingress = 0,
 	.egress = 0,
 	.transfer = 1,
-}; 
+};
 
 // it is used during the decap/decap operation to install a decap/encap rule to transfer pkts
 static const struct rte_flow_attr dp_flow_attr_transfer_multi_stage = {
@@ -354,13 +354,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	int action_cnt = 0;
 
 	struct rte_flow_action_jump jump_action; // 1
-	struct rte_flow_action_age flow_age_special; 
+	struct rte_flow_action_age flow_age_capture; // 2
 	struct rte_flow_action special_moni_action[3];
 	int special_moni_action_cnt = 0;
 
 	// misc variables needed to create the flow
-	struct flow_age_ctx *agectx, *agectx_special;
-	struct rte_flow_action *age_action, *age_action_special;
+	struct flow_age_ctx *agectx, *agectx_capture;
+	struct rte_flow_action *age_action, *age_action_capture;
 	struct dp_port *port;
 	struct rte_ether_hdr new_eth_hdr;
 	rte_be32_t actual_ol_ipv4_addr;
@@ -404,23 +404,23 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	// create special actions
 	if ((!cross_pf_port) && dp_port_get(m->port)->captured) {
-		agectx_special = allocate_agectx();
-		if (!agectx_special)
+		agectx_capture = allocate_agectx();
+		if (!agectx_capture)
 			return DP_ERROR;
 
 		attr = &dp_flow_attr_transfer_multi_stage;
 
-		age_action_special = &special_moni_action[special_moni_action_cnt++];
-		dp_set_flow_age_action(age_action_special, &flow_age_special, df->conntrack->timeout_value, agectx_special);
-		
-		dp_set_jump_group_action(&special_moni_action[special_moni_action_cnt++], &jump_action, DP_RTE_FLOW_MONITORING_GROUP);
-		
+		age_action_capture = &special_moni_action[special_moni_action_cnt++];
+		dp_set_flow_age_action(age_action_capture, &flow_age_capture, df->conntrack->timeout_value, agectx_capture);
+
+		dp_set_jump_group_action(&special_moni_action[special_moni_action_cnt++], &jump_action, DP_RTE_FLOW_CAPTURE_GROUP);
+
 		dp_set_end_action(&special_moni_action[special_moni_action_cnt++]);
 		// struct rte_flow *sp_flow;
 
-		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_pf_attr_transfer_special,
-													pattern, special_moni_action, age_action_special, df, agectx_special))) {
-			dp_destroy_rte_flow_agectx(agectx_special);
+		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_pf_attr_transfer_capture,
+													pattern, special_moni_action, age_action_capture, df, agectx_capture))) {
+			dp_destroy_rte_flow_agectx(agectx_capture);
 			return DP_ERROR;
 		}
 
@@ -466,7 +466,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	dp_set_end_action(&actions[action_cnt++]);
 
 	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port,
-													cross_pf_port? &dp_flow_pf_attr_ingress : attr,
+													cross_pf_port ? &dp_flow_pf_attr_ingress : attr,
 													pattern, actions,
 													age_action, df, agectx))
 	) {
@@ -478,7 +478,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		DPS_LOG_DEBUG("Installed flow rules to handle hairpin pkts on both PF and VF", DP_LOG_PORTID(m->port), DP_LOG_PORTID(df->nxt_hop));
 	else
 		DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
-	
+
 	return DP_OK;
 }
 

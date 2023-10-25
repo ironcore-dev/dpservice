@@ -921,9 +921,8 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 	}
 
 	if (status != DP_GRPC_OK) {
-		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces())) {
+		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces()))
 			status = DP_GRPC_ERR_CAPTURE_INIT_CANNOT_ROLLBACK;
-		}
 	}
 
 	return status;
@@ -933,10 +932,9 @@ static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture_stop	*reply = dp_grpc_single_reply(responder);
 	int ret = dp_turn_off_offload_pkt_capture_on_all_ifaces();
-	
-	if (DP_FAILED(ret)) {
+
+	if (DP_FAILED(ret))
 		return DP_GRPC_ERR_CAPTURE_CANNOT_STOP;
-	}
 
 	reply->port_cnt = ret;
 	return DP_GRPC_OK;

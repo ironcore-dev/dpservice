@@ -11,7 +11,6 @@ extern "C" {
 #define DP_CAPTURE_MAX_PORT_NUM 16
 
 enum dp_event_type {
-	DP_EVENT_TYPE_UNKNOWN,
 	DP_EVENT_TYPE_LINK_STATUS,
 	DP_EVENT_TYPE_FLOW_AGING,
 };
@@ -45,8 +44,6 @@ uint16_t dp_get_capture_udp_dst_port(void);
 void dp_set_capture_enabled(bool enabled);
 
 bool dp_get_capture_enabled(void);
- 
-
 
 #ifdef __cplusplus
 }

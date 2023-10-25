@@ -27,10 +27,10 @@ static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
 	.transfer = 1,
 };
 
-// it is used to install the flow capturing rule into the monitoring group
+// it is used to install the flow capturing rule into the capturing group
 // transfer flag is set to allow the port action
-static const struct rte_flow_attr dp_flow_attr_default_monitoring_ingress = {
-	.group = DP_RTE_FLOW_MONITORING_GROUP,
+static const struct rte_flow_attr dp_flow_attr_default_capture_ingress = {
+	.group = DP_RTE_FLOW_CAPTURE_GROUP,
 	.priority = 0,
 	.ingress = 0,
 	.egress = 0,
@@ -69,7 +69,7 @@ int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
 	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
 	int pattern_cnt = 0;
 
-	// jump action from default group to monitoring group
+	// jump action from default group to capturing group
 	struct rte_flow_action_jump jump_action; // #1
 	struct rte_flow_action action[2];	// + end
 	int action_cnt = 0;
@@ -103,14 +103,12 @@ int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
 void dp_configure_packet_capture_action(uint8_t *encaped_mirror_hdr,
 										struct rte_flow_action_raw_encap *encap_action,
 										struct rte_flow_action_port_id *port_id_action,
-										struct rte_flow_action *sub_action,
-										uint32_t install_to_port)
+										struct rte_flow_action *sub_action)
 {
 	struct rte_ether_hdr *encap_eth_hdr = (struct rte_ether_hdr *)encaped_mirror_hdr;
-	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr*)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr)]);
-	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr*)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)]);
+	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr)]);
+	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)]);
 	int sub_action_cnt = 0;
-	// uint32_t dst_port = install_to_port == dp_port_get_pf1_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
 
 	rte_ether_addr_copy(dp_get_neigh_mac(0), &encap_eth_hdr->dst_addr);
 	rte_ether_addr_copy(dp_get_mac(0), &encap_eth_hdr->src_addr);
@@ -120,7 +118,7 @@ void dp_configure_packet_capture_action(uint8_t *encaped_mirror_hdr,
 	rte_memcpy(new_ipv6_hdr->dst_addr, dp_get_capture_node_ipv6_addr(), sizeof(new_ipv6_hdr->dst_addr));
 	new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	new_ipv6_hdr->payload_len = 0;
-	new_ipv6_hdr->proto = DP_IP_PROTO_UDP; 
+	new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
 	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 
 
@@ -129,12 +127,12 @@ void dp_configure_packet_capture_action(uint8_t *encaped_mirror_hdr,
 	udp_hdr->dgram_cksum = 0;
 
 	dp_set_raw_encap_action(&sub_action[sub_action_cnt++], encap_action, encaped_mirror_hdr, DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE);
-	dp_set_send_to_port_action(&sub_action[sub_action_cnt++], port_id_action, 0); // must be a pf port here
+	dp_set_send_to_port_action(&sub_action[sub_action_cnt++], port_id_action, dp_port_get_pf0_id()); // must be a pf port here
 	dp_set_end_action(&sub_action[sub_action_cnt++]);
 }
 
 
-int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
+int dp_install_default_rule_in_capture_group(uint16_t port_id, bool is_on)
 {
 
 	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
@@ -160,7 +158,7 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 	// create actions
 	// create sampling action
 	if (is_on) {
-		dp_configure_packet_capture_action(raw_encap_hdr, &encap_action, &port_id_action, sub_action, port_id);
+		dp_configure_packet_capture_action(raw_encap_hdr, &encap_action, &port_id_action, sub_action);
 		dp_set_sample_action(&action[action_cnt++], &sample_action, 1, sub_action); // mirror all packets, without explicite sub sample action
 	}
 
@@ -171,13 +169,12 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 	dp_set_end_action(&action[action_cnt++]);
 
 	// validate and install flow rule
-	flow = dp_install_rte_flow(port_id, &dp_flow_attr_default_monitoring_ingress, pattern, action);
+	flow = dp_install_rte_flow(port_id, &dp_flow_attr_default_capture_ingress, pattern, action);
 
 	if (!flow) {
 		DPS_LOG_DEBUG("Failed to install default monitoring flow rule on port %d \n", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
-	
 
 	port->default_capture_flow = flow;
 
@@ -216,7 +213,7 @@ static int dp_install_pf_default_flow(struct dp_port *port, bool is_on)
 {
 	int ret;
 
-	ret = dp_install_default_rule_in_monitoring_group(port->port_id, is_on);
+	ret = dp_install_default_rule_in_capture_group(port->port_id, is_on);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed to install default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
@@ -242,7 +239,7 @@ static int dp_install_vf_default_capture_flow(struct dp_port *port)
 {
 	int ret;
 
-	ret = dp_install_default_rule_in_monitoring_group(port->port_id, true);
+	ret = dp_install_default_rule_in_capture_group(port->port_id, true);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed to install default capture flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
@@ -255,17 +252,17 @@ static int dp_turn_on_offload_pkt_capture(struct dp_port *port)
 {
 	if (!port->allocated || port->captured)
 		return DP_OK;
-	
+
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
-	
+
 	switch (port->port_type) {
 	case DP_PORT_PF:
 		if (DP_FAILED(dp_install_pf_default_flow(port, true)))
 			return DP_ERROR;
 		break;
 	case DP_PORT_VF:
-		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_MONITORING_GROUP)))
+		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_CAPTURE_GROUP)))
 			return DP_ERROR;
 		// rollback flow rules if failed on the second one for VF.
 		if (DP_FAILED(dp_install_vf_default_capture_flow(port))) {
@@ -288,7 +285,7 @@ static int dp_turn_off_offload_pkt_capture(struct dp_port *port)
 {
 	if (!port->allocated || !port->captured)
 		return DP_OK;
-	
+
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 
@@ -317,7 +314,7 @@ int dp_turn_on_offload_pkt_capture_on_single_iface(uint16_t port_id)
 int dp_turn_off_offload_pkt_capture_on_single_iface(uint16_t port_id)
 {
 	struct dp_port *port = dp_port_get(port_id);
-	
+
 	return dp_turn_off_offload_pkt_capture(port);
 }
 
@@ -342,7 +339,7 @@ int dp_turn_off_offload_pkt_capture_on_all_ifaces(void)
 		if (port->captured) {
 			if (DP_FAILED(dp_turn_off_offload_pkt_capture(port)))
 				return DP_ERROR;
-			count ++;
+			count++;
 		}
 	}
 	return count;
