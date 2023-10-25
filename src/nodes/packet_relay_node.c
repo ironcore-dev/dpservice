@@ -13,7 +13,7 @@ DP_NODE_REGISTER_NOINIT(PACKET_RELAY, packet_relay, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, struct rte_mbuf *m)
 {
-	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	struct rte_ipv4_hdr *ipv4_hdr = dp_get_ipv4_hdr(m);
 	struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
 	uint32_t temp_ip;
 	uint32_t cksum;

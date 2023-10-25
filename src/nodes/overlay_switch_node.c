@@ -17,27 +17,25 @@ DP_NODE_REGISTER_NOINIT(OVERLAY_SWITCH, overlay_switch, NEXT_NODES);
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	int proto_id;
+	struct rte_ipv6_hdr *ipv6_hdr;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
 		return OVERLAY_SWITCH_NEXT_IPIP;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		proto_id = extract_outer_ipv6_header(m, NULL, 0);
-		if (DP_FAILED(proto_id))
-			return OVERLAY_SWITCH_NEXT_DROP;
-
-		if (proto_id == DP_IP_PROTO_IPv4_ENCAP) {
+		ipv6_hdr = dp_get_ipv6_hdr(m);
+		switch (ipv6_hdr->proto) {
+		case DP_IP_PROTO_IPv4_ENCAP:
 			df->l3_type = RTE_ETHER_TYPE_IPV4;
+			dp_extract_underlay_header(df, ipv6_hdr);
 			return OVERLAY_SWITCH_NEXT_IPIP;
-		}
-
-		if (proto_id == DP_IP_PROTO_IPv6_ENCAP) {
+		case DP_IP_PROTO_IPv6_ENCAP:
 			df->l3_type = RTE_ETHER_TYPE_IPV6;
+			dp_extract_underlay_header(df, ipv6_hdr);
 			return OVERLAY_SWITCH_NEXT_IPIP;
+		default:
+			return OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
 		}
-
-		return OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
 	}
 
 	return OVERLAY_SWITCH_NEXT_DROP;

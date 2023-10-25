@@ -78,42 +78,22 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 	uint16_t port = ctx->port_id;
 	uint16_t queue = ctx->queue_id;
 	uint16_t sent_count;
-	uint16_t new_eth_type;
-	struct rte_mbuf *pkt;
+	struct rte_mbuf *m;
 	struct dp_flow *df;
 
 	// since this node is emitting packets, dp_forward_* wrapper functions cannot be used
-	// this code should colely resemble the one inside those functions
+	// this code should closely resemble the one inside those functions
 
 	for (uint16_t i = 0; i < nb_objs; ++i) {
-		pkt = (struct rte_mbuf *)objs[i];
-		df = dp_get_flow_ptr(pkt);
-		// TODO temporary, the whole condition below should be removed soon
-		if (df->virtsvc)
-			continue;
-		// Rewrite ethernet header for all packets except:
-		//  - packets created by rewriting a source packet (pkt->port == port)
-		//  - packets created by dp_service to directly send to VFs (DP_PER_TYPE_DIRECT_TX)
-		// Always rewrite regardless the above for:
-		//  - packets that require changes to underlaying IPv6 address, mainly LB packets and NAT packets that are bounced back to network
-		//  - packets already encapsulated for outgoing traffic (DP_FLOW_TYPE_OUTGOING)
-		if ((pkt->port != port && df->periodic_type != DP_PER_TYPE_DIRECT_TX)
-			|| df->flags.nat == DP_CHG_UL_DST_IP
-			|| df->flags.flow_type == DP_FLOW_TYPE_OUTGOING
-		) {
-			new_eth_type = dp_port_is_pf(port) ? RTE_ETHER_TYPE_IPV6 : df->l3_type;
-			if (unlikely(DP_FAILED(rewrite_eth_hdr(pkt, port, new_eth_type))))
-				DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
-			// since this is done in burst, just send out a bad packet..
-		}
-
+		m = (struct rte_mbuf *)objs[i];
+		df = dp_get_flow_ptr(m);
 		if (df->conntrack) {
 			// mark the flow as default if it is not marked as any other status
 			if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
 				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
-
+			// offload this flow from now on
 			if (df->flags.offload_decision == DP_FLOW_OFFLOAD_INSTALL || df->flags.offload_ipv6)
-				if (DP_FAILED(dp_offload_handler(pkt, df)))
+				if (DP_FAILED(dp_offload_handler(m, df)))
 					DPNODE_LOG_WARNING(node, "Offloading handler failed");
 		}
 	}

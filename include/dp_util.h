@@ -41,8 +41,6 @@ int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char if
 
 int dp_get_num_of_vfs(void);
 
-int rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type);
-
 
 struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id);
 

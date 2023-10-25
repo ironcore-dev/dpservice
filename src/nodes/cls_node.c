@@ -41,34 +41,31 @@ static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unuse
 DP_NODE_REGISTER_NOINIT(CLS, cls, NEXT_NODES);
 #endif
 
-static __rte_always_inline int is_arp(struct rte_mbuf *m)
+static __rte_always_inline int is_arp(struct rte_ether_hdr *ether_hdr)
 {
-	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	struct rte_arp_hdr *req_arp_hdr = (struct rte_arp_hdr *)(req_eth_hdr + 1);
+	struct rte_arp_hdr *arp_hdr = (struct rte_arp_hdr *)(ether_hdr + 1);
 
-	return req_arp_hdr->arp_hardware == htons(RTE_ARP_HRD_ETHER)
-		&& req_arp_hdr->arp_hlen == RTE_ETHER_ADDR_LEN
-		&& req_arp_hdr->arp_protocol == htons(RTE_ETHER_TYPE_IPV4)
-		&& req_arp_hdr->arp_plen == 4
+	return arp_hdr->arp_hardware == htons(RTE_ARP_HRD_ETHER)
+		&& arp_hdr->arp_hlen == RTE_ETHER_ADDR_LEN
+		&& arp_hdr->arp_protocol == htons(RTE_ETHER_TYPE_IPV4)
+		&& arp_hdr->arp_plen == 4
 		;
 } 
 
-static __rte_always_inline int is_ipv6_nd(struct rte_mbuf *m)
+static __rte_always_inline int is_ipv6_nd(struct rte_ether_hdr *ether_hdr)
 {
-	struct rte_ether_hdr *req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
-	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr *)(req_ipv6_hdr + 1);
+	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
+	struct icmp6hdr *icmp6_hdr = (struct icmp6hdr *)(ipv6_hdr + 1);
 
-	return req_ipv6_hdr->proto == DP_IP_PROTO_ICMPV6
-		&& (req_icmp6_hdr->icmp6_type == NDISC_NEIGHBOUR_SOLICITATION
-			|| req_icmp6_hdr->icmp6_type == NDISC_ROUTER_SOLICITATION)
+	return ipv6_hdr->proto == IPPROTO_ICMPV6
+		&& (icmp6_hdr->icmp6_type == NDISC_NEIGHBOUR_SOLICITATION
+			|| icmp6_hdr->icmp6_type == NDISC_ROUTER_SOLICITATION)
 		;
 }
 
 #ifdef ENABLE_VIRTSVC
-static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_mbuf *m)
+static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_ether_hdr *ether_hdr)
 {
-	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)(ether_hdr + 1);
 	rte_be32_t addr = ipv4_hdr->dst_addr;
 	uint16_t proto = ipv4_hdr->next_proto_id;
@@ -94,9 +91,8 @@ static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_mb
 	return NULL;
 }
 
-static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(struct rte_mbuf *m)
+static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(struct rte_ether_hdr *ether_hdr)
 {
-	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	uint8_t *addr = ipv6_hdr->src_addr;
 	uint16_t proto = ipv6_hdr->proto;
@@ -125,30 +121,35 @@ static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(struct rte_mb
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	uint32_t l2_type = m->packet_type & RTE_PTYPE_L2_MASK;
-	uint32_t l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
-	struct dp_flow *df = dp_init_flow_ptr(m);
+	struct rte_ether_hdr *ether_hdr;
+	uint32_t l3_type;
+	struct dp_flow *df;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
 #endif
 
-	if (unlikely(l2_type != RTE_PTYPE_L2_ETHER))
+	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
 		return CLS_NEXT_DROP;
+
+	l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
+	ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 
 	if (unlikely(l3_type == 0)) {
 		// Manual test, because Mellanox PMD drivers do not set detailed L2 packet_type in mbuf
-		if (is_arp(m))
+		if (is_arp(ether_hdr))
 			return CLS_NEXT_ARP;
 		return CLS_NEXT_DROP;
 	}
 
+	// L3-aware nodes need dp_flow structure (call cannot fail)
+	df = dp_init_flow_ptr(m);
+
 	if (RTE_ETH_IS_IPV4_HDR(l3_type)) {
 		if (dp_port_is_pf(m->port))
 			return CLS_NEXT_DROP;
-		extract_inner_ethernet_header(m);
 #ifdef ENABLE_VIRTSVC
 		if (virtsvc_present) {
-			virtsvc = get_outgoing_virtsvc(m);
+			virtsvc = get_outgoing_virtsvc(ether_hdr);
 			if (virtsvc) {
 				df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 				df->virtsvc = virtsvc;
@@ -156,31 +157,30 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			}
 		}
 #endif
+		df->l3_type = ntohs(ether_hdr->ether_type);
 		return CLS_NEXT_CONNTRACK;
 	}
 
 	if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
 		if (dp_port_is_pf(m->port)) {
-			if (unlikely(is_ipv6_nd(m)))
+			if (unlikely(is_ipv6_nd(ether_hdr)))
 				return CLS_NEXT_DROP;
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
-			extract_outer_ethernet_header(m);
 #ifdef ENABLE_VIRTSVC
 			if (virtsvc_present) {
-				virtsvc = get_incoming_virtsvc(m);
+				virtsvc = get_incoming_virtsvc(ether_hdr);
 				if (virtsvc) {
 					df->virtsvc = virtsvc;
 					return CLS_NEXT_VIRTSVC;
 				}
 			}
 #endif
-			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-			m->packet_type &= ~RTE_PTYPE_L2_MASK;
+			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
 			return CLS_NEXT_OVERLAY_SWITCH;
 		} else {
-			if (is_ipv6_nd(m))
+			if (is_ipv6_nd(ether_hdr))
 				return CLS_NEXT_IPV6_ND;
-			extract_inner_ethernet_header(m);
+			df->l3_type = ntohs(ether_hdr->ether_type);
 			return CLS_NEXT_IPV6_LOOKUP;
 		}
 	}

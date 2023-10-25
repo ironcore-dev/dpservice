@@ -95,21 +95,6 @@ int dp_get_num_of_vfs(void)
 	return vfs;
 }
 
-int rewrite_eth_hdr(struct rte_mbuf *m, uint16_t port_id, uint16_t eth_type)
-{
-	struct rte_ether_hdr *eth_hdr;
-
-	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
-	if (unlikely(!eth_hdr))
-		return DP_ERROR;
-
-	m->packet_type |= RTE_PTYPE_L2_ETHER;
-	rte_ether_addr_copy(dp_get_neigh_mac(port_id), &eth_hdr->dst_addr);
-	eth_hdr->ether_type = htons(eth_type);
-	rte_ether_addr_copy(dp_get_mac(port_id), &eth_hdr->src_addr);
-	return DP_OK;
-}
-
 
 static uint32_t dp_jhash_1word(const void *key, __rte_unused uint32_t length, uint32_t initval)
 {

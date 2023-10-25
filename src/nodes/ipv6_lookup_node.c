@@ -19,24 +19,19 @@ DP_NODE_REGISTER_NOINIT(IPV6_LOOKUP, ipv6_lookup, NEXT_NODES);
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	struct rte_ipv6_hdr *ipv6_hdr;
+	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	struct vm_route route;
 	int t_vni;
 	int dst_port;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		t_vni = df->tun_info.dst_vni;
-		ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *);
-	} else {
-		t_vni = 0;
-		ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
-										   sizeof(struct rte_ether_hdr));
-	}
+	t_vni = df->flags.flow_type == DP_FLOW_TYPE_INCOMING
+		? df->tun_info.dst_vni
+		: 0;
 
-	if (DP_FAILED(extract_inner_l3_header(m, ipv6_hdr, 0)))
-		return IPV6_LOOKUP_NEXT_DROP;
+	dp_extract_ipv6_header(df, ipv6_hdr);
 
-	if (DP_FAILED(extract_inner_l4_header(m, ipv6_hdr + 1, 0)))
+	if (DP_FAILED(dp_extract_l4_header(df, ipv6_hdr + 1)))
 		return IPV6_LOOKUP_NEXT_DROP;
 
 	// TODO: add broadcast routes when machine is added
@@ -62,6 +57,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (dp_conf_is_offload_enabled())
 		df->flags.offload_ipv6 = 1;
+
+	// next hop is known, fill in Ether header
+	// (PF egress goes through a tunnel that destroys Ether header)
+	if (!dp_port_is_pf(dst_port))
+		dp_fill_ether_hdr(ether_hdr, dst_port, RTE_ETHER_TYPE_IPV6);
 
 	return IPV6_LOOKUP_NEXT_L2_DECAP;
 }

@@ -5,6 +5,7 @@
 #include <rte_common.h>
 #include <rte_flow.h>
 #include <rte_atomic.h>
+#include "dp_error.h"
 #include "dp_flow.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
@@ -120,6 +121,62 @@ static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
 
 	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
 	mark->flags.is_recirc = false;
+}
+
+
+static __rte_always_inline void dp_extract_ipv4_header(struct dp_flow *df, const struct rte_ipv4_hdr *ipv4_hdr)
+{
+	df->src.src_addr = ipv4_hdr->src_addr;
+	df->dst.dst_addr = ipv4_hdr->dst_addr;
+	df->l4_type = ipv4_hdr->next_proto_id;
+}
+
+static __rte_always_inline void dp_extract_ipv6_header(struct dp_flow *df, const struct rte_ipv6_hdr *ipv6_hdr)
+{
+	rte_memcpy(df->dst.dst_addr6, ipv6_hdr->dst_addr, sizeof(df->dst.dst_addr6));
+	rte_memcpy(df->src.src_addr6, ipv6_hdr->src_addr, sizeof(df->src.src_addr6));
+	df->l4_type = ipv6_hdr->proto;
+}
+
+static __rte_always_inline int dp_extract_l4_header(struct dp_flow *df, const void *l4_hdr)
+{
+	if (df->l4_type == IPPROTO_TCP) {
+		df->l4_info.trans_port.dst_port = ((const struct rte_tcp_hdr *)l4_hdr)->dst_port;
+		df->l4_info.trans_port.src_port = ((const struct rte_tcp_hdr *)l4_hdr)->src_port;
+		return DP_OK;
+	} else if (df->l4_type == IPPROTO_UDP) {
+		df->l4_info.trans_port.dst_port = ((const struct rte_udp_hdr *)l4_hdr)->dst_port;
+		df->l4_info.trans_port.src_port = ((const struct rte_udp_hdr *)l4_hdr)->src_port;
+		return DP_OK;
+	} else if (df->l4_type == IPPROTO_ICMP) {
+		df->l4_info.icmp_field.icmp_type = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_type;
+		df->l4_info.icmp_field.icmp_code = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_code;
+		df->l4_info.icmp_field.icmp_identifier = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_ident;
+		return DP_OK;
+	} else if (df->l4_type == IPPROTO_ICMPV6) {
+		df->l4_info.icmp_field.icmp_type = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_type;
+		return DP_OK;
+	}
+
+	return DP_ERROR;
+}
+
+static __rte_always_inline void dp_extract_underlay_header(struct dp_flow *df, const struct rte_ipv6_hdr *ipv6_hdr)
+{
+	rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
+	rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
+	df->tun_info.proto_id = ipv6_hdr->proto;
+}
+
+
+static __rte_always_inline struct rte_ipv4_hdr *dp_get_ipv4_hdr(struct rte_mbuf *m)
+{
+	return rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+}
+
+static __rte_always_inline struct rte_ipv6_hdr *dp_get_ipv6_hdr(struct rte_mbuf *m)
+{
+	return rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *, sizeof(struct rte_ether_hdr));
 }
 
 #ifdef __cplusplus

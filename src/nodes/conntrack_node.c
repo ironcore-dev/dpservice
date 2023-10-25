@@ -49,17 +49,13 @@ static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct rte_ipv4_hdr *ipv4_hdr;
-	struct dp_flow *df;
+	struct dp_flow *df = dp_get_flow_ptr(m);
+	struct rte_ipv4_hdr *ipv4_hdr = dp_get_ipv4_hdr(m);
 	int ret;
 
-	df = dp_get_flow_ptr(m);
-	ipv4_hdr = dp_get_ipv4_hdr(m);
+	dp_extract_ipv4_header(df, ipv4_hdr);
 
-	if (DP_FAILED(extract_inner_l3_header(m, ipv4_hdr, 0)))
-		return CONNTRACK_NEXT_DROP;
-
-	if (DP_FAILED(extract_inner_l4_header(m, ipv4_hdr + 1, 0)))
+	if (DP_FAILED(dp_extract_l4_header(df, ipv4_hdr + 1)))
 		return CONNTRACK_NEXT_DROP;
 
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))

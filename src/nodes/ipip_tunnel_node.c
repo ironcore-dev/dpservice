@@ -29,18 +29,19 @@ static int ipip_tunnel_node_init(__rte_unused const struct rte_graph *graph, __r
 
 static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df)
 {
+	struct rte_ether_hdr *ether_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
 	rte_be16_t payload_len;
 	uint32_t packet_type;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		df->tun_info.proto_id = DP_IP_PROTO_IPv4_ENCAP;
-		payload_len = rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *)->total_length;
-		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4;
+		payload_len = dp_get_ipv4_hdr(m)->total_length;
+		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4 | RTE_PTYPE_L2_ETHER;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		df->tun_info.proto_id = DP_IP_PROTO_IPv6_ENCAP;
-		payload_len = htons(ntohs(rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *)->payload_len) + sizeof(struct rte_ipv6_hdr));
-		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV6;
+		payload_len = htons(ntohs(dp_get_ipv6_hdr(m)->payload_len) + sizeof(struct rte_ipv6_hdr));
+		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV6 | RTE_PTYPE_L2_ETHER;
 	} else {
 		DPNODE_LOG_WARNING(node, "Invalid tunnel type", DP_LOG_VALUE(df->l3_type));
 		return IPIP_TUNNEL_NEXT_DROP;
@@ -50,12 +51,16 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 	m->outer_l3_len = sizeof(struct rte_ipv6_hdr);
 	m->l2_len = 0; /* We dont have inner l2, when we encapsulate */
 
-	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
-	if (unlikely(!ipv6_hdr)) {
+	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr));
+	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
+	if (unlikely(!ether_hdr)) {
 		DPNODE_LOG_WARNING(node, "No space in mbuf for IPv6 header");
 		return IPIP_TUNNEL_NEXT_DROP;
 	}
 
+	dp_fill_ether_hdr(ether_hdr, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
+
+	ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
@@ -74,10 +79,6 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 	m->ol_flags |= RTE_MBUF_F_TX_TUNNEL_IP;
 
 	if (df->flags.nat == DP_LB_RECIRC) {
-		if (unlikely(DP_FAILED(rewrite_eth_hdr(m, df->nxt_hop, RTE_ETHER_TYPE_IPV6)))) {
-			DPNODE_LOG_WARNING(node, "No space in mbuf for ethernet header");
-			return IPIP_TUNNEL_NEXT_DROP;
-		}
 		dp_get_pkt_mark(m)->flags.is_recirc = true;
 		return IPIP_TUNNEL_NEXT_CLS;
 	}
@@ -88,33 +89,41 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(__rte_unused struct rte_node *node,
 															   struct rte_mbuf *m, struct dp_flow *df)
 {
-	rte_edge_t next_index = IPIP_TUNNEL_NEXT_DROP;
+	struct rte_ether_hdr *ether_hdr;
 	struct dp_vnf_value *vnf_val;
-	uint8_t proto = df->tun_info.proto_id;
+	rte_edge_t next_node;
+	uint32_t l3_type;
 
 	vnf_val = dp_get_vnf_value_with_key((void *)df->tun_info.ul_dst_addr6);
-	if (vnf_val) {
-		df->tun_info.dst_vni = vnf_val->vni;
-		df->vnf_type = vnf_val->v_type;
-		df->nxt_hop = vnf_val->portid;
-	} else {
+	if (!vnf_val)
+		return IPIP_TUNNEL_NEXT_DROP;
+
+	df->tun_info.dst_vni = vnf_val->vni;
+	df->vnf_type = vnf_val->v_type;
+	df->nxt_hop = vnf_val->portid;
+
+	switch (df->tun_info.proto_id) {
+	case DP_IP_PROTO_IPv4_ENCAP:
+		l3_type = RTE_PTYPE_L3_IPV4;
+		next_node = IPIP_TUNNEL_NEXT_IPV4_CONNTRACK;
+		break;
+	case DP_IP_PROTO_IPv6_ENCAP:
+		l3_type = RTE_PTYPE_L3_IPV6;
+		next_node = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
+		break;
+	default:
 		return IPIP_TUNNEL_NEXT_DROP;
 	}
 
-	if (proto == DP_IP_PROTO_IPv4_ENCAP)
-		next_index = IPIP_TUNNEL_NEXT_IPV4_CONNTRACK;
+	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
+	// no errorchecking as we just created more space than we need ^
+	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
+	dp_fill_ether_hdr(ether_hdr, df->nxt_hop, df->l3_type);
 
-	if (proto == DP_IP_PROTO_IPv6_ENCAP)
-		next_index = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
+	// this shift is non-standard as the actual values of PTYPE should be opaque
+	m->packet_type = ((m->packet_type & RTE_PTYPE_INNER_L4_MASK) >> 16) | l3_type | RTE_PTYPE_L2_ETHER;
 
-	if (next_index != IPIP_TUNNEL_NEXT_DROP) {
-		rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv6_hdr));
-		// this shift is non-standard as the actual values of PTYPE should be opaque
-		m->packet_type = ((m->packet_type & RTE_PTYPE_INNER_L4_MASK) >> 16)
-						 | (proto == DP_IP_PROTO_IPv4_ENCAP ? RTE_PTYPE_L3_IPV4 : RTE_PTYPE_L3_IPV6);
-	}
-
-	return next_index;
+	return next_node;
 }
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)

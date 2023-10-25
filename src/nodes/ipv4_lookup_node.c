@@ -29,8 +29,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	// TODO: add broadcast routes when machine is added
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
-		// the ethernet header cannot be removed is due to dhcp node needs mac info
-		// TODO: extract mac info in cls node
 		return IPV4_LOOKUP_NEXT_DHCP;
 
 	if (DP_FAILED(dp_lookup_ip4_route(m->port, df->tun_info.dst_vni, df,
@@ -62,8 +60,15 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			return IPV4_LOOKUP_NEXT_DROP;
 	}
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		df->nxt_hop = dp_multipath_get_pf(df->dp_flow_hash);
+		nxt_hop_is_pf = true;
+	}
+
+	// next hop is known, fill in Ether header
+	// (PF egress goes through a tunnel that destroys Ether header)
+	if (!nxt_hop_is_pf)
+		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), df->nxt_hop, RTE_ETHER_TYPE_IPV4);
 
 	return IPV4_LOOKUP_NEXT_NAT;
 }
