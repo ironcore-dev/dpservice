@@ -364,7 +364,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	}
 
 	if (cross_pf_port)
-		DPS_LOG_DEBUG("Installed encap flow rule on VF", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed cross pf encap flow rules", DP_LOG_PORTID(m->port));
 	else
 		DPS_LOG_DEBUG("Installed encap flow rule on VF", DP_LOG_PORTID(m->port));
 

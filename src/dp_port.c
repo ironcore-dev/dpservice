@@ -494,7 +494,7 @@ static int dp_install_pf_init_rte_rules(uint32_t port_id)
 {
 	int ret;
 
-	// this rule must be installed before any other rules
+	// only capture IPinIP packets
 	ret = dp_port_install_isolated_mode(port_id);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot install default isolation rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
@@ -574,6 +574,10 @@ int dp_port_stop(uint16_t port_id)
 
 	port = dp_port_get(port_id);
 	if (!port)
+		return DP_ERROR;
+
+	// not really resolve the issue, but let's do it explicitly
+	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 
 	if (DP_FAILED(dp_stop_eth_port(port_id)))

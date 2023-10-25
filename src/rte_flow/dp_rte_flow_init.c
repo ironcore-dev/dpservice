@@ -187,7 +187,7 @@ int dp_install_default_rule_in_monitoring_group(uint16_t port_id, bool is_on)
 }
 
 
-static int dp_destroy_default_flow(struct dp_port *port)
+int dp_destroy_default_flow(struct dp_port *port)
 {
 	struct rte_flow_error error;
 	int ret;
@@ -350,48 +350,6 @@ int dp_turn_off_offload_pkt_capture_on_all_ifaces(void)
 	}
 	return count;
 }
-
-// int dp_pf_remove_capture_pkt_isolation_rule(void)
-// {
-// 	int ret;
-// 	struct dp_port *port;
-// 	struct rte_flow_error error;
-// 	struct dp_ports *ports = get_dp_ports();
-	
-// 	DP_FOREACH_PORT(ports, port) {
-// 		if (port->port_type == DP_PORT_PF && port->default_capture_pkt_isolation_rule) {
-// 			ret = rte_flow_destroy(port->port_id, port->default_jump_flow, &error);
-// 			if (DP_FAILED(ret)) {
-// 				DPS_LOG_WARNING("Failed to destroy default capture pkt isolation rule", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
-// 				return DP_ERROR;
-// 			}
-// 		}
-// 	}
-// 	return DP_OK;
-
-// }
-
-// int dp_pf_install_capture_pkt_isolation_rule(void)
-// {
-// 	struct dp_port *port;
-// 	struct rte_flow_error error;
-// 	struct dp_ports *ports = get_dp_ports();
-	
-// 	// default_capture_pkt_isolation_rule is trusted to be null when start_port is called
-// 	DP_FOREACH_PORT(ports, port) {
-// 		if (port->port_type == DP_PORT_PF && !port->default_capture_pkt_isolation_rule) {
-// 			if (DP_FAILED(dp_install_isolate_captured_flow(port->port_id))) {
-// 				DPS_LOG_WARNING("Failed to install isolated_captured_flow", DP_LOG_PORTID(port->port_id));
-				
-// 				//fallback by removing every installed such rule from pfs, nothing can be done if this failed again, restart maybe
-// 				dp_pf_remove_capture_pkt_isolation_rule();
-// 				return DP_ERROR;
-// 			}
-// 		}
-// 	}
-
-// 	return DP_OK;
-// }
 
 #ifdef ENABLE_VIRTSVC
 int dp_install_isolated_mode_virtsvc(int port_id, uint8_t proto_id, const uint8_t svc_ipv6[16], rte_be16_t svc_port)
