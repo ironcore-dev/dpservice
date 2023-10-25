@@ -65,7 +65,8 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 														 struct rte_mbuf *m,
 														 struct dp_flow *df)
 {
-	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)rte_pktmbuf_mtod(m, struct rte_ipv4_hdr *);
+	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)(ether_hdr + 1);
 	rte_be16_t payload_len = htons(ntohs(ipv4_hdr->total_length) - sizeof(struct rte_ipv4_hdr));
 	rte_be32_t original_ip = ipv4_hdr->src_addr;
 	uint8_t proto = ipv4_hdr->next_proto_id;
@@ -79,14 +80,15 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	int conn_idx;
 
 	// replace IPv4 header with IPv6 header
-	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ipv4_hdr));
-	ipv6_hdr = (struct rte_ipv6_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr));
-	if (unlikely(!ipv6_hdr)) {
+	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
+	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
+	if (unlikely(!ether_hdr)) {
 		DPNODE_LOG_WARNING(node, "No more space in the packet for IPv6 header");
 		return VIRTSVC_NEXT_DROP;
 	}
-	m->packet_type = (m->packet_type & RTE_PTYPE_L4_MASK) | RTE_PTYPE_L3_IPV6;
+	m->packet_type = (m->packet_type & RTE_PTYPE_L4_MASK) | RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L2_ETHER;
 
+	ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->proto = proto;
@@ -137,6 +139,8 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 		m->l4_len = sizeof(struct rte_udp_hdr);
 	}
 
+	dp_fill_ether_hdr(ether_hdr, pf_port_id, RTE_ETHER_TYPE_IPV6);
+
 	return next_tx_index[pf_port_id];
 }
 
@@ -153,9 +157,11 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 {
 	static rte_be16_t packet_id = 0;
 
-	struct rte_ipv6_hdr *ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *);
+	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	uint8_t proto = ipv6_hdr->proto;
 	uint8_t ttl = ipv6_hdr->hop_limits;
+	rte_be16_t total_length = htons(ntohs(ipv6_hdr->payload_len) + sizeof(struct rte_ipv4_hdr));
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 	struct rte_udp_hdr *udp_hdr;
@@ -163,18 +169,19 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	struct dp_virtsvc_conn *conn;
 
 	// replace IPv6 header with IPv4 header
-	rte_pktmbuf_adj(m, sizeof(struct rte_ipv6_hdr));
-	ipv4_hdr = (struct rte_ipv4_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ipv4_hdr));
-	if (unlikely(!ipv4_hdr)) {
+	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
+	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
+	if (unlikely(!ether_hdr)) {
 		DPNODE_LOG_WARNING(node, "No more space in the packet for IPv4 header");
 		return VIRTSVC_NEXT_DROP;
 	}
-	m->packet_type = (m->packet_type & ~RTE_PTYPE_L3_MASK) | RTE_PTYPE_L3_IPV4;
+	m->packet_type = (m->packet_type & ~RTE_PTYPE_L3_MASK) | RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L2_ETHER;
 
+	ipv4_hdr = (struct rte_ipv4_hdr *)(ether_hdr + 1);
 	ipv4_hdr->version_ihl = 0x45;
-	ipv4_hdr->total_length = htons(m->pkt_len);
+	ipv4_hdr->total_length = total_length;
 	ipv4_hdr->type_of_service = 0;
-	ipv4_hdr->packet_id = packet_id++;
+	ipv4_hdr->packet_id = packet_id++;  // incrementing a BE16, but it has to be unique, not really ordered
 	ipv4_hdr->fragment_offset = 0;
 	ipv4_hdr->time_to_live = ttl;
 	ipv4_hdr->next_proto_id = proto;
@@ -216,8 +223,8 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 
 	ipv4_hdr->dst_addr = conn->vf_ip;
 	vf_port_id = conn->vf_port_id;
-	// to make tx_node work
-	df->l3_type = RTE_ETHER_TYPE_IPV4;
+
+	dp_fill_ether_hdr(ether_hdr, vf_port_id, RTE_ETHER_TYPE_IPV4);
 
 	if (dp_port_get_vf_attach_status(vf_port_id) == DP_VF_PORT_DETACHED)
 		return VIRTSVC_NEXT_DROP;

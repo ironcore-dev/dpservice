@@ -110,6 +110,9 @@ void dp_set_vm_pxe_str(uint16_t portid, const char *p_str);
 int dp_lpm_reset_all_route_tables(int socketid);
 int dp_lpm_reset_route_tables(int vni, int socketid);
 struct dp_fwall_head *dp_get_fwall_head(int port_id);
+
+void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type);
+
 #ifdef __cplusplus
 }
 #endif

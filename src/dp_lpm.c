@@ -578,3 +578,11 @@ struct dp_fwall_head *dp_get_fwall_head(int port_id)
 	RTE_VERIFY(port_id < DP_MAX_PORTS);
 	return &vm_table[port_id].fwall_head;
 }
+
+void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type)
+{
+	RTE_VERIFY(port_id < DP_MAX_PORTS);
+	rte_ether_addr_copy(&vm_table[port_id].info.neigh_mac, &ether_hdr->dst_addr);
+	rte_ether_addr_copy(&vm_table[port_id].info.own_mac, &ether_hdr->src_addr);
+	ether_hdr->ether_type = htons(ether_type);
+}

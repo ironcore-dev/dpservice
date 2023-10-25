@@ -96,7 +96,8 @@ static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_mb
 
 static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(struct rte_mbuf *m)
 {
-	struct rte_ipv6_hdr *ipv6_hdr = rte_pktmbuf_mtod(m, struct rte_ipv6_hdr *);
+	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	uint8_t *addr = ipv6_hdr->src_addr;
 	uint16_t proto = ipv6_hdr->proto;
 	rte_be16_t port;
@@ -151,8 +152,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			if (virtsvc) {
 				df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 				df->virtsvc = virtsvc;
-				rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-				m->packet_type &= ~RTE_PTYPE_L2_MASK;
 				return CLS_NEXT_VIRTSVC;
 			}
 		}
@@ -166,8 +165,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				return CLS_NEXT_DROP;
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 			extract_outer_ethernet_header(m);
-			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
-			m->packet_type &= ~RTE_PTYPE_L2_MASK;
 #ifdef ENABLE_VIRTSVC
 			if (virtsvc_present) {
 				virtsvc = get_incoming_virtsvc(m);
@@ -177,6 +174,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				}
 			}
 #endif
+			rte_pktmbuf_adj(m, (uint16_t)sizeof(struct rte_ether_hdr));
+			m->packet_type &= ~RTE_PTYPE_L2_MASK;
 			return CLS_NEXT_OVERLAY_SWITCH;
 		} else {
 			if (is_ipv6_nd(m))
