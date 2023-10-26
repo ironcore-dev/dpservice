@@ -250,35 +250,40 @@ static int dp_install_vf_default_capture_flow(struct dp_port *port)
 
 static int dp_turn_on_offload_pkt_capture(struct dp_port *port)
 {
-	if (!port->allocated || port->captured)
-		return DP_OK;
+	if (!port->allocated)
+		return DP_GRPC_ERR_CAPTURE_INIT_PORT_NOT_ALLOC;
+
+	if (port->captured)
+		return DP_GRPC_ERR_CAPTURE_INIT_PORT_ALREADY_SET;
 
 	if (DP_FAILED(dp_destroy_default_flow(port)))
-		return DP_ERROR;
+		return DP_GRPC_ERR_CAPTURE_INIT_FAILED_DEL_DEFAULT;
 
 	switch (port->port_type) {
 	case DP_PORT_PF:
 		if (DP_FAILED(dp_install_pf_default_flow(port, true)))
-			return DP_ERROR;
+			return DP_GRPC_ERR_CAPTURE_INIT_FAILED_SET_PF;
 		break;
 	case DP_PORT_VF:
 		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_CAPTURE_GROUP)))
-			return DP_ERROR;
+			return DP_GRPC_ERR_CAPTURE_INIT_FAILED_SET_VF;
 		// rollback flow rules if failed on the second one for VF.
 		if (DP_FAILED(dp_install_vf_default_capture_flow(port))) {
 			if (DP_FAILED(dp_destroy_default_flow(port))) {
 				DPS_LOG_ERR("Failed to recover from turning capturing on by destroying previously installed default rule", DP_LOG_PORTID(port->port_id));
-				return DP_ERROR;
+				return DP_GRPC_ERR_CAPTURE_INIT_FAILED_RECOVER;
 			}
-			if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_VNET_GROUP)))
+			if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_VNET_GROUP))) {
 				DPS_LOG_ERR("Failed to recover from turning capturing on by installing default jump rule to the vnet group", DP_LOG_PORTID(port->port_id));
-			return DP_ERROR;
+				return DP_GRPC_ERR_CAPTURE_INIT_FAILED_RECOVER;
+			}
+			return DP_GRPC_ERR_CAPTURE_INIT_FAILED_SET_VF;
 		}
 		break;
 	}
 
 	port->captured = true;
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 static int dp_turn_off_offload_pkt_capture(struct dp_port *port)

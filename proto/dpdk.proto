@@ -547,10 +547,6 @@ message CaptureStartRequest {
 
 message CaptureStartResponse {
 	Status status = 1;
-	oneof interface_info {
-		bytes vf_name = 2;
-		uint32 pf_index = 3;
-	}
 }
 
 message CaptureStopRequest {
