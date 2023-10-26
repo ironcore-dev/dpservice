@@ -913,15 +913,13 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 			break;
 		}
 
-		if (DP_FAILED(dp_turn_on_offload_pkt_capture_on_single_iface(port_id))) {
-			reply->interface = request->interfaces[i];
-			status = DP_GRPC_ERR_CAPTURE_CANNOT_INIT;
-			break;
-		}
+		status = dp_turn_on_offload_pkt_capture_on_single_iface(port_id);
+		if (DP_FAILED(status))
+			break;	// stop continuing to turn on offload capture on other interfaces
 	}
 
-	if (status != DP_GRPC_OK) {
-		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces()))
+	if (DP_FAILED(status)) {
+		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces()))	// try to turn off capture on all interfaces
 			status = DP_GRPC_ERR_CAPTURE_INIT_CANNOT_ROLLBACK;
 	}
 

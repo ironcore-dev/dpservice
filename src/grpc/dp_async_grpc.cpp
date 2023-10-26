@@ -541,11 +541,9 @@ void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
 	reply_.set_underlay_route(strbuf);
 }
 
-const char* CaptureStopCall::FillRequest(struct dpgrpc_request* request)
+const char* CaptureStopCall::FillRequest(__rte_unused struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Stop packet capture");
-
-	RTE_SET_USED(request);
 
 	return NULL;
 }
@@ -603,13 +601,8 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 	return NULL;
 }
 
-void CaptureStartCall::ParseReply(struct dpgrpc_reply* reply)
+void CaptureStartCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 {
-	if (reply->capture_stat.interface.type == DP_CAPTURE_IFACE_TYPE_SINGLE_PF) {
-		reply_.set_pf_index(reply->capture_stat.interface.interface_info.pf_index);
-	} else if (reply->capture_stat.interface.type == DP_CAPTURE_IFACE_TYPE_SINGLE_VF) {
-		reply_.set_vf_name(reply->capture_stat.interface.interface_info.iface_id);
-	}
 }
 
 const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
