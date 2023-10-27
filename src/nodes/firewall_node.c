@@ -26,19 +26,19 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	enum dp_fwall_action action;
 
 	// currently only IPv4 firewall is implemented
-	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		if (!DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4 && cntrack) {
+		if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status)) {
+			action = (enum dp_fwall_action)cntrack->fwall_action[df->flags.dir];
+		} else if (df->flags.dir == DP_FLOW_DIR_ORG) {
 			action = dp_get_firewall_action(m);
 			cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
 			cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
-		}
-
-		if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status))
-			action = (enum dp_fwall_action)cntrack->fwall_action[df->flags.dir];
-
+			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_FIREWALL;
+		} else
+			action = DP_FWALL_DROP;
 		/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */
-		/*if (action == DP_FWALL_DROP)
-			return FIREWALL_NEXT_DROP;*/
+		// if (action == DP_FWALL_DROP)
+		// 	return FIREWALL_NEXT_DROP;
 	}
 
 	if (dp_port_is_pf(df->nxt_hop))
