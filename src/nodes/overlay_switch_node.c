@@ -10,7 +10,8 @@
 
 // "ipv6_lookup" for unrecognized ipv6 packets, normally it is not needed
 #define NEXT_NODES(NEXT) \
-	NEXT(OVERLAY_SWITCH_NEXT_IPIP, "ipip_tunnel") \
+	NEXT(OVERLAY_SWITCH_NEXT_IPIP_ENCAP, "ipip_encap") \
+	NEXT(OVERLAY_SWITCH_NEXT_IPIP_DECAP, "ipip_decap") \
 	NEXT(OVERLAY_SWITCH_NEXT_IPV6_LOOKUP, "ipv6_lookup")
 DP_NODE_REGISTER_NOINIT(OVERLAY_SWITCH, overlay_switch, NEXT_NODES);
 
@@ -20,7 +21,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ipv6_hdr *ipv6_hdr;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-		return OVERLAY_SWITCH_NEXT_IPIP;
+		return OVERLAY_SWITCH_NEXT_IPIP_ENCAP;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
 		ipv6_hdr = dp_get_ipv6_hdr(m);
@@ -28,11 +29,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		case DP_IP_PROTO_IPv4_ENCAP:
 			df->l3_type = RTE_ETHER_TYPE_IPV4;
 			dp_extract_underlay_header(df, ipv6_hdr);
-			return OVERLAY_SWITCH_NEXT_IPIP;
+			return OVERLAY_SWITCH_NEXT_IPIP_DECAP;
 		case DP_IP_PROTO_IPv6_ENCAP:
 			df->l3_type = RTE_ETHER_TYPE_IPV6;
 			dp_extract_underlay_header(df, ipv6_hdr);
-			return OVERLAY_SWITCH_NEXT_IPIP;
+			return OVERLAY_SWITCH_NEXT_IPIP_DECAP;
 		default:
 			return OVERLAY_SWITCH_NEXT_IPV6_LOOKUP;
 		}
@@ -46,6 +47,6 @@ static uint16_t overlay_switch_node_process(struct rte_graph *graph,
 											void **objs,
 											uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, OVERLAY_SWITCH_NEXT_IPIP, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, OVERLAY_SWITCH_NEXT_IPIP_DECAP, get_next_index);
 	return nb_objs;
 }

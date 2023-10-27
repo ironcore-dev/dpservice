@@ -1,4 +1,4 @@
-#include "nodes/ipip_tunnel_node.h"
+#include "nodes/ipip_encap_node.h"
 #include <rte_common.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
@@ -10,25 +10,19 @@
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(IPIP_TUNNEL_NEXT_CLS, "cls") \
-	NEXT(IPIP_TUNNEL_NEXT_IPV4_CONNTRACK, "conntrack") \
-	NEXT(IPIP_TUNNEL_NEXT_IPV6_LOOKUP, "ipv6_lookup")
-DP_NODE_REGISTER(IPIP_TUNNEL, ipip_tunnel, NEXT_NODES);
+	NEXT(IPIP_ENCAP_NEXT_CLS, "cls")
+DP_NODE_REGISTER_NOINIT(IPIP_ENCAP, ipip_encap, NEXT_NODES);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
 
-int ipip_tunnel_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
+int ipip_encap_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
 {
-	return dp_node_append_pf_tx(DP_NODE_GET_SELF(ipip_tunnel), next_tx_index, port_id, tx_node_name);
+	return dp_node_append_pf_tx(DP_NODE_GET_SELF(ipip_encap), next_tx_index, port_id, tx_node_name);
 }
 
-static int ipip_tunnel_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
-	return DP_OK;
-}
-
-static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *node, struct rte_mbuf *m, struct dp_flow *df)
-{
+	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
 	rte_be16_t payload_len;
@@ -44,7 +38,7 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV6 | RTE_PTYPE_L2_ETHER;
 	} else {
 		DPNODE_LOG_WARNING(node, "Invalid tunnel type", DP_LOG_VALUE(df->l3_type));
-		return IPIP_TUNNEL_NEXT_DROP;
+		return IPIP_ENCAP_NEXT_DROP;
 	}
 
 	m->outer_l2_len = sizeof(struct rte_ether_hdr);
@@ -55,7 +49,7 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
 	if (unlikely(!ether_hdr)) {
 		DPNODE_LOG_WARNING(node, "No space in mbuf for IPv6 header");
-		return IPIP_TUNNEL_NEXT_DROP;
+		return IPIP_ENCAP_NEXT_DROP;
 	}
 
 	dp_fill_ether_hdr(ether_hdr, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
@@ -80,66 +74,13 @@ static __rte_always_inline rte_edge_t handle_ipip_tunnel_encap(struct rte_node *
 
 	if (df->flags.nat == DP_LB_RECIRC) {
 		dp_get_pkt_mark(m)->flags.is_recirc = true;
-		return IPIP_TUNNEL_NEXT_CLS;
+		return IPIP_ENCAP_NEXT_CLS;
 	}
 
 	return next_tx_index[df->nxt_hop];
 }
 
-static __rte_always_inline rte_edge_t handle_ipip_tunnel_decap(__rte_unused struct rte_node *node,
-															   struct rte_mbuf *m, struct dp_flow *df)
-{
-	struct rte_ether_hdr *ether_hdr;
-	struct dp_vnf_value *vnf_val;
-	rte_edge_t next_node;
-	uint32_t l3_type;
-
-	vnf_val = dp_get_vnf_value_with_key((void *)df->tun_info.ul_dst_addr6);
-	if (!vnf_val)
-		return IPIP_TUNNEL_NEXT_DROP;
-
-	df->tun_info.dst_vni = vnf_val->vni;
-	df->vnf_type = vnf_val->v_type;
-	df->nxt_hop = vnf_val->portid;
-
-	switch (df->tun_info.proto_id) {
-	case DP_IP_PROTO_IPv4_ENCAP:
-		l3_type = RTE_PTYPE_L3_IPV4;
-		next_node = IPIP_TUNNEL_NEXT_IPV4_CONNTRACK;
-		break;
-	case DP_IP_PROTO_IPv6_ENCAP:
-		l3_type = RTE_PTYPE_L3_IPV6;
-		next_node = IPIP_TUNNEL_NEXT_IPV6_LOOKUP;
-		break;
-	default:
-		return IPIP_TUNNEL_NEXT_DROP;
-	}
-
-	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
-	// no errorchecking as we just created more space than we need ^
-	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
-	dp_fill_ether_hdr(ether_hdr, df->nxt_hop, df->l3_type);
-
-	// this shift is non-standard as the actual values of PTYPE should be opaque
-	m->packet_type = ((m->packet_type & RTE_PTYPE_INNER_L4_MASK) >> 16) | l3_type | RTE_PTYPE_L2_ETHER;
-
-	return next_node;
-}
-
-static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
-{
-	struct dp_flow *df = dp_get_flow_ptr(m);
-
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-		return handle_ipip_tunnel_encap(node, m, df);
-
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
-		return handle_ipip_tunnel_decap(node, m, df);
-
-	return IPIP_TUNNEL_NEXT_DROP;
-}
-
-static uint16_t ipip_tunnel_node_process(struct rte_graph *graph,
+static uint16_t ipip_encap_node_process(struct rte_graph *graph,
 										 struct rte_node *node,
 										 void **objs,
 										 uint16_t nb_objs)
