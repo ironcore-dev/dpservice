@@ -24,8 +24,8 @@
 	NEXT(CLS_NEXT_ARP, "arp") \
 	NEXT(CLS_NEXT_IPV6_ND, "ipv6_nd") \
 	NEXT(CLS_NEXT_CONNTRACK, "conntrack") \
+	NEXT(CLS_NEXT_IPIP_DECAP, "ipip_decap") \
 	NEXT(CLS_NEXT_IPV6_LOOKUP, "ipv6_lookup") \
-	NEXT(CLS_NEXT_OVERLAY_SWITCH, "overlay_switch") \
 	VIRTSVC_NEXT(NEXT)
 
 #ifdef ENABLE_VIRTSVC
@@ -41,9 +41,9 @@ static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unuse
 DP_NODE_REGISTER_NOINIT(CLS, cls, NEXT_NODES);
 #endif
 
-static __rte_always_inline int is_arp(struct rte_ether_hdr *ether_hdr)
+static __rte_always_inline int is_arp(const struct rte_ether_hdr *ether_hdr)
 {
-	struct rte_arp_hdr *arp_hdr = (struct rte_arp_hdr *)(ether_hdr + 1);
+	const struct rte_arp_hdr *arp_hdr = (const struct rte_arp_hdr *)(ether_hdr + 1);
 
 	return arp_hdr->arp_hardware == htons(RTE_ARP_HRD_ETHER)
 		&& arp_hdr->arp_hlen == RTE_ETHER_ADDR_LEN
@@ -52,10 +52,9 @@ static __rte_always_inline int is_arp(struct rte_ether_hdr *ether_hdr)
 		;
 } 
 
-static __rte_always_inline int is_ipv6_nd(struct rte_ether_hdr *ether_hdr)
+static __rte_always_inline int is_ipv6_nd(const struct rte_ipv6_hdr *ipv6_hdr)
 {
-	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
-	struct icmp6hdr *icmp6_hdr = (struct icmp6hdr *)(ipv6_hdr + 1);
+	const struct icmp6hdr *icmp6_hdr = (const struct icmp6hdr *)(ipv6_hdr + 1);
 
 	return ipv6_hdr->proto == IPPROTO_ICMPV6
 		&& (icmp6_hdr->icmp6_type == NDISC_NEIGHBOUR_SOLICITATION
@@ -64,9 +63,9 @@ static __rte_always_inline int is_ipv6_nd(struct rte_ether_hdr *ether_hdr)
 }
 
 #ifdef ENABLE_VIRTSVC
-static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_ether_hdr *ether_hdr)
+static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(const struct rte_ether_hdr *ether_hdr)
 {
-	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)(ether_hdr + 1);
+	const struct rte_ipv4_hdr *ipv4_hdr = (const struct rte_ipv4_hdr *)(ether_hdr + 1);
 	rte_be32_t addr = ipv4_hdr->dst_addr;
 	uint16_t proto = ipv4_hdr->next_proto_id;
 	rte_be16_t port;
@@ -74,9 +73,9 @@ static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_et
 	int diff;
 
 	if (proto == IPPROTO_TCP)
-		port = ((struct rte_tcp_hdr *)(ipv4_hdr + 1))->dst_port;
+		port = ((const struct rte_tcp_hdr *)(ipv4_hdr + 1))->dst_port;
 	else if (proto == IPPROTO_UDP)
-		port = ((struct rte_udp_hdr *)(ipv4_hdr + 1))->dst_port;
+		port = ((const struct rte_udp_hdr *)(ipv4_hdr + 1))->dst_port;
 	else
 		return NULL;
 
@@ -91,19 +90,18 @@ static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(struct rte_et
 	return NULL;
 }
 
-static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(struct rte_ether_hdr *ether_hdr)
+static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(const struct rte_ipv6_hdr *ipv6_hdr)
 {
-	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
-	uint8_t *addr = ipv6_hdr->src_addr;
+	const uint8_t *addr = ipv6_hdr->src_addr;
 	uint16_t proto = ipv6_hdr->proto;
 	rte_be16_t port;
 	const struct dp_virtsvc_lookup_entry *entry;
 	int diff;
 
 	if (proto == IPPROTO_TCP)
-		port = ((struct rte_tcp_hdr *)(ipv6_hdr + 1))->src_port;
+		port = ((const struct rte_tcp_hdr *)(ipv6_hdr + 1))->src_port;
 	else if (proto == IPPROTO_UDP)
-		port = ((struct rte_udp_hdr *)(ipv6_hdr + 1))->src_port;
+		port = ((const struct rte_udp_hdr *)(ipv6_hdr + 1))->src_port;
 	else
 		return NULL;
 
@@ -121,7 +119,8 @@ static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(struct rte_et
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct rte_ether_hdr *ether_hdr;
+	const struct rte_ether_hdr *ether_hdr;
+	const struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t l3_type;
 	struct dp_flow *df;
 #ifdef ENABLE_VIRTSVC
@@ -162,23 +161,36 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
+		ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
 		if (dp_port_is_pf(m->port)) {
-			if (unlikely(is_ipv6_nd(ether_hdr)))
+			if (unlikely(is_ipv6_nd(ipv6_hdr)))
 				return CLS_NEXT_DROP;
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 #ifdef ENABLE_VIRTSVC
 			if (virtsvc_present) {
-				virtsvc = get_incoming_virtsvc(ether_hdr);
+				virtsvc = get_incoming_virtsvc(ipv6_hdr);
 				if (virtsvc) {
 					df->virtsvc = virtsvc;
 					return CLS_NEXT_VIRTSVC;
 				}
 			}
 #endif
+			switch (ipv6_hdr->proto) {
+			case IPPROTO_IPIP:
+				df->l3_type = RTE_ETHER_TYPE_IPV4;
+				break;
+			case IPPROTO_IPV6:
+				df->l3_type = RTE_ETHER_TYPE_IPV6;
+				break;
+			default:
+				df->l3_type = ntohs(ether_hdr->ether_type);
+				return CLS_NEXT_IPV6_LOOKUP;
+			}
 			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
-			return CLS_NEXT_OVERLAY_SWITCH;
+			dp_extract_underlay_header(df, ipv6_hdr);
+			return CLS_NEXT_IPIP_DECAP;
 		} else {
-			if (is_ipv6_nd(ether_hdr))
+			if (is_ipv6_nd(ipv6_hdr))
 				return CLS_NEXT_IPV6_ND;
 			df->l3_type = ntohs(ether_hdr->ether_type);
 			return CLS_NEXT_IPV6_LOOKUP;

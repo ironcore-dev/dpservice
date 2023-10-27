@@ -26,7 +26,6 @@ dp_sources = [
   'nodes/ipv6_nd_node.c',
   'nodes/l2_decap_node.c',
   'nodes/lb_node.c',
-  'nodes/overlay_switch_node.c',
   'nodes/packet_relay_node.c',
   'nodes/rx_node.c',
   'nodes/rx_periodic_node.c',

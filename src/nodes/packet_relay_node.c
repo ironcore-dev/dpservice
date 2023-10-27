@@ -8,7 +8,7 @@
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(PACKET_RELAY_NEXT_OVERLAY_SWITCH, "overlay_switch")
+	NEXT(PACKET_RELAY_NEXT_IPIP_ENCAP, "ipip_encap")
 DP_NODE_REGISTER_NOINIT(PACKET_RELAY, packet_relay, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, struct rte_mbuf *m)
@@ -39,7 +39,7 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	dp_nat_chg_ip(df, ipv4_hdr, m);
 	memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
 
-	return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
+	return PACKET_RELAY_NEXT_IPIP_ENCAP;
 }
 
 
@@ -57,7 +57,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// trick: use src place to store old dst address for offloading
 		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));
 		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
-		return PACKET_RELAY_NEXT_OVERLAY_SWITCH;
+		return PACKET_RELAY_NEXT_IPIP_ENCAP;
 	}
 
 	if (df->l4_type == DP_IP_PROTO_ICMP)
@@ -71,6 +71,6 @@ static uint16_t packet_relay_node_process(struct rte_graph *graph,
 										  void **objs,
 										  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, PACKET_RELAY_NEXT_OVERLAY_SWITCH, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, PACKET_RELAY_NEXT_IPIP_ENCAP, get_next_index);
 	return nb_objs;
 }

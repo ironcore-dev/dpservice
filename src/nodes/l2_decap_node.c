@@ -10,7 +10,7 @@
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(L2_DECAP_OVERLAY_SWITCH, "overlay_switch")
+	NEXT(L2_DECAP_IPIP_ENCAP, "ipip_encap")
 DP_NODE_REGISTER_NOINIT(L2_DECAP, l2_decap, NEXT_NODES);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
@@ -26,7 +26,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	// TODO this could be done via next_tx_index maybe
 	if (dp_port_is_pf(df->nxt_hop))
-		return L2_DECAP_OVERLAY_SWITCH;
+		return L2_DECAP_IPIP_ENCAP;
 
 	// TODO this is now an almost empty node
 
@@ -38,6 +38,6 @@ static uint16_t l2_decap_node_process(struct rte_graph *graph,
 									  void **objs,
 									  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, L2_DECAP_OVERLAY_SWITCH, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, L2_DECAP_IPIP_ENCAP, get_next_index);
 	return nb_objs;
 }
