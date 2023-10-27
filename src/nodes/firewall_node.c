@@ -1,3 +1,4 @@
+#include "nodes/firewall_node.h"
 #include <rte_common.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
@@ -8,8 +9,15 @@
 #include "dp_log.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(FIREWALL_NEXT_L2_DECAP, "l2_decap")
+	NEXT(FIREWALL_NEXT_IPIP_ENCAP, "ipip_encap")
 DP_NODE_REGISTER_NOINIT(FIREWALL, firewall, NEXT_NODES);
+
+static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int firewall_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_vf_tx(DP_NODE_GET_SELF(firewall), next_tx_index, port_id, tx_node_name);
+}
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -17,20 +25,26 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct flow_value *cntrack = df->conntrack;
 	enum dp_fwall_action action;
 
-	if (!DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
-		action = dp_get_firewall_action(m);
-		cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
-		cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
+	// currently only IPv4 firewall is implemented
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+		if (!DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
+			action = dp_get_firewall_action(m);
+			cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
+			cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
+		}
+
+		if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status))
+			action = (enum dp_fwall_action)cntrack->fwall_action[df->flags.dir];
+
+		/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */
+		/*if (action == DP_FWALL_DROP)
+			return FIREWALL_NEXT_DROP;*/
 	}
 
-	if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status))
-		action = (enum dp_fwall_action)cntrack->fwall_action[df->flags.dir];
+	if (dp_port_is_pf(df->nxt_hop))
+		return FIREWALL_NEXT_IPIP_ENCAP;
 
-	/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */
-	/*if (action == DP_FWALL_DROP)
-		return FIREWALL_NEXT_DROP;*/
-
-	return FIREWALL_NEXT_L2_DECAP;
+	return next_tx_index[df->nxt_hop];
 }
 
 static uint16_t firewall_node_process(struct rte_graph *graph,
@@ -38,6 +52,6 @@ static uint16_t firewall_node_process(struct rte_graph *graph,
 									  void **objs,
 									  uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, FIREWALL_NEXT_L2_DECAP, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, FIREWALL_NEXT_IPIP_ENCAP, get_next_index);
 	return nb_objs;
 }

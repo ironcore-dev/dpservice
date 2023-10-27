@@ -11,7 +11,7 @@
 #include "nodes/dhcpv6_node.h"
 #include "nodes/ipip_encap_node.h"
 #include "nodes/ipv6_nd_node.h"
-#include "nodes/l2_decap_node.h"
+#include "nodes/firewall_node.h"
 #include "nodes/rx_node.h"
 #include "nodes/rx_periodic_node.h"
 #include "nodes/tx_node.h"
@@ -139,7 +139,7 @@ static int dp_graph_init_nodes(void)
 				|| DP_FAILED(dhcp_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(dhcpv6_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(ipv6_nd_node_append_vf_tx(port_id, name))
-				|| DP_FAILED(l2_decap_node_append_vf_tx(port_id, name))
+				|| DP_FAILED(firewall_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(rx_periodic_node_append_vf_tx(port_id, name)))
 				return DP_ERROR;
 			break;

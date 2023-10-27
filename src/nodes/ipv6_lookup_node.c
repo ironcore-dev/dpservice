@@ -13,7 +13,7 @@
 
 #define NEXT_NODES(NEXT) \
 	NEXT(IPV6_LOOKUP_NEXT_DHCPV6, "dhcpv6") \
-	NEXT(IPV6_LOOKUP_NEXT_L2_DECAP, "l2_decap")
+	NEXT(IPV6_LOOKUP_NEXT_FIREWALL, "firewall")
 DP_NODE_REGISTER_NOINIT(IPV6_LOOKUP, ipv6_lookup, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
@@ -63,7 +63,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!dp_port_is_pf(dst_port))
 		dp_fill_ether_hdr(ether_hdr, dst_port, RTE_ETHER_TYPE_IPV6);
 
-	return IPV6_LOOKUP_NEXT_L2_DECAP;
+	return IPV6_LOOKUP_NEXT_FIREWALL;
 }
 
 static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
@@ -71,6 +71,6 @@ static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV6_LOOKUP_NEXT_L2_DECAP, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV6_LOOKUP_NEXT_FIREWALL, get_next_index);
 	return nb_objs;
 }

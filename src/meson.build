@@ -24,7 +24,6 @@ dp_sources = [
   'nodes/ipv4_lookup_node.c',
   'nodes/ipv6_lookup_node.c',
   'nodes/ipv6_nd_node.c',
-  'nodes/l2_decap_node.c',
   'nodes/lb_node.c',
   'nodes/packet_relay_node.c',
   'nodes/rx_node.c',
