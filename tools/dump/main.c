@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <pcap/pcap.h>
+#include <regex.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +49,8 @@ static char *eal_args[RTE_DIM(eal_args_mem)];
 
 static const char *pcap_path = NULL;
 static struct dp_pcap dp_pcap;
+
+static char node_filter[DP_GRAPHTRACE_NODE_FILTER_SIZE] = "";
 
 static bool interrupt = false;
 static bool primary_alive = false;
@@ -207,6 +210,10 @@ static int dp_graphtrace_start(void)
 		.params.start.hw = dp_conf_is_offload_enabled(),
 	};
 
+	if (*node_filter)
+		snprintf(request.params.start.node_filter, sizeof(request.params.start.node_filter),
+				 "%s", node_filter);
+
 	ret = dp_graphtrace_request(&request, &reply);
 	if (DP_FAILED(ret))
 		return ret;
@@ -346,6 +353,27 @@ static int dp_argparse_opt_pcap(const char *arg)
 	dump_func = dp_pcap_dump;
 	return DP_OK;
 }
+
+static int dp_argparse_opt_node_filter(const char *arg)
+{
+	regex_t validation_re;
+	char reg_error[256];
+	int reg_ret;
+
+	if ((size_t)snprintf(node_filter, sizeof(node_filter), "%s", arg) >= sizeof(node_filter)) {
+		fprintf(stderr, "Node filter regular expression is too long\n");
+		return DP_ERROR;
+	}
+	reg_ret = regcomp(&validation_re, node_filter, REG_NOSUB);
+	if (reg_ret != 0) {
+		regerror(reg_ret, &validation_re, reg_error, sizeof(reg_error));
+		fprintf(stderr, "Invalid node filter regular expression: %s\n", reg_error);
+		return DP_ERROR;
+	}
+	regfree(&validation_re);
+	return DP_OK;
+}
+
 
 int main(int argc, char **argv)
 {
