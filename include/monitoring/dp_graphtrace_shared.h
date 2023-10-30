@@ -16,6 +16,8 @@
 
 #define DP_MP_ACTION_GRAPHTRACE "dp_mp_graphtrace"
 
+#define DP_GRAPHTRACE_NODE_FILTER_SIZE 64
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,6 +48,7 @@ struct dp_graphtrace_pktinfo {
 struct dp_graphtrace_params_start {
 	bool drops;
 	bool nodes;
+	char node_filter[DP_GRAPHTRACE_NODE_FILTER_SIZE];
 	bool hw;
 };
 

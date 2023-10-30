@@ -18,6 +18,11 @@
       "default": "false"
     },
     {
+      "lgopt": "node-filter",
+      "help": "show only nodes with name matching REGEX",
+      "arg": "REGEX"
+    },
+    {
       "lgopt": "hw",
       "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
       "var": "offload_enabled",

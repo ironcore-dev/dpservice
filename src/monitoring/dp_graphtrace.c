@@ -1,5 +1,6 @@
 #include "monitoring/dp_graphtrace.h"
 
+#include <regex.h>
 #include <rte_mbuf.h>
 
 #include "dp_conf.h"
@@ -22,6 +23,8 @@ bool _dp_graphtrace_hw_enabled = false;
 
 static struct dp_graphtrace graphtrace;
 static bool offload_enabled;
+static bool nodename_filtered;
+static regex_t nodename_re;
 
 static int dp_graphtrace_init_memzone(void)
 {
@@ -62,13 +65,24 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 {
 	int ret;
 
+	nodename_filtered = request->params.start.node_filter[0] != '\0';
+	if (nodename_filtered)
+		if (regcomp(&nodename_re, request->params.start.node_filter, REG_NOMATCH) != 0)
+			return -EINVAL;
+
+	// not making the error code better since 'start.hw' branch will be removed anyway
 	if (request->params.start.hw) {
-		if (!offload_enabled)
+		if (!offload_enabled) {
+			if (nodename_filtered)
+				regfree(&nodename_re);
 			return -EPERM;
+		}
 
 		ret = dp_send_event_hardware_capture_start_msg();
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot send hardware capture start message");
+			if (nodename_filtered)
+				regfree(&nodename_re);
 			return ret;
 		}
 
@@ -91,6 +105,8 @@ static int dp_handle_graphtrace_stop(void)
 {
 	if (_dp_graphtrace_enabled) {
 		_dp_graphtrace_enabled = false;
+		if (nodename_filtered)
+			regfree(&nodename_re);
 		DPS_LOG_INFO("Graphtrace disabled");
 	}
 	if (_dp_graphtrace_hw_enabled) {
@@ -192,20 +208,21 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
 	uint32_t sent;
 
 	for (uint32_t i = 0; i < nb_objs; ++i) {
+		if (nodename_filtered && node && regexec(&nodename_re, node->name, 0, NULL, 0) == REG_NOMATCH)
+			continue;
 		dup = rte_pktmbuf_copy(objs[i], graphtrace.mempool, 0, UINT32_MAX);
 		if (likely(!dup)) {
 			// allocation (pool size) is designed to fail when the ringbuffer is (almost) full
 			// this prevent unnecessary copying and immediate freeing after enqueue() fails
 			break;
-		} else {
-			dups[nb_dups++] = dup;
-			pktinfo = dp_get_graphtrace_pktinfo(dup);
-			pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
-			pktinfo->pkt_type = type;
-			pktinfo->node = node;
-			pktinfo->next_node = next_node;
-			pktinfo->dst_port_id = dst_port_id;
 		}
+		dups[nb_dups++] = dup;
+		pktinfo = dp_get_graphtrace_pktinfo(dup);
+		pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;
+		pktinfo->pkt_type = type;
+		pktinfo->node = node;
+		pktinfo->next_node = next_node;
+		pktinfo->dst_port_id = dst_port_id;
 	}
 
 	if (likely(nb_dups == 0))
