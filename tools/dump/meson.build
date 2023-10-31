@@ -1,5 +1,3 @@
-pcap_dep = dependency('pcap')
-
 dpservice_dump_sources = [
   'main.c',
   '../../src/dp_error.c',

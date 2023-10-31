@@ -19,6 +19,11 @@ void dp_pcap_free(struct dp_pcap *dp_pcap);
 
 void dp_pcap_dump(struct dp_pcap *dp_pcap, struct rte_mbuf *m, struct timeval *timestamp);
 
+int dp_compile_bpf(struct bpf_program *bpf, const char *pcap_filter);
+void dp_free_bpf(struct bpf_program *bpf);
+
+bool dp_is_bpf_match(struct bpf_program *bpf, struct rte_mbuf *m);
+
 #ifdef __cplusplus
 }
 #endif

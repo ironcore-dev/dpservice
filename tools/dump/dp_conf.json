@@ -23,6 +23,11 @@
       "arg": "REGEX"
     },
     {
+      "lgopt": "filter",
+      "help": "show only packets matching a pcap-style FILTER",
+      "arg": "FILTER"
+    },
+    {
       "lgopt": "hw",
       "help": "capture offloaded packets (only outgoing VF->PF packets supported)",
       "var": "offload_enabled",

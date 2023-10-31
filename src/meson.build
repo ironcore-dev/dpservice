@@ -9,6 +9,7 @@ dp_sources = [
   'monitoring/dp_graphtrace.c',
   'monitoring/dp_graphtrace_shared.c',
   'monitoring/dp_monitoring.c',
+  'monitoring/dp_pcap.c',
   'nodes/arp_node.c',
   'nodes/arp_node.c',
   'nodes/cls_node.c',
@@ -69,7 +70,7 @@ endif
 exe = executable('dpservice-bin',
   sources: [ dp_sources, grpc_generated ],
   include_directories: [ includes ],
-  dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep ]
+  dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep, pcap_dep ]
 )
 
 if get_option('enable_usermode')

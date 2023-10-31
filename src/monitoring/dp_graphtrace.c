@@ -8,6 +8,7 @@
 #include "dp_log.h"
 #include "dpdk_layer.h"
 #include "monitoring/dp_graphtrace_shared.h"
+#include "monitoring/dp_pcap.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "monitoring/dp_event.h"
@@ -17,6 +18,8 @@
 static enum dp_graphtrace_loglevel graphtrace_loglevel;
 #endif
 
+#define DP_IS_NUL_TERMINATED(ARRAY) (strnlen((ARRAY), sizeof(ARRAY)) < sizeof(ARRAY))
+
 int _dp_graphtrace_flags;
 bool _dp_graphtrace_enabled = false;
 bool _dp_graphtrace_hw_enabled = false;
@@ -25,6 +28,8 @@ static struct dp_graphtrace graphtrace;
 static bool offload_enabled;
 static bool nodename_filtered;
 static regex_t nodename_re;
+static bool bpf_filtered;
+static struct bpf_program bpf;
 
 static int dp_graphtrace_init_memzone(void)
 {
@@ -66,15 +71,28 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 	int ret;
 
 	nodename_filtered = request->params.start.node_filter[0] != '\0';
-	if (nodename_filtered)
-		if (regcomp(&nodename_re, request->params.start.node_filter, REG_NOMATCH) != 0)
+	if (nodename_filtered) {
+		if (!DP_IS_NUL_TERMINATED(request->params.start.node_filter)
+			|| regcomp(&nodename_re, request->params.start.node_filter, REG_NOMATCH) != 0)
 			return -EINVAL;
+	}
+
+	bpf_filtered = request->params.start.pcap_filter[0] != '\0';
+	if (bpf_filtered) {
+		if (!DP_IS_NUL_TERMINATED(request->params.start.pcap_filter)
+			|| DP_FAILED(dp_compile_bpf(&bpf, request->params.start.pcap_filter))) {
+			regfree(&nodename_re);
+			return -EINVAL;
+		}
+	}
 
 	// not making the error code better since 'start.hw' branch will be removed anyway
 	if (request->params.start.hw) {
 		if (!offload_enabled) {
 			if (nodename_filtered)
 				regfree(&nodename_re);
+			if (bpf_filtered)
+				dp_free_bpf(&bpf);
 			return -EPERM;
 		}
 
@@ -83,6 +101,8 @@ static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *req
 			DPS_LOG_ERR("Cannot send hardware capture start message");
 			if (nodename_filtered)
 				regfree(&nodename_re);
+			if (bpf_filtered)
+				dp_free_bpf(&bpf);
 			return ret;
 		}
 
@@ -107,6 +127,8 @@ static int dp_handle_graphtrace_stop(void)
 		_dp_graphtrace_enabled = false;
 		if (nodename_filtered)
 			regfree(&nodename_re);
+		if (bpf_filtered)
+			dp_free_bpf(&bpf);
 		DPS_LOG_INFO("Graphtrace disabled");
 	}
 	if (_dp_graphtrace_hw_enabled) {
@@ -209,6 +231,8 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
 
 	for (uint32_t i = 0; i < nb_objs; ++i) {
 		if (nodename_filtered && node && regexec(&nodename_re, node->name, 0, NULL, 0) == REG_NOMATCH)
+			continue;
+		if (bpf_filtered && !dp_is_bpf_match(&bpf, objs[i]))
 			continue;
 		dup = rte_pktmbuf_copy(objs[i], graphtrace.mempool, 0, UINT32_MAX);
 		if (likely(!dup)) {

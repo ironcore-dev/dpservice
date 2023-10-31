@@ -62,6 +62,7 @@ grpc_dep = dependency('grpc')
 grpccpp_dep = dependency('grpc++')
 thread_dep = dependency('threads')
 libuuid_dep = dependency('uuid')
+pcap_dep = dependency('pcap')
 
 protoc = find_program('protoc')
 grpc_cpp = find_program('grpc_cpp_plugin')

@@ -7,6 +7,7 @@
 | --drops | None | show dropped packets |  |
 | --nodes | None | show graph node traversal |  |
 | --node-filter | REGEX | show only nodes with name matching REGEX |  |
+| --filter | FILTER | show only packets matching a pcap-style FILTER |  |
 | --hw | None | capture offloaded packets (only outgoing VF->PF packets supported) |  |
 | --pcap | FILE | write packets into a PCAP file |  |
 | --stop | None | do nothing, only make sure tracing is disabled in dp-service |  |

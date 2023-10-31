@@ -17,6 +17,7 @@
 #define DP_MP_ACTION_GRAPHTRACE "dp_mp_graphtrace"
 
 #define DP_GRAPHTRACE_NODE_FILTER_SIZE 64
+#define DP_GRAPHTRACE_PCAP_FILTER_SIZE 180
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,10 +46,12 @@ struct dp_graphtrace_pktinfo {
 	uint16_t dst_port_id;
 };
 
+// TODO this is bad! this is too small to be used right!
 struct dp_graphtrace_params_start {
 	bool drops;
 	bool nodes;
 	char node_filter[DP_GRAPHTRACE_NODE_FILTER_SIZE];
+	char pcap_filter[DP_GRAPHTRACE_PCAP_FILTER_SIZE];
 	bool hw;
 };
 

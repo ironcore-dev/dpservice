@@ -14,7 +14,7 @@ sudo apt install meson build-essential python3-pyelftools
 
 To [build dp-service](#building-the-service) you also need:
 ```bash
-sudo apt install git pkgconf cmake protobuf-compiler-grpc libgrpc++-dev uuid-dev
+sudo apt install git pkgconf cmake protobuf-compiler-grpc libgrpc++-dev uuid-dev libpcap-dev
 ```
 For [automated testing](../testing/) (enabled via meson option `-Denable_tests=true`) also install:
 ```bash

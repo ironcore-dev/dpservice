@@ -1,6 +1,5 @@
 #include <fcntl.h>
 #include <getopt.h>
-#include <pcap/pcap.h>
 #include <regex.h>
 #include <signal.h>
 #include <stdio.h>
@@ -39,7 +38,7 @@ static const struct timespec connect_timeout = {
 // therefore convert them from literals and remember them for freeing later
 static const char *eal_arg_strings[] = {
 	"dpservice-dump",				// this binary (not used, can actually be any string)
-	"--proc-type=secondary",		// connect to the primary process (dp_service) instead
+	"--proc-type=secondary",		// connect to the primary process (dpservice-bin) instead
 	"--no-pci",						// do not try to use any hardware
 	"--log-level=6",				// hide DPDK's informational messages (level 7)
 };
@@ -51,6 +50,7 @@ static const char *pcap_path = NULL;
 static struct dp_pcap dp_pcap;
 
 static char node_filter[DP_GRAPHTRACE_NODE_FILTER_SIZE] = "";
+static char packet_filter[DP_GRAPHTRACE_PCAP_FILTER_SIZE] = "";
 
 static bool interrupt = false;
 static bool primary_alive = false;
@@ -176,6 +176,9 @@ static int dp_graphtrace_request(struct dp_graphtrace_mp_request *request, struc
 	struct rte_mp_msg mp_request;
 	struct rte_mp_reply mp_reply;
 
+	static_assert(sizeof(struct dp_graphtrace_mp_request) <= sizeof(mp_request.param),
+				  "Graphtrace request is too big");
+
 	rte_strscpy(mp_request.name, DP_MP_ACTION_GRAPHTRACE, sizeof(mp_request.name));
 	mp_request.len_param = sizeof(struct dp_graphtrace_mp_request);
 	mp_request.num_fds = 0;
@@ -211,8 +214,10 @@ static int dp_graphtrace_start(void)
 	};
 
 	if (*node_filter)
-		snprintf(request.params.start.node_filter, sizeof(request.params.start.node_filter),
-				 "%s", node_filter);
+		snprintf(request.params.start.node_filter, sizeof(request.params.start.node_filter), "%s", node_filter);
+
+	if (*packet_filter)
+		snprintf(request.params.start.pcap_filter, sizeof(request.params.start.pcap_filter), "%s", packet_filter);
 
 	ret = dp_graphtrace_request(&request, &reply);
 	if (DP_FAILED(ret))
@@ -364,13 +369,35 @@ static int dp_argparse_opt_node_filter(const char *arg)
 		fprintf(stderr, "Node filter regular expression is too long\n");
 		return DP_ERROR;
 	}
+
 	reg_ret = regcomp(&validation_re, node_filter, REG_NOSUB);
 	if (reg_ret != 0) {
 		regerror(reg_ret, &validation_re, reg_error, sizeof(reg_error));
 		fprintf(stderr, "Invalid node filter regular expression: %s\n", reg_error);
 		return DP_ERROR;
 	}
+
 	regfree(&validation_re);
+
+	return DP_OK;
+}
+
+static int dp_argparse_opt_filter(const char *arg)
+{
+	struct bpf_program validation_bpf;
+
+	if ((size_t)snprintf(packet_filter, sizeof(packet_filter), "%s", arg) >= sizeof(packet_filter)) {
+		fprintf(stderr, "Filter string is too long\n");
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_compile_bpf(&validation_bpf, arg))) {
+		fprintf(stderr, "Invalid Filter string\n");
+		return DP_ERROR;
+	}
+
+	dp_free_bpf(&validation_bpf);
+
 	return DP_OK;
 }
 
