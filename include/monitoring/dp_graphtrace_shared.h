@@ -4,20 +4,22 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
+#include <rte_memzone.h>
 #include <rte_ring.h>
 
 #include "dp_mbuf_dyn.h"
 
 #define DP_GRAPHTRACE_MEMPOOL_NAME "dp_graphtrace_mempool"
 #define DP_GRAPHTRACE_RINGBUF_NAME "dp_graphtrace_ringbuf"
+#define DP_GRAPHTRACE_FILTERS_NAME "dp_graphtrace_filters"
 
 // DPDK requirement: power of 2 and less than INT32_MAX
 #define DP_GRAPHTRACE_RINGBUF_SIZE 65536
 
 #define DP_MP_ACTION_GRAPHTRACE "dp_mp_graphtrace"
 
-#define DP_GRAPHTRACE_NODE_FILTER_SIZE 64
-#define DP_GRAPHTRACE_PCAP_FILTER_SIZE 180
+#define DP_GRAPHTRACE_NODE_REGEX_MAXLEN 256
+#define DP_GRAPHTRACE_FILTER_MAXLEN 1024
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,8 +36,14 @@ enum dp_graphtrace_pkt_type {
 };
 
 struct dp_graphtrace {
-	struct rte_mempool	*mempool;
-	struct rte_ring		*ringbuf;
+	struct rte_mempool *mempool;
+	struct rte_ring *ringbuf;
+	const struct rte_memzone *filters;
+};
+
+struct dp_graphtrace_params {
+	char node_regex[DP_GRAPHTRACE_NODE_REGEX_MAXLEN];
+	char filter_string[DP_GRAPHTRACE_FILTER_MAXLEN];
 };
 
 struct dp_graphtrace_pktinfo {
@@ -46,12 +54,9 @@ struct dp_graphtrace_pktinfo {
 	uint16_t dst_port_id;
 };
 
-// TODO this is bad! this is too small to be used right!
 struct dp_graphtrace_params_start {
 	bool drops;
 	bool nodes;
-	char node_filter[DP_GRAPHTRACE_NODE_FILTER_SIZE];
-	char pcap_filter[DP_GRAPHTRACE_PCAP_FILTER_SIZE];
 	bool hw;
 };
 

@@ -17,7 +17,6 @@ enum {
 _OPT_SHOPT_MAX = 255,
 	OPT_DROPS,
 	OPT_NODES,
-	OPT_NODE_FILTER,
 	OPT_FILTER,
 	OPT_HW,
 	OPT_PCAP,
@@ -30,8 +29,7 @@ static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
 	{ "drops", 0, 0, OPT_DROPS },
-	{ "nodes", 0, 0, OPT_NODES },
-	{ "node-filter", 1, 0, OPT_NODE_FILTER },
+	{ "nodes", 1, 0, OPT_NODES },
 	{ "filter", 1, 0, OPT_FILTER },
 	{ "hw", 0, 0, OPT_HW },
 	{ "pcap", 1, 0, OPT_PCAP },
@@ -40,18 +38,12 @@ static const struct option dp_conf_longopts[] = {
 };
 
 static bool showing_drops = false;
-static bool showing_nodes = false;
 static bool offload_enabled = false;
 static bool stop_mode = false;
 
 bool dp_conf_is_showing_drops(void)
 {
 	return showing_drops;
-}
-
-bool dp_conf_is_showing_nodes(void)
-{
-	return showing_nodes;
 }
 
 bool dp_conf_is_offload_enabled(void)
@@ -68,7 +60,7 @@ bool dp_conf_is_stop_mode(void)
 
 /* These functions need to be implemented by the user of this generated code */
 static void dp_argparse_version(void);
-static int dp_argparse_opt_node_filter(const char *arg);
+static int dp_argparse_opt_nodes(const char *arg);
 static int dp_argparse_opt_filter(const char *arg);
 static int dp_argparse_opt_pcap(const char *arg);
 
@@ -76,15 +68,14 @@ static int dp_argparse_opt_pcap(const char *arg);
 static inline void dp_argparse_help(const char *progname, FILE *outfile)
 {
 	fprintf(outfile, "Usage: %s [options]\n"
-		" -h, --help               display this help and exit\n"
-		" -v, --version            display version and exit\n"
-		"     --drops              show dropped packets\n"
-		"     --nodes              show graph node traversal\n"
-		"     --node-filter=REGEX  show only nodes with name matching REGEX\n"
-		"     --filter=FILTER      show only packets matching a pcap-style FILTER\n"
-		"     --hw                 capture offloaded packets (only outgoing VF->PF packets supported)\n"
-		"     --pcap=FILE          write packets into a PCAP file\n"
-		"     --stop               do nothing, only make sure tracing is disabled in dp-service\n"
+		" -h, --help           display this help and exit\n"
+		" -v, --version        display version and exit\n"
+		"     --drops          show dropped packets\n"
+		"     --nodes=REGEX    show graph node traversal, limit to REGEX-matched nodes (empty string for all)\n"
+		"     --filter=FILTER  show only packets matching a pcap-style FILTER\n"
+		"     --hw             capture offloaded packets (only outgoing VF->PF packets supported)\n"
+		"     --pcap=FILE      write packets into a PCAP file\n"
+		"     --stop           do nothing, only make sure tracing is disabled in dp-service\n"
 	, progname);
 }
 
@@ -95,9 +86,7 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 	case OPT_DROPS:
 		return dp_argparse_store_true(&showing_drops);
 	case OPT_NODES:
-		return dp_argparse_store_true(&showing_nodes);
-	case OPT_NODE_FILTER:
-		return dp_argparse_opt_node_filter(arg);
+		return dp_argparse_opt_nodes(arg);
 	case OPT_FILTER:
 		return dp_argparse_opt_filter(arg);
 	case OPT_HW:

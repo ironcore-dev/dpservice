@@ -5,8 +5,7 @@
 | -h, --help | None | display this help and exit |  |
 | -v, --version | None | display version and exit |  |
 | --drops | None | show dropped packets |  |
-| --nodes | None | show graph node traversal |  |
-| --node-filter | REGEX | show only nodes with name matching REGEX |  |
+| --nodes | REGEX | show graph node traversal, limit to REGEX-matched nodes (empty string for all) |  |
 | --filter | FILTER | show only packets matching a pcap-style FILTER |  |
 | --hw | None | capture offloaded packets (only outgoing VF->PF packets supported) |  |
 | --pcap | FILE | write packets into a PCAP file |  |

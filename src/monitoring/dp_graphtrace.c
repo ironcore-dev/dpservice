@@ -31,7 +31,7 @@ static regex_t nodename_re;
 static bool bpf_filtered;
 static struct bpf_program bpf;
 
-static int dp_graphtrace_init_memzone(void)
+static int dp_graphtrace_init_memory(void)
 {
 	// DPDK recommendation for mempool size: power of 2 minus one for best memory utilization
 	// So using ringbuffer size minus one, when the ring buffer is (almost) full, allocation will start failing
@@ -53,35 +53,51 @@ static int dp_graphtrace_init_memzone(void)
 		return DP_ERROR;
 	}
 
+	graphtrace.filters = rte_memzone_reserve(DP_GRAPHTRACE_FILTERS_NAME, sizeof(struct dp_graphtrace_params),
+											 rte_socket_id(), 0);
+	if (!graphtrace.filters) {
+		DPS_LOG_ERR("Cannot create graphtrace filter definition memory", DP_LOG_RET(rte_errno));
+		rte_mempool_free(graphtrace.mempool);
+		rte_ring_free(graphtrace.ringbuf);
+		return DP_ERROR;
+	}
+
 	offload_enabled = dp_conf_is_offload_enabled();
 
 	return DP_OK;
 }
 
-static void dp_graphtrace_free_memzone(void)
+static void dp_graphtrace_free_memory(void)
 {
 	rte_ring_free(graphtrace.ringbuf);
 	graphtrace.ringbuf = NULL;
 	rte_mempool_free(graphtrace.mempool);
 	graphtrace.mempool = NULL;
+	rte_memzone_free(graphtrace.filters);
+	graphtrace.filters = NULL;
 }
 
 static int dp_handle_graphtrace_start(const struct dp_graphtrace_mp_request *request)
 {
+	struct dp_graphtrace_params *filters = (struct dp_graphtrace_params *)graphtrace.filters->addr;
 	int ret;
 
-	nodename_filtered = request->params.start.node_filter[0] != '\0';
+	// there are additional parameters in shared memory (cannot fit into the request)
+	if (!DP_IS_NUL_TERMINATED(filters->node_regex)
+		|| !DP_IS_NUL_TERMINATED(filters->filter_string))
+		return -EINVAL;
+
+	nodename_filtered = *filters->node_regex;
 	if (nodename_filtered) {
-		if (!DP_IS_NUL_TERMINATED(request->params.start.node_filter)
-			|| regcomp(&nodename_re, request->params.start.node_filter, REG_NOMATCH) != 0)
+		if (regcomp(&nodename_re, filters->node_regex, REG_NOSUB) != 0)
 			return -EINVAL;
 	}
 
-	bpf_filtered = request->params.start.pcap_filter[0] != '\0';
+	bpf_filtered = *filters->filter_string;
 	if (bpf_filtered) {
-		if (!DP_IS_NUL_TERMINATED(request->params.start.pcap_filter)
-			|| DP_FAILED(dp_compile_bpf(&bpf, request->params.start.pcap_filter))) {
-			regfree(&nodename_re);
+		if (DP_FAILED(dp_compile_bpf(&bpf, filters->filter_string))) {
+			if (nodename_filtered)
+				regfree(&nodename_re);
 			return -EINVAL;
 		}
 	}
@@ -191,7 +207,7 @@ int dp_graphtrace_init(void)
 {
 	int ret;
 
-	ret = dp_graphtrace_init_memzone();
+	ret = dp_graphtrace_init_memory();
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to init memzone for dp graphtrace", DP_LOG_RET(ret));
 		return DP_ERROR;
@@ -200,7 +216,7 @@ int dp_graphtrace_init(void)
 	ret = rte_mp_action_register(DP_MP_ACTION_GRAPHTRACE, dp_handle_mp_graphtrace_action);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot register graphtrace action", DP_LOG_RET(ret));
-		dp_graphtrace_free_memzone();
+		dp_graphtrace_free_memory();
 		return DP_ERROR;
 	}
 
@@ -213,9 +229,20 @@ int dp_graphtrace_init(void)
 void dp_graphtrace_free(void)
 {
 	rte_mp_action_unregister(DP_MP_ACTION_GRAPHTRACE);
-	dp_graphtrace_free_memzone();
+	dp_graphtrace_free_memory();
 }
 
+
+static __rte_always_inline
+bool dp_is_node_match(regex_t *re, const struct rte_node *node, const struct rte_node *next_node)
+{
+	if (node)
+		return regexec(re, node->name, 0, NULL, 0) == 0;
+	else if (next_node)
+		return regexec(re, next_node->name, 0, NULL, 0) == 0;
+	else
+		return false;
+}
 
 void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
 						 const struct rte_node *node,
@@ -230,7 +257,7 @@ void _dp_graphtrace_send(enum dp_graphtrace_pkt_type type,
 	uint32_t sent;
 
 	for (uint32_t i = 0; i < nb_objs; ++i) {
-		if (nodename_filtered && node && regexec(&nodename_re, node->name, 0, NULL, 0) == REG_NOMATCH)
+		if (nodename_filtered && !dp_is_node_match(&nodename_re, node, next_node))
 			continue;
 		if (bpf_filtered && !dp_is_bpf_match(&bpf, objs[i]))
 			continue;

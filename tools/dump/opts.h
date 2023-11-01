@@ -6,7 +6,6 @@
 /***********************************************************************/
 
 bool dp_conf_is_showing_drops(void);
-bool dp_conf_is_showing_nodes(void);
 bool dp_conf_is_offload_enabled(void);
 bool dp_conf_is_stop_mode(void);
 

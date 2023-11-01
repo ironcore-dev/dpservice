@@ -49,8 +49,9 @@ static char *eal_args[RTE_DIM(eal_args_mem)];
 static const char *pcap_path = NULL;
 static struct dp_pcap dp_pcap;
 
-static char node_filter[DP_GRAPHTRACE_NODE_FILTER_SIZE] = "";
-static char packet_filter[DP_GRAPHTRACE_PCAP_FILTER_SIZE] = "";
+static bool showing_nodes = false;
+static char node_filter[DP_GRAPHTRACE_NODE_REGEX_MAXLEN] = "";
+static char packet_filter[DP_GRAPHTRACE_FILTER_MAXLEN] = "";
 
 static bool interrupt = false;
 static bool primary_alive = false;
@@ -88,6 +89,10 @@ static int dp_graphtrace_connect(struct dp_graphtrace *graphtrace)
 
 	graphtrace->ringbuf = rte_ring_lookup(DP_GRAPHTRACE_RINGBUF_NAME);
 	if (!graphtrace->ringbuf)
+		return DP_ERROR;
+
+	graphtrace->filters = rte_memzone_lookup(DP_GRAPHTRACE_FILTERS_NAME);
+	if (!graphtrace->filters)
 		return DP_ERROR;
 
 	return DP_OK;
@@ -202,22 +207,21 @@ static int dp_graphtrace_request(struct dp_graphtrace_mp_request *request, struc
 	return DP_OK;
 }
 
-static int dp_graphtrace_start(void)
+static int dp_graphtrace_start(struct dp_graphtrace *graphtrace)
 {
 	int ret;
 	struct dp_graphtrace_mp_reply reply;
 	struct dp_graphtrace_mp_request request = {
 		.action = DP_GRAPHTRACE_ACTION_START,
 		.params.start.drops = dp_conf_is_showing_drops(),
-		.params.start.nodes = dp_conf_is_showing_nodes(),
+		.params.start.nodes = showing_nodes,
 		.params.start.hw = dp_conf_is_offload_enabled(),
 	};
+	struct dp_graphtrace_params *filters = (struct dp_graphtrace_params *)graphtrace->filters->addr;
 
-	if (*node_filter)
-		snprintf(request.params.start.node_filter, sizeof(request.params.start.node_filter), "%s", node_filter);
-
-	if (*packet_filter)
-		snprintf(request.params.start.pcap_filter, sizeof(request.params.start.pcap_filter), "%s", packet_filter);
+	// sizes already checked by argument parser, default is an empty string
+	snprintf(filters->node_regex, sizeof(filters->node_regex), "%s", node_filter);
+	snprintf(filters->filter_string, sizeof(filters->filter_string), "%s", packet_filter);
 
 	ret = dp_graphtrace_request(&request, &reply);
 	if (DP_FAILED(ret))
@@ -295,7 +299,7 @@ static int dp_graphtrace_main(void)
 		return ret;
 	}
 
-	if (DP_FAILED(dp_graphtrace_start())) {
+	if (DP_FAILED(dp_graphtrace_start(&graphtrace))) {
 		fprintf(stderr, "Failed to request graph tracing\n");
 		rte_eal_alarm_cancel(dp_graphtrace_monitor_primary, (void *)-1);
 		return DP_ERROR;
@@ -359,11 +363,17 @@ static int dp_argparse_opt_pcap(const char *arg)
 	return DP_OK;
 }
 
-static int dp_argparse_opt_node_filter(const char *arg)
+static int dp_argparse_opt_nodes(const char *arg)
 {
 	regex_t validation_re;
 	char reg_error[256];
 	int reg_ret;
+
+	// prevent accidental '--nodes -option' meaning '--nodes="-option"'
+	if (*arg == '-') {
+		fprintf(stderr, "Node filter regular expression starts with ambiguous '-'\n");
+		return DP_ERROR;
+	}
 
 	if ((size_t)snprintf(node_filter, sizeof(node_filter), "%s", arg) >= sizeof(node_filter)) {
 		fprintf(stderr, "Node filter regular expression is too long\n");
@@ -379,6 +389,7 @@ static int dp_argparse_opt_node_filter(const char *arg)
 
 	regfree(&validation_re);
 
+	showing_nodes = true;
 	return DP_OK;
 }
 
