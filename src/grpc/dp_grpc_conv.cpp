@@ -108,7 +108,6 @@ bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port)
 		return false;
 	*dp_port = port;
 	return true;
-
 }
 
 bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type)

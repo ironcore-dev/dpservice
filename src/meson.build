@@ -34,6 +34,7 @@ dp_sources = [
   'rte_flow/dp_rte_flow.c',
   'rte_flow/dp_rte_flow_init.c',
   'rte_flow/dp_rte_flow_traffic_forward.c',
+  'rte_flow/dp_rte_flow_capture.c',
   'dp_argparse.c',
   'dp_conf.c',
   'dp_error.c',

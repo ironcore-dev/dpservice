@@ -17,7 +17,7 @@
 #include "grpc/dp_grpc_api.h"
 #include "grpc/dp_grpc_responder.h"
 #include "monitoring/dp_monitoring.h"
-#include "rte_flow/dp_rte_flow_init.h"
+#include "rte_flow/dp_rte_flow_capture.h"
 
 static uint32_t pfx_counter = 0;
 
@@ -886,42 +886,44 @@ static int dp_process_get_version(struct dp_grpc_responder *responder)
 
 static int dp_process_capture_start(struct dp_grpc_responder *responder)
 {
-	struct dpgrpc_capture_config *request = &responder->request.start_capture;
-	struct dpgrpc_capture_stat	*reply = dp_grpc_single_reply(responder);
-	int port_id = -1, status = DP_GRPC_OK;
+	struct dpgrpc_capture *request = &responder->request.capture_start;
+	int port_id = -1;
+	int status = DP_GRPC_OK;
 
-	dp_set_capture_node_ipv6_addr(request->dst_addr6);
-	dp_set_capture_udp_src_port(request->udp_src_port);
-	dp_set_capture_udp_dst_port(request->udp_dst_port);
+	if (dp_is_capture_enabled())
+		return DP_GRPC_ERR_ALREADY_ACTIVE;
 
-	dp_set_capture_enabled(true);
+	dp_set_capture_hdr_config(request->dst_addr6, request->udp_src_port, request->udp_dst_port);
 
-	for (int i = 0; i < request->filled_interface_info_count; ++i) {
+	for (int i = 0; i < request->interface_count; ++i) {
 		switch (request->interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
-			port_id = dp_get_portid_with_vm_handle(request->interfaces[i].interface_info.iface_id);
+			port_id = dp_get_portid_with_vm_handle(request->interfaces[i].spec.iface_id);
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
-			//index check is done on the grpc client side
-			port_id = request->interfaces[i].interface_info.pf_index == 0 ? dp_port_get_pf0_id() : dp_port_get_pf1_id();
+			if (request->interfaces[i].spec.pf_index >= DP_MAX_PF_PORTS)
+				return DP_GRPC_ERR_NOT_FOUND;
+			port_id = request->interfaces[i].spec.pf_index == 0 ? dp_port_get_pf0_id() : dp_port_get_pf1_id();
 			break;
 		}
 
 		if (DP_FAILED(port_id)) {
-			reply->interface = request->interfaces[i];
-			status = DP_GRPC_ERR_CAPTURE_INIT_INVALID_PORT_ID;
+			DPS_LOG_WARNING("Got invalid port id when initializing capturing", DP_LOG_PORTID(port_id));
+			status = DP_GRPC_ERR_NOT_FOUND;
 			break;
 		}
 
-		status = dp_turn_on_offload_pkt_capture_on_single_iface(port_id);
-		if (DP_FAILED(status))
-			break;	// stop continuing to turn on offload capture on other interfaces
+		status = dp_enable_port_offload_pkt_capture(port_id);
+		if (DP_FAILED(status)) // stop continuing to turn on offload capture on other interfaces, if capturing init failed on any port. abort and rollback.
+			break;
 	}
 
+	// try to turn off capture on all interfaces if any of them failed to turn on
 	if (DP_FAILED(status)) {
-		if (DP_FAILED(dp_turn_off_offload_pkt_capture_on_all_ifaces()))	// try to turn off capture on all interfaces
-			status = DP_GRPC_ERR_CAPTURE_INIT_CANNOT_ROLLBACK;
-	}
+		if (DP_FAILED(dp_disable_pkt_capture_on_all_ifaces()))
+			status = DP_GRPC_ERR_ROLLBACK;
+	} else
+		dp_set_capture_enabled(true);
 
 	return status;
 }
@@ -929,12 +931,19 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture_stop	*reply = dp_grpc_single_reply(responder);
-	int ret = dp_turn_off_offload_pkt_capture_on_all_ifaces();
+	int ret;
 
-	if (DP_FAILED(ret))
-		return DP_GRPC_ERR_CAPTURE_CANNOT_STOP;
+	if (!dp_is_capture_enabled())
+		return DP_GRPC_ERR_NOT_ACTIVE;
+
+	ret = dp_disable_pkt_capture_on_all_ifaces();
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to stop packet capture on all interfaces"); // it is problematic that we cannot rollback here
+		return ret;
+	}
 
 	reply->port_cnt = ret;
+	dp_set_capture_enabled(false);
 	return DP_GRPC_OK;
 }
 
@@ -1072,7 +1081,7 @@ void dp_process_request(struct rte_mbuf *m)
 	}
 
 	if (DP_FAILED(ret)) {
-		// as gRPC errors are explicitely defined due to API reasons
+		// as gRPC errors are explicitly defined due to API reasons
 		// extract the proper value from the standard (negative) retvals
 		ret = dp_errcode_to_grpc_errcode(ret);
 		DPGRPC_LOG_WARNING("Failed request", DP_LOG_GRPCREQUEST(responder.request.type), DP_LOG_GRPCRET(ret));

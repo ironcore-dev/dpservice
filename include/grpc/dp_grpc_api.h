@@ -173,20 +173,15 @@ struct dpgrpc_capture_interface {
 	union {
 		char	iface_id[VM_IFACE_ID_MAX_LEN];
 		uint8_t pf_index;
-	} interface_info;
+	} spec;
 };
 
-struct dpgrpc_capture_config {
+struct dpgrpc_capture {
 	uint8_t			dst_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	uint8_t			filled_interface_info_count;
+	uint8_t			interface_count;
 	uint32_t		udp_src_port;
 	uint32_t		udp_dst_port;
 	struct dpgrpc_capture_interface interfaces[DP_CAPTURE_MAX_PORT_NUM];
-};
-
-struct dpgrpc_capture_stat {
-	uint8_t							status;
-	struct dpgrpc_capture_interface interface;
 };
 
 struct dpgrpc_capture_stop {
@@ -231,7 +226,7 @@ struct dpgrpc_request {
 		struct dpgrpc_vni		vni_in_use;
 		struct dpgrpc_vni		vni_reset;
 		struct dpgrpc_versions	get_version;
-		struct dpgrpc_capture_config	start_capture;
+		struct dpgrpc_capture	capture_start;
 	};
 };
 
@@ -269,7 +264,6 @@ struct dpgrpc_reply {
 		struct dpgrpc_fwrule_info	fwrule;
 		struct dpgrpc_vni_in_use	vni_in_use;
 		struct dpgrpc_versions		versions;
-		struct dpgrpc_capture_stat 	capture_stat;
 		struct dpgrpc_capture_stop	capture_stop;
 	};
 };
