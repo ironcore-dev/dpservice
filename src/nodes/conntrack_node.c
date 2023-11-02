@@ -51,7 +51,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ipv4_hdr *ipv4_hdr = dp_get_ipv4_hdr(m);
-	int ret;
 
 	dp_extract_ipv4_header(df, ipv4_hdr);
 
@@ -68,8 +67,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		|| df->l4_type == IPPROTO_UDP
 		|| df->l4_type == IPPROTO_ICMP
 	) {
-		ret = dp_cntrack_handle(m, df);
-		if (DP_FAILED(ret))
+		if (DP_FAILED(dp_cntrack_handle(m, df)))
 			return CONNTRACK_NEXT_DROP;
 	} else {
 		return CONNTRACK_NEXT_DROP;

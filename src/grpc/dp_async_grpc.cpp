@@ -543,64 +543,62 @@ void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
 
 const char* CaptureStopCall::FillRequest(__rte_unused struct dpgrpc_request* request)
 {
-	DPGRPC_LOG_INFO("Stop packet capture");
+	DPGRPC_LOG_INFO("Stopping packet capture");
 
 	return NULL;
 }
 void CaptureStopCall::ParseReply(struct dpgrpc_reply* reply)
 {
-	reply_.set_captured_interface_cnt((uint32_t)reply->capture_stop.port_cnt);
+	reply_.set_stopped_interface_cnt((uint32_t)reply->capture_stop.port_cnt);
 }
 
 const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 {
 
-	DPGRPC_LOG_INFO("Start packet capture",
+	DPGRPC_LOG_INFO("Starting packet capture",
 				DP_LOG_IPV6STR(request_.sink_node_ip().address().c_str()),
 				DP_LOG_PORT(request_.udp_src_port()),
 				DP_LOG_PORT(request_.udp_dst_port()));
 
-	if (!GrpcConv::StrToIpv6(request_.sink_node_ip().address(), request->start_capture.dst_addr6))
+	if (!GrpcConv::StrToIpv6(request_.sink_node_ip().address(), request->capture_start.dst_addr6))
 		return "Invalid sink_node_ip";
 	if (request_.udp_src_port() > UINT16_MAX)
 		return "Invalid udp_src_port";
 	if (request_.udp_dst_port() > UINT16_MAX)
 		return "Invalid udp_dst_port";
 
-	request->start_capture.udp_src_port = request_.udp_src_port();
-	request->start_capture.udp_dst_port = request_.udp_dst_port();
+	request->capture_start.udp_src_port = request_.udp_src_port();
+	request->capture_start.udp_dst_port = request_.udp_dst_port();
 
 	if (request_.interfaces_size() > DP_CAPTURE_MAX_PORT_NUM)
 		return "Too many interfaces to be captured";
 
-	request->start_capture.filled_interface_info_count = 0;
+	request->capture_start.interface_count = 0;
 	for (int i = 0; i < request_.interfaces_size(); ++i) {
-		if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interfaces(i).interface_type(), &request->start_capture.interfaces[i].type)) {
-			return "Invalid interface_type";
+		if (!GrpcConv::GrpcToDpCaptureInterfaceType(request_.interfaces(i).interface_type(), &request->capture_start.interfaces[i].type)) {
+			return "Invalid interfaces.interface_type";
 		}
 
-		switch (request->start_capture.interfaces[i].type) {
+		switch (request->capture_start.interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
 			DPGRPC_LOG_INFO("Set packet capture interface vf",
 							DP_LOG_PORT_TYPE(request_.interfaces(i).interface_type()),
 							DP_LOG_IFACE(request_.interfaces(i).vf_name().c_str()));
-			if (SNPRINTF_FAILED(request->start_capture.interfaces[i].interface_info.iface_id, request_.interfaces(i).vf_name()))
+			if (SNPRINTF_FAILED(request->capture_start.interfaces[i].spec.iface_id, request_.interfaces(i).vf_name()))
 				return "Invalid interface_id";
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
 			DPGRPC_LOG_INFO("Set packet capture interface pf",
 							DP_LOG_PORT_TYPE(request_.interfaces(i).interface_type()),
 							DP_LOG_IFACE_INDEX(request_.interfaces(i).pf_index()));
-			// TODO: maybe a validity check here for indexes
-			request->start_capture.interfaces[i].interface_info.pf_index = request_.interfaces(i).pf_index();
+			request->capture_start.interfaces[i].spec.pf_index = request_.interfaces(i).pf_index();
 			break;
 		}
 
-		request->start_capture.filled_interface_info_count++;
+		request->capture_start.interface_count++;
 	}
 	return NULL;
 }
-
 void CaptureStartCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 {
 }
@@ -613,7 +611,6 @@ const char* GetNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid interface_id";
 	return NULL;
 }
-
 void GetNatCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	IpAddress *nat_ip;

@@ -9,7 +9,7 @@
 
 #define DP_IPIP_ENCAP_HEADER_SIZE (sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr))
 
-// it is used by pf to install a rule to move hairpin packets to the right rx hairpin queue
+// this attribute value is used by pf to install a rule to move hairpin packets to the right rx hairpin queue
 static const struct rte_flow_attr dp_flow_pf_attr_ingress = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
@@ -18,7 +18,7 @@ static const struct rte_flow_attr dp_flow_pf_attr_ingress = {
 	.transfer = 0,
 };
 
-// it is used by vf to install a rule to move hairpin packets to the right rx hairpin queue
+// this attribute value is used by vf to install a rule to move hairpin packets to the right rx hairpin queue
 static const struct rte_flow_attr dp_flow_vf_attr_ingress = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
@@ -27,7 +27,7 @@ static const struct rte_flow_attr dp_flow_vf_attr_ingress = {
 	.transfer = 0,
 };
 
-// it is used during the encap operation to install a encap/decap rule on pf to process pkts arriving to tx hairpin queue
+// this attribute value is used during the encap operation to install a encap/decap rule on pf to process pkts arriving to tx hairpin queue
 static const struct rte_flow_attr dp_flow_attr_egress = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
@@ -36,7 +36,7 @@ static const struct rte_flow_attr dp_flow_attr_egress = {
 	.transfer = 0,
 };
 
-// it is used during the decap operation on pf to install a redirecting rule
+// this attribute value is used during the decap operation on pf to install a redirecting rule
 // to point a specific flow to either capturing rule or vnet rule
 static const struct rte_flow_attr dp_flow_pf_attr_transfer_capture = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
@@ -46,7 +46,7 @@ static const struct rte_flow_attr dp_flow_pf_attr_transfer_capture = {
 	.transfer = 1,
 };
 
-// it is used during the decap/decap operation to install a decap/encap rule to transfer pkts
+// this attribute value is used during the decap/decap operation to install a decap/encap rule to transfer pkts
 static const struct rte_flow_attr dp_flow_attr_transfer_multi_stage = {
 	.group = DP_RTE_FLOW_VNET_GROUP,
 	.priority = 0,
@@ -55,7 +55,7 @@ static const struct rte_flow_attr dp_flow_attr_transfer_multi_stage = {
 	.transfer = 1,
 };
 
-// it is used during the decap/encap operation to install a decap/encap rule to transfer pkts
+// this attribute value is used during the decap/encap operation to install a decap/encap rule to transfer pkts
 static const struct rte_flow_attr dp_flow_attr_transfer_single_stage = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
 	.priority = 0,
@@ -217,8 +217,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	const struct rte_flow_attr *attr;
 	uint16_t t_port_id;
 	bool cross_pf_port;
+	struct dp_port *incoming_port;
 
 	cross_pf_port = df->nxt_hop != dp_port_get_pf0_id();
+
+	incoming_port = dp_port_get(m->port);
+	if (!incoming_port) {
+		DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(m->port));
+		return DP_ERROR;
+	}
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
 	if (cross_pf_port) {
@@ -308,7 +315,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 		attr = &dp_flow_attr_egress;
 		t_port_id = dp_port_get_pf1_id();
 	} else {
-		if (dp_port_get(m->port)->captured)
+		if (incoming_port->captured)
 			attr = &dp_flow_attr_transfer_multi_stage;
 		else
 			attr = &dp_flow_attr_transfer_single_stage;
@@ -353,13 +360,13 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_action actions[7];            // + end
 	int action_cnt = 0;
 
-	struct rte_flow_action_jump jump_action; // 1
-	struct rte_flow_action_age flow_age_capture; // 2
-	struct rte_flow_action special_moni_action[3];
+	struct rte_flow_action_jump jump_action; // #1
+	struct rte_flow_action_age flow_age_capture; // #2
+	struct rte_flow_action special_moni_action[3]; // + end
 	int special_moni_action_cnt = 0;
 
 	// misc variables needed to create the flow
-	struct flow_age_ctx *agectx, *agectx_capture;
+	struct flow_age_ctx *agectx, *agectx_capture = NULL;
 	struct rte_flow_action *age_action, *age_action_capture;
 	struct dp_port *port;
 	struct rte_ether_hdr new_eth_hdr;
@@ -402,8 +409,8 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
-	// create special actions
-	if ((!cross_pf_port) && dp_port_get(m->port)->captured) {
+	// create one action to redirect flow packets to the capturing group.
+	if (!cross_pf_port && dp_port_get(m->port)->captured) {
 		agectx_capture = allocate_agectx();
 		if (!agectx_capture)
 			return DP_ERROR;
@@ -416,7 +423,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		dp_set_jump_group_action(&special_moni_action[special_moni_action_cnt++], &jump_action, DP_RTE_FLOW_CAPTURE_GROUP);
 
 		dp_set_end_action(&special_moni_action[special_moni_action_cnt++]);
-		// struct rte_flow *sp_flow;
 
 		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_pf_attr_transfer_capture,
 													pattern, special_moni_action, age_action_capture, df, agectx_capture))) {
@@ -424,7 +430,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			return DP_ERROR;
 		}
 
-		DPS_LOG_DEBUG("Installed special flow rule on PF", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed capturing flow rule on PF", DP_LOG_PORTID(m->port));
 	}
 
 
@@ -443,8 +449,12 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	// make flow aging work
 	agectx = allocate_agectx();
-	if (!agectx)
+	if (!agectx) {
+		if (agectx_capture)
+			if (DP_FAILED(dp_destroy_rte_flow_agectx(agectx_capture)))
+				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
+	}
 
 	age_action = &actions[action_cnt++];
 	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
@@ -455,6 +465,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		if (!port) {
 			DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
 			dp_destroy_rte_flow_agectx(agectx);
+			// no need to free the above appeared (not allocated) agectx_capture, as the capturing rule is not installed for the cross-pf case
 			return DP_ERROR;
 		}
 		// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
@@ -471,6 +482,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 													age_action, df, agectx))
 	) {
 		dp_destroy_rte_flow_agectx(agectx);
+		if (agectx_capture)
+			if (DP_FAILED(dp_destroy_rte_flow_agectx(agectx_capture)))
+				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
 	}
 
@@ -552,8 +566,6 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	dp_set_end_action(&actions[action_cnt++]);
 
-	// TODO: this attribute has not been tested with DPDK 22.11,
-	// so maybe 'dp_flow_attr_transfer' should be ifdef'd too
 	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_attr_transfer_single_stage,
 													pattern, actions,
 													age_action, df, agectx))

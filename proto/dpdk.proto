@@ -532,7 +532,7 @@ message DeleteFirewallRuleResponse {
 
 message CapturedInterface {
 	CaptureInterfaceType interface_type = 1;
-	oneof interface_info {
+	oneof spec {
 		bytes vf_name = 2;
 		uint32 pf_index = 3;
 	}
@@ -554,7 +554,7 @@ message CaptureStopRequest {
 
 message CaptureStopResponse {
 	Status status = 1;
-	uint32 captured_interface_cnt = 2;
+	uint32 stopped_interface_cnt = 2;
 }
 
 service DPDKonmetal {

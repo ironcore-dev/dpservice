@@ -24,7 +24,6 @@ int _dp_graphtrace_flags;
 bool _dp_graphtrace_enabled = false;
 
 static struct dp_graphtrace graphtrace;
-static bool offload_enabled;
 static bool nodename_filtered;
 static regex_t nodename_re;
 static bool bpf_filtered;
@@ -60,8 +59,6 @@ static int dp_graphtrace_init_memory(void)
 		rte_ring_free(graphtrace.ringbuf);
 		return DP_ERROR;
 	}
-
-	offload_enabled = dp_conf_is_offload_enabled();
 
 	return DP_OK;
 }

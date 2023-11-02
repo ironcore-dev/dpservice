@@ -13,6 +13,7 @@
 #include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "rte_flow/dp_rte_flow_capture.h"
 #include "monitoring/dp_graphtrace.h"
 
 static const struct rte_eth_conf port_conf_default = {
@@ -459,7 +460,6 @@ static int dp_install_vf_init_rte_rules(uint32_t port_id)
 {
 	int ret;
 
-	// too long, thus using a ret variable
 	ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
@@ -532,7 +532,6 @@ int dp_port_stop(uint16_t port_id)
 	if (!port)
 		return DP_ERROR;
 
-	// not really resolve the issue, but let's do it explicitly
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 

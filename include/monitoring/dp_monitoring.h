@@ -31,19 +31,21 @@ struct dp_event_msg {
 	} event_entry;
 };
 
+struct dp_capture_hdr_config {
+	uint8_t capture_node_ipv6_addr[16];
+	uint32_t capture_udp_src_port;
+	uint32_t capture_udp_dst_port;
+};
+
 void dp_process_event_msg(struct rte_mbuf *m);
 
-void dp_set_capture_node_ipv6_addr(uint8_t *addr);
-void dp_set_capture_udp_src_port(uint32_t port);
 
-void dp_set_capture_udp_dst_port(uint32_t port);
-uint8_t *dp_get_capture_node_ipv6_addr(void);
-uint16_t dp_get_capture_udp_src_port(void);
-uint16_t dp_get_capture_udp_dst_port(void);
+void dp_set_capture_hdr_config(uint8_t *addr, uint32_t udp_src_port, uint32_t udp_dst_port);
+const struct dp_capture_hdr_config *dp_get_capture_hdr_config(void);
 
 void dp_set_capture_enabled(bool enabled);
 
-bool dp_get_capture_enabled(void);
+bool dp_is_capture_enabled(void);
 
 #ifdef __cplusplus
 }
