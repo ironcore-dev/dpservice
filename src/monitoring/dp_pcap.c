@@ -6,6 +6,12 @@
 
 #define DP_PCAP_MTU 9100
 
+// largest header is Ether + IPv6(underlay) + IPv4(with all options) + TCP(with all options)
+// this adds up to 14 + 40 + 60 + 60
+// adding a few more to round it up and be on the safe side
+// this size should never result in actual data copy by rte_pktmbuf_read()
+#define DP_PCAP_FILTER_MTU 256
+
 int dp_pcap_init(struct dp_pcap *dp_pcap, const char *dump_path)
 {
 	dp_pcap->error[0] = '\0';
@@ -72,8 +78,7 @@ void dp_free_bpf(struct bpf_program *bpf)
 
 bool dp_is_bpf_match(struct bpf_program *bpf, struct rte_mbuf *m)
 {
-	// TODO this can be optimized because the filter will never look that far!
-	uint8_t buffer[DP_PCAP_MTU];
+	uint8_t buffer[DP_PCAP_FILTER_MTU];
 	uint32_t len = rte_pktmbuf_pkt_len(m);
 	struct pcap_pkthdr header = {
 		.len = len,
