@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void send_to_all_vfs(const struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type);
+void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type);
 void trigger_garp(void);
 void trigger_nd_unsol_adv(void);
 void trigger_nd_ra(void);

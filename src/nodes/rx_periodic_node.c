@@ -10,9 +10,7 @@
 #include "monitoring/dp_monitoring.h"
 #include "nodes/common_node.h"
 
-#define NEXT_NODES(NEXT) \
-	NEXT(RX_PERIODIC_NEXT_CLS, "cls")
-DP_NODE_REGISTER_SOURCE(RX_PERIODIC, rx_periodic, NEXT_NODES);
+DP_NODE_REGISTER_SOURCE(RX_PERIODIC, rx_periodic, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
 
@@ -53,12 +51,7 @@ static __rte_always_inline void handle_nongraph_queues(void)
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	struct dp_flow *df = dp_get_flow_ptr(m);
-
-	if (df->periodic_type == DP_PER_TYPE_DIRECT_TX)
-		return next_tx_index[m->port];
-
-	return RX_PERIODIC_NEXT_CLS;
+	return next_tx_index[m->port];
 }
 
 static uint16_t rx_periodic_node_process(struct rte_graph *graph,

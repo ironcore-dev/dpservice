@@ -11,7 +11,7 @@ static uint8_t dp_mc_ipv6[16] = {0xff,0x02,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01};
 static uint8_t dp_mc_mac[6] = {0x33,0x33,0x00,0x00,0x00,0x01};
 
 
-void send_to_all_vfs(const struct rte_mbuf *pkt, enum dp_periodic_type per_type, uint16_t eth_type)
+void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 {
 	struct dp_flow *df;
 	struct rte_ether_hdr *eth_hdr;
@@ -47,7 +47,6 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, enum dp_periodic_type per_type,
 
 		dp_init_pkt_mark(clone_buf);
 		df = dp_init_flow_ptr(clone_buf);
-		df->periodic_type = per_type;
 		df->l3_type = eth_type;
 				
 		ret = rte_ring_sp_enqueue(dp_layer->periodic_msg_queue, clone_buf);
@@ -88,7 +87,7 @@ void trigger_garp(void)
 	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_arp_hdr);
 	pkt->pkt_len = pkt->data_len;
 
-	send_to_all_vfs(pkt, DP_PER_TYPE_DIRECT_TX, RTE_ETHER_TYPE_ARP);
+	send_to_all_vfs(pkt, RTE_ETHER_TYPE_ARP);
 	rte_pktmbuf_free(pkt);
 }
 
@@ -141,7 +140,7 @@ void trigger_nd_unsol_adv(void)
 	icmp6_hdr->icmp6_cksum = 0;
 	icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp6_hdr);
 
-	send_to_all_vfs(pkt, DP_PER_TYPE_DIRECT_TX,RTE_ETHER_TYPE_IPV6);
+	send_to_all_vfs(pkt, RTE_ETHER_TYPE_IPV6);
 	rte_pktmbuf_free(pkt);
 }
 
@@ -195,6 +194,6 @@ void trigger_nd_ra(void)
 	icmp6_hdr->icmp6_cksum = 0;
 	icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp6_hdr);
 
-	send_to_all_vfs(pkt, DP_PER_TYPE_DIRECT_TX, RTE_ETHER_TYPE_IPV6);
+	send_to_all_vfs(pkt, RTE_ETHER_TYPE_IPV6);
 	rte_pktmbuf_free(pkt);
 }

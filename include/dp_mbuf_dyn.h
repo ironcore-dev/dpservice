@@ -17,12 +17,6 @@
 extern "C" {
 #endif
 
-enum dp_periodic_type {
-	DP_PER_TYPE_ZERO,
-	DP_PER_TYPE_ND_RA,
-	DP_PER_TYPE_DIRECT_TX,
-} __rte_packed;
-
 struct dp_flow {
 	struct {
 		uint16_t	flow_type : 2;		// local,outgoing,incoming
@@ -70,7 +64,6 @@ struct dp_flow {
 	} tun_info;
 	uint8_t					vnf_type;
 	uint8_t					nxt_hop;
-	enum dp_periodic_type	periodic_type;
 	struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc	*virtsvc;
@@ -88,8 +81,6 @@ struct dp_pkt_mark {
 
 static_assert(sizeof(struct dp_flow) + sizeof(struct dp_pkt_mark) <= DP_MBUF_PRIV_DATA_SIZE,
 			  "packet private data is too big to fit in packet");
-static_assert(sizeof(((struct dp_flow *)0)->periodic_type) == 1,
-			  "enum dp_periodic_type is unnecessarily big");
 static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORTS,
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
 
