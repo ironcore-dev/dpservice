@@ -114,6 +114,7 @@ pciutils \
 procps \
 libuuid1 \
 libgrpc++1.51 \
+libpcap0.8-dev \
 iproute2 \
 udev \
 gawk \
@@ -152,6 +153,7 @@ pciutils \
 procps \
 libuuid1 \
 libgrpc++1.51 \
+libpcap0.8-dev \
 iproute2 \
 udev \
 gawk \
