@@ -38,6 +38,7 @@ static const struct rte_eth_conf port_conf_default = {
 	},
 };
 
+static struct dp_port *port_table[DP_MAX_PORTS];
 static uint16_t pf_ports[DP_MAX_PF_PORTS];
 static struct dp_ports dp_ports;
 
@@ -62,18 +63,10 @@ uint16_t dp_port_get_pf1_id(void)
 	return pf_ports[1];
 }
 
-bool dp_port_is_pf(uint16_t port_id)
-{
-	if (port_id == DP_INVALID_PORT_ID)
-		return false;
-	for (int i = 0; i < DP_MAX_PF_PORTS; ++i)
-		if (pf_ports[i] == port_id)
-			return true;
-	return false;
-}
-
 static int dp_port_register_pf(uint16_t port_id)
 {
+	// sub-optimal, but the number of PF ports is extremely low
+	// and this is only called in initialization
 	for (int i = 0; i < DP_MAX_PF_PORTS; ++i) {
 		if (pf_ports[i] == DP_INVALID_PORT_ID) {
 			pf_ports[i] = port_id;
@@ -87,10 +80,10 @@ static int dp_port_register_pf(uint16_t port_id)
 
 static inline struct dp_port *get_port(uint16_t port_id)
 {
-	DP_FOREACH_PORT(&dp_ports, port)
-		if (port->port_id == port_id)
-			return port;
-	return NULL;
+	if (port_id >= RTE_DIM(port_table))  // includes DP_INVALID_PORT_ID
+		return NULL;
+
+	return port_table[port_id];
 }
 
 struct dp_port *dp_port_get(uint16_t port_id)
@@ -113,6 +106,13 @@ struct dp_port *dp_port_get_vf(uint16_t port_id)
 	}
 
 	return port;
+}
+
+bool dp_port_is_pf(uint16_t port_id)
+{
+	struct dp_port *port = get_port(port_id);
+
+	return port && port->port_type == DP_PORT_PF;
 }
 
 int dp_port_set_link_status(uint16_t port_id, uint8_t status)
@@ -279,6 +279,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	port = dp_ports.end++;
 	port->port_type = type;
 	port->port_id = port_id;
+	port_table[port_id] = port;
 
 	switch (type) {
 	case DP_PORT_PF:
@@ -304,21 +305,19 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	return port;
 }
 
-static int dp_port_set_up_hairpin(void)
+static int dp_port_set_up_hairpins(void)
 {
+	uint16_t pf0 = dp_port_get_pf0_id();
+	uint16_t pf1 = dp_port_get_pf1_id();
 
 	DP_FOREACH_PORT(&dp_ports, port) {
 		if (port->port_type == DP_PORT_PF) {
-			port->peer_pf_port_id = \
-					port->port_id == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : dp_port_get_pf0_id();
-
+			port->peer_pf_port_id = port->port_id == pf0 ? pf1 : pf0;
 			port->peer_pf_hairpin_tx_rx_queue_offset = 1;
 		}
-
 		if (DP_FAILED(dp_hairpin_setup(port)))
 				return DP_ERROR;
 	}
-
 	return DP_OK;
 }
 
@@ -395,7 +394,7 @@ int dp_ports_init(void)
 		return DP_ERROR;
 
 	if (dp_conf_is_offload_enabled()) {
-		if (DP_FAILED(dp_port_set_up_hairpin()))
+		if (DP_FAILED(dp_port_set_up_hairpins()))
 			return DP_ERROR;
 	}
 
