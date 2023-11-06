@@ -13,8 +13,8 @@ extern "C" {
 
 int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group);
 
-int dp_enable_port_offload_pkt_capture(uint16_t port_id);
-int dp_disable_port_offload_pkt_capture(uint16_t port_id);
+int dp_enable_pkt_capture(struct dp_port *port);
+int dp_disable_pkt_capture(struct dp_port *port);
 
 int dp_disable_pkt_capture_on_all_ifaces(void);
 

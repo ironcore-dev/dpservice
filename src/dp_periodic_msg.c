@@ -17,7 +17,7 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_arp_hdr *arp_hdr;
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-	struct dp_ports *ports = get_dp_ports();
+	struct dp_ports *ports = dp_get_ports();
 	struct rte_mbuf *clone_buf;
 	const struct rte_ether_addr *mac;
 	int ret;

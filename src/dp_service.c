@@ -133,31 +133,18 @@ static int setup_sighandlers(void)
 
 static int init_interfaces(void)
 {
-	uint16_t pf0, pf1;
-	int pf0_socket;
+	struct dp_port *pf0;
 
 	dp_multipath_init();
 
 	if (DP_FAILED(dp_ports_init()))
 		return DP_ERROR;
 
-	// only now (after init) these are valid
-	pf0 = dp_port_get_pf0_id();
-	pf1 = dp_port_get_pf1_id();
+	// only now (after init) this is valid
+	pf0 = dp_get_pf0();
 
-	// TODO(plague): this is called many times, PR for putting the socket of a port into dp_port.c
-	//               (also socket_id is always passed along with port_id)
-	pf0_socket = rte_eth_dev_socket_id(pf0);
-	if (DP_FAILED(pf0_socket)) {
-		if (pf0_socket == SOCKET_ID_ANY) {
-			DPS_LOG_WARNING("Cannot get numa socket for pf0", DP_LOG_PORTID(pf0));
-		} else {
-			DPS_LOG_ERR("Cannot get numa socket for pf0", DP_LOG_PORTID(pf0), DP_LOG_RET(rte_errno));
-			return pf0_socket;
-		}
-	}
 #ifdef ENABLE_VIRTSVC
-	if (DP_FAILED(dp_virtsvc_init(pf0_socket)))
+	if (DP_FAILED(dp_virtsvc_init(pf0->socket_id)))
 		return DP_ERROR;
 #endif
 	if (DP_FAILED(dp_graph_init())
@@ -172,17 +159,17 @@ static int init_interfaces(void)
 #ifdef ENABLE_PYTEST
 	if (dp_conf_is_wcmp_enabled())
 #endif
-	if (DP_FAILED(dp_port_start(pf1)))
+	if (DP_FAILED(dp_port_start(dp_get_pf1())))
 		return DP_ERROR;
 
 	// VFs are started by GRPC later
 
-	if (DP_FAILED(dp_flow_init(pf0_socket))
-		|| DP_FAILED(dp_nat_init(pf0_socket))
-		|| DP_FAILED(dp_lb_init(pf0_socket))
-		|| DP_FAILED(dp_vni_init(pf0_socket))
-		|| DP_FAILED(dp_lpm_init(pf0_socket))
-		|| DP_FAILED(dp_vnf_init(pf0_socket)))
+	if (DP_FAILED(dp_flow_init(pf0->socket_id))
+		|| DP_FAILED(dp_nat_init(pf0->socket_id))
+		|| DP_FAILED(dp_lb_init(pf0->socket_id))
+		|| DP_FAILED(dp_vni_init(pf0->socket_id))
+		|| DP_FAILED(dp_lpm_init(pf0->socket_id))
+		|| DP_FAILED(dp_vnf_init(pf0->socket_id)))
 		return DP_ERROR;
 
 	return DP_OK;

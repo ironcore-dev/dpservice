@@ -98,7 +98,7 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 		return;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (m->port == dp_port_get_pf0_id())
+		if (m->port == dp_get_pf0()->port_id)
 			offload_check = flow_val->incoming_flow_offloaded_flag.pf0;
 		else
 			offload_check = flow_val->incoming_flow_offloaded_flag.pf1;

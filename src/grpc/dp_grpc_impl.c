@@ -91,7 +91,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 		ret = dp_create_lb(request, ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
-		if (DP_FAILED(dp_create_vni_route_tables(vni, rte_eth_dev_socket_id(dp_port_get_pf0_id())))) {
+		if (DP_FAILED(dp_create_vni_route_tables(vni, dp_get_pf0()->socket_id))) {
 			ret = DP_GRPC_ERR_VNI_INIT4;
 			goto err_lb;
 		}
@@ -163,7 +163,7 @@ static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 static int dp_process_initialize(__rte_unused struct dp_grpc_responder *responder)
 {
 	dp_del_all_neigh_nat_entries_in_vni(DP_NETWORK_NAT_ALL_VNI);
-	return dp_lpm_reset_all_route_tables(rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+	return dp_lpm_reset_all_route_tables(dp_get_pf0()->socket_id);
 }
 
 static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
@@ -174,7 +174,7 @@ static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
 	if (request->type == DP_VNI_IPV4) {
 		reply->in_use = dp_is_vni_route_table_available(request->vni,
 														DP_IP_PROTO_IPV4,
-														rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+														dp_get_pf0()->socket_id);
 	} else
 		return DP_GRPC_ERR_WRONG_TYPE;
 
@@ -242,7 +242,7 @@ static int dp_process_reset_vni(struct dp_grpc_responder *responder)
 	struct dpgrpc_vni *request = &responder->request.vni_reset;
 
 	if (request->type == DP_VNI_BOTH)
-		return dp_lpm_reset_route_tables(request->vni, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+		return dp_lpm_reset_route_tables(request->vni, dp_get_pf0()->socket_id);
 	else
 		return DP_GRPC_ERR_WRONG_TYPE;
 }
@@ -455,7 +455,7 @@ static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		ret = dp_del_route(port_id, dp_get_vm_vni(port_id),
 						   vnf_val.alias_pfx.ip, vnf_val.alias_pfx.length,
-						   rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+						   rte_eth_dev_socket_id(port_id));
 		// ignore the error and try to delete the vnf entry anyway
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
@@ -469,74 +469,58 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	struct dpgrpc_iface *request = &responder->request.add_iface;
 	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
 
-	struct dp_port *dp_port;
+	struct dp_port *port;
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	uint16_t port_id = DP_INVALID_PORT_ID;
 	struct dp_vnf_value vnf_val;
 	int ret = DP_GRPC_OK;
-	int socket_id;
 
-	if (request->pci_name[0] == '\0'
-		|| DP_FAILED(rte_eth_dev_get_port_by_name(request->pci_name, &port_id))
-	) {
+	port = dp_get_port_by_name(request->pci_name);
+	if (!port) {
 		ret = DP_GRPC_ERR_NOT_FOUND;
 		goto err;
 	}
-
-	if (port_id == DP_INVALID_PORT_ID) {
-		ret = DP_GRPC_ERR_LIMIT_REACHED;
-		goto err;
-	}
-
-	if (!dp_port_is_vf_free(port_id)) {
+	if (port->allocated) {
 		ret = DP_GRPC_ERR_ALREADY_EXISTS;
 		goto err;
 	}
-
-	// can only fail if the port_id is invalid
-	socket_id = rte_eth_dev_socket_id(port_id);
-
-	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_INTERFACE_IP, request->vni, port_id, ul_addr6))) {
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_INTERFACE_IP, request->vni, port->port_id, ul_addr6))) {
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
-	if (DP_FAILED(dp_map_vm_handle(request->iface_id, port_id))) {
+	if (DP_FAILED(dp_map_vm_handle(request->iface_id, port->port_id))) {
 		ret = DP_GRPC_ERR_VM_HANDLE;
 		goto err_vnf;
 	}
-	if (DP_FAILED(dp_setup_vm(port_id, request->vni, socket_id))) {
+	if (DP_FAILED(dp_setup_vm(port->port_id, request->vni, port->socket_id))) {
 		ret = DP_GRPC_ERR_VNI_INIT4;
 		goto handle_err;
 	}
-	dp_set_dhcp_range_ip4(port_id, request->ip4_addr, DP_LPM_DHCP_IP_DEPTH);
-	dp_set_vm_pxe_ip4(port_id, request->ip4_pxe_addr);
-	dp_set_vm_pxe_str(port_id, request->pxe_str);
-	dp_set_dhcp_range_ip6(port_id, request->ip6_addr, DP_LPM_DHCP_IP6_DEPTH);
-	ret = dp_add_route(port_id, request->vni, 0, request->ip4_addr, NULL, 32, socket_id);
+	dp_set_dhcp_range_ip4(port->port_id, request->ip4_addr, DP_LPM_DHCP_IP_DEPTH);
+	dp_set_vm_pxe_ip4(port->port_id, request->ip4_pxe_addr);
+	dp_set_vm_pxe_str(port->port_id, request->pxe_str);
+	dp_set_dhcp_range_ip6(port->port_id, request->ip6_addr, DP_LPM_DHCP_IP6_DEPTH);
+	ret = dp_add_route(port->port_id, request->vni, 0, request->ip4_addr, NULL, 32, port->socket_id);
 	if (DP_FAILED(ret))
 		goto vm_err;
-	ret = dp_add_route6(port_id, request->vni, 0, request->ip6_addr, NULL, 128, socket_id);
+	ret = dp_add_route6(port->port_id, request->vni, 0, request->ip6_addr, NULL, 128, port->socket_id);
 	if (DP_FAILED(ret))
 		goto route_err;
-	if (DP_FAILED(dp_port_start(port_id))) {
+	if (DP_FAILED(dp_port_start(port))) {
 		ret = DP_GRPC_ERR_PORT_START;
 		goto route6_err;
 	}
-	// should never fail as we just created it
-	dp_port = dp_port_get(port_id);
-	if (dp_port)
-		snprintf(reply->name, sizeof(reply->name), "%s", dp_port->vf_name);
 
-	dp_set_vm_ul_ip6(port_id, ul_addr6);
-	rte_memcpy(reply->ul_addr6, dp_get_vm_ul_ip6(port_id), sizeof(reply->ul_addr6));
+	dp_set_vm_ul_ip6(port->port_id, ul_addr6);
+	rte_memcpy(reply->ul_addr6, dp_get_vm_ul_ip6(port->port_id), sizeof(reply->ul_addr6));
+	snprintf(reply->name, sizeof(reply->name), "%s", port->vf_name);
 	return DP_GRPC_OK;
 
 route6_err:
-	dp_del_route6(port_id, request->vni, request->ip6_addr, 128, socket_id);
+	dp_del_route6(port->port_id, request->vni, request->ip6_addr, 128, port->socket_id);
 route_err:
-	dp_del_route(port_id, request->vni, request->ip4_addr, 32, socket_id);
+	dp_del_route(port->port_id, request->vni, request->ip4_addr, 32, port->socket_id);
 vm_err:
-	dp_del_vm(port_id, socket_id);
+	dp_del_vm(port->port_id, port->socket_id);
 handle_err:
 	dp_del_portid_with_vm_handle(request->iface_id);
 err_vnf:
@@ -552,6 +536,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	int port_id;
 	uint32_t ipv4;
 	uint32_t vni;
+	struct dp_port *port;
 	int ret = DP_GRPC_OK;
 
 	port_id = dp_get_portid_with_vm_handle(request->iface_id);
@@ -560,13 +545,14 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 
 	ipv4 = dp_get_dhcp_range_ip4(port_id);
 	vni = dp_get_vm_vni(port_id);
+	port = dp_get_port(port_id);
 
 	dp_del_vnf_with_vnf_key(dp_get_vm_ul_ip6(port_id));
-	if (DP_FAILED(dp_port_stop(port_id)))
+	if (DP_FAILED(dp_port_stop(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
 	dp_del_portid_with_vm_handle(request->iface_id);
-	dp_del_vm(port_id, rte_eth_dev_socket_id(port_id));
+	dp_del_vm(port->port_id, port->socket_id);
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_del_vm(port_id);
 #endif
@@ -596,18 +582,19 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 static int dp_process_create_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.add_route;
+	const struct dp_port *pf0 = dp_get_pf0();
 
 	if (request->trgt_addr.ip_type != RTE_ETHER_TYPE_IPV6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
 	if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		return dp_add_route(dp_port_get_pf0_id(), request->vni, request->trgt_vni,
+		return dp_add_route(pf0->port_id, request->vni, request->trgt_vni,
 							request->pfx_addr.ipv4, request->trgt_addr.ipv6,
-							request->pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+							request->pfx_length, pf0->socket_id);
 	} else if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
-		return dp_add_route6(dp_port_get_pf0_id(), request->vni, request->trgt_vni,
+		return dp_add_route6(pf0->port_id, request->vni, request->trgt_vni,
 							 request->pfx_addr.ipv6, request->trgt_addr.ipv6,
-							 request->pfx_length, rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+							 request->pfx_length, pf0->socket_id);
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 }
@@ -615,15 +602,16 @@ static int dp_process_create_route(struct dp_grpc_responder *responder)
 static int dp_process_delete_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.del_route;
+	const struct dp_port *pf0 = dp_get_pf0();
 
 	if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		return dp_del_route(dp_port_get_pf0_id(), request->vni,
+		return dp_del_route(pf0->port_id, request->vni,
 							request->pfx_addr.ipv4, request->pfx_length,
-							rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+							pf0->socket_id);
 	} else if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
-		return dp_del_route6(dp_port_get_pf0_id(), request->vni,
+		return dp_del_route6(pf0->port_id, request->vni,
 							 request->pfx_addr.ipv6, request->pfx_length,
-							 rte_eth_dev_socket_id(dp_port_get_pf0_id()));
+							 pf0->socket_id);
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 }
@@ -806,9 +794,10 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 
 static int dp_process_list_routes(struct dp_grpc_responder *responder)
 {
+	const struct dp_port *pf0 = dp_get_pf0();
+
 	return dp_list_routes(responder->request.list_route.vni,
-						  rte_eth_dev_socket_id(dp_port_get_pf0_id()),
-						  0, DP_LIST_EXT_ROUTES, responder);
+						  pf0->socket_id, pf0->port_id, DP_LIST_EXT_ROUTES, responder);
 }
 
 static int dp_process_list_lbtargets(struct dp_grpc_responder *responder)
@@ -887,7 +876,7 @@ static int dp_process_get_version(struct dp_grpc_responder *responder)
 static int dp_process_capture_start(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture *request = &responder->request.capture_start;
-	int port_id = -1;
+	struct dp_port *port = NULL;
 	int status = DP_GRPC_OK;
 
 	if (!dp_conf_is_offload_enabled())
@@ -901,22 +890,20 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 	for (int i = 0; i < request->interface_count; ++i) {
 		switch (request->interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
-			port_id = dp_get_portid_with_vm_handle(request->interfaces[i].spec.iface_id);
+			port = dp_get_vf(dp_get_portid_with_vm_handle(request->interfaces[i].spec.iface_id));
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
-			if (request->interfaces[i].spec.pf_index >= DP_MAX_PF_PORTS)
-				return DP_GRPC_ERR_NOT_FOUND;
-			port_id = request->interfaces[i].spec.pf_index == 0 ? dp_port_get_pf0_id() : dp_port_get_pf1_id();
+			port = dp_get_pf(request->interfaces[i].spec.pf_index);
 			break;
 		}
 
-		if (DP_FAILED(port_id)) {
-			DPS_LOG_WARNING("Got invalid port id when initializing capturing", DP_LOG_PORTID(port_id));
+		if (!port) {
+			DPS_LOG_WARNING("Got invalid port when initializing capturing", DP_LOG_PORTID(port->port_id));
 			status = DP_GRPC_ERR_NOT_FOUND;
 			break;
 		}
 
-		status = dp_enable_port_offload_pkt_capture(port_id);
+		status = dp_enable_pkt_capture(port);
 		if (DP_FAILED(status)) // stop continuing to turn on offload capture on other interfaces, if capturing init failed on any port. abort and rollback.
 			break;
 	}
@@ -953,7 +940,7 @@ static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 static int dp_process_capture_status(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture *reply = dp_grpc_single_reply(responder);
-	struct dp_ports *ports = get_dp_ports();
+	struct dp_ports *ports = dp_get_ports();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 	int count = 0;
 
@@ -976,7 +963,7 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 
 		if (port->port_type == DP_PORT_PF) {
 			reply->interfaces[count].type = DP_CAPTURE_IFACE_TYPE_SINGLE_PF;
-			reply->interfaces[count].spec.pf_index = port->port_id == dp_port_get_pf0_id() ? 0 : 1;
+			reply->interfaces[count].spec.pf_index = port == dp_get_pf0() ? 0 : 1;
 		} else {
 			reply->interfaces[count].type = DP_CAPTURE_IFACE_TYPE_SINGLE_VF;
 			static_assert(sizeof(reply->interfaces[count].spec.iface_id) == VM_IFACE_ID_MAX_LEN,

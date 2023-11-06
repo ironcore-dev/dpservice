@@ -100,7 +100,6 @@ int dp_map_vm_handle(const void *key, uint16_t portid)
 		goto err;
 	}
 
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	ret = rte_hash_lookup(vm_handle_tbl, key);
 	if (ret != -ENOENT) {
 		if (DP_FAILED(ret))
@@ -158,7 +157,6 @@ const uint8_t *dp_get_gw_ip6(void)
 
 void dp_set_vm_pxe_str(uint16_t portid, const char *p_str)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(vm_table[portid].info.pxe_str, p_str,
 			   sizeof(vm_table[portid].info.pxe_str));
 }
@@ -223,7 +221,6 @@ const uint8_t *dp_get_vm_ip6(uint16_t portid)
 
 const uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	return vm_table[portid].ul_ipv6;
 }
 
@@ -423,14 +420,12 @@ int dp_del_route6(uint16_t portid, uint32_t vni, const uint8_t *ipv6, uint8_t de
 
 void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	vm_table[portid].info.own_ip = ip;
 	vm_table[portid].info.depth = depth;
 }
 
 void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	vm_table[portid].info.pxe_ip = ip;
 }
 
@@ -442,7 +437,6 @@ uint32_t dp_get_vm_pxe_ip4(uint16_t portid)
 
 void dp_set_dhcp_range_ip6(uint16_t portid, const uint8_t *ipv6, uint8_t depth)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(&vm_table[portid].info.dhcp_ipv6, ipv6, 16);
 	vm_table[portid].info.depth = depth;
 }
@@ -455,7 +449,6 @@ void dp_set_vm_ip6(uint16_t portid, const uint8_t *ipv6)
 
 void dp_set_vm_ul_ip6(uint16_t portid, const uint8_t *ipv6)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
 	rte_memcpy(&vm_table[portid].ul_ipv6, ipv6, 16);
 }
 
@@ -485,8 +478,6 @@ const struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
 
 int dp_setup_vm(int port_id, int vni, int socket_id)
 {
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-
 	if (DP_FAILED(dp_create_vni_route_tables(vni, socket_id)))
 		return DP_ERROR;
 
@@ -559,8 +550,6 @@ int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_
 
 void dp_del_vm(int port_id, int socket_id)
 {
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-
 	dp_del_route(port_id, vm_table[port_id].vni, vm_table[port_id].info.own_ip, 32, socket_id);
 	dp_del_route6(port_id, vm_table[port_id].vni, vm_table[port_id].info.dhcp_ipv6, 128, socket_id);
 

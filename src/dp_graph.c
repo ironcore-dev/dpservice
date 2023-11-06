@@ -120,7 +120,7 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 static int dp_graph_init_nodes(void)
 {
 	char name[RTE_NODE_NAMESIZE];
-	struct dp_ports *ports = get_dp_ports();
+	struct dp_ports *ports = dp_get_ports();
 	uint16_t port_id;
 
 	DP_FOREACH_PORT(ports, port) {

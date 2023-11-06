@@ -9,7 +9,7 @@ extern "C" {
 
 void dp_multipath_init(void);
 
-uint16_t dp_multipath_get_pf(uint32_t hash);
+uint16_t dp_multipath_get_pf_id(uint32_t hash);
 
 #ifdef __cplusplus
 }

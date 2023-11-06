@@ -35,14 +35,14 @@ int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
 	int pattern_cnt = 0;
 
 	// jump action from default group to capturing group
-	struct rte_flow_action_jump jump_action; // #1
-	struct rte_flow_action action[2];		// + end
+	struct rte_flow_action_jump jump_action;	// #1
+	struct rte_flow_action action[2];			// + end
 	int action_cnt = 0;
 
 	struct rte_flow *flow;
 	struct dp_port *port;
 
-	port = dp_port_get(port_id);
+	port = dp_get_port(port_id);
 	if (!port)
 		return DP_ERROR;
 
@@ -77,7 +77,7 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr)]);
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)]);
 	int sub_action_cnt = 0;
-	uint16_t outgoing_port_id = dp_port_get_pf0_id();
+	uint16_t outgoing_port_id = dp_get_pf0()->port_id;
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 
 	rte_ether_addr_copy(dp_get_neigh_mac(outgoing_port_id), &encap_eth_hdr->dst_addr);
@@ -90,7 +90,6 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	new_ipv6_hdr->payload_len = 0;
 	new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
 	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-
 
 	udp_hdr->dst_port = htons(capture_hdr_config->capture_udp_dst_port);
 	udp_hdr->src_port = htons(capture_hdr_config->capture_udp_src_port);
@@ -121,7 +120,7 @@ static int dp_install_default_rule_in_capture_group(uint16_t port_id, bool captu
 	struct dp_port *port;
 	uint8_t raw_encap_hdr[DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE];
 
-	port = dp_port_get(port_id);
+	port = dp_get_port(port_id);
 	if (!port)
 		return DP_ERROR;
 
@@ -219,7 +218,7 @@ static int dp_install_vf_default_capture_flow(struct dp_port *port)
 	return DP_OK;
 }
 
-static int dp_turn_on_offload_pkt_capture(struct dp_port *port)
+int dp_enable_pkt_capture(struct dp_port *port)
 {
 	if (!port || !port->allocated)
 		return DP_GRPC_ERR_NO_VM;
@@ -257,7 +256,7 @@ static int dp_turn_on_offload_pkt_capture(struct dp_port *port)
 	return DP_GRPC_OK;
 }
 
-static int dp_turn_off_offload_pkt_capture(struct dp_port *port)
+int dp_disable_pkt_capture(struct dp_port *port)
 {
 	if (!port || !port->allocated)
 		return DP_GRPC_ERR_NO_VM;
@@ -287,29 +286,15 @@ static int dp_turn_off_offload_pkt_capture(struct dp_port *port)
 	return DP_OK;
 }
 
-int dp_enable_port_offload_pkt_capture(uint16_t port_id)
-{
-	struct dp_port *port = dp_port_get(port_id);
-
-	return dp_turn_on_offload_pkt_capture(port);
-}
-
-int dp_disable_port_offload_pkt_capture(uint16_t port_id)
-{
-	struct dp_port *port = dp_port_get(port_id);
-
-	return dp_turn_off_offload_pkt_capture(port);
-}
-
 int dp_disable_pkt_capture_on_all_ifaces(void)
 {
-	struct dp_ports *ports = get_dp_ports();
+	struct dp_ports *ports = dp_get_ports();
 	int count = 0;
 	int ret;
 
 	DP_FOREACH_PORT(ports, port) {
 		if (port->allocated && port->captured) {
-			ret = dp_turn_off_offload_pkt_capture(port);
+			ret = dp_enable_pkt_capture(port);
 			if (DP_FAILED(ret))
 				return ret;
 			count++;

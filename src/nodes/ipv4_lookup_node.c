@@ -61,7 +61,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-		df->nxt_hop = dp_multipath_get_pf(df->dp_flow_hash);
+		df->nxt_hop = dp_multipath_get_pf_id(df->dp_flow_hash);
 		nxt_hop_is_pf = true;
 	}
 

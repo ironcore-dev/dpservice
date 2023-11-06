@@ -39,41 +39,42 @@ static const struct rte_eth_conf port_conf_default = {
 };
 
 static struct dp_port *port_table[DP_MAX_PORTS];
-static uint16_t pf_ports[DP_MAX_PF_PORTS];
+static struct dp_port *pf_ports[DP_MAX_PF_PORTS];
 static struct dp_ports dp_ports;
 
-struct dp_ports *get_dp_ports(void)
+struct dp_ports *dp_get_ports(void)
 {
 	return &dp_ports;
 }
 
-static void dp_port_init_pf_table(void)
-{
-	for (int i = 0; i < DP_MAX_PF_PORTS; ++i)
-		pf_ports[i] = DP_INVALID_PORT_ID;
-}
-
-uint16_t dp_port_get_pf0_id(void)
+struct dp_port *dp_get_pf0(void)
 {
 	return pf_ports[0];
 }
 
-uint16_t dp_port_get_pf1_id(void)
+struct dp_port *dp_get_pf1(void)
 {
 	return pf_ports[1];
 }
 
-static int dp_port_register_pf(uint16_t port_id)
+struct dp_port *dp_get_pf(uint16_t index)
+{
+	if (index >= RTE_DIM(pf_ports))
+		return NULL;
+	return pf_ports[index];
+}
+
+static int dp_port_register_pf(struct dp_port *port)
 {
 	// sub-optimal, but the number of PF ports is extremely low
 	// and this is only called in initialization
-	for (int i = 0; i < DP_MAX_PF_PORTS; ++i) {
-		if (pf_ports[i] == DP_INVALID_PORT_ID) {
-			pf_ports[i] = port_id;
+	for (size_t i = 0; i < RTE_DIM(pf_ports); ++i) {
+		if (pf_ports[i] == NULL) {
+			pf_ports[i] = port;
 			return DP_OK;
 		}
 	}
-	DPS_LOG_ERR("To many physical ports", DP_LOG_MAX(DP_MAX_PF_PORTS));
+	DPS_LOG_ERR("To many physical ports", DP_LOG_MAX(RTE_DIM(pf_ports)));
 	return DP_ERROR;
 }
 
@@ -86,26 +87,36 @@ static inline struct dp_port *get_port(uint16_t port_id)
 	return port_table[port_id];
 }
 
-struct dp_port *dp_port_get(uint16_t port_id)
+struct dp_port *dp_get_port(uint16_t port_id)
 {
 	struct dp_port *port = get_port(port_id);
 
 	if (!port)
-		DPS_LOG_ERR("Port not registered in dp-service", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
 
 	return port;
 }
 
-struct dp_port *dp_port_get_vf(uint16_t port_id)
+struct dp_port *dp_get_vf(uint16_t port_id)
 {
 	struct dp_port *port = get_port(port_id);
 
 	if (!port || port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port not registered in dp-service", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORTID(port_id));
 		return NULL;
 	}
 
 	return port;
+}
+
+struct dp_port *dp_get_port_by_name(const char *pci_name)
+{
+	uint16_t port_id;
+
+	if (pci_name[0] == '\0' || DP_FAILED(rte_eth_dev_get_port_by_name(pci_name, &port_id)))
+		return NULL;
+
+	return get_port(port_id);
 }
 
 bool dp_port_is_pf(uint16_t port_id)
@@ -115,30 +126,9 @@ bool dp_port_is_pf(uint16_t port_id)
 	return port && port->port_type == DP_PORT_PF;
 }
 
-int dp_port_set_link_status(uint16_t port_id, uint8_t status)
-{
-	struct dp_port *port = dp_port_get(port_id);
-
-	if (!port)
-		return DP_ERROR;
-
-	port->link_status = status;
-	return DP_OK;
-}
-
-uint8_t dp_port_get_link_status(uint16_t port_id)
-{
-	struct dp_port *port = get_port(port_id);
-
-	if (!port)
-		return RTE_ETH_LINK_DOWN;
-
-	return port->link_status;
-}
-
 int dp_port_set_vf_attach_status(uint16_t port_id, enum dp_vf_port_attach_status status)
 {
-	struct dp_port *port = dp_port_get_vf(port_id);
+	struct dp_port *port = dp_get_vf(port_id);
 
 	if (!port)
 		return DP_ERROR;
@@ -157,15 +147,7 @@ enum dp_vf_port_attach_status dp_port_get_vf_attach_status(uint16_t port_id)
 	return port->attach_status;
 }
 
-bool dp_port_is_vf_free(uint16_t port_id)
-{
-	struct dp_port *port = get_port(port_id);
-
-	return port && port->port_type == DP_PORT_VF && !port->allocated;
-}
-
-
-static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
+static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	struct rte_ether_addr pf_neigh_mac;
@@ -182,12 +164,12 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
 		: (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs);
 
-	ret = rte_eth_dev_configure(port_id,
+	ret = rte_eth_dev_configure(port->port_id,
 								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
 								&port_conf);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -196,12 +178,12 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 
 	/* RX and TX queues config */
 	for (int i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
-		ret = rte_eth_rx_queue_setup(port_id, i, 1024,
-									 rte_eth_dev_socket_id(port_id),
+		ret = rte_eth_rx_queue_setup(port->port_id, i, 1024,
+									 port->socket_id,
 									 &rxq_conf,
 									 dp_layer->rte_mempool);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -210,31 +192,31 @@ static int dp_port_init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_in
 	txq_conf.offloads = port_conf.txmode.offloads;
 
 	for (int i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
-		ret = rte_eth_tx_queue_setup(port_id, i, 2048,
-									 rte_eth_dev_socket_id(port_id),
+		ret = rte_eth_tx_queue_setup(port->port_id, i, 2048,
+									 port->socket_id,
 									 &txq_conf);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
 
 	/* dp-service specific config */
 	if (port_type == DP_PORT_VF) {
-		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORTID(port_id));
-		ret = rte_eth_promiscuous_enable(port_id);
+		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORTID(port->port_id));
+		ret = rte_eth_promiscuous_enable(port->port_id);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
 
-	dp_set_mac(port_id);
+	dp_set_mac(port->port_id);
 
 	if (port_type == DP_PORT_PF) {
-		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, dp_get_mac(port_id))))
+		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, dp_get_mac(port->port_id))))
 			return DP_ERROR;
-		dp_set_neigh_mac(port_id, &pf_neigh_mac);
+		dp_set_neigh_mac(port->port_id, &pf_neigh_mac);
 	}
 
 	return DP_OK;
@@ -262,27 +244,44 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 {
 	static int last_pf1_hairpin_tx_rx_queue_offset = 1;
 	struct dp_port *port;
+	int socket_id;
 	int ret;
 
+	if (port_id >= RTE_DIM(port_table)) {
+		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(port_table)));
+		return NULL;
+	}
+
 	if (type == DP_PORT_PF) {
-		if (DP_FAILED(dp_port_register_pf(port_id)))
-			return NULL;
 		if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
 			if (DP_FAILED(dp_port_flow_isolate(port_id)))
 				return NULL;
 	}
 
-	if (DP_FAILED(dp_port_init_ethdev(port_id, dev_info, type)))
-		return NULL;
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return NULL;
+		}
+	}
 
 	// oveflow check done by liming the number of calls to this function
 	port = dp_ports.end++;
 	port->port_type = type;
 	port->port_id = port_id;
+	port->socket_id = socket_id;
 	port_table[port_id] = port;
+
+	if (DP_FAILED(dp_port_init_ethdev(port, dev_info, type)))
+		return NULL;
 
 	switch (type) {
 	case DP_PORT_PF:
+		if (DP_FAILED(dp_port_register_pf(port)))
+			return NULL;
 		ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
@@ -292,7 +291,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	case DP_PORT_VF:
 		// All VFs belong to pf0, assign a tx queue from pf1 for it
 		if (dp_conf_is_offload_enabled()) {
-			port->peer_pf_port_id = dp_port_get_pf1_id();
+			port->peer_pf_port_id = dp_get_pf1()->port_id;
 			port->peer_pf_hairpin_tx_rx_queue_offset = last_pf1_hairpin_tx_rx_queue_offset++;
 			if (last_pf1_hairpin_tx_rx_queue_offset > UINT8_MAX) {
 				DPS_LOG_ERR("Too many VFs, cannot create more hairpins");
@@ -307,12 +306,12 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 
 static int dp_port_set_up_hairpins(void)
 {
-	uint16_t pf0 = dp_port_get_pf0_id();
-	uint16_t pf1 = dp_port_get_pf1_id();
+	const struct dp_port *pf0 = dp_get_pf0();
+	const struct dp_port *pf1 = dp_get_pf1();
 
 	DP_FOREACH_PORT(&dp_ports, port) {
 		if (port->port_type == DP_PORT_PF) {
-			port->peer_pf_port_id = port->port_id == pf0 ? pf1 : pf0;
+			port->peer_pf_port_id = (port->port_id == pf0->port_id ? pf1 : pf0)->port_id;
 			port->peer_pf_hairpin_tx_rx_queue_offset = 1;
 		}
 		if (DP_FAILED(dp_hairpin_setup(port)))
@@ -379,7 +378,6 @@ int dp_ports_init(void)
 	int num_of_vfs = get_dpdk_layer()->num_of_vfs;
 	int num_of_ports = DP_MAX_PF_PORTS + num_of_vfs;
 
-	dp_port_init_pf_table();
 	dp_ports.ports = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
 	if (!dp_ports.ports) {
 		DPS_LOG_ERR("Cannot allocate port table");
@@ -404,8 +402,6 @@ int dp_ports_init(void)
 static int dp_stop_eth_port(uint16_t port_id)
 {
 	int ret, ret2;
-
-	// TODO(Tao): look into tearing down hairpins
 
 	// error already logged
 	ret = rx_node_set_enabled(port_id, false);
@@ -446,7 +442,7 @@ static int dp_port_install_isolated_mode(int port_id)
 static int dp_port_bind_port_hairpins(struct dp_port *port)
 {
 	// two pf port's hairpins are bound when processing the second port
-	if (port->port_id == dp_port_get_pf0_id())
+	if (port == dp_get_pf0())
 		return DP_OK;
 
 	if (DP_FAILED(dp_hairpin_bind(port)))
@@ -483,7 +479,7 @@ static int dp_init_port(struct dp_port *port)
 
 	if (dp_conf_is_offload_enabled()) {
 #ifdef ENABLE_PYTEST
-		if (port->peer_pf_port_id != dp_port_get_pf1_id())
+		if (port->peer_pf_port_id != dp_get_pf1()->port_id)
 #endif
 		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 			return DP_ERROR;
@@ -496,18 +492,13 @@ static int dp_init_port(struct dp_port *port)
 	return DP_OK;
 }
 
-int dp_port_start(uint16_t port_id)
+int dp_port_start(struct dp_port *port)
 {
-	struct dp_port *port;
 	int ret;
 
-	port = dp_port_get(port_id);
-	if (!port)
-		return DP_ERROR;
-
-	ret = rte_eth_dev_start(port_id);
+	ret = rte_eth_dev_start(port->port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -519,22 +510,15 @@ int dp_port_start(uint16_t port_id)
 
 	port->link_status = RTE_ETH_LINK_UP;
 	port->allocated = true;
-
 	return DP_OK;
 }
 
-int dp_port_stop(uint16_t port_id)
+int dp_port_stop(struct dp_port *port)
 {
-	struct dp_port *port;
-
-	port = dp_port_get(port_id);
-	if (!port)
-		return DP_ERROR;
-
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_stop_eth_port(port_id)))
+	if (DP_FAILED(dp_stop_eth_port(port->port_id)))
 		return DP_ERROR;
 
 	port->allocated = false;

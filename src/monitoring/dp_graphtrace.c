@@ -230,7 +230,6 @@ void _dp_graphtrace_send(const struct rte_node *node,
 			// this prevent unnecessary copying and immediate freeing after enqueue() fails
 			break;
 		}
-
 		dups[nb_dups++] = dup;
 		pktinfo = dp_get_graphtrace_pktinfo(dup);
 		pktinfo->pktid = dp_get_pkt_mark(objs[i])->id;

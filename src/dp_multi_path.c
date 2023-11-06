@@ -30,21 +30,21 @@ void dp_multipath_init(void)
 		pf0_egress_select_table[i] = PEER_PORT;
 }
 
-uint16_t dp_multipath_get_pf(uint32_t hash)
+uint16_t dp_multipath_get_pf_id(uint32_t hash)
 {
 	if (!dp_conf_is_wcmp_enabled())
-		return dp_port_get_pf0_id();
+		return dp_get_pf0()->port_id;
 
 	enum egress_pf_port selected_port = pf0_egress_select_table[hash % PORT_SELECT_TABLE_SIZE];
-	uint16_t owner_port_id = dp_port_get_pf0_id();
-	uint16_t peer_port_id = dp_port_get_pf1_id();
+	struct dp_port *owner_port = dp_get_pf0();
+	struct dp_port *peer_port = dp_get_pf1();
 
 	// basic logic of port redundancy if one of ports are down
-	if ((selected_port == PEER_PORT && dp_port_get_link_status(peer_port_id) == RTE_ETH_LINK_UP)
-		|| (selected_port == OWNER_PORT && dp_port_get_link_status(owner_port_id) == RTE_ETH_LINK_DOWN)
+	if ((selected_port == PEER_PORT && peer_port->link_status == RTE_ETH_LINK_UP)
+		|| (selected_port == OWNER_PORT && owner_port->link_status == RTE_ETH_LINK_DOWN)
 	) {
-		return peer_port_id;
+		return peer_port->port_id;
 	}
 
-	return owner_port_id;
+	return owner_port->port_id;
 }

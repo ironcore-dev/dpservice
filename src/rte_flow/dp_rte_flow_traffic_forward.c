@@ -217,11 +217,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	const struct rte_flow_attr *attr;
 	uint16_t t_port_id;
 	bool cross_pf_port;
-	struct dp_port *incoming_port;
+	const struct dp_port *incoming_port;
 
-	cross_pf_port = df->nxt_hop != dp_port_get_pf0_id();
+	cross_pf_port = df->nxt_hop != dp_get_pf0()->port_id;
 
-	incoming_port = dp_port_get(m->port);
+	incoming_port = dp_get_port(m->port);
 	if (!incoming_port) {
 		DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
@@ -313,7 +313,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// install rte flow to the right port
 	if (cross_pf_port) {
 		attr = &dp_flow_attr_egress;
-		t_port_id = dp_port_get_pf1_id();
+		t_port_id = dp_get_pf1()->port_id;
 	} else {
 		if (incoming_port->captured)
 			attr = &dp_flow_attr_transfer_multi_stage;
@@ -357,24 +357,24 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_action_age flow_age;         // #5
 	struct rte_flow_action_queue redirect_queue; // #6 (choose one)
 	struct rte_flow_action_port_id send_to_port; // #6 (choose one)
-	struct rte_flow_action actions[7];            // + end
+	struct rte_flow_action actions[7];           // + end
 	int action_cnt = 0;
 
-	struct rte_flow_action_jump jump_action; // #1
-	struct rte_flow_action_age flow_age_capture; // #2
+	struct rte_flow_action_jump jump_action;       // #1
+	struct rte_flow_action_age flow_age_capture;   // #2
 	struct rte_flow_action special_moni_action[3]; // + end
 	int special_moni_action_cnt = 0;
 
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx, *agectx_capture = NULL;
 	struct rte_flow_action *age_action, *age_action_capture;
-	struct dp_port *port;
+	const struct dp_port *port;
 	struct rte_ether_hdr new_eth_hdr;
 	rte_be32_t actual_ol_ipv4_addr;
 	bool cross_pf_port;
 	const struct rte_flow_attr *attr =  &dp_flow_attr_transfer_single_stage;
 
-	cross_pf_port = m->port != dp_port_get_pf0_id();
+	cross_pf_port = m->port != dp_get_pf0()->port_id;
 	if (cross_pf_port)
 		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
 	else
@@ -410,7 +410,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// create one action to redirect flow packets to the capturing group.
-	if (!cross_pf_port && dp_port_get(m->port)->captured) {
+	if (!cross_pf_port && dp_get_port(m->port)->captured) {
 		agectx_capture = allocate_agectx();
 		if (!agectx_capture)
 			return DP_ERROR;
@@ -461,7 +461,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	if (cross_pf_port) {
 		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
-		port = dp_port_get_vf((uint16_t)df->nxt_hop);
+		port = dp_get_vf((uint16_t)df->nxt_hop);
 		if (!port) {
 			DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
 			dp_destroy_rte_flow_agectx(agectx);
@@ -521,7 +521,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct dp_port *incoming_port;
 	const struct rte_flow_attr *attr;
 
-	incoming_port = dp_port_get(m->port);
+	incoming_port = dp_get_port(m->port);
 	if (!incoming_port) {
 		DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
@@ -633,7 +633,7 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	// set proper ethernet addresses
 	// in network traffic has to be set via the other pf port via hairpin
-	df->nxt_hop = m->port == dp_port_get_pf0_id() ? dp_port_get_pf1_id() : m->port;
+	df->nxt_hop = m->port == dp_get_pf0()->port_id ? dp_get_pf1()->port_id : m->port;
 	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, dp_get_mac(df->nxt_hop));
 	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, dp_get_neigh_mac(df->nxt_hop));
 

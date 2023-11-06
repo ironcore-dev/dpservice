@@ -76,9 +76,14 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 	struct dp_event_msg *status_msg = rte_pktmbuf_mtod(m, struct dp_event_msg *);
 	uint16_t port_id = status_msg->event_entry.link_status.port_id;
 	uint8_t status = status_msg->event_entry.link_status.status;
+	struct dp_port *port = dp_get_port(port_id);
 
-	if (DP_FAILED(dp_port_set_link_status(port_id, status)))
-		DPS_LOG_WARNING("Cannot set link status", DP_LOG_PORTID(port_id), DP_LOG_VALUE(status));
+	if (!port) {
+		DPS_LOG_WARNING("Cannot set link status, port invalid", DP_LOG_PORTID(port_id), DP_LOG_VALUE(status));
+		return;
+	}
+
+	port->link_status = status;
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows
@@ -96,13 +101,10 @@ int dp_send_event_flow_aging_msg(void)
 void dp_process_event_flow_aging_msg(__rte_unused struct rte_mbuf *m)
 {
 	if (dp_conf_is_offload_enabled()) {
-		struct dp_ports *ports = get_dp_ports();
-
-		dp_process_aged_flows(dp_port_get_pf0_id());
-		dp_process_aged_flows(dp_port_get_pf1_id());
+		const struct dp_ports *ports = dp_get_ports();
 
 		DP_FOREACH_PORT(ports, port) {
-			if (port->port_type == DP_PORT_VF && port->allocated)
+			if (port->allocated)
 				dp_process_aged_flows(port->port_id);
 		}
 	}

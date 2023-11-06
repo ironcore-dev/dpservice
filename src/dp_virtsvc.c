@@ -346,7 +346,7 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 	*conn_idx = ret;
 
 	static_assert(sizeof(key_hash) == sizeof(uint32_t), "Virtsvc key is not 32b integer");
-	*pf_port_id = dp_multipath_get_pf(key_hash);
+	*pf_port_id = dp_multipath_get_pf_id(key_hash);
 
 	return DP_OK;
 }

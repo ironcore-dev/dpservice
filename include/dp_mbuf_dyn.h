@@ -19,13 +19,13 @@ extern "C" {
 
 struct dp_flow {
 	struct {
-		uint16_t	flow_type : 2;		// local,outgoing,incoming
+		uint16_t	flow_type : 2;			// local,outgoing,incoming
 		uint16_t	public_flow : 1;
-		uint16_t	overlay_type: 1;	// supported overlay type
+		uint16_t	overlay_type: 1;		// supported overlay type
 		uint16_t	nat : 3;
-		uint16_t	offload_ipv6 : 1;	// tmp solution to set if we should offload ipv6 pkts
-		uint16_t	dir : 2;			// store the direction of each packet
-		uint16_t	offload_decision: 2;	// store the offload status of each packet
+		uint16_t	offload_ipv6 : 1;		// tmp solution to set if we should offload ipv6 pkts
+		uint16_t	dir : 2;				// store the direction of each packet
+		uint16_t	offload_decision : 2;	// store the offload status of each packet
 	} flags;
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	union {

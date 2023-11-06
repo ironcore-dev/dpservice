@@ -12,7 +12,7 @@ struct dp_internal_stats _dp_stats = {0};
 int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict)
 {
 	int ret;
-	struct dp_ports *ports = get_dp_ports();
+	struct dp_ports *ports = dp_get_ports();
 
 	DP_FOREACH_PORT(ports, port) {
 		if (port->port_type != DP_PORT_VF || !port->allocated)
