@@ -126,25 +126,25 @@ bool dp_port_is_pf(uint16_t port_id)
 	return port && port->port_type == DP_PORT_PF;
 }
 
-int dp_port_set_vf_attach_status(uint16_t port_id, enum dp_vf_port_attach_status status)
+int dp_attach_vf(uint16_t port_id)
 {
 	struct dp_port *port = dp_get_vf(port_id);
 
 	if (!port)
 		return DP_ERROR;
 
-	port->attach_status = status;
+	port->attached = true;
 	return DP_OK;
 }
 
-enum dp_vf_port_attach_status dp_port_get_vf_attach_status(uint16_t port_id)
+bool dp_is_vf_attached(uint16_t port_id)
 {
 	struct dp_port *port = get_port(port_id);
 
 	if (!port || port->port_type != DP_PORT_VF)
-		return DP_VF_PORT_DETACHED;
+		return false;
 
-	return port->attach_status;
+	return port->attached;
 }
 
 static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)

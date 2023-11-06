@@ -56,7 +56,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL || df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (!nxt_hop_is_pf && dp_port_get_vf_attach_status(df->nxt_hop) == DP_VF_PORT_DETACHED)
+		if (!nxt_hop_is_pf && !dp_is_vf_attached(df->nxt_hop))
 			return IPV4_LOOKUP_NEXT_DROP;
 	}
 

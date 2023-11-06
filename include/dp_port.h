@@ -22,11 +22,6 @@ enum dp_port_type {
 	DP_PORT_VF,
 };
 
-enum dp_vf_port_attach_status {
-	DP_VF_PORT_DETACHED,
-	DP_VF_PORT_ATTACHED,
-};
-
 struct dp_port {
 	enum dp_port_type				port_type;
 	uint16_t						port_id;
@@ -37,7 +32,7 @@ struct dp_port {
 	char							vf_name[IF_NAMESIZE];
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
-	enum dp_vf_port_attach_status	attach_status;  // TODO bool
+	bool							attached;
 	struct rte_flow					*default_jump_flow;
 	struct rte_flow					*default_capture_flow;
 	bool							captured;
@@ -57,8 +52,8 @@ struct dp_port *dp_get_port_by_name(const char *pci_name);
 
 bool dp_port_is_pf(uint16_t port_id);
 
-int dp_port_set_vf_attach_status(uint16_t port_id, enum dp_vf_port_attach_status status);
-enum dp_vf_port_attach_status dp_port_get_vf_attach_status(uint16_t port_id);
+int dp_attach_vf(uint16_t port_id);
+bool dp_is_vf_attached(uint16_t port_id);
 
 int dp_ports_init(void);
 void dp_ports_free(void);

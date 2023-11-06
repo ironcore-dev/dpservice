@@ -226,7 +226,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 
 	dp_fill_ether_hdr(ether_hdr, vf_port_id, RTE_ETHER_TYPE_IPV4);
 
-	if (dp_port_get_vf_attach_status(vf_port_id) == DP_VF_PORT_DETACHED)
+	if (!dp_is_vf_attached(vf_port_id))
 		return VIRTSVC_NEXT_DROP;
 
 	return next_tx_index[vf_port_id];
