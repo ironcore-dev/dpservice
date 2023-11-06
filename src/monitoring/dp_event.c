@@ -104,7 +104,6 @@ void dp_process_event_flow_aging_msg(__rte_unused struct rte_mbuf *m)
 		DP_FOREACH_PORT(ports, port) {
 			if (port->port_type == DP_PORT_VF && port->allocated)
 				dp_process_aged_flows(port->port_id);
-
 		}
 	}
 

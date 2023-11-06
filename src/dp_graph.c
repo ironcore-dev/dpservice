@@ -132,7 +132,7 @@ static int dp_graph_init_nodes(void)
 			return DP_ERROR;
 
 		// some nodes need a direct Tx connection to all PF/VF ports, add them dynamically
-		snprintf(name, sizeof(name), "tx-%u", port->port_id);
+		snprintf(name, sizeof(name), "tx-%u", port_id);
 		switch (port->port_type) {
 		case DP_PORT_VF:
 			if (DP_FAILED(arp_node_append_vf_tx(port_id, name))
