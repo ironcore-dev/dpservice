@@ -2,6 +2,7 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_port.h"
 #include "dp_vnf.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_helpers.h"
@@ -145,7 +146,7 @@ static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_fl
 		df->flags.offload_decision = df->conntrack->offload_flags.reply;
 }
 
-static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct rte_mbuf *m)
+static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct dp_port *port)
 {
 	struct flow_value *flow_val;
 	struct flow_key inverted_key;
@@ -163,14 +164,14 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
 	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
 	flow_val->timeout_value = flow_timeout;
-	flow_val->created_port_id = m->port;
+	flow_val->created_port_id = port->port_id;
 
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
 	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
 	if (offload_mode_enabled
 		&& (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
-		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, m->port, DP_VNF_MATCH_ALL_PORT_ID))
+		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, DP_VNF_MATCH_ALL_PORT_ID))
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;
 	else
@@ -238,7 +239,12 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 
 static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flow *df, struct flow_value **p_flow_val)
 {
+	struct dp_port *port;
 	int ret;
+
+	port = dp_get_port(m->port);
+	if (unlikely(!port))
+		return DP_ERROR;
 
 	// TODO(plague): discuss making DP_FAILED() unlikely by default
 	ret = dp_build_flow_key(curr_key, m);
@@ -267,7 +273,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 			return ret;
 		}
 		// create new flow if needed
-		*p_flow_val = flow_table_insert_entry(curr_key, df, m);
+		*p_flow_val = flow_table_insert_entry(curr_key, df, port);
 		if (unlikely(!*p_flow_val)) {
 			DPS_LOG_WARNING("Failed to create a new flow table entry");
 			return DP_ERROR;

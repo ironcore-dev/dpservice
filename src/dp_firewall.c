@@ -3,6 +3,7 @@
 #include "dp_error.h"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_port.h"
 #include "grpc/dp_grpc_responder.h"
 
 void dp_init_firewall_rules_list(int port_id)

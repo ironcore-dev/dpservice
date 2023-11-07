@@ -4,6 +4,7 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_nat.h"
+#include "dp_port.h"
 #include "nodes/ipv6_nd_node.h"
 #include "rte_flow/dp_rte_flow_helpers.h"
 
@@ -159,20 +160,21 @@ static __rte_always_inline int dp_install_rte_flow_with_indirect(uint16_t port_i
 
 static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_IPIP_ENCAP_HEADER_SIZE],
 															const struct dp_flow *df,
-															const uint8_t *src_ip6)
+															const struct dp_port *incoming_port,
+															const struct dp_port *outgoing_port)
 {
 	struct rte_ether_hdr *encap_eth_hdr = (struct rte_ether_hdr *)raw_hdr;
 	struct rte_ipv6_hdr *encap_ipv6_hdr = (struct rte_ipv6_hdr *)(&raw_hdr[sizeof(struct rte_ether_hdr)]);
 
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &encap_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &encap_eth_hdr->src_addr);
+	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &encap_eth_hdr->dst_addr);
+	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &encap_eth_hdr->src_addr);
 	encap_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	encap_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	encap_ipv6_hdr->payload_len = 0;
 	encap_ipv6_hdr->proto = df->tun_info.proto_id;
 	encap_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	rte_memcpy(encap_ipv6_hdr->src_addr, src_ip6, sizeof(encap_ipv6_hdr->src_addr));
+	rte_memcpy(encap_ipv6_hdr->src_addr, dp_get_port_ul_ip6(incoming_port->port_id), sizeof(encap_ipv6_hdr->src_addr));
 	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
 }
 
@@ -218,14 +220,21 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	uint16_t t_port_id;
 	bool cross_pf_port;
 	const struct dp_port *incoming_port;
-
-	cross_pf_port = df->nxt_hop != dp_get_pf0()->port_id;
+	const struct dp_port *outgoing_port;
 
 	incoming_port = dp_get_port(m->port);
 	if (!incoming_port) {
-		DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(m->port));
+		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
 		return DP_ERROR;
 	}
+
+	outgoing_port = dp_get_port(df->nxt_hop);
+	if (!outgoing_port) {
+		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
+		return DP_ERROR;
+	}
+
+	cross_pf_port = outgoing_port != dp_get_pf0();
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
 	if (cross_pf_port) {
@@ -268,15 +277,15 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 		dp_set_end_action(&hairpin_actions[hairpin_action_cnt++]);
 
-		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_vf_attr_ingress,
+		if (DP_FAILED(dp_install_rte_flow_with_indirect(incoming_port->port_id, &dp_flow_vf_attr_ingress,
 														hairpin_pattern, hairpin_actions,
 														hairpin_age_action, df, hairpin_agectx))
 		) {
 			dp_destroy_rte_flow_agectx(hairpin_agectx);
-			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(m->port));
+			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(incoming_port->port_id));
 			return DP_ERROR;
 		}
-		DPS_LOG_DEBUG("Installed a flow rule to move pkts to hairpin rx queue", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed a flow rule to move pkts to hairpin rx queue", DP_LOG_PORTID(incoming_port->port_id));
 	}
 
 	// replace source ip if vip-nat/network-nat is enabled
@@ -290,7 +299,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	// standard actions do not have the power to do what needs to be done here
 	// thus a raw decap (to get a 'naked' packet) and raw encap is used
 	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, sizeof(struct rte_ether_hdr));
-	dp_create_ipip_encap_header(raw_encap_hdr, df, dp_get_port_ul_ip6(m->port));
+	dp_create_ipip_encap_header(raw_encap_hdr, df, incoming_port, outgoing_port);
 	dp_set_raw_encap_action(&actions[action_cnt++], &raw_encap, raw_encap_hdr, sizeof(raw_encap_hdr));
 
 	// make flow aging work
@@ -306,7 +315,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 
 	// send to the right port (unless already handled by the hairpin)
 	if (!cross_pf_port)
-		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
+		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, outgoing_port->port_id);
 
 	dp_set_end_action(&actions[action_cnt++]);
 
@@ -319,7 +328,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 			attr = &dp_flow_attr_transfer_multi_stage;
 		else
 			attr = &dp_flow_attr_transfer_single_stage;
-		t_port_id = m->port;
+		t_port_id = incoming_port->port_id;
 	}
 	if (DP_FAILED(dp_install_rte_flow_with_indirect(t_port_id, attr,
 													pattern, actions,
@@ -332,9 +341,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	}
 
 	if (cross_pf_port)
-		DPS_LOG_DEBUG("Installed cross pf encap flow rules", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed cross pf encap flow rules", DP_LOG_PORTID(incoming_port->port_id));
 	else
-		DPS_LOG_DEBUG("Installed encap flow rule on VF", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed encap flow rule on VF", DP_LOG_PORTID(incoming_port->port_id));
 
 	return DP_OK;
 }
@@ -368,21 +377,34 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx, *agectx_capture = NULL;
 	struct rte_flow_action *age_action, *age_action_capture;
-	const struct dp_port *port;
 	struct rte_ether_hdr new_eth_hdr;
 	rte_be32_t actual_ol_ipv4_addr;
 	bool cross_pf_port;
 	const struct rte_flow_attr *attr =  &dp_flow_attr_transfer_single_stage;
+	const struct dp_port *incoming_port;
+	const struct dp_port *outgoing_port;
 
-	cross_pf_port = m->port != dp_get_pf0()->port_id;
+	incoming_port = dp_get_port(m->port);
+	if (!incoming_port) {
+		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
+		return DP_ERROR;
+	}
+
+	outgoing_port = dp_get_port(df->nxt_hop);
+	if (!outgoing_port) {
+		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
+		return DP_ERROR;
+	}
+
+	cross_pf_port = incoming_port != dp_get_pf0();
 	if (cross_pf_port)
 		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
 	else
 		df->conntrack->incoming_flow_offloaded_flag.pf0 = true;
 
 	// prepare the new ethernet header to replace the IPIP one
-	rte_ether_addr_copy(dp_get_neigh_mac(df->nxt_hop), &new_eth_hdr.dst_addr);
-	rte_ether_addr_copy(dp_get_mac(df->nxt_hop), &new_eth_hdr.src_addr);
+	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &new_eth_hdr.dst_addr);
+	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &new_eth_hdr.src_addr);
 	new_eth_hdr.ether_type = htons(df->l3_type);
 
 	// restore the actual incoming pkt's ipv6 dst addr
@@ -410,7 +432,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// create one action to redirect flow packets to the capturing group.
-	if (!cross_pf_port && dp_get_port(m->port)->captured) {
+	if (!cross_pf_port && incoming_port->captured) {
 		agectx_capture = allocate_agectx();
 		if (!agectx_capture)
 			return DP_ERROR;
@@ -424,15 +446,14 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 		dp_set_end_action(&special_moni_action[special_moni_action_cnt++]);
 
-		if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_pf_attr_transfer_capture,
+		if (DP_FAILED(dp_install_rte_flow_with_indirect(incoming_port->port_id, &dp_flow_pf_attr_transfer_capture,
 													pattern, special_moni_action, age_action_capture, df, agectx_capture))) {
 			dp_destroy_rte_flow_agectx(agectx_capture);
 			return DP_ERROR;
 		}
 
-		DPS_LOG_DEBUG("Installed capturing flow rule on PF", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed capturing flow rule on PF", DP_LOG_PORTID(incoming_port->port_id));
 	}
-
 
 	// remove the IPIP header and replace it with a standard Ethernet header
 	dp_set_raw_decap_action(&actions[action_cnt++], &raw_decap, NULL, DP_IPIP_ENCAP_HEADER_SIZE);
@@ -452,7 +473,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	if (!agectx) {
 		if (agectx_capture)
 			if (DP_FAILED(dp_destroy_rte_flow_agectx(agectx_capture)))
-				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORTID(m->port));
+				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORTID(incoming_port->port_id));
 		return DP_ERROR;
 	}
 
@@ -461,22 +482,21 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 
 	if (cross_pf_port) {
 		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
-		port = dp_get_vf((uint16_t)df->nxt_hop);
-		if (!port) {
-			DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(df->nxt_hop));
+		if (outgoing_port->port_type != DP_PORT_VF) {
+			DPS_LOG_ERR("Outgoing port not a VF", DP_LOG_PORTID(outgoing_port->port_id));
 			dp_destroy_rte_flow_agectx(agectx);
 			// no need to free the above appeared (not allocated) agectx_capture, as the capturing rule is not installed for the cross-pf case
 			return DP_ERROR;
 		}
 		// pf's rx hairpin queue for vf starts from index 2. (0: normal rxq, 1: hairpin rxq for another pf.)
 		dp_set_redirect_queue_action(&actions[action_cnt++], &redirect_queue,
-									 DP_NR_RESERVED_RX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset);
+									 DP_NR_RESERVED_RX_QUEUES - 1 + outgoing_port->peer_pf_hairpin_tx_rx_queue_offset);
 	} else
-		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
+		dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, outgoing_port->port_id);
 
 	dp_set_end_action(&actions[action_cnt++]);
 
-	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port,
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(incoming_port->port_id,
 													cross_pf_port ? &dp_flow_pf_attr_ingress : attr,
 													pattern, actions,
 													age_action, df, agectx))
@@ -484,14 +504,16 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		dp_destroy_rte_flow_agectx(agectx);
 		if (agectx_capture)
 			if (DP_FAILED(dp_destroy_rte_flow_agectx(agectx_capture)))
-				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORTID(m->port));
+				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF",
+							DP_LOG_PORTID(incoming_port->port_id));
 		return DP_ERROR;
 	}
 
 	if (cross_pf_port)
-		DPS_LOG_DEBUG("Installed flow rules to handle hairpin pkts on both PF and VF", DP_LOG_PORTID(m->port), DP_LOG_PORTID(df->nxt_hop));
+		DPS_LOG_DEBUG("Installed flow rules to handle hairpin pkts on both PF and VF",
+					  DP_LOG_PORTID(incoming_port->port_id), DP_LOG_PORTID(outgoing_port->port_id));
 	else
-		DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(m->port));
+		DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(incoming_port->port_id));
 
 	return DP_OK;
 }
@@ -518,12 +540,19 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct flow_age_ctx *agectx;
 	struct rte_flow_action *age_action;
 	rte_be32_t actual_ol_ipv4_dst_addr;
-	struct dp_port *incoming_port;
 	const struct rte_flow_attr *attr;
+	const struct dp_port *incoming_port;
+	const struct dp_port *outgoing_port;
 
 	incoming_port = dp_get_port(m->port);
 	if (!incoming_port) {
-		DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(m->port));
+		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
+		return DP_ERROR;
+	}
+
+	outgoing_port = dp_get_port(df->nxt_hop);
+	if (!outgoing_port) {
+		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
 		return DP_ERROR;
 	}
 
@@ -550,8 +579,8 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// set proper ethernet addresses
-	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, dp_get_neigh_mac(df->nxt_hop));
-	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, dp_get_mac(df->nxt_hop));
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
 
 	// replace IPv4 address in overlay if VIP/NAT enabled
 	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
@@ -570,7 +599,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	dp_set_flow_age_action(age_action, &flow_age, df->conntrack->timeout_value, agectx);
 
 	// send to the right port
-	dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, df->nxt_hop);
+	dp_set_send_to_port_action(&actions[action_cnt++], &send_to_port, outgoing_port->port_id);
 
 	dp_set_end_action(&actions[action_cnt++]);
 
@@ -579,7 +608,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 		else
 			attr = &dp_flow_attr_transfer_single_stage;
 
-	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, attr,
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(incoming_port->port_id, attr,
 													pattern, actions,
 													age_action, df, agectx))
 	) {
@@ -587,7 +616,7 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 		return DP_ERROR;
 	}
 
-	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORTID(m->port));
+	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORTID(incoming_port->port_id));
 	return DP_OK;
 }
 
@@ -612,6 +641,22 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
+	const struct dp_port *incoming_port;
+	const struct dp_port *outgoing_port;
+
+	incoming_port = dp_get_port(m->port);
+	if (!incoming_port) {
+		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
+		return DP_ERROR;
+	}
+
+	df->nxt_hop = (incoming_port == dp_get_pf0() ? dp_get_pf1() : incoming_port)->port_id;
+
+	outgoing_port = dp_get_port(df->nxt_hop);
+	if (!outgoing_port) {
+		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
+		return DP_ERROR;
+	}
 
 	// create match pattern based on dp_flow
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
@@ -630,12 +675,10 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
-
 	// set proper ethernet addresses
 	// in network traffic has to be set via the other pf port via hairpin
-	df->nxt_hop = m->port == dp_get_pf0()->port_id ? dp_get_pf1()->port_id : m->port;
-	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, dp_get_mac(df->nxt_hop));
-	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, dp_get_neigh_mac(df->nxt_hop));
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
 
 	// set the right underlay address
 	dp_set_ipv6_set_dst_action(&actions[action_cnt++], &set_ipv6, df->tun_info.ul_dst_addr6);
@@ -663,12 +706,12 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 	// bouncing back rule's expiration is taken care of by the rte flow rule expiration mechanism;
 	// no need to perform query to perform checking on expiration status, thus an indirect action is not needed
 
-	if (DP_FAILED(dp_install_rte_flow_with_age(m->port, &dp_flow_pf_attr_ingress, pattern, actions, df->conntrack, agectx))) {
+	if (DP_FAILED(dp_install_rte_flow_with_age(incoming_port->port_id, &dp_flow_pf_attr_ingress, pattern, actions, df->conntrack, agectx))) {
 		dp_destroy_rte_flow_agectx(agectx);
 		return DP_ERROR;
 	}
 
-	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORTID(m->port));
+	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORTID(incoming_port->port_id));
 	return DP_OK;
 }
 

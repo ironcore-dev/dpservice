@@ -77,11 +77,11 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr)]);
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)]);
 	int sub_action_cnt = 0;
-	uint16_t outgoing_port_id = dp_get_pf0()->port_id;
+	struct dp_port *outgoing_port = dp_get_pf0();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 
-	rte_ether_addr_copy(dp_get_neigh_mac(outgoing_port_id), &encap_eth_hdr->dst_addr);
-	rte_ether_addr_copy(dp_get_mac(outgoing_port_id), &encap_eth_hdr->src_addr);
+	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &encap_eth_hdr->dst_addr);
+	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &encap_eth_hdr->src_addr);
 	encap_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	rte_memcpy(new_ipv6_hdr->src_addr, dp_conf_get_underlay_ip(), sizeof(new_ipv6_hdr->src_addr));
@@ -96,7 +96,7 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	udp_hdr->dgram_cksum = 0;
 
 	dp_set_raw_encap_action(&sub_action[sub_action_cnt++], encap_action, encaped_mirror_hdr, DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE);
-	dp_set_send_to_port_action(&sub_action[sub_action_cnt++], port_id_action, outgoing_port_id); // must be a pf port here
+	dp_set_send_to_port_action(&sub_action[sub_action_cnt++], port_id_action, outgoing_port->port_id); // must be a pf port here
 	dp_set_end_action(&sub_action[sub_action_cnt++]);
 }
 

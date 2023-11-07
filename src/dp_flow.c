@@ -95,7 +95,7 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 }
 
 /* Isolating only VNF NAT conntrack entries at the moment. The others should follow */
-static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow_key *key, uint16_t port)
+static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct dp_port *port, struct flow_key *key)
 {
 	struct snat_data *s_data;
 	struct dp_vnf_value vnf_val;
@@ -121,7 +121,12 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct flow
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
+	struct dp_port *port;
 	int ret = DP_OK;
+
+	port = dp_get_port(m->port);
+	if (!port)
+		return DP_ERROR;
 
 	key->ip_dst = ntohl(df->dst.dst_addr);
 	key->ip_src = ntohl(df->src.src_addr);
@@ -131,9 +136,9 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
 		key->vni = df->tun_info.dst_vni;
 	else
-		key->vni = dp_get_vm_vni(m->port);
+		key->vni = port->vm.vni;
 
-	dp_mark_vnf_type(df, key, m->port);
+	dp_mark_vnf_type(df, port, key);
 
 	switch (df->l4_type) {
 	case IPPROTO_TCP:

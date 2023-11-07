@@ -4,6 +4,7 @@
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_flow.h>
+#include "dp_port.h"
 #include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
@@ -44,7 +45,7 @@ int dp_get_portid_with_vnf_key(const void *key, enum vnf_type v_type);
 int dp_del_vnf_with_vnf_key(const void *key);
 int dp_del_vnf_with_value(const struct dp_vnf_value *val);
 int dp_find_vnf_with_value(const struct dp_vnf_value *val);
-int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid, bool match_all);
+int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, struct dp_port *port, bool match_all);
 int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder);
 
 #ifdef __cplusplus

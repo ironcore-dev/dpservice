@@ -1,7 +1,8 @@
-#ifndef __INCLUDE_DP_MULTI_PATH_H
-#define __INCLUDE_DP_MULTI_PATH_H
+#ifndef __INCLUDE_DP_MULTI_PATH_H__
+#define __INCLUDE_DP_MULTI_PATH_H__
 
 #include <stdint.h>
+#include "dp_port.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -9,10 +10,10 @@ extern "C" {
 
 void dp_multipath_init(void);
 
-uint16_t dp_multipath_get_pf_id(uint32_t hash);
+struct dp_port *dp_multipath_get_pf(uint32_t hash);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __INCLUDE_DP_MULTI_PATH_H */
+#endif

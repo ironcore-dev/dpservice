@@ -24,15 +24,22 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const uint8_t *underlay_dst;
 	struct dp_icmp_err_ip_info icmp_err_ip_info;
 	struct dnat_data *dnat_data;
+	struct dp_port *port;
 
 	if (!cntrack)
 		return DNAT_NEXT_IPV4_LOOKUP;
 
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df->dst.dst_addr);
-		vni = df->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df->tun_info.dst_vni;
-		dnat_data = dp_get_dnat_data(dst_ip, vni);
+		vni = df->tun_info.dst_vni;
+		if (vni == 0) {
+			port = dp_get_port(m->port);
+			if (!port)
+				return DNAT_NEXT_DROP;
+			vni = port->vm.vni;
+		}
 
+		dnat_data = dp_get_dnat_data(dst_ip, vni);
 		if (dnat_data) {
 			// if it is a network nat pkt
 			if (dnat_data->dnat_ip == 0) {
@@ -88,12 +95,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return DNAT_NEXT_PACKET_RELAY;
 	}
 
-
 	if (DP_IS_FLOW_STATUS_FLAG_DEFAULT(cntrack->flow_status) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
 		&& df->l4_type == DP_IP_PROTO_ICMP
 		&& df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
 		return DNAT_NEXT_PACKET_RELAY;
-
 
 	if (DP_IS_FLOW_STATUS_FLAG_DST_NAT(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);

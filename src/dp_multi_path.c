@@ -30,10 +30,10 @@ void dp_multipath_init(void)
 		pf0_egress_select_table[i] = PEER_PORT;
 }
 
-uint16_t dp_multipath_get_pf_id(uint32_t hash)
+struct dp_port *dp_multipath_get_pf(uint32_t hash)
 {
 	if (!dp_conf_is_wcmp_enabled())
-		return dp_get_pf0()->port_id;
+		return dp_get_pf0();
 
 	enum egress_pf_port selected_port = pf0_egress_select_table[hash % PORT_SELECT_TABLE_SIZE];
 	struct dp_port *owner_port = dp_get_pf0();
@@ -43,8 +43,8 @@ uint16_t dp_multipath_get_pf_id(uint32_t hash)
 	if ((selected_port == PEER_PORT && peer_port->link_status == RTE_ETH_LINK_UP)
 		|| (selected_port == OWNER_PORT && owner_port->link_status == RTE_ETH_LINK_DOWN)
 	) {
-		return peer_port->port_id;
+		return peer_port;
 	}
 
-	return owner_port->port_id;
+	return owner_port;
 }

@@ -6,6 +6,7 @@ extern "C"
 {
 #endif
 
+#include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df);

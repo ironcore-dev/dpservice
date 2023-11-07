@@ -5,11 +5,13 @@
 #include <rte_mempool.h>
 #include <rte_ring.h>
 
-#include "dp_port.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define DP_MAX_PF_PORTS 2
+#define DP_MAX_VF_PORTS 126
+#define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS)
 
 #define DP_NR_STD_RX_QUEUES		1
 #define DP_NR_STD_TX_QUEUES		1

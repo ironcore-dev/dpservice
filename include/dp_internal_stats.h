@@ -10,6 +10,8 @@ extern "C" {
 #endif
 
 struct dp_internal_nat_stats {
+	// TODO DP_MAX_PORTS
+	// TODO merge with dp_port
 	uint16_t dp_stat_nat_used_port_cnt[DP_MAX_VF_PORTS + 2];
 };
 

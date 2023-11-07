@@ -38,6 +38,7 @@ static const struct rte_eth_conf port_conf_default = {
 	},
 };
 
+// TODO maybe use RTE_MAX_ETHPORTS to make sure there will never be such value?
 static struct dp_port *port_table[DP_MAX_PORTS];
 static struct dp_port *pf_ports[DP_MAX_PF_PORTS];
 static struct dp_ports dp_ports;
@@ -137,6 +138,7 @@ int dp_attach_vf(uint16_t port_id)
 	return DP_OK;
 }
 
+// TODO obsolete
 bool dp_is_vf_attached(uint16_t port_id)
 {
 	struct dp_port *port = get_port(port_id);
@@ -211,12 +213,15 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		}
 	}
 
-	dp_set_mac(port->port_id);
+	if (DP_FAILED(dp_load_mac(port))) {
+		DPS_LOG_ERR("Cannot retrieve MAC address", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
 
 	if (port_type == DP_PORT_PF) {
-		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, dp_get_mac(port->port_id))))
+		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->vm.info.own_mac)))
 			return DP_ERROR;
-		dp_set_neigh_mac(port->port_id, &pf_neigh_mac);
+		rte_ether_addr_copy(&pf_neigh_mac, &port->vm.info.neigh_mac);
 	}
 
 	return DP_OK;

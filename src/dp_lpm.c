@@ -6,10 +6,10 @@
 #include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_port.h"
 #include "dp_vni.h"
 #include "grpc/dp_grpc_responder.h"
 
-static struct vm_entry vm_table[DP_MAX_PORTS];
 static struct rte_hash *vm_handle_tbl = NULL;
 
 static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
@@ -34,69 +34,70 @@ void dp_lpm_free(void)
 	dp_free_jhash_table(vm_handle_tbl);
 }
 
-static __rte_always_inline int dp_lpm_fill_route_tables(int portid, struct vm_entry *entry)
+static __rte_always_inline int dp_lpm_fill_route_tables(struct dp_port *port)
 {
-	int socket_id = rte_eth_dev_socket_id(portid);
 	int ret;
 
-	ret = dp_add_route(portid, entry->vni, 0, entry->info.own_ip, NULL, 32, socket_id);
+	ret = dp_add_route(port, port->vm.vni, 0, port->vm.info.own_ip, NULL, 32);
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = dp_add_route6(portid, entry->vni, 0, entry->info.dhcp_ipv6, NULL, 128, socket_id);
+	ret = dp_add_route6(port, port->vm.vni, 0, port->vm.info.dhcp_ipv6, NULL, 128);
 	if (DP_FAILED(ret))
 		return ret;
 
 	return DP_GRPC_OK;
 }
 
-int dp_lpm_reset_all_route_tables(int socketid)
+int dp_lpm_reset_all_route_tables(int socket_id)
 {
+	struct dp_ports *ports = dp_get_ports();
 	int ret;
 
-	if (DP_FAILED(dp_reset_all_vni_route_tables(socketid)))
+	if (DP_FAILED(dp_reset_all_vni_route_tables(socket_id)))
 		return DP_GRPC_ERR_ROUTE_RESET;
 
-	for (int i = 0; i < DP_MAX_PORTS; ++i) {
-		if (vm_table[i].vm_ready) {
-			ret = dp_lpm_fill_route_tables(i, &vm_table[i]);
-			if (DP_FAILED(ret))
-				return ret;
-		}
+	DP_FOREACH_PORT(ports, port) {
+		if (!port->vm.ready)
+			continue;
+		ret = dp_lpm_fill_route_tables(port);
+		if (DP_FAILED(ret))
+			return ret;
 	}
 
 	return DP_GRPC_OK;
 }
 
-int dp_lpm_reset_route_tables(int vni, int socketid)
+int dp_lpm_reset_route_tables(int vni, int socket_id)
 {
+	struct dp_ports *ports = dp_get_ports();
 	int ret;
 
-	if (DP_FAILED(dp_reset_vni_route_tables(vni, socketid))) {
-		DPS_LOG_ERR("Resetting vni route tables failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socketid));
+	if (DP_FAILED(dp_reset_vni_route_tables(vni, socket_id))) {
+		DPS_LOG_ERR("Resetting vni route tables failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socket_id));
 		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
-	for (int i = 0; i < DP_MAX_PORTS; ++i) {
+	DP_FOREACH_PORT(ports, port) {
 		// TODO(plague?): the cast does not seem nice, define a type for VNIs?
-		if (vm_table[i].vm_ready && (int)vm_table[i].vni == vni) {
-			ret = dp_lpm_fill_route_tables(i, &vm_table[i]);
-			if (DP_FAILED(ret))
-				return ret;
-		}
+		if (!port->vm.ready || (int)port->vm.vni != vni)
+			continue;
+		ret = dp_lpm_fill_route_tables(port);
+		if (DP_FAILED(ret))
+			return ret;
 	}
 
 	return DP_GRPC_OK;
 }
 
-int dp_map_vm_handle(const void *key, uint16_t portid)
+int dp_map_vm_handle(const void *key, struct dp_port *port)
 {
 	uint16_t *p_port_id;
 	int ret;
 
 	p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
 	if (!p_port_id) {
-		DPS_LOG_ERR("Cannot allocate VM handle", DP_LOG_PORTID(portid));
+		DPS_LOG_ERR("Cannot allocate VM handle", DP_LOG_PORTID(port->port_id));
 		goto err;
 	}
 
@@ -109,11 +110,11 @@ int dp_map_vm_handle(const void *key, uint16_t portid)
 		goto err_free;
 	}
 
-	rte_memcpy(vm_table[portid].machineid, key, sizeof(vm_table[portid].machineid));
-	*p_port_id = portid;
+	rte_memcpy(port->vm.machineid, key, sizeof(port->vm.machineid));
+	*p_port_id = port->port_id;
 	ret = rte_hash_add_key_data(vm_handle_tbl, key, p_port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORTID(portid), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		goto err_free;
 	}
 	return DP_OK;
@@ -136,6 +137,17 @@ int dp_get_portid_with_vm_handle(const void *key)
 	return *p_port_id;
 }
 
+struct dp_port *dp_get_port_with_vm_handle(const void *key)
+{
+	int port_id;
+
+	port_id = dp_get_portid_with_vm_handle(key);
+	if (DP_FAILED(port_id))
+		return NULL;
+
+	return dp_get_port(port_id);
+}
+
 void dp_del_portid_with_vm_handle(const void *key)
 {
 	uint16_t *p_port_id = NULL;
@@ -155,93 +167,34 @@ const uint8_t *dp_get_gw_ip6(void)
 	return dp_router_gw_ip6;
 }
 
-void dp_set_vm_pxe_str(uint16_t portid, const char *p_str)
+bool dp_arp_cycle_needed(struct dp_port *port)
 {
-	rte_memcpy(vm_table[portid].info.pxe_str, p_str,
-			   sizeof(vm_table[portid].info.pxe_str));
+	return  (port->vm.ready &&
+			(port->vm.info.neigh_mac.addr_bytes[0] == 0) &&
+			(port->vm.info.neigh_mac.addr_bytes[1] == 0) &&
+			(port->vm.info.neigh_mac.addr_bytes[2] == 0) &&
+			(port->vm.info.neigh_mac.addr_bytes[3] == 0) &&
+			(port->vm.info.neigh_mac.addr_bytes[4] == 0) &&
+			(port->vm.info.neigh_mac.addr_bytes[5] == 0));
 }
 
-const char *dp_get_vm_pxe_str(uint16_t portid)
+// TODO inline in dp_vm.c?
+// TODO re-check the use of struct dp_port instead
+const uint8_t *dp_get_port_ul_ip6(uint16_t port_id)
 {
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return (char *)vm_table[portid].info.pxe_str;
+	struct dp_port *port = dp_get_port(port_id);
+
+	return port && port->vm.ready ? port->vm.ul_ipv6 : service_ul_ip;
 }
 
-int dp_get_active_vm_ports(int *act_ports)
-{
-	int i, count = 0;
-
-	for (i = 0; i < DP_MAX_PORTS; i++)
-		if (vm_table[i].vm_ready)
-			act_ports[count++] = i;
-	return count;
-}
-
-bool dp_arp_cycle_needed(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return  (vm_table[portid].vm_ready &&
-			(vm_table[portid].info.neigh_mac.addr_bytes[0] == 0) &&
-			(vm_table[portid].info.neigh_mac.addr_bytes[1] == 0) &&
-			(vm_table[portid].info.neigh_mac.addr_bytes[2] == 0) &&
-			(vm_table[portid].info.neigh_mac.addr_bytes[3] == 0) &&
-			(vm_table[portid].info.neigh_mac.addr_bytes[4] == 0) &&
-			(vm_table[portid].info.neigh_mac.addr_bytes[5] == 0));
-}
-
-uint32_t dp_get_dhcp_range_ip4(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return vm_table[portid].info.own_ip;
-}
-
-const uint8_t *dp_get_dhcp_range_ip6(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return vm_table[portid].info.dhcp_ipv6;
-}
-
-const uint8_t *dp_get_vm_machineid(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return vm_table[portid].machineid;
-}
-
-uint32_t dp_get_vm_vni(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return vm_table[portid].vni;
-}
-
-const uint8_t *dp_get_vm_ip6(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return vm_table[portid].info.vm_ipv6;
-}
-
-const uint8_t *dp_get_vm_ul_ip6(uint16_t portid)
-{
-	return vm_table[portid].ul_ipv6;
-}
-
-const uint8_t *dp_get_port_ul_ip6(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	const struct vm_entry *entry = &vm_table[portid];
-
-	return entry->vm_ready ? entry->ul_ipv6 : service_ul_ip;
-}
-
-int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 const uint8_t *ip6, uint8_t depth, int socketid)
+int dp_add_route(struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
+				 const uint8_t *ip6, uint8_t depth)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	root = dp_get_vni_route4_table(vni, socketid);
+	root = dp_get_vni_route4_table(vni);
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
@@ -254,9 +207,9 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 		return DP_GRPC_ERR_ROUTE_INSERT;
 
 	// can only fail if node is NULL
-	rte_rib_set_nh(node, portid);
+	rte_rib_set_nh(node, port->port_id);
 	/* This is an external route */
-	if (dp_port_is_pf(portid)) {
+	if (port->port_type == DP_PORT_PF) {
 		route = rte_rib_get_ext(node);
 		route->vni = t_vni;
 		rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
@@ -265,15 +218,13 @@ int dp_add_route(uint16_t portid, uint32_t vni, uint32_t t_vni, uint32_t ip,
 	return DP_GRPC_OK;
 }
 
-int dp_del_route(uint16_t portid, uint32_t vni, uint32_t ip, uint8_t depth, int socketid)
+int dp_del_route(struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth)
 {
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;
 
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	root = dp_get_vni_route4_table(vni, socketid);
+	root = dp_get_vni_route4_table(vni);
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
@@ -283,24 +234,28 @@ int dp_del_route(uint16_t portid, uint32_t vni, uint32_t ip, uint8_t depth, int 
 
 	// can only fail if node or next_hop is NULL
 	rte_rib_get_nh(node, &next_hop);
-	if (next_hop != portid)
+	if (next_hop != port->port_id)
 		return DP_GRPC_ERR_ROUTE_BAD_PORT;
 
 	rte_rib_remove(root, ip, depth);
 	return DP_GRPC_OK;
 }
 
-static __rte_always_inline bool dp_route_in_dhcp_range(const struct rte_rib_node *node, uint16_t portid)
+static __rte_always_inline bool dp_route_in_dhcp_range(const struct rte_rib_node *node,
+													   const struct dp_port *port)
 {
 	uint32_t ipv4 = 0;
 	uint8_t depth = 0;
 
+	// both calls only fail when either param is NULL
 	rte_rib_get_ip(node, &ipv4);
 	rte_rib_get_depth(node, &depth);
-	return dp_get_dhcp_range_ip4(portid) == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
+	return port->vm.info.own_ip == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
 }
 
-static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool ext_routes,
+static int dp_list_route_entry(struct rte_rib_node *node,
+							   const struct dp_port *port,
+							   bool ext_routes,
 							   struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *reply;
@@ -313,7 +268,7 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool 
 	rte_rib_get_nh(node, &next_hop);
 
 	if ((ext_routes && dp_port_is_pf(next_hop))
-		|| (!ext_routes && next_hop == portid && !dp_route_in_dhcp_range(node, portid))
+		|| (!ext_routes && next_hop == port->port_id && !dp_route_in_dhcp_range(node, port))
 	) {
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
@@ -336,14 +291,14 @@ static int dp_list_route_entry(struct rte_rib_node *node, uint16_t portid, bool 
 	return DP_GRPC_OK;
 }
 
-int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
+int dp_list_routes(struct dp_port *port, int vni, bool ext_routes,
 				   struct dp_grpc_responder *responder)
 {
 	struct rte_rib_node *node = NULL;
 	struct rte_rib *root;
 	int ret;
 
-	root = dp_get_vni_route4_table(vni, socketid);
+	root = dp_get_vni_route4_table(vni);
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
@@ -351,14 +306,14 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 
 	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
 	if (node) {
-		ret = dp_list_route_entry(node, portid, ext_routes, responder);
+		ret = dp_list_route_entry(node, port, ext_routes, responder);
 		if (DP_FAILED(ret))
 			return ret;
 	}
 
 	node = NULL;  // needed to start rte_rib_get_nxt() traversal
 	while ((node = rte_rib_get_nxt(root, RTE_IPV4(0, 0, 0, 0), 0, node, RTE_RIB_GET_NXT_ALL))) {
-		ret = dp_list_route_entry(node, portid, ext_routes, responder);
+		ret = dp_list_route_entry(node, port, ext_routes, responder);
 		if (DP_FAILED(ret))
 			return ret;
 	}
@@ -366,16 +321,14 @@ int dp_list_routes(int vni, int socketid, uint16_t portid, bool ext_routes,
 	return DP_GRPC_OK;
 }
 
-int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
-				  const uint8_t *ext_ip6, uint8_t depth, int socketid)
+int dp_add_route6(struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
+				  const uint8_t *ext_ip6, uint8_t depth)
 {
 	struct vm_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	root = dp_get_vni_route6_table(vni, socketid);
+	root = dp_get_vni_route6_table(vni);
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
@@ -388,9 +341,9 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, const uint8_t *
 		return DP_GRPC_ERR_ROUTE_INSERT;
 
 	// can only fail if node is NULL
-	rte_rib6_set_nh(node, portid);
+	rte_rib6_set_nh(node, port->port_id);
 	/* This is an external route */
-	if (dp_port_is_pf(portid)) {
+	if (port->port_type == DP_PORT_PF) {
 		route = rte_rib6_get_ext(node);
 		route->vni = t_vni;
 		rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
@@ -399,14 +352,13 @@ int dp_add_route6(uint16_t portid, uint32_t vni, uint32_t t_vni, const uint8_t *
 	return DP_GRPC_OK;
 }
 
-int dp_del_route6(uint16_t portid, uint32_t vni, const uint8_t *ipv6, uint8_t depth, int socketid)
+int dp_del_route6(struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
+	uint64_t next_hop;
 
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-
-	root = dp_get_vni_route6_table(vni, socketid);
+	root = dp_get_vni_route6_table(vni);
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
@@ -414,164 +366,135 @@ int dp_del_route6(uint16_t portid, uint32_t vni, const uint8_t *ipv6, uint8_t de
 	if (!node)
 		return DP_GRPC_ERR_ROUTE_NOT_FOUND;
 
+	// can only fail if node or next_hop is NULL
+	rte_rib6_get_nh(node, &next_hop);
+	if (next_hop != port->port_id)
+		return DP_GRPC_ERR_ROUTE_BAD_PORT;
+
 	rte_rib6_remove(root, ipv6, depth);
 	return DP_GRPC_OK;
 }
 
-void dp_set_dhcp_range_ip4(uint16_t portid, uint32_t ip, uint8_t depth)
+// TODO inline?
+int dp_load_mac(struct dp_port *port)
 {
-	vm_table[portid].info.own_ip = ip;
-	vm_table[portid].info.depth = depth;
+	return rte_eth_macaddr_get(port->port_id, &port->vm.info.own_mac);
 }
 
-void dp_set_vm_pxe_ip4(uint16_t portid, uint32_t ip)
+int dp_setup_vm(struct dp_port *port, int vni)
 {
-	vm_table[portid].info.pxe_ip = ip;
-}
-
-uint32_t dp_get_vm_pxe_ip4(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return vm_table[portid].info.pxe_ip;
-}
-
-void dp_set_dhcp_range_ip6(uint16_t portid, const uint8_t *ipv6, uint8_t depth)
-{
-	rte_memcpy(&vm_table[portid].info.dhcp_ipv6, ipv6, 16);
-	vm_table[portid].info.depth = depth;
-}
-
-void dp_set_vm_ip6(uint16_t portid, const uint8_t *ipv6)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	rte_memcpy(&vm_table[portid].info.vm_ipv6, ipv6, 16);
-}
-
-void dp_set_vm_ul_ip6(uint16_t portid, const uint8_t *ipv6)
-{
-	rte_memcpy(&vm_table[portid].ul_ipv6, ipv6, 16);
-}
-
-void dp_set_mac(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	rte_eth_macaddr_get(portid, &vm_table[portid].info.own_mac);
-}
-
-const struct rte_ether_addr *dp_get_mac(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return &vm_table[portid].info.own_mac;
-}
-
-void dp_set_neigh_mac(uint16_t portid, const struct rte_ether_addr *neigh)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	rte_ether_addr_copy(neigh,  &vm_table[portid].info.neigh_mac);
-}
-
-const struct rte_ether_addr *dp_get_neigh_mac(uint16_t portid)
-{
-	RTE_VERIFY(portid < DP_MAX_PORTS);
-	return &vm_table[portid].info.neigh_mac;
-}
-
-int dp_setup_vm(int port_id, int vni, int socket_id)
-{
-	if (DP_FAILED(dp_create_vni_route_tables(vni, socket_id)))
+	if (DP_FAILED(dp_create_vni_route_tables(vni, port->socket_id)))
 		return DP_ERROR;
 
-	dp_init_firewall_rules_list(port_id);
-	vm_table[port_id].vni = vni;
-	vm_table[port_id].vm_ready = 1;
+	dp_init_firewall_rules_list(port->port_id);
+	port->vm.vni = vni;
+	port->vm.ready = 1;
 	return DP_OK;
 }
 
-int dp_lookup_ip4_route(int port_id, int t_vni, const struct dp_flow *df, int socketid,
-						 struct vm_route *route, uint32_t *route_key, uint64_t *dst_port_id)
+struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
+									int t_vni,
+									const struct dp_flow *df,
+									struct vm_route *route,
+									uint32_t *route_key)
 {
 	uint32_t dst_ip = ntohl(df->dst.dst_addr);
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;
+	struct dp_port *dst_port;
 
-	if (t_vni)
-		root = dp_get_vni_route4_table(t_vni, socketid);
-	else
-		root = dp_get_vni_route4_table(vm_table[port_id].vni, socketid);
+	if (t_vni == 0)
+		t_vni = port->vm.vni;
 
+	root = dp_get_vni_route4_table(t_vni);
 	if (!root)
-		return DP_ERROR;
+		return NULL;
 
 	node = rte_rib_lookup(root, dst_ip);
 	if (!node)
-		return DP_ERROR;
+		return NULL;
 
 	if (DP_FAILED(rte_rib_get_nh(node, &next_hop)))
-		return DP_ERROR;
+		return NULL;
 
-	if (dp_port_is_pf(next_hop))
+	dst_port = dp_get_port(next_hop);
+	if (!dst_port)
+		return NULL;
+
+	if (dst_port->port_type == DP_PORT_PF)
 		*route = *(struct vm_route *)rte_rib_get_ext(node);
 
-	*dst_port_id = next_hop;
 	if (DP_FAILED(rte_rib_get_ip(node, route_key)))
-		return DP_ERROR;
+		return NULL;
 
-	return DP_OK;
+	return dst_port;
 }
 
-int dp_get_ip6_dst_port(int port_id, int t_vni, const struct rte_ipv6_hdr *ipv6_hdr,
-						 struct vm_route *route, int socketid)
+struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
+									int t_vni,
+									const struct rte_ipv6_hdr *ipv6_hdr,
+									struct vm_route *route)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 	uint64_t next_hop;
+	struct dp_port *dst_port;
 
-	if (t_vni)
-		root = dp_get_vni_route6_table(t_vni, socketid);
-	else
-		root = dp_get_vni_route6_table(vm_table[port_id].vni, socketid);
+	if (t_vni == 0)
+		t_vni = port->vm.vni;
 
+	root = dp_get_vni_route6_table(t_vni);
 	if (!root)
-		return DP_ERROR;
+		return NULL;
 
 	node = rte_rib6_lookup(root, ipv6_hdr->dst_addr);
 	if (!node)
-		return DP_ERROR;
+		return NULL;
 
 	if (DP_FAILED(rte_rib6_get_nh(node, &next_hop)))
-		return DP_ERROR;
+		return NULL;
 
-	if (dp_port_is_pf(next_hop))
+	dst_port = dp_get_port(next_hop);
+	if (!dst_port)
+		return NULL;
+
+	if (dst_port->port_type == DP_PORT_PF)
 		*route = *(struct vm_route *)rte_rib6_get_ext(node);
 
-	return next_hop;
+	return dst_port;
 }
 
-void dp_del_vm(int port_id, int socket_id)
+void dp_del_vm(struct dp_port *port)
 {
-	dp_del_route(port_id, vm_table[port_id].vni, vm_table[port_id].info.own_ip, 32, socket_id);
-	dp_del_route6(port_id, vm_table[port_id].vni, vm_table[port_id].info.dhcp_ipv6, 128, socket_id);
+	uint32_t vni = port->vm.vni;
 
-	if (DP_FAILED(dp_delete_vni_route_tables(vm_table[port_id].vni)))
-		DPS_LOG_WARNING("Unable to delete route tables", DP_LOG_VNI(vm_table[port_id].vni));
+	dp_del_route(port, vni, port->vm.info.own_ip, 32);
+	dp_del_route6(port, vni, port->vm.info.dhcp_ipv6, 128);
 
-	dp_del_all_firewall_rules(port_id);
-	memset(&vm_table[port_id], 0, sizeof(vm_table[port_id]));
+	if (DP_FAILED(dp_delete_vni_route_tables(vni)))
+		DPS_LOG_WARNING("Unable to delete route tables", DP_LOG_VNI(vni));
+
+	dp_del_all_firewall_rules(port->port_id);
+	memset(&port->vm, 0, sizeof(port->vm));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
-	dp_set_mac(port_id);
+	dp_load_mac(port);
 }
 
 struct dp_fwall_head *dp_get_fwall_head(int port_id)
 {
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-	return &vm_table[port_id].fwall_head;
+	// TODO temporary fix
+	struct dp_port *port = dp_get_port(port_id);
+
+	return &port->vm.fwall_head;
 }
 
 void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type)
 {
-	RTE_VERIFY(port_id < DP_MAX_PORTS);
-	rte_ether_addr_copy(&vm_table[port_id].info.neigh_mac, &ether_hdr->dst_addr);
-	rte_ether_addr_copy(&vm_table[port_id].info.own_mac, &ether_hdr->src_addr);
+	// TODO temporary fix
+	struct dp_port *port = dp_get_port(port_id);
+
+	rte_ether_addr_copy(&port->vm.info.neigh_mac, &ether_hdr->dst_addr);
+	rte_ether_addr_copy(&port->vm.info.own_mac, &ether_hdr->src_addr);
 	ether_hdr->ether_type = htons(ether_type);
 }

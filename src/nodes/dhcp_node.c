@@ -167,6 +167,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv4_hdr *incoming_ipv4_hdr;
 	struct rte_udp_hdr *incoming_udp_hdr;
 	struct dp_dhcp_header *dhcp_hdr;
+	struct dp_port *port;
 	int options_len, header_size;
 	uint8_t msg_type;
 
@@ -204,6 +205,10 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return DHCP_NEXT_DROP;
 	}
 
+	port = dp_get_port(m->port);
+	if (!port)
+		return DHCP_NEXT_DROP;
+
 	/* rewrite the packet and send it back as a response */
 
 	m->ol_flags = RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
@@ -213,9 +218,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	m->l4_len = sizeof(struct rte_udp_hdr);
 
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
-	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), 6);
+	rte_ether_addr_copy(&port->vm.info.own_mac, &incoming_eth_hdr->src_addr);
 	if (response_type == DHCPACK)
-		dp_set_neigh_mac(m->port, &incoming_eth_hdr->dst_addr);
+		rte_ether_addr_copy(&incoming_eth_hdr->dst_addr, &port->vm.info.neigh_mac);
 
 	incoming_ipv4_hdr->src_addr = server_ip;
 
@@ -224,14 +229,14 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	dhcp_hdr->op = DP_BOOTP_REPLY;
 	dhcp_hdr->magic = dhcp_hdr_magic;
-	dhcp_hdr->yiaddr = htonl(dp_get_dhcp_range_ip4(m->port));
+	dhcp_hdr->yiaddr = htonl(port->vm.info.own_ip);
 	dhcp_hdr->giaddr = server_ip;
 	rte_memcpy(dhcp_hdr->chaddr, incoming_eth_hdr->dst_addr.addr_bytes, 6);
 
 	if (pxe_mode != DP_PXE_MODE_NONE) {
 		memset(&incoming_eth_hdr->dst_addr, ~0, sizeof(incoming_eth_hdr->dst_addr));
 		incoming_ipv4_hdr->dst_addr = 0xFFFFFFFF;
-		pxe_srv_ip = htonl(dp_get_vm_pxe_ip4(m->port));
+		pxe_srv_ip = htonl(port->vm.info.pxe_ip);
 		dhcp_hdr->siaddr = pxe_srv_ip;
 		switch (pxe_mode) {
 		case DP_PXE_MODE_TFTP:
@@ -244,13 +249,13 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				return DHCP_NEXT_DROP;
 			}
 			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
-					"http://", pxe_srv_ip_str, dp_get_vm_pxe_str(m->port));
+					"http://", pxe_srv_ip_str, (char *)port->vm.info.pxe_str);
 			break;
 		case DP_PXE_MODE_NONE:
 			assert(false);
 		}
 	} else {
-		incoming_ipv4_hdr->dst_addr = htonl(dp_get_dhcp_range_ip4(m->port));
+		incoming_ipv4_hdr->dst_addr = htonl(port->vm.info.own_ip);
 		dhcp_hdr->siaddr = server_ip;
 	}
 

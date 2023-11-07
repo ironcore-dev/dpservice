@@ -50,11 +50,11 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, uint16_t portid, bool match_all)
+int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, struct dp_port *port, bool match_all)
 {
 	val->v_type = v_type;
-	val->portid = match_all ? DP_VNF_MATCH_ALL_PORT_ID_VALUE : portid;
-	val->vni = dp_get_vm_vni(portid);
+	val->portid = match_all ? DP_VNF_MATCH_ALL_PORT_ID_VALUE : port->port_id;
+	val->vni = port->vm.vni;
 	return dp_find_vnf_with_value(val);
 }
 

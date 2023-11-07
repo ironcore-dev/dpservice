@@ -1,21 +1,16 @@
-#ifndef _DP_PORT_H_
-#define _DP_PORT_H_
+#ifndef __DP_PORT_H__
+#define __DP_PORT_H__
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/if.h>
 #include <rte_pci.h>
+#include "dpdk_layer.h"
+#include "dp_lpm.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// strangely this is never done by DPDK in general, only in specific headers
-#define DP_INVALID_PORT_ID UINT16_MAX
-
-#define DP_MAX_PF_PORTS 2
-#define DP_MAX_VF_PORTS 126
-#define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS)
 
 enum dp_port_type {
 	DP_PORT_PF,
@@ -33,6 +28,7 @@ struct dp_port {
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
 	bool							attached;
+	struct vm_entry					vm;
 	struct rte_flow					*default_jump_flow;
 	struct rte_flow					*default_capture_flow;
 	bool							captured;

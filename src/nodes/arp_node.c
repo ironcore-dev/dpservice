@@ -34,11 +34,16 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	rte_be32_t requested_ip = incoming_arp_hdr->arp_data.arp_tip;
 	rte_be32_t sender_ip = incoming_arp_hdr->arp_data.arp_sip;
 	struct rte_ether_addr tmp_addr;
+	struct dp_port *port;
 	uint32_t temp_ip;
 
+	port = dp_get_port(m->port);
+	if (!port)
+		return false;
+
 	// ARP reply from VM
-	if (dp_arp_cycle_needed(m->port) && sender_ip == htonl(dp_get_dhcp_range_ip4(m->port))) {
-		dp_set_neigh_mac(m->port, &incoming_eth_hdr->src_addr);
+	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->vm.info.own_ip)) {
+		rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &port->vm.info.neigh_mac);
 		return true;
 	}
 
@@ -48,14 +53,15 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 
 	// respond back to origin address from this address (reuse the packet)
 	rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->dst_addr);
-	rte_memcpy(incoming_eth_hdr->src_addr.addr_bytes, dp_get_mac(m->port), RTE_ETHER_ADDR_LEN);
-	incoming_arp_hdr->arp_opcode = htons(DP_ARP_REPLY);
-	rte_memcpy(tmp_addr.addr_bytes, incoming_arp_hdr->arp_data.arp_sha.addr_bytes, RTE_ETHER_ADDR_LEN);
-	rte_memcpy(incoming_arp_hdr->arp_data.arp_sha.addr_bytes, dp_get_mac(m->port), RTE_ETHER_ADDR_LEN);
+	rte_ether_addr_copy(&port->vm.info.own_mac, &incoming_eth_hdr->src_addr);
+	rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &tmp_addr);
+	rte_ether_addr_copy(&port->vm.info.own_mac, &incoming_arp_hdr->arp_data.arp_sha);
+	rte_ether_addr_copy(&tmp_addr, &incoming_arp_hdr->arp_data.arp_tha);
 	temp_ip = incoming_arp_hdr->arp_data.arp_sip;
 	incoming_arp_hdr->arp_data.arp_sip = incoming_arp_hdr->arp_data.arp_tip;
 	incoming_arp_hdr->arp_data.arp_tip = temp_ip;
-	rte_ether_addr_copy(&tmp_addr, &incoming_arp_hdr->arp_data.arp_tha);
+	incoming_arp_hdr->arp_opcode = htons(DP_ARP_REPLY);
+
 	return true;
 }
 

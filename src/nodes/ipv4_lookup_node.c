@@ -24,27 +24,27 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct vm_route route;
 	uint32_t route_key = 0;
-	uint64_t dst_port_id;
-	bool nxt_hop_is_pf;
+	struct dp_port *port;
+	struct dp_port *dst_port;
 
 	// TODO: add broadcast routes when machine is added
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	if (DP_FAILED(dp_lookup_ip4_route(m->port, df->tun_info.dst_vni, df,
-									  rte_eth_dev_socket_id(m->port),
-									  &route, &route_key, &dst_port_id)))
+	port = dp_get_port(m->port);
+	if (unlikely(!port))
 		return IPV4_LOOKUP_NEXT_DROP;
 
-	df->nxt_hop = (uint8_t)dst_port_id;
-	nxt_hop_is_pf = dp_port_is_pf(df->nxt_hop);
+	dst_port = dp_get_ip4_dst_port(port, df->tun_info.dst_vni, df, &route, &route_key);
+	if (!dst_port)
+		return IPV4_LOOKUP_NEXT_DROP;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (nxt_hop_is_pf)
+		if (dst_port->port_type == DP_PORT_PF)
 			return IPV4_LOOKUP_NEXT_DROP;
 	} else {
 		df->tun_info.dst_vni = route.vni;
-		if (nxt_hop_is_pf) {
+		if (dst_port->port_type == DP_PORT_PF) {
 			rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
 			df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		}
@@ -56,20 +56,19 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL || df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (!nxt_hop_is_pf && !dp_is_vf_attached(df->nxt_hop))
+		if (dst_port->port_type == DP_PORT_VF && !dst_port->attached)
 			return IPV4_LOOKUP_NEXT_DROP;
 	}
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
-		df->nxt_hop = dp_multipath_get_pf_id(df->dp_flow_hash);
-		nxt_hop_is_pf = true;
-	}
+	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+		dst_port = dp_multipath_get_pf(df->dp_flow_hash);
 
 	// next hop is known, fill in Ether header
 	// (PF egress goes through a tunnel that destroys Ether header)
-	if (!nxt_hop_is_pf)
-		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), df->nxt_hop, RTE_ETHER_TYPE_IPV4);
+	if (dst_port->port_type == DP_PORT_VF)
+		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port->port_id, RTE_ETHER_TYPE_IPV4);
 
+	df->nxt_hop = dst_port->port_id;
 	return IPV4_LOOKUP_NEXT_NAT;
 }
 

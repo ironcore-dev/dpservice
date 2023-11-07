@@ -22,8 +22,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	struct vm_route route;
+	struct dp_port *port;
+	struct dp_port *dst_port;
 	int t_vni;
-	int dst_port;
 
 	t_vni = df->flags.flow_type == DP_FLOW_TYPE_INCOMING
 		? df->tun_info.dst_vni
@@ -38,18 +39,26 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
-	dst_port = dp_get_ip6_dst_port(m->port, t_vni, ipv6_hdr, &route, rte_eth_dev_socket_id(m->port));
-	if (DP_FAILED(dst_port))
+	port = dp_get_port(m->port);
+	if (unlikely(!port))
 		return IPV6_LOOKUP_NEXT_DROP;
 
-	df->nxt_hop = dst_port;
+	dst_port = dp_get_ip6_dst_port(port, t_vni, ipv6_hdr, &route);
+	if (!dst_port)
+		return IPV6_LOOKUP_NEXT_DROP;
+
+	df->nxt_hop = dst_port->port_id;
 
 	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df->tun_info.dst_vni = route.vni;
 
-	if (dp_port_is_pf(df->nxt_hop)) {
+	if (dst_port->port_type == DP_PORT_PF) {
 		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
 		df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
+	} else {
+		// next hop is known, fill in Ether header
+		// (PF egress goes through a tunnel that destroys Ether header)
+		dp_fill_ether_hdr(ether_hdr, dst_port->port_id, RTE_ETHER_TYPE_IPV6);
 	}
 
 	if (!df->flags.flow_type)
@@ -57,11 +66,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (dp_conf_is_offload_enabled())
 		df->flags.offload_ipv6 = 1;
-
-	// next hop is known, fill in Ether header
-	// (PF egress goes through a tunnel that destroys Ether header)
-	if (!dp_port_is_pf(dst_port))
-		dp_fill_ether_hdr(ether_hdr, dst_port, RTE_ETHER_TYPE_IPV6);
 
 	return IPV6_LOOKUP_NEXT_FIREWALL;
 }

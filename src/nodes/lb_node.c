@@ -32,6 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
 	struct flow_key *flow_key;
+	struct dp_port *port;
 	uint32_t dst_ip, vni;
 	uint8_t *target_ip6;
 
@@ -39,7 +40,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return LB_NEXT_DNAT;
 
 	dst_ip = ntohl(df->dst.dst_addr);
-	vni = df->tun_info.dst_vni == 0 ? dp_get_vm_vni(m->port) : df->tun_info.dst_vni;
+	vni = df->tun_info.dst_vni;
+	if (vni == 0) {
+		port = dp_get_port(m->port);
+		// TODO: mention this in the PR
+		if (!port)
+			return LB_NEXT_DROP;
+		vni = port->vm.vni;
+	}
 
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status)
 		&& df->flags.dir == DP_FLOW_DIR_ORG

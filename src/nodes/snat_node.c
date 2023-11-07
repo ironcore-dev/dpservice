@@ -22,6 +22,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ipv4_hdr *ipv4_hdr;
 	uint32_t src_ip;
 	struct snat_data *snat_data;
+	struct dp_port *port;
 	uint16_t nat_port;
 	uint32_t vni;
 	int ret;
@@ -30,8 +31,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return SNAT_NEXT_FIREWALL;
 
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
+		port = dp_get_port(m->port);
+		if (!port)
+			return SNAT_NEXT_DROP;
+
 		src_ip = ntohl(df->src.src_addr);
-		vni = dp_get_vm_vni(m->port);
+		vni = port->vm.vni;
 		snat_data = dp_get_vm_snat_data(src_ip, vni);
 
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->network_nat_ip != 0)
@@ -49,7 +54,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				nat_port = (uint16_t)ret;
 				ipv4_hdr->src_addr = htonl(snat_data->network_nat_ip);
 
-				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);
+				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);  // TODO use port
 
 				if (df->l4_type == DP_IP_PROTO_ICMP) {
 					dp_change_icmp_identifier(m, nat_port);

@@ -4,6 +4,7 @@
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_periodic_msg.h"
+#include "dp_port.h"
 #include "nodes/arp_node.h"
 #include "nodes/ipv6_nd_node.h"
 
@@ -35,14 +36,14 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 		clone_buf->port = port->port_id;
 		eth_hdr = rte_pktmbuf_mtod(clone_buf, struct rte_ether_hdr *);
 
-		mac = dp_get_mac(clone_buf->port);
+		mac = &port->vm.info.own_mac;
 		rte_ether_addr_copy(mac, &eth_hdr->src_addr);
 
 		if (eth_type == RTE_ETHER_TYPE_ARP) {
 			arp_hdr = (struct rte_arp_hdr *)(eth_hdr + 1);
-			rte_memcpy(arp_hdr->arp_data.arp_sha.addr_bytes, mac, RTE_ETHER_ADDR_LEN);
-			if (dp_arp_cycle_needed(clone_buf->port))
-				arp_hdr->arp_data.arp_tip = htonl(dp_get_dhcp_range_ip4(clone_buf->port));
+			rte_ether_addr_copy(mac, &arp_hdr->arp_data.arp_sha);
+			if (dp_arp_cycle_needed(port))
+				arp_hdr->arp_data.arp_tip = htonl(port->vm.info.own_ip);
 		}
 
 		dp_init_pkt_mark(clone_buf);
