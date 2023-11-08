@@ -185,5 +185,6 @@ CREATE_CALLCLASS(ResetVni, SingleReplyCall);
 
 CREATE_CALLCLASS(CaptureStart, SingleReplyCall);
 CREATE_CALLCLASS(CaptureStop, SingleReplyCall);
+CREATE_CALLCLASS(CaptureStatus, SingleReplyCall);
 
 #endif

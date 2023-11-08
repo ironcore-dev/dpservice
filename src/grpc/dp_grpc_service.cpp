@@ -117,6 +117,7 @@ void GRPCService::HandleRpcs()
 	new GetVersionCall();
 	new CaptureStartCall();
 	new CaptureStopCall();
+	new CaptureStatusCall();
 
 	while (cq_->Next(&tag, &ok) && ok) {
 		call = static_cast<BaseCall*>(tag);

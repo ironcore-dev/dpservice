@@ -947,6 +947,43 @@ static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
+static int dp_process_capture_get_status(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_capture *reply = dp_grpc_single_reply(responder);
+	struct dp_ports *ports = get_dp_ports();
+	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
+	int count = 0;
+
+	reply->is_active = dp_is_capture_enabled();
+
+	if (reply->is_active) {
+		DP_FOREACH_PORT(ports, port) {
+			if (port->allocated && port->captured) {
+				if (port->port_type == DP_PORT_PF) {
+					reply->interfaces[count].type = DP_CAPTURE_IFACE_TYPE_SINGLE_PF;
+					reply->interfaces[count].spec.pf_index = port->port_id == dp_port_get_pf0_id() ? 0 : 1;
+				} else {
+					reply->interfaces[count].type = DP_CAPTURE_IFACE_TYPE_SINGLE_VF;
+					memcpy(reply->interfaces[count].spec.iface_id, dp_get_vm_machineid(port->port_id), sizeof(port->port_name));
+				}
+				count++;
+			}
+			// it shouldnot never happen, but just in case
+			if (count >= DP_CAPTURE_MAX_PORT_NUM) {
+				DPS_LOG_ERR("Unexpected too many interfaces are captured");
+				return DP_GRPC_ERR_LIMIT_REACHED;
+			}
+		}
+	}
+
+	memcpy(reply->dst_addr6, capture_hdr_config->capture_node_ipv6_addr, sizeof(reply->dst_addr6));
+	reply->udp_src_port = capture_hdr_config->capture_udp_src_port;
+	reply->udp_dst_port = capture_hdr_config->capture_udp_dst_port;
+	reply->interface_count = count;
+
+	return DP_GRPC_OK;
+}
+
 
 void dp_process_request(struct rte_mbuf *m)
 {
@@ -1073,6 +1110,9 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_CaptureStop:
 		ret = dp_process_capture_stop(&responder);
+		break;
+	case DP_REQ_TYPE_CaptureStatus:
+		ret = dp_process_capture_get_status(&responder);
 		break;
 	// DP_REQ_TYPE_CheckInitialized is handled by the gRPC thread
 	default:

@@ -46,6 +46,12 @@ The following command is used to stop capturing on all configured interfaces. No
 /bin/dpservice-cli capture stop
 ```
 
+or before you start capturing, it is also recommended to check the operation status of this capturing feature by using:
+```
+/bin/dpservice-cli capture status
+```
+The returned values incude this feature's operation status, as well as the configuration information using the "capture start" subcommand.
+
 ## How offloaded packets are captured
 Offloaded packets are captured by using special rte flow rules, especially the one that enables packet sampling on the RX side of an interface. The captured packets are encapsulated by prepending extra headers. Despite the fact that captured Ethernet frames are treated as UDP payload, it is flexible to use other customized headers as well. The format of encapsulation is as follows:
 
