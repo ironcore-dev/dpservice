@@ -498,6 +498,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	port->vm.info.depth = DP_LPM_DHCP_IP_DEPTH;
 	rte_memcpy(port->vm.info.dhcp_ipv6, request->ip6_addr, sizeof(port->vm.info.dhcp_ipv6));
 	port->vm.info.depth = DP_LPM_DHCP_IP6_DEPTH;
+	static_assert(sizeof(request->pxe_str) == sizeof(port->vm.info.pxe_str), "Incompatible VM PXE size");
 	rte_memcpy(port->vm.info.pxe_str, request->pxe_str, sizeof(port->vm.info.pxe_str));
 	port->vm.info.pxe_ip = request->ip4_pxe_addr;
 
@@ -573,6 +574,7 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	reply->ip4_addr = port->vm.info.own_ip;
 	rte_memcpy(reply->ip6_addr, port->vm.info.dhcp_ipv6, sizeof(reply->ip6_addr));
 	reply->vni = port->vm.vni;
+	static_assert(sizeof(reply->iface_id) == sizeof(port->vm.machineid), "Incompatible VM ID size");
 	rte_memcpy(reply->iface_id, port->vm.machineid, sizeof(reply->iface_id));
 	rte_eth_dev_get_name_by_port(port->port_id, reply->pci_name);
 	rte_memcpy(reply->ul_addr6, port->vm.ul_ipv6, sizeof(reply->ul_addr6));
@@ -777,6 +779,7 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		reply->ip4_addr = port->vm.info.own_ip;
 		rte_memcpy(reply->ip6_addr, port->vm.info.dhcp_ipv6, sizeof(reply->ip6_addr));
 		reply->vni = port->vm.vni;
+		static_assert(sizeof(reply->iface_id) == sizeof(port->vm.machineid), "Incompatible VM ID size");
 		rte_memcpy(reply->iface_id, port->vm.machineid, sizeof(reply->iface_id));
 		// TODO isn't this already present?
 		rte_eth_dev_get_name_by_port(port->port_id, reply->pci_name);

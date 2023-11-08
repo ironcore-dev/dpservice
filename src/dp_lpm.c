@@ -90,8 +90,7 @@ int dp_lpm_reset_route_tables(int vni, int socket_id)
 	return DP_GRPC_OK;
 }
 
-// TODO strlen?
-int dp_map_vm_handle(const void *key, struct dp_port *port)
+int dp_map_vm_handle(const char key[VM_IFACE_ID_MAX_LEN], struct dp_port *port)
 {
 	hash_sig_t hash = rte_hash_hash(vm_handle_tbl, key);
 	int ret;
@@ -111,8 +110,9 @@ int dp_map_vm_handle(const void *key, struct dp_port *port)
 		return DP_ERROR;
 	}
 
-	// TODO len
-	rte_memcpy(port->vm.machineid, key, sizeof(port->vm.machineid));
+	static_assert(sizeof(port->vm.machineid) == VM_IFACE_ID_MAX_LEN, "Incompatible VM ID size");
+	rte_memcpy(port->vm.machineid, key, VM_IFACE_ID_MAX_LEN);
+
 	return DP_OK;
 }
 
@@ -459,14 +459,6 @@ void dp_del_vm(struct dp_port *port)
 	memset(&port->vm, 0, sizeof(port->vm));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
 	dp_load_mac(port);
-}
-
-struct dp_fwall_head *dp_get_fwall_head(int port_id)
-{
-	// TODO temporary fix
-	struct dp_port *port = dp_get_port(port_id);
-
-	return &port->vm.fwall_head;
 }
 
 void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type)

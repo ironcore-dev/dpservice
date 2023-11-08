@@ -249,7 +249,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				return DHCP_NEXT_DROP;
 			}
 			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
-					"http://", pxe_srv_ip_str, (char *)port->vm.info.pxe_str);
+					"http://", pxe_srv_ip_str, port->vm.info.pxe_str);
 			break;
 		case DP_PXE_MODE_NONE:
 			assert(false);

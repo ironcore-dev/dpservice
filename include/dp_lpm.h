@@ -46,16 +46,16 @@ struct macip_entry {
 	uint8_t		dhcp_ipv6[16];
 	uint8_t		vm_ipv6[16];
 	uint32_t	pxe_ip;
-	uint8_t		pxe_str[VM_MACHINE_PXE_MAX_LEN];
+	char		pxe_str[VM_MACHINE_PXE_MAX_LEN];
 };
 
 struct vm_entry {
 	struct dp_fwall_head	fwall_head;
 	struct macip_entry		info;
 	uint32_t				vni;
-	uint8_t					machineid[VM_IFACE_ID_MAX_LEN];
+	char					machineid[VM_IFACE_ID_MAX_LEN];
 	uint8_t					ul_ipv6[16];
-	uint8_t					ready;
+	bool					ready;
 };
 
 struct vm_route {
@@ -80,7 +80,7 @@ struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 int dp_lpm_init(int socket_id);
 void dp_lpm_free(void);
 
-int dp_map_vm_handle(const void *key, struct dp_port *port);
+int dp_map_vm_handle(const char key[VM_IFACE_ID_MAX_LEN], struct dp_port *port);
 void dp_unmap_vm_handle(const void *key);
 struct dp_port *dp_get_port_with_vm_handle(const void *key);
 
@@ -105,8 +105,6 @@ int dp_list_routes(struct dp_port *port, int vni, bool ext_routes, struct dp_grp
 
 int dp_lpm_reset_all_route_tables(int socket_id);
 int dp_lpm_reset_route_tables(int vni, int socket_id);
-
-struct dp_fwall_head *dp_get_fwall_head(int port_id);
 
 void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type);
 
