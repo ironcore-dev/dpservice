@@ -23,14 +23,24 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
+	struct dp_port *src_port;
+	struct dp_port *dst_port;
 	enum dp_fwall_action action;
+
+	src_port = dp_get_port(m->port);
+	if (!src_port)
+		return FIREWALL_NEXT_DROP;
+
+	dst_port = dp_get_port(df->nxt_hop);
+	if (!dst_port)
+		return FIREWALL_NEXT_DROP;
 
 	// currently only IPv4 firewall is implemented
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4 && cntrack) {
 		if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status)) {
 			action = (enum dp_fwall_action)cntrack->fwall_action[df->flags.dir];
 		} else if (df->flags.dir == DP_FLOW_DIR_ORG) {
-			action = dp_get_firewall_action(m);
+			action = dp_get_firewall_action(df, src_port, dst_port);
 			cntrack->fwall_action[DP_FLOW_DIR_ORG] = (uint8_t)action;
 			cntrack->fwall_action[DP_FLOW_DIR_REPLY] = (uint8_t)action;
 			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_FIREWALL;
@@ -41,10 +51,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// 	return FIREWALL_NEXT_DROP;
 	}
 
-	if (dp_port_is_pf(df->nxt_hop))
+	if (dst_port->port_type == DP_PORT_PF)
 		return FIREWALL_NEXT_IPIP_ENCAP;
 
-	return next_tx_index[df->nxt_hop];
+	return next_tx_index[dst_port->port_id];
 }
 
 static uint16_t firewall_node_process(struct rte_graph *graph,

@@ -90,71 +90,50 @@ int dp_lpm_reset_route_tables(int vni, int socket_id)
 	return DP_GRPC_OK;
 }
 
+// TODO strlen?
 int dp_map_vm_handle(const void *key, struct dp_port *port)
 {
-	uint16_t *p_port_id;
+	hash_sig_t hash = rte_hash_hash(vm_handle_tbl, key);
 	int ret;
 
-	p_port_id = rte_zmalloc("vm_handle_mapping", sizeof(uint16_t), RTE_CACHE_LINE_SIZE);
-	if (!p_port_id) {
-		DPS_LOG_ERR("Cannot allocate VM handle", DP_LOG_PORTID(port->port_id));
-		goto err;
-	}
-
-	ret = rte_hash_lookup(vm_handle_tbl, key);
+	ret = rte_hash_lookup_with_hash(vm_handle_tbl, key, hash);
 	if (ret != -ENOENT) {
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("VM handle lookup failed", DP_LOG_RET(ret));
 		else
 			DPS_LOG_ERR("VM handle already exists");
-		goto err_free;
+		return DP_ERROR;
 	}
 
-	rte_memcpy(port->vm.machineid, key, sizeof(port->vm.machineid));
-	*p_port_id = port->port_id;
-	ret = rte_hash_add_key_data(vm_handle_tbl, key, p_port_id);
+	ret = rte_hash_add_key_with_hash_data(vm_handle_tbl, key, hash, port);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
-		goto err_free;
+		return DP_ERROR;
 	}
-	return DP_OK;
 
-err_free:
-	rte_free(p_port_id);
-err:
-	return DP_ERROR;
+	// TODO len
+	rte_memcpy(port->vm.machineid, key, sizeof(port->vm.machineid));
+	return DP_OK;
 }
 
-int dp_get_portid_with_vm_handle(const void *key)
+void dp_unmap_vm_handle(const void *key)
 {
-	uint16_t *p_port_id;
-	int ret;
-
-	ret = rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id);
-	if (DP_FAILED(ret))
-		return ret;
-
-	return *p_port_id;
+	rte_hash_del_key(vm_handle_tbl, key);
 }
 
 struct dp_port *dp_get_port_with_vm_handle(const void *key)
 {
-	int port_id;
+	struct dp_port *port;
+	int ret;
 
-	port_id = dp_get_portid_with_vm_handle(key);
-	if (DP_FAILED(port_id))
+	ret = rte_hash_lookup_data(vm_handle_tbl, key, (void **)&port);
+	if (DP_FAILED(ret)) {
+		if (ret != -ENOENT)
+			DPS_LOG_ERR("Failed to look the VM port-id up", DP_LOG_RET(ret));
 		return NULL;
+	}
 
-	return dp_get_port(port_id);
-}
-
-void dp_del_portid_with_vm_handle(const void *key)
-{
-	uint16_t *p_port_id = NULL;
-
-	rte_hash_lookup_data(vm_handle_tbl, key, (void **)&p_port_id);
-	rte_free(p_port_id);
-	rte_hash_del_key(vm_handle_tbl, key);
+	return port;
 }
 
 uint32_t dp_get_gw_ip4(void)
@@ -386,7 +365,7 @@ int dp_setup_vm(struct dp_port *port, int vni)
 	if (DP_FAILED(dp_create_vni_route_tables(vni, port->socket_id)))
 		return DP_ERROR;
 
-	dp_init_firewall_rules_list(port->port_id);
+	dp_init_firewall_rules(port);
 	port->vm.vni = vni;
 	port->vm.ready = 1;
 	return DP_OK;
@@ -475,7 +454,8 @@ void dp_del_vm(struct dp_port *port)
 	if (DP_FAILED(dp_delete_vni_route_tables(vni)))
 		DPS_LOG_WARNING("Unable to delete route tables", DP_LOG_VNI(vni));
 
-	dp_del_all_firewall_rules(port->port_id);
+	dp_del_all_firewall_rules(port);
+
 	memset(&port->vm, 0, sizeof(port->vm));
 	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
 	dp_load_mac(port);

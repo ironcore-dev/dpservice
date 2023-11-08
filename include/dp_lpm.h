@@ -50,7 +50,7 @@ struct macip_entry {
 };
 
 struct vm_entry {
-	struct dp_fwall_head	fwall_head;  // TODO(think over) mvoe this to port itself?
+	struct dp_fwall_head	fwall_head;
 	struct macip_entry		info;
 	uint32_t				vni;
 	uint8_t					machineid[VM_IFACE_ID_MAX_LEN];
@@ -58,13 +58,13 @@ struct vm_entry {
 	uint8_t					ready;
 };
 
-// TODO
-struct dp_port;
-
 struct vm_route {
 	int		vni;
 	uint8_t	nh_ipv6[16];
 };
+
+// forward declaraction because 'struct vm_entry' is a part of 'struct dp_port'
+struct dp_port;
 
 struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 									int t_vni,
@@ -81,9 +81,8 @@ int dp_lpm_init(int socket_id);
 void dp_lpm_free(void);
 
 int dp_map_vm_handle(const void *key, struct dp_port *port);
-int dp_get_portid_with_vm_handle(const void *key);
+void dp_unmap_vm_handle(const void *key);
 struct dp_port *dp_get_port_with_vm_handle(const void *key);
-void dp_del_portid_with_vm_handle(const void *key);
 
 uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);

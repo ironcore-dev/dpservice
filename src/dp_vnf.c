@@ -155,7 +155,7 @@ int dp_del_vnf_with_value(const struct dp_vnf_value *val)
 	return delete_count > 0 ? DP_GRPC_OK : DP_GRPC_ERR_NOT_FOUND;
 }
 
-int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_grpc_responder *responder)
+int dp_list_vnf_alias_routes(uint16_t port_id, enum vnf_type v_type, struct dp_grpc_responder *responder)
 {
 	const void *key;
 	struct dp_vnf_value *data;
@@ -174,7 +174,7 @@ int dp_list_vnf_alias_routes(uint16_t portid, enum vnf_type v_type, struct dp_gr
 			return DP_GRPC_ERR_ITERATOR;
 		}
 
-		if (portid != data->portid || data->v_type != v_type)
+		if (port_id != data->portid || data->v_type != v_type)
 			continue;
 
 		reply = dp_grpc_add_reply(responder);

@@ -55,11 +55,11 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 }
 
 static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
-							   int vni, uint16_t portid, uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
+							   int vni, uint16_t port_id, uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	dp_generate_underlay_ipv6(ul_addr6);
 	val->v_type = v_type;
-	val->portid = portid;
+	val->portid = port_id;
 	val->vni = vni;
 	return dp_set_vnf_value((void *)ul_addr6, val);
 }
@@ -184,19 +184,19 @@ static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
 static int dp_process_create_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_fwrule *request = &responder->request.add_fwrule;
-	int port_id;
+	struct dp_port *port;
 
-	port_id = dp_get_portid_with_vm_handle(request->iface_id);
-	if (DP_FAILED(port_id))
+	port = dp_get_port_with_vm_handle(request->iface_id);
+	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	if (dp_get_firewall_rule(request->rule.rule_id, port_id))
+	if (dp_get_firewall_rule(request->rule.rule_id, port))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	if (request->rule.action == DP_FWALL_DROP)
 		return DP_GRPC_ERR_NO_DROP_SUPPORT;
 
-	if (DP_FAILED(dp_add_firewall_rule(&request->rule, port_id)))
+	if (DP_FAILED(dp_add_firewall_rule(&request->rule, port)))
 		return DP_GRPC_ERR_OUT_OF_MEMORY;
 
 	return DP_GRPC_OK;
@@ -207,14 +207,14 @@ static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 	struct dpgrpc_fwrule_id *request = &responder->request.get_fwrule;
 	struct dpgrpc_fwrule_info *reply = dp_grpc_single_reply(responder);
 
-	int port_id;
+	struct dp_port *port;
 	struct dp_fwall_rule *rule;
 
-	port_id = dp_get_portid_with_vm_handle(request->iface_id);
-	if (DP_FAILED(port_id))
+	port = dp_get_port_with_vm_handle(request->iface_id);
+	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	rule = dp_get_firewall_rule(request->rule_id, port_id);
+	rule = dp_get_firewall_rule(request->rule_id, port);
 	if (!rule)
 		return DP_GRPC_ERR_NOT_FOUND;
 
@@ -225,13 +225,13 @@ static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 static int dp_process_delete_fwrule(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_fwrule_id *request = &responder->request.del_fwrule;
-	int port_id;
+	struct dp_port *port;
 
-	port_id = dp_get_portid_with_vm_handle(request->iface_id);
-	if (DP_FAILED(port_id))
+	port = dp_get_port_with_vm_handle(request->iface_id);
+	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	if (DP_FAILED(dp_delete_firewall_rule(request->rule_id, port_id)))
+	if (DP_FAILED(dp_delete_firewall_rule(request->rule_id, port)))
 		return DP_GRPC_ERR_NOT_FOUND;
 
 	return DP_GRPC_OK;
@@ -523,7 +523,7 @@ route_err:
 vm_err:
 	dp_del_vm(port);
 handle_err:
-	dp_del_portid_with_vm_handle(request->iface_id);
+	dp_unmap_vm_handle(request->iface_id);
 err_vnf:
 	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
@@ -550,7 +550,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	if (DP_FAILED(dp_port_stop(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
-	dp_del_portid_with_vm_handle(request->iface_id);
+	dp_unmap_vm_handle(request->iface_id);
 	dp_del_vm(port);
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_del_vm(port->port_id);
@@ -799,35 +799,35 @@ static int dp_process_list_lbtargets(struct dp_grpc_responder *responder)
 
 static int dp_process_list_fwrules(struct dp_grpc_responder *responder)
 {
-	int port_id;
+	struct dp_port *port;
 
-	port_id = dp_get_portid_with_vm_handle(responder->request.list_fwrule.iface_id);
-	if (DP_FAILED(port_id))
+	port = dp_get_port_with_vm_handle(responder->request.list_fwrule.iface_id);
+	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	return dp_list_firewall_rules(port_id, responder);
+	return dp_list_firewall_rules(port, responder);
 }
 
 static int dp_process_list_lbprefixes(struct dp_grpc_responder *responder)
 {
-	int port_id;
+	struct dp_port *port;
 
-	port_id = dp_get_portid_with_vm_handle(responder->request.list_lbpfx.iface_id);
-	if (DP_FAILED(port_id))
+	port = dp_get_port_with_vm_handle(responder->request.list_lbpfx.iface_id);
+	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	return dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_LB_ALIAS_PFX, responder);
+	return dp_list_vnf_alias_routes(port->port_id, DP_VNF_TYPE_LB_ALIAS_PFX, responder);
 }
 
 static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 {
-	int port_id;
+	struct dp_port *port;
 
-	port_id = dp_get_portid_with_vm_handle(responder->request.list_pfx.iface_id);
-	if (DP_FAILED(port_id))
+	port = dp_get_port_with_vm_handle(responder->request.list_pfx.iface_id);
+	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	return dp_list_vnf_alias_routes(port_id, DP_VNF_TYPE_ALIAS_PFX, responder);
+	return dp_list_vnf_alias_routes(port->port_id, DP_VNF_TYPE_ALIAS_PFX, responder);
 }
 
 static int dp_process_list_localnats(struct dp_grpc_responder *responder)
