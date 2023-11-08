@@ -518,6 +518,14 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct flow_age_ctx *agectx;
 	struct rte_flow_action *age_action;
 	rte_be32_t actual_ol_ipv4_dst_addr;
+	struct dp_port *incoming_port;
+	const struct rte_flow_attr *attr;
+
+	incoming_port = dp_port_get(m->port);
+	if (!incoming_port) {
+		DPS_LOG_ERR("Port not registered in service", DP_LOG_PORTID(m->port));
+		return DP_ERROR;
+	}
 
 	// create local flow match pattern
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
@@ -566,7 +574,12 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 
 	dp_set_end_action(&actions[action_cnt++]);
 
-	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, &dp_flow_attr_transfer_single_stage,
+	if (incoming_port->captured)
+			attr = &dp_flow_attr_transfer_multi_stage;
+		else
+			attr = &dp_flow_attr_transfer_single_stage;
+
+	if (DP_FAILED(dp_install_rte_flow_with_indirect(m->port, attr,
 													pattern, actions,
 													age_action, df, agectx))
 	) {
