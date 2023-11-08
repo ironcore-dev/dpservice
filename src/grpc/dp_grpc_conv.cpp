@@ -124,6 +124,20 @@ bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dp
 	}
 }
 
+bool DpCaptureInterfaceTypeToGrpc(CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type dp_capture_iface_type)
+{
+	switch (dp_capture_iface_type) {
+	case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
+		grpc_type = CaptureInterfaceType::SINGLE_PF;
+		return true;
+	case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
+		grpc_type = CaptureInterfaceType::SINGLE_VF;
+		return true;
+	default:
+		return false;
+	}
+}
+
 const char *Ipv4ToStr(uint32_t ipv4)
 {
 	struct in_addr addr = {

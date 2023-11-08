@@ -57,6 +57,7 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_ResetVni,
 	DP_REQ_TYPE_CaptureStart,
 	DP_REQ_TYPE_CaptureStop,
+	DP_REQ_TYPE_CaptureStatus,
 };
 
 // in sync with dpdk proto!
@@ -182,6 +183,7 @@ struct dpgrpc_capture {
 	uint32_t		udp_src_port;
 	uint32_t		udp_dst_port;
 	struct dpgrpc_capture_interface interfaces[DP_CAPTURE_MAX_PORT_NUM];
+	bool			is_active;
 };
 
 struct dpgrpc_capture_stop {
@@ -265,6 +267,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_vni_in_use	vni_in_use;
 		struct dpgrpc_versions		versions;
 		struct dpgrpc_capture_stop	capture_stop;
+		struct dpgrpc_capture		capture_get;
 	};
 };
 

@@ -532,17 +532,22 @@ message DeleteFirewallRuleResponse {
 
 message CapturedInterface {
 	CaptureInterfaceType interface_type = 1;
+	bytes filter =  2;
 	oneof spec {
-		bytes vf_name = 2;
-		uint32 pf_index = 3;
+		bytes vf_name = 3;
+		uint32 pf_index = 4;
 	}
 }
 
-message CaptureStartRequest {
+message CaptureConfig {
 	IpAddress sink_node_ip = 1;
 	uint32 udp_src_port = 2;
 	uint32 udp_dst_port = 3;
 	repeated CapturedInterface interfaces = 4;
+}
+
+message CaptureStartRequest {
+	CaptureConfig capture_config = 1;
 }
 
 message CaptureStartResponse {
@@ -555,6 +560,15 @@ message CaptureStopRequest {
 message CaptureStopResponse {
 	Status status = 1;
 	uint32 stopped_interface_cnt = 2;
+}
+
+message CaptureStatusRequest {
+}
+
+message CaptureStatusResponse {
+	Status status = 1;
+	bool is_active = 2;
+	CaptureConfig capture_config = 3;
 }
 
 service DPDKonmetal {
@@ -648,4 +662,5 @@ service DPDKonmetal {
 	//// PACKET CAPTURE
 	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}
 	rpc CaptureStop(CaptureStopRequest) returns (CaptureStopResponse) {}
+	rpc CaptureStatus(CaptureStatusRequest) returns (CaptureStatusResponse) {}
 }
