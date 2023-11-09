@@ -19,7 +19,7 @@ int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict)
 
 		ret = rte_tel_data_add_dict_u64(dict, port->vm.machineid, port->stats.nat_stats.used_port_cnt);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Failed to add interface used nat port telemetry data", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Failed to add interface used nat port telemetry data", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return ret;
 		}
 	}

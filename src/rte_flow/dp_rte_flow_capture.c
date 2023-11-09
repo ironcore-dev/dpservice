@@ -59,7 +59,7 @@ int dp_install_jump_rule_in_default_group(struct dp_port *port, uint32_t dst_gro
 
 	port->default_jump_flow = flow;
 
-	DPS_LOG_DEBUG("Installed the default jumping flow rule that destinated to group", DP_LOG_PORTID(port->port_id), DP_LOG_RTE_GROUP(dst_group));
+	DPS_LOG_DEBUG("Installed the default jumping flow rule that destinated to group", DP_LOG_PORT(port), DP_LOG_RTE_GROUP(dst_group));
 	return DP_OK;
 }
 
@@ -134,13 +134,13 @@ static int dp_install_default_rule_in_capture_group(struct dp_port *port, bool c
 	// validate and install flow rule
 	flow = dp_install_rte_flow(port->port_id, &dp_flow_attr_default_capture_ingress, pattern, action);
 	if (!flow) {
-		DPS_LOG_WARNING("Failed to install default monitoring flow rule", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_WARNING("Failed to install default monitoring flow rule", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
 
 	port->default_capture_flow = flow;
 
-	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORTID(port->port_id));
+	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORT(port));
 	return DP_OK;
 }
 
@@ -153,7 +153,7 @@ int dp_destroy_default_flow(struct dp_port *port)
 	if (port->default_jump_flow) {
 		ret = rte_flow_destroy(port->port_id, port->default_jump_flow, &error);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_WARNING("Failed to destroy default jump flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+			DPS_LOG_WARNING("Failed to destroy default jump flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -161,7 +161,7 @@ int dp_destroy_default_flow(struct dp_port *port)
 	if (port->default_capture_flow) {
 		ret = rte_flow_destroy(port->port_id, port->default_capture_flow, &error);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_WARNING("Failed to destroy default capture flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+			DPS_LOG_WARNING("Failed to destroy default capture flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -175,7 +175,7 @@ static int dp_install_pf_default_flow(struct dp_port *port, bool capture_on)
 
 	ret = dp_install_default_rule_in_capture_group(port, capture_on);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to install default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("Failed to install default flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -188,7 +188,7 @@ static int dp_install_vf_default_jump_flow(struct dp_port *port, uint32_t dst_gr
 
 	ret = dp_install_jump_rule_in_default_group(port, dst_group);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to install default jump flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("Failed to install default jump flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -201,7 +201,7 @@ static int dp_install_vf_default_capture_flow(struct dp_port *port)
 
 	ret = dp_install_default_rule_in_capture_group(port, true);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("Failed to install default capture flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("Failed to install default capture flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -230,11 +230,11 @@ int dp_enable_pkt_capture(struct dp_port *port)
 		// rollback flow rules if failed on the second one for VF.
 		if (DP_FAILED(dp_install_vf_default_capture_flow(port))) {
 			if (DP_FAILED(dp_destroy_default_flow(port))) {
-				DPS_LOG_ERR("Failed to recover from turning capturing on by destroying previously installed default rule", DP_LOG_PORTID(port->port_id));
+				DPS_LOG_ERR("Failed to recover from turning capturing on by destroying previously installed default rule", DP_LOG_PORT(port));
 				return DP_GRPC_ERR_ROLLBACK;
 			}
 			if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_VNET_GROUP))) {
-				DPS_LOG_ERR("Failed to recover from turning capturing on by installing default jump rule to the vnet group", DP_LOG_PORTID(port->port_id));
+				DPS_LOG_ERR("Failed to recover from turning capturing on by installing default jump rule to the vnet group", DP_LOG_PORT(port));
 				return DP_GRPC_ERR_ROLLBACK;
 			}
 			return DP_GRPC_ERR_RTE_RULE_ADD;
@@ -265,7 +265,7 @@ int dp_disable_pkt_capture(struct dp_port *port)
 	case DP_PORT_VF:
 		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_VNET_GROUP))) {
 			// rollback does not make sense here, but rather to report the error. because the default operation should be without capturing.
-			DPS_LOG_ERR("Failed to turn capturing off by installing default jump rule to the vnet group on vf", DP_LOG_PORTID(port->port_id));
+			DPS_LOG_ERR("Failed to turn capturing off by installing default jump rule to the vnet group on vf", DP_LOG_PORT(port));
 			return DP_GRPC_ERR_RTE_RULE_ADD;
 		}
 

@@ -120,7 +120,7 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 int dp_attach_vf(struct dp_port *port)
 {
 	if (port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
 
@@ -150,7 +150,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
 								&port_conf);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -164,7 +164,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 									 &rxq_conf,
 									 dp_layer->rte_mempool);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
@@ -177,23 +177,23 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 									 port->socket_id,
 									 &txq_conf);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
 
 	/* dp-service specific config */
 	if (port_type == DP_PORT_VF) {
-		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORT(port));
 		ret = rte_eth_promiscuous_enable(port->port_id);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
 
 	if (DP_FAILED(dp_load_mac(port))) {
-		DPS_LOG_ERR("Cannot retrieve MAC address", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_ERR("Cannot retrieve MAC address", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
 
@@ -444,7 +444,7 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 
 	ret = dp_install_jump_rule_in_default_group(port, DP_RTE_FLOW_VNET_GROUP);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -485,7 +485,7 @@ int dp_port_start(struct dp_port *port)
 
 	ret = rte_eth_dev_start(port->port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return ret;
 	}
 

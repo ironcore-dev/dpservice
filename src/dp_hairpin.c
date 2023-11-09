@@ -80,7 +80,7 @@ int dp_hairpin_setup(const struct dp_port *port)
 											 hairpin_queue_id,
 											 peer_hairpin_queue_id))
 	) {
-		DPS_LOG_ERR("Failed to setup hairpin rx queue for vf", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_ERR("Failed to setup hairpin rx queue for vf", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
 
@@ -91,7 +91,7 @@ int dp_hairpin_setup(const struct dp_port *port)
 												peer_hairpin_queue_id,
 												hairpin_queue_id))
 		) {
-			DPS_LOG_ERR("Failed to setup hairpin tx queue for vf", DP_LOG_PORTID(port->port_id));
+			DPS_LOG_ERR("Failed to setup hairpin tx queue for vf", DP_LOG_PORT(port));
 			return DP_ERROR;
 		}
 	}
@@ -101,22 +101,22 @@ int dp_hairpin_setup(const struct dp_port *port)
 int dp_hairpin_bind(const struct dp_port *port)
 {
 	uint16_t port_id = port->port_id;
-	uint16_t peer_pf_port = port->peer_pf_port_id;
+	uint16_t peer_pf_port_id = port->peer_pf_port_id;
 	int ret;
 
 	// bind txq of peer_pf_port to rxq of port_id
 
-	DPS_LOG_DEBUG("Trying to bind peer to port", DP_LOG_PEER_PORTID(peer_pf_port), DP_LOG_PORTID(port_id));
-	ret = rte_eth_hairpin_bind(peer_pf_port, port_id);
+	DPS_LOG_DEBUG("Trying to bind peer to port", DP_LOG_PEER_PORTID(peer_pf_port_id), DP_LOG_PORTID(port_id));
+	ret = rte_eth_hairpin_bind(peer_pf_port_id, port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Failed to bind peer to port", DP_LOG_PEER_PORTID(peer_pf_port), DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Failed to bind peer to port", DP_LOG_PEER_PORTID(peer_pf_port_id), DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
-	DPS_LOG_DEBUG("Trying to bind port to peer", DP_LOG_PORTID(port_id), DP_LOG_PEER_PORTID(peer_pf_port));
-	ret = rte_eth_hairpin_bind(port_id, peer_pf_port);
+	DPS_LOG_DEBUG("Trying to bind port to peer", DP_LOG_PORTID(port_id), DP_LOG_PEER_PORTID(peer_pf_port_id));
+	ret = rte_eth_hairpin_bind(port_id, peer_pf_port_id);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Failed to bind port to peer", DP_LOG_PORTID(port_id), DP_LOG_PEER_PORTID(peer_pf_port), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Failed to bind port to peer", DP_LOG_PORTID(port_id), DP_LOG_PEER_PORTID(peer_pf_port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 

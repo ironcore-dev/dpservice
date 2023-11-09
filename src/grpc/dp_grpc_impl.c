@@ -894,7 +894,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 		}
 
 		if (!port) {
-			DPS_LOG_WARNING("Got invalid port when initializing capturing", DP_LOG_PORTID(port->port_id));
+			DPS_LOG_WARNING("Got invalid port when initializing capturing", DP_LOG_PORT(port));
 			status = DP_GRPC_ERR_NOT_FOUND;
 			break;
 		}

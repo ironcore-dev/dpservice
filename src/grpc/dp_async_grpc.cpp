@@ -695,7 +695,7 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 	for (int i = 0; i < request_.loadbalanced_ports_size(); ++i) {
 		DPGRPC_LOG_INFO("Adding loadbalanced port",
 						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
-						DP_LOG_PORT(request_.loadbalanced_ports(i).port()),
+						DP_LOG_L4PORT(request_.loadbalanced_ports(i).port()),
 						DP_LOG_PROTO(request_.loadbalanced_ports(i).protocol()));
 		if (request_.loadbalanced_ports(i).port() > UINT16_MAX)
 			return "Invalid loadbalanced_ports.port";
@@ -1092,8 +1092,8 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Starting packet capture",
 					DP_LOG_IPV6STR(request_.capture_config().sink_node_ip().address().c_str()),
-					DP_LOG_PORT(request_.capture_config().udp_src_port()),
-					DP_LOG_PORT(request_.capture_config().udp_dst_port()));
+					DP_LOG_L4PORT(request_.capture_config().udp_src_port()),
+					DP_LOG_L4PORT(request_.capture_config().udp_dst_port()));
 
 	if (request_.capture_config().udp_src_port() > UINT16_MAX)
 		return "Invalid udp_src_port";
@@ -1116,14 +1116,14 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 		switch (request->capture_start.interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
 			DPGRPC_LOG_INFO("Set packet capture interface vf",
-							DP_LOG_PORT_TYPE(request_.capture_config().interfaces(i).interface_type()),
+							DP_LOG_IFACE_TYPE(request_.capture_config().interfaces(i).interface_type()),
 							DP_LOG_IFACE(request_.capture_config().interfaces(i).vf_name().c_str()));
 			if (SNPRINTF_FAILED(request->capture_start.interfaces[i].spec.iface_id, request_.capture_config().interfaces(i).vf_name()))
 				return "Invalid interface_id";
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
 			DPGRPC_LOG_INFO("Set packet capture interface pf",
-							DP_LOG_PORT_TYPE(request_.capture_config().interfaces(i).interface_type()),
+							DP_LOG_IFACE_TYPE(request_.capture_config().interfaces(i).interface_type()),
 							DP_LOG_IFACE_INDEX(request_.capture_config().interfaces(i).pf_index()));
 			request->capture_start.interfaces[i].spec.pf_index = request_.capture_config().interfaces(i).pf_index();
 			break;

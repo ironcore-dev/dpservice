@@ -45,17 +45,16 @@ extern "C" {
 #define DP_LOG_PORTID(VALUE) _DP_LOG_UINT("port_id", VALUE)
 #define DP_LOG_PEER_PORTID(VALUE) _DP_LOG_UINT("peer_port_id", VALUE)
 #define DP_LOG_QUEUEID(VALUE) _DP_LOG_UINT("queue_id", VALUE)
-#define DP_LOG_SOCKID(VALUE) _DP_LOG_UINT("socket_id", VALUE)
+#define DP_LOG_SOCKID(VALUE) _DP_LOG_INT("socket_id", VALUE)
 #define DP_LOG_IFNAME(VALUE) _DP_LOG_STR("interface_name", VALUE)
 #define DP_LOG_LCORE(VALUE) _DP_LOG_UINT("lcore_id", VALUE)
 #define DP_LOG_RTE_GROUP(VALUE) _DP_LOG_UINT("rte_group", VALUE)
-#define DP_LOG_PORT_TYPE(VALUE) _DP_LOG_UINT("port_type", VALUE)
 // networking stack
 #define DP_LOG_IPV4(VALUE) _DP_LOG_IPV4("ipv4", VALUE)
 #define DP_LOG_IPV6(VALUE) _DP_LOG_IPV6("ipv6", VALUE)
 #define DP_LOG_SRC_IPV4(VALUE) _DP_LOG_IPV4("src_ipv4", VALUE)
 #define DP_LOG_DST_IPV4(VALUE) _DP_LOG_IPV4("dst_ipv4", VALUE)
-#define DP_LOG_PORT(VALUE) _DP_LOG_UINT("port", VALUE)
+#define DP_LOG_L4PORT(VALUE) _DP_LOG_UINT("port", VALUE)
 #define DP_LOG_SRC_PORT(VALUE) _DP_LOG_UINT("src_port", VALUE)
 #define DP_LOG_DST_PORT(VALUE) _DP_LOG_UINT("dst_port", VALUE)
 #define DP_LOG_PROTO(VALUE) _DP_LOG_UINT("protocol", VALUE)
@@ -71,6 +70,7 @@ extern "C" {
 #define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)
 #define DP_LOG_IFACE(VALUE) _DP_LOG_STR("interface_id", VALUE)
 #define DP_LOG_IFACE_INDEX(VALUE) _DP_LOG_INT("interface_index", VALUE)
+#define DP_LOG_IFACE_TYPE(VALUE) _DP_LOG_UINT("interface_type", VALUE)
 #define DP_LOG_TVNI(VALUE) _DP_LOG_UINT("t_vni", VALUE)
 #define DP_LOG_PCI(VALUE) _DP_LOG_STR("pci", VALUE)
 #define DP_LOG_PXE_SRV(VALUE) _DP_LOG_STR("pxe_server", VALUE)
@@ -102,6 +102,8 @@ extern "C" {
 #define DP_LOG_NODE(VALUE) _DP_LOG_STR("node", (VALUE)->name)
 #define DP_LOG_TELEMETRY_CMD(VALUE) _DP_LOG_STR("telemetry_cmd", VALUE)
 #define DP_LOG_NETLINK(VALUE) _DP_LOG_STR("netlink_msg", VALUE)
+// compound macros
+#define DP_LOG_PORT(VALUE) DP_LOG_PORTID((VALUE)->port_id), DP_LOG_SOCKID((VALUE)->socket_id)
 
 
 #define DP_STRUCTURED_LOG(LEVEL, LOGTYPE, MESSAGE, ...) \

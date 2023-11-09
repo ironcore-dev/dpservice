@@ -106,7 +106,7 @@ int dp_map_vm_handle(const char key[VM_IFACE_ID_MAX_LEN], struct dp_port *port)
 
 	ret = rte_hash_add_key_with_hash_data(vm_handle_tbl, key, hash, port);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
