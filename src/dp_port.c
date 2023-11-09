@@ -80,7 +80,7 @@ static int dp_port_register_pf(struct dp_port *port)
 }
 
 
-static inline struct dp_port *get_port(uint16_t port_id)
+static __rte_always_inline struct dp_port *get_port(uint16_t port_id)
 {
 	if (port_id >= RTE_DIM(port_table))  // includes DP_INVALID_PORT_ID
 		return NULL;
@@ -94,18 +94,6 @@ struct dp_port *dp_get_port(uint16_t port_id)
 
 	if (!port)
 		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
-
-	return port;
-}
-
-struct dp_port *dp_get_vf(uint16_t port_id)
-{
-	struct dp_port *port = get_port(port_id);
-
-	if (!port || port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORTID(port_id));
-		return NULL;
-	}
 
 	return port;
 }
@@ -129,24 +117,16 @@ bool dp_port_is_pf(uint16_t port_id)
 
 int dp_attach_vf(uint16_t port_id)
 {
-	struct dp_port *port = dp_get_vf(port_id);
+	struct dp_port *port;
 
-	if (!port)
+	port = get_port(port_id);
+	if (!port || port->port_type != DP_PORT_VF) {
+		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
+	}
 
 	port->attached = true;
 	return DP_OK;
-}
-
-// TODO obsolete
-bool dp_is_vf_attached(uint16_t port_id)
-{
-	struct dp_port *port = get_port(port_id);
-
-	if (!port || port->port_type != DP_PORT_VF)
-		return false;
-
-	return port->attached;
 }
 
 static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)

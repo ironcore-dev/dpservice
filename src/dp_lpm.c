@@ -461,11 +461,8 @@ void dp_del_vm(struct dp_port *port)
 	dp_load_mac(port);
 }
 
-void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type)
+void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *port, uint16_t ether_type)
 {
-	// TODO temporary fix
-	struct dp_port *port = dp_get_port(port_id);
-
 	rte_ether_addr_copy(&port->vm.info.neigh_mac, &ether_hdr->dst_addr);
 	rte_ether_addr_copy(&port->vm.info.own_mac, &ether_hdr->src_addr);
 	ether_hdr->ether_type = htons(ether_type);

@@ -77,6 +77,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	struct dp_virtsvc *virtsvc = df->virtsvc;
 	struct dp_virtsvc_conn *conn;
 	uint16_t pf_port_id;
+	struct dp_port *pf_port;
 	int conn_idx;
 
 	// replace IPv4 header with IPv6 header
@@ -139,7 +140,11 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 		m->l4_len = sizeof(struct rte_udp_hdr);
 	}
 
-	dp_fill_ether_hdr(ether_hdr, pf_port_id, RTE_ETHER_TYPE_IPV6);
+	pf_port = dp_get_port(pf_port_id);
+	if (!pf_port)
+		return VIRTSVC_NEXT_DROP;
+
+	dp_fill_ether_hdr(ether_hdr, pf_port, RTE_ETHER_TYPE_IPV6);
 
 	return next_tx_index[pf_port_id];
 }
@@ -167,6 +172,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	struct rte_udp_hdr *udp_hdr;
 	uint16_t vf_port_id;
 	struct dp_virtsvc_conn *conn;
+	struct dp_port *vf_port;
 
 	// replace IPv6 header with IPv4 header
 	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
@@ -224,10 +230,11 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	ipv4_hdr->dst_addr = conn->vf_ip;
 	vf_port_id = conn->vf_port_id;
 
-	dp_fill_ether_hdr(ether_hdr, vf_port_id, RTE_ETHER_TYPE_IPV4);
-
-	if (!dp_is_vf_attached(vf_port_id))
+	vf_port = dp_get_port(vf_port_id);
+	if (!vf_port || !vf_port->attached)
 		return VIRTSVC_NEXT_DROP;
+
+	dp_fill_ether_hdr(ether_hdr, vf_port, RTE_ETHER_TYPE_IPV4);
 
 	return next_tx_index[vf_port_id];
 }

@@ -58,7 +58,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	} else {
 		// next hop is known, fill in Ether header
 		// (PF egress goes through a tunnel that destroys Ether header)
-		dp_fill_ether_hdr(ether_hdr, dst_port->port_id, RTE_ETHER_TYPE_IPV6);
+		dp_fill_ether_hdr(ether_hdr, dst_port, RTE_ETHER_TYPE_IPV6);
 	}
 
 	if (!df->flags.flow_type)

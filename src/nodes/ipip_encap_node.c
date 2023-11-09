@@ -25,6 +25,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
+	struct dp_port *dst_port;
 	rte_be16_t payload_len;
 	uint32_t packet_type;
 
@@ -52,7 +53,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return IPIP_ENCAP_NEXT_DROP;
 	}
 
-	dp_fill_ether_hdr(ether_hdr, df->nxt_hop, RTE_ETHER_TYPE_IPV6);
+	dst_port = dp_get_port(df->nxt_hop);
+	if (!dst_port)
+		return IPIP_ENCAP_NEXT_DROP;
+
+	dp_fill_ether_hdr(ether_hdr, dst_port, RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;

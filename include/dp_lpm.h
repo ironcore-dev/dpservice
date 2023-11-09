@@ -106,9 +106,10 @@ int dp_list_routes(struct dp_port *port, int vni, bool ext_routes, struct dp_grp
 int dp_lpm_reset_all_route_tables(int socket_id);
 int dp_lpm_reset_route_tables(int vni, int socket_id);
 
-void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, uint16_t port_id, uint16_t ether_type);
+void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *port, uint16_t ether_type);
 
 #ifdef __cplusplus
 }
 #endif
+
 #endif

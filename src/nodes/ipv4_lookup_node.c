@@ -66,7 +66,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	// next hop is known, fill in Ether header
 	// (PF egress goes through a tunnel that destroys Ether header)
 	if (dst_port->port_type == DP_PORT_VF)
-		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port->port_id, RTE_ETHER_TYPE_IPV4);
+		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port, RTE_ETHER_TYPE_IPV4);
 
 	df->nxt_hop = dst_port->port_id;
 	return IPV4_LOOKUP_NEXT_NAT;

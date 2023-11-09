@@ -18,11 +18,16 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
 	struct dp_vnf_value *vnf_val;
+	struct dp_port *dst_port;
 	rte_edge_t next_node;
 	uint32_t l3_type;
 
 	vnf_val = dp_get_vnf_value_with_key((void *)df->tun_info.ul_dst_addr6);
 	if (!vnf_val)
+		return IPIP_DECAP_NEXT_DROP;
+
+	dst_port = dp_get_port(vnf_val->portid);
+	if (!dst_port)
 		return IPIP_DECAP_NEXT_DROP;
 
 	df->tun_info.dst_vni = vnf_val->vni;
@@ -45,7 +50,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
 	// no errorchecking as we just created more space than we need ^
 	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr));
-	dp_fill_ether_hdr(ether_hdr, df->nxt_hop, df->l3_type);
+	dp_fill_ether_hdr(ether_hdr, dst_port, df->l3_type);
 
 	// this shift is non-standard as the actual values of PTYPE should be opaque
 	m->packet_type = ((m->packet_type & RTE_PTYPE_INNER_L4_MASK) >> 16) | l3_type | RTE_PTYPE_L2_ETHER;
