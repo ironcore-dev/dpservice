@@ -72,7 +72,7 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	struct rte_ipv6_hdr *new_ipv6_hdr = (struct rte_ipv6_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr)]);
 	struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)(&encaped_mirror_hdr[sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)]);
 	int sub_action_cnt = 0;
-	struct dp_port *outgoing_port = dp_get_pf0();
+	const struct dp_port *outgoing_port = dp_get_pf0();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 
 	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &encap_eth_hdr->dst_addr);

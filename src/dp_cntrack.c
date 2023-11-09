@@ -146,7 +146,7 @@ static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_fl
 		df->flags.offload_decision = df->conntrack->offload_flags.reply;
 }
 
-static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, struct dp_port *port)
+static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, const struct dp_port *port)
 {
 	struct flow_value *flow_val;
 	struct flow_key inverted_key;

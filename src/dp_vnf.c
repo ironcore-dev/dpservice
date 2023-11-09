@@ -49,7 +49,7 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, struct dp_port *port, bool match_all)
+int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, const struct dp_port *port, bool match_all)
 {
 	val->v_type = v_type;
 	val->portid = match_all ? DP_VNF_MATCH_ALL_PORT_ID_VALUE : port->port_id;

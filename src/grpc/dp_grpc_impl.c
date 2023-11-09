@@ -888,7 +888,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 			port = dp_get_port_with_vm_handle(request->interfaces[i].spec.iface_id);
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
-			port = dp_get_pf(request->interfaces[i].spec.pf_index);
+			port = dp_get_port_by_pf_index(request->interfaces[i].spec.pf_index);
 			break;
 		}
 
@@ -935,7 +935,7 @@ static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 static int dp_process_capture_status(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_capture *reply = dp_grpc_single_reply(responder);
-	struct dp_ports *ports = dp_get_ports();
+	const struct dp_ports *ports = dp_get_ports();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 	int count = 0;
 

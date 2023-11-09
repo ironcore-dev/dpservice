@@ -380,7 +380,7 @@ static int dp_port_install_isolated_mode(int port_id)
 #endif
 }
 
-static int dp_port_bind_port_hairpins(struct dp_port *port)
+static int dp_port_bind_port_hairpins(const struct dp_port *port)
 {
 	// two pf port's hairpins are bound when processing the second port
 	if (port == dp_get_pf0())

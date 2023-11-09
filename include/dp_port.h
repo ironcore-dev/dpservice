@@ -130,23 +130,20 @@ const struct dp_ports *dp_get_ports(void)
 		 VARNAME < (DP_PORTS)->end; \
 		 ++VARNAME)
 
-// TODO const??
 static __rte_always_inline
-struct dp_port *dp_get_pf0(void)
+const struct dp_port *dp_get_pf0(void)
 {
 	return _dp_pf_ports[0];
 }
 
-// TODO const??
 static __rte_always_inline
-struct dp_port *dp_get_pf1(void)
+const struct dp_port *dp_get_pf1(void)
 {
 	return _dp_pf_ports[1];
 }
 
-// TODO const??
 static __rte_always_inline
-struct dp_port *dp_get_pf(uint16_t index)
+struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 {
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }

@@ -19,7 +19,7 @@ void dp_del_vm(struct dp_port *port);
 
 
 static __rte_always_inline
-bool dp_arp_cycle_needed(struct dp_port *port)
+bool dp_arp_cycle_needed(const struct dp_port *port)
 {
 	static struct rte_ether_addr nul_mac = {0};
 

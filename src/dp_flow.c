@@ -95,7 +95,7 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 }
 
 /* Isolating only VNF NAT conntrack entries at the moment. The others should follow */
-static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct dp_port *port, struct flow_key *key)
+static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struct dp_port *port, struct flow_key *key)
 {
 	struct snat_data *s_data;
 	struct dp_vnf_value vnf_val;
@@ -121,7 +121,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, struct dp_p
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	struct dp_port *port = dp_get_port(m);
+	const struct dp_port *port = dp_get_port(m);
 	int ret = DP_OK;
 
 	key->ip_dst = ntohl(df->dst.dst_addr);

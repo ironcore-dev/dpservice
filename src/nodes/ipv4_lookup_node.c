@@ -24,7 +24,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct vm_route route;
 	uint32_t route_key = 0;
-	struct dp_port *dst_port;
+	const struct dp_port *dst_port;
 
 	// TODO: add broadcast routes when machine is added
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))

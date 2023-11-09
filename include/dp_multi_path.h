@@ -10,7 +10,7 @@ extern "C" {
 
 void dp_multipath_init(void);
 
-struct dp_port *dp_multipath_get_pf(uint32_t hash);
+const struct dp_port *dp_multipath_get_pf(uint32_t hash);
 
 #ifdef __cplusplus
 }

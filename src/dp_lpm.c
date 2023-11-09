@@ -13,7 +13,7 @@
 static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
 
-static __rte_always_inline int dp_lpm_fill_route_tables(struct dp_port *port)
+static __rte_always_inline int dp_lpm_fill_route_tables(const struct dp_port *port)
 {
 	int ret;
 
@@ -272,11 +272,11 @@ int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6,
 	return DP_GRPC_OK;
 }
 
-struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
-									int t_vni,
-									const struct dp_flow *df,
-									struct vm_route *route,
-									uint32_t *route_key)
+const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
+										  int t_vni,
+										  const struct dp_flow *df,
+										  struct vm_route *route,
+										  uint32_t *route_key)
 {
 	uint32_t dst_ip = ntohl(df->dst.dst_addr);
 	struct rte_rib_node *node;
@@ -311,10 +311,10 @@ struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	return dst_port;
 }
 
-struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
-									int t_vni,
-									const struct rte_ipv6_hdr *ipv6_hdr,
-									struct vm_route *route)
+const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
+										  int t_vni,
+										  const struct rte_ipv6_hdr *ipv6_hdr,
+										  struct vm_route *route)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;

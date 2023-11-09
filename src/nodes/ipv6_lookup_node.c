@@ -22,7 +22,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	struct vm_route route;
-	struct dp_port *dst_port;
+	const struct dp_port *dst_port;
 	int t_vni;
 
 	t_vni = df->flags.flow_type == DP_FLOW_TYPE_INCOMING
