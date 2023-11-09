@@ -890,6 +890,9 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 	int port_id = -1;
 	int status = DP_GRPC_OK;
 
+	if (!dp_conf_is_offload_enabled())
+		return DP_GRPC_ERR_NOT_ACTIVE;
+
 	if (dp_is_capture_enabled())
 		return DP_GRPC_ERR_ALREADY_ACTIVE;
 
