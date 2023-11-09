@@ -66,27 +66,18 @@ struct dp_ports {
 	struct dp_port *end;
 };
 
-struct dp_ports *dp_get_ports(void);
+// hidden structures for inline functions to access
+extern struct dp_port *_dp_port_table[DP_MAX_PORTS];
+extern struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
+extern struct dp_ports _dp_ports;
 
-#define DP_FOREACH_PORT(DP_PORTS, VARNAME) \
-	for (struct dp_port *VARNAME = (DP_PORTS)->ports; \
-		 VARNAME < (DP_PORTS)->end; \
-		 ++VARNAME)
 
-struct dp_port *dp_get_port(struct rte_mbuf *m);
-struct dp_port *dp_get_dst_port(struct dp_flow *df);
-
-struct dp_port *dp_get_port_by_id(uint16_t port_id);
 struct dp_port *dp_get_port_by_name(const char *pci_name);
 
 int dp_attach_vf(struct dp_port *port);
 
 int dp_ports_init(void);
 void dp_ports_free(void);
-
-struct dp_port *dp_get_pf0(void);
-struct dp_port *dp_get_pf1(void);
-struct dp_port *dp_get_pf(uint16_t index);
 
 int dp_port_start(struct dp_port *port);
 int dp_port_stop(struct dp_port *port);
@@ -102,6 +93,62 @@ static __rte_always_inline
 const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port)
 {
 	return port->vm.ready ? port->vm.ul_ipv6 : dp_conf_get_underlay_ip();
+}
+
+static __rte_always_inline
+struct dp_port *dp_get_port(struct rte_mbuf *m)
+{
+	// m->port should've already been validated
+	return _dp_port_table[m->port];
+}
+
+static __rte_always_inline
+struct dp_port *dp_get_dst_port(struct dp_flow *df)
+{
+	// df->nxt_hop should've already been validated
+	return _dp_port_table[df->nxt_hop];
+}
+
+static __rte_always_inline
+struct dp_port *dp_get_port_by_id(uint16_t port_id)
+{
+	if (unlikely(port_id >= RTE_DIM(_dp_port_table))) {
+		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
+		return NULL;
+	}
+	return _dp_port_table[port_id];
+}
+
+static __rte_always_inline
+const struct dp_ports *dp_get_ports(void)
+{
+	return &_dp_ports;
+}
+
+#define DP_FOREACH_PORT(DP_PORTS, VARNAME) \
+	for (struct dp_port *VARNAME = (DP_PORTS)->ports; \
+		 VARNAME < (DP_PORTS)->end; \
+		 ++VARNAME)
+
+// TODO const??
+static __rte_always_inline
+struct dp_port *dp_get_pf0(void)
+{
+	return _dp_pf_ports[0];
+}
+
+// TODO const??
+static __rte_always_inline
+struct dp_port *dp_get_pf1(void)
+{
+	return _dp_pf_ports[1];
+}
+
+// TODO const??
+static __rte_always_inline
+struct dp_port *dp_get_pf(uint16_t index)
+{
+	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }
 
 #ifdef __cplusplus

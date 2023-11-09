@@ -10,8 +10,8 @@
 
 int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict)
 {
+	const struct dp_ports *ports = dp_get_ports();
 	int ret;
-	struct dp_ports *ports = dp_get_ports();
 
 	DP_FOREACH_PORT(ports, port) {
 		if (port->port_type != DP_PORT_VF || !port->allocated)

@@ -764,10 +764,8 @@ static int dp_process_delete_neighnat(struct dp_grpc_responder *responder)
 static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_iface *reply;
-	struct dp_ports *ports = dp_get_ports();
+	const struct dp_ports *ports = dp_get_ports();
 
-	// TODO if this is not usable, add another pass though the array to check for emptiness!
-	// TODO otherwise remove this comment
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	DP_FOREACH_PORT(ports, port) {

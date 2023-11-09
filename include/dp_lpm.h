@@ -56,13 +56,13 @@ struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);
 
-int dp_add_route(struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
+int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 const uint8_t *ip6, uint8_t depth);
-int dp_del_route(struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth);
-int dp_add_route6(struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
+int dp_del_route(const struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth);
+int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
 				  const uint8_t *ext_ip6, uint8_t depth);
-int dp_del_route6(struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth);
-int dp_list_routes(struct dp_port *port, int vni, bool ext_routes, struct dp_grpc_responder *responder);
+int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth);
+int dp_list_routes(const struct dp_port *port, int vni, bool ext_routes, struct dp_grpc_responder *responder);
 
 int dp_lpm_reset_all_route_tables(int socket_id);
 int dp_lpm_reset_route_tables(int vni, int socket_id);

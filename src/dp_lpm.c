@@ -30,7 +30,7 @@ static __rte_always_inline int dp_lpm_fill_route_tables(struct dp_port *port)
 
 int dp_lpm_reset_all_route_tables(int socket_id)
 {
-	struct dp_ports *ports = dp_get_ports();
+	const struct dp_ports *ports = dp_get_ports();
 	int ret;
 
 	if (DP_FAILED(dp_reset_all_vni_route_tables(socket_id)))
@@ -49,7 +49,7 @@ int dp_lpm_reset_all_route_tables(int socket_id)
 
 int dp_lpm_reset_route_tables(int vni, int socket_id)
 {
-	struct dp_ports *ports = dp_get_ports();
+	const struct dp_ports *ports = dp_get_ports();
 	int ret;
 
 	if (DP_FAILED(dp_reset_vni_route_tables(vni, socket_id))) {
@@ -79,7 +79,7 @@ const uint8_t *dp_get_gw_ip6(void)
 	return dp_router_gw_ip6;
 }
 
-int dp_add_route(struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
+int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 const uint8_t *ip6, uint8_t depth)
 {
 	struct vm_route *route = NULL;
@@ -110,7 +110,7 @@ int dp_add_route(struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip
 	return DP_GRPC_OK;
 }
 
-int dp_del_route(struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth)
+int dp_del_route(const struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth)
 {
 	struct rte_rib_node *node;
 	struct rte_rib *root;
@@ -188,7 +188,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	return DP_GRPC_OK;
 }
 
-int dp_list_routes(struct dp_port *port, int vni, bool ext_routes,
+int dp_list_routes(const struct dp_port *port, int vni, bool ext_routes,
 				   struct dp_grpc_responder *responder)
 {
 	struct rte_rib_node *node = NULL;
@@ -218,7 +218,7 @@ int dp_list_routes(struct dp_port *port, int vni, bool ext_routes,
 	return DP_GRPC_OK;
 }
 
-int dp_add_route6(struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
+int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
 				  const uint8_t *ext_ip6, uint8_t depth)
 {
 	struct vm_route *route = NULL;
@@ -249,7 +249,7 @@ int dp_add_route6(struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint
 	return DP_GRPC_OK;
 }
 
-int dp_del_route6(struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth)
+int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;

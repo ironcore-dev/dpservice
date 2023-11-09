@@ -38,68 +38,22 @@ static const struct rte_eth_conf port_conf_default = {
 	},
 };
 
-static struct dp_port *port_table[DP_MAX_PORTS];
-static struct dp_port *pf_ports[DP_MAX_PF_PORTS];
-static struct dp_ports dp_ports;
-
-struct dp_ports *dp_get_ports(void)
-{
-	return &dp_ports;
-}
-
-struct dp_port *dp_get_pf0(void)
-{
-	return pf_ports[0];
-}
-
-struct dp_port *dp_get_pf1(void)
-{
-	return pf_ports[1];
-}
-
-struct dp_port *dp_get_pf(uint16_t index)
-{
-	if (index >= RTE_DIM(pf_ports))
-		return NULL;
-	return pf_ports[index];
-}
+struct dp_port *_dp_port_table[DP_MAX_PORTS];
+struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
+struct dp_ports _dp_ports;
 
 static int dp_port_register_pf(struct dp_port *port)
 {
 	// sub-optimal, but the number of PF ports is extremely low
 	// and this is only called in initialization
-	for (size_t i = 0; i < RTE_DIM(pf_ports); ++i) {
-		if (pf_ports[i] == NULL) {
-			pf_ports[i] = port;
+	for (size_t i = 0; i < RTE_DIM(_dp_pf_ports); ++i) {
+		if (_dp_pf_ports[i] == NULL) {
+			_dp_pf_ports[i] = port;
 			return DP_OK;
 		}
 	}
-	DPS_LOG_ERR("To many physical ports", DP_LOG_MAX(RTE_DIM(pf_ports)));
+	DPS_LOG_ERR("To many physical ports", DP_LOG_MAX(RTE_DIM(_dp_pf_ports)));
 	return DP_ERROR;
-}
-
-// TODO inline
-struct dp_port *dp_get_port(struct rte_mbuf *m)
-{
-	// m->port should've already been validated
-	return port_table[m->port];
-}
-
-// TODO inline
-struct dp_port *dp_get_dst_port(struct dp_flow *df)
-{
-	// df->nxt_hop should've already been validated
-	return port_table[df->nxt_hop];
-}
-
-// TODO inline? not sure
-struct dp_port *dp_get_port_by_id(uint16_t port_id)
-{
-	if (port_id >= RTE_DIM(port_table)) {
-		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
-		return NULL;
-	}
-	return port_table[port_id];
 }
 
 struct dp_port *dp_get_port_by_name(const char *pci_name)
@@ -109,12 +63,12 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	if (pci_name[0] == '\0' || DP_FAILED(rte_eth_dev_get_port_by_name(pci_name, &port_id)))
 		return NULL;  // no error, this comes from a client
 
-	if (port_id >= RTE_DIM(port_table)) {
+	if (port_id >= RTE_DIM(_dp_port_table)) {
 		DPS_LOG_ERR("Invalid port stored for this device", DP_LOG_PCI(pci_name));
 		return NULL;
 	}
 
-	return port_table[port_id];
+	return _dp_port_table[port_id];
 }
 
 int dp_attach_vf(struct dp_port *port)
@@ -234,8 +188,8 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	int socket_id;
 	int ret;
 
-	if (port_id >= RTE_DIM(port_table)) {
-		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(port_table)));
+	if (port_id >= RTE_DIM(_dp_port_table)) {
+		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
 		return NULL;
 	}
 
@@ -256,11 +210,11 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	}
 
 	// oveflow check done by liming the number of calls to this function
-	port = dp_ports.end++;
+	port = _dp_ports.end++;
 	port->port_type = type;
 	port->port_id = port_id;
 	port->socket_id = socket_id;
-	port_table[port_id] = port;
+	_dp_port_table[port_id] = port;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info, type)))
 		return NULL;
@@ -296,7 +250,7 @@ static int dp_port_set_up_hairpins(void)
 	const struct dp_port *pf0 = dp_get_pf0();
 	const struct dp_port *pf1 = dp_get_pf1();
 
-	DP_FOREACH_PORT(&dp_ports, port) {
+	DP_FOREACH_PORT(&_dp_ports, port) {
 		if (port->port_type == DP_PORT_PF) {
 			port->peer_pf_port_id = (port->port_id == pf0->port_id ? pf1 : pf0)->port_id;
 			port->peer_pf_hairpin_tx_rx_queue_offset = 1;
@@ -365,12 +319,12 @@ int dp_ports_init(void)
 	int num_of_vfs = get_dpdk_layer()->num_of_vfs;
 	int num_of_ports = DP_MAX_PF_PORTS + num_of_vfs;
 
-	dp_ports.ports = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
-	if (!dp_ports.ports) {
+	_dp_ports.ports = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
+	if (!_dp_ports.ports) {
 		DPS_LOG_ERR("Cannot allocate port table");
 		return DP_ERROR;
 	}
-	dp_ports.end = dp_ports.ports;
+	_dp_ports.end = _dp_ports.ports;
 
 	// these need to be done in order
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
@@ -405,11 +359,11 @@ static int dp_stop_eth_port(uint16_t port_id)
 void dp_ports_free(void)
 {
 	// without stopping started ports, DPDK complains
-	DP_FOREACH_PORT(&dp_ports, port) {
+	DP_FOREACH_PORT(&_dp_ports, port) {
 		if (port->allocated)
 			 dp_stop_eth_port(port->port_id);
 	}
-	free(dp_ports.ports);
+	free(_dp_ports.ports);
 }
 
 

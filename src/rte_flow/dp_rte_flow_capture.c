@@ -278,7 +278,7 @@ int dp_disable_pkt_capture(struct dp_port *port)
 
 int dp_disable_pkt_capture_on_all_ifaces(void)
 {
-	struct dp_ports *ports = dp_get_ports();
+	const struct dp_ports *ports = dp_get_ports();
 	int count = 0;
 	int ret;
 
