@@ -198,6 +198,9 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		return DP_ERROR;
 	}
 
+	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
+	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
+
 	if (port_type == DP_PORT_PF) {
 		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->vm.info.own_mac)))
 			return DP_ERROR;

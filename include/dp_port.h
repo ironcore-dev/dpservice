@@ -26,6 +26,7 @@ struct dp_port {
 	uint8_t							link_status;
 	bool							allocated;
 	char							vf_name[IF_NAMESIZE];
+	char							dev_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
 	bool							attached;

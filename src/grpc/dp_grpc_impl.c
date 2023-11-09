@@ -576,7 +576,8 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	reply->vni = port->vm.vni;
 	static_assert(sizeof(reply->iface_id) == sizeof(port->vm.machineid), "Incompatible VM ID size");
 	rte_memcpy(reply->iface_id, port->vm.machineid, sizeof(reply->iface_id));
-	rte_eth_dev_get_name_by_port(port->port_id, reply->pci_name);
+	static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
+	rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
 	rte_memcpy(reply->ul_addr6, port->vm.ul_ipv6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }
@@ -781,8 +782,8 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		reply->vni = port->vm.vni;
 		static_assert(sizeof(reply->iface_id) == sizeof(port->vm.machineid), "Incompatible VM ID size");
 		rte_memcpy(reply->iface_id, port->vm.machineid, sizeof(reply->iface_id));
-		// TODO isn't this already present?
-		rte_eth_dev_get_name_by_port(port->port_id, reply->pci_name);
+		static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
+		rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
 		rte_memcpy(reply->ul_addr6, port->vm.ul_ipv6, sizeof(reply->ul_addr6));
 	}
 
