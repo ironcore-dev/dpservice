@@ -33,7 +33,6 @@ int dp_set_vnf_value(const void *key, const struct dp_vnf_value *val)
 		return DP_ERROR;
 	}
 
-	RTE_VERIFY(val->portid < DP_MAX_PORTS);
 	if (rte_hash_lookup(vnf_handle_tbl, key) >= 0)
 		goto err;
 

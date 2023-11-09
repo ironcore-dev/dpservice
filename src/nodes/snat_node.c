@@ -54,7 +54,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				nat_port = (uint16_t)ret;
 				ipv4_hdr->src_addr = htonl(snat_data->network_nat_ip);
 
-				DP_STATS_NAT_INC_USED_PORT_CNT(m->port);  // TODO use port
+				DP_STATS_NAT_INC_USED_PORT_CNT(port);
 
 				if (df->l4_type == DP_IP_PROTO_ICMP) {
 					dp_change_icmp_identifier(m, nat_port);

@@ -11,6 +11,7 @@
 #include "dp_internal_stats.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_port.h"
 #include "grpc/dp_grpc_responder.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -520,6 +521,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	struct netnat_portmap_key portmap_key = {0};
 	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
 	struct netnat_portmap_data *portmap_data;
+	struct dp_port *created_port;
 	int ret;
 
 	portoverload_tbl_key.nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst;
@@ -552,7 +554,12 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 		rte_free(portmap_data);
 	}
 
-	DP_STATS_NAT_DEC_USED_PORT_CNT(cntrack->created_port_id);
+	created_port = dp_get_port(cntrack->created_port_id);
+	if (!created_port)
+		return DP_ERROR;
+
+	DP_STATS_NAT_DEC_USED_PORT_CNT(created_port);
+
 	return DP_OK;
 }
 

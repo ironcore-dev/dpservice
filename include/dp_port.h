@@ -5,8 +5,9 @@
 #include <stdbool.h>
 #include <net/if.h>
 #include <rte_pci.h>
-#include "dpdk_layer.h"
+#include "dp_internal_stats.h"
 #include "dp_lpm.h"
+#include "dpdk_layer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +33,7 @@ struct dp_port {
 	struct rte_flow					*default_jump_flow;
 	struct rte_flow					*default_capture_flow;
 	bool							captured;
+	struct dp_port_stats			stats;
 };
 
 struct dp_ports {
