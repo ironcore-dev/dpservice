@@ -14,7 +14,6 @@ extern "C" {
 #include <rte_log.h>
 #include <rte_mbuf.h>
 
-#define VM_IFACE_ID_MAX_LEN		64
 #define DP_FIREWALL_ID_MAX_LEN	64
 #define VM_MACHINE_PXE_MAX_LEN	32
 #define DP_LB_ID_MAX_LEN		64

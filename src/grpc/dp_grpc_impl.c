@@ -11,6 +11,7 @@
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
+#include "dp_vm.h"
 #include "dp_vnf.h"
 #include "dp_vni.h"
 #include "dpdk_layer.h"

@@ -10,29 +10,8 @@
 #include "dp_vni.h"
 #include "grpc/dp_grpc_responder.h"
 
-static struct rte_hash *vm_handle_tbl = NULL;
-
 static const uint32_t dp_router_gw_ip4 = RTE_IPV4(169, 254, 0, 1);
 static const uint8_t dp_router_gw_ip6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01};
-
-static const uint8_t *service_ul_ip;
-
-int dp_lpm_init(int socket_id)
-{
-	vm_handle_tbl = dp_create_jhash_table(DP_MAX_PORTS, VM_IFACE_ID_MAX_LEN,
-										  "vm_handle_table", socket_id);
-	if (!vm_handle_tbl)
-		return DP_ERROR;
-
-	service_ul_ip = dp_conf_get_underlay_ip();
-
-	return DP_OK;
-}
-
-void dp_lpm_free(void)
-{
-	dp_free_jhash_table(vm_handle_tbl);
-}
 
 static __rte_always_inline int dp_lpm_fill_route_tables(struct dp_port *port)
 {
@@ -90,52 +69,6 @@ int dp_lpm_reset_route_tables(int vni, int socket_id)
 	return DP_GRPC_OK;
 }
 
-int dp_map_vm_handle(const char key[VM_IFACE_ID_MAX_LEN], struct dp_port *port)
-{
-	hash_sig_t hash = rte_hash_hash(vm_handle_tbl, key);
-	int ret;
-
-	ret = rte_hash_lookup_with_hash(vm_handle_tbl, key, hash);
-	if (ret != -ENOENT) {
-		if (DP_FAILED(ret))
-			DPS_LOG_ERR("VM handle lookup failed", DP_LOG_RET(ret));
-		else
-			DPS_LOG_ERR("VM handle already exists");
-		return DP_ERROR;
-	}
-
-	ret = rte_hash_add_key_with_hash_data(vm_handle_tbl, key, hash, port);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot add VM handle data", DP_LOG_PORT(port), DP_LOG_RET(ret));
-		return DP_ERROR;
-	}
-
-	static_assert(sizeof(port->vm.machineid) == VM_IFACE_ID_MAX_LEN, "Incompatible VM ID size");
-	rte_memcpy(port->vm.machineid, key, VM_IFACE_ID_MAX_LEN);
-
-	return DP_OK;
-}
-
-void dp_unmap_vm_handle(const void *key)
-{
-	rte_hash_del_key(vm_handle_tbl, key);
-}
-
-struct dp_port *dp_get_port_with_vm_handle(const void *key)
-{
-	struct dp_port *port;
-	int ret;
-
-	ret = rte_hash_lookup_data(vm_handle_tbl, key, (void **)&port);
-	if (DP_FAILED(ret)) {
-		if (ret != -ENOENT)
-			DPS_LOG_ERR("Failed to look the VM port-id up", DP_LOG_RET(ret));
-		return NULL;
-	}
-
-	return port;
-}
-
 uint32_t dp_get_gw_ip4(void)
 {
 	return dp_router_gw_ip4;
@@ -144,23 +77,6 @@ uint32_t dp_get_gw_ip4(void)
 const uint8_t *dp_get_gw_ip6(void)
 {
 	return dp_router_gw_ip6;
-}
-
-bool dp_arp_cycle_needed(struct dp_port *port)
-{
-	return  (port->vm.ready &&
-			(port->vm.info.neigh_mac.addr_bytes[0] == 0) &&
-			(port->vm.info.neigh_mac.addr_bytes[1] == 0) &&
-			(port->vm.info.neigh_mac.addr_bytes[2] == 0) &&
-			(port->vm.info.neigh_mac.addr_bytes[3] == 0) &&
-			(port->vm.info.neigh_mac.addr_bytes[4] == 0) &&
-			(port->vm.info.neigh_mac.addr_bytes[5] == 0));
-}
-
-// TODO inline in dp_vm.c?
-const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port)
-{
-	return port->vm.ready ? port->vm.ul_ipv6 : service_ul_ip;
 }
 
 int dp_add_route(struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
@@ -356,23 +272,6 @@ int dp_del_route6(struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8
 	return DP_GRPC_OK;
 }
 
-// TODO inline?
-int dp_load_mac(struct dp_port *port)
-{
-	return rte_eth_macaddr_get(port->port_id, &port->vm.info.own_mac);
-}
-
-int dp_setup_vm(struct dp_port *port, int vni)
-{
-	if (DP_FAILED(dp_create_vni_route_tables(vni, port->socket_id)))
-		return DP_ERROR;
-
-	dp_init_firewall_rules(port);
-	port->vm.vni = vni;
-	port->vm.ready = 1;
-	return DP_OK;
-}
-
 struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 									int t_vni,
 									const struct dp_flow *df,
@@ -444,28 +343,4 @@ struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 		*route = *(struct vm_route *)rte_rib6_get_ext(node);
 
 	return dst_port;
-}
-
-void dp_del_vm(struct dp_port *port)
-{
-	uint32_t vni = port->vm.vni;
-
-	dp_del_route(port, vni, port->vm.info.own_ip, 32);
-	dp_del_route6(port, vni, port->vm.info.dhcp_ipv6, 128);
-
-	if (DP_FAILED(dp_delete_vni_route_tables(vni)))
-		DPS_LOG_WARNING("Unable to delete route tables", DP_LOG_VNI(vni));
-
-	dp_del_all_firewall_rules(port);
-
-	memset(&port->vm, 0, sizeof(port->vm));
-	// own mac address in the vm_entry needs to be refilled due to the above cleaning process
-	dp_load_mac(port);
-}
-
-void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *port, uint16_t ether_type)
-{
-	rte_ether_addr_copy(&port->vm.info.neigh_mac, &ether_hdr->dst_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &ether_hdr->src_addr);
-	ether_hdr->ether_type = htons(ether_type);
 }

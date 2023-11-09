@@ -7,6 +7,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
+#include "dp_vm.h"
 #include "nodes/common_node.h"
 
 DP_NODE_REGISTER(ARP, arp, DP_NODE_DEFAULT_NEXT_ONLY);

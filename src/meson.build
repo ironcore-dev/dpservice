@@ -55,6 +55,7 @@ dp_sources = [
   'dp_telemetry.c',
   'dp_timers.c',
   'dp_util.c',
+  'dp_vm.c',
   'dp_vnf.c',
   'dp_vni.c',
   'dpdk_layer.c',

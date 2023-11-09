@@ -5,8 +5,8 @@
 #include <rte_mbuf.h>
 #include "dp_conf.h"
 #include "dp_error.h"
-#include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_vm.h"
 #include "nodes/common_node.h"
 #include "protocols/dp_dhcpv6.h"
 #include "rte_flow/dp_rte_flow.h"

@@ -2,8 +2,9 @@
 #define __DP_GRPC_API_H__
 
 #include <stdint.h>
-#include "dp_util.h"
 #include "dp_firewall.h"
+#include "dp_util.h"
+#include "dp_vm.h"
 #include "monitoring/dp_monitoring.h"
 
 #ifdef __cplusplus

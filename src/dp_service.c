@@ -11,7 +11,7 @@
 #include "dp_graph.h"
 #include "dp_lb.h"
 #include "dp_log.h"
-#include "dp_lpm.h"
+#include "dp_vm.h"
 #include "dp_multi_path.h"
 #include "dp_nat.h"
 #include "dp_port.h"
@@ -168,7 +168,7 @@ static int init_interfaces(void)
 		|| DP_FAILED(dp_nat_init(pf0->socket_id))
 		|| DP_FAILED(dp_lb_init(pf0->socket_id))
 		|| DP_FAILED(dp_vni_init(pf0->socket_id))
-		|| DP_FAILED(dp_lpm_init(pf0->socket_id))
+		|| DP_FAILED(dp_vms_init(pf0->socket_id))
 		|| DP_FAILED(dp_vnf_init(pf0->socket_id)))
 		return DP_ERROR;
 
@@ -178,7 +178,7 @@ static int init_interfaces(void)
 static void free_interfaces(void)
 {
 	dp_vnf_free();
-	dp_lpm_free();
+	dp_vms_free();
 	dp_vni_free();
 	dp_lb_free();
 	dp_nat_free();

@@ -75,7 +75,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 								uint16_t nb_objs)
 {
 	struct tx_node_ctx *ctx = (struct tx_node_ctx *)node->ctx;
-	uint16_t port = ctx->port_id;
+	uint16_t port_id = ctx->port_id;
 	uint16_t queue = ctx->queue_id;
 	uint16_t sent_count;
 	struct rte_mbuf *m;
@@ -98,8 +98,8 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		}
 	}
 
-	sent_count = rte_eth_tx_burst(port, queue, (struct rte_mbuf **)objs, nb_objs);
-	dp_graphtrace_tx_burst(node, objs, sent_count, port);
+	sent_count = rte_eth_tx_burst(port_id, queue, (struct rte_mbuf **)objs, nb_objs);
+	dp_graphtrace_tx_burst(node, objs, sent_count, port_id);
 
 	if (unlikely(sent_count != nb_objs)) {
 		DPNODE_LOG_WARNING(node, "Not all packets transmitted successfully", DP_LOG_VALUE(sent_count), DP_LOG_MAX(nb_objs));
