@@ -23,17 +23,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
-	struct dp_port *src_port;
-	struct dp_port *dst_port;
+	struct dp_port *src_port = dp_get_port(m);
+	struct dp_port *dst_port = dp_get_dst_port(df);
 	enum dp_fwall_action action;
-
-	src_port = dp_get_port(m->port);
-	if (!src_port)
-		return FIREWALL_NEXT_DROP;
-
-	dst_port = dp_get_port(df->nxt_hop);
-	if (!dst_port)
-		return FIREWALL_NEXT_DROP;
 
 	// currently only IPv4 firewall is implemented
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4 && cntrack) {

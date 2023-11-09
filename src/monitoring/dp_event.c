@@ -76,8 +76,9 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 	struct dp_event_msg *status_msg = rte_pktmbuf_mtod(m, struct dp_event_msg *);
 	uint16_t port_id = status_msg->event_entry.link_status.port_id;
 	uint8_t status = status_msg->event_entry.link_status.status;
-	struct dp_port *port = dp_get_port(port_id);
+	struct dp_port *port;
 
+	port = dp_get_port_by_id(port_id);
 	if (!port) {
 		DPS_LOG_WARNING("Cannot set link status, port invalid", DP_LOG_PORTID(port_id), DP_LOG_VALUE(status));
 		return;

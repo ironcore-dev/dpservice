@@ -167,7 +167,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv4_hdr *incoming_ipv4_hdr;
 	struct rte_udp_hdr *incoming_udp_hdr;
 	struct dp_dhcp_header *dhcp_hdr;
-	struct dp_port *port;
+	struct dp_port *port = dp_get_port(m);
 	int options_len, header_size;
 	uint8_t msg_type;
 
@@ -204,10 +204,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		DPNODE_LOG_DEBUG(node, "Unhandled DHCP message type", DP_LOG_VALUE(msg_type));
 		return DHCP_NEXT_DROP;
 	}
-
-	port = dp_get_port(m->port);
-	if (!port)
-		return DHCP_NEXT_DROP;
 
 	/* rewrite the packet and send it back as a response */
 
@@ -279,8 +275,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				 + header_size;
 	m->data_len = m->pkt_len;
 
-	if (DP_FAILED(dp_attach_vf(m->port))) {
-		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(m->port));
+	if (DP_FAILED(dp_attach_vf(port))) {
+		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(port->port_id));
 		return DHCP_NEXT_DROP;
 	}
 

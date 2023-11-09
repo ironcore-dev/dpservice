@@ -21,7 +21,7 @@ static __rte_always_inline void dp_lb_set_next_hop(struct dp_flow *df, uint16_t 
 {
 	df->flags.flow_type = DP_FLOW_TYPE_OUTGOING; // for recirc pkt, it will be changed back to DP_FLOW_TYPE_INCOMING in cls_node.c
 	if (DP_FAILED(dp_get_portid_with_vnf_key(df->tun_info.ul_dst_addr6, DP_VNF_TYPE_LB_ALIAS_PFX))) {
-		df->nxt_hop = port_id;
+		df->nxt_hop = port_id;  // needs to validated by the caller!
 		df->flags.nat = DP_CHG_UL_DST_IP;
 	} else
 		df->flags.nat = DP_LB_RECIRC;
@@ -32,7 +32,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
 	struct flow_key *flow_key;
-	struct dp_port *port;
 	uint32_t dst_ip, vni;
 	uint8_t *target_ip6;
 
@@ -41,13 +40,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	dst_ip = ntohl(df->dst.dst_addr);
 	vni = df->tun_info.dst_vni;
-	if (vni == 0) {
-		port = dp_get_port(m->port);
-		// TODO: mention this in the PR
-		if (!port)
-			return LB_NEXT_DROP;
-		vni = port->vm.vni;
-	}
+	if (vni == 0)
+		vni = dp_get_port(m)->vm.vni;
 
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status)
 		&& df->flags.dir == DP_FLOW_DIR_ORG

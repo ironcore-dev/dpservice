@@ -24,7 +24,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const uint8_t *underlay_dst;
 	struct dp_icmp_err_ip_info icmp_err_ip_info;
 	struct dnat_data *dnat_data;
-	struct dp_port *port;
 
 	if (!cntrack)
 		return DNAT_NEXT_IPV4_LOOKUP;
@@ -32,12 +31,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni;
-		if (vni == 0) {
-			port = dp_get_port(m->port);
-			if (!port)
-				return DNAT_NEXT_DROP;
-			vni = port->vm.vni;
-		}
+		if (vni == 0)
+			vni = dp_get_port(m)->vm.vni;
 
 		dnat_data = dp_get_dnat_data(dst_ip, vni);
 		if (dnat_data) {

@@ -123,6 +123,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t l3_type;
 	struct dp_flow *df;
+	struct dp_port *port;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
 #endif
@@ -143,8 +144,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	// L3-aware nodes need dp_flow structure (call cannot fail)
 	df = dp_init_flow_ptr(m);
 
+	// this is validating the port-id for all subsequent uses of dp_get_port(m)
+	port = dp_get_port_by_id(m->port);
+	if (unlikely(!port))
+		return CLS_NEXT_DROP;
+
 	if (RTE_ETH_IS_IPV4_HDR(l3_type)) {
-		if (dp_port_is_pf(m->port))
+		if (port->port_type == DP_PORT_PF)
 			return CLS_NEXT_DROP;
 #ifdef ENABLE_VIRTSVC
 		if (virtsvc_present) {
@@ -162,7 +168,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
 		ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
-		if (dp_port_is_pf(m->port)) {
+		if (port->port_type == DP_PORT_PF) {
 			if (unlikely(is_ipv6_nd(ipv6_hdr)))
 				return CLS_NEXT_DROP;
 			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;

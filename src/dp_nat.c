@@ -554,7 +554,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 		rte_free(portmap_data);
 	}
 
-	created_port = dp_get_port(cntrack->created_port_id);
+	created_port = dp_get_port_by_id(cntrack->created_port_id);
 	if (!created_port)
 		return DP_ERROR;
 

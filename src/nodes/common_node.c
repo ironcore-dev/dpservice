@@ -35,10 +35,14 @@ int dp_node_append_vf_tx(struct rte_node_register *node,
 					  uint16_t port_id,
 					  const char *tx_node_name)
 {
-	if (dp_port_is_pf(port_id)) {
-		DPNODE_LOG_ERR(node, "Node not designed to be connected to physical ports");
+	struct dp_port *port;
+
+	port = dp_get_port_by_id(port_id);
+	if (!port || port->port_type != DP_PORT_VF) {
+		DPNODE_LOG_ERR(node, "Node requires a valid virtual port to connect to");
 		return DP_ERROR;
 	}
+
 	return dp_node_append_tx(node, next_tx_indices, port_id, tx_node_name);
 }
 
@@ -48,9 +52,13 @@ int dp_node_append_pf_tx(struct rte_node_register *node,
 					  uint16_t port_id,
 					  const char *tx_node_name)
 {
-	if (!dp_port_is_pf(port_id)) {
-		DPNODE_LOG_ERR(node, "Node not designed to be connected to virtual ports");
+	struct dp_port *port;
+
+	port = dp_get_port_by_id(port_id);
+	if (!port || port->port_type != DP_PORT_PF) {
+		DPNODE_LOG_ERR(node, "Node requires a valid physical port to connect to");
 		return DP_ERROR;
 	}
+
 	return dp_node_append_tx(node, next_tx_indices, port_id, tx_node_name);
 }

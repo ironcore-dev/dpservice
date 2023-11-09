@@ -77,7 +77,6 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 	uint16_t op_code;
 	uint16_t op_len = 0;
 	const struct dhcpv6_option *opt;
-	struct dp_port *port;
 
 	for (int i = 0;
 		 i + sizeof(struct dhcpv6_option) < (size_t)options_len;  // len already checked for being positive
@@ -107,12 +106,9 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 				DPS_LOG_WARNING("Malformed DHCPv6 IA_NA option");
 				return DP_ERROR;
 			}
-			port = dp_get_port(m->port);
-			if (!port)
-				return DP_ERROR;
 			reply_options->opt_iana = opt_iana_template;
 			reply_options->opt_iana.ia_na.iaid = ((const struct dhcpv6_ia_na *)&opt->data)->iaid;
-			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, port->vm.info.dhcp_ipv6, 16);
+			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_port(m)->vm.info.dhcp_ipv6, 16);
 			reply_options->opt_iana_len = sizeof(opt_iana_template);
 			break;
 		case DHCPV6_OPT_RAPID_COMMIT:
@@ -197,7 +193,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv6_hdr *req_ipv6_hdr; 
 	struct rte_udp_hdr *req_udp_hdr;
 	struct dhcpv6_packet *dhcp_pkt;
-	struct dp_port *port;
 	int req_options_len = rte_pktmbuf_data_len(m) - DP_DHCPV6_PKT_FIXED_LEN;
 	int reply_options_len;
 
@@ -207,10 +202,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		return DHCPV6_NEXT_DROP;
 	}
 
-	port = dp_get_port(m->port);
-	if (unlikely(!port))
-		return DHCPV6_NEXT_DROP;
-
 	req_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
 	req_udp_hdr = (struct rte_udp_hdr *)(req_ipv6_hdr + 1);
@@ -218,7 +209,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	// switch the packet's direction
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &req_eth_hdr->src_addr);
+	rte_ether_addr_copy(&dp_get_port(m)->vm.info.own_mac, &req_eth_hdr->src_addr);
 
 	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr, sizeof(req_ipv6_hdr->dst_addr));
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6, sizeof(req_ipv6_hdr->src_addr));

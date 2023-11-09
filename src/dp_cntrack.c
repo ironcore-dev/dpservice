@@ -239,12 +239,7 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 
 static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flow *df, struct flow_value **p_flow_val)
 {
-	struct dp_port *port;
 	int ret;
-
-	port = dp_get_port(m->port);
-	if (unlikely(!port))
-		return DP_ERROR;
 
 	// TODO(plague): discuss making DP_FAILED() unlikely by default
 	ret = dp_build_flow_key(curr_key, m);
@@ -273,7 +268,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 			return ret;
 		}
 		// create new flow if needed
-		*p_flow_val = flow_table_insert_entry(curr_key, df, port);
+		*p_flow_val = flow_table_insert_entry(curr_key, df, dp_get_port(m));
 		if (unlikely(!*p_flow_val)) {
 			DPS_LOG_WARNING("Failed to create a new flow table entry");
 			return DP_ERROR;

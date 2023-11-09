@@ -34,12 +34,8 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	rte_be32_t requested_ip = incoming_arp_hdr->arp_data.arp_tip;
 	rte_be32_t sender_ip = incoming_arp_hdr->arp_data.arp_sip;
 	struct rte_ether_addr tmp_addr;
-	struct dp_port *port;
+	struct dp_port *port = dp_get_port(m);
 	uint32_t temp_ip;
-
-	port = dp_get_port(m->port);
-	if (!port)
-		return false;
 
 	// ARP reply from VM
 	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->vm.info.own_ip)) {
@@ -65,17 +61,17 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	return true;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *pkt)
+static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
-	if (!arp_handled(pkt))
+	if (!arp_handled(m))
 		return ARP_NEXT_DROP;
 
-	if (DP_FAILED(dp_attach_vf(pkt->port))) {
-		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(pkt->port));
+	if (DP_FAILED(dp_attach_vf(dp_get_port(m)))) {
+		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(m->port));
 		return ARP_NEXT_DROP;
 	}
 
-	return next_tx_index[pkt->port];
+	return next_tx_index[m->port];
 }
 
 static __rte_always_inline uint16_t arp_node_process(struct rte_graph *graph,

@@ -158,12 +158,9 @@ bool dp_arp_cycle_needed(struct dp_port *port)
 }
 
 // TODO inline in dp_vm.c?
-// TODO re-check the use of struct dp_port instead
-const uint8_t *dp_get_port_ul_ip6(uint16_t port_id)
+const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port)
 {
-	struct dp_port *port = dp_get_port(port_id);
-
-	return port && port->vm.ready ? port->vm.ul_ipv6 : service_ul_ip;
+	return port->vm.ready ? port->vm.ul_ipv6 : service_ul_ip;
 }
 
 int dp_add_route(struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
@@ -239,6 +236,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 {
 	struct dpgrpc_route *reply;
 	uint64_t next_hop;
+	struct dp_port *dst_port;
 	struct vm_route *vm_route;
 	uint32_t ipv4;
 	uint8_t depth;
@@ -246,8 +244,12 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	// can only fail when any argument is NULL
 	rte_rib_get_nh(node, &next_hop);
 
-	if ((ext_routes && dp_port_is_pf(next_hop))
-		|| (!ext_routes && next_hop == port->port_id && !dp_route_in_dhcp_range(node, port))
+	dst_port = dp_get_port_by_id(next_hop);
+	if (unlikely(!dst_port))
+		return DP_GRPC_ERR_NO_VM;
+
+	if ((ext_routes && dst_port->port_type == DP_PORT_PF)
+		|| (!ext_routes && dst_port->port_id == port->port_id && !dp_route_in_dhcp_range(node, port))
 	) {
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
@@ -397,7 +399,7 @@ struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	if (DP_FAILED(rte_rib_get_nh(node, &next_hop)))
 		return NULL;
 
-	dst_port = dp_get_port(next_hop);
+	dst_port = dp_get_port_by_id(next_hop);
 	if (!dst_port)
 		return NULL;
 
@@ -434,7 +436,7 @@ struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 	if (DP_FAILED(rte_rib6_get_nh(node, &next_hop)))
 		return NULL;
 
-	dst_port = dp_get_port(next_hop);
+	dst_port = dp_get_port_by_id(next_hop);
 	if (!dst_port)
 		return NULL;
 

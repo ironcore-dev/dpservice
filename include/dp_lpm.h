@@ -86,7 +86,8 @@ struct dp_port *dp_get_port_with_vm_handle(const void *key);
 
 uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);
-const uint8_t *dp_get_port_ul_ip6(uint16_t port_id);
+
+const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port);
 
 int dp_load_mac(struct dp_port *port);
 

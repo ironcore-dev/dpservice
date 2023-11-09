@@ -140,7 +140,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 		m->l4_len = sizeof(struct rte_udp_hdr);
 	}
 
-	pf_port = dp_get_port(pf_port_id);
+	pf_port = dp_get_port_by_id(pf_port_id);
 	if (!pf_port)
 		return VIRTSVC_NEXT_DROP;
 
@@ -230,7 +230,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	ipv4_hdr->dst_addr = conn->vf_ip;
 	vf_port_id = conn->vf_port_id;
 
-	vf_port = dp_get_port(vf_port_id);
+	vf_port = dp_get_port_by_id(vf_port_id);
 	if (!vf_port || !vf_port->attached)
 		return VIRTSVC_NEXT_DROP;
 

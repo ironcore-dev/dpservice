@@ -44,13 +44,13 @@ struct dp_ports {
 
 struct dp_ports *dp_get_ports(void);
 
-struct dp_port *dp_get_port(uint16_t port_id);
+struct dp_port *dp_get_port(struct rte_mbuf *m);
+struct dp_port *dp_get_dst_port(struct dp_flow *df);
 
+struct dp_port *dp_get_port_by_id(uint16_t port_id);
 struct dp_port *dp_get_port_by_name(const char *pci_name);
 
-bool dp_port_is_pf(uint16_t port_id);
-
-int dp_attach_vf(uint16_t port_id);
+int dp_attach_vf(struct dp_port *port);
 
 int dp_ports_init(void);
 void dp_ports_free(void);

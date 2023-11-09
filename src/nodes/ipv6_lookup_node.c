@@ -22,7 +22,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	struct vm_route route;
-	struct dp_port *port;
 	struct dp_port *dst_port;
 	int t_vni;
 
@@ -39,15 +38,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
-	port = dp_get_port(m->port);
-	if (unlikely(!port))
-		return IPV6_LOOKUP_NEXT_DROP;
-
-	dst_port = dp_get_ip6_dst_port(port, t_vni, ipv6_hdr, &route);
+	dst_port = dp_get_ip6_dst_port(dp_get_port(m), t_vni, ipv6_hdr, &route);
 	if (!dst_port)
 		return IPV6_LOOKUP_NEXT_DROP;
 
-	df->nxt_hop = dst_port->port_id;
+	df->nxt_hop = dst_port->port_id;  // always valid since coming from struct dp_port
 
 	if (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
 		df->tun_info.dst_vni = route.vni;

@@ -174,7 +174,7 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 	encap_ipv6_hdr->payload_len = 0;
 	encap_ipv6_hdr->proto = df->tun_info.proto_id;
 	encap_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	rte_memcpy(encap_ipv6_hdr->src_addr, dp_get_port_ul_ip6(incoming_port->port_id), sizeof(encap_ipv6_hdr->src_addr));
+	rte_memcpy(encap_ipv6_hdr->src_addr, dp_get_port_ul_ip6(incoming_port), sizeof(encap_ipv6_hdr->src_addr));
 	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
 }
 
@@ -218,23 +218,9 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	uint8_t raw_encap_hdr[DP_IPIP_ENCAP_HEADER_SIZE];
 	const struct rte_flow_attr *attr;
 	uint16_t t_port_id;
-	bool cross_pf_port;
-	const struct dp_port *incoming_port;
-	const struct dp_port *outgoing_port;
-
-	incoming_port = dp_get_port(m->port);
-	if (!incoming_port) {
-		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
-		return DP_ERROR;
-	}
-
-	outgoing_port = dp_get_port(df->nxt_hop);
-	if (!outgoing_port) {
-		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
-		return DP_ERROR;
-	}
-
-	cross_pf_port = outgoing_port != dp_get_pf0();
+	const struct dp_port *incoming_port = dp_get_port(m);
+	const struct dp_port *outgoing_port = dp_get_dst_port(df);
+	bool cross_pf_port = outgoing_port != dp_get_pf0();
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
 	if (cross_pf_port) {
@@ -379,24 +365,11 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_flow_action *age_action, *age_action_capture;
 	struct rte_ether_hdr new_eth_hdr;
 	rte_be32_t actual_ol_ipv4_addr;
-	bool cross_pf_port;
 	const struct rte_flow_attr *attr =  &dp_flow_attr_transfer_single_stage;
-	const struct dp_port *incoming_port;
-	const struct dp_port *outgoing_port;
+	const struct dp_port *incoming_port = dp_get_port(m);
+	const struct dp_port *outgoing_port = dp_get_dst_port(df);
+	bool cross_pf_port = incoming_port != dp_get_pf0();
 
-	incoming_port = dp_get_port(m->port);
-	if (!incoming_port) {
-		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
-		return DP_ERROR;
-	}
-
-	outgoing_port = dp_get_port(df->nxt_hop);
-	if (!outgoing_port) {
-		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
-		return DP_ERROR;
-	}
-
-	cross_pf_port = incoming_port != dp_get_pf0();
 	if (cross_pf_port)
 		df->conntrack->incoming_flow_offloaded_flag.pf1 = true;
 	else
@@ -541,20 +514,8 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct rte_flow_action *age_action;
 	rte_be32_t actual_ol_ipv4_dst_addr;
 	const struct rte_flow_attr *attr;
-	const struct dp_port *incoming_port;
-	const struct dp_port *outgoing_port;
-
-	incoming_port = dp_get_port(m->port);
-	if (!incoming_port) {
-		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
-		return DP_ERROR;
-	}
-
-	outgoing_port = dp_get_port(df->nxt_hop);
-	if (!outgoing_port) {
-		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
-		return DP_ERROR;
-	}
+	const struct dp_port *incoming_port = dp_get_port(m);
+	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 
 	// create local flow match pattern
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
@@ -641,22 +602,11 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
-	const struct dp_port *incoming_port;
-	const struct dp_port *outgoing_port;
-
-	incoming_port = dp_get_port(m->port);
-	if (!incoming_port) {
-		DPS_LOG_ERR("Incoming port not registered in service", DP_LOG_PORTID(m->port));
-		return DP_ERROR;
-	}
+	const struct dp_port *incoming_port = dp_get_port(m);
+	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 
 	df->nxt_hop = (incoming_port == dp_get_pf0() ? dp_get_pf1() : incoming_port)->port_id;
-
-	outgoing_port = dp_get_port(df->nxt_hop);
-	if (!outgoing_port) {
-		DPS_LOG_ERR("Outgoing port not registered in service", DP_LOG_PORTID(df->nxt_hop));
-		return DP_ERROR;
-	}
+	// no need to validate as this can only be PF0/PF1
 
 	// create match pattern based on dp_flow
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));

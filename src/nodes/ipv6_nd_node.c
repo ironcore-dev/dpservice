@@ -29,11 +29,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const uint8_t *rt_ip = dp_get_gw_ip6();
 	struct nd_msg *nd_msg;
 	struct ra_msg *req_ra_msg;
-	struct dp_port *port;
-
-	port = dp_get_port(m->port);
-	if (unlikely(!port))
-		return IPV6_ND_NEXT_DROP;
+	struct dp_port *port = dp_get_port(m);
 
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_ether_addr_copy(&port->vm.info.own_mac, &req_eth_hdr->src_addr);

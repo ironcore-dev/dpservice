@@ -29,7 +29,7 @@ static const struct rte_flow_attr dp_flow_attr_default_capture_ingress = {
 	.transfer = 1,
 };
 
-int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
+int dp_install_jump_rule_in_default_group(struct dp_port *port, uint32_t dst_group)
 {
 	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
 	int pattern_cnt = 0;
@@ -40,11 +40,6 @@ int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
 	int action_cnt = 0;
 
 	struct rte_flow *flow;
-	struct dp_port *port;
-
-	port = dp_get_port(port_id);
-	if (!port)
-		return DP_ERROR;
 
 	// all ethernet packets
 	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
@@ -58,13 +53,13 @@ int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group)
 	dp_set_end_action(&action[action_cnt++]);
 
 	// validate and install flow rule
-	flow = dp_install_rte_flow(port_id, &dp_flow_attr_default_jump_ingress, pattern, action);
+	flow = dp_install_rte_flow(port->port_id, &dp_flow_attr_default_jump_ingress, pattern, action);
 	if (!flow)
 		return DP_ERROR;
 
 	port->default_jump_flow = flow;
 
-	DPS_LOG_DEBUG("Installed the default jumping flow rule that destinated to group", DP_LOG_PORTID(port_id), DP_LOG_RTE_GROUP(dst_group));
+	DPS_LOG_DEBUG("Installed the default jumping flow rule that destinated to group", DP_LOG_PORTID(port->port_id), DP_LOG_RTE_GROUP(dst_group));
 	return DP_OK;
 }
 
@@ -101,7 +96,7 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 }
 
 
-static int dp_install_default_rule_in_capture_group(uint16_t port_id, bool capture_on)
+static int dp_install_default_rule_in_capture_group(struct dp_port *port, bool capture_on)
 {
 
 	struct rte_flow_item pattern[2]; // first is a NULL ethernet header matching, second is the end
@@ -117,12 +112,7 @@ static int dp_install_default_rule_in_capture_group(uint16_t port_id, bool captu
 	struct rte_flow_action sub_action[3];			// + end
 
 	struct rte_flow *flow;
-	struct dp_port *port;
 	uint8_t raw_encap_hdr[DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE];
-
-	port = dp_get_port(port_id);
-	if (!port)
-		return DP_ERROR;
 
 	// all ethernet packets
 	dp_set_eth_match_all_item(&pattern[pattern_cnt++]);
@@ -142,15 +132,15 @@ static int dp_install_default_rule_in_capture_group(uint16_t port_id, bool captu
 	dp_set_end_action(&action[action_cnt++]);
 
 	// validate and install flow rule
-	flow = dp_install_rte_flow(port_id, &dp_flow_attr_default_capture_ingress, pattern, action);
+	flow = dp_install_rte_flow(port->port_id, &dp_flow_attr_default_capture_ingress, pattern, action);
 	if (!flow) {
-		DPS_LOG_WARNING("Failed to install default monitoring flow rule", DP_LOG_PORTID(port_id));
+		DPS_LOG_WARNING("Failed to install default monitoring flow rule", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
 
 	port->default_capture_flow = flow;
 
-	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORTID(port_id));
+	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORTID(port->port_id));
 	return DP_OK;
 }
 
@@ -183,7 +173,7 @@ static int dp_install_pf_default_flow(struct dp_port *port, bool capture_on)
 {
 	int ret;
 
-	ret = dp_install_default_rule_in_capture_group(port->port_id, capture_on);
+	ret = dp_install_default_rule_in_capture_group(port, capture_on);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed to install default flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
@@ -196,7 +186,7 @@ static int dp_install_vf_default_jump_flow(struct dp_port *port, uint32_t dst_gr
 {
 	int ret;
 
-	ret = dp_install_jump_rule_in_default_group(port->port_id, dst_group);
+	ret = dp_install_jump_rule_in_default_group(port, dst_group);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed to install default jump flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
@@ -209,7 +199,7 @@ static int dp_install_vf_default_capture_flow(struct dp_port *port)
 {
 	int ret;
 
-	ret = dp_install_default_rule_in_capture_group(port->port_id, true);
+	ret = dp_install_default_rule_in_capture_group(port, true);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed to install default capture flow", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;

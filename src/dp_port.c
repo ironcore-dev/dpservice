@@ -38,7 +38,6 @@ static const struct rte_eth_conf port_conf_default = {
 	},
 };
 
-// TODO maybe use RTE_MAX_ETHPORTS to make sure there will never be such value?
 static struct dp_port *port_table[DP_MAX_PORTS];
 static struct dp_port *pf_ports[DP_MAX_PF_PORTS];
 static struct dp_ports dp_ports;
@@ -79,23 +78,28 @@ static int dp_port_register_pf(struct dp_port *port)
 	return DP_ERROR;
 }
 
-
-static __rte_always_inline struct dp_port *get_port(uint16_t port_id)
+// TODO inline
+struct dp_port *dp_get_port(struct rte_mbuf *m)
 {
-	if (port_id >= RTE_DIM(port_table))  // includes DP_INVALID_PORT_ID
-		return NULL;
-
-	return port_table[port_id];
+	// m->port should've already been validated
+	return port_table[m->port];
 }
 
-struct dp_port *dp_get_port(uint16_t port_id)
+// TODO inline
+struct dp_port *dp_get_dst_port(struct dp_flow *df)
 {
-	struct dp_port *port = get_port(port_id);
+	// df->nxt_hop should've already been validated
+	return port_table[df->nxt_hop];
+}
 
-	if (!port)
+// TODO inline? not sure
+struct dp_port *dp_get_port_by_id(uint16_t port_id)
+{
+	if (port_id >= RTE_DIM(port_table)) {
 		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
-
-	return port;
+		return NULL;
+	}
+	return port_table[port_id];
 }
 
 struct dp_port *dp_get_port_by_name(const char *pci_name)
@@ -103,25 +107,20 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	uint16_t port_id;
 
 	if (pci_name[0] == '\0' || DP_FAILED(rte_eth_dev_get_port_by_name(pci_name, &port_id)))
+		return NULL;  // no error, this comes from a client
+
+	if (port_id >= RTE_DIM(port_table)) {
+		DPS_LOG_ERR("Invalid port stored for this device", DP_LOG_PCI(pci_name));
 		return NULL;
+	}
 
-	return get_port(port_id);
+	return port_table[port_id];
 }
 
-bool dp_port_is_pf(uint16_t port_id)
+int dp_attach_vf(struct dp_port *port)
 {
-	struct dp_port *port = get_port(port_id);
-
-	return port && port->port_type == DP_PORT_PF;
-}
-
-int dp_attach_vf(uint16_t port_id)
-{
-	struct dp_port *port;
-
-	port = get_port(port_id);
-	if (!port || port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORTID(port_id));
+	if (port->port_type != DP_PORT_VF) {
+		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
 
@@ -439,13 +438,13 @@ static int dp_port_bind_port_hairpins(struct dp_port *port)
 	return DP_OK;
 }
 
-static int dp_install_vf_init_rte_rules(uint32_t port_id)
+static int dp_install_vf_init_rte_rules(struct dp_port *port)
 {
 	int ret;
 
-	ret = dp_install_jump_rule_in_default_group(port_id, DP_RTE_FLOW_VNET_GROUP);
+	ret = dp_install_jump_rule_in_default_group(port, DP_RTE_FLOW_VNET_GROUP);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot install default jump rule", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 
@@ -473,7 +472,7 @@ static int dp_init_port(struct dp_port *port)
 			return DP_ERROR;
 
 		if (port->port_type == DP_PORT_VF)
-			if (DP_FAILED(dp_install_vf_init_rte_rules(port->port_id)))
+			if (DP_FAILED(dp_install_vf_init_rte_rules(port)))
 				assert(false);  // if any flow rule failed, stop process running due to possible hw/driver failure
 	}
 

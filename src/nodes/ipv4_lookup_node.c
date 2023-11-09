@@ -24,18 +24,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct vm_route route;
 	uint32_t route_key = 0;
-	struct dp_port *port;
 	struct dp_port *dst_port;
 
 	// TODO: add broadcast routes when machine is added
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	port = dp_get_port(m->port);
-	if (unlikely(!port))
-		return IPV4_LOOKUP_NEXT_DROP;
-
-	dst_port = dp_get_ip4_dst_port(port, df->tun_info.dst_vni, df, &route, &route_key);
+	dst_port = dp_get_ip4_dst_port(dp_get_port(m), df->tun_info.dst_vni, df, &route, &route_key);
 	if (!dst_port)
 		return IPV4_LOOKUP_NEXT_DROP;
 
@@ -68,7 +63,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (dst_port->port_type == DP_PORT_VF)
 		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port, RTE_ETHER_TYPE_IPV4);
 
-	df->nxt_hop = dst_port->port_id;
+	df->nxt_hop = dst_port->port_id;  // always valid since coming from struct dp_port
 	return IPV4_LOOKUP_NEXT_NAT;
 }
 

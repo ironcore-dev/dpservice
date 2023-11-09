@@ -11,7 +11,7 @@ extern "C" {
 #include "dp_port.h"
 
 
-int dp_install_jump_rule_in_default_group(uint16_t port_id, uint32_t dst_group);
+int dp_install_jump_rule_in_default_group(struct dp_port *port, uint32_t dst_group);
 
 int dp_enable_pkt_capture(struct dp_port *port);
 int dp_disable_pkt_capture(struct dp_port *port);
