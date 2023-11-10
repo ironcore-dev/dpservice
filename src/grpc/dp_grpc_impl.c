@@ -56,16 +56,16 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 }
 
 static int dp_insert_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type,
-							   int vni, uint16_t port_id, uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
+							   int vni, const struct dp_port *port, uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	dp_generate_underlay_ipv6(ul_addr6);
 	val->v_type = v_type;
-	val->portid = port_id;
+	val->portid = port->port_id;
 	val->vni = vni;
 	return dp_set_vnf_value((void *)ul_addr6, val);
 }
 
-static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, struct dp_port *port)
+static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, const struct dp_port *port)
 {
 	val->v_type = v_type;
 	val->portid = port->port_id;
@@ -85,7 +85,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		vni = request->vni;
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB, vni, 0, ul_addr6))) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB, vni, dp_get_pf0(), ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
@@ -269,7 +269,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		vm_ip = port->vm.info.own_ip;
 		vm_vni = port->vm.vni;
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, vm_vni, port->port_id, ul_addr6))) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, vm_vni, port, ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
@@ -374,7 +374,7 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, !DP_VNF_MATCH_ALL_PORT_ID)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
-	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port->vm.vni, port->port_id, ul_addr6)))
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port->vm.vni, port, ul_addr6)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
 	rte_memcpy(reply->trgt_addr.ipv6, ul_addr6, sizeof(reply->trgt_addr.ipv6));
@@ -425,7 +425,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 		if (DP_FAILED(ret))
 			return ret;
 
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, vm_vni, port->port_id, ul_addr6))) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, vm_vni, port, ul_addr6))) {
 			dp_del_route(port, vm_vni, vnf_val.alias_pfx.ip, vnf_val.alias_pfx.length);
 			return DP_GRPC_ERR_VNF_INSERT;
 		}
@@ -481,7 +481,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_ALREADY_EXISTS;
 		goto err;
 	}
-	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_INTERFACE_IP, request->vni, port->port_id, ul_addr6))) {
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_INTERFACE_IP, request->vni, port, ul_addr6))) {
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
@@ -509,7 +509,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	ret = dp_add_route6(port, request->vni, 0, request->ip6_addr, NULL, 128);
 	if (DP_FAILED(ret))
 		goto route_err;
-	if (DP_FAILED(dp_port_start(port))) {
+	if (DP_FAILED(dp_start_port(port))) {
 		ret = DP_GRPC_ERR_PORT_START;
 		goto route6_err;
 	}
@@ -549,7 +549,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	vni = port->vm.vni;
 
 	dp_del_vnf_with_vnf_key(port->vm.ul_ipv6);
-	if (DP_FAILED(dp_port_stop(port)))
+	if (DP_FAILED(dp_stop_port(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
 	dp_unmap_vm_handle(request->iface_id);
@@ -634,7 +634,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		vm_ip = port->vm.info.own_ip;
 		vm_vni = port->vm.vni;
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, vm_vni, port->port_id, ul_addr6))) {
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, vm_vni, port, ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}

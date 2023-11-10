@@ -79,8 +79,8 @@ int dp_attach_vf(struct dp_port *port);
 int dp_ports_init(void);
 void dp_ports_free(void);
 
-int dp_port_start(struct dp_port *port);
-int dp_port_stop(struct dp_port *port);
+int dp_start_port(struct dp_port *port);
+int dp_stop_port(struct dp_port *port);
 
 
 static __rte_always_inline

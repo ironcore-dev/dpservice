@@ -178,7 +178,10 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
 }
 
-static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline
+int dp_offload_handle_tunnel_encap_traffic(struct dp_flow *df,
+										   const struct dp_port *incoming_port,
+										   const struct dp_port *outgoing_port)
 {
 	// match pattern for outgoing VF packets
 	struct rte_flow_item_eth eth_spec; // #1
@@ -218,8 +221,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	uint8_t raw_encap_hdr[DP_IPIP_ENCAP_HEADER_SIZE];
 	const struct rte_flow_attr *attr;
 	uint16_t t_port_id;
-	const struct dp_port *incoming_port = dp_get_port(m);
-	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 	bool cross_pf_port = outgoing_port != dp_get_pf0();
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
@@ -268,10 +269,10 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 														hairpin_age_action, df, hairpin_agectx))
 		) {
 			dp_destroy_rte_flow_agectx(hairpin_agectx);
-			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORTID(incoming_port->port_id));
+			DPS_LOG_ERR("Failed to install hairpin queue flow rule on VF", DP_LOG_PORT(incoming_port));
 			return DP_ERROR;
 		}
-		DPS_LOG_DEBUG("Installed a flow rule to move pkts to hairpin rx queue", DP_LOG_PORTID(incoming_port->port_id));
+		DPS_LOG_DEBUG("Installed a flow rule to move pkts to hairpin rx queue", DP_LOG_PORT(incoming_port));
 	}
 
 	// replace source ip if vip-nat/network-nat is enabled
@@ -327,14 +328,18 @@ static __rte_always_inline int dp_offload_handle_tunnel_encap_traffic(struct rte
 	}
 
 	if (cross_pf_port)
-		DPS_LOG_DEBUG("Installed cross pf encap flow rules", DP_LOG_PORTID(incoming_port->port_id));
+		DPS_LOG_DEBUG("Installed cross pf encap flow rules", DP_LOG_PORT(incoming_port));
 	else
-		DPS_LOG_DEBUG("Installed encap flow rule on VF", DP_LOG_PORTID(incoming_port->port_id));
+		DPS_LOG_DEBUG("Installed encap flow rule on VF", DP_LOG_PORT(incoming_port));
 
 	return DP_OK;
 }
 
-static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline
+int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
+										   const struct dp_port *incoming_port,
+										   const struct dp_port *outgoing_port,
+										   bool is_recirc)
 {
 	// match pattern for incoming tunneled packets
 	struct rte_flow_item_eth eth_spec;   // #1
@@ -366,8 +371,6 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	struct rte_ether_hdr new_eth_hdr;
 	rte_be32_t actual_ol_ipv4_addr;
 	const struct rte_flow_attr *attr =  &dp_flow_attr_transfer_single_stage;
-	const struct dp_port *incoming_port = dp_get_port(m);
-	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 	bool cross_pf_port = incoming_port != dp_get_pf0();
 
 	if (cross_pf_port)
@@ -381,7 +384,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	new_eth_hdr.ether_type = htons(df->l3_type);
 
 	// restore the actual incoming pkt's ipv6 dst addr
-	if (dp_get_pkt_mark(m)->flags.is_recirc)
+	if (is_recirc)
 		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
 
 	// create flow match patterns
@@ -425,7 +428,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 			return DP_ERROR;
 		}
 
-		DPS_LOG_DEBUG("Installed capturing flow rule on PF", DP_LOG_PORTID(incoming_port->port_id));
+		DPS_LOG_DEBUG("Installed capturing flow rule on PF", DP_LOG_PORT(incoming_port));
 	}
 
 	// remove the IPIP header and replace it with a standard Ethernet header
@@ -446,7 +449,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	if (!agectx) {
 		if (agectx_capture)
 			if (DP_FAILED(dp_destroy_rte_flow_agectx(agectx_capture)))
-				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORTID(incoming_port->port_id));
+				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF", DP_LOG_PORT(incoming_port));
 		return DP_ERROR;
 	}
 
@@ -456,7 +459,7 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 	if (cross_pf_port) {
 		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
 		if (outgoing_port->port_type != DP_PORT_VF) {
-			DPS_LOG_ERR("Outgoing port not a VF", DP_LOG_PORTID(outgoing_port->port_id));
+			DPS_LOG_ERR("Outgoing port not a VF", DP_LOG_PORT(outgoing_port));
 			dp_destroy_rte_flow_agectx(agectx);
 			// no need to free the above appeared (not allocated) agectx_capture, as the capturing rule is not installed for the cross-pf case
 			return DP_ERROR;
@@ -478,20 +481,23 @@ static __rte_always_inline int dp_offload_handle_tunnel_decap_traffic(struct rte
 		if (agectx_capture)
 			if (DP_FAILED(dp_destroy_rte_flow_agectx(agectx_capture)))
 				DPS_LOG_ERR("Failed to rollback by removing installed capturing rule on PF",
-							DP_LOG_PORTID(incoming_port->port_id));
+							DP_LOG_PORT(incoming_port));
 		return DP_ERROR;
 	}
 
 	if (cross_pf_port)
 		DPS_LOG_DEBUG("Installed flow rules to handle hairpin pkts on both PF and VF",
-					  DP_LOG_PORTID(incoming_port->port_id), DP_LOG_PORTID(outgoing_port->port_id));
+					  DP_LOG_PORTID(incoming_port->port_id), DP_LOG_PORT(outgoing_port));
 	else
-		DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORTID(incoming_port->port_id));
+		DPS_LOG_DEBUG("Installed normal decap flow rule on PF", DP_LOG_PORT(incoming_port));
 
 	return DP_OK;
 }
 
-static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline
+int dp_offload_handle_local_traffic(struct dp_flow *df,
+									const struct dp_port *incoming_port,
+									const struct dp_port *outgoing_port)
 {
 	// match local traffic packets
 	struct rte_flow_item_eth eth_spec; // #1
@@ -514,8 +520,6 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 	struct rte_flow_action *age_action;
 	rte_be32_t actual_ol_ipv4_dst_addr;
 	const struct rte_flow_attr *attr;
-	const struct dp_port *incoming_port = dp_get_port(m);
-	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 
 	// create local flow match pattern
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
@@ -577,11 +581,14 @@ static __rte_always_inline int dp_offload_handle_local_traffic(struct rte_mbuf *
 		return DP_ERROR;
 	}
 
-	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORTID(incoming_port->port_id));
+	DPS_LOG_DEBUG("Installed local flow rule", DP_LOG_PORT(incoming_port));
 	return DP_OK;
 }
 
-static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_mbuf *m, struct dp_flow *df)
+static __rte_always_inline
+int dp_offload_handle_in_network_traffic(struct dp_flow *df,
+										 const struct dp_port *incoming_port,
+										 const struct dp_port *outgoing_port)
 {
 	// match in-network underlay packets
 	struct rte_flow_item_eth eth_spec;   // #1
@@ -602,8 +609,6 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
-	const struct dp_port *incoming_port = dp_get_port(m);
-	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 
 	df->nxt_hop = (incoming_port == dp_get_pf0() ? dp_get_pf1() : incoming_port)->port_id;
 	// no need to validate as this can only be PF0/PF1
@@ -661,37 +666,39 @@ static __rte_always_inline int dp_offload_handle_in_network_traffic(struct rte_m
 		return DP_ERROR;
 	}
 
-	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORTID(incoming_port->port_id));
+	DPS_LOG_DEBUG("Installed in-network decap flow rule on PF", DP_LOG_PORT(incoming_port));
 	return DP_OK;
 }
 
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
+	const struct dp_port *incoming_port = dp_get_port(m);
+	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 	int ret;
 
 	// TODO(plague): think about using enum for flow_type
 	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL) {
-		ret = dp_offload_handle_local_traffic(m, df);
+		ret = dp_offload_handle_local_traffic(df, incoming_port, outgoing_port);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
 	} else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		ret = dp_offload_handle_tunnel_decap_traffic(m, df);
+		ret = dp_offload_handle_tunnel_decap_traffic(df, incoming_port, outgoing_port, dp_get_pkt_mark(m)->flags.is_recirc);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
 	} else if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 		) {
-			ret = dp_offload_handle_in_network_traffic(m, df);
+			ret = dp_offload_handle_in_network_traffic(df, incoming_port, outgoing_port);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
 		} else {
-			ret = dp_offload_handle_tunnel_encap_traffic(m, df);
+			ret = dp_offload_handle_tunnel_encap_traffic(df, incoming_port, outgoing_port);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORTID(m->port), DP_LOG_RET(ret));
+				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
 		}
 	} else {
-		DPS_LOG_ERR("Invalid flow type to offload", DP_LOG_PORTID(m->port), DP_LOG_VALUE(df->flags.flow_type));
+		DPS_LOG_ERR("Invalid flow type to offload", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_VALUE(df->flags.flow_type));
 		ret = DP_ERROR;
 	}
 	return ret;

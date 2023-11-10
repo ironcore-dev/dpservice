@@ -433,7 +433,7 @@ static int dp_init_port(struct dp_port *port)
 	return DP_OK;
 }
 
-int dp_port_start(struct dp_port *port)
+int dp_start_port(struct dp_port *port)
 {
 	int ret;
 
@@ -454,7 +454,7 @@ int dp_port_start(struct dp_port *port)
 	return DP_OK;
 }
 
-int dp_port_stop(struct dp_port *port)
+int dp_stop_port(struct dp_port *port)
 {
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;

@@ -37,7 +37,8 @@ struct dp_vni_data {
 	int				vni;
 };
 
-static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni)
+static __rte_always_inline
+struct rte_rib *dp_get_vni_route4_table(int vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -55,7 +56,8 @@ static __rte_always_inline struct rte_rib *dp_get_vni_route4_table(int vni)
 	return vni_data->ipv4[DP_SOCKETID(vni_data->socket_id)];
 }
 
-static __rte_always_inline struct rte_rib6 *dp_get_vni_route6_table(int vni)
+static __rte_always_inline
+struct rte_rib6 *dp_get_vni_route6_table(int vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
