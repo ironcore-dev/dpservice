@@ -247,9 +247,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (dp_conf_is_offload_enabled())
 		DPNODE_LOG_WARNING(node, "Virtual services not supported while offloading");
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
+	if (dp_get_port(m)->port_type == DP_PORT_VF)
 		return virtsvc_request_next(node, m, df);
-	else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+	else
 		return virtsvc_reply_next(node, m, df);
 
 	return VIRTSVC_NEXT_DROP;

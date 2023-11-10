@@ -100,7 +100,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 	struct snat_data *s_data;
 	struct dp_vnf_value vnf_val;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+	if (port->port_type == DP_PORT_PF) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
 			key->vnf = (uint8_t)df->vnf_type;
 		else
@@ -129,7 +129,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 	key->proto = df->l4_type;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING)
+	if (port->port_type == DP_PORT_PF)
 		key->vni = df->tun_info.dst_vni;
 	else
 		key->vni = port->vm.vni;

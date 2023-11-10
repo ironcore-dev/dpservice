@@ -15,10 +15,6 @@ extern "C"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
 
-#define DP_FLOW_TYPE_LOCAL		1
-#define DP_FLOW_TYPE_OUTGOING	2
-#define DP_FLOW_TYPE_INCOMING	3
-
 #define DP_FLOW_WEST_EAST		0
 #define DP_FLOW_SOUTH_NORTH		1
 

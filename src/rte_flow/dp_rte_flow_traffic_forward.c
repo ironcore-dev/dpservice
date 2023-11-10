@@ -675,16 +675,22 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 	int ret;
 
-	// TODO(plague): think about using enum for flow_type
-	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL) {
+	if (incoming_port->port_type == outgoing_port->port_type) {
+		if (outgoing_port->port_type == DP_PORT_PF) {
+			DPS_LOG_ERR("Cannot offload PF-PF flows", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port));
+			return DP_ERROR;
+		}
+		// VF -> VF
 		ret = dp_offload_handle_local_traffic(df, incoming_port, outgoing_port);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
-	} else if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
+	} else if (incoming_port->port_type == DP_PORT_PF) {
+		// PF -> VF
 		ret = dp_offload_handle_tunnel_decap_traffic(df, incoming_port, outgoing_port, dp_get_pkt_mark(m)->flags.is_recirc);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
-	} else if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING) {
+	} else {
+		// VF -> PF
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 		) {
@@ -696,9 +702,7 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 			if (DP_FAILED(ret))
 				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
 		}
-	} else {
-		DPS_LOG_ERR("Invalid flow type to offload", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_VALUE(df->flags.flow_type));
-		ret = DP_ERROR;
 	}
+
 	return ret;
 }

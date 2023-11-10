@@ -26,27 +26,6 @@ static int conntrack_node_init(__rte_unused const struct rte_graph *graph, __rte
 	return DP_OK;
 }
 
-static __rte_always_inline rte_edge_t dp_find_nxt_graph_node(struct dp_flow *df)
-{
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		switch (df->vnf_type) {
-		case DP_VNF_TYPE_LB:
-			return CONNTRACK_NEXT_LB;
-		case DP_VNF_TYPE_VIP:
-		case DP_VNF_TYPE_NAT:
-			return CONNTRACK_NEXT_DNAT;
-		case DP_VNF_TYPE_LB_ALIAS_PFX:
-		case DP_VNF_TYPE_INTERFACE_IP:
-		case DP_VNF_TYPE_ALIAS_PFX:
-			return CONNTRACK_NEXT_FIREWALL;
-		default:
-			return CONNTRACK_NEXT_LB;
-		}
-	}
-	return CONNTRACK_NEXT_DNAT;
-}
-
-
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
@@ -73,7 +52,22 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return CONNTRACK_NEXT_DROP;
 	}
 
-	return dp_find_nxt_graph_node(df);
+	if (dp_get_port(m)->port_type == DP_PORT_VF)
+		return CONNTRACK_NEXT_DNAT;
+
+	switch (df->vnf_type) {
+	case DP_VNF_TYPE_LB:
+		return CONNTRACK_NEXT_LB;
+	case DP_VNF_TYPE_VIP:
+	case DP_VNF_TYPE_NAT:
+		return CONNTRACK_NEXT_DNAT;
+	case DP_VNF_TYPE_LB_ALIAS_PFX:
+	case DP_VNF_TYPE_INTERFACE_IP:
+	case DP_VNF_TYPE_ALIAS_PFX:
+		return CONNTRACK_NEXT_FIREWALL;
+	default:
+		return CONNTRACK_NEXT_LB;
+	}
 }
 
 static uint16_t conntrack_node_process(struct rte_graph *graph,

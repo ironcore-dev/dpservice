@@ -93,31 +93,30 @@ static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_v
 
 static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
-	bool offload_check = false;
+	bool offload_other_pf = false;
+	struct dp_port *port = dp_get_port(m);
 
 	if (!offload_mode_enabled)
 		return;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (m->port == dp_get_pf0()->port_id)
-			offload_check = flow_val->incoming_flow_offloaded_flag.pf0;
+	if (port->port_type == DP_PORT_PF) {
+		if (port == dp_get_pf0())
+			offload_other_pf = !flow_val->incoming_flow_offloaded_flag.pf0;
 		else
-			offload_check = flow_val->incoming_flow_offloaded_flag.pf1;
+			offload_other_pf = !flow_val->incoming_flow_offloaded_flag.pf1;
 	}
 
 	if (df->flags.dir == DP_FLOW_DIR_ORG) {
 		/* Despite the incoming flow is offloaded to one of the pf ports, pkts can arrive on another one */
 		/* So we need to check if the incoming flow is offloaded on the current port, */
 		/* if not, we do another offloading */
-		if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD ||
-			(df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check))
+		if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD || offload_other_pf)
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
 		else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
 			flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
 
 	} else if (df->flags.dir == DP_FLOW_DIR_REPLY) {
-		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD ||
-			(df->flags.flow_type == DP_FLOW_TYPE_INCOMING && !offload_check))
+		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD || offload_other_pf)
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
 		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
 			flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
@@ -170,7 +169,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
 	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
 	if (offload_mode_enabled
-		&& (df->flags.flow_type != DP_FLOW_TYPE_INCOMING)
+		&& port->port_type == DP_PORT_VF
 		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, DP_VNF_MATCH_ALL_PORT_ID))
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;

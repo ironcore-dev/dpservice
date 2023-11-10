@@ -24,41 +24,34 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct vm_route route;
 	uint32_t route_key = 0;
+	const struct dp_port *src_port = dp_get_port(m);
 	const struct dp_port *dst_port;
 
 	// TODO: add broadcast routes when machine is added
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	dst_port = dp_get_ip4_dst_port(dp_get_port(m), df->tun_info.dst_vni, df, &route, &route_key);
+	dst_port = dp_get_ip4_dst_port(src_port, df->tun_info.dst_vni, df, &route, &route_key);
 	if (!dst_port)
 		return IPV4_LOOKUP_NEXT_DROP;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (dst_port->port_type == DP_PORT_PF)
+	if (dst_port->port_type == DP_PORT_PF) {
+		if (src_port->port_type == DP_PORT_PF)
 			return IPV4_LOOKUP_NEXT_DROP;
+		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
+		dst_port = dp_multipath_get_pf(df->dp_flow_hash);
 	} else {
-		df->tun_info.dst_vni = route.vni;
-		if (dst_port->port_type == DP_PORT_PF) {
-			rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
-			df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
-		}
+		// next hop is known, fill in Ether header
+		// (PF egress goes through a tunnel that destroys Ether header)
+		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port, RTE_ETHER_TYPE_IPV4);
 	}
 
+	if (src_port->port_type == DP_PORT_VF)
+		df->tun_info.dst_vni = route.vni;
+
 	df->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
-
-	if (!df->flags.flow_type)
-		df->flags.flow_type = DP_FLOW_TYPE_LOCAL;
-
-	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
-		dst_port = dp_multipath_get_pf(df->dp_flow_hash);
-
-	// next hop is known, fill in Ether header
-	// (PF egress goes through a tunnel that destroys Ether header)
-	if (dst_port->port_type == DP_PORT_VF)
-		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port, RTE_ETHER_TYPE_IPV4);
-
 	df->nxt_hop = dst_port->port_id;  // always valid since coming from struct dp_port
+
 	return IPV4_LOOKUP_NEXT_NAT;
 }
 

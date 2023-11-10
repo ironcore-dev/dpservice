@@ -19,9 +19,8 @@ DP_NODE_REGISTER_NOINIT(LB, lb, NEXT_NODES);
 
 static __rte_always_inline void dp_lb_set_next_hop(struct dp_flow *df, uint16_t port_id)
 {
-	df->flags.flow_type = DP_FLOW_TYPE_OUTGOING; // for recirc pkt, it will be changed back to DP_FLOW_TYPE_INCOMING in cls_node.c
 	if (DP_FAILED(dp_get_portid_with_vnf_key(df->tun_info.ul_dst_addr6, DP_VNF_TYPE_LB_ALIAS_PFX))) {
-		df->nxt_hop = port_id;  // needs to validated by the caller!
+		df->nxt_hop = port_id;  // needs to validated by the caller (but it's always m->port)
 		df->flags.nat = DP_CHG_UL_DST_IP;
 	} else
 		df->flags.nat = DP_LB_RECIRC;

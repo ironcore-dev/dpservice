@@ -34,7 +34,6 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	temp_ip = ipv4_hdr->dst_addr;
 	ipv4_hdr->dst_addr = ipv4_hdr->src_addr;
 	ipv4_hdr->src_addr = temp_ip;
-	df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 	df->nxt_hop = m->port;
 	dp_nat_chg_ip(df, ipv4_hdr, m);
 	memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
@@ -52,7 +51,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return PACKET_RELAY_NEXT_DROP;
 
 	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
-		df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 		df->nxt_hop = m->port;
 		// trick: use src place to store old dst address for offloading
 		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));

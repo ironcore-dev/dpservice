@@ -156,7 +156,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (virtsvc_present) {
 			virtsvc = get_outgoing_virtsvc(ether_hdr);
 			if (virtsvc) {
-				df->flags.flow_type = DP_FLOW_TYPE_OUTGOING;
 				df->virtsvc = virtsvc;
 				return CLS_NEXT_VIRTSVC;
 			}
@@ -171,7 +170,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (port->port_type == DP_PORT_PF) {
 			if (unlikely(is_ipv6_nd(ipv6_hdr)))
 				return CLS_NEXT_DROP;
-			df->flags.flow_type = DP_FLOW_TYPE_INCOMING;
 #ifdef ENABLE_VIRTSVC
 			if (virtsvc_present) {
 				virtsvc = get_incoming_virtsvc(ipv6_hdr);

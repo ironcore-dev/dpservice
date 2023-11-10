@@ -19,9 +19,8 @@ extern "C" {
 
 struct dp_flow {
 	struct {
-		uint16_t	flow_type : 2;			// local,outgoing,incoming
 		uint16_t	public_flow : 1;
-		uint16_t	overlay_type: 1;		// supported overlay type
+		uint16_t	overlay_type : 1;		// supported overlay type
 		uint16_t	nat : 3;
 		uint16_t	offload_ipv6 : 1;		// tmp solution to set if we should offload ipv6 pkts
 		uint16_t	dir : 2;				// store the direction of each packet
@@ -61,8 +60,8 @@ struct dp_flow {
 		uint8_t		proto_id;	//proto_id in outer ipv6 header
 		uint32_t	dst_vni;
 	} tun_info;
-	uint8_t					vnf_type;
-	uint8_t					nxt_hop;
+	uint8_t				vnf_type;  // TODO(plague) enum?
+	uint8_t				nxt_hop;
 	struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc	*virtsvc;

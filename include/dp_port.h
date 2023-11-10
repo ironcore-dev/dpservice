@@ -43,7 +43,7 @@ struct vm_entry {
 };
 
 struct dp_port {
-	enum dp_port_type		port_type;
+	enum dp_port_type		port_type;  // TODO bool!
 	uint16_t				port_id;
 	char					port_name[IF_NAMESIZE];
 	int						socket_id;
