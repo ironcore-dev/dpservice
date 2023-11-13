@@ -64,8 +64,8 @@ int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, cons
 int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth);
 int dp_list_routes(const struct dp_port *port, int vni, bool ext_routes, struct dp_grpc_responder *responder);
 
-int dp_lpm_reset_all_route_tables(int socket_id);
-int dp_lpm_reset_route_tables(int vni, int socket_id);
+int dp_lpm_reset_all_route_tables(void);
+int dp_lpm_reset_route_tables(int vni);
 
 #ifdef __cplusplus
 }

@@ -20,7 +20,7 @@ void dp_vni_free(void)
 	dp_free_jhash_table(vni_handle_tbl);
 }
 
-bool dp_is_vni_route_table_available(int vni, int type, int socket_id)
+bool dp_is_vni_route_table_available(int vni, int type)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -35,8 +35,8 @@ bool dp_is_vni_route_table_available(int vni, int type, int socket_id)
 		return false;
 	}
 
-	return (type == DP_IP_PROTO_IPV4 && vni_data->ipv4[DP_SOCKETID(socket_id)])
-		|| (type == DP_IP_PROTO_IPV6 && vni_data->ipv6[DP_SOCKETID(socket_id)]);
+	return (type == DP_IP_PROTO_IPV4 && vni_data->ipv4[DP_SOCKETID(vni_data->socket_id)])
+		|| (type == DP_IP_PROTO_IPV6 && vni_data->ipv6[DP_SOCKETID(vni_data->socket_id)]);
 }
 
 static __rte_always_inline void dp_free_rib6(struct dp_vni_data *vni_data)
@@ -190,7 +190,26 @@ int dp_delete_vni_route_tables(int vni)
 	return DP_OK;
 }
 
-int dp_reset_vni_route_tables(int vni, int socket_id)
+static int dp_reset_vni_data(int vni, struct dp_vni_data *vni_data)
+{
+	int socket_id = DP_SOCKETID(vni_data->socket_id);
+
+	if (vni_data->ipv4[socket_id]) {
+		rte_rib_free(vni_data->ipv4[socket_id]);
+		if (DP_FAILED(dp_create_rib(vni, socket_id, vni_data)))
+			return DP_ERROR;
+	}
+
+	if (vni_data->ipv6[socket_id]) {
+		rte_rib6_free(vni_data->ipv6[socket_id]);
+		if (DP_FAILED(dp_create_rib6(vni, socket_id, vni_data)))
+			return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+int dp_reset_vni_route_tables(int vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -204,22 +223,10 @@ int dp_reset_vni_route_tables(int vni, int socket_id)
 		return DP_OK;
 	}
 
-	if (vni_data->ipv4[DP_SOCKETID(socket_id)]) {
-		rte_rib_free(vni_data->ipv4[DP_SOCKETID(socket_id)]);
-		if (DP_FAILED(dp_create_rib(vni, socket_id, vni_data)))
-			return DP_ERROR;
-	}
-
-	if (vni_data->ipv6[DP_SOCKETID(socket_id)]) {
-		rte_rib6_free(vni_data->ipv6[DP_SOCKETID(socket_id)]);
-		if (DP_FAILED(dp_create_rib6(vni, socket_id, vni_data)))
-			return DP_ERROR;
-	}
-
-	return DP_OK;
+	return dp_reset_vni_data(vni, vni_data);
 }
 
-int dp_reset_all_vni_route_tables(int socket_id)
+int dp_reset_all_vni_route_tables(void)
 {
 	struct dp_vni_data *vni_data;
 	const struct dp_vni_key *vni_key;
@@ -230,16 +237,8 @@ int dp_reset_all_vni_route_tables(int socket_id)
 		return DP_OK;
 
 	while ((ret = rte_hash_iterate(vni_handle_tbl, (const void **)&vni_key, (void **)&vni_data, &iter)) != -ENOENT) {
-		if (vni_data->ipv4[DP_SOCKETID(socket_id)]) {
-			rte_rib_free(vni_data->ipv4[DP_SOCKETID(socket_id)]);
-			if (DP_FAILED(dp_create_rib(vni_key->vni, socket_id, vni_data)))
-				return DP_ERROR;
-		}
-		if (vni_data->ipv6[DP_SOCKETID(socket_id)]) {
-			rte_rib6_free(vni_data->ipv6[DP_SOCKETID(socket_id)]);
-			if (DP_FAILED(dp_create_rib6(vni_key->vni, socket_id, vni_data)))
-				return DP_ERROR;
-		}
+		if (DP_FAILED(dp_reset_vni_data(vni_key->vni, vni_data)))
+			return DP_ERROR;
 	}
 
 	return DP_OK;

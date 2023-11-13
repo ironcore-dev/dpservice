@@ -164,7 +164,7 @@ static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 static int dp_process_initialize(__rte_unused struct dp_grpc_responder *responder)
 {
 	dp_del_all_neigh_nat_entries_in_vni(DP_NETWORK_NAT_ALL_VNI);
-	return dp_lpm_reset_all_route_tables(dp_get_pf0()->socket_id);
+	return dp_lpm_reset_all_route_tables();
 }
 
 static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
@@ -173,9 +173,7 @@ static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
 	struct dpgrpc_vni_in_use *reply = dp_grpc_single_reply(responder);
 
 	if (request->type == DP_VNI_IPV4) {
-		reply->in_use = dp_is_vni_route_table_available(request->vni,
-														DP_IP_PROTO_IPV4,
-														dp_get_pf0()->socket_id);
+		reply->in_use = dp_is_vni_route_table_available(request->vni, DP_IP_PROTO_IPV4);
 	} else
 		return DP_GRPC_ERR_WRONG_TYPE;
 
@@ -243,7 +241,7 @@ static int dp_process_reset_vni(struct dp_grpc_responder *responder)
 	struct dpgrpc_vni *request = &responder->request.vni_reset;
 
 	if (request->type == DP_VNI_BOTH)
-		return dp_lpm_reset_route_tables(request->vni, dp_get_pf0()->socket_id);
+		return dp_lpm_reset_route_tables(request->vni);
 	else
 		return DP_GRPC_ERR_WRONG_TYPE;
 }

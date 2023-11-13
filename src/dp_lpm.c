@@ -28,12 +28,12 @@ static __rte_always_inline int dp_lpm_fill_route_tables(const struct dp_port *po
 	return DP_GRPC_OK;
 }
 
-int dp_lpm_reset_all_route_tables(int socket_id)
+int dp_lpm_reset_all_route_tables(void)
 {
 	const struct dp_ports *ports = dp_get_ports();
 	int ret;
 
-	if (DP_FAILED(dp_reset_all_vni_route_tables(socket_id)))
+	if (DP_FAILED(dp_reset_all_vni_route_tables()))
 		return DP_GRPC_ERR_ROUTE_RESET;
 
 	DP_FOREACH_PORT(ports, port) {
@@ -47,13 +47,13 @@ int dp_lpm_reset_all_route_tables(int socket_id)
 	return DP_GRPC_OK;
 }
 
-int dp_lpm_reset_route_tables(int vni, int socket_id)
+int dp_lpm_reset_route_tables(int vni)
 {
 	const struct dp_ports *ports = dp_get_ports();
 	int ret;
 
-	if (DP_FAILED(dp_reset_vni_route_tables(vni, socket_id))) {
-		DPS_LOG_ERR("Resetting vni route tables failed", DP_LOG_VNI(vni), DP_LOG_SOCKID(socket_id));
+	if (DP_FAILED(dp_reset_vni_route_tables(vni))) {
+		DPS_LOG_ERR("Resetting vni route tables failed", DP_LOG_VNI(vni));
 		return DP_GRPC_ERR_ROUTE_RESET;
 	}
 
