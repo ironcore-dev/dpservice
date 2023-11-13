@@ -166,11 +166,11 @@ enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df,
 	struct dp_fwall_rule *rule;
 
 	/* Outgoing traffic to PF (VF Egress, PF Ingress), PF has no Ingress rules */
-	if (dst_port->port_type == DP_PORT_PF)
+	if (dst_port->is_pf)
 		return dp_get_egress_action(df, &src_port->vm.fwall_head);
 
 	/* Incoming from PF, PF has no Egress rules */
-	if (src_port->port_type == DP_PORT_PF)
+	if (src_port->is_pf)
 		egress_action = DP_FWALL_ACCEPT;
 	/* Incoming from VF. Check originating VF's Egress rules */
 	else

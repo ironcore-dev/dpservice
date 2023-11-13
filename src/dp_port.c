@@ -16,6 +16,9 @@
 #include "rte_flow/dp_rte_flow_capture.h"
 #include "monitoring/dp_graphtrace.h"
 
+#define DP_PORT_INIT_PF true
+#define DP_PORT_INIT_VF false
+
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
 		.mq_mode = RTE_ETH_MQ_RX_NONE,
@@ -71,7 +74,7 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	return _dp_port_table[port_id];
 }
 
-static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
+static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	struct rte_ether_addr pf_neigh_mac;
@@ -84,9 +87,9 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	/* Default config */
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
-	nr_hairpin_queues = port_type == DP_PORT_VF
-		? DP_NR_VF_HAIRPIN_RX_TX_QUEUES
-		: (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs);
+	nr_hairpin_queues = port->is_pf
+		? (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs)
+		: DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
 
 	ret = rte_eth_dev_configure(port->port_id,
 								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
@@ -126,7 +129,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	}
 
 	/* dp-service specific config */
-	if (port_type == DP_PORT_VF) {
+	if (!port->is_pf) {
 		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORT(port));
 		ret = rte_eth_promiscuous_enable(port->port_id);
 		if (DP_FAILED(ret)) {
@@ -143,7 +146,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
 	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
 
-	if (port_type == DP_PORT_PF) {
+	if (port->is_pf) {
 		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->vm.info.own_mac)))
 			return DP_ERROR;
 		rte_ether_addr_copy(&pf_neigh_mac, &port->vm.info.neigh_mac);
@@ -170,7 +173,7 @@ static int dp_port_flow_isolate(uint16_t port_id)
 	return DP_OK;
 }
 
-static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, enum dp_port_type type)
+static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, bool is_pf)
 {
 	static int last_pf1_hairpin_tx_rx_queue_offset = 1;
 	struct dp_port *port;
@@ -182,7 +185,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 		return NULL;
 	}
 
-	if (type == DP_PORT_PF) {
+	if (is_pf) {
 		if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
 			if (DP_FAILED(dp_port_flow_isolate(port_id)))
 				return NULL;
@@ -200,16 +203,15 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 
 	// oveflow check done by liming the number of calls to this function
 	port = _dp_ports.end++;
-	port->port_type = type;
+	port->is_pf = is_pf;
 	port->port_id = port_id;
 	port->socket_id = socket_id;
 	_dp_port_table[port_id] = port;
 
-	if (DP_FAILED(dp_port_init_ethdev(port, dev_info, type)))
+	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
 
-	switch (type) {
-	case DP_PORT_PF:
+	if (is_pf) {
 		if (DP_FAILED(dp_port_register_pf(port)))
 			return NULL;
 		ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
@@ -217,8 +219,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 			DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
 			return NULL;
 		}
-		break;
-	case DP_PORT_VF:
+	} else {
 		// All VFs belong to pf0, assign a tx queue from pf1 for it
 		if (dp_conf_is_offload_enabled()) {
 			port->peer_pf_port_id = dp_get_pf1()->port_id;
@@ -229,8 +230,8 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 			}
 		}
 		// No link status callback, VFs are not critical for cross-hypervisor communication
-		break;
 	}
+
 	return port;
 }
 
@@ -240,7 +241,7 @@ static int dp_port_set_up_hairpins(void)
 	const struct dp_port *pf1 = dp_get_pf1();
 
 	DP_FOREACH_PORT(&_dp_ports, port) {
-		if (port->port_type == DP_PORT_PF) {
+		if (port->is_pf) {
 			port->peer_pf_port_id = (port->port_id == pf0->port_id ? pf1 : pf0)->port_id;
 			port->peer_pf_hairpin_tx_rx_queue_offset = 1;
 		}
@@ -262,7 +263,7 @@ static int dp_port_init_pf(const char *pf_name)
 			return DP_ERROR;
 		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
 			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_PF);
+			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
 			if (!port)
 				return DP_ERROR;
 			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
@@ -286,7 +287,7 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 			return DP_ERROR;
 		if (strstr(ifname, vf_pattern) && ++vf_count <= num_of_vfs) {
 			DPS_LOG_INFO("INIT initializing VF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_VF);
+			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_VF);
 			if (!port)
 				return DP_ERROR;
 			snprintf(port->port_name, sizeof(port->port_name), "%s", vf_pattern);
@@ -403,7 +404,7 @@ static int dp_init_port(struct dp_port *port)
 	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
 		return DP_OK;
 
-	if (port->port_type == DP_PORT_PF)
+	if (port->is_pf)
 		if (DP_FAILED(dp_port_install_isolated_mode(port->port_id)))
 			return DP_ERROR;
 
@@ -414,7 +415,7 @@ static int dp_init_port(struct dp_port *port)
 		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 			return DP_ERROR;
 
-		if (port->port_type == DP_PORT_VF)
+		if (!port->is_pf)
 			if (DP_FAILED(dp_install_vf_init_rte_rules(port)))
 				assert(false);  // if any flow rule failed, stop process running due to possible hw/driver failure
 	}

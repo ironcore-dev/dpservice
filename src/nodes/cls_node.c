@@ -150,7 +150,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return CLS_NEXT_DROP;
 
 	if (RTE_ETH_IS_IPV4_HDR(l3_type)) {
-		if (port->port_type == DP_PORT_PF)
+		if (port->is_pf)
 			return CLS_NEXT_DROP;
 #ifdef ENABLE_VIRTSVC
 		if (virtsvc_present) {
@@ -167,7 +167,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
 		ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
-		if (port->port_type == DP_PORT_PF) {
+		if (port->is_pf) {
 			if (unlikely(is_ipv6_nd(ipv6_hdr)))
 				return CLS_NEXT_DROP;
 #ifdef ENABLE_VIRTSVC

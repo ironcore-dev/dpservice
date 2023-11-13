@@ -35,8 +35,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!dst_port)
 		return IPV4_LOOKUP_NEXT_DROP;
 
-	if (dst_port->port_type == DP_PORT_PF) {
-		if (src_port->port_type == DP_PORT_PF)
+	if (dst_port->is_pf) {
+		if (src_port->is_pf)
 			return IPV4_LOOKUP_NEXT_DROP;
 		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
 		dst_port = dp_multipath_get_pf(df->dp_flow_hash);
@@ -46,7 +46,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port, RTE_ETHER_TYPE_IPV4);
 	}
 
-	if (src_port->port_type == DP_PORT_VF)
+	if (!src_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
 	df->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;

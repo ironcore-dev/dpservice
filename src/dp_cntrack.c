@@ -99,7 +99,7 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 	if (!offload_mode_enabled)
 		return;
 
-	if (port->port_type == DP_PORT_PF) {
+	if (port->is_pf) {
 		if (port == dp_get_pf0())
 			offload_other_pf = !flow_val->incoming_flow_offloaded_flag.pf0;
 		else
@@ -169,7 +169,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
 	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
 	if (offload_mode_enabled
-		&& port->port_type == DP_PORT_VF
+		&& !port->is_pf
 		&& !DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, DP_VNF_MATCH_ALL_PORT_ID))
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;

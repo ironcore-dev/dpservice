@@ -16,11 +16,6 @@ extern "C" {
 
 #define VM_IFACE_ID_MAX_LEN		64
 
-enum dp_port_type {
-	DP_PORT_PF,
-	DP_PORT_VF,
-};
-
 struct macip_entry {
 	struct rte_ether_addr	own_mac;
 	struct rte_ether_addr	neigh_mac;
@@ -43,7 +38,7 @@ struct vm_entry {
 };
 
 struct dp_port {
-	enum dp_port_type		port_type;  // TODO bool!
+	bool					is_pf;
 	uint16_t				port_id;
 	char					port_name[IF_NAMESIZE];
 	int						socket_id;

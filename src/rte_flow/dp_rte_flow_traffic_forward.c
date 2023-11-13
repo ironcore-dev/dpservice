@@ -458,7 +458,7 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 
 	if (cross_pf_port) {
 		// move this packet to the right hairpin rx queue of pf, so as to be moved to vf
-		if (outgoing_port->port_type != DP_PORT_VF) {
+		if (unlikely(outgoing_port->is_pf)) {
 			DPS_LOG_ERR("Outgoing port not a VF", DP_LOG_PORT(outgoing_port));
 			dp_destroy_rte_flow_agectx(agectx);
 			// no need to free the above appeared (not allocated) agectx_capture, as the capturing rule is not installed for the cross-pf case
@@ -675,8 +675,8 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 	const struct dp_port *outgoing_port = dp_get_dst_port(df);
 	int ret;
 
-	if (incoming_port->port_type == outgoing_port->port_type) {
-		if (outgoing_port->port_type == DP_PORT_PF) {
+	if (incoming_port->is_pf == outgoing_port->is_pf) {
+		if (unlikely(incoming_port->is_pf)) {
 			DPS_LOG_ERR("Cannot offload PF-PF flows", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port));
 			return DP_ERROR;
 		}
@@ -684,7 +684,7 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 		ret = dp_offload_handle_local_traffic(df, incoming_port, outgoing_port);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
-	} else if (incoming_port->port_type == DP_PORT_PF) {
+	} else if (incoming_port->is_pf) {
 		// PF -> VF
 		ret = dp_offload_handle_tunnel_decap_traffic(df, incoming_port, outgoing_port, dp_get_pkt_mark(m)->flags.is_recirc);
 		if (DP_FAILED(ret))

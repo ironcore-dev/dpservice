@@ -101,7 +101,7 @@ int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint3
 	// can only fail if node is NULL
 	rte_rib_set_nh(node, port->port_id);
 	/* This is an external route */
-	if (port->port_type == DP_PORT_PF) {
+	if (port->is_pf) {
 		route = rte_rib_get_ext(node);
 		route->vni = t_vni;
 		rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
@@ -164,7 +164,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	if (unlikely(!dst_port))
 		return DP_GRPC_ERR_NO_VM;
 
-	if ((ext_routes && dst_port->port_type == DP_PORT_PF)
+	if ((ext_routes && dst_port->is_pf)
 		|| (!ext_routes && dst_port->port_id == port->port_id && !dp_route_in_dhcp_range(node, port))
 	) {
 		reply = dp_grpc_add_reply(responder);
@@ -240,7 +240,7 @@ int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, cons
 	// can only fail if node is NULL
 	rte_rib6_set_nh(node, port->port_id);
 	/* This is an external route */
-	if (port->port_type == DP_PORT_PF) {
+	if (port->is_pf) {
 		route = rte_rib6_get_ext(node);
 		route->vni = t_vni;
 		rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
@@ -302,7 +302,7 @@ const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	if (!dst_port)
 		return NULL;
 
-	if (dst_port->port_type == DP_PORT_PF)
+	if (dst_port->is_pf)
 		*route = *(struct vm_route *)rte_rib_get_ext(node);
 
 	if (DP_FAILED(rte_rib_get_ip(node, route_key)))
@@ -339,7 +339,7 @@ const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 	if (!dst_port)
 		return NULL;
 
-	if (dst_port->port_type == DP_PORT_PF)
+	if (dst_port->is_pf)
 		*route = *(struct vm_route *)rte_rib6_get_ext(node);
 
 	return dst_port;

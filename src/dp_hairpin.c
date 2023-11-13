@@ -65,15 +65,14 @@ static int setup_hairpin_rx_tx_queues(uint16_t port_id,
 
 int dp_hairpin_setup(const struct dp_port *port)
 {
-
 	uint16_t hairpin_queue_id = 0;
 	uint16_t peer_hairpin_queue_id = 0;
 
 	hairpin_queue_id = DP_NR_STD_RX_QUEUES;
-	if (port->port_type == DP_PORT_VF)
-		peer_hairpin_queue_id = DP_NR_RESERVED_TX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
-	else
+	if (port->is_pf)
 		peer_hairpin_queue_id = DP_NR_STD_TX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
+	else
+		peer_hairpin_queue_id = DP_NR_RESERVED_TX_QUEUES - 1 + port->peer_pf_hairpin_tx_rx_queue_offset;
 
 	if (DP_FAILED(setup_hairpin_rx_tx_queues(port->port_id,
 											 port->peer_pf_port_id,
@@ -85,7 +84,7 @@ int dp_hairpin_setup(const struct dp_port *port)
 	}
 
 	// PF's hairpin queue is configured one by one
-	if (port->port_type == DP_PORT_VF) {
+	if (!port->is_pf) {
 		if (DP_FAILED(setup_hairpin_rx_tx_queues(port->peer_pf_port_id,
 												port->port_id,
 												peer_hairpin_queue_id,
@@ -95,6 +94,7 @@ int dp_hairpin_setup(const struct dp_port *port)
 			return DP_ERROR;
 		}
 	}
+
 	return DP_OK;
 }
 

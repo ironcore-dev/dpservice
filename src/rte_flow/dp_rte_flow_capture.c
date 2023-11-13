@@ -219,12 +219,10 @@ int dp_enable_pkt_capture(struct dp_port *port)
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_GRPC_ERR_RTE_RULE_DEL;
 
-	switch (port->port_type) {
-	case DP_PORT_PF:
+	if (port->is_pf) {
 		if (DP_FAILED(dp_install_pf_default_flow(port, true)))
 			return DP_GRPC_ERR_RTE_RULE_ADD;
-		break;
-	case DP_PORT_VF:
+	} else {
 		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_CAPTURE_GROUP)))
 			return DP_GRPC_ERR_RTE_RULE_ADD;
 		// rollback flow rules if failed on the second one for VF.
@@ -239,7 +237,6 @@ int dp_enable_pkt_capture(struct dp_port *port)
 			}
 			return DP_GRPC_ERR_RTE_RULE_ADD;
 		}
-		break;
 	}
 
 	port->captured = true;
@@ -257,19 +254,15 @@ int dp_disable_pkt_capture(struct dp_port *port)
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_GRPC_ERR_RTE_RULE_DEL;
 
-	switch (port->port_type) {
-	case DP_PORT_PF:
+	if (port->is_pf) {
 		if (DP_FAILED(dp_install_pf_default_flow(port, false)))
 			return DP_GRPC_ERR_RTE_RULE_ADD;
-		break;
-	case DP_PORT_VF:
+	} else {
 		if (DP_FAILED(dp_install_vf_default_jump_flow(port, DP_RTE_FLOW_VNET_GROUP))) {
 			// rollback does not make sense here, but rather to report the error. because the default operation should be without capturing.
 			DPS_LOG_ERR("Failed to turn capturing off by installing default jump rule to the vnet group on vf", DP_LOG_PORT(port));
 			return DP_GRPC_ERR_RTE_RULE_ADD;
 		}
-
-		break;
 	}
 
 	port->captured = false;

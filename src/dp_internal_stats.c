@@ -14,7 +14,7 @@ int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict)
 	int ret;
 
 	DP_FOREACH_PORT(ports, port) {
-		if (port->port_type != DP_PORT_VF || !port->allocated)
+		if (port->is_pf || !port->allocated)
 			continue;
 
 		ret = rte_tel_data_add_dict_u64(dict, port->vm.machineid, port->stats.nat_stats.used_port_cnt);

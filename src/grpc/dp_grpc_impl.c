@@ -954,7 +954,7 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 			return DP_GRPC_ERR_LIMIT_REACHED;
 		}
 
-		if (port->port_type == DP_PORT_PF) {
+		if (port->is_pf) {
 			reply->interfaces[count].type = DP_CAPTURE_IFACE_TYPE_SINGLE_PF;
 			reply->interfaces[count].spec.pf_index = port == dp_get_pf0() ? 0 : 1;
 		} else {

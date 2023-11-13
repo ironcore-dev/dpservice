@@ -43,7 +43,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// 	return FIREWALL_NEXT_DROP;
 	}
 
-	if (dst_port->port_type == DP_PORT_PF)
+	if (dst_port->is_pf)
 		return FIREWALL_NEXT_IPIP_ENCAP;
 
 	return next_tx_index[dst_port->port_id];

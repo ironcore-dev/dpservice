@@ -133,8 +133,10 @@ static int dp_graph_init_nodes(void)
 
 		// some nodes need a direct Tx connection to all PF/VF ports, add them dynamically
 		snprintf(name, sizeof(name), "tx-%u", port_id);
-		switch (port->port_type) {
-		case DP_PORT_VF:
+		if (port->is_pf) {
+			if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, name)))
+				return DP_ERROR;
+		} else {
 			if (DP_FAILED(arp_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(dhcp_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(dhcpv6_node_append_vf_tx(port_id, name))
@@ -142,11 +144,6 @@ static int dp_graph_init_nodes(void)
 				|| DP_FAILED(firewall_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(rx_periodic_node_append_vf_tx(port_id, name)))
 				return DP_ERROR;
-			break;
-		case DP_PORT_PF:
-			if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, name)))
-				return DP_ERROR;
-			break;
 		}
 #ifdef ENABLE_VIRTSVC
 		// virtual services node is bi-directional

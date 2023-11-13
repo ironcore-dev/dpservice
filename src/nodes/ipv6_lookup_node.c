@@ -35,14 +35,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
-	t_vni = src_port->port_type == DP_PORT_PF ? df->tun_info.dst_vni : 0;
+	t_vni = src_port->is_pf ? df->tun_info.dst_vni : 0;
 
 	dst_port = dp_get_ip6_dst_port(src_port, t_vni, ipv6_hdr, &route);
 	if (!dst_port)
 		return IPV6_LOOKUP_NEXT_DROP;
 
-	if (dst_port->port_type == DP_PORT_PF) {
-		if (src_port->port_type == DP_PORT_PF)
+	if (dst_port->is_pf) {
+		if (src_port->is_pf)
 			return IPV6_LOOKUP_NEXT_DROP;
 		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
 	} else {
@@ -54,7 +54,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (dp_conf_is_offload_enabled())
 		df->flags.offload_ipv6 = 1;
 
-	if (src_port->port_type == DP_PORT_VF)
+	if (!src_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
 	df->nxt_hop = dst_port->port_id;  // always valid since coming from struct dp_port

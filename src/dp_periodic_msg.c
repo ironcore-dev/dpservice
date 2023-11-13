@@ -25,7 +25,7 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 	int ret;
 
 	DP_FOREACH_PORT(ports, port) {
-		if (port->port_type != DP_PORT_VF || !port->allocated)
+		if (port->is_pf || !port->allocated)
 			continue;
 
 		clone_buf = rte_pktmbuf_copy(pkt, dp_layer->rte_mempool, 0, UINT32_MAX);
