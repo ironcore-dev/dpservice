@@ -276,11 +276,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				 + header_size;
 	m->data_len = m->pkt_len;
 
-	if (DP_FAILED(dp_attach_vf(port))) {
-		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORT(port));
-		return DHCP_NEXT_DROP;
-	}
-
 	return next_tx_index[m->port];
 }
 

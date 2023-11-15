@@ -71,17 +71,6 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	return _dp_port_table[port_id];
 }
 
-int dp_attach_vf(struct dp_port *port)
-{
-	if (port->port_type != DP_PORT_VF) {
-		DPS_LOG_ERR("VF port not registered in dpservice", DP_LOG_PORT(port));
-		return DP_ERROR;
-	}
-
-	port->attached = true;
-	return DP_OK;
-}
-
 static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info, enum dp_port_type port_type)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
