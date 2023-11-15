@@ -19,7 +19,7 @@
 
 // Prevent errors and large inputs (negative values/errors will be converted to huge size by uint)
 #define SNPRINTF_FAILED(DEST, SRC) \
-	((uint)snprintf(DEST, sizeof(DEST), "%s", SRC.c_str()) >= sizeof(DEST))
+	((SRC).empty() || (uint)snprintf((DEST), sizeof(DEST), "%s", (SRC).c_str()) >= sizeof(DEST))
 
 
 CallState BaseCall::HandleRpc()
