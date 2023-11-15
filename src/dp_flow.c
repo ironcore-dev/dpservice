@@ -121,7 +121,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	const struct dp_port *port = dp_get_port(m);
+	const struct dp_port *port = dp_get_in_port(m);
 	int ret = DP_OK;
 
 	key->ip_dst = ntohl(df->dst.dst_addr);

@@ -42,13 +42,13 @@ struct vm_route {
 	uint8_t	nh_ipv6[16];
 };
 
-const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct dp_flow *df,
 										  struct vm_route *route,
 										  uint32_t *route_key);
 
-const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct rte_ipv6_hdr *ipv6_hdr,
 										  struct vm_route *route);

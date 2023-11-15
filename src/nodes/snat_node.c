@@ -31,7 +31,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return SNAT_NEXT_FIREWALL;
 
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
-		port = dp_get_port(m);
+		port = dp_get_in_port(m);
 		src_ip = ntohl(df->src.src_addr);
 		vni = port->vm.vni;
 		snat_data = dp_get_vm_snat_data(src_ip, vni);

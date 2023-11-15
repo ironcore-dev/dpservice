@@ -35,7 +35,7 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	rte_be32_t requested_ip = incoming_arp_hdr->arp_data.arp_tip;
 	rte_be32_t sender_ip = incoming_arp_hdr->arp_data.arp_sip;
 	struct rte_ether_addr tmp_addr;
-	struct dp_port *port = dp_get_port(m);
+	struct dp_port *port = dp_get_in_port(m);
 	uint32_t temp_ip;
 
 	// ARP reply from VM

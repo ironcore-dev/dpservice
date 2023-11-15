@@ -272,7 +272,7 @@ int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6,
 	return DP_GRPC_OK;
 }
 
-const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct dp_flow *df,
 										  struct vm_route *route,
@@ -285,7 +285,7 @@ const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	struct dp_port *dst_port;
 
 	if (t_vni == 0)
-		t_vni = port->vm.vni;
+		t_vni = in_port->vm.vni;
 
 	root = dp_get_vni_route4_table(t_vni);
 	if (!root)
@@ -311,7 +311,7 @@ const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	return dst_port;
 }
 
-const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct rte_ipv6_hdr *ipv6_hdr,
 										  struct vm_route *route)
@@ -322,7 +322,7 @@ const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 	struct dp_port *dst_port;
 
 	if (t_vni == 0)
-		t_vni = port->vm.vni;
+		t_vni = in_port->vm.vni;
 
 	root = dp_get_vni_route6_table(t_vni);
 	if (!root)

@@ -671,42 +671,42 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
-	const struct dp_port *incoming_port = dp_get_port(m);
-	const struct dp_port *outgoing_port = dp_get_dst_port(df);
+	const struct dp_port *in_port = dp_get_in_port(m);
+	const struct dp_port *out_port = dp_get_out_port(df);
 	int ret;
 
-	if (!incoming_port->is_pf && !outgoing_port->is_pf) {
+	if (!in_port->is_pf && !out_port->is_pf) {
 		// VF -> VF
-		ret = dp_offload_handle_local_traffic(df, incoming_port, outgoing_port);
+		ret = dp_offload_handle_local_traffic(df, in_port, out_port);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
-	} else if (outgoing_port->is_pf) {
+			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
+	} else if (out_port->is_pf) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 		) {
-			if (unlikely(!incoming_port->is_pf)) {
-				DPS_LOG_ERR("Invalid in-network flow", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port));
+			if (unlikely(!in_port->is_pf)) {
+				DPS_LOG_ERR("Invalid in-network flow", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port));
 				return DP_ERROR;
 			}
 			// PF -> PF
-			ret = dp_offload_handle_in_network_traffic(df, incoming_port);
+			ret = dp_offload_handle_in_network_traffic(df, in_port);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
+				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
 		} else {
-			if (unlikely(incoming_port->is_pf)) {
-				DPS_LOG_ERR("Invalid encap flow", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port));
+			if (unlikely(in_port->is_pf)) {
+				DPS_LOG_ERR("Invalid encap flow", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port));
 				return DP_ERROR;
 			}
 			// VF -> PF
-			ret = dp_offload_handle_tunnel_encap_traffic(df, incoming_port, outgoing_port);
+			ret = dp_offload_handle_tunnel_encap_traffic(df, in_port, out_port);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
+				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
 		}
 	} else {
 		// PF -> VF
-		ret = dp_offload_handle_tunnel_decap_traffic(df, incoming_port, outgoing_port, dp_get_pkt_mark(m)->flags.is_recirc);
+		ret = dp_offload_handle_tunnel_decap_traffic(df, in_port, out_port, dp_get_pkt_mark(m)->flags.is_recirc);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
 	}
 
 	return ret;

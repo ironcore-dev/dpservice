@@ -168,7 +168,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv4_hdr *incoming_ipv4_hdr;
 	struct rte_udp_hdr *incoming_udp_hdr;
 	struct dp_dhcp_header *dhcp_hdr;
-	struct dp_port *port = dp_get_port(m);
+	struct dp_port *port = dp_get_in_port(m);
 	int options_len, header_size;
 	uint8_t msg_type;
 

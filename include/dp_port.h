@@ -88,14 +88,14 @@ const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port)
 }
 
 static __rte_always_inline
-struct dp_port *dp_get_port(struct rte_mbuf *m)
+struct dp_port *dp_get_in_port(struct rte_mbuf *m)
 {
 	// m->port should've already been validated
 	return _dp_port_table[m->port];
 }
 
 static __rte_always_inline
-struct dp_port *dp_get_dst_port(struct dp_flow *df)
+struct dp_port *dp_get_out_port(struct dp_flow *df)
 {
 	// df->nxt_hop should've already been validated
 	return _dp_port_table[df->nxt_hop];

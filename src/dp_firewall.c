@@ -159,27 +159,27 @@ static __rte_always_inline enum dp_fwall_action dp_get_egress_action(const struc
 }
 
 enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df,
-											const struct dp_port *src_port,
-											const struct dp_port *dst_port)
+											const struct dp_port *in_port,
+											const struct dp_port *out_port)
 {
 	enum dp_fwall_action egress_action;
 	struct dp_fwall_rule *rule;
 
 	/* Outgoing traffic to PF (VF Egress, PF Ingress), PF has no Ingress rules */
-	if (dst_port->is_pf)
-		return dp_get_egress_action(df, &src_port->vm.fwall_head);
+	if (out_port->is_pf)
+		return dp_get_egress_action(df, &in_port->vm.fwall_head);
 
 	/* Incoming from PF, PF has no Egress rules */
-	if (src_port->is_pf)
+	if (in_port->is_pf)
 		egress_action = DP_FWALL_ACCEPT;
 	/* Incoming from VF. Check originating VF's Egress rules */
 	else
-		egress_action = dp_get_egress_action(df, &src_port->vm.fwall_head);
+		egress_action = dp_get_egress_action(df, &in_port->vm.fwall_head);
 
 	if (egress_action != DP_FWALL_ACCEPT)
 		return DP_FWALL_DROP;
 
-	rule = dp_is_matched_in_fwall_list(df, &dst_port->vm.fwall_head, DP_FWALL_INGRESS, NULL);
+	rule = dp_is_matched_in_fwall_list(df, &out_port->vm.fwall_head, DP_FWALL_INGRESS, NULL);
 	if (!rule || rule->action != DP_FWALL_ACCEPT)
 		return DP_FWALL_DROP;
 
