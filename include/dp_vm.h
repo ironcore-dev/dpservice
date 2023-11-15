@@ -24,14 +24,14 @@ bool dp_arp_cycle_needed(const struct dp_port *port)
 	static struct rte_ether_addr nul_mac = {0};
 
 	return port->vm.ready
-		&& rte_is_same_ether_addr(&port->vm.info.neigh_mac, &nul_mac);
+		&& rte_is_same_ether_addr(&port->neigh_mac, &nul_mac);
 }
 
 static __rte_always_inline
 void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *port, uint16_t ether_type)
 {
-	rte_ether_addr_copy(&port->vm.info.neigh_mac, &ether_hdr->dst_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &ether_hdr->src_addr);
+	rte_ether_addr_copy(&port->neigh_mac, &ether_hdr->dst_addr);
+	rte_ether_addr_copy(&port->own_mac, &ether_hdr->src_addr);
 	ether_hdr->ether_type = htons(ether_type);
 }
 

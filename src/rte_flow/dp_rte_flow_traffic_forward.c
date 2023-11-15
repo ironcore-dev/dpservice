@@ -166,8 +166,8 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 	struct rte_ether_hdr *encap_eth_hdr = (struct rte_ether_hdr *)raw_hdr;
 	struct rte_ipv6_hdr *encap_ipv6_hdr = (struct rte_ipv6_hdr *)(&raw_hdr[sizeof(struct rte_ether_hdr)]);
 
-	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &encap_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &encap_eth_hdr->src_addr);
+	rte_ether_addr_copy(&outgoing_port->neigh_mac, &encap_eth_hdr->dst_addr);
+	rte_ether_addr_copy(&outgoing_port->own_mac, &encap_eth_hdr->src_addr);
 	encap_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	encap_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
@@ -379,8 +379,8 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 		df->conntrack->incoming_flow_offloaded_flag.pf0 = true;
 
 	// prepare the new ethernet header to replace the IPIP one
-	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &new_eth_hdr.dst_addr);
-	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &new_eth_hdr.src_addr);
+	rte_ether_addr_copy(&outgoing_port->neigh_mac, &new_eth_hdr.dst_addr);
+	rte_ether_addr_copy(&outgoing_port->own_mac, &new_eth_hdr.src_addr);
 	new_eth_hdr.ether_type = htons(df->l3_type);
 
 	// restore the actual incoming pkt's ipv6 dst addr
@@ -544,8 +544,8 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// set proper ethernet addresses
-	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
-	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->neigh_mac);
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->own_mac);
 
 	// replace IPv4 address in overlay if VIP/NAT enabled
 	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
@@ -631,8 +631,8 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 	// in network traffic has to be set via the other pf port via hairpin
 	outgoing_port = incoming_port == dp_get_pf0() ? dp_get_pf1() : dp_get_pf0();
 	// do *not* change df->nxt_hop though, as that carries the "proper" outgoing port
-	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
-	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->own_mac);
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->neigh_mac);
 
 	// set the right underlay address
 	dp_set_ipv6_set_dst_action(&actions[action_cnt++], &set_ipv6, df->tun_info.ul_dst_addr6);

@@ -209,7 +209,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	// switch the packet's direction
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&dp_get_in_port(m)->vm.info.own_mac, &req_eth_hdr->src_addr);
+	rte_ether_addr_copy(&dp_get_in_port(m)->own_mac, &req_eth_hdr->src_addr);
 
 	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr, sizeof(req_ipv6_hdr->dst_addr));
 	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6, sizeof(req_ipv6_hdr->src_addr));

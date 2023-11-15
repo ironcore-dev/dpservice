@@ -52,9 +52,8 @@ struct dp_fwall_rule {
 	TAILQ_ENTRY(dp_fwall_rule) next_rule;
 };
 
-// forward-declaration due to 'struct dp_fwall_rule' being part of 'struct dp_grpc_responder'
+// forward-declaration due to 'struct dp_fwall_rule' being part of these structures
 struct dp_grpc_responder;
-// dtto for 'struct vm_entry' which is part of 'struct dp_port'
 struct dp_port;
 
 void dp_init_firewall_rules(struct dp_port *port);

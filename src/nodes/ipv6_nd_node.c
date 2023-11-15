@@ -32,7 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_port *port = dp_get_in_port(m);
 
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &req_eth_hdr->src_addr);
+	rte_ether_addr_copy(&port->own_mac, &req_eth_hdr->src_addr);
 
 	if (!memcmp(req_ipv6_hdr->src_addr, dp_unspecified_ipv6, sizeof(req_ipv6_hdr->src_addr)))
 		rte_memcpy(req_ipv6_hdr->dst_addr, dp_multicast_ipv6, sizeof(req_ipv6_hdr->dst_addr));
@@ -48,7 +48,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		nd_msg = (struct nd_msg *)(req_ipv6_hdr + 1);
 		if (memcmp(&nd_msg->target, rt_ip, sizeof(nd_msg->target)))
 			return IPV6_ND_NEXT_DROP;
-		rte_ether_addr_copy(&req_eth_hdr->dst_addr, &port->vm.info.neigh_mac);
+		rte_ether_addr_copy(&req_eth_hdr->dst_addr, &port->neigh_mac);
 		rte_memcpy(port->vm.info.vm_ipv6, req_ipv6_hdr->dst_addr, sizeof(port->vm.info.vm_ipv6));
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
 		req_icmp6_hdr->icmp6_solicited = 1;

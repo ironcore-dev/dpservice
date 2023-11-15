@@ -215,9 +215,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	m->l4_len = sizeof(struct rte_udp_hdr);
 
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &incoming_eth_hdr->src_addr);
+	rte_ether_addr_copy(&port->own_mac, &incoming_eth_hdr->src_addr);
 	if (response_type == DHCPACK)
-		rte_ether_addr_copy(&incoming_eth_hdr->dst_addr, &port->vm.info.neigh_mac);
+		rte_ether_addr_copy(&incoming_eth_hdr->dst_addr, &port->neigh_mac);
 
 	incoming_ipv4_hdr->src_addr = server_ip;
 

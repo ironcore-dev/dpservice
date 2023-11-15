@@ -21,7 +21,6 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	const struct dp_ports *ports = dp_get_ports();
 	struct rte_mbuf *clone_buf;
-	const struct rte_ether_addr *mac;
 	int ret;
 
 	DP_FOREACH_PORT(ports, port) {
@@ -37,12 +36,11 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 		clone_buf->port = port->port_id;
 		eth_hdr = rte_pktmbuf_mtod(clone_buf, struct rte_ether_hdr *);
 
-		mac = &port->vm.info.own_mac;
-		rte_ether_addr_copy(mac, &eth_hdr->src_addr);
+		rte_ether_addr_copy(&port->own_mac, &eth_hdr->src_addr);
 
 		if (eth_type == RTE_ETHER_TYPE_ARP) {
 			arp_hdr = (struct rte_arp_hdr *)(eth_hdr + 1);
-			rte_ether_addr_copy(mac, &arp_hdr->arp_data.arp_sha);
+			rte_ether_addr_copy(&port->own_mac, &arp_hdr->arp_data.arp_sha);
 			if (dp_arp_cycle_needed(port))
 				arp_hdr->arp_data.arp_tip = htonl(port->vm.info.own_ip);
 		}
