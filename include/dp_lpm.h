@@ -37,21 +37,21 @@ extern "C" {
 #define DP_LIST_EXT_ROUTES true
 #define DP_LIST_INT_ROUTES false
 
-struct vm_route {
+struct dp_iface_route {
 	int		vni;
 	uint8_t	nh_ipv6[16];
 };
 
-const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct dp_flow *df,
-										  struct vm_route *route,
+										  struct dp_iface_route *route,
 										  uint32_t *route_key);
 
-const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct rte_ipv6_hdr *ipv6_hdr,
-										  struct vm_route *route);
+										  struct dp_iface_route *route);
 
 uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);

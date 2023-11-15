@@ -22,35 +22,35 @@ DP_NODE_REGISTER_NOINIT(IPV4_LOOKUP, ipv4_lookup, NEXT_NODES);
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	struct vm_route route;
+	struct dp_iface_route route;
 	uint32_t route_key = 0;
-	const struct dp_port *src_port = dp_get_port(m);
-	const struct dp_port *dst_port;
+	const struct dp_port *in_port = dp_get_in_port(m);
+	const struct dp_port *out_port;
 
 	// TODO: add broadcast routes when machine is added
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	dst_port = dp_get_ip4_dst_port(src_port, df->tun_info.dst_vni, df, &route, &route_key);
-	if (!dst_port)
+	out_port = dp_get_ip4_out_port(in_port, df->tun_info.dst_vni, df, &route, &route_key);
+	if (!out_port)
 		return IPV4_LOOKUP_NEXT_DROP;
 
-	if (dst_port->is_pf) {
-		if (src_port->is_pf)
+	if (out_port->is_pf) {
+		if (in_port->is_pf)
 			return IPV4_LOOKUP_NEXT_DROP;
 		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
-		dst_port = dp_multipath_get_pf(df->dp_flow_hash);
+		out_port = dp_multipath_get_pf(df->dp_flow_hash);
 	} else {
 		// next hop is known, fill in Ether header
 		// (PF egress goes through a tunnel that destroys Ether header)
-		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), dst_port, RTE_ETHER_TYPE_IPV4);
+		dp_fill_ether_hdr(rte_pktmbuf_mtod(m, struct rte_ether_hdr *), out_port, RTE_ETHER_TYPE_IPV4);
 	}
 
-	if (!src_port->is_pf)
+	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
 	df->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
-	df->nxt_hop = dst_port->port_id;  // always valid since coming from struct dp_port
+	df->nxt_hop = out_port->port_id;  // always valid since coming from struct dp_port
 
 	return IPV4_LOOKUP_NEXT_NAT;
 }

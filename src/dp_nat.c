@@ -67,11 +67,11 @@ void dp_nat_free(void)
 	dp_free_jhash_table(ipv4_snat_tbl);
 }
 
-struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni)
+struct snat_data *dp_get_iface_snat_data(uint32_t iface_ip, uint32_t vni)
 {
 	struct snat_data *data;
 	struct nat_key nkey = {
-		.ip = vm_ip,
+		.ip = iface_ip,
 		.vni = vni
 	};
 	int ret;
@@ -86,11 +86,11 @@ struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni)
 	return data;
 }
 
-static struct snat_data *dp_create_vm_snat_data(uint32_t vm_ip, uint32_t vni)
+static struct snat_data *dp_create_snat_data(uint32_t iface_ip, uint32_t vni)
 {
 	struct snat_data *data;
 	struct nat_key nkey = {
-		.ip = vm_ip,
+		.ip = iface_ip,
 		.vni = vni
 	};
 
@@ -106,10 +106,10 @@ static struct snat_data *dp_create_vm_snat_data(uint32_t vm_ip, uint32_t vni)
 	return data;
 }
 
-static void dp_delete_vm_snat_data(uint32_t vm_ip, uint32_t vni, struct snat_data *data)
+static void dp_delete_snat_data(uint32_t iface_ip, uint32_t vni, struct snat_data *data)
 {
 	struct nat_key nkey = {
-		.ip = vm_ip,
+		.ip = iface_ip,
 		.vni = vni
 	};
 
@@ -118,78 +118,79 @@ static void dp_delete_vm_snat_data(uint32_t vm_ip, uint32_t vni, struct snat_dat
 		DPS_LOG_WARNING("Failed to delete SNAT key");
 }
 
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
+						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
-	data = dp_get_vm_snat_data(vm_ip, vni);
+	data = dp_get_iface_snat_data(iface_ip, vni);
 	if (!data) {
-		data = dp_create_vm_snat_data(vm_ip, vni);
+		data = dp_create_snat_data(iface_ip, vni);
 		if (!data)
 			return DP_GRPC_ERR_SNAT_CREATE;
 	} else if (data->vip_ip != 0)
 		return DP_GRPC_ERR_SNAT_EXISTS;
 
-	data->vip_ip = s_ip;
-	rte_memcpy(data->ul_ip6, ul_ipv6, sizeof(data->ul_ip6));
+	data->vip_ip = vip_ip;
+	rte_memcpy(data->ul_vip_ip6, ul_ipv6, sizeof(data->ul_vip_ip6));
 	return DP_GRPC_OK;
 }
 
-int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port,
-							  uint16_t max_port, const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
+						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
-	data = dp_get_vm_snat_data(vm_ip, vni);
+	data = dp_get_iface_snat_data(iface_ip, vni);
 	if (!data) {
-		data = dp_create_vm_snat_data(vm_ip, vni);
+		data = dp_create_snat_data(iface_ip, vni);
 		if (!data)
 			return DP_GRPC_ERR_SNAT_CREATE;
-	} else if (data->network_nat_ip != 0)
+	} else if (data->nat_ip != 0)
 		return DP_GRPC_ERR_SNAT_EXISTS;
 
-	rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_ip6));
-	data->network_nat_ip = s_ip;
-	data->network_nat_port_range[0] = min_port;
-	data->network_nat_port_range[1] = max_port;
+	rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_vip_ip6));
+	data->nat_ip = nat_ip;
+	data->nat_port_range[0] = min_port;
+	data->nat_port_range[1] = max_port;
 	return DP_GRPC_OK;
 }
 
-int dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni)
+int dp_del_iface_vip_ip(uint32_t iface_ip, uint32_t vni)
 {
 	struct snat_data *data;
 
-	data = dp_get_vm_snat_data(vm_ip, vni);
+	data = dp_get_iface_snat_data(iface_ip, vni);
 	if (!data)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	// NAT stil present, keep the data
-	if (data->network_nat_ip != 0) {
+	if (data->nat_ip != 0) {
 		data->vip_ip = 0;
 		return DP_GRPC_OK;
 	}
 
-	dp_delete_vm_snat_data(vm_ip, vni, data);
+	dp_delete_snat_data(iface_ip, vni, data);
 	return DP_GRPC_OK;
 }
 
-int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni)
+int dp_del_iface_nat_ip(uint32_t iface_ip, uint32_t vni)
 {
 	struct snat_data *data;
 
-	data = dp_get_vm_snat_data(vm_ip, vni);
+	data = dp_get_iface_snat_data(iface_ip, vni);
 	if (!data)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	// VIP stil present, keep the data
 	if (data->vip_ip != 0) {
-		data->network_nat_ip = 0;
-		data->network_nat_port_range[0] = 0;
-		data->network_nat_port_range[1] = 0;
+		data->nat_ip = 0;
+		data->nat_port_range[0] = 0;
+		data->nat_port_range[1] = 0;
 		return DP_GRPC_OK;
 	}
 
-	dp_delete_vm_snat_data(vm_ip, vni, data);
+	dp_delete_snat_data(iface_ip, vni, data);
 	return DP_GRPC_OK;
 
 }
@@ -422,18 +423,18 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portmap_data *portmap_data;
 	uint16_t min_port, max_port, allocated_port = 0, tmp_port;
-	uint32_t vm_src_info_hash;
+	uint32_t iface_src_info_hash;
 	int ret;
 	bool need_to_find_new_port = true;
-	uint32_t vm_ip = ntohl(df->src.src_addr);
-	uint16_t vm_port = ntohs(df->l4_info.trans_port.src_port);
+	uint32_t iface_src_ip = ntohl(df->src.src_addr);
+	uint16_t iface_src_port = ntohs(df->l4_info.trans_port.src_port);
 	uint64_t timestamp;
 
-	portmap_key.vm_src_ip = vm_ip;
+	portmap_key.iface_src_ip = iface_src_ip;
 	portmap_key.vni = vni;
-	portmap_key.vm_src_port = vm_port;
+	portmap_key.iface_src_port = iface_src_port;
 
-	portoverload_tbl_key.nat_ip = snat_data->network_nat_ip;
+	portoverload_tbl_key.nat_ip = snat_data->nat_ip;
 	portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
 	portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 	portoverload_tbl_key.l4_type = df->l4_type;
@@ -459,13 +460,13 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	}
 
 	if (need_to_find_new_port) {
-		min_port = snat_data->network_nat_port_range[0];
-		max_port = snat_data->network_nat_port_range[1];
+		min_port = snat_data->nat_port_range[0];
+		max_port = snat_data->nat_port_range[1];
 
-		vm_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, &portmap_key);
+		iface_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, &portmap_key);
 
 		for (uint16_t p = 0; p < max_port - min_port; p++) {
-			tmp_port = min_port + (uint16_t)((vm_src_info_hash + p) % (uint32_t)(max_port - min_port));
+			tmp_port = min_port + (uint16_t)((iface_src_info_hash + p) % (uint32_t)(max_port - min_port));
 			portoverload_tbl_key.nat_port = tmp_port;
 			ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 			if (ret == -ENOENT) {
@@ -484,9 +485,9 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
 				snat_data->log_timestamp = timestamp;
 				DPS_LOG_WARNING("NAT portmap range is full",
-								DP_LOG_IPV4(snat_data->network_nat_ip),
-								DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(vm_ip),
-								DP_LOG_SRC_PORT(vm_port));
+								DP_LOG_IPV4(snat_data->nat_ip),
+								DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(iface_src_ip),
+								DP_LOG_SRC_PORT(iface_src_port));
 			}
 			return DP_ERROR;
 		}
@@ -501,7 +502,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 
 	if (need_to_find_new_port) {
 		portmap_data = rte_zmalloc("netnat_portmap_val", sizeof(struct netnat_portmap_data), RTE_CACHE_LINE_SIZE);
-		portmap_data->nat_ip = snat_data->network_nat_ip;
+		portmap_data->nat_ip = snat_data->nat_ip;
 		portmap_data->nat_port = allocated_port;
 		portmap_data->flow_cnt++;
 
@@ -535,8 +536,8 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
-	portmap_key.vm_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
-	portmap_key.vm_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
+	portmap_key.iface_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
+	portmap_key.iface_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
@@ -580,12 +581,12 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 		if (DP_FAILED(ret))
 			return DP_GRPC_ERR_ITERATOR;
 
-		if (data->network_nat_ip == nat_ip) {
+		if (data->nat_ip == nat_ip) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			reply->min_port = data->network_nat_port_range[0];
-			reply->max_port = data->network_nat_port_range[1];
+			reply->min_port = data->nat_port_range[0];
+			reply->max_port = data->nat_port_range[1];
 			reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 			reply->addr.ipv4 = nkey->ip;
 			reply->vni = nkey->vni;

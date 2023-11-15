@@ -11,7 +11,7 @@
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
-#include "dp_vm.h"
+#include "dp_iface.h"
 #include "dp_vnf.h"
 #include "dp_vni.h"
 #include "dpdk_layer.h"
@@ -69,7 +69,7 @@ static __rte_always_inline int dp_remove_vnf_entry(struct dp_vnf_value *val, enu
 {
 	val->v_type = v_type;
 	val->portid = port->port_id;
-	val->vni = port->vm.vni;
+	val->vni = port->iface.vni;
 	return dp_del_vnf_with_value(val);
 }
 
@@ -185,7 +185,7 @@ static int dp_process_create_fwrule(struct dp_grpc_responder *responder)
 	struct dpgrpc_fwrule *request = &responder->request.add_fwrule;
 	struct dp_port *port;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -209,7 +209,7 @@ static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 	struct dp_port *port;
 	struct dp_fwall_rule *rule;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -226,7 +226,7 @@ static int dp_process_delete_fwrule(struct dp_grpc_responder *responder)
 	struct dpgrpc_fwrule_id *request = &responder->request.del_fwrule;
 	struct dp_port *port;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -254,29 +254,29 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_vnf_value vnf_val = {0};
 	struct dp_port *port;
-	uint32_t vm_ip, vm_vni;
+	uint32_t iface_ip, iface_vni;
 	uint32_t vip;
 	int ret;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port) {
 		ret = DP_GRPC_ERR_NO_VM;
 		goto err;
 	}
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		vm_ip = port->vm.info.own_ip;
-		vm_vni = port->vm.vni;
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, vm_vni, port, ul_addr6))) {
+		iface_ip = port->iface.cfg.own_ip;
+		iface_vni = port->iface.vni;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, iface_vni, port, ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
 		vip = request->addr.ipv4;
-		ret = dp_set_vm_snat_ip(vm_ip, vip, vm_vni, ul_addr6);
+		ret = dp_set_iface_vip_ip(iface_ip, vip, iface_vni, ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
-		ret = dp_set_dnat_ip(vip, vm_ip, vm_vni);
+		ret = dp_set_dnat_ip(vip, iface_ip, iface_vni);
 		if (DP_FAILED(ret))
 			goto err_snat;
 
@@ -288,7 +288,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 
 err_snat:
-	dp_del_vm_snat_ip(vm_ip, vm_vni);
+	dp_del_iface_vip_ip(iface_ip, iface_vni);
 err_vnf:
 	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
@@ -302,28 +302,28 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 
 	struct dp_port *port;
 	struct snat_data *s_data;
-	uint32_t vm_ip, vm_vni;
+	uint32_t iface_ip, iface_vni;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	vm_ip = port->vm.info.own_ip;
-	vm_vni = port->vm.vni;
+	iface_ip = port->iface.cfg.own_ip;
+	iface_vni = port->iface.vni;
 
-	s_data = dp_get_vm_snat_data(vm_ip, vm_vni);
+	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	dp_del_vnf_with_vnf_key(s_data->ul_ip6);
+	dp_del_vnf_with_vnf_key(s_data->ul_vip_ip6);
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->vip_ip;
 
 	// always delete, i.e. do not use dp_del_vip_from_dnat(),
 	// because 1:1 VIP is not shared with anything
-	dp_del_dnat_ip(s_data->vip_ip, vm_vni);
-	dp_del_vm_snat_ip(vm_ip, vm_vni);
+	dp_del_dnat_ip(s_data->vip_ip, iface_vni);
+	dp_del_iface_vip_ip(iface_ip, iface_vni);
 	dp_remove_nat_flows(port->port_id, DP_FLOW_NAT_TYPE_VIP);
 	return DP_GRPC_OK;
 }
@@ -336,17 +336,17 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	struct dp_port *port;
 	struct snat_data *s_data;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_vm_snat_data(port->vm.info.own_ip, port->vm.vni);
+	s_data = dp_get_iface_snat_data(port->iface.cfg.own_ip, port->iface.vni);
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->vip_ip;
-	rte_memcpy(reply->ul_addr6, s_data->ul_ip6, sizeof(reply->ul_addr6));
+	rte_memcpy(reply->ul_addr6, s_data->ul_vip_ip6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }
 
@@ -365,14 +365,14 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (request->addr.ip_type != RTE_ETHER_TYPE_IPV4)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
 	if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, !DP_VNF_MATCH_ALL_PORT_ID)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
-	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port->vm.vni, port, ul_addr6)))
+	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, ul_addr6)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
 	rte_memcpy(reply->trgt_addr.ipv6, ul_addr6, sizeof(reply->trgt_addr.ipv6));
@@ -392,7 +392,7 @@ static int dp_process_delete_lbprefix(struct dp_grpc_responder *responder)
 	if (request->addr.ip_type != RTE_ETHER_TYPE_IPV4)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -406,25 +406,25 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_port *port;
-	uint32_t vm_vni;
+	uint32_t iface_vni;
 	struct dp_vnf_value vnf_val = {
 		.alias_pfx.ip = request->addr.ipv4,
 		.alias_pfx.length = request->length,
 	};
 	int ret;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		vm_vni = port->vm.vni;
-		ret = dp_add_route(port, vm_vni, 0, vnf_val.alias_pfx.ip, NULL, vnf_val.alias_pfx.length);
+		iface_vni = port->iface.vni;
+		ret = dp_add_route(port, iface_vni, 0, vnf_val.alias_pfx.ip, NULL, vnf_val.alias_pfx.length);
 		if (DP_FAILED(ret))
 			return ret;
 
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, vm_vni, port, ul_addr6))) {
-			dp_del_route(port, vm_vni, vnf_val.alias_pfx.ip, vnf_val.alias_pfx.length);
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, ul_addr6))) {
+			dp_del_route(port, iface_vni, vnf_val.alias_pfx.ip, vnf_val.alias_pfx.length);
 			return DP_GRPC_ERR_VNF_INSERT;
 		}
 		rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
@@ -445,12 +445,12 @@ static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 	};
 	int ret, ret2;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_del_route(port, port->vm.vni,
+		ret = dp_del_route(port, port->iface.vni,
 						   vnf_val.alias_pfx.ip, vnf_val.alias_pfx.length);
 		// ignore the error and try to delete the vnf entry anyway
 	} else
@@ -483,27 +483,27 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
-	if (DP_FAILED(dp_map_vm_handle(request->iface_id, port))) {
+	if (DP_FAILED(dp_map_iface_id(request->iface_id, port))) {
 		ret = DP_GRPC_ERR_VM_HANDLE;
 		goto err_vnf;
 	}
-	if (DP_FAILED(dp_setup_vm(port, request->vni))) {
+	if (DP_FAILED(dp_setup_iface(port, request->vni))) {
 		ret = DP_GRPC_ERR_VNI_INIT4;
 		goto handle_err;
 	}
 
-	rte_memcpy(port->vm.ul_ipv6, ul_addr6, sizeof(port->vm.ul_ipv6));
-	port->vm.info.own_ip = request->ip4_addr;
-	port->vm.info.depth = DP_LPM_DHCP_IP_DEPTH;
-	rte_memcpy(port->vm.info.dhcp_ipv6, request->ip6_addr, sizeof(port->vm.info.dhcp_ipv6));
-	port->vm.info.depth = DP_LPM_DHCP_IP6_DEPTH;
-	static_assert(sizeof(request->pxe_str) == sizeof(port->vm.info.pxe_str), "Incompatible VM PXE size");
-	rte_memcpy(port->vm.info.pxe_str, request->pxe_str, sizeof(port->vm.info.pxe_str));
-	port->vm.info.pxe_ip = request->ip4_pxe_addr;
+	rte_memcpy(port->iface.ul_ipv6, ul_addr6, sizeof(port->iface.ul_ipv6));
+	port->iface.cfg.own_ip = request->ip4_addr;
+	port->iface.cfg.ip_depth = DP_LPM_DHCP_IP_DEPTH;
+	rte_memcpy(port->iface.cfg.dhcp_ipv6, request->ip6_addr, sizeof(port->iface.cfg.dhcp_ipv6));
+	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
+	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
+	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
+	port->iface.cfg.pxe_ip = request->ip4_pxe_addr;
 
 	ret = dp_add_route(port, request->vni, 0, request->ip4_addr, NULL, 32);
 	if (DP_FAILED(ret))
-		goto vm_err;
+		goto iface_err;
 	ret = dp_add_route6(port, request->vni, 0, request->ip6_addr, NULL, 128);
 	if (DP_FAILED(ret))
 		goto route_err;
@@ -512,7 +512,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		goto route6_err;
 	}
 
-	rte_memcpy(reply->ul_addr6, port->vm.ul_ipv6, sizeof(reply->ul_addr6));
+	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
 	snprintf(reply->name, sizeof(reply->name), "%s", port->vf_name);
 	return DP_GRPC_OK;
 
@@ -520,10 +520,10 @@ route6_err:
 	dp_del_route6(port, request->vni, request->ip6_addr, 128);
 route_err:
 	dp_del_route(port, request->vni, request->ip4_addr, 32);
-vm_err:
-	dp_del_vm(port);
+iface_err:
+	dp_delete_iface(port);
 handle_err:
-	dp_unmap_vm_handle(request->iface_id);
+	dp_unmap_iface_id(request->iface_id);
 err_vnf:
 	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
@@ -539,23 +539,23 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	uint32_t vni;
 	int ret = DP_GRPC_OK;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	ipv4 = port->vm.info.own_ip;
-	vni = port->vm.vni;
+	ipv4 = port->iface.cfg.own_ip;
+	vni = port->iface.vni;
 
-	dp_del_vnf_with_vnf_key(port->vm.ul_ipv6);
+	dp_del_vnf_with_vnf_key(port->iface.ul_ipv6);
 	if (DP_FAILED(dp_stop_port(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
-	dp_unmap_vm_handle(request->iface_id);
-	dp_del_vm(port);
+	dp_unmap_iface_id(request->iface_id);
+	dp_delete_iface(port);
 #ifdef ENABLE_VIRTSVC
-	dp_virtsvc_del_vm(port->port_id);
+	dp_virtsvc_del_iface(port->port_id);
 #endif
-	dp_remove_vm_flows(port->port_id, ipv4, vni);
+	dp_remove_iface_flows(port->port_id, ipv4, vni);
 	return ret;
 }
 
@@ -566,18 +566,18 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 
 	struct dp_port *port;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	reply->ip4_addr = port->vm.info.own_ip;
-	rte_memcpy(reply->ip6_addr, port->vm.info.dhcp_ipv6, sizeof(reply->ip6_addr));
-	reply->vni = port->vm.vni;
-	static_assert(sizeof(reply->iface_id) == sizeof(port->vm.machineid), "Incompatible VM ID size");
-	rte_memcpy(reply->iface_id, port->vm.machineid, sizeof(reply->iface_id));
+	reply->ip4_addr = port->iface.cfg.own_ip;
+	rte_memcpy(reply->ip6_addr, port->iface.cfg.dhcp_ipv6, sizeof(reply->ip6_addr));
+	reply->vni = port->iface.vni;
+	static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
+	rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
 	static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 	rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
-	rte_memcpy(reply->ul_addr6, port->vm.ul_ipv6, sizeof(reply->ul_addr6));
+	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }
 
@@ -620,29 +620,29 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	struct dp_vnf_value vnf_val = {0};
 	struct dp_port *port;
-	uint32_t vm_ip, vm_vni;
+	uint32_t iface_ip, iface_vni;
 	int ret;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port) {
 		ret = DP_GRPC_ERR_NO_VM;
 		goto err;
 	}
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		vm_ip = port->vm.info.own_ip;
-		vm_vni = port->vm.vni;
-		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, vm_vni, port, ul_addr6))) {
+		iface_ip = port->iface.cfg.own_ip;
+		iface_vni = port->iface.vni;
+		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, iface_vni, port, ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
-		ret = dp_set_vm_network_snat_ip(vm_ip, request->addr.ipv4, vm_vni,
+		ret = dp_set_iface_nat_ip(iface_ip, request->addr.ipv4, iface_vni,
 										request->min_port, request->max_port,
 										ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
-		ret = dp_set_dnat_ip(request->addr.ipv4, 0, vm_vni);
+		ret = dp_set_dnat_ip(request->addr.ipv4, 0, iface_vni);
 		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS)
 			goto err_dnat;
 		rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
@@ -653,7 +653,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 
 err_dnat:
-	dp_del_vm_network_snat_ip(vm_ip, vm_vni);
+	dp_del_iface_nat_ip(iface_ip, iface_vni);
 err_vnf:
 	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
@@ -668,26 +668,26 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 
 	struct dp_port *port;
 	struct snat_data *s_data;
-	uint32_t vm_ip, vm_vni;
+	uint32_t iface_ip, iface_vni;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	vm_ip = port->vm.info.own_ip;
-	vm_vni = port->vm.vni;
+	iface_ip = port->iface.cfg.own_ip;
+	iface_vni = port->iface.vni;
 
-	s_data = dp_get_vm_snat_data(vm_ip, vm_vni);
-	if (!s_data || !s_data->network_nat_ip)
+	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
+	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	dp_del_vnf_with_vnf_key(s_data->ul_nat_ip6);
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
-	reply->addr.ipv4 = s_data->network_nat_ip;
-	dp_del_vip_from_dnat(s_data->network_nat_ip, vm_vni);
+	reply->addr.ipv4 = s_data->nat_ip;
+	dp_del_vip_from_dnat(s_data->nat_ip, iface_vni);
 	dp_remove_nat_flows(port->port_id, DP_FLOW_NAT_TYPE_NETWORK_LOCAL);
-	return dp_del_vm_network_snat_ip(vm_ip, vm_vni);
+	return dp_del_iface_nat_ip(iface_ip, iface_vni);
 }
 
 static int dp_process_get_nat(struct dp_grpc_responder *responder)
@@ -698,18 +698,18 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	struct dp_port *port;
 	struct snat_data *s_data;
 
-	port = dp_get_port_with_vm_handle(request->iface_id);
+	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_vm_snat_data(port->vm.info.own_ip, port->vm.vni);
-	if (!s_data || !s_data->network_nat_ip)
+	s_data = dp_get_iface_snat_data(port->iface.cfg.own_ip, port->iface.vni);
+	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
-	reply->addr.ipv4 = s_data->network_nat_ip;
-	reply->min_port = s_data->network_nat_port_range[0];
-	reply->max_port = s_data->network_nat_port_range[1];
+	reply->addr.ipv4 = s_data->nat_ip;
+	reply->min_port = s_data->nat_port_range[0];
+	reply->max_port = s_data->nat_port_range[1];
 	rte_memcpy(reply->ul_addr6, s_data->ul_nat_ip6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }
@@ -767,21 +767,21 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	DP_FOREACH_PORT(ports, port) {
-		if (!port->vm.ready)
+		if (!port->iface.ready)
 			continue;
 
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
-		reply->ip4_addr = port->vm.info.own_ip;
-		rte_memcpy(reply->ip6_addr, port->vm.info.dhcp_ipv6, sizeof(reply->ip6_addr));
-		reply->vni = port->vm.vni;
-		static_assert(sizeof(reply->iface_id) == sizeof(port->vm.machineid), "Incompatible VM ID size");
-		rte_memcpy(reply->iface_id, port->vm.machineid, sizeof(reply->iface_id));
+		reply->ip4_addr = port->iface.cfg.own_ip;
+		rte_memcpy(reply->ip6_addr, port->iface.cfg.dhcp_ipv6, sizeof(reply->ip6_addr));
+		reply->vni = port->iface.vni;
+		static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
+		rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
 		static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 		rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
-		rte_memcpy(reply->ul_addr6, port->vm.ul_ipv6, sizeof(reply->ul_addr6));
+		rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
 	}
 
 	return DP_GRPC_OK;
@@ -802,7 +802,7 @@ static int dp_process_list_fwrules(struct dp_grpc_responder *responder)
 {
 	struct dp_port *port;
 
-	port = dp_get_port_with_vm_handle(responder->request.list_fwrule.iface_id);
+	port = dp_get_port_with_iface_id(responder->request.list_fwrule.iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -813,7 +813,7 @@ static int dp_process_list_lbprefixes(struct dp_grpc_responder *responder)
 {
 	struct dp_port *port;
 
-	port = dp_get_port_with_vm_handle(responder->request.list_lbpfx.iface_id);
+	port = dp_get_port_with_iface_id(responder->request.list_lbpfx.iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -824,7 +824,7 @@ static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 {
 	struct dp_port *port;
 
-	port = dp_get_port_with_vm_handle(responder->request.list_pfx.iface_id);
+	port = dp_get_port_with_iface_id(responder->request.list_pfx.iface_id);
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
@@ -883,7 +883,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 	for (int i = 0; i < request->interface_count; ++i) {
 		switch (request->interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
-			port = dp_get_port_with_vm_handle(request->interfaces[i].spec.iface_id);
+			port = dp_get_port_with_iface_id(request->interfaces[i].spec.iface_id);
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
 			port = dp_get_port_by_pf_index(request->interfaces[i].spec.pf_index);
@@ -959,9 +959,9 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 			reply->interfaces[count].spec.pf_index = port == dp_get_pf0() ? 0 : 1;
 		} else {
 			reply->interfaces[count].type = DP_CAPTURE_IFACE_TYPE_SINGLE_VF;
-			static_assert(sizeof(reply->interfaces[count].spec.iface_id) == sizeof(port->vm.machineid),
+			static_assert(sizeof(reply->interfaces[count].spec.iface_id) == sizeof(port->iface.id),
 						  "Invalid size for captured interface id");
-			rte_memcpy(reply->interfaces[count].spec.iface_id, port->vm.machineid, sizeof(port->vm.machineid));
+			rte_memcpy(reply->interfaces[count].spec.iface_id, port->iface.id, sizeof(port->iface.id));
 		}
 		count++;
 	}

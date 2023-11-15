@@ -94,7 +94,7 @@ static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_v
 static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
 	bool offload_other_pf = false;
-	struct dp_port *port = dp_get_port(m);
+	struct dp_port *port = dp_get_in_port(m);
 
 	if (!offload_mode_enabled)
 		return;
@@ -267,7 +267,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 			return ret;
 		}
 		// create new flow if needed
-		*p_flow_val = flow_table_insert_entry(curr_key, df, dp_get_port(m));
+		*p_flow_val = flow_table_insert_entry(curr_key, df, dp_get_in_port(m));
 		if (unlikely(!*p_flow_val)) {
 			DPS_LOG_WARNING("Failed to create a new flow table entry");
 			return DP_ERROR;

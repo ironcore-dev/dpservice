@@ -31,12 +31,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return SNAT_NEXT_FIREWALL;
 
 	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flags.dir == DP_FLOW_DIR_ORG) {
-		port = dp_get_port(m);
+		port = dp_get_in_port(m);
 		src_ip = ntohl(df->src.src_addr);
-		vni = port->vm.vni;
-		snat_data = dp_get_vm_snat_data(src_ip, vni);
+		vni = port->iface.vni;
+		snat_data = dp_get_iface_snat_data(src_ip, vni);
 
-		if (snat_data && (snat_data->vip_ip != 0 || snat_data->network_nat_ip != 0)
+		if (snat_data && (snat_data->vip_ip != 0 || snat_data->nat_ip != 0)
 			&& df->flags.public_flow == DP_FLOW_SOUTH_NORTH) {
 			ipv4_hdr = dp_get_ipv4_hdr(m);
 			// TODO(tao?): in case of both VIP and NAT set, VIP gets written here and immediately overwritten by NAT
@@ -44,12 +44,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				ipv4_hdr->src_addr = htonl(snat_data->vip_ip);
 				cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 			}
-			if (snat_data->network_nat_ip != 0) {
+			if (snat_data->nat_ip != 0) {
 				ret = dp_allocate_network_snat_port(snat_data, df, vni);
 				if (DP_FAILED(ret))
 					return SNAT_NEXT_DROP;
 				nat_port = (uint16_t)ret;
-				ipv4_hdr->src_addr = htonl(snat_data->network_nat_ip);
+				ipv4_hdr->src_addr = htonl(snat_data->nat_ip);
 
 				DP_STATS_NAT_INC_USED_PORT_CNT(port);
 
@@ -76,7 +76,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
-			if (snat_data->network_nat_ip != 0)
+			if (snat_data->nat_ip != 0)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))

@@ -52,7 +52,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return CONNTRACK_NEXT_DROP;
 	}
 
-	if (!dp_get_port(m)->is_pf)
+	if (!dp_get_in_port(m)->is_pf)
 		return CONNTRACK_NEXT_DNAT;
 
 	switch (df->vnf_type) {

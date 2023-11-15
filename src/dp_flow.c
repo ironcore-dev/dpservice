@@ -108,8 +108,8 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 	} else {
 		vnf_val.alias_pfx.ip = key->ip_src;
 		vnf_val.alias_pfx.length = 32;
-		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
-		if (s_data && s_data->network_nat_ip != 0)
+		s_data = dp_get_iface_snat_data(key->ip_src, key->vni);
+		if (s_data && s_data->nat_ip != 0)
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
 		else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, !DP_VNF_MATCH_ALL_PORT_ID)))
 			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
@@ -121,7 +121,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	const struct dp_port *port = dp_get_port(m);
+	const struct dp_port *port = dp_get_in_port(m);
 	int ret = DP_OK;
 
 	key->ip_dst = ntohl(df->dst.dst_addr);
@@ -132,7 +132,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	if (port->is_pf)
 		key->vni = df->tun_info.dst_vni;
 	else
-		key->vni = port->vm.vni;
+		key->vni = port->iface.vni;
 
 	dp_mark_vnf_type(df, port, key);
 
@@ -458,7 +458,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 	}
 }
 
-void dp_remove_vm_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
+void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 {
 	struct flow_value *flow_val = NULL;
 	const struct flow_key *next_key;

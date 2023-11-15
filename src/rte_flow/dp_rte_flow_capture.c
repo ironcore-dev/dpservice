@@ -75,8 +75,8 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	const struct dp_port *outgoing_port = dp_get_pf0();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 
-	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &encap_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &encap_eth_hdr->src_addr);
+	rte_ether_addr_copy(&outgoing_port->neigh_mac, &encap_eth_hdr->dst_addr);
+	rte_ether_addr_copy(&outgoing_port->own_mac, &encap_eth_hdr->src_addr);
 	encap_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	rte_memcpy(new_ipv6_hdr->src_addr, dp_conf_get_underlay_ip(), sizeof(new_ipv6_hdr->src_addr));

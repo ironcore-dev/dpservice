@@ -352,7 +352,7 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 }
 
 
-void dp_virtsvc_del_vm(uint16_t port_id)
+void dp_virtsvc_del_iface(uint16_t port_id)
 {
 	struct dp_virtsvc_conn_key delete_key;
 	struct dp_virtsvc_conn *conn;

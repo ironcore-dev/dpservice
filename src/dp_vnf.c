@@ -53,7 +53,7 @@ int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, const struc
 {
 	val->v_type = v_type;
 	val->portid = match_all ? DP_VNF_MATCH_ALL_PORT_ID_VALUE : port->port_id;
-	val->vni = port->vm.vni;
+	val->vni = port->iface.vni;
 	return dp_find_vnf_with_value(val);
 }
 

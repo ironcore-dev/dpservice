@@ -150,10 +150,10 @@ bool dp_is_lb_enabled(void)
 	return rte_hash_count(ipv4_lb_tbl) > 0;
 }
 
-bool dp_is_ip_lb(uint32_t vm_ip, uint32_t vni)
+bool dp_is_ip_lb(uint32_t ol_ip, uint32_t vni)
 {
 	struct lb_key nkey = {
-		.ip = vm_ip,
+		.ip = ol_ip,
 		.vni = vni
 	};
 
@@ -223,11 +223,11 @@ static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
 	return ret;
 }
 
-uint8_t *dp_lb_get_backend_ip(uint32_t v_ip, uint32_t vni, rte_be16_t port, uint8_t proto)
+uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uint8_t proto)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
-		.ip = v_ip,
+		.ip = ol_ip,
 		.vni = vni
 	};
 	struct lb_port lb_port;

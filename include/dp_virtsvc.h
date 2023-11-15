@@ -106,7 +106,7 @@ int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 							 uint16_t *pf_port_id,
 							 int *conn_idx);
 
-void dp_virtsvc_del_vm(uint16_t port_id);
+void dp_virtsvc_del_iface(uint16_t port_id);
 
 int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict);
 

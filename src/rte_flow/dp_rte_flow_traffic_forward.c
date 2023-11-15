@@ -166,15 +166,15 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 	struct rte_ether_hdr *encap_eth_hdr = (struct rte_ether_hdr *)raw_hdr;
 	struct rte_ipv6_hdr *encap_ipv6_hdr = (struct rte_ipv6_hdr *)(&raw_hdr[sizeof(struct rte_ether_hdr)]);
 
-	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &encap_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &encap_eth_hdr->src_addr);
+	rte_ether_addr_copy(&outgoing_port->neigh_mac, &encap_eth_hdr->dst_addr);
+	rte_ether_addr_copy(&outgoing_port->own_mac, &encap_eth_hdr->src_addr);
 	encap_eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	encap_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	encap_ipv6_hdr->payload_len = 0;
 	encap_ipv6_hdr->proto = df->tun_info.proto_id;
 	encap_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	rte_memcpy(encap_ipv6_hdr->src_addr, dp_get_port_ul_ip6(incoming_port), sizeof(encap_ipv6_hdr->src_addr));
+	rte_memcpy(encap_ipv6_hdr->src_addr, dp_get_port_ul_ipv6(incoming_port), sizeof(encap_ipv6_hdr->src_addr));
 	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
 }
 
@@ -379,8 +379,8 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 		df->conntrack->incoming_flow_offloaded_flag.pf0 = true;
 
 	// prepare the new ethernet header to replace the IPIP one
-	rte_ether_addr_copy(&outgoing_port->vm.info.neigh_mac, &new_eth_hdr.dst_addr);
-	rte_ether_addr_copy(&outgoing_port->vm.info.own_mac, &new_eth_hdr.src_addr);
+	rte_ether_addr_copy(&outgoing_port->neigh_mac, &new_eth_hdr.dst_addr);
+	rte_ether_addr_copy(&outgoing_port->own_mac, &new_eth_hdr.src_addr);
 	new_eth_hdr.ether_type = htons(df->l3_type);
 
 	// restore the actual incoming pkt's ipv6 dst addr
@@ -544,8 +544,8 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// set proper ethernet addresses
-	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
-	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->neigh_mac);
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->own_mac);
 
 	// replace IPv4 address in overlay if VIP/NAT enabled
 	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
@@ -631,8 +631,8 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 	// in network traffic has to be set via the other pf port via hairpin
 	outgoing_port = incoming_port == dp_get_pf0() ? dp_get_pf1() : dp_get_pf0();
 	// do *not* change df->nxt_hop though, as that carries the "proper" outgoing port
-	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
-	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
+	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->own_mac);
+	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->neigh_mac);
 
 	// set the right underlay address
 	dp_set_ipv6_set_dst_action(&actions[action_cnt++], &set_ipv6, df->tun_info.ul_dst_addr6);
@@ -671,42 +671,42 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 
 int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 {
-	const struct dp_port *incoming_port = dp_get_port(m);
-	const struct dp_port *outgoing_port = dp_get_dst_port(df);
+	const struct dp_port *in_port = dp_get_in_port(m);
+	const struct dp_port *out_port = dp_get_out_port(df);
 	int ret;
 
-	if (!incoming_port->is_pf && !outgoing_port->is_pf) {
+	if (!in_port->is_pf && !out_port->is_pf) {
 		// VF -> VF
-		ret = dp_offload_handle_local_traffic(df, incoming_port, outgoing_port);
+		ret = dp_offload_handle_local_traffic(df, in_port, out_port);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
-	} else if (outgoing_port->is_pf) {
+			DPS_LOG_ERR("Failed to install local flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
+	} else if (out_port->is_pf) {
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 		) {
-			if (unlikely(!incoming_port->is_pf)) {
-				DPS_LOG_ERR("Invalid in-network flow", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port));
+			if (unlikely(!in_port->is_pf)) {
+				DPS_LOG_ERR("Invalid in-network flow", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port));
 				return DP_ERROR;
 			}
 			// PF -> PF
-			ret = dp_offload_handle_in_network_traffic(df, incoming_port);
+			ret = dp_offload_handle_in_network_traffic(df, in_port);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
+				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
 		} else {
-			if (unlikely(incoming_port->is_pf)) {
-				DPS_LOG_ERR("Invalid encap flow", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port));
+			if (unlikely(in_port->is_pf)) {
+				DPS_LOG_ERR("Invalid encap flow", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port));
 				return DP_ERROR;
 			}
 			// VF -> PF
-			ret = dp_offload_handle_tunnel_encap_traffic(df, incoming_port, outgoing_port);
+			ret = dp_offload_handle_tunnel_encap_traffic(df, in_port, out_port);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
+				DPS_LOG_ERR("Failed to install encap flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
 		}
 	} else {
 		// PF -> VF
-		ret = dp_offload_handle_tunnel_decap_traffic(df, incoming_port, outgoing_port, dp_get_pkt_mark(m)->flags.is_recirc);
+		ret = dp_offload_handle_tunnel_decap_traffic(df, in_port, out_port, dp_get_pkt_mark(m)->flags.is_recirc);
 		if (DP_FAILED(ret))
-			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Failed to install decap flow rule", DP_LOG_PORT(in_port), DP_LOG_PORT(out_port), DP_LOG_RET(ret));
 	}
 
 	return ret;

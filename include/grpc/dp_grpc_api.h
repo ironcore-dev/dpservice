@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "dp_firewall.h"
 #include "dp_util.h"
-#include "dp_vm.h"
+#include "dp_iface.h"
 #include "monitoring/dp_monitoring.h"
 
 #ifdef __cplusplus
@@ -74,18 +74,18 @@ enum dpgrpc_capture_iface_type {
 };
 
 struct dpgrpc_iface {
-	char					iface_id[VM_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	uint32_t				ip4_addr;
 	uint8_t					ip6_addr[DP_VNF_IPV6_ADDR_SIZE];
 	uint32_t				vni;
 	uint32_t				ip4_pxe_addr;						// request (create) only
-	char					pxe_str[VM_MACHINE_PXE_MAX_LEN];	// request (create) only
+	char					pxe_str[DP_IFACE_PXE_MAX_LEN];	// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_iface_id {
-	char 					iface_id[VM_IFACE_ID_MAX_LEN];
+	char 					iface_id[DP_IFACE_ID_MAX_LEN];
 };
 
 struct dpgrpc_address {
@@ -100,7 +100,7 @@ struct dpgrpc_address {
 struct dpgrpc_prefix {
 	struct dpgrpc_address	addr;
 	uint32_t				length;
-	char					iface_id[VM_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN];
 };
 
 struct dpgrpc_route {
@@ -113,12 +113,12 @@ struct dpgrpc_route {
 
 struct dpgrpc_vip {
 	struct dpgrpc_address	addr;
-	char					iface_id[VM_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_nat {
-	char					iface_id[VM_IFACE_ID_MAX_LEN];		// local only
+	char					iface_id[DP_IFACE_ID_MAX_LEN];		// local only
 	struct dpgrpc_address	addr;
 	uint16_t				min_port;
 	uint16_t				max_port;
@@ -150,12 +150,12 @@ struct dpgrpc_lb_target {
 };
 
 struct dpgrpc_fwrule {
-	char					iface_id[VM_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	struct dp_fwall_rule	rule;
 };
 
 struct dpgrpc_fwrule_id {
-	char					iface_id[VM_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	char					rule_id[DP_FIREWALL_ID_MAX_LEN];
 };
 
@@ -173,7 +173,7 @@ struct dpgrpc_versions {
 struct dpgrpc_capture_interface {
 	enum dpgrpc_capture_iface_type	type;
 	union {
-		char	iface_id[VM_IFACE_ID_MAX_LEN];
+		char	iface_id[DP_IFACE_ID_MAX_LEN];
 		uint8_t pf_index;
 	} spec;
 };

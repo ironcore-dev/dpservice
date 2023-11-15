@@ -6,7 +6,7 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
-#include "dp_vm.h"
+#include "dp_iface.h"
 #include "nodes/common_node.h"
 #include "protocols/dp_dhcpv6.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -21,9 +21,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
-	struct vm_route route;
-	const struct dp_port *src_port = dp_get_port(m);
-	const struct dp_port *dst_port;
+	struct dp_iface_route route;
+	const struct dp_port *in_port = dp_get_in_port(m);
+	const struct dp_port *out_port;
 	int t_vni;
 
 	dp_extract_ipv6_header(df, ipv6_hdr);
@@ -35,29 +35,29 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 		return IPV6_LOOKUP_NEXT_DHCPV6;
 
-	t_vni = src_port->is_pf ? df->tun_info.dst_vni : 0;
+	t_vni = in_port->is_pf ? df->tun_info.dst_vni : 0;
 
-	dst_port = dp_get_ip6_dst_port(src_port, t_vni, ipv6_hdr, &route);
-	if (!dst_port)
+	out_port = dp_get_ip6_out_port(in_port, t_vni, ipv6_hdr, &route);
+	if (!out_port)
 		return IPV6_LOOKUP_NEXT_DROP;
 
-	if (dst_port->is_pf) {
-		if (src_port->is_pf)
+	if (out_port->is_pf) {
+		if (in_port->is_pf)
 			return IPV6_LOOKUP_NEXT_DROP;
 		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
 	} else {
 		// next hop is known, fill in Ether header
 		// (PF egress goes through a tunnel that destroys Ether header)
-		dp_fill_ether_hdr(ether_hdr, dst_port, RTE_ETHER_TYPE_IPV6);
+		dp_fill_ether_hdr(ether_hdr, out_port, RTE_ETHER_TYPE_IPV6);
 	}
 
 	if (dp_conf_is_offload_enabled())
 		df->flags.offload_ipv6 = 1;
 
-	if (!src_port->is_pf)
+	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
-	df->nxt_hop = dst_port->port_id;  // always valid since coming from struct dp_port
+	df->nxt_hop = out_port->port_id;  // always valid since coming from struct dp_port
 
 	return IPV6_LOOKUP_NEXT_FIREWALL;
 }

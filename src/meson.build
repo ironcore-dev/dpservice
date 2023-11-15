@@ -36,12 +36,15 @@ dp_sources = [
   'rte_flow/dp_rte_flow_traffic_forward.c',
   'rte_flow/dp_rte_flow_capture.c',
   'dp_argparse.c',
+  'dp_cntrack.c',
   'dp_conf.c',
   'dp_error.c',
   'dp_firewall.c',
   'dp_flow.c',
   'dp_graph.c',
   'dp_hairpin.c',
+  'dp_iface.c',
+  'dp_internal_stats.c',
   'dp_lb.c',
   'dp_log.c',
   'dp_lpm.c',
@@ -55,12 +58,9 @@ dp_sources = [
   'dp_telemetry.c',
   'dp_timers.c',
   'dp_util.c',
-  'dp_vm.c',
   'dp_vnf.c',
   'dp_vni.c',
   'dpdk_layer.c',
-  'dp_internal_stats.c',
-  'dp_cntrack.c'
 ]
 if get_option('enable_virtual_services')
   dp_sources += [

@@ -7,7 +7,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
-#include "dp_vm.h"
+#include "dp_iface.h"
 #include "nodes/common_node.h"
 
 DP_NODE_REGISTER(ARP, arp, DP_NODE_DEFAULT_NEXT_ONLY);
@@ -35,12 +35,12 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	rte_be32_t requested_ip = incoming_arp_hdr->arp_data.arp_tip;
 	rte_be32_t sender_ip = incoming_arp_hdr->arp_data.arp_sip;
 	struct rte_ether_addr tmp_addr;
-	struct dp_port *port = dp_get_port(m);
+	struct dp_port *port = dp_get_in_port(m);
 	uint32_t temp_ip;
 
 	// ARP reply from VM
-	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->vm.info.own_ip)) {
-		rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &port->vm.info.neigh_mac);
+	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->iface.cfg.own_ip)) {
+		rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &port->neigh_mac);
 		return true;
 	}
 
@@ -50,9 +50,9 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 
 	// respond back to origin address from this address (reuse the packet)
 	rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &incoming_eth_hdr->dst_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &incoming_eth_hdr->src_addr);
+	rte_ether_addr_copy(&port->own_mac, &incoming_eth_hdr->src_addr);
 	rte_ether_addr_copy(&incoming_arp_hdr->arp_data.arp_sha, &tmp_addr);
-	rte_ether_addr_copy(&port->vm.info.own_mac, &incoming_arp_hdr->arp_data.arp_sha);
+	rte_ether_addr_copy(&port->own_mac, &incoming_arp_hdr->arp_data.arp_sha);
 	rte_ether_addr_copy(&tmp_addr, &incoming_arp_hdr->arp_data.arp_tha);
 	temp_ip = incoming_arp_hdr->arp_data.arp_sip;
 	incoming_arp_hdr->arp_data.arp_sip = incoming_arp_hdr->arp_data.arp_tip;
