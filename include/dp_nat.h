@@ -44,9 +44,9 @@ typedef struct network_nat_entry {
 
 struct snat_data {
 	uint32_t	vip_ip;
-	uint32_t	network_nat_ip;
-	uint16_t	network_nat_port_range[2];
-	uint8_t		ul_ip6[16]; /* VIP underlady */
+	uint32_t	nat_ip;
+	uint16_t	nat_port_range[2];
+	uint8_t		ul_vip_ip6[16]; /* VIP underlay */
 	uint8_t		ul_nat_ip6[16]; /* NAT Gateway underlay */
 	uint64_t	log_timestamp;
 };
@@ -56,9 +56,9 @@ struct dnat_data {
 };
 
 struct netnat_portmap_key {
-	uint32_t	vm_src_ip;
+	uint32_t	iface_src_ip;
 	uint32_t	vni;
-	uint16_t	vm_src_port;
+	uint16_t	iface_src_port;
 } __rte_packed;
 
 struct netnat_portmap_data {
@@ -83,9 +83,15 @@ struct nat_check_result {
 int dp_nat_init(int socket_id);
 void dp_nat_free(void);
 
-int dp_del_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
-uint32_t dp_get_vm_snat_ip(uint32_t vm_ip, uint32_t vni);
-int dp_set_vm_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
+uint32_t dp_get_iface_vip_ip(uint32_t iface_ip, uint32_t vni);
+int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
+						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
+int dp_del_iface_vip_ip(uint32_t iface_ip, uint32_t vni);
+
+uint32_t dp_get_iface_nat_ip(uint32_t iface_ip, uint32_t vni);
+int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
+						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
+int dp_del_iface_nat_ip(uint32_t iface_ip, uint32_t vni);
 
 int dp_del_dnat_ip(uint32_t d_ip, uint32_t vni);
 struct dnat_data *dp_get_dnat_data(uint32_t d_ip, uint32_t vni);
@@ -106,16 +112,13 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IP
 const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
 											  uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-uint32_t dp_get_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
-int dp_set_vm_network_snat_ip(uint32_t vm_ip, uint32_t s_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
-							  const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
-int dp_del_vm_network_snat_ip(uint32_t vm_ip, uint32_t vni);
 int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni);
 const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
+
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);
 int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);
-struct snat_data *dp_get_vm_snat_data(uint32_t vm_ip, uint32_t vni);
+struct snat_data *dp_get_iface_snat_data(uint32_t iface_ip, uint32_t vni);
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 
 

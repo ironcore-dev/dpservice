@@ -8,7 +8,7 @@
 
 void dp_init_firewall_rules(struct dp_port *port)
 {
-	TAILQ_INIT(&port->vm.fwall_head);
+	TAILQ_INIT(&port->iface.fwall_head);
 }
 
 int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *port)
@@ -19,7 +19,7 @@ int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *p
 		return DP_ERROR;
 
 	*rule = *new_rule;
-	TAILQ_INSERT_TAIL(&port->vm.fwall_head, rule, next_rule);
+	TAILQ_INSERT_TAIL(&port->iface.fwall_head, rule, next_rule);
 
 	return DP_OK;
 }
@@ -27,7 +27,7 @@ int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *p
 
 int dp_delete_firewall_rule(const char *rule_id, struct dp_port *port)
 {
-	struct dp_fwall_head *fwall_head = &port->vm.fwall_head;
+	struct dp_fwall_head *fwall_head = &port->iface.fwall_head;
 	struct dp_fwall_rule *rule, *next_rule;
 
 	for (rule = TAILQ_FIRST(fwall_head); rule != NULL; rule = next_rule) {
@@ -46,7 +46,7 @@ struct dp_fwall_rule *dp_get_firewall_rule(const char *rule_id, const struct dp_
 {
 	struct dp_fwall_rule *rule;
 
-	TAILQ_FOREACH(rule, &port->vm.fwall_head, next_rule)
+	TAILQ_FOREACH(rule, &port->iface.fwall_head, next_rule)
 		if (memcmp(rule->rule_id, rule_id, sizeof(rule->rule_id)) == 0)
 			return rule;
 
@@ -60,7 +60,7 @@ int dp_list_firewall_rules(const struct dp_port *port, struct dp_grpc_responder 
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
-	TAILQ_FOREACH(rule, &port->vm.fwall_head, next_rule) {
+	TAILQ_FOREACH(rule, &port->iface.fwall_head, next_rule) {
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
@@ -159,27 +159,27 @@ static __rte_always_inline enum dp_fwall_action dp_get_egress_action(const struc
 }
 
 enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df,
-											const struct dp_port *src_port,
-											const struct dp_port *dst_port)
+											const struct dp_port *in_port,
+											const struct dp_port *out_port)
 {
 	enum dp_fwall_action egress_action;
 	struct dp_fwall_rule *rule;
 
 	/* Outgoing traffic to PF (VF Egress, PF Ingress), PF has no Ingress rules */
-	if (dst_port->is_pf)
-		return dp_get_egress_action(df, &src_port->vm.fwall_head);
+	if (out_port->is_pf)
+		return dp_get_egress_action(df, &in_port->iface.fwall_head);
 
 	/* Incoming from PF, PF has no Egress rules */
-	if (src_port->is_pf)
+	if (in_port->is_pf)
 		egress_action = DP_FWALL_ACCEPT;
 	/* Incoming from VF. Check originating VF's Egress rules */
 	else
-		egress_action = dp_get_egress_action(df, &src_port->vm.fwall_head);
+		egress_action = dp_get_egress_action(df, &in_port->iface.fwall_head);
 
 	if (egress_action != DP_FWALL_ACCEPT)
 		return DP_FWALL_DROP;
 
-	rule = dp_is_matched_in_fwall_list(df, &dst_port->vm.fwall_head, DP_FWALL_INGRESS, NULL);
+	rule = dp_is_matched_in_fwall_list(df, &out_port->iface.fwall_head, DP_FWALL_INGRESS, NULL);
 	if (!rule || rule->action != DP_FWALL_ACCEPT)
 		return DP_FWALL_DROP;
 
@@ -188,7 +188,7 @@ enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df,
 
 void dp_del_all_firewall_rules(struct dp_port *port)
 {
-	struct dp_fwall_head *fwall_head = &port->vm.fwall_head;
+	struct dp_fwall_head *fwall_head = &port->iface.fwall_head;
 	struct dp_fwall_rule *rule;
 
 	while ((rule = TAILQ_FIRST(fwall_head)) != NULL) {

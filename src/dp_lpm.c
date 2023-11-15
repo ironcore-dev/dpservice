@@ -17,11 +17,11 @@ static __rte_always_inline int dp_lpm_fill_route_tables(const struct dp_port *po
 {
 	int ret;
 
-	ret = dp_add_route(port, port->vm.vni, 0, port->vm.info.own_ip, NULL, 32);
+	ret = dp_add_route(port, port->iface.vni, 0, port->iface.cfg.own_ip, NULL, 32);
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = dp_add_route6(port, port->vm.vni, 0, port->vm.info.dhcp_ipv6, NULL, 128);
+	ret = dp_add_route6(port, port->iface.vni, 0, port->iface.cfg.dhcp_ipv6, NULL, 128);
 	if (DP_FAILED(ret))
 		return ret;
 
@@ -37,7 +37,7 @@ int dp_lpm_reset_all_route_tables(void)
 		return DP_GRPC_ERR_ROUTE_RESET;
 
 	DP_FOREACH_PORT(ports, port) {
-		if (!port->vm.ready)
+		if (!port->iface.ready)
 			continue;
 		ret = dp_lpm_fill_route_tables(port);
 		if (DP_FAILED(ret))
@@ -59,7 +59,7 @@ int dp_lpm_reset_route_tables(int vni)
 
 	DP_FOREACH_PORT(ports, port) {
 		// TODO(plague?): the cast does not seem nice, define a type for VNIs?
-		if (!port->vm.ready || (int)port->vm.vni != vni)
+		if (!port->iface.ready || (int)port->iface.vni != vni)
 			continue;
 		ret = dp_lpm_fill_route_tables(port);
 		if (DP_FAILED(ret))
@@ -82,7 +82,7 @@ const uint8_t *dp_get_gw_ip6(void)
 int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 const uint8_t *ip6, uint8_t depth)
 {
-	struct vm_route *route = NULL;
+	struct dp_iface_route *route = NULL;
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 
@@ -142,7 +142,7 @@ static __rte_always_inline bool dp_route_in_dhcp_range(const struct rte_rib_node
 	// both calls only fail when either param is NULL
 	rte_rib_get_ip(node, &ipv4);
 	rte_rib_get_depth(node, &depth);
-	return port->vm.info.own_ip == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
+	return port->iface.cfg.own_ip == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
 }
 
 static int dp_list_route_entry(struct rte_rib_node *node,
@@ -153,7 +153,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	struct dpgrpc_route *reply;
 	uint64_t next_hop;
 	struct dp_port *dst_port;
-	struct vm_route *vm_route;
+	struct dp_iface_route *route;
 	uint32_t ipv4;
 	uint8_t depth;
 
@@ -178,10 +178,10 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 		reply->pfx_length = depth;
 
 		if (ext_routes) {
-			vm_route = (struct vm_route *)rte_rib_get_ext(node);
+			route = (struct dp_iface_route *)rte_rib_get_ext(node);
 			reply->trgt_addr.ip_type = RTE_ETHER_TYPE_IPV6;
-			reply->trgt_vni = vm_route->vni;
-			rte_memcpy(reply->trgt_addr.ipv6, vm_route->nh_ipv6, sizeof(reply->trgt_addr.ipv6));
+			reply->trgt_vni = route->vni;
+			rte_memcpy(reply->trgt_addr.ipv6, route->nh_ipv6, sizeof(reply->trgt_addr.ipv6));
 		}
 
 	}
@@ -221,7 +221,7 @@ int dp_list_routes(const struct dp_port *port, int vni, bool ext_routes,
 int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
 				  const uint8_t *ext_ip6, uint8_t depth)
 {
-	struct vm_route *route = NULL;
+	struct dp_iface_route *route = NULL;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 
@@ -272,10 +272,10 @@ int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6,
 	return DP_GRPC_OK;
 }
 
-const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct dp_flow *df,
-										  struct vm_route *route,
+										  struct dp_iface_route *route,
 										  uint32_t *route_key)
 {
 	uint32_t dst_ip = ntohl(df->dst.dst_addr);
@@ -285,7 +285,7 @@ const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	struct dp_port *dst_port;
 
 	if (t_vni == 0)
-		t_vni = port->vm.vni;
+		t_vni = in_port->iface.vni;
 
 	root = dp_get_vni_route4_table(t_vni);
 	if (!root)
@@ -303,7 +303,7 @@ const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 		return NULL;
 
 	if (dst_port->is_pf)
-		*route = *(struct vm_route *)rte_rib_get_ext(node);
+		*route = *(struct dp_iface_route *)rte_rib_get_ext(node);
 
 	if (DP_FAILED(rte_rib_get_ip(node, route_key)))
 		return NULL;
@@ -311,10 +311,10 @@ const struct dp_port *dp_get_ip4_dst_port(const struct dp_port *port,
 	return dst_port;
 }
 
-const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
+const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  int t_vni,
 										  const struct rte_ipv6_hdr *ipv6_hdr,
-										  struct vm_route *route)
+										  struct dp_iface_route *route)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -322,7 +322,7 @@ const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 	struct dp_port *dst_port;
 
 	if (t_vni == 0)
-		t_vni = port->vm.vni;
+		t_vni = in_port->iface.vni;
 
 	root = dp_get_vni_route6_table(t_vni);
 	if (!root)
@@ -340,7 +340,7 @@ const struct dp_port *dp_get_ip6_dst_port(const struct dp_port *port,
 		return NULL;
 
 	if (dst_port->is_pf)
-		*route = *(struct vm_route *)rte_rib6_get_ext(node);
+		*route = *(struct dp_iface_route *)rte_rib6_get_ext(node);
 
 	return dst_port;
 }

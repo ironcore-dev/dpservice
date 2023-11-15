@@ -32,7 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni;
 		if (vni == 0)
-			vni = dp_get_port(m)->vm.vni;
+			vni = dp_get_in_port(m)->iface.vni;
 
 		dnat_data = dp_get_dnat_data(dst_ip, vni);
 		if (dnat_data) {

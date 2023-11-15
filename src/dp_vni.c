@@ -68,7 +68,7 @@ static __rte_always_inline int dp_create_rib6(uint32_t vni, int socket_id, struc
 	char s[64];
 
 	config_ipv6.max_nodes = IPV6_DP_RIB_MAX_RULES;
-	config_ipv6.ext_sz = sizeof(struct vm_route);
+	config_ipv6.ext_sz = sizeof(struct dp_iface_route);
 
 	snprintf(s, sizeof(s), "IPV6_DP_RIB_%d_%d", vni, socket_id);
 	new_rib6 = rte_rib6_create(s, socket_id, &config_ipv6);
@@ -90,7 +90,7 @@ static __rte_always_inline int dp_create_rib(uint32_t vni, int socket_id, struct
 	char s[64];
 
 	config_ipv4.max_nodes = IPV4_DP_RIB_MAX_RULES;
-	config_ipv4.ext_sz = sizeof(struct vm_route);
+	config_ipv4.ext_sz = sizeof(struct dp_iface_route);
 
 	snprintf(s, sizeof(s), "IPV4_DP_RIB_%d_%d", vni, socket_id);
 	new_rib = rte_rib_create(s, socket_id, &config_ipv4);

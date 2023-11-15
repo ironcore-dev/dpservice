@@ -14,25 +14,24 @@
 extern "C" {
 #endif
 
-#define VM_IFACE_ID_MAX_LEN		64
+#define DP_IFACE_ID_MAX_LEN	64
 
-struct macip_entry {
-	struct rte_ether_addr	own_mac;
-	struct rte_ether_addr	neigh_mac;
+struct dp_iface_cfg {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
-	uint8_t					depth;
+	uint8_t					ip_depth;
 	uint8_t					dhcp_ipv6[16];
-	uint8_t					vm_ipv6[16];
+	uint8_t					own_ipv6[16];
+	uint8_t					ip6_depth;
 	uint32_t				pxe_ip;
-	char					pxe_str[VM_MACHINE_PXE_MAX_LEN];
+	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
 };
 
-struct vm_entry {
+struct dp_port_iface {
 	struct dp_fwall_head	fwall_head;
-	struct macip_entry		info;
+	struct dp_iface_cfg		cfg;
 	uint32_t				vni;
-	char					machineid[VM_IFACE_ID_MAX_LEN];
+	char					id[DP_IFACE_ID_MAX_LEN];
 	uint8_t					ul_ipv6[16];
 	bool					ready;
 };
@@ -48,7 +47,9 @@ struct dp_port {
 	char					dev_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t					peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t				peer_pf_port_id;
-	struct vm_entry			vm;
+	struct rte_ether_addr	own_mac;
+	struct rte_ether_addr	neigh_mac;
+	struct dp_port_iface	iface;
 	struct rte_flow			*default_jump_flow;
 	struct rte_flow			*default_capture_flow;
 	bool					captured;
@@ -78,24 +79,24 @@ int dp_stop_port(struct dp_port *port);
 static __rte_always_inline
 int dp_load_mac(struct dp_port *port)
 {
-	return rte_eth_macaddr_get(port->port_id, &port->vm.info.own_mac);
+	return rte_eth_macaddr_get(port->port_id, &port->own_mac);
 }
 
 static __rte_always_inline
-const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port)
+const uint8_t *dp_get_port_ul_ipv6(const struct dp_port *port)
 {
-	return port->vm.ready ? port->vm.ul_ipv6 : dp_conf_get_underlay_ip();
+	return port->iface.ready ? port->iface.ul_ipv6 : dp_conf_get_underlay_ip();
 }
 
 static __rte_always_inline
-struct dp_port *dp_get_port(struct rte_mbuf *m)
+struct dp_port *dp_get_in_port(struct rte_mbuf *m)
 {
 	// m->port should've already been validated
 	return _dp_port_table[m->port];
 }
 
 static __rte_always_inline
-struct dp_port *dp_get_dst_port(struct dp_flow *df)
+struct dp_port *dp_get_out_port(struct dp_flow *df)
 {
 	// df->nxt_hop should've already been validated
 	return _dp_port_table[df->nxt_hop];

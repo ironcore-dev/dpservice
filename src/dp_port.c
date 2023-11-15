@@ -147,9 +147,9 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
 
 	if (port->is_pf) {
-		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->vm.info.own_mac)))
+		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->own_mac)))
 			return DP_ERROR;
-		rte_ether_addr_copy(&pf_neigh_mac, &port->vm.info.neigh_mac);
+		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
 	}
 
 	return DP_OK;

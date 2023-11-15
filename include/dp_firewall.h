@@ -52,16 +52,15 @@ struct dp_fwall_rule {
 	TAILQ_ENTRY(dp_fwall_rule) next_rule;
 };
 
-// forward-declaration due to 'struct dp_fwall_rule' being part of 'struct dp_grpc_responder'
+// forward-declaration due to 'struct dp_fwall_rule' being part of these structures
 struct dp_grpc_responder;
-// dtto for 'struct vm_entry' which is part of 'struct dp_port'
 struct dp_port;
 
 void dp_init_firewall_rules(struct dp_port *port);
 int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *port);
 int dp_delete_firewall_rule(const char *rule_id, struct dp_port *port);
 struct dp_fwall_rule *dp_get_firewall_rule(const char *rule_id, const struct dp_port *port);
-enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df, const struct dp_port *src_port, const struct dp_port *dst_port);
+enum dp_fwall_action dp_get_firewall_action(struct dp_flow *df, const struct dp_port *in_port, const struct dp_port *out_port);
 int dp_list_firewall_rules(const struct dp_port *port, struct dp_grpc_responder *responder);
 void dp_del_all_firewall_rules(struct dp_port *port);
 

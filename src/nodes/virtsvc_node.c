@@ -9,7 +9,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
-#include "dp_vm.h"
+#include "dp_iface.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -247,7 +247,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (dp_conf_is_offload_enabled())
 		DPNODE_LOG_WARNING(node, "Virtual services not supported while offloading");
 
-	if (dp_get_port(m)->is_pf)
+	if (dp_get_in_port(m)->is_pf)
 		return virtsvc_reply_next(node, m, df);
 	else
 		return virtsvc_request_next(node, m, df);
