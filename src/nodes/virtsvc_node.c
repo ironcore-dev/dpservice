@@ -232,7 +232,7 @@ static __rte_always_inline uint16_t virtsvc_reply_next(struct rte_node *node,
 	vf_port_id = conn->vf_port_id;
 
 	vf_port = dp_get_port_by_id(vf_port_id);
-	if (!vf_port || !vf_port->attached)
+	if (!vf_port)
 		return VIRTSVC_NEXT_DROP;
 
 	dp_fill_ether_hdr(ether_hdr, vf_port, RTE_ETHER_TYPE_IPV4);

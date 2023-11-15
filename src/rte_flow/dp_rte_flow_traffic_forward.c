@@ -587,8 +587,7 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 
 static __rte_always_inline
 int dp_offload_handle_in_network_traffic(struct dp_flow *df,
-										 const struct dp_port *incoming_port,
-										 const struct dp_port *outgoing_port)
+										 const struct dp_port *incoming_port)
 {
 	// match in-network underlay packets
 	struct rte_flow_item_eth eth_spec;   // #1
@@ -609,9 +608,7 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 
 	// misc variables needed to create the flow
 	struct flow_age_ctx *agectx;
-
-	df->nxt_hop = (incoming_port == dp_get_pf0() ? dp_get_pf1() : incoming_port)->port_id;
-	// no need to validate as this can only be PF0/PF1
+	const struct dp_port *outgoing_port;
 
 	// create match pattern based on dp_flow
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
@@ -632,6 +629,8 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 
 	// set proper ethernet addresses
 	// in network traffic has to be set via the other pf port via hairpin
+	outgoing_port = incoming_port == dp_get_pf0() ? dp_get_pf1() : incoming_port;
+	df->nxt_hop = outgoing_port->port_id;
 	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
 	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
 
@@ -689,7 +688,7 @@ int dp_offload_handler(struct rte_mbuf *m, struct dp_flow *df)
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
 			|| df->conntrack->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD
 		) {
-			ret = dp_offload_handle_in_network_traffic(df, incoming_port, outgoing_port);
+			ret = dp_offload_handle_in_network_traffic(df, incoming_port);
 			if (DP_FAILED(ret))
 				DPS_LOG_ERR("Failed to install in-network flow rule", DP_LOG_PORT(incoming_port), DP_LOG_PORT(outgoing_port), DP_LOG_RET(ret));
 		} else {
