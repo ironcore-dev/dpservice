@@ -62,15 +62,10 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	return true;
 }
 
-static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	if (!arp_handled(m))
 		return ARP_NEXT_DROP;
-
-	if (DP_FAILED(dp_attach_vf(dp_get_port(m)))) {
-		DPNODE_LOG_ERR(node, "Cannot attach port", DP_LOG_PORTID(m->port));
-		return ARP_NEXT_DROP;
-	}
 
 	return next_tx_index[m->port];
 }

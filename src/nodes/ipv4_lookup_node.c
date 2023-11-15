@@ -50,11 +50,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!df->flags.flow_type)
 		df->flags.flow_type = DP_FLOW_TYPE_LOCAL;
 
-	if (df->flags.flow_type == DP_FLOW_TYPE_LOCAL || df->flags.flow_type == DP_FLOW_TYPE_INCOMING) {
-		if (dst_port->port_type == DP_PORT_VF && !dst_port->attached)
-			return IPV4_LOOKUP_NEXT_DROP;
-	}
-
 	if (df->flags.flow_type == DP_FLOW_TYPE_OUTGOING)
 		dst_port = dp_multipath_get_pf(df->dp_flow_hash);
 

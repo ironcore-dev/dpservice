@@ -53,7 +53,6 @@ struct dp_port {
 	char					dev_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t					peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t				peer_pf_port_id;
-	bool					attached;
 	struct vm_entry			vm;
 	struct rte_flow			*default_jump_flow;
 	struct rte_flow			*default_capture_flow;
@@ -73,8 +72,6 @@ extern struct dp_ports _dp_ports;
 
 
 struct dp_port *dp_get_port_by_name(const char *pci_name);
-
-int dp_attach_vf(struct dp_port *port);
 
 int dp_ports_init(void);
 void dp_ports_free(void);
