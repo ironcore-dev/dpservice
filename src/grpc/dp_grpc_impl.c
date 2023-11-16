@@ -272,7 +272,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 			goto err;
 		}
 		vip = request->addr.ipv4;
-		ret = dp_set_vm_snat_ip(iface_ip, vip, iface_vni, ul_addr6);
+		ret = dp_set_iface_vip_ip(iface_ip, vip, iface_vni, ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
@@ -288,7 +288,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 
 err_snat:
-	dp_del_vm_snat_ip(iface_ip, iface_vni);
+	dp_del_iface_vip_ip(iface_ip, iface_vni);
 err_vnf:
 	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
@@ -311,7 +311,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	iface_ip = port->iface.info.own_ip;
 	iface_vni = port->iface.vni;
 
-	s_data = dp_get_vm_snat_data(iface_ip, iface_vni);
+	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
@@ -323,7 +323,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	// always delete, i.e. do not use dp_del_vip_from_dnat(),
 	// because 1:1 VIP is not shared with anything
 	dp_del_dnat_ip(s_data->vip_ip, iface_vni);
-	dp_del_vm_snat_ip(iface_ip, iface_vni);
+	dp_del_iface_vip_ip(iface_ip, iface_vni);
 	dp_remove_nat_flows(port->port_id, DP_FLOW_NAT_TYPE_VIP);
 	return DP_GRPC_OK;
 }
@@ -340,7 +340,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_vm_snat_data(port->iface.info.own_ip, port->iface.vni);
+	s_data = dp_get_iface_snat_data(port->iface.info.own_ip, port->iface.vni);
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
@@ -636,7 +636,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
-		ret = dp_set_vm_network_snat_ip(iface_ip, request->addr.ipv4, iface_vni,
+		ret = dp_set_iface_nat_ip(iface_ip, request->addr.ipv4, iface_vni,
 										request->min_port, request->max_port,
 										ul_addr6);
 		if (DP_FAILED(ret))
@@ -653,7 +653,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 
 err_dnat:
-	dp_del_vm_network_snat_ip(iface_ip, iface_vni);
+	dp_del_iface_nat_ip(iface_ip, iface_vni);
 err_vnf:
 	dp_del_vnf_with_vnf_key(ul_addr6);
 err:
@@ -677,7 +677,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	iface_ip = port->iface.info.own_ip;
 	iface_vni = port->iface.vni;
 
-	s_data = dp_get_vm_snat_data(iface_ip, iface_vni);
+	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
 	if (!s_data || !s_data->network_nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
@@ -687,7 +687,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	reply->addr.ipv4 = s_data->network_nat_ip;
 	dp_del_vip_from_dnat(s_data->network_nat_ip, iface_vni);
 	dp_remove_nat_flows(port->port_id, DP_FLOW_NAT_TYPE_NETWORK_LOCAL);
-	return dp_del_vm_network_snat_ip(iface_ip, iface_vni);
+	return dp_del_iface_nat_ip(iface_ip, iface_vni);
 }
 
 static int dp_process_get_nat(struct dp_grpc_responder *responder)
@@ -702,7 +702,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_vm_snat_data(port->iface.info.own_ip, port->iface.vni);
+	s_data = dp_get_iface_snat_data(port->iface.info.own_ip, port->iface.vni);
 	if (!s_data || !s_data->network_nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 

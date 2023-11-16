@@ -108,7 +108,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 	} else {
 		vnf_val.alias_pfx.ip = key->ip_src;
 		vnf_val.alias_pfx.length = 32;
-		s_data = dp_get_vm_snat_data(key->ip_src, key->vni);
+		s_data = dp_get_iface_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->network_nat_ip != 0)
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
 		else if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, !DP_VNF_MATCH_ALL_PORT_ID)))

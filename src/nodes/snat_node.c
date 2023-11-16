@@ -34,7 +34,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		port = dp_get_in_port(m);
 		src_ip = ntohl(df->src.src_addr);
 		vni = port->iface.vni;
-		snat_data = dp_get_vm_snat_data(src_ip, vni);
+		snat_data = dp_get_iface_snat_data(src_ip, vni);
 
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->network_nat_ip != 0)
 			&& df->flags.public_flow == DP_FLOW_SOUTH_NORTH) {
