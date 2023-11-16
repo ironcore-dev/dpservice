@@ -14,23 +14,23 @@
 extern "C" {
 #endif
 
-#define VM_IFACE_ID_MAX_LEN		64
+#define DP_IFACE_ID_MAX_LEN	64
 
 struct dp_port_ips {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
 	uint8_t					depth;
 	uint8_t					dhcp_ipv6[16];
-	uint8_t					vm_ipv6[16];
+	uint8_t					own_ipv6[16];
 	uint32_t				pxe_ip;
-	char					pxe_str[VM_MACHINE_PXE_MAX_LEN];
+	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
 };
 
-struct dp_port_vm {
+struct dp_port_iface {
 	struct dp_fwall_head	fwall_head;
 	struct dp_port_ips		info;
 	uint32_t				vni;
-	char					machineid[VM_IFACE_ID_MAX_LEN];
+	char					id[DP_IFACE_ID_MAX_LEN];
 	uint8_t					ul_ipv6[16];
 	bool					ready;
 };
@@ -48,7 +48,7 @@ struct dp_port {
 	uint16_t				peer_pf_port_id;
 	struct rte_ether_addr	own_mac;
 	struct rte_ether_addr	neigh_mac;
-	struct dp_port_vm		vm;
+	struct dp_port_iface	iface;
 	struct rte_flow			*default_jump_flow;
 	struct rte_flow			*default_capture_flow;
 	bool					captured;
@@ -82,9 +82,9 @@ int dp_load_mac(struct dp_port *port)
 }
 
 static __rte_always_inline
-const uint8_t *dp_get_port_ul_ip6(const struct dp_port *port)
+const uint8_t *dp_get_port_ul_ipv6(const struct dp_port *port)
 {
-	return port->vm.ready ? port->vm.ul_ipv6 : dp_conf_get_underlay_ip();
+	return port->iface.ready ? port->iface.ul_ipv6 : dp_conf_get_underlay_ip();
 }
 
 static __rte_always_inline

@@ -132,7 +132,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	if (port->is_pf)
 		key->vni = df->tun_info.dst_vni;
 	else
-		key->vni = port->vm.vni;
+		key->vni = port->iface.vni;
 
 	dp_mark_vnf_type(df, port, key);
 
@@ -458,7 +458,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 	}
 }
 
-void dp_remove_vm_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
+void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 {
 	struct flow_value *flow_val = NULL;
 	const struct flow_key *next_key;

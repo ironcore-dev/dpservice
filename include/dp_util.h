@@ -15,7 +15,7 @@ extern "C" {
 #include <rte_mbuf.h>
 
 #define DP_FIREWALL_ID_MAX_LEN	64
-#define VM_MACHINE_PXE_MAX_LEN	32
+#define DP_IFACE_PXE_MAX_LEN	32
 #define DP_LB_ID_MAX_LEN		64
 #define DP_LB_MAX_PORTS			16
 

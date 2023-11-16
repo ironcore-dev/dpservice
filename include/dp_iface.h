@@ -1,5 +1,5 @@
-#ifndef __DP_VM_H__
-#define __DP_VM_H__
+#ifndef __DP_IFACE_H__
+#define __DP_IFACE_H__
 
 #include "dp_port.h"
 
@@ -7,15 +7,15 @@
 extern "C" {
 #endif
 
-int dp_vms_init(int socket_id);
-void dp_vms_free(void);
+int dp_ifaces_init(int socket_id);
+void dp_ifaces_free(void);
 
-int dp_map_vm_handle(const char key[VM_IFACE_ID_MAX_LEN], struct dp_port *port);
-void dp_unmap_vm_handle(const void *key);
-struct dp_port *dp_get_port_with_vm_handle(const void *key);
+int dp_map_iface_id(const char iface_id[DP_IFACE_ID_MAX_LEN], struct dp_port *port);
+void dp_unmap_iface_id(const char iface_id[DP_IFACE_ID_MAX_LEN]);
+struct dp_port *dp_get_port_with_iface_id(const char iface_id[DP_IFACE_ID_MAX_LEN]);
 
-int dp_setup_vm(struct dp_port *port, int vni);
-void dp_del_vm(struct dp_port *port);
+int dp_setup_iface(struct dp_port *port, int vni);
+void dp_delete_iface(struct dp_port *port);
 
 
 static __rte_always_inline
@@ -23,7 +23,7 @@ bool dp_arp_cycle_needed(const struct dp_port *port)
 {
 	static struct rte_ether_addr nul_mac = {0};
 
-	return port->vm.ready
+	return port->iface.ready
 		&& rte_is_same_ether_addr(&port->neigh_mac, &nul_mac);
 }
 

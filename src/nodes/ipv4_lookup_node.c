@@ -22,7 +22,7 @@ DP_NODE_REGISTER_NOINIT(IPV4_LOOKUP, ipv4_lookup, NEXT_NODES);
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	struct vm_route route;
+	struct dp_iface_route route;
 	uint32_t route_key = 0;
 	const struct dp_port *in_port = dp_get_in_port(m);
 	const struct dp_port *out_port;

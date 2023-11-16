@@ -7,7 +7,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
-#include "dp_vm.h"
+#include "dp_iface.h"
 #include "nodes/common_node.h"
 
 DP_NODE_REGISTER(ARP, arp, DP_NODE_DEFAULT_NEXT_ONLY);
@@ -39,7 +39,7 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	uint32_t temp_ip;
 
 	// ARP reply from VM
-	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->vm.info.own_ip)) {
+	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->iface.info.own_ip)) {
 		rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &port->neigh_mac);
 		return true;
 	}
