@@ -1,5 +1,5 @@
-#ifndef __DP_IFACE_H__
-#define __DP_IFACE_H__
+#ifndef __INCLUDE_DP_IFACE_H__
+#define __INCLUDE_DP_IFACE_H__
 
 #include "dp_port.h"
 

@@ -315,7 +315,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	dp_del_vnf_with_vnf_key(s_data->ul_ip6);
+	dp_del_vnf_with_vnf_key(s_data->ul_vip_ip6);
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->vip_ip;
@@ -346,7 +346,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->vip_ip;
-	rte_memcpy(reply->ul_addr6, s_data->ul_ip6, sizeof(reply->ul_addr6));
+	rte_memcpy(reply->ul_addr6, s_data->ul_vip_ip6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }
 
@@ -678,14 +678,14 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	iface_vni = port->iface.vni;
 
 	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
-	if (!s_data || !s_data->network_nat_ip)
+	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	dp_del_vnf_with_vnf_key(s_data->ul_nat_ip6);
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
-	reply->addr.ipv4 = s_data->network_nat_ip;
-	dp_del_vip_from_dnat(s_data->network_nat_ip, iface_vni);
+	reply->addr.ipv4 = s_data->nat_ip;
+	dp_del_vip_from_dnat(s_data->nat_ip, iface_vni);
 	dp_remove_nat_flows(port->port_id, DP_FLOW_NAT_TYPE_NETWORK_LOCAL);
 	return dp_del_iface_nat_ip(iface_ip, iface_vni);
 }
@@ -703,13 +703,13 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_NO_VM;
 
 	s_data = dp_get_iface_snat_data(port->iface.info.own_ip, port->iface.vni);
-	if (!s_data || !s_data->network_nat_ip)
+	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
-	reply->addr.ipv4 = s_data->network_nat_ip;
-	reply->min_port = s_data->network_nat_port_range[0];
-	reply->max_port = s_data->network_nat_port_range[1];
+	reply->addr.ipv4 = s_data->nat_ip;
+	reply->min_port = s_data->nat_port_range[0];
+	reply->max_port = s_data->nat_port_range[1];
 	rte_memcpy(reply->ul_addr6, s_data->ul_nat_ip6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }

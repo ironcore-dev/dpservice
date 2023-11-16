@@ -44,9 +44,9 @@ typedef struct network_nat_entry {
 
 struct snat_data {
 	uint32_t	vip_ip;
-	uint32_t	network_nat_ip;
-	uint16_t	network_nat_port_range[2];
-	uint8_t		ul_ip6[16]; /* VIP underlady */
+	uint32_t	nat_ip;
+	uint16_t	nat_port_range[2];
+	uint8_t		ul_vip_ip6[16]; /* VIP underlayy */
 	uint8_t		ul_nat_ip6[16]; /* NAT Gateway underlay */
 	uint64_t	log_timestamp;
 };
