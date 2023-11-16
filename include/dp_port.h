@@ -16,7 +16,7 @@ extern "C" {
 
 #define DP_IFACE_ID_MAX_LEN	64
 
-struct dp_port_ips {
+struct dp_iface_cfg {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
 	uint8_t					depth;
@@ -28,7 +28,7 @@ struct dp_port_ips {
 
 struct dp_port_iface {
 	struct dp_fwall_head	fwall_head;
-	struct dp_port_ips		info;
+	struct dp_iface_cfg		cfg;
 	uint32_t				vni;
 	char					id[DP_IFACE_ID_MAX_LEN];
 	uint8_t					ul_ipv6[16];

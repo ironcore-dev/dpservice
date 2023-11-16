@@ -226,14 +226,14 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	dhcp_hdr->op = DP_BOOTP_REPLY;
 	dhcp_hdr->magic = dhcp_hdr_magic;
-	dhcp_hdr->yiaddr = htonl(port->iface.info.own_ip);
+	dhcp_hdr->yiaddr = htonl(port->iface.cfg.own_ip);
 	dhcp_hdr->giaddr = server_ip;
 	rte_memcpy(dhcp_hdr->chaddr, incoming_eth_hdr->dst_addr.addr_bytes, 6);
 
 	if (pxe_mode != DP_PXE_MODE_NONE) {
 		memset(&incoming_eth_hdr->dst_addr, ~0, sizeof(incoming_eth_hdr->dst_addr));
 		incoming_ipv4_hdr->dst_addr = 0xFFFFFFFF;
-		pxe_srv_ip = htonl(port->iface.info.pxe_ip);
+		pxe_srv_ip = htonl(port->iface.cfg.pxe_ip);
 		dhcp_hdr->siaddr = pxe_srv_ip;
 		switch (pxe_mode) {
 		case DP_PXE_MODE_TFTP:
@@ -246,13 +246,13 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 				return DHCP_NEXT_DROP;
 			}
 			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
-					"http://", pxe_srv_ip_str, port->iface.info.pxe_str);
+					"http://", pxe_srv_ip_str, port->iface.cfg.pxe_str);
 			break;
 		case DP_PXE_MODE_NONE:
 			assert(false);
 		}
 	} else {
-		incoming_ipv4_hdr->dst_addr = htonl(port->iface.info.own_ip);
+		incoming_ipv4_hdr->dst_addr = htonl(port->iface.cfg.own_ip);
 		dhcp_hdr->siaddr = server_ip;
 	}
 

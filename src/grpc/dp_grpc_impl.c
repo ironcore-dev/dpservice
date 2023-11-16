@@ -265,7 +265,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	}
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		iface_ip = port->iface.info.own_ip;
+		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
 		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_VIP, iface_vni, port, ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
@@ -308,7 +308,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	iface_ip = port->iface.info.own_ip;
+	iface_ip = port->iface.cfg.own_ip;
 	iface_vni = port->iface.vni;
 
 	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
@@ -340,7 +340,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_iface_snat_data(port->iface.info.own_ip, port->iface.vni);
+	s_data = dp_get_iface_snat_data(port->iface.cfg.own_ip, port->iface.vni);
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
@@ -493,13 +493,13 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	}
 
 	rte_memcpy(port->iface.ul_ipv6, ul_addr6, sizeof(port->iface.ul_ipv6));
-	port->iface.info.own_ip = request->ip4_addr;
-	port->iface.info.depth = DP_LPM_DHCP_IP_DEPTH;
-	rte_memcpy(port->iface.info.dhcp_ipv6, request->ip6_addr, sizeof(port->iface.info.dhcp_ipv6));
-	port->iface.info.depth = DP_LPM_DHCP_IP6_DEPTH;
-	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.info.pxe_str), "Incompatible interface PXE size");
-	rte_memcpy(port->iface.info.pxe_str, request->pxe_str, sizeof(port->iface.info.pxe_str));
-	port->iface.info.pxe_ip = request->ip4_pxe_addr;
+	port->iface.cfg.own_ip = request->ip4_addr;
+	port->iface.cfg.depth = DP_LPM_DHCP_IP_DEPTH;
+	rte_memcpy(port->iface.cfg.dhcp_ipv6, request->ip6_addr, sizeof(port->iface.cfg.dhcp_ipv6));
+	port->iface.cfg.depth = DP_LPM_DHCP_IP6_DEPTH;
+	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
+	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
+	port->iface.cfg.pxe_ip = request->ip4_pxe_addr;
 
 	ret = dp_add_route(port, request->vni, 0, request->ip4_addr, NULL, 32);
 	if (DP_FAILED(ret))
@@ -543,7 +543,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	ipv4 = port->iface.info.own_ip;
+	ipv4 = port->iface.cfg.own_ip;
 	vni = port->iface.vni;
 
 	dp_del_vnf_with_vnf_key(port->iface.ul_ipv6);
@@ -570,8 +570,8 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	reply->ip4_addr = port->iface.info.own_ip;
-	rte_memcpy(reply->ip6_addr, port->iface.info.dhcp_ipv6, sizeof(reply->ip6_addr));
+	reply->ip4_addr = port->iface.cfg.own_ip;
+	rte_memcpy(reply->ip6_addr, port->iface.cfg.dhcp_ipv6, sizeof(reply->ip6_addr));
 	reply->vni = port->iface.vni;
 	static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
 	rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
@@ -630,7 +630,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	}
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		iface_ip = port->iface.info.own_ip;
+		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
 		if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_NAT, iface_vni, port, ul_addr6))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
@@ -674,7 +674,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	iface_ip = port->iface.info.own_ip;
+	iface_ip = port->iface.cfg.own_ip;
 	iface_vni = port->iface.vni;
 
 	s_data = dp_get_iface_snat_data(iface_ip, iface_vni);
@@ -702,7 +702,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	s_data = dp_get_iface_snat_data(port->iface.info.own_ip, port->iface.vni);
+	s_data = dp_get_iface_snat_data(port->iface.cfg.own_ip, port->iface.vni);
 	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
@@ -774,8 +774,8 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		if (!reply)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
-		reply->ip4_addr = port->iface.info.own_ip;
-		rte_memcpy(reply->ip6_addr, port->iface.info.dhcp_ipv6, sizeof(reply->ip6_addr));
+		reply->ip4_addr = port->iface.cfg.own_ip;
+		rte_memcpy(reply->ip6_addr, port->iface.cfg.dhcp_ipv6, sizeof(reply->ip6_addr));
 		reply->vni = port->iface.vni;
 		static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
 		rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));

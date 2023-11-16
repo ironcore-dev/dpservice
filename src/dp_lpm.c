@@ -17,11 +17,11 @@ static __rte_always_inline int dp_lpm_fill_route_tables(const struct dp_port *po
 {
 	int ret;
 
-	ret = dp_add_route(port, port->iface.vni, 0, port->iface.info.own_ip, NULL, 32);
+	ret = dp_add_route(port, port->iface.vni, 0, port->iface.cfg.own_ip, NULL, 32);
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = dp_add_route6(port, port->iface.vni, 0, port->iface.info.dhcp_ipv6, NULL, 128);
+	ret = dp_add_route6(port, port->iface.vni, 0, port->iface.cfg.dhcp_ipv6, NULL, 128);
 	if (DP_FAILED(ret))
 		return ret;
 
@@ -142,7 +142,7 @@ static __rte_always_inline bool dp_route_in_dhcp_range(const struct rte_rib_node
 	// both calls only fail when either param is NULL
 	rte_rib_get_ip(node, &ipv4);
 	rte_rib_get_depth(node, &depth);
-	return port->iface.info.own_ip == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
+	return port->iface.cfg.own_ip == ipv4 && depth == DP_LPM_DHCP_IP_DEPTH;
 }
 
 static int dp_list_route_entry(struct rte_rib_node *node,
