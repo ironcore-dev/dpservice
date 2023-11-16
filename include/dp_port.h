@@ -19,9 +19,10 @@ extern "C" {
 struct dp_iface_cfg {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
-	uint8_t					depth;
+	uint8_t					ip_depth;
 	uint8_t					dhcp_ipv6[16];
 	uint8_t					own_ipv6[16];
+	uint8_t					ip6_depth;
 	uint32_t				pxe_ip;
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
 };

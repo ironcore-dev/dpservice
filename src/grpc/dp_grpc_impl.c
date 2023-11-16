@@ -494,9 +494,9 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 
 	rte_memcpy(port->iface.ul_ipv6, ul_addr6, sizeof(port->iface.ul_ipv6));
 	port->iface.cfg.own_ip = request->ip4_addr;
-	port->iface.cfg.depth = DP_LPM_DHCP_IP_DEPTH;
+	port->iface.cfg.ip_depth = DP_LPM_DHCP_IP_DEPTH;
 	rte_memcpy(port->iface.cfg.dhcp_ipv6, request->ip6_addr, sizeof(port->iface.cfg.dhcp_ipv6));
-	port->iface.cfg.depth = DP_LPM_DHCP_IP6_DEPTH;
+	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
 	port->iface.cfg.pxe_ip = request->ip4_pxe_addr;
