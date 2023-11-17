@@ -369,7 +369,7 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	if (!DP_FAILED(dp_get_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port, !DP_VNF_MATCH_ALL_PORT_ID)))
+	if (dp_vnf_lbprefix_exists(&vnf_val.alias_pfx, port->iface.vni, port->port_id))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	if (DP_FAILED(dp_insert_vnf_entry(&vnf_val, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, ul_addr6)))

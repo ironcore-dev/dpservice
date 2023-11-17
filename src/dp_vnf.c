@@ -49,12 +49,17 @@ err:
 	return DP_ERROR;
 }
 
-int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, const struct dp_port *port, bool match_all)
+bool dp_vnf_lbprefix_exists(struct dp_vnf_prefix *prefix, uint32_t vni, uint16_t port_id)
 {
-	val->v_type = v_type;
-	val->portid = match_all ? DP_VNF_MATCH_ALL_PORT_ID_VALUE : port->port_id;
-	val->vni = port->iface.vni;
-	return dp_find_vnf_with_value(val);
+	struct dp_vnf_value val = {
+		.v_type = DP_VNF_TYPE_LB_ALIAS_PFX,
+		.vni = vni,
+		.portid = port_id,
+		.alias_pfx = *prefix,
+	};
+
+	// TODO maybe better, given the retuval!
+	return dp_find_vnf_with_value(&val) == DP_GRPC_OK;
 }
 
 const struct dp_vnf_value *dp_get_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
@@ -91,7 +96,7 @@ int dp_del_vnf_with_addr(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 
 static __rte_always_inline bool dp_vnf_equal(const struct dp_vnf_value *val1, const struct dp_vnf_value *val2)
 {
-	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_ID_VALUE) || (val1->portid == val2->portid))
+	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_IDS) || (val1->portid == val2->portid))
 		&& val1->alias_pfx.ip == val2->alias_pfx.ip
 		&& val1->alias_pfx.length == val2->alias_pfx.length
 		&& val1->v_type == val2->v_type;
