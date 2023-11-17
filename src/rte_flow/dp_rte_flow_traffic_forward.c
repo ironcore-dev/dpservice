@@ -629,8 +629,8 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 
 	// set proper ethernet addresses
 	// in network traffic has to be set via the other pf port via hairpin
-	outgoing_port = incoming_port == dp_get_pf0() ? dp_get_pf1() : incoming_port;
-	df->nxt_hop = outgoing_port->port_id;
+	outgoing_port = incoming_port == dp_get_pf0() ? dp_get_pf1() : dp_get_pf0();
+	// do *not* change df->nxt_hop though, as that carries the "proper" outgoing port
 	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->vm.info.own_mac);
 	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->vm.info.neigh_mac);
 
