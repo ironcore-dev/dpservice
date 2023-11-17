@@ -52,7 +52,7 @@ struct dp_flow {
 		} icmp_field;
 	} l4_info;
 
-	uint32_t		dp_flow_hash;
+	uint32_t		dp_flow_hash;  // TODO: could be brought down to 1-bit as it only chooses PF0/PF1 in ipv4_lookup
 
 	struct {
 		uint8_t		ul_src_addr6[16];

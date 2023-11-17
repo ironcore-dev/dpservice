@@ -46,11 +46,11 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
 int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
 
-int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct dp_grpc_responder *responder);
-
 bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len);
 
 int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len);
+
+int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct dp_grpc_responder *responder);
 
 #ifdef __cplusplus
 }

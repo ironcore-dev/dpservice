@@ -24,7 +24,7 @@
 	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
 	DP_LOG_PROTO((KEY)->proto), \
 	DP_LOG_VNI((KEY)->vni), \
-	DP_LOG_VNF_TYPE((KEY)->vnf), \
+	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
 	DP_LOG_SRC_IPV4((KEY)->ip_src), DP_LOG_DST_IPV4((KEY)->ip_dst), \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
@@ -101,17 +101,17 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 
 	if (port->is_pf) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
-			key->vnf = df->vnf_type;
+			key->vnf_type = df->vnf_type;
 		else
-			key->vnf = DP_VNF_TYPE_UNDEFINED;
+			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
 	} else {
 		s_data = dp_get_iface_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->nat_ip != 0)
-			key->vnf = DP_VNF_TYPE_NAT;
+			key->vnf_type = DP_VNF_TYPE_NAT;
 		else if (dp_vnf_lbprefix_exists(port->port_id, key->ip_src, 32))
-			key->vnf = DP_VNF_TYPE_LB_ALIAS_PFX;
+			key->vnf_type = DP_VNF_TYPE_LB_ALIAS_PFX;
 		else
-			key->vnf = DP_VNF_TYPE_UNDEFINED;
+			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
 	}
 }
 
@@ -159,7 +159,7 @@ void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *in
 	inv_key->ip_src = key->ip_dst;
 	inv_key->ip_dst = key->ip_src;
 	inv_key->vni = key->vni;
-	inv_key->vnf = key->vnf;
+	inv_key->vnf_type = key->vnf_type;
 	inv_key->proto = key->proto;
 
 	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
@@ -235,7 +235,7 @@ bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *
 		&& key1->port_dst == key2->port_dst
 		&& key1->src.port_src == key2->src.port_src
 		&& key1->vni == key2->vni
-		&& key1->vnf == key2->vnf;
+		&& key1->vnf_type == key2->vnf_type;
 }
 
 void dp_free_flow(struct dp_ref *ref)
