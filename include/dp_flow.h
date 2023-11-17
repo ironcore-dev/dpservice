@@ -66,8 +66,14 @@ enum dp_flow_tcp_state {
 };
 
 struct flow_key {
-	uint32_t ip_dst;
-	uint32_t ip_src;
+	union {
+		uint32_t	ip4;
+		uint8_t		ip6[16];
+	} l3_dst;
+	union {
+		uint32_t	ip4;
+		uint8_t		ip6[16];
+	} l3_src;
 	uint16_t port_dst;
 	union {
 		uint16_t port_src;

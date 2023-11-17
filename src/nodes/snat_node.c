@@ -78,7 +78,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			/* Expect the new destination in this conntrack object */
 			cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4 = ntohl(ipv4_hdr->src_addr);
 			if (snat_data->nat_ip != 0)
 				cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 
@@ -93,7 +93,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
-		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
+		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4);
 
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
@@ -112,7 +112,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		&& (df->flow_dir == DP_FLOW_DIR_REPLY)) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		df->src.src_addr = ipv4_hdr->src_addr;
-		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst);
+		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4);
 		df->nat_addr = ipv4_hdr->src_addr;
 		df->nat_type = DP_NAT_CHG_SRC_IP;
 		dp_nat_chg_ip(df, ipv4_hdr, m);

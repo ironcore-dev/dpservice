@@ -532,9 +532,9 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	struct dp_port *created_port;
 	int ret;
 
-	portoverload_tbl_key.nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst;
+	portoverload_tbl_key.nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4;
 	portoverload_tbl_key.nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
-	portoverload_tbl_key.dst_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_dst;
+	portoverload_tbl_key.dst_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4;
 	portoverload_tbl_key.dst_port = cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst;
 	portoverload_tbl_key.l4_type = cntrack->flow_key[DP_FLOW_DIR_ORG].proto;
 
@@ -543,7 +543,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
-	portmap_key.iface_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src;
+	portmap_key.iface_src_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4;
 	portmap_key.iface_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 
