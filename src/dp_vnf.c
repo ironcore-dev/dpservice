@@ -5,6 +5,8 @@
 #include "dp_lpm.h"
 #include "grpc/dp_grpc_responder.h"
 
+#define DP_VNF_MAX_TABLE_SIZE 1000
+
 static struct rte_hash *vnf_handle_tbl = NULL;
 
 int dp_vnf_init(int socket_id)

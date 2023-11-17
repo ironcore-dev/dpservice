@@ -101,17 +101,17 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 
 	if (port->is_pf) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
-			key->vnf = (uint8_t)df->vnf_type;
+			key->vnf = df->vnf_type;
 		else
-			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
+			key->vnf = DP_VNF_TYPE_UNDEFINED;
 	} else {
 		s_data = dp_get_iface_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->nat_ip != 0)
-			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
+			key->vnf = DP_VNF_TYPE_NAT;
 		else if (dp_vnf_lbprefix_exists(port->port_id, key->ip_src, 32))
-			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
+			key->vnf = DP_VNF_TYPE_LB_ALIAS_PFX;
 		else
-			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
+			key->vnf = DP_VNF_TYPE_UNDEFINED;
 	}
 }
 

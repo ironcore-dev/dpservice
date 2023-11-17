@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 #include "dp_firewall.h"
-#include "dp_util.h"
 #include "dp_iface.h"
+#include "dp_util.h"
+#include "dp_vnf.h"
 #include "monitoring/dp_monitoring.h"
 
 #ifdef __cplusplus

@@ -1,5 +1,6 @@
 #ifndef __INCLUDE_DP_FLOW_PRIV_H__
 #define __INCLUDE_DP_FLOW_PRIV_H__
+
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_flow.h>
@@ -8,6 +9,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_refcount.h"
 #include "dp_timers.h"
+#include "dp_vnf.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,8 +95,10 @@ struct flow_key {
 	} src;
 	uint32_t vni;
 	uint8_t  proto;
-	uint8_t  vnf;
+	enum dp_vnf_type vnf;
 } __rte_packed;
+static_assert(sizeof(((struct flow_key *)0)->vnf) == 1,
+			  "enum dp_vnf_type is unnecessarily big");
 
 struct flow_nf_info {
 	uint32_t vni;
