@@ -35,8 +35,8 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 
 	vnf = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf), RTE_CACHE_LINE_SIZE);
 	if (!vnf) {
-		DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNI(vni), DP_LOG_PORTID(port_id),
-						DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len));
+		DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
+						DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len));
 		return DP_ERROR;
 	}
 
@@ -48,8 +48,8 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 
 	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, vnf);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_VNI(vni), DP_LOG_PORTID(port_id),
-						DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
+						DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
 		rte_free(vnf);
 		return DP_ERROR;
 	}
@@ -138,7 +138,7 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t prefix
 			// should only ever fail on no-entry or invalid-arguments, but both are covered by rte_hash_iterate()
 			ret = rte_hash_del_key(vnf_handle_tbl, key);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret), DP_LOG_PORTID(port_id),
+				DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret), DP_LOG_VNF_TYPE(type), DP_LOG_PORTID(port_id),
 							DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len));
 		}
 	}

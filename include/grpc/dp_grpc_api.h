@@ -80,7 +80,7 @@ struct dpgrpc_iface {
 	uint8_t					ip6_addr[DP_VNF_IPV6_ADDR_SIZE];
 	uint32_t				vni;
 	uint32_t				ip4_pxe_addr;						// request (create) only
-	char					pxe_str[DP_IFACE_PXE_MAX_LEN];	// request (create) only
+	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
 };
@@ -92,7 +92,6 @@ struct dpgrpc_iface_id {
 struct dpgrpc_address {
 	uint32_t				ip_type;
 	union {
-		// TODO(plague): this is sometimes network, sometimes host byte order! (needs PR)
 		uint32_t			ipv4;
 		uint8_t				ipv6[DP_VNF_IPV6_ADDR_SIZE];
 	};

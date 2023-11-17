@@ -392,7 +392,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		iface_vni = port->iface.vni;
-		ret = dp_add_route(port, iface_vni, 0,  request->addr.ipv4, NULL, request->length);
+		ret = dp_add_route(port, iface_vni, 0, request->addr.ipv4, NULL, request->length);
 		if (DP_FAILED(ret))
 			return ret;
 
