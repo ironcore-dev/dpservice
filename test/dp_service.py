@@ -97,9 +97,9 @@ class DpService:
 		grpc_client.addroute(vni2, "0.0.0.0/0", vni2, router_ul_ipv6)
 
 	def attach(self, grpc_client):
-		VM1.ul_ipv6 = grpc_client.getinterface(VM1.name)['underlayRoute']
-		VM2.ul_ipv6 = grpc_client.getinterface(VM2.name)['underlayRoute']
-		VM3.ul_ipv6 = grpc_client.getinterface(VM3.name)['underlayRoute']
+		VM1.ul_ipv6 = grpc_client.getinterface(VM1.name)['underlay_route']
+		VM2.ul_ipv6 = grpc_client.getinterface(VM2.name)['underlay_route']
+		VM3.ul_ipv6 = grpc_client.getinterface(VM3.name)['underlay_route']
 
 	def get_vm_tap(self, idx):
 		iface = f"tap{idx}"
