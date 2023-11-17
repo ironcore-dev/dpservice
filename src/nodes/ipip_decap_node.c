@@ -17,22 +17,22 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
-	const struct dp_vnf_value *vnf_val;
+	const struct dp_vnf *vnf;
 	struct dp_port *dst_port;
 	rte_edge_t next_node;
 	uint32_t l3_type;
 
-	vnf_val = dp_get_vnf_value(df->tun_info.ul_dst_addr6);
-	if (!vnf_val)
+	vnf = dp_get_vnf(df->tun_info.ul_dst_addr6);
+	if (!vnf)
 		return IPIP_DECAP_NEXT_DROP;
 
-	dst_port = dp_get_port_by_id(vnf_val->portid);
+	dst_port = dp_get_port_by_id(vnf->port_id);
 	if (!dst_port)
 		return IPIP_DECAP_NEXT_DROP;
 
-	df->tun_info.dst_vni = vnf_val->vni;
-	df->vnf_type = vnf_val->v_type;
-	df->nxt_hop = vnf_val->portid;  // already validated above
+	df->tun_info.dst_vni = vnf->vni;
+	df->vnf_type = vnf->type;
+	df->nxt_hop = vnf->port_id;  // already validated above
 
 	switch (df->tun_info.proto_id) {
 	case DP_IP_PROTO_IPv4_ENCAP:

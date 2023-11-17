@@ -19,10 +19,10 @@ DP_NODE_REGISTER_NOINIT(LB, lb, NEXT_NODES);
 
 static __rte_always_inline void dp_lb_set_next_hop(struct dp_flow *df, uint16_t port_id)
 {
-	const struct dp_vnf_value *vnf_val;
+	const struct dp_vnf *vnf;
 
-	vnf_val = dp_get_vnf_value(df->tun_info.ul_dst_addr6);
-	if (!vnf_val || vnf_val->v_type != DP_VNF_TYPE_LB_ALIAS_PFX) {
+	vnf = dp_get_vnf(df->tun_info.ul_dst_addr6);
+	if (!vnf || vnf->type != DP_VNF_TYPE_LB_ALIAS_PFX) {
 		df->nxt_hop = port_id;  // needs to validated by the caller (but it's always m->port)
 		df->flags.nat = DP_CHG_UL_DST_IP;
 	} else

@@ -55,7 +55,7 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 }
 
 static int dp_create_vnf_route(uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE] /* out */,
-							   enum vnf_type type, uint32_t vni, const struct dp_port *port,
+							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
 							   uint32_t prefix_ip, uint16_t prefix_len)
 {
 	dp_generate_underlay_ipv6(ul_addr6);
@@ -92,7 +92,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 err_lb:
 	dp_delete_lb((void *)request->lb_id);
 err_vnf:
-	dp_del_vnf_with_addr(ul_addr6);
+	dp_del_vnf(ul_addr6);
 err:
 	return ret;
 }
@@ -107,7 +107,7 @@ static int dp_process_delete_lb(struct dp_grpc_responder *responder)
 	if (DP_FAILED(ret))
 		return ret;
 
-	dp_del_vnf_with_addr(lb.ul_addr6);
+	dp_del_vnf(lb.ul_addr6);
 
 	ret = dp_delete_lb(request->lb_id);
 	if (DP_FAILED(ret))
@@ -275,7 +275,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 err_snat:
 	dp_del_iface_vip_ip(iface_ip, iface_vni);
 err_vnf:
-	dp_del_vnf_with_addr(ul_addr6);
+	dp_del_vnf(ul_addr6);
 err:
 	return ret;
 }
@@ -300,7 +300,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	dp_del_vnf_with_addr(s_data->ul_vip_ip6);
+	dp_del_vnf(s_data->ul_vip_ip6);
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->vip_ip;
@@ -492,7 +492,7 @@ iface_err:
 handle_err:
 	dp_unmap_iface_id(request->iface_id);
 err_vnf:
-	dp_del_vnf_with_addr(ul_addr6);
+	dp_del_vnf(ul_addr6);
 err:
 	return ret;
 }
@@ -513,7 +513,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	ipv4 = port->iface.cfg.own_ip;
 	vni = port->iface.vni;
 
-	dp_del_vnf_with_addr(port->iface.ul_ipv6);
+	dp_del_vnf(port->iface.ul_ipv6);
 	if (DP_FAILED(dp_stop_port(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
@@ -621,7 +621,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 err_dnat:
 	dp_del_iface_nat_ip(iface_ip, iface_vni);
 err_vnf:
-	dp_del_vnf_with_addr(ul_addr6);
+	dp_del_vnf(ul_addr6);
 err:
 	return ret;
 
@@ -647,7 +647,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	dp_del_vnf_with_addr(s_data->ul_nat_ip6);
+	dp_del_vnf(s_data->ul_nat_ip6);
 
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->nat_ip;
