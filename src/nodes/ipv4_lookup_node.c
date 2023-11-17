@@ -5,6 +5,7 @@
 #include <rte_mbuf.h>
 #include "dp_conf.h"
 #include "dp_flow.h"
+#include "dp_iface.h"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_multi_path.h"

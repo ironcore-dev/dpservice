@@ -1,18 +1,20 @@
 #ifndef __INCLUDE_DP_VNF_H__
 #define __INCLUDE_DP_VNF_H__
 
-#include <rte_hash.h>
-#include <rte_jhash.h>
-#include <rte_flow.h>
-#include "dp_port.h"
-#include "grpc/dp_grpc_responder.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <rte_common.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define DP_VNF_MAX_TABLE_SIZE 1000
+#define DP_VNF_IPV6_ADDR_SIZE 16
+
 #define DP_VNF_MATCH_ALL_PORT_IDS 0xFFFF
+
+// forward declaration as 'struct dp_grpc_responder' needs some definitions from here
+struct dp_grpc_responder;
 
 enum dp_vnf_type {
 	DP_VNF_TYPE_UNDEFINED,
@@ -22,7 +24,7 @@ enum dp_vnf_type {
 	DP_VNF_TYPE_VIP,
 	DP_VNF_TYPE_NAT,
 	DP_VNF_TYPE_INTERFACE_IP,
-};
+} __rte_packed;  // for 'struct dp_flow' and 'struct flow_key'
 
 struct dp_vnf_prefix {
 	uint32_t	ip;

@@ -10,6 +10,7 @@
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
+#include "dp_vnf.h"
 
 #define DP_MBUF_PRIV_DATA_SIZE (RTE_CACHE_LINE_SIZE * 2)
 
@@ -60,7 +61,7 @@ struct dp_flow {
 		uint8_t		proto_id;	//proto_id in outer ipv6 header
 		uint32_t	dst_vni;
 	} tun_info;
-	uint8_t				vnf_type;  // TODO(plague) enum?
+	enum dp_vnf_type	vnf_type;
 	uint8_t				nxt_hop;
 	struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC
@@ -81,6 +82,8 @@ static_assert(sizeof(struct dp_flow) + sizeof(struct dp_pkt_mark) <= DP_MBUF_PRI
 			  "packet private data is too big to fit in packet");
 static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORTS,
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
+static_assert(sizeof(((struct dp_flow *)0)->vnf_type) == 1,
+			  "enum dp_vnf_type is unnecessarily big");
 
 extern rte_atomic32_t dp_pkt_id_counter;
 
