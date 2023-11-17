@@ -11,7 +11,7 @@
 #include "rte_flow/dp_rte_flow_helpers.h"
 #include "monitoring/dp_graphtrace.h"
 
-static struct flow_key key_cache[2];
+static struct flow_key key_cache[2] = {0};
 static int key_cache_index = 0;
 static struct flow_key *prev_key = NULL;
 static struct flow_key *curr_key = &key_cache[0];
@@ -166,7 +166,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	/* Details can be found in https://github.com/ironcore-dev/dpservice/pull/341 */
 	if (offload_mode_enabled
 		&& !port->is_pf
-		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->vni, key->ip_dst, 32)
+		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->vni, key->l3_dst.ip4, 32)
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;
 	else
@@ -187,6 +187,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	// Implicit casting from hash_sig_t to uint32_t!
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
+	memset(&inverted_key, 0, sizeof(inverted_key));
 	dp_invert_flow_key(key, &inverted_key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = inverted_key;
 	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
@@ -242,11 +243,14 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		return ret;
 
 	// highly optimized comparator for a specific key size
-	static_assert(sizeof(struct flow_key) == 18, "struct flow_key changed size");
+	static_assert(sizeof(struct flow_key) == 42, "struct flow_key changed size");
 	if (prev_key
 		&& ((const uint64_t *)curr_key)[0] == ((const uint64_t *)prev_key)[0]
 		&& ((const uint64_t *)curr_key)[1] == ((const uint64_t *)prev_key)[1]
-		&& ((const uint16_t *)curr_key)[8] == ((const uint16_t *)prev_key)[8]
+		&& ((const uint64_t *)curr_key)[2] == ((const uint64_t *)prev_key)[2]
+		&& ((const uint64_t *)curr_key)[3] == ((const uint64_t *)prev_key)[3]
+		&& ((const uint64_t *)curr_key)[4] == ((const uint64_t *)prev_key)[4]
+		&& ((const uint16_t *)curr_key)[20] == ((const uint16_t *)prev_key)[20]
 	) {
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;

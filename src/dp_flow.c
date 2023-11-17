@@ -28,7 +28,7 @@
 	DP_LOG_PROTO((KEY)->proto), \
 	DP_LOG_VNI((KEY)->vni), \
 	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
-	DP_LOG_SRC_IPV4((KEY)->ip_src), DP_LOG_DST_IPV4((KEY)->ip_dst), \
+	DP_LOG_SRC_IPV4((KEY)->l3_src.ip4), DP_LOG_DST_IPV4((KEY)->l3_dst.ip4), \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
@@ -80,8 +80,8 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 			return DP_ERROR;
 		}
 
-		key->ip_dst = ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr);
-		key->ip_src = ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr);
+		key->l3_dst.ip4 = ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr);
+		key->l3_src.ip4 = ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr);
 
 		key->proto = icmp_err_ip_info.err_ipv4_hdr->next_proto_id;
 
@@ -108,10 +108,10 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
 	} else {
-		s_data = dp_get_iface_snat_data(key->ip_src, key->vni);
+		s_data = dp_get_iface_snat_data(key->l3_src.ip4, key->vni);
 		if (s_data && s_data->nat_ip != 0)
 			key->vnf_type = DP_VNF_TYPE_NAT;
-		else if (dp_vnf_lbprefix_exists(port->port_id, key->vni, key->ip_src, 32))
+		else if (dp_vnf_lbprefix_exists(port->port_id, key->vni, key->l3_src.ip4, 32))
 			key->vnf_type = DP_VNF_TYPE_LB_ALIAS_PFX;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
@@ -124,8 +124,10 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	const struct dp_port *port = dp_get_in_port(m);
 	int ret = DP_OK;
 
-	key->ip_dst = ntohl(df->dst.dst_addr);
-	key->ip_src = ntohl(df->src.src_addr);
+	memset(key, 0, sizeof(struct flow_key));
+
+	key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
+	key->l3_src.ip4 = ntohl(df->src.src_addr);
 
 	key->proto = df->l4_type;
 
@@ -159,8 +161,8 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
 {
-	inv_key->ip_src = key->ip_dst;
-	inv_key->ip_dst = key->ip_src;
+	inv_key->l3_src.ip4 = key->l3_dst.ip4;
+	inv_key->l3_dst.ip4 = key->l3_src.ip4;
 	inv_key->vni = key->vni;
 	inv_key->vnf_type = key->vnf_type;
 	inv_key->proto = key->proto;
@@ -233,8 +235,8 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2)
 {
 	return key1->proto == key2->proto
-		&& key1->ip_src == key2->ip_src
-		&& key1->ip_dst == key2->ip_dst
+		&& key1->l3_src.ip4 == key2->l3_src.ip4
+		&& key1->l3_dst.ip4 == key2->l3_dst.ip4
 		&& key1->port_dst == key2->port_dst
 		&& key1->src.port_src == key2->src.port_src
 		&& key1->vni == key2->vni
@@ -261,7 +263,7 @@ void dp_free_network_nat_port(const struct flow_value *cntrack)
 		ret = dp_remove_network_snat_port(cntrack);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to remove an allocated NAT port",
-						DP_LOG_DST_IPV4(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst),
+						DP_LOG_DST_IPV4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4),
 						DP_LOG_DST_PORT(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst),
 						DP_LOG_RET(ret));
 	}
@@ -450,7 +452,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
 			return;
 		}
-		if (next_key->vni == vni && next_key->ip_dst == ipv4
+		if (next_key->vni == vni && next_key->l3_dst.ip4 == ipv4
 			&& next_key->port_dst >= min_port && next_key->port_dst < max_port
 		) {
 			dp_remove_flow(flow_val);
@@ -471,7 +473,7 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 			return;
 		}
 		if (flow_val->created_port_id == port_id
-			|| (next_key->vni == vni && flow_val->flow_key[DP_FLOW_DIR_ORG].ip_dst == ipv4)
+			|| (next_key->vni == vni && flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4 == ipv4)
 		) {
 			dp_remove_flow(flow_val);
 		}
