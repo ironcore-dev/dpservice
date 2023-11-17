@@ -22,44 +22,37 @@ void dp_vnf_free(void)
 	dp_free_jhash_table(vnf_handle_tbl);
 }
 
-int dp_set_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], const struct dp_vnf_value *val)
+int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum vnf_type type,
+			   uint32_t vni, uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len)
 {
-	struct dp_vnf_value *temp_val;
+	struct dp_vnf_value *val;
 	int ret;
 
-	temp_val = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf_value), RTE_CACHE_LINE_SIZE);
-	if (!temp_val) {
-		DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_PORTID(val->portid));
+	if (rte_hash_lookup(vnf_handle_tbl, ul_addr6) != -ENOENT)
+		return DP_ERROR;
+
+	val = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf_value), RTE_CACHE_LINE_SIZE);
+	if (!val) {
+		DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNI(vni), DP_LOG_PORTID(port_id),
+						DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len));
 		return DP_ERROR;
 	}
 
-	if (rte_hash_lookup(vnf_handle_tbl, ul_addr6) >= 0)
-		goto err;
+	val->v_type = type;
+	val->vni = vni;
+	val->portid = port_id;
+	val->alias_pfx.ip = prefix_ip;
+	val->alias_pfx.length = prefix_len;
 
-	*temp_val = *val;
-	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, temp_val);
+	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, val);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_PORTID(temp_val->portid), DP_LOG_RET(ret));
-		goto err;
+		DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_VNI(vni), DP_LOG_PORTID(port_id),
+						DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
+		rte_free(val);
+		return DP_ERROR;
 	}
+
 	return DP_OK;
-
-err:
-	rte_free(temp_val);
-	return DP_ERROR;
-}
-
-bool dp_vnf_lbprefix_exists(struct dp_vnf_prefix *prefix, uint32_t vni, uint16_t port_id)
-{
-	struct dp_vnf_value val = {
-		.v_type = DP_VNF_TYPE_LB_ALIAS_PFX,
-		.vni = vni,
-		.portid = port_id,
-		.alias_pfx = *prefix,
-	};
-
-	// TODO maybe better, given the retuval!
-	return dp_find_vnf_with_value(&val) == DP_GRPC_OK;
 }
 
 const struct dp_vnf_value *dp_get_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
@@ -94,15 +87,17 @@ int dp_del_vnf_with_addr(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 	return DP_OK;
 }
 
-static __rte_always_inline bool dp_vnf_equal(const struct dp_vnf_value *val1, const struct dp_vnf_value *val2)
+static __rte_always_inline bool dp_vnf_match(const struct dp_vnf_value *val,
+											 enum vnf_type type, uint16_t port_id,
+											 uint32_t prefix_ip, uint16_t prefix_len)
 {
-	return ((val1->portid == DP_VNF_MATCH_ALL_PORT_IDS) || (val1->portid == val2->portid))
-		&& val1->alias_pfx.ip == val2->alias_pfx.ip
-		&& val1->alias_pfx.length == val2->alias_pfx.length
-		&& val1->v_type == val2->v_type;
+	return (port_id == DP_VNF_MATCH_ALL_PORT_IDS || val->portid == port_id)
+		&& val->alias_pfx.ip == prefix_ip
+		&& val->alias_pfx.length == prefix_len
+		&& val->v_type == type;
 }
 
-int dp_find_vnf_with_value(const struct dp_vnf_value *val)
+bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
@@ -110,16 +105,18 @@ int dp_find_vnf_with_value(const struct dp_vnf_value *val)
 	const void *key;
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, &key, (void **)&temp_val, &iter)) != -ENOENT) {
-		if (DP_FAILED(ret))
-			return DP_GRPC_ERR_ITERATOR;
-
-		if (dp_vnf_equal(val, temp_val))
-			return DP_GRPC_OK;
+		if (DP_FAILED(ret)) {
+			DPS_LOG_WARNING("Iterating VNF table failed", DP_LOG_RET(ret), DP_LOG_PORTID(port_id),
+							DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len));
+			return false;
+		}
+		if (dp_vnf_match(temp_val, DP_VNF_TYPE_LB_ALIAS_PFX, port_id, prefix_ip, prefix_len))
+			return true;
 	}
-	return DP_GRPC_ERR_NOT_FOUND;
+	return false;
 }
 
-int dp_del_vnf_with_value(const struct dp_vnf_value *val)
+int dp_del_vnf_by_value(enum vnf_type type, uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len)
 {
 	struct dp_vnf_value *temp_val = NULL;
 	uint32_t iter = 0;
@@ -131,7 +128,7 @@ int dp_del_vnf_with_value(const struct dp_vnf_value *val)
 		if (DP_FAILED(ret))
 			return DP_GRPC_ERR_ITERATOR;
 
-		if (dp_vnf_equal(val, temp_val)) {
+		if (dp_vnf_match(temp_val, type, port_id, prefix_ip, prefix_len)) {
 			delete_count++;
 			rte_free(temp_val);
 			// this seems unsafe (deletion during traversal), but should be convered by having the table big enough
@@ -139,13 +136,14 @@ int dp_del_vnf_with_value(const struct dp_vnf_value *val)
 			// should only ever fail on no-entry or invalid-arguments, but both are covered by rte_hash_iterate()
 			ret = rte_hash_del_key(vnf_handle_tbl, key);
 			if (DP_FAILED(ret))
-				DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret));
+				DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret), DP_LOG_PORTID(port_id),
+							DP_LOG_IPV4(prefix_ip), DP_LOG_PREFLEN(prefix_len));
 		}
 	}
 	return delete_count > 0 ? DP_GRPC_OK : DP_GRPC_ERR_NOT_FOUND;
 }
 
-int dp_list_vnf_alias_routes(uint16_t port_id, enum vnf_type v_type, struct dp_grpc_responder *responder)
+int dp_list_vnf_alias_prefixes(uint16_t port_id, enum vnf_type v_type, struct dp_grpc_responder *responder)
 {
 	const uint8_t *ul_addr6;
 	struct dp_vnf_value *data;

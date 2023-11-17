@@ -39,14 +39,16 @@ struct dp_vnf_value {
 int dp_vnf_init(int socket_id);
 void dp_vnf_free(void);
 
-int dp_set_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], const struct dp_vnf_value *val);
+int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum vnf_type type,
+			   uint32_t vni, uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len);
 const struct dp_vnf_value *dp_get_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
 int dp_del_vnf_with_addr(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
-int dp_del_vnf_with_value(const struct dp_vnf_value *val);
-int dp_find_vnf_with_value(const struct dp_vnf_value *val);
-int dp_list_vnf_alias_routes(uint16_t port_id, enum vnf_type v_type, struct dp_grpc_responder *responder);
 
-bool dp_vnf_lbprefix_exists(struct dp_vnf_prefix *prefix, uint32_t vni, uint16_t port_id);
+int dp_list_vnf_alias_prefixes(uint16_t port_id, enum vnf_type v_type, struct dp_grpc_responder *responder);
+
+bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len);
+
+int dp_del_vnf_by_value(enum vnf_type type, uint16_t port_id, uint32_t prefix_ip, uint16_t prefix_len);
 
 #ifdef __cplusplus
 }
