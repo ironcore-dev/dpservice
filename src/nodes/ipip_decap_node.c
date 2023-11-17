@@ -17,12 +17,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
-	struct dp_vnf_value *vnf_val;
+	const struct dp_vnf_value *vnf_val;
 	struct dp_port *dst_port;
 	rte_edge_t next_node;
 	uint32_t l3_type;
 
-	vnf_val = dp_get_vnf_value_with_key((void *)df->tun_info.ul_dst_addr6);
+	vnf_val = dp_get_vnf_value(df->tun_info.ul_dst_addr6);
 	if (!vnf_val)
 		return IPIP_DECAP_NEXT_DROP;
 

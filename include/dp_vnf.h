@@ -39,10 +39,10 @@ struct dp_vnf_value {
 
 int dp_vnf_init(int socket_id);
 void dp_vnf_free(void);
-int dp_set_vnf_value(const void *key, const struct dp_vnf_value *val);
-struct dp_vnf_value *dp_get_vnf_value_with_key(const void *key);
-int dp_get_portid_with_vnf_key(const void *key, enum vnf_type v_type);
-int dp_del_vnf_with_vnf_key(const void *key);
+
+int dp_set_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], const struct dp_vnf_value *val);
+const struct dp_vnf_value *dp_get_vnf_value(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
+int dp_del_vnf_with_addr(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
 int dp_del_vnf_with_value(const struct dp_vnf_value *val);
 int dp_find_vnf_with_value(const struct dp_vnf_value *val);
 int dp_get_vnf_entry(struct dp_vnf_value *val, enum vnf_type v_type, const struct dp_port *port, bool match_all);
