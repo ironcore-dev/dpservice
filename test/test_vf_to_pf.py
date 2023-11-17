@@ -24,7 +24,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
 
 	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-			    IP(dst=public_ip, src=VM1.ip) /
+			    IP(dst=public_ip3, src=VM1.ip) /
 			    ICMP(type=8, id=0x0040))
 	delayed_sendp(icmp_pkt, VM1.tap)
 
@@ -61,7 +61,7 @@ def reply_tcp_pkt_from_vm1_max_port(nat_ul_ipv6):
 
 def send_tcp_through_port(port):
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-			   IP(dst=public_ip, src=VM1.ip) /
+			   IP(dst=public_ip3, src=VM1.ip) /
 			   TCP(sport=port))
 	delayed_sendp(tcp_pkt, VM1.tap)
 
@@ -76,7 +76,7 @@ def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redun
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1_max_port, args=(nat_ul_ipv6,)).start()
 	send_tcp_through_port(1246)
-	send_tcp_through_port(1247)
+	send_tcp_through_port(1547)
 	grpc_client.delnat(VM1.name)
 
 
@@ -106,9 +106,9 @@ def request_tcp(dport, pf_name, vip_ul_ipv6):
 
 def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 	vip_ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	request_tcp(80, PF0.tap, vip_ul_ipv6)
+	request_tcp(180, PF0.tap, vip_ul_ipv6)
 	if port_redundancy:
-		request_tcp(82, PF1.tap, vip_ul_ipv6)
+		request_tcp(120, PF1.tap, vip_ul_ipv6)
 	grpc_client.delvip(VM2.name)
 
 
@@ -147,7 +147,7 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	request_icmperr(501, PF0.tap, nat_ul_ipv6)
 	if port_redundancy:
-		request_icmperr(500, PF1.tap, nat_ul_ipv6)
+		request_icmperr(565, PF1.tap, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)
 
 def test_vf_to_pf_firewall_tcp_block(prepare_ipv4, grpc_client):

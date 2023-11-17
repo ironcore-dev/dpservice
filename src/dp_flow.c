@@ -138,8 +138,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	memset(key, 0, sizeof(struct flow_key));
 	key->l3_type = df->l3_type;
 
-	switch (df->l3_type)
-	{
+	switch (df->l3_type) {
 	case RTE_ETHER_TYPE_IPV4:
 		key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
 		key->l3_src.ip4 = ntohl(df->src.src_addr);
