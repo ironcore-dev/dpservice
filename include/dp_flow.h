@@ -95,9 +95,9 @@ struct flow_key {
 	} src;
 	uint32_t vni;
 	uint8_t  proto;
-	enum dp_vnf_type vnf;
+	enum dp_vnf_type vnf_type;
 } __rte_packed;
-static_assert(sizeof(((struct flow_key *)0)->vnf) == 1,
+static_assert(sizeof(((struct flow_key *)0)->vnf_type) == 1,
 			  "enum dp_vnf_type is unnecessarily big");
 
 struct flow_nf_info {
