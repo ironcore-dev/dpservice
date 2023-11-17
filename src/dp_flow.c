@@ -98,7 +98,6 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struct dp_port *port, struct flow_key *key)
 {
 	struct snat_data *s_data;
-	struct dp_vnf_prefix prefix;
 
 	if (port->is_pf) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
@@ -106,12 +105,10 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
 	} else {
-		prefix.ip = key->ip_src;
-		prefix.length = 32;
 		s_data = dp_get_iface_snat_data(key->ip_src, key->vni);
 		if (s_data && s_data->nat_ip != 0)
 			key->vnf = (uint8_t)DP_VNF_TYPE_NAT;
-		else if (dp_vnf_lbprefix_exists(&prefix, port->iface.vni, port->port_id))
+		else if (dp_vnf_lbprefix_exists(port->port_id, key->ip_src, 32))
 			key->vnf = (uint8_t)DP_VNF_TYPE_LB_ALIAS_PFX;
 		else
 			key->vnf = (uint8_t)DP_VNF_TYPE_UNDEFINED;
