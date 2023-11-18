@@ -53,7 +53,7 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
-										  const struct rte_ipv6_hdr *ipv6_hdr,
+										  const struct dp_flow *df,
 										  struct dp_iface_route *route);
 
 uint32_t dp_get_gw_ip4(void);

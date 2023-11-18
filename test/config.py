@@ -57,6 +57,9 @@ dhcp_dns2 = "8.8.8.8"
 
 # Some "random" IP on the internet
 public_ip = "45.86.6.6"
+public_ip2 = "45.86.6.106"
+public_ip3 = "45.86.6.206"
+public_ipv6 = "2001:4860:4860::8888"
 
 # Virtual IP functionality
 vip_vip = "172.20.0.1"

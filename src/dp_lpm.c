@@ -315,7 +315,7 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
-										  const struct rte_ipv6_hdr *ipv6_hdr,
+										  const struct dp_flow *df,
 										  struct dp_iface_route *route)
 {
 	struct rte_rib6_node *node;
@@ -330,7 +330,7 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	if (!root)
 		return NULL;
 
-	node = rte_rib6_lookup(root, ipv6_hdr->dst_addr);
+	node = rte_rib6_lookup(root, df->dst.dst_addr6);
 	if (!node)
 		return NULL;
 

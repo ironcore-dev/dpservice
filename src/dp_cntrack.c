@@ -188,7 +188,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
 	memset(&inverted_key, 0, sizeof(inverted_key));
-	dp_invert_flow_key(key, &inverted_key);
+	dp_invert_flow_key(key, df->l3_type, &inverted_key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = inverted_key;
 	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
 		goto error_add_inv;
@@ -243,14 +243,14 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		return ret;
 
 	// highly optimized comparator for a specific key size
-	static_assert(sizeof(struct flow_key) == 42, "struct flow_key changed size");
+	static_assert(sizeof(struct flow_key) == 44, "struct flow_key changed size");
 	if (prev_key
 		&& ((const uint64_t *)curr_key)[0] == ((const uint64_t *)prev_key)[0]
 		&& ((const uint64_t *)curr_key)[1] == ((const uint64_t *)prev_key)[1]
 		&& ((const uint64_t *)curr_key)[2] == ((const uint64_t *)prev_key)[2]
 		&& ((const uint64_t *)curr_key)[3] == ((const uint64_t *)prev_key)[3]
 		&& ((const uint64_t *)curr_key)[4] == ((const uint64_t *)prev_key)[4]
-		&& ((const uint16_t *)curr_key)[20] == ((const uint16_t *)prev_key)[20]
+		&& ((const uint32_t *)curr_key)[20] == ((const uint32_t *)prev_key)[20]
 	) {
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;
@@ -296,7 +296,10 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 	flow_val->timestamp = rte_rdtsc();
 
 	if (df->l4_type == IPPROTO_TCP && df->vnf_type != DP_VNF_TYPE_LB) {
-		tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv4_hdr(m) + 1);
+		if (df->l3_type == RTE_ETHER_TYPE_IPV4)
+			tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv4_hdr(m) + 1);
+		else
+			tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv6_hdr(m) + 1);
 		dp_cntrack_tcp_state(flow_val, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}

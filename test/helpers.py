@@ -7,7 +7,7 @@ import time
 from scapy.all import *
 from scapy.layers.dhcp import *
 from scapy.layers.inet import Ether, ICMP, TCP
-from scapy.layers.inet6 import IPv6, _ICMPv6
+from scapy.layers.inet6 import IPv6, ICMPv6EchoRequest, ICMPv6EchoReply, _ICMPv6
 
 from config import *
 
@@ -41,8 +41,14 @@ def request_ip(vm):
 def is_icmp_pkt(pkt):
 	return ICMP in pkt
 
+def is_icmpv6_echo_pkt(pkt):
+	return ICMPv6EchoRequest in pkt
+
 def is_udp_pkt(pkt):
 	return UDP in pkt
+
+def is_ipv6_tcp_pkt(pkt):
+	return IPv6 in pkt and TCP in pkt
 
 def is_tcp_pkt(pkt):
 	return TCP in pkt
@@ -50,7 +56,7 @@ def is_tcp_pkt(pkt):
 def is_tcp_vip_src_pkt(pkt):
 	return TCP in pkt and pkt[IP].src == vip_vip
 
-def is_icmpv6echo_pkt(pkt):
+def is_icmpv6echo_reply_pkt(pkt):
 	return ICMPv6EchoReply in pkt
 
 def is_encaped_icmpv6_pkt(pkt):

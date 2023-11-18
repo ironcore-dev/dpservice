@@ -98,6 +98,8 @@ class DpService:
 		grpc_client.addroute(vni1, neigh_vni1_ov_ipv6_route, 0, neigh_vni1_ul_ipv6)
 		grpc_client.addroute(vni1, "0.0.0.0/0", vni1, router_ul_ipv6)
 		grpc_client.addroute(vni2, "0.0.0.0/0", vni2, router_ul_ipv6)
+		grpc_client.addroute(vni1, "::/0", vni1, router_ul_ipv6)
+		grpc_client.addroute(vni2, "::/0", vni2, router_ul_ipv6)
 
 	def attach(self, grpc_client):
 		VM1.ul_ipv6 = grpc_client.getinterface(VM1.name)['underlay_route']

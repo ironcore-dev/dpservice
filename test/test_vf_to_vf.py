@@ -100,3 +100,40 @@ def test_vf_to_vf_icmp(prepare_ipv4, grpc_client):
 
 	delayed_sendp(icmp_pkt, VM1.tap)
 	sniff_packet(VM1.tap, is_icmp_pkt)
+
+def vf_to_vf_icmpv6_responder(vf_tap):
+	pkt = sniff_packet(vf_tap, is_icmpv6_echo_pkt)
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) / IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=58) / ICMPv6EchoReply(type=129))
+	delayed_sendp(reply_pkt, vf_tap)
+	pkt = sniff_packet(vf_tap, is_icmpv6_echo_pkt)
+	delayed_sendp(reply_pkt, vf_tap)
+
+# send icmpv6 packet from vm1 to vm2, vm2 replies back, for twice
+def test_vf_to_vf_icmpv6(prepare_ipv4, grpc_client):
+	icmpv6_respond_thread = threading.Thread(target=vf_to_vf_icmpv6_responder, args=(VM2.tap,))
+	icmpv6_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x86DD) / IPv6(dst=VM2.ipv6, src=VM1.ipv6, nh=58) / ICMPv6EchoRequest())
+	icmpv6_respond_thread.start()
+	delayed_sendp(icmpv6_pkt, VM1.tap)
+	sniff_packet(VM1.tap, is_icmpv6echo_reply_pkt)
+
+	delayed_sendp(icmpv6_pkt, VM1.tap)
+	sniff_packet(VM1.tap, is_icmpv6echo_reply_pkt)
+
+def vf_to_vf_ipv6_tcp_responder(vf_tap):
+	pkt = sniff_packet(vf_tap, is_ipv6_tcp_pkt)
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst) /
+				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
+	delayed_sendp(reply_pkt, vf_tap)
+
+
+def test_vf_to_vf_ipv6_tcp(prepare_ipv4, grpc_client):
+
+	threading.Thread(target=vf_to_vf_ipv6_tcp_responder, args=(VM2.tap,)).start()
+
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x86DD) /
+			   IPv6(dst=VM2.ipv6, src=VM1.ipv6) /
+			   TCP(dport=1234))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	sniff_packet(VM1.tap, is_ipv6_tcp_pkt)
