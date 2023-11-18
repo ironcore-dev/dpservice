@@ -11,11 +11,9 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_iface.h"
 #include "nodes/common_node.h"
-#include "protocols/dp_dhcpv6.h"
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(IPV6_LOOKUP_NEXT_DHCPV6, "dhcpv6") \
 	NEXT(IPV6_LOOKUP_NEXT_FIREWALL, "firewall")
 DP_NODE_REGISTER_NOINIT(IPV6_LOOKUP, ipv6_lookup, NEXT_NODES);
 
@@ -23,24 +21,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	struct dp_iface_route route;
 	const struct dp_port *in_port = dp_get_in_port(m);
 	const struct dp_port *out_port;
 	int t_vni;
 
-	dp_extract_ipv6_header(df, ipv6_hdr);
-
-	if (DP_FAILED(dp_extract_l4_header(df, ipv6_hdr + 1)))
-		return IPV6_LOOKUP_NEXT_DROP;
-
-	// TODO: add broadcast routes when machine is added
-	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
-		return IPV6_LOOKUP_NEXT_DHCPV6;
-
 	t_vni = in_port->is_pf ? df->tun_info.dst_vni : 0;
 
-	out_port = dp_get_ip6_out_port(in_port, t_vni, ipv6_hdr, &route);
+	out_port = dp_get_ip6_out_port(in_port, t_vni, df, &route);
 	if (!out_port)
 		return IPV6_LOOKUP_NEXT_DROP;
 

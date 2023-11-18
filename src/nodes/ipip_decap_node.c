@@ -12,8 +12,7 @@
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(IPIP_DECAP_NEXT_IPV4_CONNTRACK, "conntrack") \
-	NEXT(IPIP_DECAP_NEXT_IPV6_LOOKUP, "ipv6_lookup")
+	NEXT(IPIP_DECAP_NEXT_CONNTRACK, "conntrack")
 DP_NODE_REGISTER_NOINIT(IPIP_DECAP, ipip_decap, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
@@ -40,11 +39,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	switch (df->tun_info.proto_id) {
 	case DP_IP_PROTO_IPv4_ENCAP:
 		l3_type = RTE_PTYPE_L3_IPV4;
-		next_node = IPIP_DECAP_NEXT_IPV4_CONNTRACK;
+		next_node = IPIP_DECAP_NEXT_CONNTRACK;
 		break;
 	case DP_IP_PROTO_IPv6_ENCAP:
 		l3_type = RTE_PTYPE_L3_IPV6;
-		next_node = IPIP_DECAP_NEXT_IPV6_LOOKUP;
+		next_node = IPIP_DECAP_NEXT_CONNTRACK;
 		break;
 	default:
 		return IPIP_DECAP_NEXT_DROP;
@@ -66,6 +65,6 @@ static uint16_t ipip_decap_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPIP_DECAP_NEXT_IPV4_CONNTRACK, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPIP_DECAP_NEXT_CONNTRACK, get_next_index);
 	return nb_objs;
 }

@@ -80,6 +80,7 @@ struct flow_key {
 		uint16_t type_src; /* ICMP */
 	} src;
 	uint32_t vni;
+	uint16_t l3_type;
 	uint8_t  proto;
 	enum dp_vnf_type vnf_type;
 } __rte_packed;
@@ -133,7 +134,7 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val);
 int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val);
 void dp_delete_flow(const struct flow_key *key);
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
-void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
+void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */);
 int dp_flow_init(int socket_id);
 void dp_flow_free(void);
 void dp_process_aged_flows(uint16_t port_id);

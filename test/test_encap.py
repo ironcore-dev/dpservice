@@ -56,6 +56,6 @@ def test_ipv6_in_ipv6(prepare_ifaces, port_redundancy):
 					 ICMPv6EchoRequest())
 	delayed_sendp(icmp_echo_pkt, VM1.tap)
 
-	pkt = sniff_packet(VM1.tap, is_icmpv6echo_pkt)
+	pkt = sniff_packet(VM1.tap, is_icmpv6echo_reply_pkt)
 	assert pkt[ICMPv6EchoReply].type == 129, \
 		"Bad ECHOv6 reply"

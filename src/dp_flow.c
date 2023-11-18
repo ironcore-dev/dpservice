@@ -14,6 +14,7 @@
 #include "dp_vnf.h"
 #include "dp_refcount.h"
 #include "dp_mbuf_dyn.h"
+#include "protocols/dp_icmpv6.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "dp_timers.h"
 #include "dp_error.h"
@@ -23,12 +24,22 @@
 // TODO(Tao?): this debug logging should be removed once the code stabilizes as it does happen quite often in the critical path
 // As this is really specific to this module **and** is calling a function,
 // this is a locally-defined macro for now (macro to preserve call-stack in logging)
-#define DP_LOG_FLOW_KEY(KEY) \
+#define DP_LOG_FLOW_KEY4(KEY) \
 	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
 	DP_LOG_PROTO((KEY)->proto), \
 	DP_LOG_VNI((KEY)->vni), \
 	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
-	DP_LOG_SRC_IPV4((KEY)->l3_src.ip4), DP_LOG_DST_IPV4((KEY)->l3_dst.ip4), \
+	DP_LOG_SRC_IPV4((KEY)->l3_src.ip4), \
+	DP_LOG_DST_IPV4((KEY)->l3_dst.ip4), \
+	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
+
+#define DP_LOG_FLOW_KEY6(KEY) \
+	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
+	DP_LOG_PROTO((KEY)->proto), \
+	DP_LOG_VNI((KEY)->vni), \
+	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
+	DP_LOG_SRC_IPV6((KEY)->l3_src.ip6), \
+	DP_LOG_DST_IPV6((KEY)->l3_dst.ip6), \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
@@ -125,9 +136,23 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	int ret = DP_OK;
 
 	memset(key, 0, sizeof(struct flow_key));
+	key->l3_type = df->l3_type;
 
-	key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
-	key->l3_src.ip4 = ntohl(df->src.src_addr);
+	switch (df->l3_type)
+	{
+	case RTE_ETHER_TYPE_IPV4:
+		key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
+		key->l3_src.ip4 = ntohl(df->src.src_addr);
+		break;
+	case RTE_ETHER_TYPE_IPV6:
+		rte_memcpy(key->l3_dst.ip6, df->dst.dst_addr6, sizeof(key->l3_dst.ip6));
+		rte_memcpy(key->l3_src.ip6, df->src.src_addr6, sizeof(key->l3_src.ip6));
+		break;
+	default:
+		key->l3_dst.ip4 = 0;
+		key->l3_src.ip4 = 0;
+		break;
+	}
 
 	key->proto = df->l4_type;
 
@@ -150,6 +175,10 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	case IPPROTO_ICMP:
 		ret = dp_build_icmp_flow_key(df, key, m);
 		break;
+	case IPPROTO_ICMPV6:
+		key->port_dst = ntohs(df->l4_info.icmp_field.icmp_identifier);
+		key->src.type_src = df->l4_info.icmp_field.icmp_type;
+		return DP_OK;
 	default:
 		key->port_dst = 0;
 		key->src.port_src = 0;
@@ -159,13 +188,19 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	return ret;
 }
 
-void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
+void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */)
 {
-	inv_key->l3_src.ip4 = key->l3_dst.ip4;
-	inv_key->l3_dst.ip4 = key->l3_src.ip4;
+	if (l3_type == RTE_ETHER_TYPE_IPV4) {
+		inv_key->l3_src.ip4 = key->l3_dst.ip4;
+		inv_key->l3_dst.ip4 = key->l3_src.ip4;
+	} else {
+		rte_memcpy(inv_key->l3_src.ip6, key->l3_dst.ip6, sizeof(inv_key->l3_src.ip6));
+		rte_memcpy(inv_key->l3_dst.ip6, key->l3_src.ip6, sizeof(inv_key->l3_dst.ip6));
+	}
 	inv_key->vni = key->vni;
 	inv_key->vnf_type = key->vnf_type;
 	inv_key->proto = key->proto;
+	inv_key->l3_type = key->l3_type;
 
 	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
 		inv_key->src.port_src = key->port_dst;
@@ -176,6 +211,14 @@ void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *in
 			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
 		else if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
 			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
+		else
+			inv_key->src.type_src = 0;
+	} else if (key->proto == IPPROTO_ICMPV6) {
+		inv_key->port_dst = key->port_dst;
+		if (key->src.type_src == DP_ICMPV6_ECHO_REPLY)
+			inv_key->src.type_src = DP_ICMPV6_ECHO_REQUEST;
+		else if (key->src.type_src == DP_ICMPV6_ECHO_REQUEST)
+			inv_key->src.type_src = DP_ICMPV6_ECHO_REPLY;
 		else
 			inv_key->src.type_src = 0;
 	} else {
@@ -191,13 +234,18 @@ static void dp_delete_flow_no_flush(const struct flow_key *key)
 	ret = rte_hash_del_key(ipv4_flow_tbl, key);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
-			DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY(key));
+			if (key->l3_type == RTE_ETHER_TYPE_IPV4)
+				DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY4(key));
+			else
+				DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY6(key));
 		else
 			DPS_LOG_ERR("Cannot delete key from flow table", DP_LOG_RET(ret));
 		return;
 	}
-
-	DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY(key));
+	if (key->l3_type == RTE_ETHER_TYPE_IPV4)
+		DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY4(key));
+	else
+		DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY6(key));
 }
 
 void dp_delete_flow(const struct flow_key *key)
@@ -225,9 +273,15 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 
 #ifdef ENABLE_PYTEST
 	if (DP_FAILED(ret))
-		DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY(key));
+		if (key->l3_type == RTE_ETHER_TYPE_IPV4)
+			DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY4(key));
+		else
+			DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY6(key));
 	else
-		DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY(key));
+		if (key->l3_type == RTE_ETHER_TYPE_IPV4)
+			DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY4(key));
+		else
+			DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY6(key));
 #endif
 	return ret;
 }

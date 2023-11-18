@@ -28,7 +28,6 @@
 	NEXT(CLS_NEXT_IPV6_ND, "ipv6_nd") \
 	NEXT(CLS_NEXT_CONNTRACK, "conntrack") \
 	NEXT(CLS_NEXT_IPIP_DECAP, "ipip_decap") \
-	NEXT(CLS_NEXT_IPV6_LOOKUP, "ipv6_lookup") \
 	VIRTSVC_NEXT(NEXT)
 
 #ifdef ENABLE_VIRTSVC
@@ -191,7 +190,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				break;
 			default:
 				df->l3_type = ntohs(ether_hdr->ether_type);
-				return CLS_NEXT_IPV6_LOOKUP;
+				return CLS_NEXT_CONNTRACK;
 			}
 			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
 			dp_extract_underlay_header(df, ipv6_hdr);
@@ -200,7 +199,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			if (is_ipv6_nd(ipv6_hdr))
 				return CLS_NEXT_IPV6_ND;
 			df->l3_type = ntohs(ether_hdr->ether_type);
-			return CLS_NEXT_IPV6_LOOKUP;
+			return CLS_NEXT_CONNTRACK;
 		}
 	}
 

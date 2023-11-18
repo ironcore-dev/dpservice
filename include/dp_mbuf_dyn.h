@@ -166,13 +166,10 @@ static __rte_always_inline int dp_extract_l4_header(struct dp_flow *df, const vo
 		df->l4_info.trans_port.dst_port = ((const struct rte_udp_hdr *)l4_hdr)->dst_port;
 		df->l4_info.trans_port.src_port = ((const struct rte_udp_hdr *)l4_hdr)->src_port;
 		return DP_OK;
-	} else if (df->l4_type == IPPROTO_ICMP) {
+	} else if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6) {
 		df->l4_info.icmp_field.icmp_type = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_type;
 		df->l4_info.icmp_field.icmp_code = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_code;
 		df->l4_info.icmp_field.icmp_identifier = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_ident;
-		return DP_OK;
-	} else if (df->l4_type == IPPROTO_ICMPV6) {
-		df->l4_info.icmp_field.icmp_type = ((const struct rte_icmp_hdr *)l4_hdr)->icmp_type;
 		return DP_OK;
 	}
 

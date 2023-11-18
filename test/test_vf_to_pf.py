@@ -185,3 +185,22 @@ def test_vf_to_pf_firewall_tcp_allow(prepare_ipv4, grpc_client, port_redundancy)
 	assert sniff_tcp_data["pkt"] != None, \
 		"Packet should not have been filtered"
 	grpc_client.delfwallrule(VM1.name, "fw1-vm1")
+
+def encaped_tcp_ipv6_in_ipv6_responder(pf_name):
+	pkt = sniff_packet(pf_name, is_ipv6_tcp_pkt)
+	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst, type=0x86DD) /
+				 IPv6(dst=pkt.getlayer(IPv6,1).src, src=pkt.getlayer(IPv6,1).dst, nh=0x29) /
+				 IPv6(dst=pkt.getlayer(IPv6,2).src, src=pkt.getlayer(IPv6,2).dst) /
+				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
+	delayed_sendp(reply_pkt, pf_name)
+
+def test_vf_to_pf_tcp_in_ipv6(prepare_ipv4, grpc_client):
+	threading.Thread(target=encaped_tcp_ipv6_in_ipv6_responder, args=(PF0.tap,)).start()
+	# vm2 (vf1) -> PF0 (ipv6 internet traffic), PF0 replies back
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM2.mac, type=0x86DD) /
+			   IPv6(dst=public_ipv6, src=VM2.ipv6) /
+			   TCP(sport=1240, dport=180))
+	delayed_sendp(tcp_pkt, VM2.tap)
+	pkt = sniff_packet(VM2.tap, is_tcp_pkt)
+	assert pkt[TCP].dport == 1240, \
+		f"Received wrong dport in packet: {pkt[TCP].dport}"
