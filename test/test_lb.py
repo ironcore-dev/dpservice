@@ -172,3 +172,39 @@ def test_external_lb_icmp_error_relay(prepare_ipv4, grpc_client):
 
 	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
 	grpc_client.dellb(lb_name)
+
+def test_network_lb_external_icmpv6_echo(prepare_ipv4, grpc_client):
+
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/443")
+
+	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
+				IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6, nh=0x29) /
+				IPv6(dst=lb_ip6, src=public_ipv6, nh=58) /
+				ICMPv6EchoRequest())
+	answer = srp1(icmp_pkt, iface=PF0.tap, timeout=sniff_timeout)
+	validate_checksums(answer)
+	assert answer and is_icmpv6echo_reply_pkt(answer), \
+		"No ECHO reply"
+
+	grpc_client.dellb(lb_name)
+
+def send_bounce_ipv6_pkt_to_pf(ipv6_lb):
+	bounce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
+				 IPv6(dst=ipv6_lb, src=local_ul_ipv6, nh=0x29) /
+				 IPv6(dst=lb_ip6, src=public_ipv6) /
+				 TCP(sport=8989, dport=8080))
+	delayed_sendp(bounce_pkt, PF0.tap)
+
+def test_external_lb_relay(prepare_ipv4, grpc_client):
+
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/8080")
+	grpc_client.addlbtarget(lb_name, neigh_ul_ipv6)
+
+
+	threading.Thread(target=send_bounce_ipv6_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_ipv6_tcp_pkt, skip=1)
+
+	dst_ip = pkt.getlayer(IPv6,1).dst
+	assert dst_ip == neigh_ul_ipv6, \
+		f"Wrong network-lb relayed packet (outer dst ipv6: {dst_ip})"
+	grpc_client.dellb(lb_name)

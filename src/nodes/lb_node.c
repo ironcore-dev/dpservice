@@ -11,6 +11,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "dp_vnf.h"
+#include "protocols/dp_icmpv6.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -36,25 +37,25 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
-	struct flow_key *flow_key;
 	uint32_t dst_ip, vni;
 	uint8_t *target_ip6;
 
 	if (!cntrack)
 		return LB_NEXT_DNAT;
 
-	dst_ip = ntohl(df->dst.dst_addr);
 	vni = df->tun_info.dst_vni;
 	if (vni == 0)
 		vni = dp_get_in_port(m)->iface.vni;
 
 	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags)
 		&& df->flow_dir == DP_FLOW_DIR_ORG
-		&& dp_is_ip_lb(dst_ip, vni)
+		&& dp_is_ip_lb(df, vni)
 	) {
-		if (df->l4_type == IPPROTO_ICMP) {
+		if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6) {
 			/* Directly answer echo replies of loadbalanced IP, do not forward */
-			if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+			if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST
+			    || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST
+			) {
 				df->nat_type = DP_CHG_UL_DST_IP;
 				return LB_NEXT_PACKET_RELAY;
 			}
@@ -63,8 +64,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				return LB_NEXT_DROP;
 		}
 
-		flow_key = &cntrack->flow_key[DP_FLOW_DIR_ORG];
-		target_ip6 = dp_lb_get_backend_ip(dst_ip, vni, htons(flow_key->port_dst), flow_key->proto);
+		target_ip6 = dp_lb_get_backend_ip(&cntrack->flow_key[DP_FLOW_DIR_ORG], vni);
 		if (!target_ip6)
 			return LB_NEXT_DROP;
 

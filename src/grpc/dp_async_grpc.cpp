@@ -756,11 +756,14 @@ void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 
 	reply_.set_vni(reply->lb.vni);
 	lb_ip = new IpAddress();
-	lb_ip->set_address(GrpcConv::Ipv4ToStr(reply->lb.addr.ipv4));
-	if (reply->lb.addr.ip_type == RTE_ETHER_TYPE_IPV4)
+	if (reply->lb.addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		lb_ip->set_ipver(IpVersion::IPV4);
-	else
+		lb_ip->set_address(GrpcConv::Ipv4ToStr(reply->lb.addr.ipv4));
+	} else {
 		lb_ip->set_ipver(IpVersion::IPV6);
+		inet_ntop(AF_INET6, reply->lb.addr.ipv6, strbuf, sizeof(strbuf));
+		lb_ip->set_address(strbuf);
+	}
 	reply_.set_allocated_loadbalanced_ip(lb_ip);
 	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
 		if (reply->lb.lbports[i].port == 0)

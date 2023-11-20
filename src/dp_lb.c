@@ -65,10 +65,16 @@ static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, stru
 int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
-	struct lb_key nkey = {
-		.ip = lb->addr.ipv4,
-		.vni = lb->vni
-	};
+	struct lb_key nkey;
+
+	memset(&nkey, 0, sizeof(nkey));
+	nkey.vni = lb->vni;
+	nkey.ip_type = lb->addr.ip_type;
+
+	if (lb->addr.ip_type == RTE_ETHER_TYPE_IPV4)
+		nkey.ip.v4 = lb->addr.ipv4;
+	else
+		rte_memcpy(nkey.ip.v6, lb->addr.ipv6, sizeof(nkey.ip.v6));
 
 	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
@@ -109,8 +115,11 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	out_lb->vni = lb_k->vni;
-	out_lb->addr.ip_type = RTE_ETHER_TYPE_IPV4;
-	out_lb->addr.ipv4 = lb_k->ip;
+	out_lb->addr.ip_type = lb_k->ip_type;
+	if (lb_k->ip_type == RTE_ETHER_TYPE_IPV4)
+		out_lb->addr.ipv4 = lb_k->ip.v4;
+	else
+		rte_memcpy(out_lb->addr.ipv6, lb_k->ip.v6, sizeof(out_lb->addr.ipv6));
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
@@ -153,12 +162,18 @@ bool dp_is_lb_enabled(void)
 	return rte_hash_count(ipv4_lb_tbl) > 0;
 }
 
-bool dp_is_ip_lb(uint32_t ol_ip, uint32_t vni)
+bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 {
-	struct lb_key nkey = {
-		.ip = ol_ip,
-		.vni = vni
-	};
+	struct lb_key nkey;
+
+	memset(&nkey, 0, sizeof(nkey));
+	nkey.vni = vni;
+	nkey.ip_type = df->l3_type;
+
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
+		nkey.ip.v4 = ntohl(df->dst.dst_addr);
+	else
+		rte_memcpy(nkey.ip.v6, df->dst.dst_addr6, sizeof(nkey.ip.v6));
 
 	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey));
 }
@@ -226,15 +241,21 @@ static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
 	return ret;
 }
 
-uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uint8_t proto)
+uint8_t *dp_lb_get_backend_ip(struct flow_key *fkey, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
-	struct lb_key nkey = {
-		.ip = ol_ip,
-		.vni = vni
-	};
 	struct lb_port lb_port;
+	struct lb_key nkey;
 	int pos;
+
+	memset(&nkey, 0, sizeof(nkey));
+	nkey.vni = vni;
+	nkey.ip_type = fkey->l3_type;
+
+	if (fkey->l3_type == RTE_ETHER_TYPE_IPV4)
+		nkey.ip.v4 = fkey->l3_dst.ip4;
+	else
+		rte_memcpy(nkey.ip.v6, fkey->l3_dst.ip6, sizeof(nkey.ip.v6));
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
 		return NULL;
@@ -243,8 +264,8 @@ uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uin
 	   This doesn't distribute the load evenly.
 	   Use maglev hashing and 5 Tuple fkey for
 	   backend selection */
-	lb_port.port = port;
-	lb_port.protocol = proto;
+	lb_port.port = htons(fkey->port_dst);
+	lb_port.protocol = fkey->proto;
 	pos = dp_lb_rr_backend(lb_val, &lb_port);
 	if (pos < 0)
 		return NULL;
