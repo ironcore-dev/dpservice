@@ -52,6 +52,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return CONNTRACK_NEXT_DROP;
 	}
 
+	// VFs packets have no VNF information (no tunnel/underlay)
 	if (!dp_get_in_port(m)->is_pf)
 		return CONNTRACK_NEXT_DNAT;
 
@@ -65,9 +66,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	case DP_VNF_TYPE_INTERFACE_IP:
 	case DP_VNF_TYPE_ALIAS_PFX:
 		return CONNTRACK_NEXT_FIREWALL;
-	default:
-		return CONNTRACK_NEXT_LB;
+	case DP_VNF_TYPE_UNDEFINED:
+		return CONNTRACK_NEXT_DROP;
 	}
+
+	return CONNTRACK_NEXT_DROP;
 }
 
 static uint16_t conntrack_node_process(struct rte_graph *graph,
