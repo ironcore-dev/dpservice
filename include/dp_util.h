@@ -21,6 +21,7 @@ extern "C" {
 #define DP_IFACE_PXE_MAX_LEN	32
 #define DP_LB_ID_MAX_LEN		64
 #define DP_LB_MAX_PORTS			16
+#define DP_IPV6_ADDR_SIZE		16
 
 #define DP_MAC_EQUAL(mac1, mac2) (((mac1)->addr_bytes[0] == (mac2)->addr_bytes[0]) && \
 								((mac1)->addr_bytes[1] == (mac2)->addr_bytes[1]) && \

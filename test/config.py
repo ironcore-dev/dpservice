@@ -75,6 +75,7 @@ nat_neigh_max_port = 520
 lb_name = "my_lb"
 lb_ip = "172.22.2.1"
 pfx_ip = "172.23.3.0"
+lb_ip6 = "2a10:defe:e01f:f4::2"
 
 # Virtual services functionality
 virtsvc_udp_svc_ipv6 = "2a00:da8:fff6::1"

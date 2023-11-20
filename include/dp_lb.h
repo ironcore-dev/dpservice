@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+#include "dp_flow.h"
 #include "grpc/dp_grpc_responder.h"
 
 #define DP_LB_TABLE_MAX			256
@@ -19,7 +20,11 @@ extern "C" {
 #define DP_LB_DLB	3
 
 struct lb_key {
-	uint32_t	ip;
+	union {
+		uint32_t	v4;
+		uint8_t		v6[16];
+	} ip;
+	uint32_t	ip_type;
 	uint32_t	vni;
 } __rte_packed;
 
@@ -39,9 +44,8 @@ struct lb_value {
 
 int dp_lb_init(int socket_id);
 void dp_lb_free(void);
-bool dp_is_ip_lb(uint32_t ol_ip, uint32_t vni);
-uint32_t dp_get_lb_ip(uint32_t ol_ip, uint32_t vni);
-uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uint8_t proto);
+bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni);
+uint8_t *dp_lb_get_backend_ip(struct flow_key *fkey, uint32_t vni);
 bool dp_is_lb_enabled(void);
 int dp_del_lb_back_ip(const void *id_key, const uint8_t *back_ip);
 int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip, uint8_t ip_size);

@@ -73,7 +73,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int ret = DP_GRPC_OK;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4 || request->addr.ip_type == RTE_ETHER_TYPE_IPV6) {
 		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), 0, 0))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;

@@ -7,6 +7,8 @@
 #include <rte_mbuf.h>
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
+#include "dp_util.h"
+#include "protocols/dp_icmpv6.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
@@ -44,6 +46,29 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	return PACKET_RELAY_NEXT_IPIP_ENCAP;
 }
 
+static __rte_always_inline rte_edge_t lb_nnat_icmpv6_reply(struct dp_flow *df, struct rte_mbuf *m)
+{
+	struct rte_ipv6_hdr *ipv6_hdr = dp_get_ipv6_hdr(m);
+	struct rte_icmp_hdr *icmp6_hdr = (struct rte_icmp_hdr *)(ipv6_hdr + 1);
+	uint8_t temp_addr[DP_IPV6_ADDR_SIZE];
+
+	if (icmp6_hdr->icmp_type != DP_ICMPV6_ECHO_REQUEST)
+		return PACKET_RELAY_NEXT_DROP;
+
+	icmp6_hdr->icmp_type = DP_ICMPV6_ECHO_REPLY;
+
+	icmp6_hdr->icmp_cksum = 0;
+	icmp6_hdr->icmp_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp6_hdr);
+
+	rte_memcpy(temp_addr, ipv6_hdr->dst_addr, DP_IPV6_ADDR_SIZE);
+	rte_memcpy(ipv6_hdr->dst_addr, ipv6_hdr->src_addr, DP_IPV6_ADDR_SIZE);
+	rte_memcpy(ipv6_hdr->src_addr, temp_addr, DP_IPV6_ADDR_SIZE);
+
+	df->nxt_hop = m->port;
+	memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
+
+	return PACKET_RELAY_NEXT_IPIP_ENCAP;
+}
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -61,8 +86,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return PACKET_RELAY_NEXT_IPIP_ENCAP;
 	}
 
-	if (df->l4_type == DP_IP_PROTO_ICMP)
+	if (df->l4_type == IPPROTO_ICMP)
 		return lb_nnat_icmp_reply(df, m);
+
+	if (df->l4_type == IPPROTO_ICMPV6)
+		return lb_nnat_icmpv6_reply(df, m);
 
 	return PACKET_RELAY_NEXT_DROP;
 }
