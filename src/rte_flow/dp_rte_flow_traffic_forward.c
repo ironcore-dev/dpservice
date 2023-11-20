@@ -276,7 +276,7 @@ int dp_offload_handle_tunnel_encap_traffic(struct dp_flow *df,
 	}
 
 	// replace source ip if vip-nat/network-nat is enabled
-	if (df->flags.nat == DP_NAT_CHG_SRC_IP) {
+	if (df->nat_type == DP_NAT_CHG_SRC_IP) {
 		dp_set_ipv4_set_src_action(&actions[action_cnt++], &set_ipv4, df->nat_addr);
 		// also replace source port if network-nat is enabled
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
@@ -396,7 +396,7 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
-		actual_ol_ipv4_addr = df->flags.nat == DP_NAT_CHG_DST_IP
+		actual_ol_ipv4_addr = df->nat_type == DP_NAT_CHG_DST_IP
 								? df->nat_addr
 								: df->dst.dst_addr;
 		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, actual_ol_ipv4_addr, df->l4_type);
@@ -436,7 +436,7 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 	dp_set_raw_encap_action(&actions[action_cnt++], &raw_encap, (uint8_t *)&new_eth_hdr, sizeof(new_eth_hdr));
 
 	// replace dst ip if VIP/NAT enabled
-	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
+	if (df->nat_type == DP_NAT_CHG_DST_IP) {
 		dp_set_ipv4_set_dst_action(&actions[action_cnt++], &set_ipv4, df->dst.dst_addr);
 		// also replace dst port if NAT enabled
 		if (df->conntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL)
@@ -528,7 +528,7 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
-		actual_ol_ipv4_dst_addr = df->flags.nat == DP_NAT_CHG_DST_IP
+		actual_ol_ipv4_dst_addr = df->nat_type == DP_NAT_CHG_DST_IP
 									? df->nat_addr
 									: df->dst.dst_addr;
 		dp_set_ipv4_src_dst_flow_item(&pattern[pattern_cnt++],
@@ -548,9 +548,9 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 	dp_set_src_mac_set_action(&actions[action_cnt++], &set_src_mac, &outgoing_port->own_mac);
 
 	// replace IPv4 address in overlay if VIP/NAT enabled
-	if (df->flags.nat == DP_NAT_CHG_DST_IP) {
+	if (df->nat_type == DP_NAT_CHG_DST_IP) {
 		dp_set_ipv4_set_dst_action(&actions[action_cnt++], &set_ipv4, df->dst.dst_addr);
-	} else if (df->flags.nat == DP_NAT_CHG_SRC_IP) {
+	} else if (df->nat_type == DP_NAT_CHG_SRC_IP) {
 		// there should be more strict condition to only apply to VIP nat pkt
 		dp_set_ipv4_set_src_action(&actions[action_cnt++], &set_ipv4, df->nat_addr);
 	}

@@ -5,8 +5,8 @@
 #include <rte_common.h>
 #include <rte_flow.h>
 #include <rte_atomic.h>
+#include "dpdk_layer.h"
 #include "dp_error.h"
-#include "dp_flow.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
@@ -18,15 +18,39 @@
 extern "C" {
 #endif
 
+enum dp_flow_type {
+	DP_FLOW_WEST_EAST,
+	DP_FLOW_SOUTH_NORTH,
+} __rte_packed;
+
+enum dp_flow_offload_state {
+	DP_FLOW_NON_OFFLOAD,
+	DP_FLOW_OFFLOAD_INSTALL,
+	DP_FLOW_OFFLOADED,
+} __rte_packed;
+
+enum dp_flow_dir {
+	DP_FLOW_DIR_ORG,
+	DP_FLOW_DIR_REPLY,
+} __rte_packed;
+#define DP_FLOW_DIR_CAPACITY 2
+
+enum dp_nat_type {
+	DP_NAT_CHG_NONE,
+	DP_NAT_CHG_SRC_IP,
+	DP_NAT_CHG_DST_IP,
+	DP_CHG_UL_DST_IP,
+	DP_LB_RECIRC,
+} __rte_packed;
+
 struct dp_flow {
-	struct {
-		uint16_t	public_flow : 1;
-		uint16_t	overlay_type : 1;		// supported overlay type
-		uint16_t	nat : 3;
-		uint16_t	offload_ipv6 : 1;		// tmp solution to set if we should offload ipv6 pkts
-		uint16_t	dir : 2;				// store the direction of each packet
-		uint16_t	offload_decision : 2;	// store the offload status of each packet
-	} flags;
+	enum dp_flow_type			flow_type : 1;
+	enum dp_nat_type			nat_type : 3;
+	bool						offload_ipv6 : 1;	// tmp solution to set if we should offload ipv6 pkts
+	enum dp_flow_dir			flow_dir : 1;		// store the direction of each packet
+	enum dp_flow_offload_state	offload_state : 2;	// store the offload status of each packet
+	enum dp_vnf_type			vnf_type : 3;
+
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	union {
 		rte_be32_t	dst_addr;
@@ -38,6 +62,8 @@ struct dp_flow {
 	} src;
 	rte_be32_t	nat_addr;
 	uint16_t	nat_port;
+
+	uint8_t		nxt_hop;
 
 	uint8_t					l4_type;
 	union {
@@ -52,7 +78,7 @@ struct dp_flow {
 		} icmp_field;
 	} l4_info;
 
-	uint32_t		dp_flow_hash;  // TODO: could be brought down to 1-bit as it only chooses PF0/PF1 in ipv4_lookup
+	uint32_t		dp_flow_hash;  // this can be brought down to 1-bit if needed (only chooses PF0/PF1 in ipv4_lookup)
 
 	struct {
 		uint8_t		ul_src_addr6[16];
@@ -61,8 +87,7 @@ struct dp_flow {
 		uint8_t		proto_id;	//proto_id in outer ipv6 header
 		uint32_t	dst_vni;
 	} tun_info;
-	enum dp_vnf_type	vnf_type;
-	uint8_t				nxt_hop;
+
 	struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc	*virtsvc;
@@ -72,7 +97,7 @@ struct dp_flow {
 struct dp_pkt_mark {
 	uint32_t id;
 	struct {
-		uint32_t is_recirc : 1;
+		uint8_t is_recirc : 1;
 	} flags;
 	// check the init function if adding more,
 	// due to this being small, memset has not been used
@@ -82,8 +107,6 @@ static_assert(sizeof(struct dp_flow) + sizeof(struct dp_pkt_mark) <= DP_MBUF_PRI
 			  "packet private data is too big to fit in packet");
 static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORTS,
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
-static_assert(sizeof(((struct dp_flow *)0)->vnf_type) == 1,
-			  "enum dp_vnf_type is unnecessarily big");
 
 extern rte_atomic32_t dp_pkt_id_counter;
 

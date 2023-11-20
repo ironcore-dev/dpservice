@@ -1,5 +1,6 @@
 #include "dp_firewall.h"
 #include <stdbool.h>
+#include <rte_malloc.h>
 #include "dp_error.h"
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"

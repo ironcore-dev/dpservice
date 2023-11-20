@@ -50,7 +50,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
-	df->flags.public_flow = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
+	df->flow_type = route_key == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 	df->nxt_hop = out_port->port_id;  // always valid since coming from struct dp_port
 
 	return IPV4_LOOKUP_NEXT_NAT;

@@ -4,6 +4,7 @@
 #include "dp_graph.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_timers.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_thread.h"
 

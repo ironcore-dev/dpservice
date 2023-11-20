@@ -6,6 +6,7 @@
 #include <rte_flow.h>
 #include <rte_malloc.h>
 #include "dpdk_layer.h"
+#include "dp_firewall.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_refcount.h"
 #include "dp_timers.h"
@@ -41,20 +42,7 @@ extern "C" {
 
 #define DP_IS_FLOW_STATUS_FLAG_NF(flag)		((flag) & DP_FLOW_STATUS_FLAG_NF)
 
-
-enum {
-	DP_FLOW_DIR_ORG,
-	DP_FLOW_DIR_REPLY,
-	DP_FLOW_DIR_CAPACITY,
-};
-
-enum {
-	DP_FLOW_STATE_NEW,
-	DP_FLOW_STATE_ESTABLISHED,
-};
-
-
-enum {
+enum dp_flow_nat_type {
 	DP_FLOW_NAT_TYPE_NONE,
 	DP_FLOW_NAT_TYPE_VIP,
 	DP_FLOW_NAT_TYPE_NETWORK_LOCAL,
@@ -63,12 +51,7 @@ enum {
 	DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC,
 	DP_FLOW_LB_TYPE_RECIRC,
 	DP_FLOW_LB_TYPE_FORWARD,
-};
-
-enum {
-	DP_FLOW_ACTION_UNSPECIFIC,
-	DP_FLOW_ACTION_DROP,
-};
+} __rte_packed;
 
 enum dp_flow_tcp_state {
 	DP_FLOW_TCP_STATE_NONE,
@@ -77,12 +60,6 @@ enum dp_flow_tcp_state {
 	DP_FLOW_TCP_STATE_ESTABLISHED,
 	DP_FLOW_TCP_STATE_FINWAIT,
 	DP_FLOW_TCP_STATE_RST_FIN,
-};
-
-enum dp_flow_offload_state {
-	DP_FLOW_NON_OFFLOAD,
-	DP_FLOW_OFFLOAD_INSTALL,
-	DP_FLOW_OFFLOADED,
 };
 
 struct flow_key {
@@ -103,11 +80,12 @@ static_assert(sizeof(((struct flow_key *)0)->vnf_type) == 1,
 struct flow_nf_info {
 	uint32_t vni;
 	uint16_t icmp_err_ip_cksum;
-	uint8_t nat_type;
+	enum dp_flow_nat_type nat_type;
 	uint8_t underlay_dst[16];
 	uint8_t l4_type;
 } __rte_packed;
-
+static_assert(sizeof(((struct flow_nf_info *)0)->nat_type) == 1,
+			  "enum dp_flow_nat_type is unnecessarily big");
 
 struct flow_value {
 	struct flow_key	flow_key[DP_FLOW_DIR_CAPACITY];
@@ -117,22 +95,20 @@ struct flow_value {
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
 	uint8_t			flow_status; // record if a flow has status associated with it
-	uint8_t			fwall_action[DP_FLOW_DIR_CAPACITY];
+	enum dp_fwall_action	fwall_action[DP_FLOW_DIR_CAPACITY];
 	struct {
-		uint8_t orig : 4;
-		uint8_t reply : 4;
-	} offload_flags;
+		enum dp_flow_offload_state orig;
+		enum dp_flow_offload_state reply;
+	} offload_state;
 	struct {
-		uint8_t pf0 : 4;
-		uint8_t pf1 : 4;
+		bool pf0;
+		bool pf1;
 	} incoming_flow_offloaded_flag;
 	struct dp_ref	ref_count;
 	union {
 		enum dp_flow_tcp_state		tcp_state;
 	} l4_state;
-
-	uint8_t			aged : 2;
-
+	bool			aged;
 };
 
 struct flow_age_ctx {
@@ -141,7 +117,6 @@ struct flow_age_ctx {
 	uint8_t				ref_index_in_cntrack;
 	uint8_t				port_id;
 	struct rte_flow_action_handle *handle;
-
 };
 
 bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2);

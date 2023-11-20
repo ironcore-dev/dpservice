@@ -59,7 +59,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 
-	if (df->flags.nat == DP_LB_RECIRC)
+	if (df->nat_type == DP_LB_RECIRC)
 		// store the original ipv6 dst address in the packet
 		rte_memcpy(ipv6_hdr->src_addr, df->tun_info.ul_src_addr6, sizeof(ipv6_hdr->src_addr));
 	else
@@ -72,7 +72,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	m->ol_flags |= RTE_MBUF_F_TX_OUTER_IPV6;
 	m->ol_flags |= RTE_MBUF_F_TX_TUNNEL_IP;
 
-	if (df->flags.nat == DP_LB_RECIRC) {
+	if (df->nat_type == DP_LB_RECIRC) {
 		dp_get_pkt_mark(m)->flags.is_recirc = true;
 		return IPIP_ENCAP_NEXT_CLS;
 	}

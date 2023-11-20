@@ -15,8 +15,15 @@ extern "C" {
 #define DP_FWALL_MATCH_ANY_PROTOCOL	0
 #define DP_FWALL_MATCH_ANY_LENGTH	0
 
-enum dp_fwall_action { DP_FWALL_DROP, DP_FWALL_ACCEPT };
-enum dp_fwall_direction { DP_FWALL_INGRESS, DP_FWALL_EGRESS };
+enum dp_fwall_action {
+	DP_FWALL_DROP,
+	DP_FWALL_ACCEPT
+};
+
+enum dp_fwall_direction {
+	DP_FWALL_INGRESS,
+	DP_FWALL_EGRESS
+};
 
 TAILQ_HEAD(dp_fwall_head, dp_fwall_rule);
 

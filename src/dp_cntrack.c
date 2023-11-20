@@ -71,9 +71,7 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 			// FIN-states already handled above
 			break;
 		}
-
 	}
-
 }
 
 
@@ -83,11 +81,11 @@ static __rte_always_inline void dp_cntrack_init_flow_offload_flags(struct flow_v
 		return;
 
 	if (df->l4_type != IPPROTO_TCP)
-		flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
+		flow_val->offload_state.orig = DP_FLOW_OFFLOAD_INSTALL;
 	else
-		flow_val->offload_flags.orig = DP_FLOW_NON_OFFLOAD; // offload tcp traffic until it is established
+		flow_val->offload_state.orig = DP_FLOW_NON_OFFLOAD; // offload tcp traffic until it is established
 
-	flow_val->offload_flags.reply = DP_FLOW_NON_OFFLOAD;
+	flow_val->offload_state.reply = DP_FLOW_NON_OFFLOAD;
 }
 
 
@@ -106,26 +104,25 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 			offload_other_pf = !flow_val->incoming_flow_offloaded_flag.pf1;
 	}
 
-	if (df->flags.dir == DP_FLOW_DIR_ORG) {
+	if (df->flow_dir == DP_FLOW_DIR_ORG) {
 		/* Despite the incoming flow is offloaded to one of the pf ports, pkts can arrive on another one */
 		/* So we need to check if the incoming flow is offloaded on the current port, */
 		/* if not, we do another offloading */
-		if (flow_val->offload_flags.orig == DP_FLOW_NON_OFFLOAD || offload_other_pf)
-			flow_val->offload_flags.orig = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.orig == DP_FLOW_OFFLOAD_INSTALL)
-			flow_val->offload_flags.orig = DP_FLOW_OFFLOADED;
+		if (flow_val->offload_state.orig == DP_FLOW_NON_OFFLOAD || offload_other_pf)
+			flow_val->offload_state.orig = DP_FLOW_OFFLOAD_INSTALL;
+		else if (flow_val->offload_state.orig == DP_FLOW_OFFLOAD_INSTALL)
+			flow_val->offload_state.orig = DP_FLOW_OFFLOADED;
 
-	} else if (df->flags.dir == DP_FLOW_DIR_REPLY) {
-		if (flow_val->offload_flags.reply == DP_FLOW_NON_OFFLOAD || offload_other_pf)
-			flow_val->offload_flags.reply = DP_FLOW_OFFLOAD_INSTALL;
-		else if (flow_val->offload_flags.reply == DP_FLOW_OFFLOAD_INSTALL)
-			flow_val->offload_flags.reply = DP_FLOW_OFFLOADED;
+	} else if (df->flow_dir == DP_FLOW_DIR_REPLY) {
+		if (flow_val->offload_state.reply == DP_FLOW_NON_OFFLOAD || offload_other_pf)
+			flow_val->offload_state.reply = DP_FLOW_OFFLOAD_INSTALL;
+		else if (flow_val->offload_state.reply == DP_FLOW_OFFLOAD_INSTALL)
+			flow_val->offload_state.reply = DP_FLOW_OFFLOADED;
 	}
 }
 
 static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
-
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
@@ -139,10 +136,10 @@ static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct rte_mbuf 
 
 static __rte_always_inline void dp_cntrack_set_pkt_offload_decision(struct dp_flow *df)
 {
-	if (df->flags.dir == DP_FLOW_DIR_ORG)
-		df->flags.offload_decision = df->conntrack->offload_flags.orig;
+	if (df->flow_dir == DP_FLOW_DIR_ORG)
+		df->offload_state = df->conntrack->offload_state.orig;
 	else
-		df->flags.offload_decision = df->conntrack->offload_flags.reply;
+		df->offload_state = df->conntrack->offload_state.reply;
 }
 
 static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flow_key *key, struct dp_flow *df, const struct dp_port *port)
@@ -172,7 +169,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	else
 		flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NONE;
 
-	df->flags.dir = DP_FLOW_DIR_ORG;
+	df->flow_dir = DP_FLOW_DIR_ORG;
 
 	dp_cntrack_init_flow_offload_flags(flow_val, df);
 
@@ -206,10 +203,10 @@ error_alloc:
 static __rte_always_inline void dp_set_pkt_flow_direction(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
 {
 	if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_REPLY]))
-		df->flags.dir = DP_FLOW_DIR_REPLY;
+		df->flow_dir = DP_FLOW_DIR_REPLY;
 
 	if (dp_are_flows_identical(key, &flow_val->flow_key[DP_FLOW_DIR_ORG]))
-		df->flags.dir = DP_FLOW_DIR_ORG;
+		df->flow_dir = DP_FLOW_DIR_ORG;
 
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 }

@@ -10,13 +10,9 @@ extern "C"
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_flow.h>
-
+#include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
-#include "dp_mbuf_dyn.h"
-
-#define DP_FLOW_WEST_EAST		0
-#define DP_FLOW_SOUTH_NORTH		1
 
 #define DP_L4_PORT_DIR_SRC 1
 #define DP_L4_PORT_DIR_DST 2

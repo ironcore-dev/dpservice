@@ -52,7 +52,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (dp_conf_is_offload_enabled())
-		df->flags.offload_ipv6 = 1;
+		df->offload_ipv6 = true;
 
 	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
