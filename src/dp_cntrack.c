@@ -166,7 +166,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
 	if (offload_mode_enabled
 		&& !port->is_pf
-		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->ip_dst, 32)
+		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->vni, key->ip_dst, 32)
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;
 	else

@@ -59,7 +59,7 @@ static int dp_create_vnf_route(uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE] /* out */
 							   uint32_t prefix_ip, uint16_t prefix_len)
 {
 	dp_generate_underlay_ipv6(ul_addr6);
-	return dp_add_vnf(ul_addr6, type, vni, port->port_id, prefix_ip, prefix_len);
+	return dp_add_vnf(ul_addr6, type, port->port_id, vni, prefix_ip, prefix_len);
 }
 
 static int dp_process_create_lb(struct dp_grpc_responder *responder)
@@ -350,7 +350,7 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	if (dp_vnf_lbprefix_exists(port->port_id, request->addr.ipv4, request->length))
+	if (dp_vnf_lbprefix_exists(port->port_id, port->iface.vni, request->addr.ipv4, request->length))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, request->addr.ipv4, request->length)))
@@ -373,7 +373,7 @@ static int dp_process_delete_lbprefix(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	return dp_del_vnf_by_value(DP_VNF_TYPE_LB_ALIAS_PFX, port->port_id, request->addr.ipv4, request->length);
+	return dp_del_vnf_by_value(DP_VNF_TYPE_LB_ALIAS_PFX, port->port_id, port->iface.vni, request->addr.ipv4, request->length);
 }
 
 static int dp_process_create_prefix(struct dp_grpc_responder *responder)
@@ -424,7 +424,7 @@ static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	ret2 = dp_del_vnf_by_value(DP_VNF_TYPE_ALIAS_PFX, port->port_id, request->addr.ipv4, request->length);
+	ret2 = dp_del_vnf_by_value(DP_VNF_TYPE_ALIAS_PFX, port->port_id, port->iface.vni, request->addr.ipv4, request->length);
 	return DP_FAILED(ret) ? ret : ret2;
 }
 
