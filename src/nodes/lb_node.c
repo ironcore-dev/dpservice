@@ -45,7 +45,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (vni == 0)
 		vni = dp_get_in_port(m)->iface.vni;
 
-	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status)
+	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags)
 		&& df->flow_dir == DP_FLOW_DIR_ORG
 		&& dp_is_ip_lb(dst_ip, vni)
 	) {
@@ -68,7 +68,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6)); // same trick as in packet_relay_node.c
 		rte_memcpy(df->tun_info.ul_dst_addr6, target_ip6, sizeof(df->tun_info.ul_dst_addr6));
 		rte_memcpy(cntrack->nf_info.underlay_dst, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6));
-		cntrack->flow_status |= DP_FLOW_STATUS_FLAG_DST_LB;
+		cntrack->flow_flags |= DP_FLOW_FLAG_DST_LB;
 		dp_lb_set_next_hop(df, m->port);
 
 		if (df->nat_type != DP_LB_RECIRC) {
@@ -80,14 +80,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return LB_NEXT_IPIP_ENCAP;
 	}
 
-	if (DP_IS_FLOW_STATUS_FLAG_DST_LB(cntrack->flow_status) && df->flow_dir == DP_FLOW_DIR_ORG) {
+	if (DP_FLOW_HAS_FLAG_DST_LB(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));
 		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
 		dp_lb_set_next_hop(df, m->port);
 		return LB_NEXT_IPIP_ENCAP;
 	}
 
-	if (DP_IS_FLOW_STATUS_FLAG_DEFAULT(cntrack->flow_status) && df->l4_type == IPPROTO_ICMP) {
+	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && df->l4_type == IPPROTO_ICMP) {
 		df->nat_type = DP_CHG_UL_DST_IP;
 		return LB_NEXT_PACKET_RELAY;
 	}

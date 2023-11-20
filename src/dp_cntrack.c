@@ -154,7 +154,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	}
 
 	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
-	flow_val->flow_status = DP_FLOW_STATUS_FLAG_NONE;
+	flow_val->flow_flags = DP_FLOW_FLAG_NONE;
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = port->port_id;
 

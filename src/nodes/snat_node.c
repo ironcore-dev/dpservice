@@ -30,7 +30,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!cntrack)
 		return SNAT_NEXT_FIREWALL;
 
-	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flow_dir == DP_FLOW_DIR_ORG) {
+	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		port = dp_get_in_port(m);
 		src_ip = ntohl(df->src.src_addr);
 		vni = port->iface.vni;
@@ -73,7 +73,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			dp_nat_chg_ip(df, ipv4_hdr, m);
 
 			/* Expect the new destination in this conntrack object */
-			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_SRC_NAT;
+			cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst = ntohl(ipv4_hdr->src_addr);
 			if (snat_data->nat_ip != 0)
@@ -88,7 +88,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	/* We already know what to do */
-	if (DP_IS_FLOW_STATUS_FLAG_SRC_NAT(cntrack->flow_status) && df->flow_dir == DP_FLOW_DIR_ORG) {
+	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_dst);
 
@@ -105,7 +105,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		dp_nat_chg_ip(df, ipv4_hdr, m);
 	}
 
-	if ((DP_IS_FLOW_STATUS_FLAG_DST_NAT(cntrack->flow_status) || DP_IS_FLOW_STATUS_FLAG_DST_LB(cntrack->flow_status))
+	if ((DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) || DP_FLOW_HAS_FLAG_DST_LB(cntrack->flow_flags))
 		&& (df->flow_dir == DP_FLOW_DIR_REPLY)) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		df->src.src_addr = ipv4_hdr->src_addr;

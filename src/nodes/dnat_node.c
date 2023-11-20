@@ -28,7 +28,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!cntrack)
 		return DNAT_NEXT_IPV4_LOOKUP;
 
-	if (DP_IS_FLOW_STATUS_FLAG_NONE(cntrack->flow_status) && df->flow_dir == DP_FLOW_DIR_ORG) {
+	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni;
 		if (vni == 0)
@@ -76,7 +76,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			dp_nat_chg_ip(df, ipv4_hdr, m);
 
 			/* Expect the new source in this conntrack object */
-			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_DST_NAT;
+			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src = ntohl(ipv4_hdr->dst_addr);
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
@@ -90,12 +90,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return DNAT_NEXT_PACKET_RELAY;
 	}
 
-	if (DP_IS_FLOW_STATUS_FLAG_DEFAULT(cntrack->flow_status) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
+	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
 		&& df->l4_type == DP_IP_PROTO_ICMP
 		&& df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
 		return DNAT_NEXT_PACKET_RELAY;
 
-	if (DP_IS_FLOW_STATUS_FLAG_DST_NAT(cntrack->flow_status) && df->flow_dir == DP_FLOW_DIR_ORG) {
+	if (DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].ip_src);
 		df->nat_type = DP_NAT_CHG_DST_IP;
@@ -105,7 +105,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	/* We already know what to do */
-	if (DP_IS_FLOW_STATUS_FLAG_SRC_NAT(cntrack->flow_status) && df->flow_dir == DP_FLOW_DIR_REPLY) {
+	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].ip_src);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {

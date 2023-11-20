@@ -97,7 +97,7 @@ struct dp_flow {
 struct dp_pkt_mark {
 	uint32_t id;
 	struct {
-		uint8_t is_recirc : 1;
+		bool is_recirc : 1;
 	} flags;
 	// check the init function if adding more,
 	// due to this being small, memset has not been used

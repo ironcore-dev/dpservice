@@ -17,30 +17,30 @@ extern "C" {
 #endif
 
 // arbitrary big number
-#define FLOW_MAX						850000
+#define DP_FLOW_TABLE_MAX				850000
 
 #define DP_FLOW_VAL_AGE_CTX_CAPACITY	6
 
 #define DP_FLOW_DEFAULT_TIMEOUT			30				/* 30 seconds */
 #define DP_FLOW_TCP_EXTENDED_TIMEOUT	(60 * 60 * 24)	/* 1 day */
 
-#define DP_FLOW_STATUS_FLAG_NONE		0x00
-#define DP_FLOW_STATUS_FLAG_SRC_NAT		0x01
-#define DP_FLOW_STATUS_FLAG_DST_NAT		0x02
-#define DP_FLOW_STATUS_FLAG_DST_LB		0x04
-#define DP_FLOW_STATUS_FLAG_FIREWALL	0x08
-#define DP_FLOW_STATUS_FLAG_DEFAULT		0x10
+#define DP_FLOW_FLAG_NONE				0x00
+#define DP_FLOW_FLAG_SRC_NAT			0x01
+#define DP_FLOW_FLAG_DST_NAT			0x02
+#define DP_FLOW_FLAG_DST_LB				0x04
+#define DP_FLOW_FLAG_FIREWALL			0x08
+#define DP_FLOW_FLAG_DEFAULT			0x10
 
-#define DP_FLOW_STATUS_FLAG_NF			(DP_FLOW_STATUS_FLAG_SRC_NAT | DP_FLOW_STATUS_FLAG_DST_NAT | DP_FLOW_STATUS_FLAG_DST_LB)
+#define DP_FLOW_FLAG_NF					(DP_FLOW_FLAG_SRC_NAT | DP_FLOW_FLAG_DST_NAT | DP_FLOW_FLAG_DST_LB)
 
-#define DP_IS_FLOW_STATUS_FLAG_NONE(flag)		(!(flag))
-#define DP_IS_FLOW_STATUS_FLAG_SRC_NAT(flag)	((flag) & DP_FLOW_STATUS_FLAG_SRC_NAT)
-#define DP_IS_FLOW_STATUS_FLAG_DST_NAT(flag)	((flag) & DP_FLOW_STATUS_FLAG_DST_NAT)
-#define DP_IS_FLOW_STATUS_FLAG_DST_LB(flag)		((flag) & DP_FLOW_STATUS_FLAG_DST_LB)
-#define DP_IS_FLOW_STATUS_FLAG_FIREWALL(flag)	((flag) & DP_FLOW_STATUS_FLAG_FIREWALL)
-#define DP_IS_FLOW_STATUS_FLAG_DEFAULT(flag)	((flag) & DP_FLOW_STATUS_FLAG_DEFAULT)
+#define DP_FLOW_HAS_NO_FLAGS(flag)		(!(flag))
+#define DP_FLOW_HAS_FLAG_SRC_NAT(flag)	((flag) & DP_FLOW_FLAG_SRC_NAT)
+#define DP_FLOW_HAS_FLAG_DST_NAT(flag)	((flag) & DP_FLOW_FLAG_DST_NAT)
+#define DP_FLOW_HAS_FLAG_DST_LB(flag)	((flag) & DP_FLOW_FLAG_DST_LB)
+#define DP_FLOW_HAS_FLAG_FIREWALL(flag)	((flag) & DP_FLOW_FLAG_FIREWALL)
+#define DP_FLOW_HAS_FLAG_DEFAULT(flag)	((flag) & DP_FLOW_FLAG_DEFAULT)
 
-#define DP_IS_FLOW_STATUS_FLAG_NF(flag)		((flag) & DP_FLOW_STATUS_FLAG_NF)
+#define DP_FLOW_HAS_FLAG_NF(flag)		((flag) & DP_FLOW_FLAG_NF)
 
 enum dp_flow_nat_type {
 	DP_FLOW_NAT_TYPE_NONE,
@@ -94,7 +94,7 @@ struct flow_value {
 	uint64_t		timestamp;
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
-	uint8_t			flow_status; // record if a flow has status associated with it
+	uint8_t			flow_flags;
 	enum dp_fwall_action	fwall_action[DP_FLOW_DIR_CAPACITY];
 	struct {
 		enum dp_flow_offload_state orig;
@@ -131,7 +131,7 @@ void dp_process_aged_flows(int port_id);
 void dp_process_aged_flows_non_offload(void);
 void dp_free_flow(struct dp_ref *ref);
 void dp_free_network_nat_port(const struct flow_value *cntrack);
-void dp_remove_nat_flows(uint16_t port_id, int nat_type);  // TODO create proper enum!
+void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type);
 void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port);
 void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni);
 

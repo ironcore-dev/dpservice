@@ -29,13 +29,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	// currently only IPv4 firewall is implemented
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4 && cntrack) {
-		if (DP_IS_FLOW_STATUS_FLAG_FIREWALL(cntrack->flow_status)) {
+		if (DP_FLOW_HAS_FLAG_FIREWALL(cntrack->flow_flags)) {
 			action = (enum dp_fwall_action)cntrack->fwall_action[df->flow_dir];
 		} else if (df->flow_dir == DP_FLOW_DIR_ORG) {
 			action = dp_get_firewall_action(df, in_port, out_port);
 			cntrack->fwall_action[DP_FLOW_DIR_ORG] = action;
 			cntrack->fwall_action[DP_FLOW_DIR_REPLY] = action;
-			cntrack->flow_status |= DP_FLOW_STATUS_FLAG_FIREWALL;
+			cntrack->flow_flags |= DP_FLOW_FLAG_FIREWALL;
 		} else
 			action = DP_FWALL_DROP;
 		/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */

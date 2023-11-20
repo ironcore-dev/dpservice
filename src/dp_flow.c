@@ -33,7 +33,7 @@ static bool offload_mode_enabled = 0;
 
 int dp_flow_init(int socket_id)
 {
-	ipv4_flow_tbl = dp_create_jhash_table(FLOW_MAX, sizeof(struct flow_key),
+	ipv4_flow_tbl = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct flow_key),
 										  "ipv4_flow_table", socket_id);
 	if (!ipv4_flow_tbl)
 		return DP_ERROR;
@@ -417,7 +417,7 @@ static __rte_always_inline void dp_remove_flow(struct flow_value *flow_val)
 	dp_age_out_flow(flow_val);
 }
 
-void dp_remove_nat_flows(uint16_t port_id, int nat_type)
+void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type)
 {
 	struct flow_value *flow_val = NULL;
 	const void *next_key;

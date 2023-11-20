@@ -89,8 +89,8 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 		df = dp_get_flow_ptr(m);
 		if (df->conntrack) {
 			// mark the flow as default if it is not marked as any other status
-			if (!DP_IS_FLOW_STATUS_FLAG_NF(df->conntrack->flow_status))
-				df->conntrack->flow_status |= DP_FLOW_STATUS_FLAG_DEFAULT;
+			if (!DP_FLOW_HAS_FLAG_NF(df->conntrack->flow_flags))
+				df->conntrack->flow_flags |= DP_FLOW_FLAG_DEFAULT;
 			// offload this flow from now on
 			if (df->offload_state == DP_FLOW_OFFLOAD_INSTALL || df->offload_ipv6)
 				if (DP_FAILED(dp_offload_handler(m, df)))
