@@ -25,7 +25,7 @@ struct dp_conf_virtual_services {
 #endif
 
 struct dp_conf_dhcp_dns {
-	int len;
+	uint8_t len;
 	uint8_t *array;
 };
 

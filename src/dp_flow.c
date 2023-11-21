@@ -305,7 +305,7 @@ int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx)
 	return DP_OK;
 }
 
-void dp_process_aged_flows(int port_id)
+void dp_process_aged_flows(uint16_t port_id)
 {
 	int total, fetched;
 	struct flow_age_ctx *agectx;
@@ -485,10 +485,11 @@ hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key)
 
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)
 {
-	for (size_t i = 0; i < sizeof(cntrack->rte_age_ctxs); ++i) {
+	static_assert(RTE_DIM(cntrack->rte_age_ctxs) <= UINT8_MAX, "Conntrack age context storage is too large");
+	for (size_t i = 0; i < RTE_DIM(cntrack->rte_age_ctxs); ++i) {
 		if (!cntrack->rte_age_ctxs[i]) {
 			cntrack->rte_age_ctxs[i] = ctx;
-			ctx->ref_index_in_cntrack = i;
+			ctx->ref_index_in_cntrack = (uint8_t)i;
 			return DP_OK;
 		}
 	}

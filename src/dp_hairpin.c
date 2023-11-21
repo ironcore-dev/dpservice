@@ -8,8 +8,8 @@
 
 static int setup_hairpin_rx_tx_queues(uint16_t port_id,
 									  uint16_t peer_port_id,
-									  uint8_t hairpin_queue_id,
-									  uint8_t peer_hairpin_queue_id)
+									  uint16_t hairpin_queue_id,
+									  uint16_t peer_hairpin_queue_id)
 {
 	int ret;
 

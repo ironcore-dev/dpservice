@@ -71,14 +71,14 @@ static int dhcpv6_node_init(__rte_unused const struct rte_graph *graph, __rte_un
 
 static __rte_always_inline int parse_options(struct rte_mbuf *m,
 											 const uint8_t *options,
-											 int options_len,
+											 size_t options_len,
 											 struct dp_dhcpv6_reply_options *reply_options)
 {
 	uint16_t op_code;
 	uint16_t op_len = 0;
 	const struct dhcpv6_option *opt;
 
-	for (int i = 0;
+	for (size_t i = 0;
 		 i + sizeof(struct dhcpv6_option) < (size_t)options_len;  // len already checked for being positive
 		 i += sizeof(struct dhcpv6_option) + op_len
 	) {
@@ -130,12 +130,12 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 static __rte_always_inline int resize_packet(struct rte_mbuf *m, int delta)
 {
 	if (delta > 0) {
-		if (!rte_pktmbuf_append(m, delta)) {
+		if (delta > UINT16_MAX || !rte_pktmbuf_append(m, (uint16_t)delta)) {
 			DPS_LOG_WARNING("Not enough space for DHCPv6 options in packet");
 			return DP_ERROR;
 		}
 	} else if (delta < 0) {
-		if (DP_FAILED(rte_pktmbuf_trim(m, -delta))) {
+		if (delta < -UINT16_MAX || DP_FAILED(rte_pktmbuf_trim(m, (uint16_t)(-delta)))) {
 			DPS_LOG_WARNING("Invalid trim of DHCPv6 packet", DP_LOG_VALUE(-delta));
 			return DP_ERROR;
 		}
@@ -153,7 +153,7 @@ static __rte_always_inline int strip_options(struct rte_mbuf *m, int options_len
 /** @return size of generated options or error */
 static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int options_len)
 {
-	uint8_t reply_options_len;
+	int reply_options_len;
 	struct dhcpv6_opt_server_id_ll opt_sid;
 	struct dp_dhcpv6_reply_options reply_options = {0};  // this makes *_len fields 0, needed later
 
@@ -165,7 +165,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	opt_sid = opt_sid_template;
 	rte_ether_addr_copy(&rte_pktmbuf_mtod(m, struct rte_ether_hdr *)->dst_addr, &opt_sid.id.mac);
 
-	reply_options_len = sizeof(opt_sid) + reply_options.opt_cid_len + reply_options.opt_iana_len + reply_options.opt_rapid_len;
+	reply_options_len = (int)sizeof(opt_sid) + reply_options.opt_cid_len + reply_options.opt_iana_len + reply_options.opt_rapid_len;
 
 	if (DP_FAILED(resize_packet(m, reply_options_len - options_len)))
 		return DP_ERROR;
@@ -193,8 +193,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct rte_ipv6_hdr *req_ipv6_hdr; 
 	struct rte_udp_hdr *req_udp_hdr;
 	struct dhcpv6_packet *dhcp_pkt;
-	int req_options_len = rte_pktmbuf_data_len(m) - DP_DHCPV6_PKT_FIXED_LEN;
+	int req_options_len = rte_pktmbuf_data_len(m) - (int)DP_DHCPV6_PKT_FIXED_LEN;
 	int reply_options_len;
+	size_t payload_len;
 
 	// packet length is uint16_t, negative value means it's less than the required length
 	if (req_options_len < 0) {
@@ -236,8 +237,12 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (DP_FAILED(reply_options_len))
 		return DHCPV6_NEXT_DROP;
 
+	payload_len = reply_options_len + DP_DHCPV6_HDR_FIXED_LEN + sizeof(struct rte_udp_hdr);
+	if (payload_len > UINT16_MAX)
+		return DHCPV6_NEXT_DROP;
+
 	// recompute checksums (offloaded)
-	req_ipv6_hdr->payload_len = req_udp_hdr->dgram_len = htons(sizeof(struct rte_udp_hdr) + DP_DHCPV6_HDR_FIXED_LEN + reply_options_len);
+	req_ipv6_hdr->payload_len = req_udp_hdr->dgram_len = htons((uint16_t)payload_len);
 	req_udp_hdr->dgram_cksum = 0;
 
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6 | RTE_MBUF_F_TX_UDP_CKSUM;

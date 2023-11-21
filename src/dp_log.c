@@ -182,8 +182,8 @@ static const char *json_escape(const char *message, char *buf, size_t bufsize)
 			buf[bufpos++] = 'u';
 			buf[bufpos++] = '0';
 			buf[bufpos++] = '0';
-			buf[bufpos++] = '0' + hi;
-			buf[bufpos++] = lo >= 10 ? 'a' + (lo-10) : '0' + lo;
+			buf[bufpos++] = (char)('0' + hi);
+			buf[bufpos++] = (char)(lo >= 10 ? 'a' + (lo-10) : '0' + lo);
 		} else if (c == '\\' || c == '\"') {
 			if (bufpos + 2 >= bufsize)
 				break;

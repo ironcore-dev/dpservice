@@ -17,6 +17,8 @@ extern "C"
 #define DP_TCP_CONTROL_FLAGS \
 	(RTE_TCP_FIN_FLAG|RTE_TCP_SYN_FLAG|RTE_TCP_RST_FLAG)
 
+#define DP_AGE_TIMEOUT_24BIT_MASK 0x00FFFFFF
+
 union dp_flow_item_l3 {
 	struct rte_flow_item_ipv4 ipv4;
 	struct rte_flow_item_ipv6 ipv6;
@@ -509,7 +511,9 @@ void dp_set_flow_age_action(struct rte_flow_action *action,
 							struct rte_flow_action_age *flow_age_action,
 							uint32_t timeout, void *age_context)
 {
-	flow_age_action->timeout = timeout;
+	// timeout has only 24 bits
+	// should always fit, the value is just a #define'd constant (unless in testing mode)
+	flow_age_action->timeout = timeout & DP_AGE_TIMEOUT_24BIT_MASK;
 	flow_age_action->reserved = 0;
 	flow_age_action->context = age_context;
 	action->type = RTE_FLOW_ACTION_TYPE_AGE;

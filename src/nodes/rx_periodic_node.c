@@ -40,11 +40,11 @@ static __rte_always_inline void handle_nongraph_queues(void)
 	struct rte_mbuf *mbufs[RTE_MAX(DP_INTERNAL_Q_SIZE, DP_GRPC_Q_SIZE)];
 	unsigned int count, i;
 
-	count = rte_ring_sc_dequeue_burst(monitoring_rx_queue, (void **)mbufs, RTE_DIM(mbufs), NULL);
+	count = rte_ring_sc_dequeue_burst(monitoring_rx_queue, (void **)mbufs, (unsigned int)RTE_DIM(mbufs), NULL);
 	for (i = 0; i < count; ++i)
 		dp_process_event_msg(mbufs[i]);
 
-	count = rte_ring_sc_dequeue_burst(grpc_tx_queue, (void **)mbufs, RTE_DIM(mbufs), NULL);
+	count = rte_ring_sc_dequeue_burst(grpc_tx_queue, (void **)mbufs, (unsigned int)RTE_DIM(mbufs), NULL);
 	for (i = 0; i < count; ++i)
 		dp_process_request(mbufs[i]);
 }
@@ -59,7 +59,7 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	unsigned int n_pkts;
+	uint16_t n_pkts;
 
 	RTE_SET_USED(nb_objs);  // this is a source node, input data is not present yet
 
@@ -72,10 +72,8 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 
 	// these packets do not come from a port, instead they enter the graph from a periodic message
 	// which also implies that this will mostly return 0
-	n_pkts = rte_ring_dequeue_burst(periodic_msg_queue,
-									objs,
-									RTE_GRAPH_BURST_SIZE,
-									NULL);
+	static_assert(RTE_GRAPH_BURST_SIZE < UINT16_MAX, "Graph burst size is too large");
+	n_pkts = (uint16_t)rte_ring_dequeue_burst(periodic_msg_queue, objs, RTE_GRAPH_BURST_SIZE, NULL);
 	if (likely(!n_pkts))
 		return 0;
 

@@ -20,12 +20,11 @@ struct dp_grpc_responder {
 	struct dpgrpc_reply *rep;
 	size_t rep_max_size;
 	size_t msg_size;
-	int rep_capacity;
-	int rep_msgcount;
+	size_t rep_capacity;
+	uint16_t rep_msgcount;
 };
 
-// returns request's type
-uint16_t dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_mbuf *req_mbuf);
+enum dpgrpc_request_type dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_mbuf *req_mbuf);
 
 static inline void *dp_grpc_single_reply(struct dp_grpc_responder *responder)
 {

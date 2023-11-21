@@ -159,7 +159,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	// can only fail when any argument is NULL
 	rte_rib_get_nh(node, &next_hop);
 
-	dst_port = dp_get_port_by_id(next_hop);
+	dst_port = dp_get_port_by_id((uint16_t)next_hop);
 	if (unlikely(!dst_port))
 		return DP_GRPC_ERR_NO_VM;
 
@@ -297,7 +297,7 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 	if (DP_FAILED(rte_rib_get_nh(node, &next_hop)))
 		return NULL;
 
-	dst_port = dp_get_port_by_id(next_hop);
+	dst_port = dp_get_port_by_id((uint16_t)next_hop);
 	if (!dst_port)
 		return NULL;
 
@@ -334,7 +334,7 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	if (DP_FAILED(rte_rib6_get_nh(node, &next_hop)))
 		return NULL;
 
-	dst_port = dp_get_port_by_id(next_hop);
+	dst_port = dp_get_port_by_id((uint16_t)next_hop);
 	if (!dst_port)
 		return NULL;
 

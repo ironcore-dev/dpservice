@@ -99,13 +99,13 @@ struct dpgrpc_address {
 
 struct dpgrpc_prefix {
 	struct dpgrpc_address	addr;
-	uint32_t				length;
+	uint8_t					length;
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
 };
 
 struct dpgrpc_route {
 	struct dpgrpc_address	pfx_addr;
-	uint32_t				pfx_length;
+	uint8_t					pfx_length;
 	uint32_t				vni;
 	struct dpgrpc_address	trgt_addr;
 	uint32_t				trgt_vni;
@@ -181,8 +181,8 @@ struct dpgrpc_capture_interface {
 struct dpgrpc_capture {
 	uint8_t			dst_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	uint8_t			interface_count;
-	uint32_t		udp_src_port;
-	uint32_t		udp_dst_port;
+	uint16_t		udp_src_port;
+	uint16_t		udp_dst_port;
 	struct dpgrpc_capture_interface interfaces[DP_CAPTURE_MAX_PORT_NUM];
 	bool			is_active;
 };
@@ -192,7 +192,7 @@ struct dpgrpc_capture_stop {
 };
 
 struct dpgrpc_request {
-	uint16_t 					type;  // enum dpgrpc_request_type
+	enum dpgrpc_request_type	type;
 	union {
 		struct dpgrpc_iface		add_iface;
 		struct dpgrpc_iface_id	del_iface;
@@ -251,12 +251,12 @@ struct dpgrpc_vni_in_use {
 };
 
 struct dpgrpc_reply {
-	uint8_t		type;  // copied enum dpgrpc_request_type
-	uint8_t		is_chained;
-	uint16_t	msg_count;
-	uint32_t	err_code;
+	enum dpgrpc_request_type		type;			// copied enum dpgrpc_request_type
+	bool							is_chained;
+	uint16_t						msg_count;
+	uint32_t						err_code;
 	union {
-		uint8_t						messages[0];  // used for multiresponse mode
+		uint8_t						messages[0];	// used for multiresponse mode
 		struct dpgrpc_ul_addr		ul_addr;
 		struct dpgrpc_iface			iface;
 		struct dpgrpc_vf_pci		vf_pci;

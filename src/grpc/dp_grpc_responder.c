@@ -1,7 +1,7 @@
 #include "grpc/dp_grpc_responder.h"
 #include "dp_log.h"
 
-uint16_t dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_mbuf *req_mbuf)
+enum dpgrpc_request_type dp_grpc_init_responder(struct dp_grpc_responder *responder, struct rte_mbuf *req_mbuf)
 {
 	void *req_payload = rte_pktmbuf_mtod(req_mbuf, void *);
 
@@ -31,6 +31,11 @@ int dp_grpc_alloc_reply(struct dp_grpc_responder *responder)
 	struct rte_mbuf *m_new;
 	struct dpgrpc_reply *rep_new;
 
+	if (responder->rep_capacity > UINT16_MAX) {
+		DPGRPC_LOG_WARNING("gRPC response array is too big, truncated", DP_LOG_GRPCREQUEST(responder->request.type));
+		return DP_ERROR;
+	}
+
 	if (responder->repcount >= RTE_DIM(responder->replies)) {
 		DPGRPC_LOG_WARNING("gRPC response array is full, truncated", DP_LOG_GRPCREQUEST(responder->request.type));
 		return DP_ERROR;
@@ -42,7 +47,7 @@ int dp_grpc_alloc_reply(struct dp_grpc_responder *responder)
 	}
 	// more reply packets follow this one; as gRPC has only one thread, this is safe to do
 	responder->rep->is_chained = 1;
-	responder->rep->msg_count = responder->rep_capacity;
+	responder->rep->msg_count = (uint16_t)responder->rep_capacity;
 	rep_new = rte_pktmbuf_mtod(m_new, struct dpgrpc_reply *);
 	rep_new->type = responder->request.type;
 	rep_new->is_chained = 0;

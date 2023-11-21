@@ -16,7 +16,7 @@ static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *
 {
 	struct rtattr *rt_attr;
 	struct ndmsg *rt_msg;
-	int rtl, ndm_family;
+	size_t rtl, ndm_family;
 
 	for (; NLMSG_OK(nh, nll); nh = NLMSG_NEXT(nh, nll)) {
 		rt_msg = (struct ndmsg *)NLMSG_DATA(nh);
@@ -40,13 +40,13 @@ static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *
 static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bufsize)
 {
 	struct nlmsghdr *nh;
-	int recv_len;
-	int msg_len = 0;
+	ssize_t recv_len;
+	ssize_t msg_len = 0;
 
 	for (;;) {
 		recv_len = recv(sock, buf, bufsize - msg_len, 0);
 		if (recv_len < 0)
-			return recv_len;
+			return (int)recv_len;
 
 		nh = (struct nlmsghdr *)buf;
 		if (nh->nlmsg_type == NLMSG_DONE)
@@ -60,7 +60,7 @@ static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bu
 		if ((sock_addr.nl_groups & RTMGRP_IPV6_ROUTE) == RTMGRP_IPV6_ROUTE)
 			break;
 	}
-	return msg_len;
+	return (int)msg_len;
 }
 
 int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac)

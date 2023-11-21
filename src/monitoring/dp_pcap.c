@@ -46,7 +46,7 @@ void dp_pcap_dump(struct dp_pcap *dp_pcap, struct rte_mbuf *m, struct timeval *t
 
 	header.ts = *timestamp;
 	header.len = rte_pktmbuf_pkt_len(m);
-	header.caplen = RTE_MIN(header.len, sizeof(buffer));
+	header.caplen = RTE_MIN(header.len, (uint32_t)sizeof(buffer));
 
 	// rte_pktmbuf_read() can only fail if the buffer is too small, hence RTE_MIN() above
 	pcap_dump((void *)dp_pcap->dumper, &header, rte_pktmbuf_read(m, 0, header.caplen, buffer));
@@ -82,7 +82,7 @@ bool dp_is_bpf_match(struct bpf_program *bpf, struct rte_mbuf *m)
 	uint32_t len = rte_pktmbuf_pkt_len(m);
 	struct pcap_pkthdr header = {
 		.len = len,
-		.caplen = RTE_MIN(len, sizeof(buffer)),
+		.caplen = RTE_MIN(len, (uint32_t)sizeof(buffer)),
 		// timestamp left zero, not needed for filtering
 	};
 

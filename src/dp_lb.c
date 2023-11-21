@@ -246,7 +246,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uin
 	if (pos < 0)
 		return NULL;
 
-	lb_val->last_sel_pos = pos;
+	lb_val->last_sel_pos = (uint16_t)pos;
 	return (uint8_t *)&lb_val->back_end_ips[pos][0];
 }
 

@@ -50,7 +50,7 @@ static_assert(DP_VIRTSVC_MAX <= UINT8_MAX+1, "Number of virtual services can be 
 static int dhcp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 	server_ip = htonl(dp_get_gw_ip4());
-	iface_mtu = htons(dp_conf_get_dhcp_mtu());
+	iface_mtu = htons((uint16_t)dp_conf_get_dhcp_mtu());
 
 	dhcp_hdr_magic = htonl(DHCP_MAGIC_COOKIE);
 
@@ -111,7 +111,7 @@ static __rte_always_inline int add_dhcp_options(struct dp_dhcp_header *dhcp_hdr,
 		return DP_ERROR;
 	*pos++ = DHCP_OPT_END;
 
-	return pos - dhcp_hdr->options;
+	return (int)(pos - dhcp_hdr->options);
 }
 
 static int parse_options(struct dp_dhcp_header *dhcp_pkt,
@@ -183,8 +183,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	incoming_udp_hdr = (struct rte_udp_hdr *)(incoming_ipv4_hdr + 1);
 	dhcp_hdr = (struct dp_dhcp_header *)(incoming_udp_hdr + 1);
 	options_len = rte_pktmbuf_data_len(m)
-					- ((uint8_t *)dhcp_hdr - (uint8_t *)incoming_eth_hdr)
-					- offsetof(struct dp_dhcp_header, options);
+					- (int)((uint8_t *)dhcp_hdr - (uint8_t *)incoming_eth_hdr)
+					- (int)offsetof(struct dp_dhcp_header, options);
+
+	if (options_len < 0)
+		return DHCP_NEXT_DROP;
 
 	if (dhcp_hdr->op != DP_BOOTP_REQUEST) {
 		DPNODE_LOG_WARNING(node, "Not a DHCP request", DP_LOG_VALUE(dhcp_hdr->op));
@@ -264,17 +267,20 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	// packet length changed because of new options, recompute envelopes
 	header_size = offsetof(struct dp_dhcp_header, options) + options_len;
+	m->pkt_len = (uint32_t)(sizeof(struct rte_ether_hdr)
+							+ sizeof(struct rte_ipv4_hdr)
+							+ sizeof(struct rte_udp_hdr)
+							+ header_size);
+	if (unlikely(m->pkt_len > UINT16_MAX))
+		return DHCP_NEXT_DROP;
+
 	incoming_ipv4_hdr->hdr_checksum = 0;
-	incoming_ipv4_hdr->total_length = htons(sizeof(struct rte_ipv4_hdr)
+	incoming_ipv4_hdr->total_length = htons((uint16_t)(sizeof(struct rte_ipv4_hdr)
 											+ sizeof(struct rte_udp_hdr)
-											+ header_size);
-	incoming_udp_hdr->dgram_len = htons(sizeof(struct rte_udp_hdr) + header_size);
+											+ header_size));
+	incoming_udp_hdr->dgram_len = htons((uint16_t)(sizeof(struct rte_udp_hdr) + header_size));
 	incoming_udp_hdr->dgram_cksum = 0;
-	m->pkt_len = sizeof(struct rte_ether_hdr)
-				 + sizeof(struct rte_ipv4_hdr)
-				 + sizeof(struct rte_udp_hdr)
-				 + header_size;
-	m->data_len = m->pkt_len;
+	m->data_len = (uint16_t)m->pkt_len;
 
 	return next_tx_index[m->port];
 }

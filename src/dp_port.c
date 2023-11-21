@@ -88,7 +88,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
 	nr_hairpin_queues = port->is_pf
-		? (DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs)
+		? (uint16_t)(DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs)
 		: DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
 
 	ret = rte_eth_dev_configure(port->port_id,
@@ -104,7 +104,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	rxq_conf.offloads = port_conf.rxmode.offloads;
 
 	/* RX and TX queues config */
-	for (int i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
+	for (uint16_t i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
 		ret = rte_eth_rx_queue_setup(port->port_id, i, 1024,
 									 port->socket_id,
 									 &rxq_conf,
@@ -118,7 +118,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	txq_conf = dev_info->default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
-	for (int i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
+	for (uint16_t i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
 		ret = rte_eth_tx_queue_setup(port->port_id, i, 2048,
 									 port->socket_id,
 									 &txq_conf);
@@ -223,7 +223,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 		// All VFs belong to pf0, assign a tx queue from pf1 for it
 		if (dp_conf_is_offload_enabled()) {
 			port->peer_pf_port_id = dp_get_pf1()->port_id;
-			port->peer_pf_hairpin_tx_rx_queue_offset = last_pf1_hairpin_tx_rx_queue_offset++;
+			port->peer_pf_hairpin_tx_rx_queue_offset = (uint8_t)last_pf1_hairpin_tx_rx_queue_offset++;
 			if (last_pf1_hairpin_tx_rx_queue_offset > UINT8_MAX) {
 				DPS_LOG_ERR("Too many VFs, cannot create more hairpins");
 				return NULL;
@@ -357,7 +357,7 @@ void dp_ports_free(void)
 }
 
 
-static int dp_port_install_isolated_mode(int port_id)
+static int dp_port_install_isolated_mode(uint16_t port_id)
 {
 	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
 	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP))

@@ -43,7 +43,7 @@ static int tel_stat_value_offset = 0;
 //
 // Graph introduces another layer of callbacks due to DPDK stats API
 //
-static __rte_always_inline int get_stat_value(const struct rte_graph_cluster_node_stats *st)
+static __rte_always_inline uint64_t get_stat_value(const struct rte_graph_cluster_node_stats *st)
 {
 	return *(const uint64_t *)((const uint8_t *)(st) + tel_stat_value_offset);
 }

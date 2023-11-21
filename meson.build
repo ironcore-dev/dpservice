@@ -12,7 +12,8 @@ if get_option('warning_level').to_int() >= 2
   common_flags = [
     # -Werror provided by 'werror=true' in default project options
     # -Wall -Wextra provided by 'warning_level=2' in default project options
-     '-Wunused', '-Wshadow', '-Wundef', '-Wcast-qual', '-Wwrite-strings', '-Wpointer-arith',
+    '-Wunused', '-Wshadow', '-Wundef', '-Wcast-qual', '-Wwrite-strings', '-Wpointer-arith',
+    '-Wconversion', '-Wno-sign-conversion'
   ]
   cflags += common_flags + [
     '-Wbad-function-cast', '-Wmissing-declarations', '-Wstrict-prototypes', '-Wmissing-prototypes',

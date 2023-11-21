@@ -67,7 +67,7 @@ static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(const struct 
 {
 	const struct rte_ipv4_hdr *ipv4_hdr = (const struct rte_ipv4_hdr *)(ether_hdr + 1);
 	rte_be32_t addr = ipv4_hdr->dst_addr;
-	uint16_t proto = ipv4_hdr->next_proto_id;
+	uint8_t proto = ipv4_hdr->next_proto_id;
 	rte_be16_t port;
 	const struct dp_virtsvc_lookup_entry *entry;
 	int diff;
@@ -93,7 +93,7 @@ static __rte_always_inline struct dp_virtsvc *get_outgoing_virtsvc(const struct 
 static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(const struct rte_ipv6_hdr *ipv6_hdr)
 {
 	const uint8_t *addr = ipv6_hdr->src_addr;
-	uint16_t proto = ipv6_hdr->proto;
+	uint8_t proto = ipv6_hdr->proto;
 	rte_be16_t port;
 	const struct dp_virtsvc_lookup_entry *entry;
 	int diff;

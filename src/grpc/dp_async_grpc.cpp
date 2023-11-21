@@ -27,7 +27,7 @@ CallState BaseCall::HandleRpc()
 	switch (call_state_) {
 	case REQUEST: {
 		struct dpgrpc_request request = {
-			.type = (uint16_t)call_type_,
+			.type = call_type_,
 		};
 		const char* error;
 		// this is how gRPC is implemented here,
@@ -314,7 +314,9 @@ const char* CreatePrefixCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_pfx.addr))
 		return "Invalid prefix.ip";
-	request->del_pfx.length = request_.prefix().length();
+	if (request_.prefix().length() > UINT8_MAX)
+		return "Invalid prefix.length";
+	request->del_pfx.length = (uint8_t)request_.prefix().length();
 	return NULL;
 }
 void CreatePrefixCall::ParseReply(struct dpgrpc_reply* reply)
@@ -335,7 +337,9 @@ const char* DeletePrefixCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_pfx.addr))
 		return "Invalid prefix.ip";
-	request->del_pfx.length = request_.prefix().length();
+	if (request_.prefix().length() > UINT8_MAX)
+		return "Invalid prefix.length";
+	request->del_pfx.length = (uint8_t)request_.prefix().length();
 	return NULL;
 }
 void DeletePrefixCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
@@ -383,7 +387,9 @@ const char* CreateRouteCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_IPV6STR(request_.route().nexthop_address().address().c_str()));
 	request->add_route.vni = request_.vni();
 	request->add_route.trgt_vni = request_.route().nexthop_vni();
-	request->add_route.pfx_length = request_.route().prefix().length();
+	if (request_.route().prefix().length() > UINT8_MAX)
+		return "Invalid route.prefix.length";
+	request->add_route.pfx_length = (uint8_t)request_.route().prefix().length();
 	if (!GrpcConv::GrpcToDpAddress(request_.route().prefix().ip(), &request->add_route.pfx_addr))
 		return "Invalid route.prefix.ip";
 	if (!GrpcConv::GrpcToDpAddress(request_.route().nexthop_address(), &request->add_route.trgt_addr))
@@ -401,7 +407,9 @@ const char* DeleteRouteCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_PREFIX(request_.route().prefix().ip().address().c_str()),
 					DP_LOG_PREFLEN(request_.route().prefix().length()));
 	request->del_route.vni = request_.vni();
-	request->add_route.pfx_length = request_.route().prefix().length();
+	if (request_.route().prefix().length() > UINT8_MAX)
+		return "Invalid route.prefix.length";
+	request->add_route.pfx_length = (uint8_t)request_.route().prefix().length();
 	if (!GrpcConv::GrpcToDpAddress(request_.route().prefix().ip(), &request->add_route.pfx_addr))
 		return "Invalid route.prefix.ip";
 	return NULL;
@@ -529,8 +537,8 @@ const char* CreateNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid max_port";
 	if (request_.min_port() >= request_.max_port())
 		return "Invalid port range";
-	request->add_nat.min_port = request_.min_port();
-	request->add_nat.max_port = request_.max_port();
+	request->add_nat.min_port = (uint16_t)request_.min_port();
+	request->add_nat.max_port = (uint16_t)request_.max_port();
 	return NULL;
 }
 void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
@@ -618,8 +626,8 @@ const char* CreateNeighborNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid max_port";
 	if (request_.min_port() >= request_.max_port())
 		return "Invalid port range";
-	request->add_neighnat.min_port = request_.min_port();
-	request->add_neighnat.max_port = request_.max_port();
+	request->add_neighnat.min_port = (uint16_t)request_.min_port();
+	request->add_neighnat.max_port = (uint16_t)request_.max_port();
 	request->add_neighnat.vni = request_.vni();
 	if (!GrpcConv::StrToIpv6(request_.underlay_route(), request->add_neighnat.neigh_addr6))
 		return "Invalid underlay_route";
@@ -644,8 +652,8 @@ const char* DeleteNeighborNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid max_port";
 	if (request_.min_port() >= request_.max_port())
 		return "Invalid port range";
-	request->del_neighnat.min_port = request_.min_port();
-	request->del_neighnat.max_port = request_.max_port();
+	request->del_neighnat.min_port = (uint16_t)request_.min_port();
+	request->del_neighnat.max_port = (uint16_t)request_.max_port();
 	request->del_neighnat.vni = request_.vni();
 	// neigh_addr6 field is implied by this unique NAT definition
 	return NULL;
@@ -699,7 +707,7 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 						DP_LOG_PROTO(request_.loadbalanced_ports(i).protocol()));
 		if (request_.loadbalanced_ports(i).port() > UINT16_MAX)
 			return "Invalid loadbalanced_ports.port";
-		request->add_lb.lbports[i].port = request_.loadbalanced_ports(i).port();
+		request->add_lb.lbports[i].port = (uint16_t)request_.loadbalanced_ports(i).port();
 		if (request_.loadbalanced_ports(i).protocol() == TCP)
 			request->add_lb.lbports[i].protocol = DP_IP_PROTO_TCP;
 		else if (request_.loadbalanced_ports(i).protocol() == UDP)
@@ -829,7 +837,9 @@ const char* CreateLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* req
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->add_lbpfx.addr))
 		return "Invalid prefix.ip";
-	request->add_lbpfx.length = request_.prefix().length();
+	if (request_.prefix().length() > UINT8_MAX)
+		return "Invalid prefix.length";
+	request->add_lbpfx.length = (uint8_t)request_.prefix().length();
 	return NULL;
 }
 void CreateLoadBalancerPrefixCall::ParseReply(struct dpgrpc_reply* reply)
@@ -850,7 +860,9 @@ const char* DeleteLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* req
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_lbpfx.addr))
 		return "Invalid prefix.ip";
-	request->del_lbpfx.length = request_.prefix().length();
+	if (request_.prefix().length() > UINT8_MAX)
+		return "Invalid prefix.length";
+	request->del_lbpfx.length = (uint8_t)request_.prefix().length();
 	return NULL;
 }
 void DeleteLoadBalancerPrefixCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
@@ -929,7 +941,7 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid action";
 	if (grpc_rule.priority() > UINT16_MAX)
 		return "Invalid priority";
-	dp_rule->priority = grpc_rule.priority();
+	dp_rule->priority = (uint16_t)grpc_rule.priority();
 
 	switch (grpc_filter.filter_case()) {
 	case ProtocolFilter::kTcpFieldNumber:
@@ -1102,8 +1114,8 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 	if (!GrpcConv::StrToIpv6(request_.capture_config().sink_node_ip().address(), request->capture_start.dst_addr6))
 		return "Invalid sink_node_ip";
 
-	request->capture_start.udp_src_port = request_.capture_config().udp_src_port();
-	request->capture_start.udp_dst_port = request_.capture_config().udp_dst_port();
+	request->capture_start.udp_src_port = (uint16_t)request_.capture_config().udp_src_port();
+	request->capture_start.udp_dst_port = (uint16_t)request_.capture_config().udp_dst_port();
 
 	if (request_.capture_config().interfaces_size() > DP_CAPTURE_MAX_PORT_NUM)
 		return "Too many interfaces to be captured";
@@ -1115,17 +1127,19 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 
 		switch (request->capture_start.interfaces[i].type) {
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_VF:
-			DPGRPC_LOG_INFO("Set packet capture interface vf",
+			DPGRPC_LOG_INFO("Setting packet capture on VF",
 							DP_LOG_IFACE_TYPE(request_.capture_config().interfaces(i).interface_type()),
 							DP_LOG_IFACE(request_.capture_config().interfaces(i).vf_name().c_str()));
 			if (SNPRINTF_FAILED(request->capture_start.interfaces[i].spec.iface_id, request_.capture_config().interfaces(i).vf_name()))
 				return "Invalid interface_id";
 			break;
 		case DP_CAPTURE_IFACE_TYPE_SINGLE_PF:
-			DPGRPC_LOG_INFO("Set packet capture interface pf",
+			DPGRPC_LOG_INFO("Setting packet capture on PF",
 							DP_LOG_IFACE_TYPE(request_.capture_config().interfaces(i).interface_type()),
 							DP_LOG_IFACE_INDEX(request_.capture_config().interfaces(i).pf_index()));
-			request->capture_start.interfaces[i].spec.pf_index = request_.capture_config().interfaces(i).pf_index();
+			if (request_.capture_config().interfaces(i).pf_index() > UINT8_MAX)
+				return "Invalid pf_index";
+			request->capture_start.interfaces[i].spec.pf_index = (uint8_t)request_.capture_config().interfaces(i).pf_index();
 			break;
 		}
 

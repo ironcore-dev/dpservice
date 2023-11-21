@@ -59,7 +59,8 @@ static __rte_always_inline void virtsvc_tcp_state_change(struct dp_virtsvc_conn 
 
 static __rte_always_inline rte_be16_t virtsvc_get_port_for_conn(int conn_idx)
 {
-	return htons(conn_idx + DP_NB_SYSTEM_PORTS);
+	// conn_idx is limited by the port table size, will fit
+	return htons((uint16_t)(conn_idx + DP_NB_SYSTEM_PORTS));
 }
 
 static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
@@ -68,7 +69,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 {
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)(ether_hdr + 1);
-	rte_be16_t payload_len = htons(ntohs(ipv4_hdr->total_length) - sizeof(struct rte_ipv4_hdr));
+	uint16_t hdr_total_len = ntohs(ipv4_hdr->total_length);
 	rte_be32_t original_ip = ipv4_hdr->src_addr;
 	uint8_t proto = ipv4_hdr->next_proto_id;
 	uint8_t ttl = ipv4_hdr->time_to_live;
@@ -81,6 +82,9 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	struct dp_port *pf_port;
 	int conn_idx;
 
+	if (hdr_total_len < sizeof(struct rte_ipv4_hdr))
+		return VIRTSVC_NEXT_DROP;
+
 	// replace IPv4 header with IPv6 header
 	rte_pktmbuf_adj(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
 	ether_hdr = (struct rte_ether_hdr *)rte_pktmbuf_prepend(m, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr));
@@ -92,7 +96,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
-	ipv6_hdr->payload_len = payload_len;
+	ipv6_hdr->payload_len = htons((uint16_t)(hdr_total_len - sizeof(struct rte_ipv4_hdr)));
 	ipv6_hdr->proto = proto;
 	ipv6_hdr->hop_limits = ttl;
 	rte_memcpy(ipv6_hdr->src_addr, service_ul_ip, sizeof(ipv6_hdr->src_addr));

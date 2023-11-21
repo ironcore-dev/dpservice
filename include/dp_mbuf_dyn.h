@@ -63,8 +63,6 @@ struct dp_flow {
 	rte_be32_t	nat_addr;
 	uint16_t	nat_port;
 
-	uint8_t		nxt_hop;
-
 	uint8_t					l4_type;
 	union {
 		struct {
@@ -87,6 +85,8 @@ struct dp_flow {
 		uint8_t		proto_id;	//proto_id in outer ipv6 header
 		uint32_t	dst_vni;
 	} tun_info;
+
+	uint16_t		nxt_hop;  // this can be brought down to only one byte (low DP_MAX_PORTS)
 
 	struct flow_value	*conntrack;
 #ifdef ENABLE_VIRTSVC

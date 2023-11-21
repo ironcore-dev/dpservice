@@ -1056,7 +1056,7 @@ public:
 			while (pt != NULL) {
 				if (countp == DP_MAX_LB_PORTS)
 					break;
-				ports[countp++] = atoi(pt);
+				ports[countp++] = (uint16_t)atoi(pt);
 				pt = strtok(NULL, ",");
 			}
 

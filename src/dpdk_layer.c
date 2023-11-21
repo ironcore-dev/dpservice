@@ -119,7 +119,8 @@ static int main_core_loop(void)
 	uint64_t prev_cycles = 0;
 	uint64_t elapsed_cycles;
 	uint64_t period_cycles = dp_timers_get_manage_interval_cycles();
-	double cycles_per_ns = rte_get_timer_hz() / (double)NS_PER_S;
+	uint64_t timer_hz = rte_get_timer_hz();
+	double cycles_per_ns = (double)timer_hz / (double)NS_PER_S;
 	int ret = DP_OK;
 
 	while (!force_quit) {
@@ -128,7 +129,7 @@ static int main_core_loop(void)
 		if (elapsed_cycles < period_cycles) {
 			// rte_delay_us_sleep() is not interruptible by signals
 			// (and signal is something that should stop this loop)
-			dp_nanosleep((period_cycles - elapsed_cycles) / cycles_per_ns);
+			dp_nanosleep((uint64_t)((double)(period_cycles - elapsed_cycles) / cycles_per_ns));
 			// if wait fails, this effectively becomes busy-wait, which is fine
 			continue;
 		}

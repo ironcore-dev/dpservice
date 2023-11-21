@@ -33,14 +33,14 @@ struct dp_event_msg {
 
 struct dp_capture_hdr_config {
 	uint8_t capture_node_ipv6_addr[16];
-	uint32_t capture_udp_src_port;
-	uint32_t capture_udp_dst_port;
+	uint16_t capture_udp_src_port;
+	uint16_t capture_udp_dst_port;
 };
 
 void dp_process_event_msg(struct rte_mbuf *m);
 
 
-void dp_set_capture_hdr_config(uint8_t *addr, uint32_t udp_src_port, uint32_t udp_dst_port);
+void dp_set_capture_hdr_config(uint8_t *addr, uint16_t udp_src_port, uint16_t udp_dst_port);
 const struct dp_capture_hdr_config *dp_get_capture_hdr_config(void);
 
 void dp_set_capture_enabled(bool enabled);

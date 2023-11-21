@@ -29,7 +29,7 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	cksum += RTE_BE16(RTE_IP_ICMP_ECHO_REPLY << 8);
 	cksum = (cksum & 0xffff) + (cksum >> 16);
 	cksum = (cksum & 0xffff) + (cksum >> 16);
-	icmp_hdr->icmp_cksum = ~cksum;
+	icmp_hdr->icmp_cksum = (uint16_t)~cksum;
 
 	temp_ip = ipv4_hdr->dst_addr;
 	ipv4_hdr->dst_addr = ipv4_hdr->src_addr;

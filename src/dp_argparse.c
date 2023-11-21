@@ -42,7 +42,7 @@ int dp_argparse_enum(const char *arg, int *dst, const char *choices[], size_t ch
 {
 	for (size_t i = 0; i < choice_count; ++i) {
 		if (!strcmp(choices[i], arg)) {
-			*dst = i;
+			*dst = (int)i;
 			return DP_OK;
 		}
 	}

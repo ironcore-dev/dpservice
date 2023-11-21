@@ -136,7 +136,7 @@ static int add_virtsvc(uint8_t proto, const char *str)
 		DP_EARLY_ERR("Invalid virtual service IPv4 port '%s'", tok);
 		return DP_ERROR;
 	}
-	from_port = htons(longport);
+	from_port = htons((uint16_t)longport);
 
 	tok = strtok(NULL, ",");
 	if (!tok) {
@@ -158,7 +158,7 @@ static int add_virtsvc(uint8_t proto, const char *str)
 		DP_EARLY_ERR("Invalid virtual service IPv6 port '%s'", tok);
 		return DP_ERROR;
 	}
-	to_port = htons(longport);
+	to_port = htons((uint16_t)longport);
 
 	// prevent virtual/service address duplicates
 	for (int i = 0; i < virtual_services.nb_entries; ++i) {

@@ -92,7 +92,8 @@ static __rte_always_inline int dp_install_rte_flow_with_age(uint16_t port_id,
 
 	agectx->cntrack = conntrack;
 	agectx->rte_flow = flow;
-	agectx->port_id = port_id;
+	static_assert(DP_MAX_PORTS <= UINT8_MAX, "Too many ports for offloading");
+	agectx->port_id = (uint8_t)port_id;
 	dp_ref_inc(&conntrack->ref_count);
 	return DP_OK;
 }

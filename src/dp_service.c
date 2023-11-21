@@ -216,7 +216,8 @@ static int run_service(void)
 {
 	int result;
 
-	srand(rte_rdtsc());
+	// the lower 32 bits are the ones that are actually changing all the time, cast is fine
+	srand((unsigned int)rte_rdtsc());
 
 	// pre-init sanity checks
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {

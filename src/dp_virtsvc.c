@@ -214,7 +214,8 @@ void dp_virtsvc_free(void)
 
 int dp_virtsvc_get_count(void)
 {
-	return dp_virtservices_end - dp_virtservices;
+	// conversion is fine, will never get that far
+	return (int)(dp_virtservices_end - dp_virtservices);
 }
 
 
@@ -255,11 +256,11 @@ static __rte_always_inline int dp_virtsvc_get_free_port(struct dp_virtsvc *virts
 		virtsvc->last_assigned_port = 0;
 #endif
 
-	for (int port = virtsvc->last_assigned_port+1; port < DP_VIRTSVC_PORTCOUNT; ++port)
+	for (uint16_t port = virtsvc->last_assigned_port+1; port < DP_VIRTSVC_PORTCOUNT; ++port)
 		if (dp_virtsvc_is_connection_old(&virtsvc->connections[port], current_tsc))
 			return virtsvc->last_assigned_port = port;
 
-	for (int port = 0; port <= virtsvc->last_assigned_port; ++port)
+	for (uint16_t port = 0; port <= virtsvc->last_assigned_port; ++port)
 		if (dp_virtsvc_is_connection_old(&virtsvc->connections[port], current_tsc))
 			return virtsvc->last_assigned_port = port;
 
@@ -317,7 +318,7 @@ static __rte_always_inline int dp_virstvc_get_connection(struct dp_virtsvc *virt
 		return ret;
 
 	assert((intptr_t)data >= 0 && (intptr_t)data < DP_VIRTSVC_PORTCOUNT);
-	return (intptr_t)data;
+	return (int)(intptr_t)data;
 }
 
 int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,

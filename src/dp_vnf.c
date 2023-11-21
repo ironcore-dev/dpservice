@@ -25,7 +25,7 @@ void dp_vnf_free(void)
 }
 
 int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type type,
-			   uint16_t port_id, uint32_t vni, uint32_t prefix_ip, uint16_t prefix_len)
+			   uint16_t port_id, uint32_t vni, uint32_t prefix_ip, uint8_t prefix_len)
 {
 	struct dp_vnf *vnf;
 	int ret;
@@ -91,7 +91,7 @@ int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 
 static __rte_always_inline bool dp_vnf_match(const struct dp_vnf *vnf, enum dp_vnf_type type,
 											 uint16_t port_id, uint32_t vni,
-											 uint32_t prefix_ip, uint16_t prefix_len)
+											 uint32_t prefix_ip, uint8_t prefix_len)
 {
 	return (port_id == DP_VNF_MATCH_ALL_PORT_IDS || vnf->port_id == port_id)
 		&& vnf->vni == vni
@@ -100,7 +100,7 @@ static __rte_always_inline bool dp_vnf_match(const struct dp_vnf *vnf, enum dp_v
 		&& vnf->type == type;
 }
 
-bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, uint32_t prefix_ip, uint16_t prefix_len)
+bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, uint32_t prefix_ip, uint8_t prefix_len)
 {
 	struct dp_vnf *vnf;
 	uint32_t iter = 0;
@@ -119,7 +119,7 @@ bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, uint32_t prefix_ip, 
 	return false;
 }
 
-int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, uint32_t prefix_ip, uint16_t prefix_len)
+int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, uint32_t prefix_ip, uint8_t prefix_len)
 {
 	struct dp_vnf *vnf;
 	uint32_t iter = 0;

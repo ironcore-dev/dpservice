@@ -35,7 +35,7 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 #ifdef ENABLE_STATIC_UNDERLAY_IP
 	random_byte = 1;
 #else
-	random_byte = rand() % 256;
+	random_byte = (uint8_t)(rand() % 256);
 #endif
 
 	/* 1 byte random value */
@@ -56,7 +56,7 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 
 static int dp_create_vnf_route(uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE] /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
-							   uint32_t prefix_ip, uint16_t prefix_len)
+							   uint32_t prefix_ip, uint8_t prefix_len)
 {
 	dp_generate_underlay_ipv6(ul_addr6);
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, prefix_ip, prefix_len);
@@ -891,7 +891,7 @@ static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 		return ret;
 	}
 
-	reply->port_cnt = ret;
+	reply->port_cnt = (uint16_t)ret;
 	dp_set_capture_enabled(false);
 	return DP_GRPC_OK;
 }
@@ -901,7 +901,7 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 	struct dpgrpc_capture *reply = dp_grpc_single_reply(responder);
 	const struct dp_ports *ports = dp_get_ports();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
-	int count = 0;
+	uint8_t count = 0;
 
 	if (!dp_is_capture_enabled()) {
 		memset(reply, 0, sizeof(*reply));
@@ -914,6 +914,8 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 			continue;
 
 		// this should never happen, but just in case
+		static_assert(DP_CAPTURE_MAX_PORT_NUM < UINT8_MAX,
+					  "Possible number of captured ports is too big");
 		if (count >= DP_CAPTURE_MAX_PORT_NUM) {
 			DPS_LOG_ERR("Unexpected number of interfaces are being captured",
 						DP_LOG_VALUE(count), DP_LOG_MAX(DP_CAPTURE_MAX_PORT_NUM));
@@ -945,7 +947,7 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 void dp_process_request(struct rte_mbuf *m)
 {
 	struct dp_grpc_responder responder;
-	uint8_t request_type;
+	enum dpgrpc_request_type request_type;
 	int ret;
 
 	request_type = dp_grpc_init_responder(&responder, m);
