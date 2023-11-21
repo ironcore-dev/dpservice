@@ -97,8 +97,8 @@ struct flow_value {
 	uint8_t			flow_flags;
 	enum dp_fwall_action	fwall_action[DP_FLOW_DIR_CAPACITY];
 	struct {
-		enum dp_flow_offload_state orig;
-		enum dp_flow_offload_state reply;
+		enum dp_pkt_offload_state orig;
+		enum dp_pkt_offload_state reply;
 	} offload_state;
 	struct {
 		bool pf0;
