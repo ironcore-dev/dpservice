@@ -14,7 +14,7 @@ int dp_map_iface_id(const char iface_id[DP_IFACE_ID_MAX_LEN], struct dp_port *po
 void dp_unmap_iface_id(const char iface_id[DP_IFACE_ID_MAX_LEN]);
 struct dp_port *dp_get_port_with_iface_id(const char iface_id[DP_IFACE_ID_MAX_LEN]);
 
-int dp_setup_iface(struct dp_port *port, int vni);
+int dp_setup_iface(struct dp_port *port, uint32_t vni);
 void dp_delete_iface(struct dp_port *port);
 
 

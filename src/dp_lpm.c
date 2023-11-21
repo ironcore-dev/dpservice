@@ -47,7 +47,7 @@ int dp_lpm_reset_all_route_tables(void)
 	return DP_GRPC_OK;
 }
 
-int dp_lpm_reset_route_tables(int vni)
+int dp_lpm_reset_route_tables(uint32_t vni)
 {
 	const struct dp_ports *ports = dp_get_ports();
 	int ret;
@@ -58,8 +58,7 @@ int dp_lpm_reset_route_tables(int vni)
 	}
 
 	DP_FOREACH_PORT(ports, port) {
-		// TODO(plague?): the cast does not seem nice, define a type for VNIs?
-		if (!port->iface.ready || (int)port->iface.vni != vni)
+		if (!port->iface.ready || port->iface.vni != vni)
 			continue;
 		ret = dp_lpm_fill_route_tables(port);
 		if (DP_FAILED(ret))
@@ -188,7 +187,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	return DP_GRPC_OK;
 }
 
-int dp_list_routes(const struct dp_port *port, int vni, bool ext_routes,
+int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
 				   struct dp_grpc_responder *responder)
 {
 	struct rte_rib_node *node = NULL;
@@ -273,7 +272,7 @@ int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6,
 }
 
 const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
-										  int t_vni,
+										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
 										  uint32_t *route_key)
@@ -312,7 +311,7 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 }
 
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
-										  int t_vni,
+										  uint32_t t_vni,
 										  const struct rte_ipv6_hdr *ipv6_hdr,
 										  struct dp_iface_route *route)
 {

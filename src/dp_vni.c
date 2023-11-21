@@ -20,7 +20,7 @@ void dp_vni_free(void)
 	dp_free_jhash_table(vni_handle_tbl);
 }
 
-bool dp_is_vni_route_table_available(int vni, int type)
+bool dp_is_vni_route_table_available(uint32_t vni, int type)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -143,7 +143,7 @@ err_alloc:
 	return DP_ERROR;
 }
 
-int dp_create_vni_route_tables(int vni, int socket_id)
+int dp_create_vni_route_tables(uint32_t vni, int socket_id)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -165,7 +165,7 @@ int dp_create_vni_route_tables(int vni, int socket_id)
 
 }
 
-int dp_delete_vni_route_tables(int vni)
+int dp_delete_vni_route_tables(uint32_t vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -190,7 +190,7 @@ int dp_delete_vni_route_tables(int vni)
 	return DP_OK;
 }
 
-static int dp_reset_vni_data(int vni, struct dp_vni_data *vni_data)
+static int dp_reset_vni_data(uint32_t vni, struct dp_vni_data *vni_data)
 {
 	int socket_id = DP_SOCKETID(vni_data->socket_id);
 
@@ -209,7 +209,7 @@ static int dp_reset_vni_data(int vni, struct dp_vni_data *vni_data)
 	return DP_OK;
 }
 
-int dp_reset_vni_route_tables(int vni)
+int dp_reset_vni_route_tables(uint32_t vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {

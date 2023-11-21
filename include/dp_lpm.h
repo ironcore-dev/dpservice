@@ -38,18 +38,18 @@ extern "C" {
 #define DP_LIST_INT_ROUTES false
 
 struct dp_iface_route {
-	int		vni;
-	uint8_t	nh_ipv6[16];
+	uint32_t vni;
+	uint8_t  nh_ipv6[16];
 };
 
 const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
-										  int t_vni,
+										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
 										  uint32_t *route_key);
 
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
-										  int t_vni,
+										  uint32_t t_vni,
 										  const struct rte_ipv6_hdr *ipv6_hdr,
 										  struct dp_iface_route *route);
 
@@ -62,10 +62,10 @@ int dp_del_route(const struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t 
 int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
 				  const uint8_t *ext_ip6, uint8_t depth);
 int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth);
-int dp_list_routes(const struct dp_port *port, int vni, bool ext_routes, struct dp_grpc_responder *responder);
+int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes, struct dp_grpc_responder *responder);
 
 int dp_lpm_reset_all_route_tables(void);
-int dp_lpm_reset_route_tables(int vni);
+int dp_lpm_reset_route_tables(uint32_t vni);
 
 #ifdef __cplusplus
 }

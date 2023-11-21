@@ -65,7 +65,7 @@ struct dp_port *dp_get_port_with_iface_id(const char iface_id[DP_IFACE_ID_MAX_LE
 }
 
 
-int dp_setup_iface(struct dp_port *port, int vni)
+int dp_setup_iface(struct dp_port *port, uint32_t vni)
 {
 	if (DP_FAILED(dp_create_vni_route_tables(vni, port->socket_id)))
 		return DP_ERROR;

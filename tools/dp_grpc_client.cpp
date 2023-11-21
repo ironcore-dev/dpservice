@@ -113,7 +113,7 @@ static char get_nat_info_type_str[10]={0};
 
 static int command;
 static int debug_mode;
-static int vni;
+static uint32_t vni;
 static int t_vni;
 static int length, src_length, dst_length;
 static bool pfx_lb_enabled = false;

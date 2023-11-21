@@ -26,7 +26,7 @@ extern struct rte_hash *vni_handle_tbl;
 #define DP_SOCKETID(SOCKETID) (unlikely((unsigned int)(SOCKETID) >= DP_NB_SOCKETS) ? 0 : (SOCKETID))
 
 struct dp_vni_key {
-	int vni;
+	uint32_t vni;
 } __rte_packed;
 
 struct dp_vni_data {
@@ -34,11 +34,11 @@ struct dp_vni_data {
 	struct rte_rib6	*ipv6[DP_NB_SOCKETS];
 	struct dp_ref	ref_count;
 	int				socket_id;
-	int				vni;
+	uint32_t		vni;
 };
 
 static __rte_always_inline
-struct rte_rib *dp_get_vni_route4_table(int vni)
+struct rte_rib *dp_get_vni_route4_table(uint32_t vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -57,7 +57,7 @@ struct rte_rib *dp_get_vni_route4_table(int vni)
 }
 
 static __rte_always_inline
-struct rte_rib6 *dp_get_vni_route6_table(int vni)
+struct rte_rib6 *dp_get_vni_route6_table(uint32_t vni)
 {
 	struct dp_vni_data *vni_data;
 	struct dp_vni_key vni_key = {
@@ -77,10 +77,10 @@ struct rte_rib6 *dp_get_vni_route6_table(int vni)
 
 int dp_vni_init(int socket_id);
 void dp_vni_free(void);
-bool dp_is_vni_route_table_available(int vni, int type);
-int dp_create_vni_route_tables(int vni, int socket_id);
-int dp_delete_vni_route_tables(int vni);
-int dp_reset_vni_route_tables(int vni);
+bool dp_is_vni_route_table_available(uint32_t vni, int type);
+int dp_create_vni_route_tables(uint32_t vni, int socket_id);
+int dp_delete_vni_route_tables(uint32_t vni);
+int dp_reset_vni_route_tables(uint32_t vni);
 int dp_reset_all_vni_route_tables(void);
 
 #ifdef __cplusplus
