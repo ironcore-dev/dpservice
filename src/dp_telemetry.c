@@ -16,6 +16,14 @@
 #include "dpdk_layer.h"
 #include "dp_internal_stats.h"
 
+struct dp_telemetry_htable {
+	const struct rte_hash *htable;
+	int capacity;
+	char name[RTE_HASH_NAMESIZE];
+};
+
+static struct dp_telemetry_htable *tel_htables = NULL;
+static int tel_htable_count = 0;
 
 static struct rte_graph_cluster_stats *tel_stats;
 static int32_t tel_graph_node_index = 0;
@@ -23,6 +31,7 @@ static struct rte_tel_data *tel_data = NULL;
 static struct rte_tel_data *tel_curr_block =  NULL;
 static int tel_callback_ret = 0;
 static int tel_stat_value_offset = 0;
+
 
 // as a dictionary only supports 256 entries, two-levels can only contain 65536 entries total
 #define DP_NODE_BLOCK_NAME_MAX sizeof("Node_65279_to_65535")
@@ -74,14 +83,18 @@ static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,
 		}
 
 		tel_callback_ret = rte_tel_data_start_dict(tel_curr_block);
-		if (DP_FAILED(tel_callback_ret))
+		if (DP_FAILED(tel_callback_ret)) {
+			rte_tel_data_free(tel_curr_block);
 			return tel_callback_ret;
+		}
 
 		snprintf(dict_name, sizeof(dict_name), "Node_%hd_to_%hd",
 				(uint16_t)(tel_graph_node_index-1), (uint16_t)(tel_graph_node_index + (RTE_TEL_MAX_DICT_ENTRIES-2)));
 		tel_callback_ret = rte_tel_data_add_dict_container(tel_data, dict_name, tel_curr_block, 0);
-		if (DP_FAILED(tel_callback_ret))
+		if (DP_FAILED(tel_callback_ret)) {
+			rte_tel_data_free(tel_curr_block);
 			return tel_callback_ret;
+		}
 	}
 
 	tel_callback_ret = rte_tel_data_add_dict_uint(tel_curr_block, stats->name, get_stat_value(stats));
@@ -172,6 +185,53 @@ static int dp_telemetry_handle_nat_used_port_count(const char *cmd,
 	return DP_OK;
 }
 
+
+static int dp_telemetry_add_htable(struct rte_tel_data *parent,
+								   struct rte_tel_data *data,
+								   const struct dp_telemetry_htable *htable)
+{
+	int ret;
+
+	ret = rte_tel_data_start_dict(data);
+	if (DP_FAILED(ret))
+		return ret;
+
+	ret = rte_tel_data_add_dict_u64(data, "capacity", htable->capacity);
+	if (DP_FAILED(ret))
+		return ret;
+
+	ret = rte_tel_data_add_dict_u64(data, "entries", rte_hash_count(htable->htable));
+	if (DP_FAILED(ret))
+		return ret;
+
+	ret = rte_tel_data_add_dict_container(parent, htable->name, data, 0);
+	if (DP_FAILED(ret))
+		return ret;
+
+	return DP_OK;
+}
+
+static int dp_telemetry_handle_table_saturation(const char *cmd,
+												__rte_unused const char *params,
+												struct rte_tel_data *data)
+{
+	struct rte_tel_data *htable_data;
+
+	if (DP_FAILED(dp_telemetry_start_dict(data, cmd)))
+		return DP_ERROR;
+
+	for (int i = 0; i < tel_htable_count; ++i) {
+		htable_data = rte_tel_data_alloc();
+		if (!htable_data)
+			return DP_ERROR;
+		if (DP_FAILED(dp_telemetry_add_htable(data, htable_data, &tel_htables[i]))) {
+			rte_tel_data_free(htable_data);
+			return DP_ERROR;
+		}
+	}
+	return DP_OK;
+}
+
 //
 // Entrypoints
 //
@@ -192,6 +252,7 @@ int dp_telemetry_init(void)
 #ifdef ENABLE_VIRTSVC
 		DP_TELEMETRY_REGISTER_COMMAND(virtsvc, used_port_count, "Returns the number of ports in use by each virtual service."),
 #endif
+		DP_TELEMETRY_REGISTER_COMMAND(table, saturation, "Returns the current and maximal capacity of each hash table."),
 	};
 
 	if (!rte_graph_has_stats_feature())
@@ -220,6 +281,31 @@ int dp_telemetry_init(void)
 
 void dp_telemetry_free(void)
 {
+	free(tel_htables);
 	if (rte_graph_has_stats_feature())
 		dp_telemetry_graph_stats_destroy();
+}
+
+int dp_telemetry_register_htable(const struct rte_hash *htable, const char name[RTE_HASH_NAMESIZE], int capacity)
+{
+	struct dp_telemetry_htable *entry;
+	void *tmp;
+
+	if (tel_htable_count >= RTE_TEL_MAX_DICT_ENTRIES) {
+		DPS_LOG_ERR("Telemetry hashtable registry is full");
+		return DP_ERROR;
+	}
+
+	tmp = realloc(tel_htables, (tel_htable_count + 1) * sizeof(*entry));
+	if (!tmp) {
+		DPS_LOG_ERR("Cannot allocate telemetry hashtable registry entry");
+		return DP_ERROR;
+	}
+
+	tel_htables = tmp;
+	entry = &tel_htables[tel_htable_count++];
+	entry->htable = htable;
+	entry->capacity = capacity;
+	snprintf(entry->name, sizeof(entry->name), "%s", name);
+	return DP_OK;
 }

@@ -44,7 +44,7 @@ int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char if
 int dp_get_num_of_vfs(void);
 
 
-struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id);
+struct rte_hash *dp_create_jhash_table(int capacity, size_t key_len, const char *name, int socket_id);
 
 void dp_free_jhash_table(struct rte_hash *table);
 

@@ -9,6 +9,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_port.h"
+#include "dp_telemetry.h"
 #include "rte_flow/dp_rte_flow.h"
 
 #define DP_SYSFS_PREFIX_MLX_DEVICE		"/sys/class/net/"
@@ -126,10 +127,10 @@ static uint32_t dp_jhash_nwords(const void *key, uint32_t length, uint32_t initv
 	return rte_jhash_32b(key, length / 4, initval);
 }
 
-struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *name, int socket_id)
+struct rte_hash *dp_create_jhash_table(int capacity, size_t key_len, const char *name, int socket_id)
 {
 	struct rte_hash *result;
-	char full_name[64];
+	char full_name[RTE_HASH_NAMESIZE];
 	rte_hash_function hash_func;
 
 	if (key_len == 4)
@@ -143,11 +144,14 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 	else
 		hash_func = rte_jhash;
 
-	snprintf(full_name, sizeof(full_name), "%s_%u", name, socket_id);
+	if ((unsigned int)snprintf(full_name, sizeof(full_name), "%s_%d", name, socket_id) >= RTE_HASH_NAMESIZE) {
+		DPS_LOG_ERR("jhash table name is too long", DP_LOG_NAME(full_name));
+		return NULL;
+	}
 
 	struct rte_hash_parameters params = {
 		.name = full_name,
-		.entries = DP_JHASH_MARGIN_COEF(entries),
+		.entries = DP_JHASH_MARGIN_COEF(capacity),
 		.key_len = (uint32_t)key_len,  // no way this will get bigger than 32b
 		.hash_func = hash_func,
 		.hash_func_init_val = 0xfee1900d,  // "random" IV
@@ -159,6 +163,11 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 	if (!result)
 		DPS_LOG_ERR("Cannot create jhash table",
 					DP_LOG_NAME(name), DP_LOG_SOCKID(socket_id), DP_LOG_RET(rte_errno));
+
+	if (DP_FAILED(dp_telemetry_register_htable(result, name, capacity))) {
+		rte_hash_free(result);
+		return NULL;
+	}
 
 	return result;
 }
