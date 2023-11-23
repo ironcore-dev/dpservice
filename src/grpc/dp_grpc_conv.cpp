@@ -148,11 +148,17 @@ const char *Ipv4ToStr(uint32_t ipv4)
 	return inet_ntoa(addr);
 }
 
-uint32_t Ipv4PrefixLenToMask(uint32_t prefix_length)
+bool Ipv4PrefixLenToMask(uint32_t prefix_length, uint32_t *mask)
 {
-	return prefix_length == DP_FWALL_MATCH_ANY_LENGTH
-		? DP_FWALL_MATCH_ANY_LENGTH
-		: ~((1 << (32 - prefix_length)) - 1);
+	if (prefix_length > 32)
+		return false;
+
+	if (prefix_length == DP_FWALL_MATCH_ANY_LENGTH)
+		*mask = DP_FWALL_MATCH_ANY_LENGTH;
+	else
+		*mask = ~((1 << (32 - prefix_length)) - 1);
+
+	return true;
 }
 
 

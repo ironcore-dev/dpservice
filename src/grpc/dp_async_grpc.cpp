@@ -925,16 +925,14 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid source_prefix.ip.ipver";
 	if (!GrpcConv::StrToIpv4(grpc_rule.source_prefix().ip().address(), &dp_rule->src_ip))
 		return "Invalid source_prefix.ip";
-	if (grpc_rule.source_prefix().length() > 32)
+	if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length(), &dp_rule->src_ip_mask))
 		return "Invalid source_prefix.length";
-	dp_rule->src_ip_mask = GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length());
 	if (grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV4)
 		return "Invalid destination_prefix.ip.ipver";
 	if (!GrpcConv::StrToIpv4(grpc_rule.destination_prefix().ip().address(), &dp_rule->dest_ip))
 		return "Invalid destination_prefix.ip";
-	if (grpc_rule.destination_prefix().length() > 32)
+	if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length(), &dp_rule->dest_ip_mask))
 		return "Invalid destination_prefix.length";
-	dp_rule->dest_ip_mask = GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length());
 	if (!GrpcConv::GrpcToDpFwallDirection(grpc_rule.direction(), &dp_rule->dir))
 		return "Invalid direction";
 	if (!GrpcConv::GrpcToDpFwallAction(grpc_rule.action(), &dp_rule->action))
@@ -995,8 +993,8 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 						DP_LOG_FWICMPTYPE(grpc_filter.icmp().icmp_type()),
 						DP_LOG_FWICMPCODE(grpc_filter.icmp().icmp_code()));
 		dp_rule->protocol = IPPROTO_ICMP;
-		dp_rule->filter.icmp.icmp_type = grpc_filter.icmp().icmp_type();
-		dp_rule->filter.icmp.icmp_code = grpc_filter.icmp().icmp_code();
+		dp_rule->filter.icmp.icmp_type = (uint32_t)grpc_filter.icmp().icmp_type();
+		dp_rule->filter.icmp.icmp_code = (uint32_t)grpc_filter.icmp().icmp_code();
 		if (dp_rule->filter.icmp.icmp_type != DP_FWALL_MATCH_ANY_ICMP_TYPE && dp_rule->filter.icmp.icmp_type > UINT8_MAX)
 			return "Invalid icmp.icmp_type";
 		if (dp_rule->filter.icmp.icmp_code != DP_FWALL_MATCH_ANY_ICMP_CODE && dp_rule->filter.icmp.icmp_code > UINT8_MAX)

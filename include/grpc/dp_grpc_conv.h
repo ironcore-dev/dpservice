@@ -29,7 +29,7 @@ namespace GrpcConv
 
 	const char *Ipv4ToStr(uint32_t ipv4);
 
-	uint32_t Ipv4PrefixLenToMask(uint32_t prefix_length);
+	bool Ipv4PrefixLenToMask(uint32_t prefix_length, uint32_t *mask);
 
 	void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface);
 
