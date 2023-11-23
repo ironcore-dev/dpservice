@@ -10,6 +10,8 @@ extern "C" {
 int dp_telemetry_init(void);
 void dp_telemetry_free(void);
 
+int dp_telemetry_register_htable(const struct rte_hash *htable, const char *name, int capacity);
+
 #ifdef __cplusplus
 }
 #endif
