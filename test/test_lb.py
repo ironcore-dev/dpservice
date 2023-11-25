@@ -65,9 +65,9 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 		pytest.skip("Port redundancy is not supported for LB(vni1) <-> VIP/NAT(vni2) test")
 
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_ip)
+	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, f"{lb_ip}/32")
 	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
-	lb_vm2_ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_ip)
+	lb_vm2_ul_ipv6 = grpc_client.addlbprefix(VM2.name, f"{lb_ip}/32")
 	grpc_client.addlbtarget(lb_name, lb_vm2_ul_ipv6)
 
 	vip_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
@@ -88,9 +88,9 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	grpc_client.delnat(VM3.name)
 
 	grpc_client.dellbtarget(lb_name, lb_vm2_ul_ipv6)
-	grpc_client.dellbprefix(VM2.name, lb_ip)
+	grpc_client.dellbprefix(VM2.name, f"{lb_ip}/32")
 	grpc_client.dellbtarget(lb_name, lb_vm1_ul_ipv6)
-	grpc_client.dellbprefix(VM1.name, lb_ip)
+	grpc_client.dellbprefix(VM1.name, f"{lb_ip}/32")
 	grpc_client.dellb(lb_name)
 
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
@@ -108,7 +108,7 @@ def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 
 	# Create a VM on VNI1 under a loadbalancer and NAT
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_ip)
+	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, f"{lb_ip}/32")
 	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
 	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 100, 101)
 
@@ -122,7 +122,7 @@ def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 
 	grpc_client.delnat(VM1.name)
 	grpc_client.dellbtarget(lb_name, lb_vm1_ul_ipv6)
-	grpc_client.dellbprefix(VM1.name, lb_ip)
+	grpc_client.dellbprefix(VM1.name, f"{lb_ip}/32")
 	grpc_client.dellb(lb_name)
 
 def send_bounce_pkt_to_pf(ipv6_lb):

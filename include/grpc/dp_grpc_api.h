@@ -8,14 +8,11 @@
 #include "dp_firewall.h"
 #include "dp_iface.h"
 #include "dp_util.h"
-#include "dp_vnf.h"
 #include "monitoring/dp_monitoring.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define DP_VNF_IPV6_ADDR_SIZE	16
 
 #define DP_GRPC_VERSION_MAX_LEN	64
 
@@ -80,24 +77,16 @@ enum dpgrpc_capture_iface_type {
 struct dpgrpc_iface {
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	uint32_t				ip4_addr;
-	uint8_t					ip6_addr[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t					ip6_addr[DP_IPV6_ADDR_SIZE];
 	uint32_t				vni;
 	uint32_t				ip4_pxe_addr;						// request (create) only
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
-	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
+	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_iface_id {
 	char 					iface_id[DP_IFACE_ID_MAX_LEN];
-};
-
-struct dpgrpc_address {
-	uint32_t				ip_type;
-	union {
-		uint32_t			ipv4;
-		uint8_t				ipv6[DP_VNF_IPV6_ADDR_SIZE];
-	};
 };
 
 struct dpgrpc_prefix {
@@ -117,7 +106,7 @@ struct dpgrpc_route {
 struct dpgrpc_vip {
 	struct dpgrpc_address	addr;
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
-	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
+	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_nat {
@@ -126,8 +115,8 @@ struct dpgrpc_nat {
 	uint16_t				min_port;
 	uint16_t				max_port;
 	uint32_t				vni;								// neighnat or reply only
-	uint8_t					neigh_addr6[DP_VNF_IPV6_ADDR_SIZE];	// neighnat only
-	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
+	uint8_t					neigh_addr6[DP_IPV6_ADDR_SIZE];	// neighnat only
+	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_lb_port {
@@ -140,7 +129,7 @@ struct dpgrpc_lb {
 	struct dpgrpc_address	addr;
 	uint32_t				vni;
 	struct dpgrpc_lb_port	lbports[DP_LB_MAX_PORTS];
-	uint8_t					ul_addr6[DP_VNF_IPV6_ADDR_SIZE];	// reply only
+	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_lb_id {
@@ -182,7 +171,7 @@ struct dpgrpc_capture_interface {
 };
 
 struct dpgrpc_capture {
-	uint8_t			dst_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t			dst_addr6[DP_IPV6_ADDR_SIZE];
 	uint8_t			interface_count;
 	uint16_t		udp_src_port;
 	uint16_t		udp_dst_port;
@@ -238,11 +227,11 @@ struct dpgrpc_request {
 
 struct dpgrpc_vf_pci {
 	char		name[RTE_ETH_NAME_MAX_LEN];
-	uint8_t		ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t		ul_addr6[DP_IPV6_ADDR_SIZE];
 };
 
 struct dpgrpc_ul_addr {
-	uint8_t		addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t		addr6[DP_IPV6_ADDR_SIZE];
 };
 
 struct dpgrpc_fwrule_info {

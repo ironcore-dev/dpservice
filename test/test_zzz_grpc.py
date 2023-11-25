@@ -138,22 +138,55 @@ def test_grpc_add_list_delPfx(prepare_ifaces, grpc_client):
 	assert myspec not in specs, \
 		f"Prefix {prefix} not deleted properly"
 
+def test_grpc_add_list_delPfx_ipv6(prepare_ifaces, grpc_client):
+	# Try to add Prefix, list, test error cases, delete prefix and list again
+	prefix = f"{pfx_ip6}/124"
+	ul_ipv6 = grpc_client.addprefix(VM2.name, prefix)
+	myspec = { "prefix": prefix, "underlay_route": ul_ipv6 }
+	specs = grpc_client.listprefixes(VM2.name)
+	assert myspec in specs, \
+		f"Prefix {prefix} not added properly"
+	# Try to add the same pfx again
+	grpc_client.expect_error(301).addprefix(VM2.name, prefix)
+	# Try to add/delete to/from a machine which doesnt exist
+	grpc_client.expect_error(205).addprefix("invalid_name", prefix)
+	grpc_client.expect_error(205).delprefix("invalid_name", prefix)
+	grpc_client.delprefix(VM2.name, prefix)
+	specs = grpc_client.listprefixes(VM2.name)
+	assert myspec not in specs, \
+		f"Prefix {prefix} not deleted properly"
+
 def test_grpc_add_list_delLoadBalancerTargets(prepare_ifaces, grpc_client):
 	# Try to add Prefix, list, test error cases, delete prefix and list again
 	lb_prefix = f"{lb_ip}/32"
-	ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_ip)
+	ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_prefix)
 	myspec = { "prefix": lb_prefix, "underlay_route": ul_ipv6 }
 	specs = grpc_client.listlbprefixes(VM2.name)
 	assert myspec in specs, \
 		f"Loadbalancer prefix {lb_prefix} not added properly"
 	# Try to add/delete to/from a machine which doesnt exist
-	grpc_client.expect_error(205).addlbprefix("invalid_name", lb_ip)
-	grpc_client.expect_error(205).dellbprefix("invalid_name", lb_ip)
-	grpc_client.dellbprefix(VM2.name, lb_ip)
+	grpc_client.expect_error(205).addlbprefix("invalid_name", lb_prefix)
+	grpc_client.expect_error(205).dellbprefix("invalid_name", lb_prefix)
+	grpc_client.dellbprefix(VM2.name, lb_prefix)
 	specs = grpc_client.listlbprefixes(VM2.name)
 	assert myspec not in specs, \
 		f"Loadbalancer prefix {lb_prefix} not deleted properly"
 
+def test_grpc_add_list_delLoadBalancerTargets_ipv6(prepare_ifaces, grpc_client):
+	# Try to add Prefix, list, test error cases, delete prefix and list again
+	lb_prefix = f"{lb_ip6}/128"
+	ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_prefix)
+	myspec = { "prefix": lb_prefix, "underlay_route": ul_ipv6 }
+	specs = grpc_client.listlbprefixes(VM2.name)
+	assert myspec in specs, \
+		f"Loadbalancer prefix {lb_prefix} not added properly"
+	# Try to add/delete to/from a machine which doesnt exist
+	grpc_client.expect_error(205).addlbprefix("invalid_name", lb_prefix)
+	grpc_client.expect_error(205).dellbprefix("invalid_name", lb_prefix)
+	grpc_client.dellbprefix(VM2.name, lb_prefix)
+	specs = grpc_client.listlbprefixes(VM2.name)
+	assert myspec not in specs, \
+		f"Loadbalancer prefix {lb_prefix} not deleted properly"
 
 def test_grpc_add_list_delFirewallRules(prepare_ifaces, grpc_client):
 	# Try to add FirewallRule, get, list, delete and test error cases
