@@ -39,6 +39,13 @@ extern "C" {
 #define DP_TCP_PKT_FLAG_SYNACK(FLAGS) \
 	(((FLAGS) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
 
+struct dpgrpc_address {
+	uint32_t				ip_type;
+	union {
+		uint32_t			ipv4;
+		uint8_t				ipv6[DP_IPV6_ADDR_SIZE];
+	};
+};
 
 int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IF_NAMESIZE]);
 

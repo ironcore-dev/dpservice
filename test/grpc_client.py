@@ -161,11 +161,11 @@ class GrpcClient:
 	def listlbtargets(self, lb_name):
 		return self._getSpecList(f"list lbtargets --lb-id={lb_name}")
 
-	def addlbprefix(self, vm_name, vip):
-		return self._getUnderlayRoute(f"add lbprefix --interface-id={vm_name} --prefix={vip}/32")
+	def addlbprefix(self, vm_name, prefix):
+		return self._getUnderlayRoute(f"add lbprefix --interface-id={vm_name} --prefix={prefix}")
 
-	def dellbprefix(self, vm_name, vip):
-		self._call(f"del lbprefix --interface-id={vm_name} --prefix={vip}/32")
+	def dellbprefix(self, vm_name, prefix):
+		self._call(f"del lbprefix --interface-id={vm_name} --prefix={prefix}")
 
 	def listlbprefixes(self, vm_name):
 		return self._getSpecList(f"list lbprefixes --interface-id={vm_name}")

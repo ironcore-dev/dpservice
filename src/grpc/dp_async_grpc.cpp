@@ -370,11 +370,15 @@ void ListPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
-			pfx->set_length(route->pfx_length);
-			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
-			pfx->set_underlay_route(strbuf);
+		} else if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
+			pfx_ip->set_address(strbuf);
+			pfx_ip->set_ipver(IpVersion::IPV6);
 		} else
-			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4);
+			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4 || route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6);
+		pfx->set_length(route->pfx_length);
+		inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+		pfx->set_underlay_route(strbuf);
 		pfx->set_allocated_ip(pfx_ip);
 	}
 }
@@ -899,8 +903,15 @@ void ListLoadBalancerPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 			pfx->set_length(route->pfx_length);
 			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
 			pfx->set_underlay_route(strbuf);
+		} else if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
+			pfx_ip->set_address(strbuf);
+			pfx_ip->set_ipver(IpVersion::IPV6);
 		} else
-			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4);
+			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4 || route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6);
+		pfx->set_length(route->pfx_length);
+		inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+		pfx->set_underlay_route(strbuf);
 		pfx->set_allocated_ip(pfx_ip);
 	}
 }
