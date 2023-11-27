@@ -22,22 +22,26 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
+	struct snat_data *snat_data = NULL;
 	struct rte_ipv4_hdr *ipv4_hdr;
-	uint32_t src_ip;
-	struct snat_data *snat_data;
 	struct dp_port *port;
+	rte_be32_t dest_ip4;
 	uint16_t nat_port;
+	uint32_t src_ip;
 	uint32_t vni;
 	int ret;
 
 	if (!cntrack)
 		return SNAT_NEXT_FIREWALL;
 
+	port = dp_get_in_port(m);
 	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
-		port = dp_get_in_port(m);
-		src_ip = ntohl(df->src.src_addr);
 		vni = port->iface.vni;
-		snat_data = dp_get_iface_snat_data(src_ip, vni);
+
+		if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+			src_ip = ntohl(df->src.src_addr);
+			snat_data = dp_get_iface_snat_data(src_ip, vni);
+		}
 
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->nat_ip != 0)
 			&& df->flow_type == DP_FLOW_SOUTH_NORTH) {
@@ -85,9 +89,55 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 				return SNAT_NEXT_DROP;
 		}
-		// it is deleted due the case where an init packet/request is sent twice, and no action is done if it is returned here
-		// it has to continue to the follow-up code
-		// return 1;
+
+		if (df->l3_type == RTE_ETHER_TYPE_IPV6 && port->iface.nat_ip && dp_is_ip6_in_nat64_range(df->dst.dst_addr6)
+		    && df->flow_type == DP_FLOW_SOUTH_NORTH) {
+			struct snat_data snat_data = {0};
+
+			snat_data.nat_ip = port->iface.nat_ip;
+			snat_data.nat_port_range[0] = port->iface.nat_port_range[0];
+			snat_data.nat_port_range[1] = port->iface.nat_port_range[1];
+			ret = dp_allocate_network_snat_port(&snat_data, df, vni);
+			if (DP_FAILED(ret))
+				return SNAT_NEXT_DROP;
+			nat_port = (uint16_t)ret;
+
+			DP_STATS_NAT_INC_USED_PORT_CNT(port);
+
+			df->nat_port = nat_port;
+			df->nat_type = DP_NAT_64_CHG_SRC_IP;
+			df->nat_addr = snat_data.nat_ip;
+			dest_ip4 = dp_nat_chg_ipv6_to_ipv4_hdr(df, m, snat_data.nat_ip);
+
+			if (df->l4_type == IPPROTO_ICMPV6) {
+				dp_change_icmp_identifier(m, nat_port);
+				cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
+				cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
+				df->offload_state = DP_FLOW_NON_OFFLOAD;
+			} else {
+				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port);
+			}
+
+			cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
+			cntrack->nf_info.vni = vni;
+			cntrack->nf_info.l4_type = df->l4_type;
+			cntrack->nf_info.icmp_err_ip_cksum = ipv4_hdr->hdr_checksum;
+
+			/* Expect the new destination in this conntrack object */
+			cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT64;
+			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			memset(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ip6, 0, DP_IPV6_ADDR_SIZE);
+			memset(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip6, 0, DP_IPV6_ADDR_SIZE);
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ip4 = ntohl(dest_ip4);
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4 = snat_data.nat_ip;
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_type = RTE_ETHER_TYPE_IPV4;
+
+			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
+				return SNAT_NEXT_DROP;
+
+			return SNAT_NEXT_FIREWALL;
+		}
 	}
 
 	/* We already know what to do */
@@ -116,6 +166,20 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df->nat_addr = ipv4_hdr->src_addr;
 		df->nat_type = DP_NAT_CHG_SRC_IP;
 		dp_nat_chg_ip(df, ipv4_hdr, m);
+	}
+
+	if (DP_FLOW_HAS_FLAG_SRC_NAT64(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
+		dp_nat_chg_ipv6_to_ipv4_hdr(df, m, port->iface.nat_ip);
+		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
+			if (df->l4_type == IPPROTO_ICMPV6)
+				dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
+			else
+				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
+		}
+
+		df->nat_type = DP_NAT_64_CHG_SRC_IP;
+		df->nat_addr = port->iface.nat_ip;
 	}
 
 	return SNAT_NEXT_FIREWALL;

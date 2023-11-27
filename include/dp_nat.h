@@ -9,12 +9,19 @@
 #include <rte_common.h>
 #include <rte_mbuf.h>
 #include "dp_flow.h"
+#include "dp_util.h"
 #include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define DP_NAT64_PREFIX		"\x00\x64\xff\x9b\x00\x00\x00\x00\x00\x00\x00\x00"
+#define DP_MIN_PACKET_SIZE	64
+
+
+// TODO: change this to a configurable value
+#define DP_NETWORK_NAT_MAX_ENTRY	256
 #define DP_NETWORK_NAT_ALL_VNI		0
 
 struct nat_key {
@@ -25,11 +32,11 @@ struct nat_key {
 typedef struct network_nat_entry {
 	union {
 		uint32_t	nat_ip4;
-		uint8_t		nat_ip6[16];
+		uint8_t		nat_ip6[DP_IPV6_ADDR_SIZE];
 	} nat_ip;
 	uint16_t	port_range[2];
 	uint32_t	vni;
-	uint8_t		dst_ipv6[16];
+	uint8_t		dst_ipv6[DP_IPV6_ADDR_SIZE];
 	TAILQ_ENTRY(network_nat_entry) entries;
 } network_nat_entry;
 
@@ -37,8 +44,8 @@ struct snat_data {
 	uint32_t	vip_ip;
 	uint32_t	nat_ip;
 	uint16_t	nat_port_range[2];
-	uint8_t		ul_vip_ip6[16]; /* VIP underlay */
-	uint8_t		ul_nat_ip6[16]; /* NAT Gateway underlay */
+	uint8_t		ul_vip_ip6[DP_IPV6_ADDR_SIZE]; /* VIP underlay */
+	uint8_t		ul_nat_ip6[DP_IPV6_ADDR_SIZE]; /* NAT Gateway underlay */
 	uint64_t	log_timestamp;
 };
 
@@ -47,9 +54,9 @@ struct dnat_data {
 };
 
 struct netnat_portmap_key {
-	uint32_t	iface_src_ip;
-	uint32_t	vni;
-	uint16_t	iface_src_port;
+	struct dpgrpc_address	src_ip;
+	uint32_t				vni;
+	uint16_t				iface_src_port;
 } __rte_packed;
 
 struct netnat_portmap_data {
@@ -74,7 +81,6 @@ struct nat_check_result {
 int dp_nat_init(int socket_id);
 void dp_nat_free(void);
 
-uint32_t dp_get_iface_vip_ip(uint32_t iface_ip, uint32_t vni);
 int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
 						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE]);
 int dp_del_iface_vip_ip(uint32_t iface_ip, uint32_t vni);
@@ -90,6 +96,9 @@ int dp_set_dnat_ip(uint32_t d_ip, uint32_t dnat_ip, uint32_t vni);
 
 void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
+
+rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip);
+void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr);
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
 
@@ -112,6 +121,10 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 struct snat_data *dp_get_iface_snat_data(uint32_t iface_ip, uint32_t vni);
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 
+static __rte_always_inline bool dp_is_ip6_in_nat64_range(const uint8_t *ipv6_addr)
+{
+	return memcmp(ipv6_addr, DP_NAT64_PREFIX, 12) == 0;
+}
 
 #ifdef __cplusplus
 }

@@ -32,16 +32,18 @@ extern "C" {
 #define DP_FLOW_FLAG_DST_NAT			0x02
 #define DP_FLOW_FLAG_DST_LB				0x04
 #define DP_FLOW_FLAG_FIREWALL			0x08
-#define DP_FLOW_FLAG_DEFAULT			0x10
+#define DP_FLOW_FLAG_SRC_NAT64			0x10
+#define DP_FLOW_FLAG_DEFAULT			0x20
 
-#define DP_FLOW_FLAG_NF					(DP_FLOW_FLAG_SRC_NAT | DP_FLOW_FLAG_DST_NAT | DP_FLOW_FLAG_DST_LB)
+#define DP_FLOW_FLAG_NF					(DP_FLOW_FLAG_SRC_NAT64 | DP_FLOW_FLAG_SRC_NAT | DP_FLOW_FLAG_DST_NAT | DP_FLOW_FLAG_DST_LB)
 
-#define DP_FLOW_HAS_NO_FLAGS(flag)		(!(flag))
-#define DP_FLOW_HAS_FLAG_SRC_NAT(flag)	((flag) & DP_FLOW_FLAG_SRC_NAT)
-#define DP_FLOW_HAS_FLAG_DST_NAT(flag)	((flag) & DP_FLOW_FLAG_DST_NAT)
-#define DP_FLOW_HAS_FLAG_DST_LB(flag)	((flag) & DP_FLOW_FLAG_DST_LB)
-#define DP_FLOW_HAS_FLAG_FIREWALL(flag)	((flag) & DP_FLOW_FLAG_FIREWALL)
-#define DP_FLOW_HAS_FLAG_DEFAULT(flag)	((flag) & DP_FLOW_FLAG_DEFAULT)
+#define DP_FLOW_HAS_NO_FLAGS(flag)			(!(flag))
+#define DP_FLOW_HAS_FLAG_SRC_NAT(flag)		((flag) & DP_FLOW_FLAG_SRC_NAT)
+#define DP_FLOW_HAS_FLAG_DST_NAT(flag)		((flag) & DP_FLOW_FLAG_DST_NAT)
+#define DP_FLOW_HAS_FLAG_DST_LB(flag)		((flag) & DP_FLOW_FLAG_DST_LB)
+#define DP_FLOW_HAS_FLAG_FIREWALL(flag)		((flag) & DP_FLOW_FLAG_FIREWALL)
+#define DP_FLOW_HAS_FLAG_SRC_NAT64(flag)	((flag) & DP_FLOW_FLAG_SRC_NAT64)
+#define DP_FLOW_HAS_FLAG_DEFAULT(flag)		((flag) & DP_FLOW_FLAG_DEFAULT)
 
 #define DP_FLOW_HAS_FLAG_NF(flag)		((flag) & DP_FLOW_FLAG_NF)
 
