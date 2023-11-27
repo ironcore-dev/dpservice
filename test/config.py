@@ -60,6 +60,7 @@ public_ip = "45.86.6.6"
 public_ip2 = "45.86.6.106"
 public_ip3 = "45.86.6.206"
 public_ipv6 = "2001:4860:4860::8888"
+public_nat64_ipv6 = "64:ff9b::808:808"
 
 # Virtual IP functionality
 vip_vip = "172.20.0.1"

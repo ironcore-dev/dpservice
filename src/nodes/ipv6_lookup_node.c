@@ -7,6 +7,7 @@
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
 #include "dp_conf.h"
+#include "dp_util.h"
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_iface.h"
@@ -14,7 +15,7 @@
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(IPV6_LOOKUP_NEXT_FIREWALL, "firewall")
+	NEXT(IPV6_LOOKUP_NEXT_SNAT, "snat")
 DP_NODE_REGISTER_NOINIT(IPV6_LOOKUP, ipv6_lookup, NEXT_NODES);
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
@@ -24,11 +25,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_iface_route route;
 	const struct dp_port *in_port = dp_get_in_port(m);
 	const struct dp_port *out_port;
+	uint8_t route_key[DP_IPV6_ADDR_SIZE] = {0};
+	uint8_t cmp_key[DP_IPV6_ADDR_SIZE] = {0};
 	int t_vni;
 
 	t_vni = in_port->is_pf ? df->tun_info.dst_vni : 0;
 
-	out_port = dp_get_ip6_out_port(in_port, t_vni, df, &route);
+	out_port = dp_get_ip6_out_port(in_port, t_vni, df, &route, route_key);
 	if (!out_port)
 		return IPV6_LOOKUP_NEXT_DROP;
 
@@ -48,9 +51,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
+	df->flow_type = rte_rib6_is_equal(route_key, cmp_key) ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 	df->nxt_hop = out_port->port_id;  // always valid since coming from struct dp_port
 
-	return IPV6_LOOKUP_NEXT_FIREWALL;
+	return IPV6_LOOKUP_NEXT_SNAT;
 }
 
 static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
@@ -58,6 +62,6 @@ static uint16_t ipv6_lookup_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
-	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV6_LOOKUP_NEXT_FIREWALL, get_next_index);
+	dp_foreach_graph_packet(graph, node, objs, nb_objs, IPV6_LOOKUP_NEXT_SNAT, get_next_index);
 	return nb_objs;
 }

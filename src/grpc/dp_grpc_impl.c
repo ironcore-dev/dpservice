@@ -633,6 +633,9 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 		ret = dp_set_dnat_ip(request->addr.ipv4, 0, iface_vni);
 		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS)
 			goto err_dnat;
+		port->iface.nat_ip = request->addr.ipv4;
+		port->iface.nat_port_range[0] = request->min_port;
+		port->iface.nat_port_range[1] = request->max_port;
 		rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
 	} else {
 		ret = DP_GRPC_ERR_BAD_IPVER;
@@ -674,6 +677,9 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
 	reply->addr.ipv4 = s_data->nat_ip;
 	dp_del_vip_from_dnat(s_data->nat_ip, iface_vni);
+	port->iface.nat_ip = 0;
+	port->iface.nat_port_range[0] = 0;
+	port->iface.nat_port_range[1] = 0;
 	dp_remove_nat_flows(port->port_id, DP_FLOW_NAT_TYPE_NETWORK_LOCAL);
 	return dp_del_iface_nat_ip(iface_ip, iface_vni);
 }

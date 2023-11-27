@@ -71,6 +71,19 @@ def send_tcp_through_port(port):
 	assert dst_ip == VM1.ip and dport == port, \
 		f"Bad TCP packet (ip: {dst_ip}, dport: {dport})"
 
+def send_tcp_through_port_with_ipv6(port):
+
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
+			   IPv6(dst=public_nat64_ipv6, src=VM1.ipv6) /
+			   TCP(sport=port))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	pkt = sniff_packet(VM1.tap, is_ipv6_tcp_pkt)
+	dst_ip = pkt[IPv6].dst
+	dport = pkt[TCP].dport
+	assert dst_ip == VM1.ipv6 and dport == port, \
+		f"Bad TCP packet (ip: {dst_ip}, dport: {dport})"
+
 
 def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
@@ -86,6 +99,11 @@ def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
 	send_tcp_through_port(1246)
 	grpc_client.delnat(VM1.name)
 
+def test_vf_to_pf_network_nat_tcp_with_ipv6(prepare_ipv4, grpc_client):
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	threading.Thread(target=reply_tcp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
+	send_tcp_through_port_with_ipv6(1246)
+	grpc_client.delnat(VM1.name)
 
 def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ul_ipv6):
 	pkt = sniff_packet(pf_name, is_tcp_pkt)

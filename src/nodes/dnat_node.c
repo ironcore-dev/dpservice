@@ -15,6 +15,7 @@
 
 #define NEXT_NODES(NEXT) \
 	NEXT(DNAT_NEXT_IPV4_LOOKUP, "ipv4_lookup") \
+	NEXT(DNAT_NEXT_IPV6_LOOKUP, "ipv6_lookup") \
 	NEXT(DNAT_NEXT_PACKET_RELAY, "packet_relay")
 DP_NODE_REGISTER_NOINIT(DNAT, dnat, NEXT_NODES);
 
@@ -132,6 +133,22 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df->nat_addr = df->dst.dst_addr; // record nat IP
 		df->dst.dst_addr = ipv4_hdr->dst_addr; // store new dst_addr (which is VM's IP)
 		dp_nat_chg_ip(df, ipv4_hdr, m);
+	}
+
+	if (DP_FLOW_HAS_FLAG_SRC_NAT64(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_REPLY) {
+		df->nat_type = DP_NAT_64_CHG_DST_IP;
+		rte_memcpy(df->dst.dst_addr6, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6, DP_IPV6_ADDR_SIZE);
+		df->nat_addr = df->dst.dst_addr;
+		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+			if (df->l4_type == IPPROTO_ICMPV6) {
+				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) /* TODO implement */
+					dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
+			} else {
+				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
+			}
+		}
+		dp_nat_chg_ipv4_to_ipv6_hdr(df, m, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6);
+		return DNAT_NEXT_IPV6_LOOKUP;
 	}
 	return DNAT_NEXT_IPV4_LOOKUP;
 }

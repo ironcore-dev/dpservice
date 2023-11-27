@@ -123,6 +123,9 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 			key->vnf_type = df->vnf_type;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
+	} else if (key->l3_type == RTE_ETHER_TYPE_IPV6) {
+		if (dp_is_ip6_in_nat64_range(key->l3_dst.ip6))
+			key->vnf_type = DP_VNF_TYPE_NAT;
 	} else {
 		s_data = dp_get_iface_snat_data(key->l3_src.ip4, key->vni);
 		if (s_data && s_data->nat_ip != 0)

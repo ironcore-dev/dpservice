@@ -44,6 +44,8 @@ enum dp_nat_type {
 	DP_NAT_CHG_DST_IP,
 	DP_CHG_UL_DST_IP,
 	DP_LB_RECIRC,
+	DP_NAT_64_CHG_SRC_IP,
+	DP_NAT_64_CHG_DST_IP,
 } __rte_packed;
 
 struct dp_flow {

@@ -54,8 +54,8 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
-										  struct dp_iface_route *route);
-
+										  struct dp_iface_route *route,
+										  uint8_t route_key[RTE_RIB6_IPV6_ADDR_SIZE]);
 uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);
 

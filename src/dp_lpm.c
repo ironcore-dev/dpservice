@@ -316,7 +316,8 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
-										  struct dp_iface_route *route)
+										  struct dp_iface_route *route,
+										  uint8_t route_key[RTE_RIB6_IPV6_ADDR_SIZE])
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
@@ -343,6 +344,9 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 
 	if (dst_port->is_pf)
 		*route = *(struct dp_iface_route *)rte_rib6_get_ext(node);
+
+	if (DP_FAILED(rte_rib6_get_ip(node, route_key)))
+		return NULL;
 
 	return dst_port;
 }

@@ -36,6 +36,8 @@ struct dp_port_iface {
 	uint32_t				vni;
 	char					id[DP_IFACE_ID_MAX_LEN];
 	uint8_t					ul_ipv6[16];
+	uint32_t				nat_ip;
+	uint16_t				nat_port_range[2];
 	bool					ready;
 };
 
