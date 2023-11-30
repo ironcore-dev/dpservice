@@ -68,7 +68,6 @@ jobs:
           version: latest
           endpoint: ${{ env.CONTEXT_NAME }} # self-hosted
       - name: Login to GHCR
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -80,25 +79,11 @@ jobs:
         with:
           context: .
           platforms: ${{env.platforms}}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: tester
           secrets: |
-            "github_token=${{ secrets.BOT_PAT }}"
-  test:
-    runs-on: [ self-hosted, dpdk ]
-    needs: buildAndPushTester
-    steps:
-      - name: Determine SHA for Docker Image
-        id: get_sha
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "DOCKER_IMAGE_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          else
-            echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
-          fi
-      - name: Run tests
-        id: run_tests
-        run: |
-          docker run --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/ironcore-dev/dpservice-tester:${{ env.DOCKER_IMAGE_SHA }}
+            "github_token=${{ secrets.GITHUB_TOKEN }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -89,7 +89,6 @@ COPY .git/ .git/
 # therefore downloading using 'ADD' is not possible
 RUN --mount=type=secret,id=github_token,dst=/run/secrets/github_token \
 sh -c 'GITHUB_TOKEN=$(if [ -f /run/secrets/github_token ]; then cat /run/secrets/github_token; else echo ""; fi) \
-&& ./hack/rel_download.sh -dir=exporter -owner=ironcore-dev -repo=prometheus-dpdk-exporter -pat=$GITHUB_TOKEN \
 && ./hack/rel_download.sh -dir=client -owner=ironcore-dev -repo=dpservice-cli -strip=2 -pat=$GITHUB_TOKEN'
 
 # Compile dpservice-bin itself
