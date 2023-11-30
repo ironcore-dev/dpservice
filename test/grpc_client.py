@@ -23,7 +23,7 @@ class GrpcClient:
 		self.cmd = build_path + "/dpservice-cli"
 		self.expectedError = 0
 		if not os.access(self.cmd, os.X_OK):
-			self.cmd = build_path + "/github.com/onmetal/dpservice-cli"
+			self.cmd = build_path + "/github.com/ironcore-dev/dpservice-cli"
 			if not os.access(self.cmd, os.X_OK):
 				print(f"""
 Missing executable grpc client
@@ -31,7 +31,7 @@ To solve this, you have a few options:
  - build one locally and copy it to {build_path}/
  - download one from GitHub manually to {build_path}/
  - use provided download script with your GitHub PAT:
- ./hack/rel_download.sh -dir=build -owner=onmetal -repo=dpservice-cli -pat=<PAT>
+ ./hack/rel_download.sh -dir=build -owner=ironcore-dev -repo=dpservice-cli -pat=<PAT>
 """, file=sys.stderr)
 				raise RuntimeError("no gRPC client")
 

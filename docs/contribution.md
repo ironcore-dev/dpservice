@@ -10,7 +10,7 @@ The Gardener on Metal project uses Github to manage reviews of pull requests.
 address (with @...) a suitable maintainer of this repository in the description of the pull request.
 
 * If you plan to do something more involved, first discuss your ideas by creating an
-[issue](https://github.com/onmetal/net-dpservice/issues) for this repository. This will avoid unnecessary work and surely give you
+[issue](https://github.com/ironcore-dev/dpservice/issues) for this repository. This will avoid unnecessary work and surely give you
 and us a good deal of inspiration.
 
 > Please follow these style guidelines to have your contribution considered by the maintainers:
@@ -58,8 +58,8 @@ process. We use [the standard DCO text of the Linux Foundation](https://develope
 * Fork and clone the repository to you local machine.
 
 ```shell
-git clone git@github.com:onmetal/net-dpservice.git
-cd net-dpservice
+git clone git@github.com:ironcore-dev/dpservice.git
+cd dpservice
 ```
 
 * Create a branch from the `main`  using 'git checkout' command.
@@ -107,4 +107,4 @@ for a review in the pull request or a comment.
 We use GitHub issues to track bugs and enhancement requests. Please provide as much context as possible when you open  an issue. The information you provide must be comprehensive enough to understand, reproduce the behavior and find related reports of  that issue for the assignee.
 Therefore, contributors may use but aren't restricted to the issue template provided by the Gardener on Metal maintainers.
 
-Issues and pull requests are tracked in the [backlog](https://github.com/onmetal/net-dpservice/projects) for this project.
+Issues and pull requests are tracked in the [backlog](https://github.com/ironcore-dev/dpservice/projects) for this project.

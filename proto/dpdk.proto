@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package dpdkonmetal.v1;
+package dpdkironcore.v1;
 option go_package = "./dpdkproto";
 
 //// ENUMS
@@ -571,7 +571,7 @@ message CaptureStatusResponse {
 	CaptureConfig capture_config = 3;
 }
 
-service DPDKonmetal {
+service DPDKironcore {
 	//// INITIALIZATION
 	// initialized indicates if the DPDK app has been initialized already, if so an UUID is returned.
 	// this UUID gets changed in case the dp-service gets restarted.

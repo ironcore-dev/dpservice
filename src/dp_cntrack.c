@@ -160,7 +160,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
-	/* Details can be found in https://github.com/onmetal/net-dpservice/pull/341 */
+	/* Details can be found in https://github.com/ironcore-dev/dpservice/pull/341 */
 	if (offload_mode_enabled
 		&& !port->is_pf
 		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->vni, key->ip_dst, 32)

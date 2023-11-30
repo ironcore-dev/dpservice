@@ -29,7 +29,7 @@
 
 using grpc::Channel;
 using grpc::ClientContext;
-using namespace dpdkonmetal::v1;
+using namespace dpdkironcore::v1;
 using namespace std::chrono;
 
 static const char short_options[] = "d" /* debug */
@@ -621,7 +621,7 @@ static int parse_args(int argc, char **argv)
 class GRPCClient {
 public:
 	GRPCClient(std::shared_ptr<Channel> channel)
-		: stub_(DPDKonmetal::NewStub(channel)) {}
+		: stub_(DPDKironcore::NewStub(channel)) {}
 	void CreateInterface() {
 			CreateInterfaceRequest request;
 			CreateInterfaceResponse response;
@@ -1430,7 +1430,7 @@ public:
 	}
 
 private:
-	std::unique_ptr<DPDKonmetal::Stub> stub_;
+	std::unique_ptr<DPDKironcore::Stub> stub_;
 };
 
 int main(int argc, char** argv)

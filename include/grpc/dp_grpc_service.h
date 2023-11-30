@@ -15,7 +15,7 @@
 using grpc::Server;
 using grpc::ServerCompletionQueue;
 
-class GRPCService final : public dpdkonmetal::v1::DPDKonmetal::AsyncService {
+class GRPCService final : public dpdkironcore::v1::DPDKironcore::AsyncService {
 private:
 	static GRPCService* instance;
 	GRPCService();

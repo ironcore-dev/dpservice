@@ -5,7 +5,7 @@
 #include "dp_grpc_api.h"
 #include "../proto/dpdk.pb.h"
 
-using namespace dpdkonmetal::v1;
+using namespace dpdkironcore::v1;
 
 namespace GrpcConv
 {

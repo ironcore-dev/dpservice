@@ -7,7 +7,7 @@
 # 4. -pat : Personal Access Token (PAT). A token provided by GitHub to access the repository.
 # 5. -release : (Optional) Release tag. By default, it is set to "latest".
 # Example usage:
-# ./hack/rel_download.sh -dir=exporter -owner=onmetal -repo=prometheus-dpdk-exporter -pat=MY_PAT
+# ./hack/rel_download.sh -dir=exporter -owner=ironcore-dev -repo=prometheus-dpdk-exporter -pat=MY_PAT
 
 set -e
 

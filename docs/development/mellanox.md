@@ -27,7 +27,7 @@ The other way is enabling IOMMU by default directly in [the kernel](kernel.md#io
 ### Enable unsafe interrupts
 In some older configurations, additional kernel command-line option is needed: `vfio_iommu_type1.allow_unsafe_interrupts=1`, [see above](#enabling-iommu) for the actual commands to use.
 
-Alternatively you can do this in module configuration (`/etc/modprobe.d/onmetal.conf`):
+Alternatively you can do this in module configuration (`/etc/modprobe.d/ironcore.conf`):
 ```
 options vfio_iommu_type1 allow_unsafe_interrupts=1
 ```

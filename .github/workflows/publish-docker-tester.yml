@@ -103,4 +103,4 @@ jobs:
       - name: Run tests
         id: run_tests
         run: |
-          docker run --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/onmetal/dp-service-tester:${{ env.DOCKER_IMAGE_SHA }}
+          docker run --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/ironcore-dev/dp-service-tester:${{ env.DOCKER_IMAGE_SHA }}
