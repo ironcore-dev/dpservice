@@ -18,12 +18,12 @@ sudo ./runtest.py
 The script prints out all `pytest` commands it uses, so in case of a failure, you can easily re-run it manually:
 ```
 TEST 1/3 - base tests:
-pytest-3 -x -v --build-path=/home/plague/git/net-dpservice/test/../build --virtsvc /home/plague/git/net-dpservice/test
+pytest-3 -x -v --build-path=/home/plague/git/dpservice/test/../build --virtsvc /home/plague/git/dpservice/test
 ...
 (error output here)
 ...
 TEST FAILED with returncode 1
-pytest-3 -x -v --build-path=/home/plague/git/net-dpservice/test/../build --virtsvc /home/plague/git/net-dpservice/test
+pytest-3 -x -v --build-path=/home/plague/git/dpservice/test/../build --virtsvc /home/plague/git/dpservice/test
 ```
 
 ### Pytest

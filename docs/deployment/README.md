@@ -1,5 +1,5 @@
 # Dataplane Service deployment
-This repository only provides a compiled binary of `dpservice-bin`. To properly use it, you need to use the provided Docker file to generate an image and run it using the [metalnet project](https://github.com/onmetal/metalnet).
+This repository only provides a compiled binary of `dpservice-bin`. To properly use it, you need to use the provided Docker file to generate an image and run it using the [metalnet project](https://github.com/ironcore-dev/metalnet).
 
 All command-line arguments and configuration files are already handled by the Docker image.
 

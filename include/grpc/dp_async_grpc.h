@@ -47,7 +47,7 @@ using grpc::ServerWriter;
 using grpc::ServerAsyncResponseWriter;
 using grpc::ServerCompletionQueue;
 
-using namespace dpdkonmetal::v1;
+using namespace dpdkironcore::v1;
 
 #include "dp_grpc_service.h"
 

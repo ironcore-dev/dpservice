@@ -28,14 +28,14 @@ Dp-service currently only supports x86 architecture (amd64 instruction set actua
 ### DPDK
 The dataplane service is built upon the [DPDK library](https://dpdk.org). Currently, the only supported version is 22.11 LTS. Unfortunately, some patching is needed, thus it needs to be built from source. Building from source also has the advantage of easier debugging later.
 ```bash
-git clone https://github.com/onmetal/net-dpservice.git
+git clone https://github.com/ironcore-dev/dpservice.git
 wget https://fast.dpdk.org/rel/dpdk-22.11.3.tar.xz
 tar xf dpdk-22.11.3.tar.xz
 cd dpdk-stable-22.11.3
-patch -p1 < ../net-dpservice/hack/dpdk_22_11_gcc12.patch
-patch -p1 < ../net-dpservice/hack/dpdk_22_11_log.patch
-patch -p1 < ../net-dpservice/hack/dpdk_22_11_telemetry_key.patch
-patch -p1 < ../net-dpservice/hack/dpdk_22_11_ethdev_conversion.patch
+patch -p1 < ../dpservice/hack/dpdk_22_11_gcc12.patch
+patch -p1 < ../dpservice/hack/dpdk_22_11_log.patch
+patch -p1 < ../dpservice/hack/dpdk_22_11_telemetry_key.patch
+patch -p1 < ../dpservice/hack/dpdk_22_11_ethdev_conversion.patch
 meson setup build
 ninja -C build
 sudo ninja -C build install
@@ -52,7 +52,7 @@ Some systems do not put the resulting (installed) `pkgconf` directory with DPDK'
 
 ## Building the service
 ```bash
-cd net-dpservice/
+cd dpservice/
 meson setup build
 ninja -C build
 ```
