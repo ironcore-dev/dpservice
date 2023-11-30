@@ -12,25 +12,23 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
-  pull_request_target:
+  pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
 
 jobs:
   buildAndPushTester:
-    runs-on:
-      labels: self-hosted
-      group: organization/default
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
+          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
           fetch-depth: 0
       - name: Determine SHA for Docker Image
         id: get_sha
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "DOCKER_IMAGE_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
           else
            echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
@@ -95,7 +93,7 @@ jobs:
       - name: Determine SHA for Docker Image
         id: get_sha
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "DOCKER_IMAGE_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
           else
             echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
