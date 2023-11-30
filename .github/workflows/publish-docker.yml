@@ -12,20 +12,18 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
-  pull_request_target:
+  pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
 
 jobs:
   buildAndPush:
-    runs-on:
-      labels: self-hosted
-      group: organization/default
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
+          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
       - uses: docker/metadata-action@v5
         id: meta
         with:

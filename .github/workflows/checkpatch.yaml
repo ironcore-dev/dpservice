@@ -1,7 +1,7 @@
 name: checkpatch
 
 on: 
-  pull_request_target:
+  pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -13,9 +13,7 @@ on:
 
 jobs:
   checkpatch:
-    runs-on:
-      labels: self-hosted
-      group: organization/default
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
