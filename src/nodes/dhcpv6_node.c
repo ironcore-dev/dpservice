@@ -19,6 +19,9 @@
 // this can be anything, IANA defined values do exist, but are not applicable here
 #define DP_DHCPV6_HW_ID	0xabcd
 
+/* TODO will be set via configuration */
+static const struct in6_addr dns64_server_addr = {{{0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x64}}};
+
 struct dp_dhcpv6_reply_options {
 	int opt_iana_len;
 	struct dhcpv6_opt_ia_na_single_addr_status opt_iana;
@@ -158,6 +161,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 {
 	int reply_options_len;
 	struct dhcpv6_opt_server_id_ll opt_sid;
+	struct dhcpv6_opt_dns_servers dns_opt;
 	struct dp_dhcpv6_reply_options reply_options = {0};  // this makes *_len fields 0, needed later
 
 	if (DP_FAILED(parse_options(m, options, options_len, &reply_options))) {
@@ -165,10 +169,14 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 		return DP_ERROR;
 	}
 
+	dns_opt.opt_code = htons(DHCPV6_OPT_DNS);
+	dns_opt.opt_len = htons(sizeof(struct in6_addr));
+
 	opt_sid = opt_sid_template;
 	rte_ether_addr_copy(&rte_pktmbuf_mtod(m, struct rte_ether_hdr *)->dst_addr, &opt_sid.id.mac);
 
 	reply_options_len = (int)sizeof(opt_sid) + reply_options.opt_cid_len + reply_options.opt_iana_len + reply_options.opt_rapid_len;
+	reply_options_len += sizeof(dns_opt.opt_code) + sizeof(dns_opt.opt_len) + ntohs(dns_opt.opt_len);
 
 	if (DP_FAILED(resize_packet(m, reply_options_len - options_len)))
 		return DP_ERROR;
@@ -186,6 +194,13 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	}
 	if (reply_options.opt_rapid_len)
 		memcpy(options, &reply_options.opt_rapid, reply_options.opt_rapid_len);
+
+	// Add DNS server option
+	memcpy(options, &dns_opt.opt_code, sizeof(dns_opt.opt_code));
+	options += sizeof(dns_opt.opt_code);
+	memcpy(options, &dns_opt.opt_len, sizeof(dns_opt.opt_len));
+	options += sizeof(dns_opt.opt_len);
+	memcpy(options, &dns64_server_addr, sizeof(dns64_server_addr));
 
 	return reply_options_len;
 }

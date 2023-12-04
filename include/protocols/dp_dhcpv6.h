@@ -53,6 +53,7 @@
 #define DHCPV6_OPT_IAADDR		5
 #define DHCPV6_OPT_STATUS_CODE	13
 #define DHCPV6_OPT_RAPID_COMMIT	14
+#define DHCPV6_OPT_DNS			23
 #define DHCPV6_OPT_IA_PD		25
 #define DHCPV6_OPT_IAPREFIX		26
 
@@ -67,6 +68,12 @@ struct dhcpv6_option {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	uint8_t data[];
+};
+
+struct dhcpv6_opt_dns_servers {
+	uint16_t opt_code;
+	uint16_t opt_len;
+	struct in6_addr dns_server_addrs[]; // Array of IPv6 addresses
 };
 
 // client id can be of any type, this is the maximum size allowed
