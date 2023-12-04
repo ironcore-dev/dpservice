@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 
 from config import *
@@ -19,7 +22,6 @@ def tcp_server_nat_pkt_check(pkt):
 		"Failed to use NAT's only single port"
 
 def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client, fast_flow_timeout):
-
 	if not fast_flow_timeout:
 		pytest.skip("Fast flow timeout needs to be enabled")
 
@@ -41,7 +43,6 @@ def test_cntrack_nat_timeout_tcp(request, prepare_ipv4, grpc_client, fast_flow_t
 	tester.request_rst()
 
 	grpc_client.delnat(VM1.name)
-
 
 def tcp_server_virtsvc_pkt_check(pkt):
 	assert pkt[IPv6].dst == virtsvc_tcp_svc_ipv6, \
@@ -111,7 +112,6 @@ def sniff_lb_pkt(dst_ipv6):
 		f"Wrong network-lb relayed packet (outer dst ipv6: {dst_ip})"
 
 def test_external_lb_relay_timeout(prepare_ipv4, grpc_client, fast_flow_timeout):
-
 	if not fast_flow_timeout:
 		pytest.skip("Fast flow timeout needs to be enabled")
 

@@ -1,8 +1,10 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import threading
 
 import pytest
 from helpers import *
-
 
 def vf_to_vf_tcp_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_tcp_pkt)
@@ -11,9 +13,7 @@ def vf_to_vf_tcp_responder(vf_tap):
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, vf_tap)
 
-
 def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):
-
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
 
 	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=1234, dst_port_max=1234)
@@ -27,7 +27,6 @@ def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):
 
 
 def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
-
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
 
 	grpc_client.addvip(VM2.name, vip_vip)

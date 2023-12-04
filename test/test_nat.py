@@ -1,8 +1,10 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 import threading
 
 from helpers import *
-
 
 def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
@@ -16,7 +18,6 @@ def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
 		"No ECHO reply"
 	grpc_client.delnat(VM1.name)
 
-
 def send_bounce_pkt_to_pf(ipv6_nat):
 	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
 				 IPv6(dst=ipv6_nat, src=router_ul_ipv6, nh=4) /
@@ -25,7 +26,6 @@ def send_bounce_pkt_to_pf(ipv6_nat):
 	delayed_sendp(bouce_pkt, PF0.tap)
 
 def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
-
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
 	# Add another neighbor and remove it to check if that does not break the other entry
@@ -76,7 +76,6 @@ def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):
 	delayed_sendp(bouce_pkt, PF0.tap)
 
 def test_network_nat_foreign_ip(prepare_ifaces, grpc_client):
-
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
 	threading.Thread(target=send_foreign_ip_nat_pkt_to_pf, args=(nat_ul_ipv6,)).start()
@@ -121,7 +120,6 @@ def router_nat_vip(dst_ipv6, check_ipv4):
 	delayed_sendp(reply_pkt, PF0.tap)
 
 def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redundancy):
-
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported for NAT(vni1) <-> VIP(vni2) test")
 

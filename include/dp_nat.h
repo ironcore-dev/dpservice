@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef __INCLUDE_DP_NAT_H__
 #define __INCLUDE_DP_NAT_H__
 
@@ -118,4 +121,3 @@ void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 }
 #endif
 #endif
-

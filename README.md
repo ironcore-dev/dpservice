@@ -1,8 +1,11 @@
 # Dataplane Service
- [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com) 
-[![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue&style=flat-square)](LICENSE)
+
+[![REUSE status](https://api.reuse.software/badge/github.com/ironcore-dev/dpservce)](https://api.reuse.software/info/github.com/ironcore-dev/dpservice)
+[![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 
 ## Overview 
+
 Dataplane Service in short form dp-service is a L3 virtual router with basic L2 capabilites and with IP in IPv6 tunneling for the uplink traffic. It uses [SRIOV](https://en.wikipedia.org/wiki/Single-root_input/output_virtualization) based Virtual Functions as its virtual ports. A virtual machine or a bare metal machine (In case dp-service running directly on SmartNIC) can be plugged to SRIOV VFs.
 
 - It can operate in offloaded and non-offloaded mode.
@@ -34,4 +37,3 @@ Please report bugs, suggestions or post question by opening a [Github issue](htt
 ## License
 
 [Apache License 2.0](/LICENSE)
-

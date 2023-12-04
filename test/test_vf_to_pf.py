@@ -1,11 +1,12 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 import threading
 
 from helpers import *
 
-
 def reply_icmp_pkt_from_vm1(nat_ul_ipv6):
-
 	pkt = sniff_packet(PF0.tap, is_icmp_pkt)
 	src_ip = pkt[IP].src
 	assert src_ip == nat_vip, \
@@ -18,7 +19,6 @@ def reply_icmp_pkt_from_vm1(nat_ul_ipv6):
 	delayed_sendp(reply_pkt, PF0.tap)
 
 def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
-
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
 	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
@@ -37,7 +37,6 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 
 
 def reply_tcp_if_port_not(forbidden_port, nat_ul_ipv6):
-
 	pkt = sniff_packet(PF0.tap, is_tcp_pkt)
 	src_ip = pkt[IP].src
 	sport = pkt[TCP].sport
@@ -61,7 +60,6 @@ def reply_tcp_pkt_from_vm1_max_port(nat_ul_ipv6):
 	reply_tcp_if_port_not(sport, nat_ul_ipv6)
 
 def send_tcp_through_port(port):
-
 	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(sport=port))
@@ -133,7 +131,6 @@ def reply_with_icmp_err_fragment_needed(pf_name, nat_ul_ipv6):
 	delayed_sendp(reply_pkt, pf_name)
 
 def request_icmperr(dport, pf_name, nat_ul_ipv6):
-
 	threading.Thread(target=reply_with_icmp_err_fragment_needed, args=(pf_name, nat_ul_ipv6)).start();
 
 	tcp_pkt = (Ether(dst=ipv6_multicast_mac, src=VM1.mac, type=0x0800) /

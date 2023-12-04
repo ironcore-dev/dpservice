@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <rte_common.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
@@ -41,7 +44,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				// extrack identifier field from icmp reply pkt, which is a reply to VM's icmp request
 				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
 					df->l4_info.trans_port.dst_port = df->l4_info.icmp_field.icmp_identifier;
-				
+
 				// it is icmp request targeting scalable nat
 				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
 					cntrack->nf_info.nat_type = DP_FLOW_NAT_AS_TARGET;
@@ -59,9 +62,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
 					return DNAT_NEXT_PACKET_RELAY;
 				}
-				
-				// if it is not a nat pkt destinated for its neighboring nat, 
-				// then it is a premature dnat pkt for network nat (sent before any outgoing traffic from VM, 
+
+				// if it is not a nat pkt destinated for its neighboring nat,
+				// then it is a premature dnat pkt for network nat (sent before any outgoing traffic from VM,
 				// and it cannot be a standalone new incoming flow for network NAT),
 				// silently drop it now.
 				return DNAT_NEXT_DROP;

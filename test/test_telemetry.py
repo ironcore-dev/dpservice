@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import json
 import pytest
 from helpers import *
@@ -19,7 +22,6 @@ def get_telemetry(request):
 		client.close()
 	return response
 
-
 def check_tel_graph(key):
 	tel = get_telemetry(f"/dp_service/graph/{key}")
 	assert tel is not None, \
@@ -35,14 +37,12 @@ def test_telemetry_graph(prepare_ifaces):
 	check_tel_graph("cycle_count")
 	check_tel_graph("realloc_count")
 
-
 def test_telemetry_nat(prepare_ifaces):
 	tel = get_telemetry("/dp_service/nat/used_port_count")
 	assert tel is not None, \
 		"Missing NAT telemetry"
 	assert VM1.name in tel and VM2.name in tel and VM3.name in tel, \
 		"Running VMs not present in NAT telemetry"
-
 
 def test_telemetry_virtsvc(request, prepare_ifaces):
 	if not request.config.getoption("--virtsvc"):

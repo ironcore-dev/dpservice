@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef __INCLUDE_DP_EVENT_H__
 #define __INCLUDE_DP_EVENT_H__
 
@@ -9,7 +12,7 @@ extern "C" {
 #include <rte_mbuf.h>
 #include <rte_ethdev.h>
 
-int dp_link_status_change_event_callback(uint16_t port_id, 
+int dp_link_status_change_event_callback(uint16_t port_id,
 										 enum rte_eth_event_type type,
 										 void *param,
 										 void *ret_param);

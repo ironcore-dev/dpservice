@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "grpc/dp_async_grpc.h"
 #include <arpa/inet.h>
 #include <rte_ether.h>
@@ -1201,4 +1204,3 @@ void CaptureStatusCall::ParseReply(struct dpgrpc_reply* reply)
 		reply_.set_allocated_capture_config(capture_config);
 	}
 }
-

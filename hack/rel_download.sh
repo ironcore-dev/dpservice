@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 # This script uses a Personal Access Token (PAT) to access a GitHub repository.
 # It takes the following parameters in the style "-parameter=PARAMETER_VALUE":
 # 1. -dir : Destination directory. A directory path (relative to the current directory) where the files will be downloaded.

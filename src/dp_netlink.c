@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,7 +67,7 @@ static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bu
 }
 
 int dp_get_pf_neigh_mac(int if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac)
-{ 
+{
 	struct sockaddr_nl sa = {
 		.nl_family = AF_NETLINK,
 		.nl_groups = RTMGRP_NEIGH,
