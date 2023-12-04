@@ -38,10 +38,37 @@ int dp_nat_init(int socket_id)
 	if (!ipv4_snat_tbl)
 		return DP_ERROR;
 
-	ipv4_dnat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct nat_key),
+	ipv4_dnat_tbl = dp_create_jhash_table(8, sizeof(struct nat_key),
 										  "ipv4_dnat_table", socket_id);
 	if (!ipv4_dnat_tbl)
 		return DP_ERROR;
+
+	struct nat_key nkey = {
+		.ip = 0x80808080,
+		.vni = 100,
+	};
+	void *x;
+
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
+	nkey.vni = 101;
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
+	nkey.vni = 102;
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
+	nkey.vni = 103;
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
+	nkey.vni = 104;
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
+	nkey.vni = 105;
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
+	nkey.vni = 106;
+	if (DP_FAILED(rte_hash_add_key_data(ipv4_dnat_tbl, &nkey, &x)))
+		assert(false);
 
 	ipv4_netnat_portmap_tbl = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct netnat_portmap_key),
 												  "ipv4_netnat_portmap_table", socket_id);
