@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import threading
 import pytest
 
@@ -7,7 +10,6 @@ from tcp_tester import TCPTesterVirtsvc
 udp_used_port = 0
 
 def reply_udp(pf_name):
-
 	global udp_used_port
 
 	pkt = sniff_packet(pf_name, is_udp_pkt)
@@ -26,7 +28,6 @@ def reply_udp(pf_name):
 	delayed_sendp(reply_pkt, pf_name)
 
 def request_udp(l4_port, pf_name):
-
 	threading.Thread(target=reply_udp, args=(pf_name,)).start()
 
 	udp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /

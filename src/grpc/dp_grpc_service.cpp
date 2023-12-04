@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "grpc/dp_grpc_service.h"
 #include "grpc/dp_async_grpc.h"
 #include "dp_lpm.h"
@@ -128,4 +131,3 @@ void GRPCService::HandleRpcs()
 	DPGRPC_LOG_ERR("gRPC internal error (cannot read next message)");
 	rte_exit(EXIT_FAILURE, "gRPC service aborted\n");
 }
-

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <rte_arp.h>
 #include "dp_error.h"
 #include "dp_log.h"
@@ -48,7 +51,7 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 		dp_init_pkt_mark(clone_buf);
 		df = dp_init_flow_ptr(clone_buf);
 		df->l3_type = eth_type;
-				
+
 		ret = rte_ring_sp_enqueue(dp_layer->periodic_msg_queue, clone_buf);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_WARNING("Cannot enqueue message to a VM", DP_LOG_PORTID(clone_buf->port), DP_LOG_RET(ret));
@@ -121,7 +124,7 @@ void trigger_nd_unsol_adv(void)
 	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));
 	rte_memcpy(ipv6_hdr->dst_addr, dp_mc_ipv6, sizeof(ipv6_hdr->dst_addr));
 	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr) + sizeof(struct in6_addr));
-	
+
 	icmp6_hdr = &(ns_msg->icmph);
 	memset(icmp6_hdr, 0, sizeof(struct icmp6hdr));
 	icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
@@ -131,7 +134,7 @@ void trigger_nd_unsol_adv(void)
 	icmp6_hdr->icmp6_hop_limit = 255;
 
 	rte_memcpy(&ns_msg->target, rt_ip, sizeof(ns_msg->target));
-	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + 
+	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) +
 			   sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 	pkt->data_len = pkt_size;
 	pkt->pkt_len = pkt_size;

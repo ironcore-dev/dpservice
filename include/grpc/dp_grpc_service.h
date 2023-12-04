@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef __INCLUDE_DP_GRPC_SERVICE_H__
 #define __INCLUDE_DP_GRPC_SERVICE_H__
 
@@ -28,7 +31,7 @@ private:
 	bool initialized = false;
 
 	void HandleRpcs();
-	
+
 public:
 	GRPCService(const GRPCService& obj) = delete;
 	static GRPCService* GetInstance();

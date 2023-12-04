@@ -1,8 +1,9 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from helpers import *
 
-
 def test_dhcpv6(prepare_ifaces):
-
 	DUID = DUID_LL(lladdr=VM1.mac)
 	IAID = 0x18702501
 

@@ -1,7 +1,9 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 
 from helpers import *
-
 
 def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 
@@ -17,7 +19,6 @@ def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 		"No ECHO reply"
 
 	grpc_client.dellb(lb_name)
-
 
 def router_loopback(dst_ipv6, check_ipv4_src, check_ipv4_dst):
 	pkt = sniff_packet(PF0.tap, is_tcp_pkt)
@@ -98,7 +99,6 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	# NOTE: this test, just like in test_pf_to_vf.py
 	# cannot be run twice in a row, since the flows need to age-out
 
-
 def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 
 	if port_redundancy:
@@ -137,14 +137,12 @@ def test_external_lb_relay(prepare_ipv4, grpc_client):
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
 	grpc_client.addlbtarget(lb_name, neigh_ul_ipv6)
 
-
 	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
 	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
 
 	dst_ip = pkt[IPv6].dst
 	assert dst_ip == neigh_ul_ipv6, \
 		f"Wrong network-lb relayed packet (outer dst ipv6: {dst_ip})"
-
 
 	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
 	grpc_client.dellb(lb_name)
@@ -171,7 +169,6 @@ def test_external_lb_icmp_error_relay(prepare_ipv4, grpc_client):
 	dst_ip = pkt[IPv6].dst
 	assert dst_ip == neigh_ul_ipv6, \
 		f"Wrong network-lb relayed icmp packet (outer dst ipv6: {dst_ip})"
-
 
 	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
 	grpc_client.dellb(lb_name)

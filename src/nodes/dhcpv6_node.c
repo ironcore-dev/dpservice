@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "nodes/dhcpv6_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
@@ -190,7 +193,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr;
-	struct rte_ipv6_hdr *req_ipv6_hdr; 
+	struct rte_ipv6_hdr *req_ipv6_hdr;
 	struct rte_udp_hdr *req_udp_hdr;
 	struct dhcpv6_packet *dhcp_pkt;
 	int req_options_len = rte_pktmbuf_data_len(m) - (int)DP_DHCPV6_PKT_FIXED_LEN;

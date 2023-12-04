@@ -1,5 +1,7 @@
-from helpers import *
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
 
+from helpers import *
 
 def test_vni_existence(prepare_ipv4, grpc_client):
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni3, lb_ip, "tcp/80")
@@ -69,4 +71,3 @@ def test_vni_neighnats(prepare_ipv4, grpc_client):
 	VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
 
 	grpc_client.dellb(lb_name)
-

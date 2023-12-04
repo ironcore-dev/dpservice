@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "nodes/virtsvc_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "dp_lb.h"
 #include <stdlib.h>
 #include <time.h>
@@ -237,8 +240,8 @@ uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uin
 		return NULL;
 
 	/* TODO This is just temporary. Round robin.
-	   This doesn't distribute the load evenly. 
-	   Use maglev hashing and 5 Tuple fkey for 
+	   This doesn't distribute the load evenly.
+	   Use maglev hashing and 5 Tuple fkey for
 	   backend selection */
 	lb_port.port = port;
 	lb_port.protocol = proto;

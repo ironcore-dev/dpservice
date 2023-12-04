@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "nodes/ipv6_nd_node.h"
 #include <rte_common.h>
 #include <rte_ether.h>
@@ -73,7 +76,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	req_icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(req_ipv6_hdr,req_icmp6_hdr);
 
 	return next_tx_index[m->port];
-} 
+}
 
 static uint16_t ipv6_nd_node_process(struct rte_graph *graph,
 									 struct rte_node *node,

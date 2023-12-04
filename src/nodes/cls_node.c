@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
@@ -50,7 +53,7 @@ static __rte_always_inline int is_arp(const struct rte_ether_hdr *ether_hdr)
 		&& arp_hdr->arp_protocol == htons(RTE_ETHER_TYPE_IPV4)
 		&& arp_hdr->arp_plen == 4
 		;
-} 
+}
 
 static __rte_always_inline int is_ipv6_nd(const struct rte_ipv6_hdr *ipv6_hdr)
 {

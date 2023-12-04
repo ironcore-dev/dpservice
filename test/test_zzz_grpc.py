@@ -1,5 +1,7 @@
-from helpers import *
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
 
+from helpers import *
 
 def test_grpc_addinterface_already_exists(prepare_ifaces, grpc_client):
 	# Try to add using an existing vm identifier

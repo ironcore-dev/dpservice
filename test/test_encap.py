@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 import shlex
 import subprocess
 import threading
 
 from helpers import *
-
 
 def ipv4_in_ipv6_icmp_responder(pf_name, vm_ipv6):
 	pkt = sniff_packet(pf_name, is_encaped_icmp_pkt)

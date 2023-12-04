@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
+
 #include "dp_flow.h"
 
 #include <rte_icmp.h>
@@ -508,4 +511,3 @@ int dp_del_rte_age_ctx(struct flow_value *cntrack, const struct flow_age_ctx *ct
 	cntrack->rte_age_ctxs[ctx->ref_index_in_cntrack] = NULL;
 	return DP_OK;
 }
-
