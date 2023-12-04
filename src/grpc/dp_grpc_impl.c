@@ -699,10 +699,10 @@ static int dp_process_create_neighnat(struct dp_grpc_responder *responder)
 
 		ret = dp_set_dnat_ip(request->addr.ipv4, 0, request->vni);
 		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS) {
- 			dp_del_network_nat_entry(request->addr.ipv4, NULL,
- 									   request->vni,
- 									   request->min_port,
- 									   request->max_port);
+			dp_del_network_nat_entry(request->addr.ipv4, NULL,
+									 request->vni,
+									 request->min_port,
+									 request->max_port);
 			return ret;
 		}
 	} else

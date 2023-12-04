@@ -20,6 +20,10 @@
 
 #define DP_NAT_FULL_LOG_DELAY 5  /* seconds */
 
+// This is based on the fact that neighnats are being put in the table along with local NAT/VIP
+// To prevent it from being too large, this is assuming 2048 ports per NAT range (32 ranges/IP)
+#define DP_NAT_TABLE_MAX (DP_MAX_VF_PORTS * 32)
+
 TAILQ_HEAD(network_nat_head, network_nat_entry);
 
 static struct rte_hash *ipv4_dnat_tbl = NULL;
