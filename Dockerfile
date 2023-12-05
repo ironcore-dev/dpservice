@@ -164,7 +164,6 @@ WORKDIR /
 COPY --from=builder /workspace/build/src/dpservice-bin \
 					/workspace/build/tools/dump/dpservice-dump \
 					/workspace/client/* \
-					/workspace/exporter/* \
 					/workspace/hack/prepare.sh \
 					/usr/local/bin
 COPY --from=builder /usr/local/lib /usr/local/lib

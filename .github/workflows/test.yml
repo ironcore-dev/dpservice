@@ -13,7 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-python@v4
         with:
-          go-version-file: 'go.mod'
-      - run: make test
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: '**/ci-requirements.txt'
+      - name: Install dependencies
+        run: |
+          sudo pip install -r hack/ci-requirements.txt
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - run: make ci-test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
