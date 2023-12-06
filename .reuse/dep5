@@ -18,11 +18,7 @@ Files:
   *meson.build
   proto/dpdk.proto
   meson_options.txt
-  include/dp_conf_opts.h
   include/dp_version.h.in
-  src/dp_conf_opts.c
-  tools/dump/opts.c
-  tools/dump/opts.h
 Copyright: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 License: Apache-2.0
 
