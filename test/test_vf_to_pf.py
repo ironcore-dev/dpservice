@@ -15,7 +15,7 @@ def reply_icmp_pkt_from_vm1(nat_ul_ipv6):
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
-				 ICMP(type=0, id=pkt[ICMP].id))
+				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
 	delayed_sendp(reply_pkt, PF0.tap)
 
 def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
@@ -31,6 +31,24 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 	pkt = sniff_packet(VM1.tap, is_icmp_pkt)
 	dst_ip = pkt[IP].dst
 	assert dst_ip == VM1.ip, \
+		f"Bad ECHO reply (dst ip: {dst_ip})"
+
+	grpc_client.delnat(VM1.name)
+
+def test_vf_to_pf_network_nat_icmpv6(prepare_ipv4, grpc_client):
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+
+	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
+
+	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
+					 IPv6(dst=public_nat64_ipv6, src=VM1.ipv6, nh=58) /
+					 ICMPv6EchoRequest(seq=1))
+
+	delayed_sendp(icmp_pkt, VM1.tap)
+
+	pkt = sniff_packet(VM1.tap, is_icmpv6echo_reply_pkt)
+	dst_ip = pkt[IPv6].dst
+	assert dst_ip == VM1.ipv6, \
 		f"Bad ECHO reply (dst ip: {dst_ip})"
 
 	grpc_client.delnat(VM1.name)

@@ -12,6 +12,7 @@
 #include "dp_nat.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "protocols/dp_icmpv6.h"
 #include "dp_internal_stats.h"
 
 #define NEXT_NODES(NEXT) \
@@ -109,11 +110,17 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			df->nat_addr = snat_data.nat_ip;
 			dest_ip4 = dp_nat_chg_ipv6_to_ipv4_hdr(df, m, snat_data.nat_ip);
 
-			if (df->l4_type == IPPROTO_ICMPV6) {
+			if (df->l4_type == IPPROTO_ICMP) {
 				dp_change_icmp_identifier(m, nat_port);
 				cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
 				cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
 				df->offload_state = DP_FLOW_NON_OFFLOAD;
+				if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REQUEST)
+					cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
+				else if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REPLY)
+					cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = RTE_IP_ICMP_ECHO_REPLY;
+				else
+					cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = 0;
 			} else {
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port);
 			}
@@ -131,6 +138,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ip4 = ntohl(dest_ip4);
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4 = snat_data.nat_ip;
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].proto = df->l4_type;
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_type = RTE_ETHER_TYPE_IPV4;
 
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
@@ -172,7 +180,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		dp_nat_chg_ipv6_to_ipv4_hdr(df, m, port->iface.nat_ip);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
-			if (df->l4_type == IPPROTO_ICMPV6)
+			if (df->l4_type == IPPROTO_ICMP)
 				dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
 			else
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
