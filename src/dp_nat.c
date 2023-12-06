@@ -18,6 +18,7 @@
 #include "dp_util.h"
 #include "grpc/dp_grpc_responder.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "protocols/dp_icmpv6.h"
 
 #define DP_NAT_FULL_LOG_DELAY 5  /* seconds */
 
@@ -296,17 +297,40 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 	}
 }
 
+static void dp_calculate_icmp_checksum(struct rte_icmp_hdr *icmp_hdr, size_t icmp_len)
+{
+	uint32_t sum = 0;
+	uint8_t *ptr = (uint8_t *)icmp_hdr;
+
+	icmp_hdr->icmp_cksum = 0;
+
+	// Process two bytes at a time in a way that respects alignment
+	for (size_t i = 0; i < icmp_len; i += 2) {
+		uint16_t word = ptr[i] | (ptr[i + 1] << 8);
+		sum += word;
+	}
+
+	// Add carry if any
+	while (sum >> 16) {
+		sum = (sum & 0xFFFF) + (sum >> 16);
+	}
+
+	// One's complement
+	icmp_hdr->icmp_cksum = ~((uint16_t)sum);
+}
+
 rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
+	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
+	int l3_offset, l4_offset;
 	rte_be32_t dest_ip4;
 	uint16_t ether_type;
 	uint8_t l4_proto;
-	int l3_offset, l4_offset;
 
 	eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	eth_hdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
@@ -338,6 +362,7 @@ rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, u
 	ipv4_hdr->dst_addr = dest_ip4;
 	ipv4_hdr->hdr_checksum = 0;
 
+	m->tx_offload = 0;
 	m->packet_type &= ~RTE_PTYPE_L3_MASK;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4;
 	m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;
@@ -360,8 +385,21 @@ rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, u
 		m->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
 		m->l4_len = sizeof(struct rte_udp_hdr);
 	break;
-	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
+		df->l4_type = IPPROTO_ICMP;
+		ipv4_hdr->next_proto_id = IPPROTO_ICMP;
 		m->l4_len = sizeof(struct rte_icmp_hdr);
+		m->l4_type = IPPROTO_ICMP;
+
+		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
+		icmp_hdr->icmp_code = 0;
+		if (icmp_hdr->icmp_type == DP_ICMPV6_ECHO_REQUEST)
+			icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REQUEST;
+		else if (icmp_hdr->icmp_type == DP_ICMPV6_ECHO_REPLY)
+			icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
+		else
+			return 0;
+		dp_calculate_icmp_checksum(icmp_hdr, rte_be_to_cpu_16(ipv4_hdr->total_length) - ((ipv4_hdr->version_ihl & 0x0F) * 4));
 	break;
 	default:
 	break;
@@ -375,6 +413,7 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
+	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
 	int l3_offset, l4_offset;
@@ -409,6 +448,7 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 	rte_memcpy(ipv6_hdr->dst_addr, ipv6_addr, DP_IPV6_ADDR_SIZE);
 	rte_memcpy(df->dst.dst_addr6, ipv6_addr, DP_IPV6_ADDR_SIZE);
 
+	m->packet_type &= ~RTE_PTYPE_L3_MASK;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = sizeof(struct rte_ipv6_hdr);
@@ -427,9 +467,19 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 		m->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
 		m->l4_len = sizeof(struct rte_udp_hdr);
 		break;
-	case IPPROTO_ICMPV6:
-		// TODO Handle ICMPv4 to ICMPv6 conversion
+	case IPPROTO_ICMP:
+		df->l4_type = IPPROTO_ICMPV6;
 		m->l4_len = sizeof(struct rte_icmp_hdr);
+		ipv6_hdr->proto = IPPROTO_ICMPV6;
+		icmp_hdr = (struct rte_icmp_hdr *)(ipv6_hdr + 1);
+		icmp_hdr->icmp_code = 0;
+		icmp_hdr->icmp_cksum = 0;
+
+		if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
+			icmp_hdr->icmp_type = DP_ICMPV6_ECHO_REQUEST;
+		if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REPLY)
+			icmp_hdr->icmp_type = DP_ICMPV6_ECHO_REPLY;
+		icmp_hdr->icmp_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp_hdr);
 		break;
 	default:
 		break;

@@ -140,8 +140,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		rte_memcpy(df->dst.dst_addr6, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6, DP_IPV6_ADDR_SIZE);
 		df->nat_addr = df->dst.dst_addr;
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-			if (df->l4_type == IPPROTO_ICMPV6) {
-				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) /* TODO implement */
+			if (df->l4_type == IPPROTO_ICMP) {
+				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
 					dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
 			} else {
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);

@@ -100,7 +100,6 @@ void dp_change_icmp_identifier(struct rte_mbuf *m, uint16_t new_val)
 	icmp_hdr->icmp_cksum = (~cksum) & 0xffff;
 }
 
-
 struct rte_flow *dp_install_rte_flow(uint16_t port_id,
 									 const struct rte_flow_attr *attr,
 									 const struct rte_flow_item pattern[],
