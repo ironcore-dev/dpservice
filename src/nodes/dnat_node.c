@@ -11,6 +11,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
 #include "nodes/common_node.h"
+#include "protocols/dp_icmpv6.h"
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
@@ -30,9 +31,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dnat_data *dnat_data;
 
 	if (!cntrack)
-		return DNAT_NEXT_IPV4_LOOKUP;
+		goto out;
 
-	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
+	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG && df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni;
 		if (vni == 0)
@@ -95,8 +96,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
-		&& df->l4_type == DP_IP_PROTO_ICMP
-		&& df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
+		&& (df->l4_type == DP_IP_PROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
+		&& (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST))
 		return DNAT_NEXT_PACKET_RELAY;
 
 	if (DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
@@ -147,10 +148,19 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 			}
 		}
-		dp_nat_chg_ipv4_to_ipv6_hdr(df, m, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6);
+		if (DP_FAILED(dp_nat_chg_ipv4_to_ipv6_hdr(df, m, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6)))
+			return DNAT_NEXT_DROP;
+
 		return DNAT_NEXT_IPV6_LOOKUP;
 	}
-	return DNAT_NEXT_IPV4_LOOKUP;
+
+out:
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
+		return DNAT_NEXT_IPV4_LOOKUP;
+	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
+		return DNAT_NEXT_IPV6_LOOKUP;
+	else
+		return DNAT_NEXT_DROP;
 }
 
 static uint16_t dnat_node_process(struct rte_graph *graph,

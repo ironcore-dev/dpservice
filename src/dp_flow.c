@@ -42,6 +42,15 @@
 	DP_LOG_DST_IPV6((KEY)->l3_dst.ip6), \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
+#define DP_LOG_DEBUG_FLOW_KEY(key, message) \
+	do { \
+		if ((key)->l3_type == RTE_ETHER_TYPE_IPV4) \
+			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY4(key)); \
+		else \
+			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY6(key)); \
+	} while (0)
+
+
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static bool offload_mode_enabled = 0;
 
@@ -112,7 +121,7 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struct dp_port *port, struct flow_key *key)
 {
 	struct snat_data *s_data;
-	struct dpgrpc_address pfx_ip;
+	struct dp_ip_address pfx_ip;
 
 	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	pfx_ip.ip_type = RTE_ETHER_TYPE_IPV4;
@@ -241,18 +250,12 @@ static void dp_delete_flow_no_flush(const struct flow_key *key)
 	ret = rte_hash_del_key(ipv4_flow_tbl, key);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
-			if (key->l3_type == RTE_ETHER_TYPE_IPV4)
-				DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY4(key));
-			else
-				DPS_LOG_DEBUG("Attempt to delete a non-existing hash key", DP_LOG_FLOW_KEY6(key));
+			DP_LOG_DEBUG_FLOW_KEY(key, "Attempt to delete a non-existing hash key");
 		else
 			DPS_LOG_ERR("Cannot delete key from flow table", DP_LOG_RET(ret));
 		return;
 	}
-	if (key->l3_type == RTE_ETHER_TYPE_IPV4)
-		DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY4(key));
-	else
-		DPS_LOG_DEBUG("Successfully deleted an existing hash key", DP_LOG_FLOW_KEY6(key));
+	DP_LOG_DEBUG_FLOW_KEY(key, "Successfully deleted an existing hash key");
 }
 
 void dp_delete_flow(const struct flow_key *key)
@@ -280,15 +283,9 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 
 #ifdef ENABLE_PYTEST
 	if (DP_FAILED(ret))
-		if (key->l3_type == RTE_ETHER_TYPE_IPV4)
-			DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY4(key));
-		else
-			DPS_LOG_DEBUG("Cannot find data in flow table", DP_LOG_FLOW_KEY6(key));
+		DP_LOG_DEBUG_FLOW_KEY(key, "Cannot find data in flow table");
 	else
-		if (key->l3_type == RTE_ETHER_TYPE_IPV4)
-			DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY4(key));
-		else
-			DPS_LOG_DEBUG("Successfully found data in flow table", DP_LOG_FLOW_KEY6(key));
+		DP_LOG_DEBUG_FLOW_KEY(key, "Successfully found data in flow table");
 #endif
 	return ret;
 }

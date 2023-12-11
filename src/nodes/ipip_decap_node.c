@@ -21,7 +21,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ether_hdr *ether_hdr;
 	const struct dp_vnf *vnf;
 	struct dp_port *dst_port;
-	rte_edge_t next_node;
 	uint32_t l3_type;
 
 	vnf = dp_get_vnf(df->tun_info.ul_dst_addr6);
@@ -39,11 +38,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	switch (df->tun_info.proto_id) {
 	case DP_IP_PROTO_IPv4_ENCAP:
 		l3_type = RTE_PTYPE_L3_IPV4;
-		next_node = IPIP_DECAP_NEXT_CONNTRACK;
 		break;
 	case DP_IP_PROTO_IPv6_ENCAP:
 		l3_type = RTE_PTYPE_L3_IPV6;
-		next_node = IPIP_DECAP_NEXT_CONNTRACK;
 		break;
 	default:
 		return IPIP_DECAP_NEXT_DROP;
@@ -57,7 +54,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	// this shift is non-standard as the actual values of PTYPE should be opaque
 	m->packet_type = ((m->packet_type & RTE_PTYPE_INNER_L4_MASK) >> 16) | l3_type | RTE_PTYPE_L2_ETHER;
 
-	return next_node;
+	return IPIP_DECAP_NEXT_CONNTRACK;
 }
 
 static uint16_t ipip_decap_node_process(struct rte_graph *graph,

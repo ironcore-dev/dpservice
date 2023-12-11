@@ -304,22 +304,19 @@ static void dp_calculate_icmp_checksum(struct rte_icmp_hdr *icmp_hdr, size_t icm
 
 	icmp_hdr->icmp_cksum = 0;
 
-	// Process two bytes at a time in a way that respects alignment
 	for (size_t i = 0; i < icmp_len; i += 2) {
-		uint16_t word = ptr[i] | (ptr[i + 1] << 8);
+		uint16_t word = (uint16_t)((uint16_t)ptr[i] | ((uint16_t)ptr[i + 1] << 8));
 		sum += word;
 	}
 
-	// Add carry if any
 	while (sum >> 16) {
 		sum = (sum & 0xFFFF) + (sum >> 16);
 	}
 
-	// One's complement
 	icmp_hdr->icmp_cksum = ~((uint16_t)sum);
 }
 
-rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip)
+int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip, rte_be32_t *dest_ip /* out */)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
@@ -327,24 +324,18 @@ rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, u
 	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
-	int l3_offset, l4_offset;
-	rte_be32_t dest_ip4;
-	uint16_t ether_type;
 	uint8_t l4_proto;
 
 	eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	eth_hdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
-	ether_type = rte_be_to_cpu_16(eth_hdr->ether_type);
-
 
 	ipv6_hdr = dp_get_ipv6_hdr(m);
-	dest_ip4 = *(rte_be32_t *)&ipv6_hdr->dst_addr[12];
+	*dest_ip = *(int *)&ipv6_hdr->dst_addr[12];
 	l4_proto = ipv6_hdr->proto;
-	l3_offset = sizeof(struct rte_ether_hdr);
-	l4_offset = l3_offset + sizeof(struct rte_ipv6_hdr);
 
 	// Adjust the packet data to fit IPv4
-	rte_pktmbuf_adj(m, sizeof(struct rte_ipv6_hdr) - sizeof(struct rte_ipv4_hdr));
+	if (rte_pktmbuf_adj(m, sizeof(struct rte_ipv6_hdr) - sizeof(struct rte_ipv4_hdr)) == NULL)
+		return DP_ERROR;
 
 	// Move the Ethernet header to just before the IPv4 header
 	memmove(rte_pktmbuf_mtod(m, uint8_t *), eth_hdr, sizeof(struct rte_ether_hdr));
@@ -352,14 +343,14 @@ rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, u
 	// Setup the new IPv4 header
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 	ipv4_hdr->version_ihl = 0x45;
-	ipv4_hdr->type_of_service = ipv6_hdr->vtc_flow;
-	ipv4_hdr->total_length = rte_cpu_to_be_16(rte_pktmbuf_data_len(m) - sizeof(struct rte_ether_hdr));
+	ipv4_hdr->type_of_service = (uint8_t)((ntohl(ipv6_hdr->vtc_flow) >> 20) & 0xFF);
+	ipv4_hdr->total_length = rte_cpu_to_be_16(rte_pktmbuf_data_len(m) - (uint16_t)sizeof(struct rte_ether_hdr));
 	ipv4_hdr->packet_id = 0;
 	ipv4_hdr->fragment_offset = 0;
 	ipv4_hdr->time_to_live = ipv6_hdr->hop_limits;
 	ipv4_hdr->next_proto_id = l4_proto;
 	ipv4_hdr->src_addr = htonl(nat_ip);
-	ipv4_hdr->dst_addr = dest_ip4;
+	ipv4_hdr->dst_addr = *dest_ip;
 	ipv4_hdr->hdr_checksum = 0;
 
 	m->tx_offload = 0;
@@ -402,13 +393,14 @@ rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, u
 		dp_calculate_icmp_checksum(icmp_hdr, rte_be_to_cpu_16(ipv4_hdr->total_length) - ((ipv4_hdr->version_ihl & 0x0F) * 4));
 	break;
 	default:
+		return DP_ERROR;
 	break;
 	}
 
-	return dest_ip4;
+	return DP_OK;
 }
 
-void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr)
+int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -416,7 +408,6 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
-	int l3_offset, l4_offset;
 	uint32_t src_ipv4;
 	uint8_t l4_proto;
 
@@ -426,11 +417,10 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 	src_ipv4 = ipv4_hdr->src_addr;
 	l4_proto = ipv4_hdr->next_proto_id;
-	l3_offset = sizeof(struct rte_ether_hdr);
-	l4_offset = l3_offset + sizeof(struct rte_ipv4_hdr);
 
 	// Adjust the packet data to fit IPv6
-	rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr) - sizeof(struct rte_ipv4_hdr));
+	if (rte_pktmbuf_prepend(m, sizeof(struct rte_ipv6_hdr) - sizeof(struct rte_ipv4_hdr)) == NULL)
+		return DP_ERROR;
 
 	// Move the Ethernet header to just before the IPv6 header
 	memmove(rte_pktmbuf_mtod(m, uint8_t *), eth_hdr, sizeof(struct rte_ether_hdr));
@@ -438,7 +428,7 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 	// Setup the new IPv6 header
 	ipv6_hdr = dp_get_ipv6_hdr(m);
 	ipv6_hdr->vtc_flow = rte_cpu_to_be_32((6 << 28) | (ipv4_hdr->type_of_service << 20));
-	ipv6_hdr->payload_len = rte_cpu_to_be_16(rte_pktmbuf_data_len(m) - sizeof(struct rte_ether_hdr) - sizeof(struct rte_ipv6_hdr));
+	ipv6_hdr->payload_len = rte_cpu_to_be_16(rte_pktmbuf_data_len(m) - (uint16_t)sizeof(struct rte_ether_hdr) - (uint16_t)sizeof(struct rte_ipv6_hdr));
 	ipv6_hdr->proto = l4_proto;
 	ipv6_hdr->hop_limits = ipv4_hdr->time_to_live;
 
@@ -482,8 +472,10 @@ void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t
 		icmp_hdr->icmp_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp_hdr);
 		break;
 	default:
+		return DP_ERROR;
 		break;
 	}
+	return DP_OK;
 }
 
 static __rte_always_inline bool dp_is_network_nat_ip(const struct network_nat_entry *entry,
@@ -629,9 +621,11 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		portmap_key.src_ip.ipv4 = iface_src_ip;
 		portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
-	} else {
+	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		rte_memcpy(portmap_key.src_ip.ipv6, df->src.src_addr6, sizeof(portmap_key.src_ip.ipv6));
 		portoverload_tbl_key.dst_ip = ntohl(*(rte_be32_t *)&df->dst.dst_addr6[12]);
+	} else {
+		return DP_GRPC_ERR_BAD_IPVER;
 	}
 	portmap_key.vni = vni;
 	portmap_key.iface_src_port = iface_src_port;
@@ -737,10 +731,12 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
-	if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_type == RTE_ETHER_TYPE_IPV6)
+	if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_type == RTE_ETHER_TYPE_IPV4)
+		portmap_key.src_ip.ipv4 = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4;
+	else if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_type == RTE_ETHER_TYPE_IPV6)
 		rte_memcpy(portmap_key.src_ip.ipv6, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6, sizeof(portmap_key.src_ip.ipv6));
 	else
-		portmap_key.src_ip.ipv4 = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4;
+		return DP_GRPC_ERR_BAD_IPVER;
 
 	portmap_key.iface_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;

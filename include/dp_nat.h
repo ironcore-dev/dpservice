@@ -17,11 +17,7 @@ extern "C" {
 #endif
 
 #define DP_NAT64_PREFIX		"\x00\x64\xff\x9b\x00\x00\x00\x00\x00\x00\x00\x00"
-#define DP_MIN_PACKET_SIZE	64
 
-
-// TODO: change this to a configurable value
-#define DP_NETWORK_NAT_MAX_ENTRY	256
 #define DP_NETWORK_NAT_ALL_VNI		0
 
 struct nat_key {
@@ -54,7 +50,7 @@ struct dnat_data {
 };
 
 struct netnat_portmap_key {
-	struct dpgrpc_address	src_ip;
+	struct dp_ip_address	src_ip;
 	uint32_t				vni;
 	uint16_t				iface_src_port;
 } __rte_packed;
@@ -97,8 +93,8 @@ int dp_set_dnat_ip(uint32_t d_ip, uint32_t dnat_ip, uint32_t vni);
 void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
-rte_be32_t dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip);
-void dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr);
+int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip, rte_be32_t *dest_ip /* out */);
+int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr);
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
 

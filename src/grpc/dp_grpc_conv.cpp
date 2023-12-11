@@ -44,7 +44,7 @@ bool StrToIpv6(const std::string& str, uint8_t *dst)
 	return inet_pton(AF_INET6, str.c_str(), dst) == 1;
 }
 
-bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dpgrpc_address *dp_addr)
+bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr)
 {
 	switch (grpc_addr.ipver()) {
 	case IpVersion::IPV4:

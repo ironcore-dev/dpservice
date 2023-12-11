@@ -73,8 +73,10 @@ int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 
 	if (lb->addr.ip_type == RTE_ETHER_TYPE_IPV4)
 		nkey.ip.v4 = lb->addr.ipv4;
-	else
+	else if (lb->addr.ip_type == RTE_ETHER_TYPE_IPV6)
 		rte_memcpy(nkey.ip.v6, lb->addr.ipv6, sizeof(nkey.ip.v6));
+	else
+		return DP_GRPC_ERR_BAD_IPVER;
 
 	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
@@ -118,8 +120,11 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 	out_lb->addr.ip_type = lb_k->ip_type;
 	if (lb_k->ip_type == RTE_ETHER_TYPE_IPV4)
 		out_lb->addr.ipv4 = lb_k->ip.v4;
-	else
+	else if (lb_k->ip_type == RTE_ETHER_TYPE_IPV6)
 		rte_memcpy(out_lb->addr.ipv6, lb_k->ip.v6, sizeof(out_lb->addr.ipv6));
+	else
+		return DP_GRPC_ERR_BAD_IPVER;
+
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
@@ -172,8 +177,10 @@ bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
 		nkey.ip.v4 = ntohl(df->dst.dst_addr);
-	else
+	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 		rte_memcpy(nkey.ip.v6, df->dst.dst_addr6, sizeof(nkey.ip.v6));
+	else
+		return false;
 
 	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &nkey));
 }
@@ -254,8 +261,10 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *fkey, uint32_t vni)
 
 	if (fkey->l3_type == RTE_ETHER_TYPE_IPV4)
 		nkey.ip.v4 = fkey->l3_dst.ip4;
-	else
+	else if (fkey->l3_type == RTE_ETHER_TYPE_IPV6)
 		rte_memcpy(nkey.ip.v6, fkey->l3_dst.ip6, sizeof(nkey.ip.v6));
+	else
+		return NULL;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &nkey, (void **)&lb_val) < 0)
 		return NULL;

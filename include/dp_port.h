@@ -9,6 +9,7 @@
 #include <net/if.h>
 #include <rte_pci.h>
 #include "dp_conf.h"
+#include "dp_util.h"
 #include "dp_firewall.h"
 #include "dp_internal_stats.h"
 #include "dpdk_layer.h"
@@ -23,8 +24,8 @@ struct dp_iface_cfg {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
 	uint8_t					ip_depth;
-	uint8_t					dhcp_ipv6[16];
-	uint8_t					own_ipv6[16];
+	uint8_t					dhcp_ipv6[DP_IPV6_ADDR_SIZE];
+	uint8_t					own_ipv6[DP_IPV6_ADDR_SIZE];
 	uint8_t					ip6_depth;
 	uint32_t				pxe_ip;
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
@@ -35,7 +36,7 @@ struct dp_port_iface {
 	struct dp_iface_cfg		cfg;
 	uint32_t				vni;
 	char					id[DP_IFACE_ID_MAX_LEN];
-	uint8_t					ul_ipv6[16];
+	uint8_t					ul_ipv6[DP_IPV6_ADDR_SIZE];
 	uint32_t				nat_ip;
 	uint16_t				nat_port_range[2];
 	bool					ready;

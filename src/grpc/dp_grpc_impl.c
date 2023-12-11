@@ -59,7 +59,7 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 
 static int dp_create_vnf_route(uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE] /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
-							   struct dpgrpc_address *pfx_ip, uint8_t prefix_len)
+							   struct dp_ip_address *pfx_ip, uint8_t prefix_len)
 {
 	dp_generate_underlay_ipv6(ul_addr6);
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
@@ -69,7 +69,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb *request = &responder->request.add_lb;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
-	struct dpgrpc_address pfx_ip;
+	struct dp_ip_address pfx_ip;
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int ret = DP_GRPC_OK;
@@ -243,7 +243,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	struct dpgrpc_address pfx_ip;
+	struct dp_ip_address pfx_ip;
 	uint32_t iface_ip, iface_vni;
 	struct dp_port *port;
 	uint32_t vip;
@@ -453,7 +453,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 
 	struct dp_port *port;
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	struct dpgrpc_address pfx_ip;
+	struct dp_ip_address pfx_ip;
 	int ret = DP_GRPC_OK;
 
 	memset(&pfx_ip, 0, sizeof(pfx_ip));
@@ -605,7 +605,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	struct dpgrpc_address pfx_ip;
+	struct dp_ip_address pfx_ip;
 	struct dp_port *port;
 	uint32_t iface_ip, iface_vni;
 	int ret;
@@ -832,7 +832,7 @@ static int dp_process_list_prefixes(struct dp_grpc_responder *responder)
 
 static int dp_process_list_localnats(struct dp_grpc_responder *responder)
 {
-	struct dpgrpc_address *request = &responder->request.list_localnat;
+	struct dp_ip_address *request = &responder->request.list_localnat;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4)
 		return dp_list_nat_local_entries(request->ipv4, responder);
@@ -842,7 +842,7 @@ static int dp_process_list_localnats(struct dp_grpc_responder *responder)
 
 static int dp_process_list_neighnats(struct dp_grpc_responder *responder)
 {
-	struct dpgrpc_address *request = &responder->request.list_neighnat;
+	struct dp_ip_address *request = &responder->request.list_neighnat;
 
 	if (request->ip_type == RTE_ETHER_TYPE_IPV4)
 		return dp_list_nat_neigh_entries(request->ipv4, responder);
