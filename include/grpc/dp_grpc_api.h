@@ -90,28 +90,28 @@ struct dpgrpc_iface_id {
 };
 
 struct dpgrpc_prefix {
-	struct dpgrpc_address	addr;
+	struct dp_ip_address	addr;
 	uint8_t					length;
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
 };
 
 struct dpgrpc_route {
-	struct dpgrpc_address	pfx_addr;
+	struct dp_ip_address	pfx_addr;
 	uint8_t					pfx_length;
 	uint32_t				vni;
-	struct dpgrpc_address	trgt_addr;
+	struct dp_ip_address	trgt_addr;
 	uint32_t				trgt_vni;
 };
 
 struct dpgrpc_vip {
-	struct dpgrpc_address	addr;
+	struct dp_ip_address	addr;
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
 };
 
 struct dpgrpc_nat {
 	char					iface_id[DP_IFACE_ID_MAX_LEN];		// local only
-	struct dpgrpc_address	addr;
+	struct dp_ip_address	addr;
 	uint16_t				min_port;
 	uint16_t				max_port;
 	uint32_t				vni;								// neighnat or reply only
@@ -126,7 +126,7 @@ struct dpgrpc_lb_port {
 
 struct dpgrpc_lb {
 	char					lb_id[DP_LB_ID_MAX_LEN];			// request only
-	struct dpgrpc_address	addr;
+	struct dp_ip_address	addr;
 	uint32_t				vni;
 	struct dpgrpc_lb_port	lbports[DP_LB_MAX_PORTS];
 	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
@@ -138,7 +138,7 @@ struct dpgrpc_lb_id {
 
 struct dpgrpc_lb_target {
 	char					lb_id[DP_LB_ID_MAX_LEN];
-	struct dpgrpc_address	addr;
+	struct dp_ip_address	addr;
 };
 
 struct dpgrpc_fwrule {
@@ -203,8 +203,8 @@ struct dpgrpc_request {
 		struct dpgrpc_iface_id	get_nat;
 		struct dpgrpc_nat		add_neighnat;
 		struct dpgrpc_nat		del_neighnat;
-		struct dpgrpc_address	list_localnat;
-		struct dpgrpc_address	list_neighnat;
+		struct dp_ip_address	list_localnat;
+		struct dp_ip_address	list_neighnat;
 		struct dpgrpc_lb		add_lb;
 		struct dpgrpc_lb_id		del_lb;
 		struct dpgrpc_lb_id		get_lb;

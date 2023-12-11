@@ -39,7 +39,7 @@ extern "C" {
 #define DP_TCP_PKT_FLAG_SYNACK(FLAGS) \
 	(((FLAGS) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
 
-struct dpgrpc_address {
+struct dp_ip_address {
 	uint32_t				ip_type;
 	union {
 		uint32_t			ipv4;

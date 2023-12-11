@@ -174,7 +174,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	rte_ether_addr_copy(&rte_pktmbuf_mtod(m, struct rte_ether_hdr *)->dst_addr, &opt_sid.id.mac);
 
 	reply_options_len = (int)sizeof(opt_sid) + reply_options.opt_cid_len + reply_options.opt_iana_len + reply_options.opt_rapid_len;
-	reply_options_len += sizeof(dns_opt.opt_code) + sizeof(dns_opt.opt_len) + ntohs(dns_opt.opt_len);
+	reply_options_len += (int)(sizeof(dns_opt.opt_code) + sizeof(dns_opt.opt_len) + ntohs(dns_opt.opt_len));
 
 	if (DP_FAILED(resize_packet(m, reply_options_len - options_len)))
 		return DP_ERROR;

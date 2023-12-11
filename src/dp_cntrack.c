@@ -149,7 +149,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 {
 	struct flow_value *flow_val;
 	struct flow_key inverted_key;
-	struct dpgrpc_address pfx_ip;
+	struct dp_ip_address pfx_ip;
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val) {
