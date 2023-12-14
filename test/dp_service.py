@@ -51,6 +51,7 @@ class DpService:
 		self.cmd +=	(f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
 					 f' --dhcp-mtu={dhcp_mtu}'
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
+					 f' --dhcpv6-dns="{dhcpv6_dns1}" --dhcpv6-dns="{dhcpv6_dns2}"'
 					 f' --grpc-port={grpc_port}'
 					  ' --no-stats'
 					  ' --color=auto')

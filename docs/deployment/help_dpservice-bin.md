@@ -10,6 +10,7 @@
 | --vf-pattern | PATTERN | virtual interface name pattern (e.g. 'eth1vf') |  |
 | --dhcp-mtu | SIZE | set the mtu field in DHCP responses (68 - 1500) |  |
 | --dhcp-dns | IPv4 | set the domain name server field in DHCP responses (can be used multiple times) |  |
+| --dhcpv6-dns | ADDR6 | set the domain name server field in DHCPv6 responses (can be used multiple times) |  |
 | --udp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service |  |
 | --tcp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service |  |
 | --wcmp | PERCENTAGE | weighted-cost-multipath percentage for pf0 (0 - 100) |  |

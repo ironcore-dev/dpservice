@@ -19,9 +19,6 @@
 // this can be anything, IANA defined values do exist, but are not applicable here
 #define DP_DHCPV6_HW_ID	0xabcd
 
-/* TODO will be set via configuration */
-static const struct in6_addr dns64_server_addr = {{{0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x64}}};
-
 struct dp_dhcpv6_reply_options {
 	int opt_iana_len;
 	struct dhcpv6_opt_ia_na_single_addr_status opt_iana;
@@ -163,6 +160,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	struct dhcpv6_opt_server_id_ll opt_sid;
 	struct dhcpv6_opt_dns_servers dns_opt;
 	struct dp_dhcpv6_reply_options reply_options = {0};  // this makes *_len fields 0, needed later
+	const struct dp_conf_dhcp_dns *dhcpv6_dns = dp_conf_get_dhcpv6_dns();
 
 	if (DP_FAILED(parse_options(m, options, options_len, &reply_options))) {
 		DPS_LOG_WARNING("Invalid DHCPv6 options received");
@@ -170,7 +168,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	}
 
 	dns_opt.opt_code = htons(DHCPV6_OPT_DNS);
-	dns_opt.opt_len = htons(sizeof(struct in6_addr));
+	dns_opt.opt_len = htons(dhcpv6_dns->len);
 
 	opt_sid = opt_sid_template;
 	rte_ether_addr_copy(&rte_pktmbuf_mtod(m, struct rte_ether_hdr *)->dst_addr, &opt_sid.id.mac);
@@ -200,7 +198,7 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	options += sizeof(dns_opt.opt_code);
 	memcpy(options, &dns_opt.opt_len, sizeof(dns_opt.opt_len));
 	options += sizeof(dns_opt.opt_len);
-	memcpy(options, &dns64_server_addr, sizeof(dns64_server_addr));
+	memcpy(options, dhcpv6_dns->array, dhcpv6_dns->len);
 
 	return reply_options_len;
 }
