@@ -24,6 +24,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_VF_PATTERN,
 	OPT_DHCP_MTU,
 	OPT_DHCP_DNS,
+	OPT_DHCPV6_DNS,
 #ifdef ENABLE_VIRTSVC
 	OPT_UDP_VIRTSVC,
 #endif
@@ -58,6 +59,7 @@ static const struct option dp_conf_longopts[] = {
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
 	{ "dhcp-mtu", 1, 0, OPT_DHCP_MTU },
 	{ "dhcp-dns", 1, 0, OPT_DHCP_DNS },
+	{ "dhcpv6-dns", 1, 0, OPT_DHCPV6_DNS },
 #ifdef ENABLE_VIRTSVC
 	{ "udp-virtsvc", 1, 0, OPT_UDP_VIRTSVC },
 #endif
@@ -203,6 +205,7 @@ int dp_conf_get_flow_timeout(void)
 static void dp_argparse_version(void);
 static int dp_argparse_opt_ipv6(const char *arg);
 static int dp_argparse_opt_dhcp_dns(const char *arg);
+static int dp_argparse_opt_dhcpv6_dns(const char *arg);
 #ifdef ENABLE_VIRTSVC
 static int dp_argparse_opt_udp_virtsvc(const char *arg);
 #endif
@@ -222,6 +225,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
 		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
 		"     --dhcp-dns=IPv4                    set the domain name server field in DHCP responses (can be used multiple times)\n"
+		"     --dhcpv6-dns=ADDR6                 set the domain name server field in DHCPv6 responses (can be used multiple times)\n"
 #ifdef ENABLE_VIRTSVC
 		"     --udp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service\n"
 #endif
@@ -262,6 +266,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_int(arg, &dhcp_mtu, 68, 1500);
 	case OPT_DHCP_DNS:
 		return dp_argparse_opt_dhcp_dns(arg);
+	case OPT_DHCPV6_DNS:
+		return dp_argparse_opt_dhcpv6_dns(arg);
 #ifdef ENABLE_VIRTSVC
 	case OPT_UDP_VIRTSVC:
 		return dp_argparse_opt_udp_virtsvc(arg);

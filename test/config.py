@@ -54,6 +54,8 @@ neigh_vni1_ov_ipv6_route = f"{neigh_vni1_ov_ipv6_prefix}::/104"
 dhcp_mtu = 1337
 dhcp_dns1 = "8.8.4.4"
 dhcp_dns2 = "8.8.8.8"
+dhcpv6_dns1 = "2001:4860:4860::6464"
+dhcpv6_dns2 = "2002:4861:4861::6464"
 
 # Some "random" IP on the internet
 public_ip = "45.86.6.6"

@@ -33,6 +33,7 @@ static char eal_a_pf0[DP_EAL_A_MAXLEN] = {0};
 static char eal_a_pf1[DP_EAL_A_MAXLEN] = {0};
 static uint8_t underlay_ip[16] = {0};
 static struct dp_conf_dhcp_dns dhcp_dns = {0};
+static struct dp_conf_dhcp_dns dhcpv6_dns = {0};
 #ifdef ENABLE_VIRTSVC
 static struct dp_conf_virtual_services virtual_services = {0};
 #endif
@@ -62,6 +63,11 @@ const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void)
 	return &dhcp_dns;
 }
 
+const struct dp_conf_dhcp_dns *dp_conf_get_dhcpv6_dns(void)
+{
+	return &dhcpv6_dns;
+}
+
 #ifdef ENABLE_VIRTSVC
 const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void)
 {
@@ -69,6 +75,32 @@ const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void)
 }
 #endif
 
+static int add_dhcpv6_dns(const char *str)
+{
+	struct in6_addr addr6;
+	uint8_t *tmp;
+
+	if (inet_pton(AF_INET6, str, &addr6) != 1) {
+		DP_EARLY_ERR("Invalid IPv6 address '%s'", str);
+		return DP_ERROR;
+	}
+
+	if (dhcpv6_dns.len + 16 > UINT8_MAX) {
+		DP_EARLY_ERR("Too many DHCPv6 DNS addresses specified");
+		return DP_ERROR;
+	}
+
+	tmp = (uint8_t *)realloc(dhcpv6_dns.array, dhcpv6_dns.len + 16);
+	if (!tmp) {
+		DP_EARLY_ERR("Cannot allocate memory for DHCPv6 DNS address");
+		return DP_ERROR;
+	}
+	dhcpv6_dns.array = tmp;
+
+	memcpy(&dhcpv6_dns.array[dhcpv6_dns.len], &addr6.s6_addr, sizeof(addr6.s6_addr));
+	dhcpv6_dns.len += 16;
+	return DP_OK;
+}
 
 static int add_dhcp_dns(const char *str)
 {
@@ -316,6 +348,11 @@ static int dp_argparse_opt_ipv6(const char *arg)
 static int dp_argparse_opt_dhcp_dns(const char *arg)
 {
 	return add_dhcp_dns(arg);
+}
+
+static int dp_argparse_opt_dhcpv6_dns(const char *arg)
+{
+	return add_dhcpv6_dns(arg);
 }
 
 #ifdef ENABLE_VIRTSVC
