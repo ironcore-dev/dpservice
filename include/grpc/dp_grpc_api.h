@@ -83,6 +83,8 @@ struct dpgrpc_iface {
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
+	uint64_t				total_flow_rate_cap;
+	uint64_t				public_flow_rate_cap;
 };
 
 struct dpgrpc_iface_id {

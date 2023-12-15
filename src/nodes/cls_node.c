@@ -164,6 +164,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		}
 #endif
 		df->l3_type = ntohs(ether_hdr->ether_type);
+		df->l3_payload_length = rte_pktmbuf_pkt_len(m) - (uint32_t)sizeof(struct rte_ether_hdr);
 		return CLS_NEXT_CONNTRACK;
 	}
 

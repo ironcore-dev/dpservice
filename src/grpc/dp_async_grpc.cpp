@@ -247,6 +247,10 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid ipv6_config.primary_address";
 	if (SNPRINTF_FAILED(request->add_iface.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
+
+	request->add_iface.total_flow_rate_cap = request_.metering_parameters().total_rate();
+	request->add_iface.public_flow_rate_cap = request_.metering_parameters().public_rate();
+
 	return NULL;
 }
 void CreateInterfaceCall::ParseReply(struct dpgrpc_reply* reply)

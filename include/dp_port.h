@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <net/if.h>
 #include <rte_pci.h>
+#include <rte_meter.h>
 #include "dp_conf.h"
 #include "dp_util.h"
 #include "dp_firewall.h"
@@ -43,23 +44,26 @@ struct dp_port_iface {
 };
 
 struct dp_port {
-	bool					is_pf;
-	uint16_t				port_id;
-	char					port_name[IF_NAMESIZE];
-	int						socket_id;
-	uint8_t					link_status;
-	bool					allocated;
-	char					vf_name[IF_NAMESIZE];
-	char					dev_name[RTE_ETH_NAME_MAX_LEN];
-	uint8_t					peer_pf_hairpin_tx_rx_queue_offset;
-	uint16_t				peer_pf_port_id;
-	struct rte_ether_addr	own_mac;
-	struct rte_ether_addr	neigh_mac;
-	struct dp_port_iface	iface;
-	struct rte_flow			*default_jump_flow;
-	struct rte_flow			*default_capture_flow;
-	bool					captured;
-	struct dp_port_stats	stats;
+	bool							is_pf;
+	uint16_t						port_id;
+	char							port_name[IF_NAMESIZE];
+	int								socket_id;
+	uint8_t							link_status;
+	bool							allocated;
+	char							vf_name[IF_NAMESIZE];
+	char							dev_name[RTE_ETH_NAME_MAX_LEN];
+	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
+	uint16_t						peer_pf_port_id;
+	struct rte_ether_addr			own_mac;
+	struct rte_ether_addr			neigh_mac;
+	struct dp_port_iface			iface;
+	struct rte_flow					*default_jump_flow;
+	struct rte_flow					*default_capture_flow;
+	bool							captured;
+	struct dp_port_stats			stats;
+	bool							soft_metering_enabled;
+	struct rte_meter_srtcm			port_srtcm;
+	struct rte_meter_srtcm_profile	port_srtcm_profile;
 };
 
 struct dp_ports {
@@ -81,6 +85,7 @@ void dp_ports_free(void);
 int dp_start_port(struct dp_port *port);
 int dp_stop_port(struct dp_port *port);
 
+int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap);
 
 static __rte_always_inline
 int dp_load_mac(struct dp_port *port)

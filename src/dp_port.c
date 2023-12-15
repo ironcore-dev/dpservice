@@ -22,6 +22,10 @@
 #define DP_PORT_INIT_PF true
 #define DP_PORT_INIT_VF false
 
+#define DP_METER_CIR_BASE_VALUE  1024 * 1024 // 1 Mbits
+#define DP_METER_EBS_BREAK_VALUE 100     // 100 Mbits/s
+#define DP_METER_MBITS_TO_BYTES  (1024 * 1024 / 8)
+
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
 		.mq_mode = RTE_ETH_MQ_RX_NONE,
@@ -42,6 +46,12 @@ static const struct rte_eth_conf port_conf_default = {
 	.intr_conf = {
 		.lsc = 1, /**< lsc interrupt feature enabled */
 	},
+};
+
+static const struct rte_meter_srtcm_params dp_srtcm_params_base = {
+	.cir = DP_METER_CIR_BASE_VALUE * 100 / 8,	// 100 Mbits/s
+	.cbs = 4096,			// 4 KBytes
+	.ebs = DP_METER_EBS_BREAK_VALUE * DP_METER_MBITS_TO_BYTES,			// DP_METER_EBS_BREAK_VALUE -> kbps -> * 1000 -> bytes
 };
 
 struct dp_port *_dp_port_table[DP_MAX_PORTS];
@@ -456,5 +466,65 @@ int dp_stop_port(struct dp_port *port)
 		return DP_ERROR;
 
 	port->allocated = false;
+	return DP_OK;
+}
+
+static int dp_port_total_flow_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap)
+{
+	return dp_set_vf_rate_limit(port->port_id, total_flow_rate_cap);
+}
+
+static int dp_port_public_flow_meter_config(struct dp_port *port, uint64_t public_flow_rate_cap)
+{
+	struct rte_meter_srtcm_params srtcm_params = dp_srtcm_params_base;
+	int ret;
+
+	srtcm_params.cir = DP_METER_CIR_BASE_VALUE * (public_flow_rate_cap / 8); // Mbits/s -> bytes/s
+	if (public_flow_rate_cap < DP_METER_EBS_BREAK_VALUE)
+		srtcm_params.ebs = public_flow_rate_cap * DP_METER_MBITS_TO_BYTES;
+
+	ret = rte_meter_srtcm_profile_config(&port->port_srtcm_profile, &srtcm_params);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure meter profile", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	ret = rte_meter_srtcm_config(&port->port_srtcm, &port->port_srtcm_profile);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure meter", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap)
+{
+	if (public_flow_rate_cap > total_flow_rate_cap) {
+		DPS_LOG_ERR("Public flow rate cap cannot be greater than total flow rate cap", DP_LOG_PORT(port));
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_port_total_flow_meter_config(port, total_flow_rate_cap))) {
+		DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port));
+		return DP_ERROR;
+	}
+
+	if (public_flow_rate_cap == 0) {
+		port->soft_metering_enabled = false;
+		return DP_OK;
+	}
+
+	if (DP_FAILED(dp_port_public_flow_meter_config(port, public_flow_rate_cap))) {
+		DPS_LOG_ERR("Cannot set public flow meter", DP_LOG_PORT(port));
+		if (DP_FAILED(dp_port_total_flow_meter_config(port, 0))) {
+			DPS_LOG_ERR("Cannot reset total flow meter", DP_LOG_PORT(port));
+			return DP_ERROR;
+		}
+		return DP_ERROR;
+	}
+
+	port->soft_metering_enabled = true;
+
 	return DP_OK;
 }

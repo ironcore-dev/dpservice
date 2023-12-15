@@ -504,6 +504,12 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		goto route6_err;
 	}
 
+	if (!port->is_pf)
+		if (DP_FAILED(dp_port_meter_config(port, request->total_flow_rate_cap, request->public_flow_rate_cap))) {
+			ret = DP_GRPC_ERR_PORT_METER;
+			goto err;
+		}
+
 	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
 	snprintf(reply->name, sizeof(reply->name), "%s", port->vf_name);
 	return DP_GRPC_OK;
@@ -548,6 +554,11 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	dp_virtsvc_del_iface(port->port_id);
 #endif
 	dp_remove_iface_flows(port->port_id, ipv4, vni);
+
+	if (!port->is_pf)
+		if (DP_FAILED(dp_port_meter_config(port, 0, 0)))
+			ret = DP_GRPC_ERR_PORT_METER;
+
 	return ret;
 }
 

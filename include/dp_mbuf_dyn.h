@@ -57,6 +57,7 @@ struct dp_flow {
 	enum dp_vnf_type			vnf_type : 3;
 
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
+	uint32_t	l3_payload_length;  //layer-3 playload length for inner packets.
 	union {
 		rte_be32_t	dst_addr;
 		uint8_t		dst_addr6[16];
