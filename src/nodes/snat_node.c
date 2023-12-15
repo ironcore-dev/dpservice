@@ -5,11 +5,13 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include <rte_meter.h>
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
+#include "dp_vni.h"
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "protocols/dp_icmpv6.h"
@@ -148,6 +150,15 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_port *port;
 	rte_be32_t dest_ip4;
 	uint32_t src_ip;
+	struct dp_port *in_port = dp_get_in_port(m);
+	enum rte_color color;
+
+	if (!in_port->is_pf && in_port->soft_metering_enabled && df->flow_type == DP_FLOW_SOUTH_NORTH
+		&& (df->l3_type == RTE_ETHER_TYPE_IPV4 || df->l3_type == RTE_ETHER_TYPE_IPV6)) {
+		color = rte_meter_srtcm_color_blind_check(&in_port->port_srtcm, &in_port->port_srtcm_profile, rte_rdtsc(), df->l3_payload_length);
+		if (color == RTE_COLOR_RED)
+			return SNAT_NEXT_DROP;
+	}
 
 	if (!cntrack)
 		return SNAT_NEXT_FIREWALL;

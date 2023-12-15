@@ -8,10 +8,16 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
+#include "dp_port.h"
 #include "rte_flow/dp_rte_flow.h"
 
-#define DP_SYSFS_PREFIX_MLX_VF_COUNT	"/sys/class/net/"
+#define DP_SYSFS_PREFIX_MLX_DEVICE		"/sys/class/net/"
+
+#define DP_SYSFS_PREFIX_MLX_VF_COUNT	DP_SYSFS_PREFIX_MLX_DEVICE
 #define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"
+
+#define DP_SYSFS_PREFIX_MLX_MAX_TX_RATE "/device/sriov/"
+#define DP_SYSFS_SUFFIX_MLX_MAX_TX_RATE "/max_tx_rate"
 #define DP_SYSFS_MAX_PATH 256
 
 // makes sure there is enough space to prevent collisions
@@ -159,4 +165,46 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 void dp_free_jhash_table(struct rte_hash *table)
 {
 	rte_hash_free(table);
+}
+
+int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate)
+{
+	char filename[DP_SYSFS_MAX_PATH];
+	uint16_t vf_pattern_len = 0;
+	const char *pattern = dp_conf_get_vf_pattern();
+	FILE *fp;
+	struct dp_port *port = dp_get_port_by_id(port_id);
+	uint64_t rate_in_mbits = rate;
+
+	if (!port) {
+		DPS_LOG_ERR("Cannot get port by id", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
+	}
+
+	while (*(pattern + vf_pattern_len) != '\0')
+		vf_pattern_len++;
+
+	if (snprintf(filename, sizeof(filename),
+				"%s%s%s%s%s",
+				DP_SYSFS_PREFIX_MLX_DEVICE,
+				dp_conf_get_pf0_name(),
+				DP_SYSFS_PREFIX_MLX_MAX_TX_RATE,
+				port->vf_name + vf_pattern_len,
+				DP_SYSFS_SUFFIX_MLX_MAX_TX_RATE)
+			>= (int)sizeof(filename)
+	) {
+		DPS_LOG_ERR("SR-IOV sysfs path to vf's max tx rate is too long");
+		return DP_ERROR;
+	}
+
+	fp = fopen(filename, "w+");
+	if (!fp) {
+		DPS_LOG_ERR("Cannot open SR-IOV sysfs path to vf's max tx rate", DP_LOG_RET(errno));
+		return DP_ERROR;
+	}
+
+	fprintf(fp, "%lu\n", rate_in_mbits);
+	fclose(fp);
+
+	return DP_OK;
 }

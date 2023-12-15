@@ -56,6 +56,8 @@ struct rte_hash *dp_create_jhash_table(int entries, size_t key_len, const char *
 
 void dp_free_jhash_table(struct rte_hash *table);
 
+int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate);
+
 
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
 // network byte-order!
