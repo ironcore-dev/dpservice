@@ -171,7 +171,7 @@ bool Ipv6PrefixLenToMask(uint32_t prefix_length, uint8_t *mask) {
 	memset(mask, 0, DP_IPV6_ADDR_SIZE); // Initialize mask to all zeros
 
 	for (uint32_t i = 0; i < prefix_length; i++) {
-		mask[i / 8] |= (1 << (7 - (i % 8)));
+		mask[i / 8] |= (uint8_t)(1 << (7 - (i % 8)));
 	}
 
 	return true;

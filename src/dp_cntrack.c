@@ -302,8 +302,10 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 	if (df->l4_type == IPPROTO_TCP && df->vnf_type != DP_VNF_TYPE_LB) {
 		if (df->l3_type == RTE_ETHER_TYPE_IPV4)
 			tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv4_hdr(m) + 1);
-		else
+		else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 			tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv6_hdr(m) + 1);
+		else
+			return DP_ERROR;
 		dp_cntrack_tcp_state(flow_val, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}
