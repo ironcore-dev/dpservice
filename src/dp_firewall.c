@@ -74,10 +74,10 @@ int dp_list_firewall_rules(const struct dp_port *port, struct dp_grpc_responder 
 	return DP_GRPC_OK;
 }
 
-static __rte_always_inline void dp_apply_ipv6_mask(const uint8_t *addr, const uint8_t *mask, uint8_t *result) {
-    for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++) {
-        result[i] = addr[i] & mask[i];
-    }
+static __rte_always_inline void dp_apply_ipv6_mask(const uint8_t *addr, const uint8_t *mask, uint8_t *result)
+{
+	for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++)
+		result[i] = addr[i] & mask[i];
 }
 
 static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *rule,
@@ -144,7 +144,7 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 		return false;
 	}
 
-	return ( is_ip_match &&
+	return (is_ip_match &&
 		((src_port_lower == DP_FWALL_MATCH_ANY_PORT) ||
 		 (src_port >= src_port_lower && src_port <= src_port_upper)) &&
 		((dst_port_lower == DP_FWALL_MATCH_ANY_PORT) ||

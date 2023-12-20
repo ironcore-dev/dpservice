@@ -300,18 +300,18 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 static void dp_calculate_icmp_checksum(struct rte_icmp_hdr *icmp_hdr, size_t icmp_len)
 {
 	uint32_t sum = 0;
+	uint16_t word;
 	uint8_t *ptr = (uint8_t *)icmp_hdr;
 
 	icmp_hdr->icmp_cksum = 0;
 
 	for (size_t i = 0; i < icmp_len; i += 2) {
-		uint16_t word = (uint16_t)((uint16_t)ptr[i] | ((uint16_t)ptr[i + 1] << 8));
+		word = (uint16_t)((uint16_t)ptr[i] | ((uint16_t)ptr[i + 1] << 8));
 		sum += word;
 	}
 
-	while (sum >> 16) {
+	while (sum >> 16)
 		sum = (sum & 0xFFFF) + (sum >> 16);
-	}
 
 	icmp_hdr->icmp_cksum = ~((uint16_t)sum);
 }
@@ -394,7 +394,6 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	break;
 	default:
 		return DP_ERROR;
-	break;
 	}
 
 	return DP_OK;
@@ -473,7 +472,6 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t 
 		break;
 	default:
 		return DP_ERROR;
-		break;
 	}
 	return DP_OK;
 }

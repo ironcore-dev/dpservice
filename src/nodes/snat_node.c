@@ -129,6 +129,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port);
 			}
 
+			ipv4_hdr = dp_get_ipv4_hdr(m);
 			cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
 			cntrack->nf_info.vni = vni;
 			cntrack->nf_info.l4_type = df->l4_type;
