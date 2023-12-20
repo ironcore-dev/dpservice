@@ -222,6 +222,24 @@ def test_vf_to_pf_firewall_tcp_allow(prepare_ipv4, grpc_client, port_redundancy)
 		"Packet should not have been filtered"
 	grpc_client.delfwallrule(VM1.name, "fw1-vm1")
 
+def test_vf_to_pf_firewall_ipv6_tcp_allow(prepare_ipv4, grpc_client, port_redundancy):
+	if port_redundancy:
+		pytest.skip()
+	sniff_tcp_data = {}
+	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data,))
+	resp_thread.start()
+	# Allow only tcp packets leaving the VM with destination port 456
+	grpc_client.addfwallrule(VM1.name, "fw1-vm16", proto="tcp", dst_port_min=456, dst_port_max=456, direction="egress")
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
+			   IPv6(dst=public_ipv6, src=VM1.ipv6) /
+			   TCP(dport=453))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	resp_thread.join()
+	assert sniff_tcp_data["pkt"] != None, \
+		"Packet should not have been filtered"
+	grpc_client.delfwallrule(VM1.name, "fw1-vm16")
+
 def encaped_tcp_ipv6_in_ipv6_responder(pf_name):
 	pkt = sniff_packet(pf_name, is_ipv6_tcp_pkt)
 	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst, type=0x86DD) /

@@ -46,13 +46,19 @@ struct dp_port_filter {
 };
 
 struct dp_fwall_rule {
-	char		rule_id[DP_FIREWALL_ID_MAX_LEN];
-	uint32_t	src_ip;
-	uint32_t	src_ip_mask;
-	uint32_t	dest_ip;
-	uint32_t	dest_ip_mask;
-	uint16_t	priority;
-	uint8_t		protocol;
+	char					rule_id[DP_FIREWALL_ID_MAX_LEN];
+	struct dp_ip_address	src_ip;
+	struct dp_ip_address	dest_ip;
+	union {
+		uint32_t			ip4;
+		uint8_t				ip6[DP_IPV6_ADDR_SIZE];
+	} src_mask;
+	union {
+		uint32_t			ip4;
+		uint8_t				ip6[DP_IPV6_ADDR_SIZE];
+	} dest_mask;
+	uint16_t				priority;
+	uint8_t					protocol;
 	union {
 		struct dp_icmp_filter icmp;
 		struct dp_port_filter tcp_udp;

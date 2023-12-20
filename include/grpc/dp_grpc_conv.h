@@ -34,6 +34,8 @@ namespace GrpcConv
 
 	bool Ipv4PrefixLenToMask(uint32_t prefix_length, uint32_t *mask);
 
+	bool Ipv6PrefixLenToMask(uint32_t prefix_length, uint8_t *mask);
+
 	void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface);
 
 	void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
