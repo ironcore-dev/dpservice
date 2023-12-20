@@ -74,6 +74,12 @@ int dp_list_firewall_rules(const struct dp_port *port, struct dp_grpc_responder 
 	return DP_GRPC_OK;
 }
 
+static __rte_always_inline void dp_apply_ipv6_mask(const uint8_t *addr, const uint8_t *mask, uint8_t *result) {
+    for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++) {
+        result[i] = addr[i] & mask[i];
+    }
+}
+
 static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *rule,
 													const struct dp_flow *df)
 {
@@ -81,9 +87,14 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	uint32_t src_ip = ntohl(df->src.src_addr);
 	uint32_t src_port_lower, src_port_upper = 0;
 	uint32_t dst_port_lower, dst_port_upper = 0;
-	uint32_t r_dest_ip = rule->dest_ip;
-	uint32_t r_src_ip = rule->src_ip;
+	uint8_t masked_src_ip6[DP_IPV6_ADDR_SIZE];
+	uint8_t masked_dest_ip6[DP_IPV6_ADDR_SIZE];
+	uint8_t masked_r_src_ip6[DP_IPV6_ADDR_SIZE];
+	uint8_t masked_r_dest_ip6[DP_IPV6_ADDR_SIZE];
+	uint32_t r_dest_ip = rule->dest_ip.ipv4;
+	uint32_t r_src_ip = rule->src_ip.ipv4;
 	uint8_t protocol = df->l4_type;
+	bool is_ip_match = false;
 	uint16_t dest_port = 0;
 	uint16_t src_port = 0;
 
@@ -117,8 +128,23 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	dst_port_lower = rule->filter.tcp_udp.dst_port.lower;
 	dst_port_upper = rule->filter.tcp_udp.dst_port.upper;
 
-	return ((src_ip & rule->src_ip_mask) == (r_src_ip & rule->src_ip_mask) &&
-		(dest_ip & rule->dest_ip_mask) == (r_dest_ip & rule->dest_ip_mask) &&
+	/* TODO Improve for NAT64 firewall ip match */
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+		is_ip_match = (src_ip & rule->src_mask.ip4) == (r_src_ip & rule->src_mask.ip4) &&
+			(dest_ip & rule->dest_mask.ip4) == (r_dest_ip & rule->dest_mask.ip4);
+	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
+		dp_apply_ipv6_mask(df->src.src_addr6, rule->src_ip.ipv6, masked_src_ip6);
+		dp_apply_ipv6_mask(df->dst.dst_addr6, rule->dest_ip.ipv6, masked_dest_ip6);
+		dp_apply_ipv6_mask(rule->src_ip.ipv6, rule->src_ip.ipv6, masked_r_src_ip6);
+		dp_apply_ipv6_mask(rule->dest_ip.ipv6, rule->dest_ip.ipv6, masked_r_dest_ip6);
+
+		is_ip_match = rte_rib6_is_equal(masked_src_ip6, masked_r_src_ip6) &&
+					rte_rib6_is_equal(masked_dest_ip6, masked_r_dest_ip6);
+	} else {
+		return false;
+	}
+
+	return ( is_ip_match &&
 		((src_port_lower == DP_FWALL_MATCH_ANY_PORT) ||
 		 (src_port >= src_port_lower && src_port <= src_port_upper)) &&
 		((dst_port_lower == DP_FWALL_MATCH_ANY_PORT) ||
