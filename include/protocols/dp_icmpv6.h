@@ -1,5 +1,5 @@
-#ifndef __INCLUDE_DP_DHCPV6_H__
-#define __INCLUDE_DP_DHCPV6_H__
+#ifndef __INCLUDE_DP_ICMPV6_H__
+#define __INCLUDE_DP_ICMPV6_H__
 
 #define	DP_ICMPV6_ECHO_REQUEST	128
 #define	DP_ICMPV6_ECHO_REPLY	129

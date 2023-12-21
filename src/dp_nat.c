@@ -327,7 +327,7 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	uint8_t l4_proto;
 
 	eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	eth_hdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV4);
 
 	ipv6_hdr = dp_get_ipv6_hdr(m);
 	*dest_ip = *(int *)&ipv6_hdr->dst_addr[12];
@@ -338,13 +338,14 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 		return DP_ERROR;
 
 	// Move the Ethernet header to just before the IPv4 header
+	// The access to the "shortened" mbuf memory is intentional and is allowed for mbufs
 	memmove(rte_pktmbuf_mtod(m, uint8_t *), eth_hdr, sizeof(struct rte_ether_hdr));
 
 	// Setup the new IPv4 header
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 	ipv4_hdr->version_ihl = 0x45;
 	ipv4_hdr->type_of_service = (uint8_t)((ntohl(ipv6_hdr->vtc_flow) >> 20) & 0xFF);
-	ipv4_hdr->total_length = rte_cpu_to_be_16(rte_pktmbuf_data_len(m) - (uint16_t)sizeof(struct rte_ether_hdr));
+	ipv4_hdr->total_length = htons(rte_pktmbuf_data_len(m) - (uint16_t)sizeof(struct rte_ether_hdr));
 	ipv4_hdr->packet_id = 0;
 	ipv4_hdr->fragment_offset = 0;
 	ipv4_hdr->time_to_live = ipv6_hdr->hop_limits;
@@ -354,7 +355,7 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	ipv4_hdr->hdr_checksum = 0;
 
 	m->tx_offload = 0;
-	m->packet_type &= ~RTE_PTYPE_L3_MASK;
+	m->packet_type = (m->packet_type & ~RTE_PTYPE_L3_MASK) | RTE_PTYPE_L3_IPV4;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4;
 	m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;
 	m->tx_offload = 0;
@@ -389,7 +390,7 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 		else if (icmp_hdr->icmp_type == DP_ICMPV6_ECHO_REPLY)
 			icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
 		else
-			return 0;
+			return DP_ERROR; //Drop unsupported ICMP Types for the time being
 		dp_calculate_icmp_checksum(icmp_hdr, rte_be_to_cpu_16(ipv4_hdr->total_length) - ((ipv4_hdr->version_ihl & 0x0F) * 4));
 	break;
 	default:
@@ -411,7 +412,7 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t 
 	uint8_t l4_proto;
 
 	eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	eth_hdr->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
+	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
 	src_ipv4 = ipv4_hdr->src_addr;
@@ -427,7 +428,7 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t 
 	// Setup the new IPv6 header
 	ipv6_hdr = dp_get_ipv6_hdr(m);
 	ipv6_hdr->vtc_flow = rte_cpu_to_be_32((6 << 28) | (ipv4_hdr->type_of_service << 20));
-	ipv6_hdr->payload_len = rte_cpu_to_be_16(rte_pktmbuf_data_len(m) - (uint16_t)sizeof(struct rte_ether_hdr) - (uint16_t)sizeof(struct rte_ipv6_hdr));
+	ipv6_hdr->payload_len = htons(rte_pktmbuf_data_len(m) - (uint16_t)sizeof(struct rte_ether_hdr) - (uint16_t)sizeof(struct rte_ipv6_hdr));
 	ipv6_hdr->proto = l4_proto;
 	ipv6_hdr->hop_limits = ipv4_hdr->time_to_live;
 
@@ -437,7 +438,7 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t 
 	rte_memcpy(ipv6_hdr->dst_addr, ipv6_addr, DP_IPV6_ADDR_SIZE);
 	rte_memcpy(df->dst.dst_addr6, ipv6_addr, DP_IPV6_ADDR_SIZE);
 
-	m->packet_type &= ~RTE_PTYPE_L3_MASK;
+	m->packet_type = (m->packet_type & ~RTE_PTYPE_L3_MASK) | RTE_PTYPE_L3_IPV6;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = sizeof(struct rte_ipv6_hdr);
@@ -466,8 +467,10 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t 
 
 		if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
 			icmp_hdr->icmp_type = DP_ICMPV6_ECHO_REQUEST;
-		if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REPLY)
+		else if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REPLY)
 			icmp_hdr->icmp_type = DP_ICMPV6_ECHO_REPLY;
+		else
+			return DP_ERROR; //Drop unsupported ICMP Types for the time being
 		icmp_hdr->icmp_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp_hdr);
 		break;
 	default:

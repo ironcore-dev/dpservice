@@ -28,7 +28,7 @@ void dp_vnf_free(void)
 }
 
 int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type type,
-			   uint16_t port_id, uint32_t vni, struct dp_ip_address *pfx_ip, uint8_t prefix_len)
+			   uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix, uint8_t prefix_len)
 {
 	struct dp_vnf *vnf;
 	int ret;
@@ -38,29 +38,29 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 
 	vnf = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf), RTE_CACHE_LINE_SIZE);
 	if (!vnf) {
-		if (pfx_ip->ip_type == RTE_ETHER_TYPE_IPV4)
+		if (prefix->ip_type == RTE_ETHER_TYPE_IPV4)
 			DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-							DP_LOG_PORTID(port_id), DP_LOG_IPV4(pfx_ip->ipv4), DP_LOG_PREFLEN(prefix_len));
+							DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix->ipv4), DP_LOG_PREFLEN(prefix_len));
 		else
 			DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-							DP_LOG_PORTID(port_id), DP_LOG_IPV6(pfx_ip->ipv6), DP_LOG_PREFLEN(prefix_len));
+							DP_LOG_PORTID(port_id), DP_LOG_IPV6(prefix->ipv6), DP_LOG_PREFLEN(prefix_len));
 		return DP_ERROR;
 	}
 
 	vnf->type = type;
 	vnf->vni = vni;
 	vnf->port_id = port_id;
-	vnf->alias_pfx.ol = *pfx_ip;
+	vnf->alias_pfx.ol = *prefix;
 	vnf->alias_pfx.length = prefix_len;
 
 	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, vnf);
 	if (DP_FAILED(ret)) {
-		if (pfx_ip->ip_type == RTE_ETHER_TYPE_IPV4)
+		if (prefix->ip_type == RTE_ETHER_TYPE_IPV4)
 			DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-							DP_LOG_PORTID(port_id), DP_LOG_IPV4(pfx_ip->ipv4), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
+							DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix->ipv4), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
 		else
 			DPS_LOG_WARNING("VNF handle addition failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-							DP_LOG_PORTID(port_id), DP_LOG_IPV6(pfx_ip->ipv6), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
+							DP_LOG_PORTID(port_id), DP_LOG_IPV6(prefix->ipv6), DP_LOG_PREFLEN(prefix_len), DP_LOG_RET(ret));
 		rte_free(vnf);
 		return DP_ERROR;
 	}
@@ -102,17 +102,18 @@ int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 
 static __rte_always_inline bool dp_vnf_match(const struct dp_vnf *vnf, enum dp_vnf_type type,
 											 uint16_t port_id, uint32_t vni,
-											 struct dp_ip_address *pfx_ip, uint8_t prefix_len)
+											 struct dp_ip_address *prefix, uint8_t prefix_len)
 {
 	return (port_id == DP_VNF_MATCH_ALL_PORT_IDS || vnf->port_id == port_id)
 		&& vnf->vni == vni
-		&& ((vnf->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV4 && vnf->alias_pfx.ol.ipv4 == pfx_ip->ipv4)
-			|| (vnf->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV6 && rte_rib6_is_equal(vnf->alias_pfx.ol.ipv6, pfx_ip->ipv6)))
-		&& vnf->alias_pfx.length == prefix_len
-		&& vnf->type == type;
+		&& vnf->type == type
+		&& vnf->alias_pfx.ol.ip_type == prefix->ip_type
+		&& ((vnf->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV4 && vnf->alias_pfx.ol.ipv4 == prefix->ipv4)
+			|| (vnf->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV6 && rte_rib6_is_equal(vnf->alias_pfx.ol.ipv6, prefix->ipv6)))
+		&& vnf->alias_pfx.length == prefix_len;
 }
 
-bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address *pfx_ip, uint8_t prefix_len)
+bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix_ip, uint8_t prefix_len)
 {
 	struct dp_vnf *vnf;
 	uint32_t iter = 0;
@@ -121,21 +122,21 @@ bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address
 
 	while ((ret = rte_hash_iterate(vnf_handle_tbl, &key, (void **)&vnf, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
-			if (pfx_ip->ip_type == RTE_ETHER_TYPE_IPV4)
+			if (prefix_ip->ip_type == RTE_ETHER_TYPE_IPV4)
 				DPS_LOG_WARNING("Iterating VNF table failed", DP_LOG_RET(ret), DP_LOG_PORTID(port_id),
-								DP_LOG_VNI(vni), DP_LOG_IPV4(pfx_ip->ipv4), DP_LOG_PREFLEN(prefix_len));
+								DP_LOG_VNI(vni), DP_LOG_IPV4(prefix_ip->ipv4), DP_LOG_PREFLEN(prefix_len));
 			else
 				DPS_LOG_WARNING("Iterating VNF table failed", DP_LOG_RET(ret), DP_LOG_PORTID(port_id),
-								DP_LOG_VNI(vni), DP_LOG_IPV6(pfx_ip->ipv6), DP_LOG_PREFLEN(prefix_len));
+								DP_LOG_VNI(vni), DP_LOG_IPV6(prefix_ip->ipv6), DP_LOG_PREFLEN(prefix_len));
 			return false;
 		}
-		if (dp_vnf_match(vnf, DP_VNF_TYPE_LB_ALIAS_PFX, port_id, vni, pfx_ip, prefix_len))
+		if (dp_vnf_match(vnf, DP_VNF_TYPE_LB_ALIAS_PFX, port_id, vni, prefix_ip, prefix_len))
 			return true;
 	}
 	return false;
 }
 
-int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, struct dp_ip_address *pfx_ip, uint8_t prefix_len)
+int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix_ip, uint8_t prefix_len)
 {
 	struct dp_vnf *vnf;
 	uint32_t iter = 0;
@@ -147,7 +148,7 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 		if (DP_FAILED(ret))
 			return DP_GRPC_ERR_ITERATOR;
 
-		if (dp_vnf_match(vnf, type, port_id, vni, pfx_ip, prefix_len)) {
+		if (dp_vnf_match(vnf, type, port_id, vni, prefix_ip, prefix_len)) {
 			delete_count++;
 			rte_free(vnf);
 			// this seems unsafe (deletion during traversal), but should be convered by having the table big enough
@@ -155,12 +156,12 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 			// should only ever fail on no-entry or invalid-arguments, but both are covered by rte_hash_iterate()
 			ret = rte_hash_del_key(vnf_handle_tbl, key);
 			if (DP_FAILED(ret)) {
-				if (pfx_ip->ip_type == RTE_ETHER_TYPE_IPV4)
+				if (prefix_ip->ip_type == RTE_ETHER_TYPE_IPV4)
 					DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret), DP_LOG_VNF_TYPE(type), DP_LOG_PORTID(port_id),
-								DP_LOG_VNI(vni), DP_LOG_IPV4(pfx_ip->ipv4), DP_LOG_PREFLEN(prefix_len));
+								DP_LOG_VNI(vni), DP_LOG_IPV4(prefix_ip->ipv4), DP_LOG_PREFLEN(prefix_len));
 				else
 					DPS_LOG_ERR("Cannot delete VNF key", DP_LOG_RET(ret), DP_LOG_VNF_TYPE(type), DP_LOG_PORTID(port_id),
-								DP_LOG_VNI(vni), DP_LOG_IPV6(pfx_ip->ipv6), DP_LOG_PREFLEN(prefix_len));
+								DP_LOG_VNI(vni), DP_LOG_IPV6(prefix_ip->ipv6), DP_LOG_PREFLEN(prefix_len));
 			}
 		}
 	}

@@ -192,23 +192,36 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	grpc_iface->set_underlay_route(strbuf);
 }
 
-uint32_t DpIpv6MaskToPrefixLen(const uint8_t *mask) {
-	uint64_t high = ((uint64_t)mask[0] << 56) | ((uint64_t)mask[1] << 48) |
-					((uint64_t)mask[2] << 40) | ((uint64_t)mask[3] << 32) |
-					((uint64_t)mask[4] << 24) | ((uint64_t)mask[5] << 16) |
-					((uint64_t)mask[6] << 8)  | (uint64_t)mask[7];
+uint32_t DpIpv6MaskToPrefixLen(const uint8_t *mask)
+{
+	uint64_t high = rte_be_to_cpu_64(*((const uint64_t *)(mask)));
+	uint64_t low = rte_be_to_cpu_64(*((const uint64_t *)(mask + 8)));
 
-	uint64_t low = ((uint64_t)mask[8] << 56) | ((uint64_t)mask[9] << 48) |
-					((uint64_t)mask[10] << 40) | ((uint64_t)mask[11] << 32) |
-					((uint64_t)mask[12] << 24) | ((uint64_t)mask[13] << 16) |
-					((uint64_t)mask[14] << 8)  | (uint64_t)mask[15];
 
 	return __builtin_popcountll(high) + __builtin_popcountll(low);
 }
 
-void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule)
+void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip, Prefix* pfx, bool is_source)
 {
 	char strbuf[INET6_ADDRSTRLEN];
+	auto& rule_ip = is_source ? dp_rule->src_ip : dp_rule->dest_ip;
+	auto& rule_mask = is_source ? dp_rule->src_mask : dp_rule->dest_mask;
+
+	if (rule_ip.ip_type == RTE_ETHER_TYPE_IPV4) {
+		ip->set_ipver(IpVersion::IPV4);
+		ip->set_address(GrpcConv::Ipv4ToStr(rule_ip.ipv4));
+		pfx->set_length(__builtin_popcount(rule_mask.ip4));
+	} else {
+		ip->set_ipver(IpVersion::IPV6);
+		inet_ntop(AF_INET6, rule_ip.ipv6, strbuf, sizeof(strbuf));
+		ip->set_address(strbuf);
+		pfx->set_length(DpIpv6MaskToPrefixLen(rule_mask.ip6));
+	}
+	pfx->set_allocated_ip(ip);
+}
+
+void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule)
+{
 	IcmpFilter *icmp_filter;
 	ProtocolFilter *filter;
 	TcpFilter *tcp_filter;
@@ -217,6 +230,7 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 	Prefix *dst_pfx;
 	IpAddress *src_ip;
 	IpAddress *dst_ip;
+	bool is_src = true;
 
 	grpc_rule->set_id(dp_rule->rule_id);
 	grpc_rule->set_priority(dp_rule->priority);
@@ -232,33 +246,12 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 
 	src_ip = new IpAddress();
 	src_pfx = new Prefix();
-	if (dp_rule->src_ip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		src_ip->set_ipver(IpVersion::IPV4);
-		src_ip->set_address(GrpcConv::Ipv4ToStr(dp_rule->src_ip.ipv4));
-		src_pfx->set_length(__builtin_popcount(dp_rule->src_mask.ip4));
-	} else {
-		src_ip->set_ipver(IpVersion::IPV6);
-		inet_ntop(AF_INET6, dp_rule->src_ip.ipv6, strbuf, sizeof(strbuf));
-		src_ip->set_address(strbuf);
-		src_pfx->set_length(DpIpv6MaskToPrefixLen(dp_rule->src_mask.ip6));
-	}
-	src_pfx->set_allocated_ip(src_ip);
+	SetupIpAndPrefix(dp_rule, src_ip, src_pfx, is_src);
 	grpc_rule->set_allocated_source_prefix(src_pfx);
 
 	dst_ip = new IpAddress();
 	dst_pfx = new Prefix();
-	if (dp_rule->dest_ip.ip_type == RTE_ETHER_TYPE_IPV4) {
-		dst_ip->set_ipver(IpVersion::IPV4);
-		dst_ip->set_address(GrpcConv::Ipv4ToStr(dp_rule->dest_ip.ipv4));
-		dst_pfx->set_length(__builtin_popcount(dp_rule->dest_mask.ip4));
-	} else {
-		dst_ip->set_ipver(IpVersion::IPV6);
-		inet_ntop(AF_INET6, dp_rule->dest_ip.ipv6, strbuf, sizeof(strbuf));
-		dst_ip->set_address(strbuf);
-		dst_pfx->set_length(DpIpv6MaskToPrefixLen(dp_rule->dest_mask.ip6));
-	}
-
-	dst_pfx->set_allocated_ip(dst_ip);
+	SetupIpAndPrefix(dp_rule, dst_ip, dst_pfx, !is_src);
 	grpc_rule->set_allocated_destination_prefix(dst_pfx);
 
 	filter = new ProtocolFilter();
