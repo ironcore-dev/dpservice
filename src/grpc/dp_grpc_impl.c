@@ -69,12 +69,13 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb *request = &responder->request.add_lb;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
-	struct dp_ip_address pfx_ip;
+	struct dp_ip_address pfx_ip = {
+		.ip_type = request->addr.ip_type
+	};
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
 	int ret = DP_GRPC_OK;
 
-	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4 || request->addr.ip_type == RTE_ETHER_TYPE_IPV6) {
 		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
@@ -243,7 +244,9 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	struct dp_ip_address pfx_ip;
+	struct dp_ip_address pfx_ip = {
+		.ip_type = request->addr.ip_type
+	};
 	uint32_t iface_ip, iface_vni;
 	struct dp_port *port;
 	uint32_t vip;
@@ -255,7 +258,6 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 		goto err;
 	}
 
-	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
@@ -453,10 +455,11 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 
 	struct dp_port *port;
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	struct dp_ip_address pfx_ip;
+	struct dp_ip_address pfx_ip = {
+		.ip_type = RTE_ETHER_TYPE_IPV4 // Just pick a random valid type, not relevant for this VNF
+	};
 	int ret = DP_GRPC_OK;
 
-	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	port = dp_get_port_by_name(request->pci_name);
 	if (!port) {
 		ret = DP_GRPC_ERR_NOT_FOUND;
@@ -605,7 +608,9 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
 	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
-	struct dp_ip_address pfx_ip;
+	struct dp_ip_address pfx_ip = {
+		.ip_type = request->addr.ip_type
+	};
 	struct dp_port *port;
 	uint32_t iface_ip, iface_vni;
 	int ret;
@@ -616,7 +621,6 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 		goto err;
 	}
 
-	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;

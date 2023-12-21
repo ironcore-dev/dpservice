@@ -40,10 +40,10 @@ extern "C" {
 	(((FLAGS) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
 
 struct dp_ip_address {
-	uint32_t				ip_type;
+	uint16_t		ip_type;
 	union {
-		uint32_t			ipv4;
-		uint8_t				ipv6[DP_IPV6_ADDR_SIZE];
+		uint32_t	ipv4;
+		uint8_t		ipv6[DP_IPV6_ADDR_SIZE];
 	};
 };
 

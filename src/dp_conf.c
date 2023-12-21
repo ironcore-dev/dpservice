@@ -85,12 +85,12 @@ static int add_dhcpv6_dns(const char *str)
 		return DP_ERROR;
 	}
 
-	if (dhcpv6_dns.len + 16 > UINT8_MAX) {
+	if (dhcpv6_dns.len + DP_IPV6_ADDR_SIZE > UINT8_MAX) {
 		DP_EARLY_ERR("Too many DHCPv6 DNS addresses specified");
 		return DP_ERROR;
 	}
 
-	tmp = (uint8_t *)realloc(dhcpv6_dns.array, dhcpv6_dns.len + 16);
+	tmp = (uint8_t *)realloc(dhcpv6_dns.array, dhcpv6_dns.len + DP_IPV6_ADDR_SIZE);
 	if (!tmp) {
 		DP_EARLY_ERR("Cannot allocate memory for DHCPv6 DNS address");
 		return DP_ERROR;
@@ -98,7 +98,7 @@ static int add_dhcpv6_dns(const char *str)
 	dhcpv6_dns.array = tmp;
 
 	memcpy(&dhcpv6_dns.array[dhcpv6_dns.len], &addr6.s6_addr, sizeof(addr6.s6_addr));
-	dhcpv6_dns.len += 16;
+	dhcpv6_dns.len += DP_IPV6_ADDR_SIZE;
 	return DP_OK;
 }
 

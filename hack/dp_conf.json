@@ -48,10 +48,10 @@
       "help": "set the domain name server field in DHCP responses (can be used multiple times)"
     },
     {
-		"lgopt": "dhcpv6-dns",
-		"arg": "ADDR6",
-		"help": "set the domain name server field in DHCPv6 responses (can be used multiple times)"
-	},
+      "lgopt": "dhcpv6-dns",
+      "arg": "ADDR6",
+      "help": "set the domain name server field in DHCPv6 responses (can be used multiple times)"
+    },
     {
       "lgopt": "udp-virtsvc",
       "arg": "IPv4,port,IPv6,port",

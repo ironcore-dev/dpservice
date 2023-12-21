@@ -162,7 +162,6 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = port->port_id;
 
-	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	pfx_ip.ip_type = RTE_ETHER_TYPE_IPV4;
 	pfx_ip.ipv4 = key->l3_dst.ip4;
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
@@ -191,7 +190,11 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	// Implicit casting from hash_sig_t to uint32_t!
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
-	memset(&inverted_key, 0, sizeof(inverted_key));
+	/* Zero out the whole address part of the keys for IPv4 as the stack may have garbage in the unused part */
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+		memset(inverted_key.l3_dst.ip6, 0, sizeof(inverted_key.l3_dst.ip6));
+		memset(inverted_key.l3_src.ip6, 0, sizeof(inverted_key.l3_src.ip6));
+	}
 	dp_invert_flow_key(key, df->l3_type, &inverted_key);
 	flow_val->flow_key[DP_FLOW_DIR_REPLY] = inverted_key;
 	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))

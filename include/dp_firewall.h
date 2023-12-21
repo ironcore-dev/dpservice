@@ -45,18 +45,19 @@ struct dp_port_filter {
 	struct dp_port_range dst_port;
 };
 
+struct dp_ip_mask {
+	union {
+		uint32_t ip4;
+		uint8_t ip6[DP_IPV6_ADDR_SIZE];
+	};
+};
+
 struct dp_fwall_rule {
 	char					rule_id[DP_FIREWALL_ID_MAX_LEN];
 	struct dp_ip_address	src_ip;
 	struct dp_ip_address	dest_ip;
-	union {
-		uint32_t			ip4;
-		uint8_t				ip6[DP_IPV6_ADDR_SIZE];
-	} src_mask;
-	union {
-		uint32_t			ip4;
-		uint8_t				ip6[DP_IPV6_ADDR_SIZE];
-	} dest_mask;
+	struct dp_ip_mask		src_mask;
+	struct dp_ip_mask		dest_mask;
 	uint16_t				priority;
 	uint8_t					protocol;
 	union {

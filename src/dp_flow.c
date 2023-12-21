@@ -152,11 +152,12 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	const struct dp_port *port = dp_get_in_port(m);
 	int ret = DP_OK;
 
-	memset(key, 0, sizeof(struct flow_key));
 	key->l3_type = df->l3_type;
 
 	switch (df->l3_type) {
 	case RTE_ETHER_TYPE_IPV4:
+		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
+		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
 		key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
 		key->l3_src.ip4 = ntohl(df->src.src_addr);
 		break;
