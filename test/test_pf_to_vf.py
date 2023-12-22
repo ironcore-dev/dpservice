@@ -14,7 +14,7 @@ def send_lb_pkt_to_pf(lb_ul_ipv6):
 
 def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-	lbpfx_ul_ipv6 = grpc_client.addlbprefix(VM1.name, f"{lb_ip}/32")
+	lbpfx_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_pfx)
 	grpc_client.addlbtarget(lb_name, lbpfx_ul_ipv6)
 
 	threading.Thread(target=send_lb_pkt_to_pf, args=(lb_ul_ipv6,)).start()
@@ -26,7 +26,7 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 		f"Wrong packet received (ip: {dst_ip}, dport: {dport})"
 
 	grpc_client.dellbtarget(lb_name, lbpfx_ul_ipv6)
-	grpc_client.dellbprefix(VM1.name, f"{lb_ip}/32")
+	grpc_client.dellbprefix(VM1.name, lb_pfx)
 	grpc_client.dellb(lb_name)
 	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
 	# TODO: Currently, to use this test again with the same port(s)
@@ -43,7 +43,7 @@ def send_lb_ipv6_pkt_to_pf(lb_ul_ipv6):
 def test_pf_to_vf_lb_ipv6_tcp(prepare_ifaces, grpc_client):
 
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/8080")
-	lbpfx_ul_ipv6 = grpc_client.addlbprefix(VM1.name, f"{lb_ip6}/128")
+	lbpfx_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_ip6_pfx)
 	grpc_client.addlbtarget(lb_name, lbpfx_ul_ipv6)
 
 	threading.Thread(target=send_lb_ipv6_pkt_to_pf, args=(lb_ul_ipv6,)).start()
@@ -55,6 +55,6 @@ def test_pf_to_vf_lb_ipv6_tcp(prepare_ifaces, grpc_client):
 		f"Wrong packet received (ip: {dst_ip}, dport: {dport})"
 
 	grpc_client.dellbtarget(lb_name, lbpfx_ul_ipv6)
-	grpc_client.dellbprefix(VM1.name, f"{lb_ip6}/128")
+	grpc_client.dellbprefix(VM1.name, lb_ip6_pfx)
 	grpc_client.dellb(lb_name)
 	#grpc_client.delfwallrule(VM1.name, "fw0-vm1")

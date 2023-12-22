@@ -197,7 +197,6 @@ uint32_t DpIpv6MaskToPrefixLen(const uint8_t *mask)
 	uint64_t high = rte_be_to_cpu_64(*((const uint64_t *)(mask)));
 	uint64_t low = rte_be_to_cpu_64(*((const uint64_t *)(mask + 8)));
 
-
 	return __builtin_popcountll(high) + __builtin_popcountll(low);
 }
 
@@ -222,6 +221,8 @@ void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip, Prefix
 
 void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule)
 {
+	constexpr bool IS_SRC = true;
+	constexpr bool IS_DST = false;
 	IcmpFilter *icmp_filter;
 	ProtocolFilter *filter;
 	TcpFilter *tcp_filter;
@@ -230,7 +231,6 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 	Prefix *dst_pfx;
 	IpAddress *src_ip;
 	IpAddress *dst_ip;
-	bool is_src = true;
 
 	grpc_rule->set_id(dp_rule->rule_id);
 	grpc_rule->set_priority(dp_rule->priority);
@@ -246,12 +246,12 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 
 	src_ip = new IpAddress();
 	src_pfx = new Prefix();
-	SetupIpAndPrefix(dp_rule, src_ip, src_pfx, is_src);
+	SetupIpAndPrefix(dp_rule, src_ip, src_pfx, IS_SRC);
 	grpc_rule->set_allocated_source_prefix(src_pfx);
 
 	dst_ip = new IpAddress();
 	dst_pfx = new Prefix();
-	SetupIpAndPrefix(dp_rule, dst_ip, dst_pfx, !is_src);
+	SetupIpAndPrefix(dp_rule, dst_ip, dst_pfx, IS_DST);
 	grpc_rule->set_allocated_destination_prefix(dst_pfx);
 
 	filter = new ProtocolFilter();

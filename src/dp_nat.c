@@ -354,7 +354,6 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	ipv4_hdr->dst_addr = *dest_ip;
 	ipv4_hdr->hdr_checksum = 0;
 
-	m->tx_offload = 0;
 	m->packet_type = (m->packet_type & ~RTE_PTYPE_L3_MASK) | RTE_PTYPE_L3_IPV4;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4;
 	m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;

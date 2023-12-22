@@ -195,7 +195,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	case IPPROTO_ICMPV6:
 		key->port_dst = ntohs(df->l4_info.icmp_field.icmp_identifier);
 		key->src.type_src = df->l4_info.icmp_field.icmp_type;
-		return DP_OK;
+		break;
 	default:
 		key->port_dst = 0;
 		key->src.port_src = 0;

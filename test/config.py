@@ -81,6 +81,7 @@ lb_pfx = "172.22.2.1/32"
 pfx_ip = "172.23.3.0"
 pfx_ip6 = "2a10:defe:dede:f4::1"
 lb_ip6 = "2a10:defe:e01f:f4::2"
+lb_ip6_pfx = "2a10:defe:e01f:f4::2/128"
 
 # Virtual services functionality
 virtsvc_udp_svc_ipv6 = "2a00:da8:fff6::1"
