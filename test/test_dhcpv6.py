@@ -31,11 +31,14 @@ def test_dhcpv6(prepare_ifaces):
 	dns_servers = None
 	if DHCP6OptDNSServers in answer:
 		dns_servers = answer[DHCP6OptDNSServers].dnsservers
-	else:
-		raise AssertionError("No DNS servers option in DHCPv6 reply")
 
-	if not dns_servers or dhcpv6_dns1 not in dns_servers or dhcpv6_dns2 not in dns_servers:
-		raise AssertionError(f"DHCPv6 reply does not specify the correct DNS servers: {dns_servers} instead of {dhcpv6_dns1} and {dhcpv6_dns2}")
+	# Check if DNS servers option is in DHCPv6 reply
+	assert dns_servers is not None, \
+		f"No DNS servers option in DHCPv6 reply"
+
+	# Check if the correct DNS servers are specified in the DHCPv6 reply
+	assert dhcpv6_dns1 in dns_servers and dhcpv6_dns2 in dns_servers, \
+		f"DHCPv6 reply does not specify the correct DNS servers: {dns_servers} instead of {dhcpv6_dns1} and {dhcpv6_dns2}"
 
 	req = DHCP6_Request()
 	iana_op = DHCP6OptIA_NA(iaid=IAID, T1=0, T2=0, ianaopts=[answer[DHCP6OptIAAddress]])
