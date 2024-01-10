@@ -45,9 +45,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		dp_fill_ether_hdr(ether_hdr, out_port, RTE_ETHER_TYPE_IPV6);
 	}
 
-	if (dp_conf_is_offload_enabled())
-		df->offload_ipv6 = true;
-
 	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
