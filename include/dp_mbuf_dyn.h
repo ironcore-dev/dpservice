@@ -51,7 +51,6 @@ enum dp_nat_type {
 struct dp_flow {
 	enum dp_flow_type			flow_type : 1;
 	enum dp_nat_type			nat_type : 3;
-	bool						offload_ipv6 : 1;	// tmp solution to set if we should offload ipv6 pkts
 	enum dp_flow_dir			flow_dir : 1;		// store the direction of each packet
 	enum dp_pkt_offload_state	offload_state : 2;	// store the offload status of each packet
 	enum dp_vnf_type			vnf_type : 3;
