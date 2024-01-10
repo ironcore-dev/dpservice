@@ -62,58 +62,58 @@ struct dhcpv6_packet {
 	uint8_t msg_type;
 	uint8_t transaction_id[3];
 	uint8_t options[];
-};
+} __rte_packed;
 
 struct dhcpv6_option {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	uint8_t data[];
-};
+} __rte_packed;
 
 struct dhcpv6_opt_dns_servers {
 	uint16_t opt_code;
 	uint16_t opt_len;
 	struct in6_addr dns_server_addrs[]; // Array of IPv6 addresses
-};
+} __rte_packed;
 
 // client id can be of any type, this is the maximum size allowed
 struct dhcpv6_opt_client_id {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	uint8_t id[128];
-};
+} __rte_packed;
 
 struct dhcpv6_ia_na {
 	rte_be32_t iaid;
 	rte_be32_t t1;
 	rte_be32_t t2;
 	struct dhcpv6_option options[];
-};
+} __rte_packed;
 
 struct dhcpv6_opt_ia_na {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_na ia_na;
-};
+} __rte_packed;
 
 struct dhcpv6_ia_addr {
 	uint8_t  ipv6[16];
 	rte_be32_t preferred_lifetime;
 	rte_be32_t valid_lifetime;
 	struct dhcpv6_option options[];
-};
+} __rte_packed;
 
 struct dhcpv6_opt_ia_addr {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_addr addr;
-};
+} __rte_packed;
 
 struct dhcpv6_opt_status_code {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	rte_be16_t status;
-};
+} __rte_packed;
 
 struct dhcpv6_duid_ll {
 	rte_be16_t type;
@@ -134,22 +134,25 @@ struct dhcpv6_ia_addr_status {
 	rte_be32_t preferred_lifetime;
 	rte_be32_t valid_lifetime;
 	struct dhcpv6_opt_status_code options[1];
-};
+} __rte_packed;
+
 struct dhcpv6_opt_ia_addr_status {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_addr_status addr;
-};
+} __rte_packed;
+
 struct dhcpv6_ia_na_single_addr_status {
 	rte_be32_t iaid;
 	rte_be32_t t1;
 	rte_be32_t t2;
 	struct dhcpv6_opt_ia_addr_status options[1];
-};
+} __rte_packed;
+
 struct dhcpv6_opt_ia_na_single_addr_status {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_na_single_addr_status ia_na;
-};
+} __rte_packed;
 
 #endif
