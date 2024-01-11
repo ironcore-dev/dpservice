@@ -499,21 +499,24 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	ret = dp_add_route6(port, request->vni, 0, request->ip6_addr, NULL, 128);
 	if (DP_FAILED(ret))
 		goto route_err;
-	if (DP_FAILED(dp_start_port(port))) {
-		ret = DP_GRPC_ERR_PORT_START;
-		goto route6_err;
-	}
 
 	if (!port->is_pf)
 		if (DP_FAILED(dp_port_meter_config(port, request->total_flow_rate_cap, request->public_flow_rate_cap))) {
 			ret = DP_GRPC_ERR_PORT_METER;
-			goto err;
+			goto route6_err;
 		}
+
+	if (DP_FAILED(dp_start_port(port))) {
+		ret = DP_GRPC_ERR_PORT_START;
+		goto meter_err;
+	}
 
 	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
 	snprintf(reply->name, sizeof(reply->name), "%s", port->vf_name);
 	return DP_GRPC_OK;
 
+meter_err:
+	dp_port_meter_config(port, 0, 0);
 route6_err:
 	dp_del_route6(port, request->vni, request->ip6_addr, 128);
 route_err:
@@ -544,6 +547,10 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	ipv4 = port->iface.cfg.own_ip;
 	vni = port->iface.vni;
 
+	if (!port->is_pf)
+		if (DP_FAILED(dp_port_meter_config(port, 0, 0)))
+			ret = DP_GRPC_ERR_PORT_METER;
+
 	dp_del_vnf(port->iface.ul_ipv6);
 	if (DP_FAILED(dp_stop_port(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
@@ -554,10 +561,6 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 	dp_virtsvc_del_iface(port->port_id);
 #endif
 	dp_remove_iface_flows(port->port_id, ipv4, vni);
-
-	if (!port->is_pf)
-		if (DP_FAILED(dp_port_meter_config(port, 0, 0)))
-			ret = DP_GRPC_ERR_PORT_METER;
 
 	return ret;
 }
@@ -581,6 +584,8 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 	rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
 	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
+	reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
+	reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
 	return DP_GRPC_OK;
 }
 
@@ -798,6 +803,8 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 		rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
 		rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
+		reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
+		reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
 	}
 
 	return DP_GRPC_OK;

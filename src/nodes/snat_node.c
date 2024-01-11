@@ -153,7 +153,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_port *in_port = dp_get_in_port(m);
 	enum rte_color color;
 
-	if (!in_port->is_pf && in_port->soft_metering_enabled && df->flow_type == DP_FLOW_SOUTH_NORTH
+	if (!in_port->is_pf && in_port->iface.public_flow_rate_cap && df->flow_type == DP_FLOW_SOUTH_NORTH
 		&& (df->l3_type == RTE_ETHER_TYPE_IPV4 || df->l3_type == RTE_ETHER_TYPE_IPV6)) {
 		color = rte_meter_srtcm_color_blind_check(&in_port->port_srtcm, &in_port->port_srtcm_profile, rte_rdtsc(), df->l3_payload_length);
 		if (color == RTE_COLOR_RED)

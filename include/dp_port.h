@@ -41,6 +41,8 @@ struct dp_port_iface {
 	uint32_t				nat_ip;
 	uint16_t				nat_port_range[2];
 	bool					ready;
+	uint64_t				total_flow_rate_cap;
+	uint64_t				public_flow_rate_cap;
 };
 
 struct dp_port {
@@ -61,7 +63,6 @@ struct dp_port {
 	struct rte_flow					*default_capture_flow;
 	bool							captured;
 	struct dp_port_stats			stats;
-	bool							soft_metering_enabled;
 	struct rte_meter_srtcm			port_srtcm;
 	struct rte_meter_srtcm_profile	port_srtcm_profile;
 };

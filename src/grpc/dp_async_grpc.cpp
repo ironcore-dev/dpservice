@@ -225,7 +225,9 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_VNI(request_.vni()),
 					DP_LOG_IPV4STR(request_.ipv4_config().primary_address().c_str()),
 					DP_LOG_IPV6STR(request_.ipv6_config().primary_address().c_str()),
-					DP_LOG_PCI(request_.device_name().c_str()));
+					DP_LOG_PCI(request_.device_name().c_str()),
+					DP_LOG_METER_TOTAL(request_.metering_parameters().total_rate()),
+					DP_LOG_METER_PUBLIC(request_.metering_parameters().public_rate()));
 	if (!GrpcConv::IsInterfaceIdValid(request_.interface_id()))
 		return "Invalid interface_id";
 	request->add_iface.vni = request_.vni();
