@@ -71,6 +71,7 @@ message Interface {
 	bytes primary_ipv6 = 4;
 	bytes underlay_route = 5;
 	string pci_name = 6;
+	MeteringParams meteringParams = 7;
 }
 
 message IpConfig {

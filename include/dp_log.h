@@ -70,6 +70,8 @@ extern "C" {
 #define DP_LOG_MINPORT(VALUE) _DP_LOG_UINT("minport", VALUE)
 #define DP_LOG_MAXPORT(VALUE) _DP_LOG_UINT("maxport", VALUE)
 #define DP_LOG_FLOW_ERROR(VALUE) _DP_LOG_STR("flow_error", VALUE)
+#define DP_LOG_METER_TOTAL(VALUE) _DP_LOG_UINT("meter_total", VALUE)
+#define DP_LOG_METER_PUBLIC(VALUE) _DP_LOG_UINT("meter_public", VALUE)
 // gRPC worker I/O
 #define DP_LOG_GRPCRET(VALUE) _DP_LOG_INT("grpc_error", VALUE), _DP_LOG_STR("grpc_message", dp_grpc_strerror(VALUE))
 #define DP_LOG_GRPCREQUEST(VALUE) _DP_LOG_INT("grpc_request", VALUE)

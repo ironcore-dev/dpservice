@@ -181,6 +181,7 @@ bool Ipv6PrefixLenToMask(uint32_t prefix_length, uint8_t *mask) {
 void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface)
 {
 	char strbuf[INET6_ADDRSTRLEN];
+	MeteringParams *metering_params;
 
 	grpc_iface->set_primary_ipv4(GrpcConv::Ipv4ToStr(dp_iface->ip4_addr));
 	inet_ntop(AF_INET6, dp_iface->ip6_addr, strbuf, sizeof(strbuf));
@@ -190,6 +191,10 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	grpc_iface->set_pci_name(dp_iface->pci_name);
 	inet_ntop(AF_INET6, dp_iface->ul_addr6, strbuf, sizeof(strbuf));
 	grpc_iface->set_underlay_route(strbuf);
+	metering_params = new MeteringParams();
+	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
+	metering_params->set_public_rate(dp_iface->public_flow_rate_cap);
+	grpc_iface->set_allocated_meteringparams(metering_params);
 }
 
 uint32_t DpIpv6MaskToPrefixLen(const uint8_t *mask)

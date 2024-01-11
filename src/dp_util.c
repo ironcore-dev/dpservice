@@ -44,15 +44,16 @@ static int get_num_of_vfs_sriov(void)
 	int vfs;
 	char filename[DP_SYSFS_MAX_PATH];
 	FILE *fp;
+	int res;
 
-	if (snprintf(filename, sizeof(filename),
+	res = snprintf(filename, sizeof(filename),
 				 "%s%s%s",
 				 DP_SYSFS_PREFIX_MLX_VF_COUNT,
 				 dp_conf_get_pf0_name(),
-				 DP_SYSFS_SUFFIX_MLX_VF_COUNT)
-			>= (int)sizeof(filename)
-	) {
-		DPS_LOG_ERR("SR-IOV sysfs path to number of VFs is too long");
+				 DP_SYSFS_SUFFIX_MLX_VF_COUNT);
+
+	if (res < 0 || (unsigned)res >= sizeof(filename)) {
+		DPS_LOG_ERR("Faled to generate SR-IOV sysfs path or SR-IOV sysfs path to number of VFs is too long");
 		return DP_ERROR;
 	}
 
@@ -175,25 +176,24 @@ int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate)
 	FILE *fp;
 	struct dp_port *port = dp_get_port_by_id(port_id);
 	uint64_t rate_in_mbits = rate;
+	int res;
 
-	if (!port) {
-		DPS_LOG_ERR("Cannot get port by id", DP_LOG_PORTID(port_id));
+	if (!port)
 		return DP_ERROR;
-	}
 
 	while (*(pattern + vf_pattern_len) != '\0')
 		vf_pattern_len++;
 
-	if (snprintf(filename, sizeof(filename),
+	res = snprintf(filename, sizeof(filename),
 				"%s%s%s%s%s",
 				DP_SYSFS_PREFIX_MLX_DEVICE,
 				dp_conf_get_pf0_name(),
 				DP_SYSFS_PREFIX_MLX_MAX_TX_RATE,
 				port->vf_name + vf_pattern_len,
-				DP_SYSFS_SUFFIX_MLX_MAX_TX_RATE)
-			>= (int)sizeof(filename)
-	) {
-		DPS_LOG_ERR("SR-IOV sysfs path to vf's max tx rate is too long");
+				DP_SYSFS_SUFFIX_MLX_MAX_TX_RATE);
+
+	if (res < 0 || (unsigned)res >= (int)sizeof(filename)) {
+		DPS_LOG_ERR("Failed to generate SR-IOV sysfs path or SR-IOV sysfs path to vf's max tx rate is too long");
 		return DP_ERROR;
 	}
 
