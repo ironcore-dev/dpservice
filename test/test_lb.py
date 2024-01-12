@@ -195,7 +195,7 @@ def send_bounce_ipv6_pkt_to_pf(ipv6_lb):
 				 TCP(sport=8989, dport=8080))
 	delayed_sendp(bounce_pkt, PF0.tap)
 
-def test_external_lb_relay(prepare_ipv4, grpc_client):
+def test_external_lb_relay_ipv6(prepare_ipv4, grpc_client):
 
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/8080")
 	grpc_client.addlbtarget(lb_name, neigh_ul_ipv6)
