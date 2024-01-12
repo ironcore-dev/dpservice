@@ -30,8 +30,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const struct dp_port *out_port = dp_get_out_port(df);
 	enum dp_fwall_action action;
 
-	// currently only IPv4 firewall is implemented
-	if (df->l3_type == RTE_ETHER_TYPE_IPV4 && cntrack) {
+	if (cntrack) {
 		if (DP_FLOW_HAS_FLAG_FIREWALL(cntrack->flow_flags)) {
 			action = (enum dp_fwall_action)cntrack->fwall_action[df->flow_dir];
 		} else if (df->flow_dir == DP_FLOW_DIR_ORG) {
