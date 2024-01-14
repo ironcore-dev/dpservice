@@ -166,6 +166,8 @@ static int dp_process_check_vniinuse(struct dp_grpc_responder *responder)
 
 	if (request->type == DP_VNI_IPV4) {
 		reply->in_use = dp_is_vni_route_table_available(request->vni, DP_IP_PROTO_IPV4);
+	} else if (request->type == DP_VNI_IPV6) {
+		reply->in_use = dp_is_vni_route_table_available(request->vni, DP_IP_PROTO_IPV6);
 	} else
 		return DP_GRPC_ERR_WRONG_TYPE;
 
