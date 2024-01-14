@@ -25,6 +25,16 @@
 
 static uint32_t pfx_counter = 0;
 
+static __rte_always_inline bool dp_is_ipv6_addr_zero(const uint8_t *addr)
+{
+	for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++) {
+		if (addr[i] != 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
 static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_IPV6_ADDR_SIZE])
 {
 	rte_be32_t local;
@@ -487,6 +497,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	rte_memcpy(port->iface.ul_ipv6, ul_addr6, sizeof(port->iface.ul_ipv6));
 	port->iface.cfg.own_ip = request->ip4_addr;
 	port->iface.cfg.ip_depth = DP_LPM_DHCP_IP_DEPTH;
+	port->iface.is_ipv6_set = !dp_is_ipv6_addr_zero(request->ip6_addr);
 	rte_memcpy(port->iface.cfg.dhcp_ipv6, request->ip6_addr, sizeof(port->iface.cfg.dhcp_ipv6));
 	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");

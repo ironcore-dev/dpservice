@@ -111,7 +111,7 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 			}
 			reply_options->opt_iana = opt_iana_template;
 			reply_options->opt_iana.ia_na.iaid = ((const struct dhcpv6_ia_na *)&opt->data)->iaid;
-			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_in_port(m)->iface.cfg.dhcp_ipv6, 16);
+			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_in_port(m)->iface.cfg.dhcp_ipv6, DP_IPV6_ADDR_SIZE);
 			reply_options->opt_iana_len = sizeof(opt_iana_template);
 			break;
 		case DHCPV6_OPT_RAPID_COMMIT:
@@ -212,6 +212,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	int req_options_len = rte_pktmbuf_data_len(m) - (int)DP_DHCPV6_PKT_FIXED_LEN;
 	int reply_options_len;
 	size_t payload_len;
+
+	if (!dp_get_in_port(m)->iface.is_ipv6_set)
+		return DHCPV6_NEXT_DROP;
 
 	// packet length is uint16_t, negative value means it's less than the required length
 	if (req_options_len < 0) {
