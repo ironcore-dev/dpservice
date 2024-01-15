@@ -27,11 +27,9 @@ static uint32_t pfx_counter = 0;
 
 static __rte_always_inline bool dp_is_ipv6_addr_zero(const uint8_t *addr)
 {
-	for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++) {
-		if (addr[i] != 0) {
+	for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++)
+		if (addr[i] != 0)
 			return false;
-		}
-	}
 	return true;
 }
 

@@ -192,6 +192,9 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (options_len < 0)
 		return DHCP_NEXT_DROP;
 
+	if (port->iface.cfg.own_ip == 0)
+		return DHCP_NEXT_DROP;
+
 	if (dhcp_hdr->op != DP_BOOTP_REQUEST) {
 		DPNODE_LOG_WARNING(node, "Not a DHCP request", DP_LOG_VALUE(dhcp_hdr->op));
 		return DHCP_NEXT_DROP;
