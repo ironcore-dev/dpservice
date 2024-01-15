@@ -374,8 +374,13 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 static int dp_process_delete_lbprefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.del_lbpfx;
-
 	struct dp_port *port;
+
+	struct dp_vnf target_vnf = {
+		.type = DP_VNF_TYPE_LB_ALIAS_PFX,
+		.alias_pfx.length = request->length,
+		.alias_pfx.ol = request->addr
+	};
 
 	if (request->addr.ip_type != RTE_ETHER_TYPE_IPV4 && request->addr.ip_type != RTE_ETHER_TYPE_IPV6)
 		return DP_GRPC_ERR_BAD_IPVER;
@@ -384,7 +389,10 @@ static int dp_process_delete_lbprefix(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	return dp_del_vnf_by_value(DP_VNF_TYPE_LB_ALIAS_PFX, port->port_id, port->iface.vni, &request->addr, request->length);
+	target_vnf.port_id = port->port_id;
+	target_vnf.vni = port->iface.vni;
+
+	return dp_del_vnf_by_value(&target_vnf);
 }
 
 static int dp_process_create_prefix(struct dp_grpc_responder *responder)
@@ -429,9 +437,14 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.del_pfx;
-
 	struct dp_port *port;
 	int ret, ret2;
+
+	struct dp_vnf target_vnf = {
+		.type = DP_VNF_TYPE_ALIAS_PFX,
+		.alias_pfx.length = request->length,
+		.alias_pfx.ol = request->addr
+	};
 
 	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
@@ -446,7 +459,10 @@ static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 	} else
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	ret2 = dp_del_vnf_by_value(DP_VNF_TYPE_ALIAS_PFX, port->port_id, port->iface.vni, &request->addr, request->length);
+	target_vnf.port_id = port->port_id;
+	target_vnf.vni = port->iface.vni;
+
+	ret2 = dp_del_vnf_by_value(&target_vnf);
 	return DP_FAILED(ret) ? ret : ret2;
 }
 
