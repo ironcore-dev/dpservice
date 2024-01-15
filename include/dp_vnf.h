@@ -52,7 +52,7 @@ int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE]);
 
 bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix_ip, uint8_t prefix_len);
 
-int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix_ip, uint8_t prefix_len);
+int dp_del_vnf_by_value(struct dp_vnf *target_vnf);
 
 int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct dp_grpc_responder *responder);
 
