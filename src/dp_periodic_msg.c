@@ -33,6 +33,9 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 		if (eth_type == RTE_ETHER_TYPE_IPV6 && !port->iface.is_ipv6_set)
 			continue;
 
+		if (eth_type == RTE_ETHER_TYPE_IPV4 && port->iface.cfg.own_ip == 0)
+			continue;
+
 		clone_buf = rte_pktmbuf_copy(pkt, dp_layer->rte_mempool, 0, UINT32_MAX);
 		if (!clone_buf) {
 			DPS_LOG_ERR("Cannot clone periodic packet");
