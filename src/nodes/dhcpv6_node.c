@@ -10,6 +10,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
+#include "dp_iface.h"
 #include "nodes/common_node.h"
 #include "protocols/dp_dhcpv6.h"
 
@@ -213,7 +214,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	int reply_options_len;
 	size_t payload_len;
 
-	if (!dp_get_in_port(m)->iface.is_ipv6_set)
+	if (dp_is_ipv6_addr_zero(dp_get_in_port(m)->iface.cfg.dhcp_ipv6))
 		return DHCPV6_NEXT_DROP;
 
 	// packet length is uint16_t, negative value means it's less than the required length

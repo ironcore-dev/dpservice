@@ -15,6 +15,11 @@
 static uint8_t dp_mc_ipv6[16] = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 };
 static uint8_t dp_mc_mac[6] = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x01 };
 
+static __rte_always_inline bool dp_is_ip_set(struct dp_port *port, uint16_t eth_type)
+{
+	return (eth_type == RTE_ETHER_TYPE_IPV6 && !dp_is_ipv6_addr_zero(port->iface.cfg.dhcp_ipv6)) ||
+		   (eth_type == RTE_ETHER_TYPE_ARP && port->iface.cfg.own_ip != 0);
+}
 
 void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 {
@@ -30,10 +35,7 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 		if (port->is_pf || !port->allocated)
 			continue;
 
-		if (eth_type == RTE_ETHER_TYPE_IPV6 && !port->iface.is_ipv6_set)
-			continue;
-
-		if (eth_type == RTE_ETHER_TYPE_IPV4 && port->iface.cfg.own_ip == 0)
+		if (!dp_is_ip_set(port, eth_type))
 			continue;
 
 		clone_buf = rte_pktmbuf_copy(pkt, dp_layer->rte_mempool, 0, UINT32_MAX);
