@@ -39,7 +39,6 @@ struct dp_port_iface {
 	uint8_t					ul_ipv6[DP_IPV6_ADDR_SIZE];
 	uint32_t				nat_ip;
 	uint16_t				nat_port_range[2];
-	bool					is_ipv6_set;
 	bool					ready;
 };
 
