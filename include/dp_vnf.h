@@ -40,7 +40,7 @@ struct dp_vnf {
 	uint32_t				vni;
 	uint16_t				port_id;
 	struct dp_vnf_prefix	alias_pfx;
-};
+} __rte_packed;
 
 int dp_vnf_init(int socket_id);
 void dp_vnf_free(void);

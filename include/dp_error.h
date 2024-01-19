@@ -67,6 +67,7 @@ const char *dp_strerror_verbose(int error);
 	ERR(PORT_METER,							383) \
 	ERR(VNF_INSERT,							401) \
 	ERR(VM_HANDLE,							402) \
+	ERR(VNF_DELETE,							403) \
 	ERR(NO_BACKIP,							421) \
 	ERR(NO_LB,								422) \
 	ERR(NO_DROP_SUPPORT,					441) \

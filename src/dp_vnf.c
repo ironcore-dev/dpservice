@@ -190,8 +190,10 @@ bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address
 		.vni = vni,
 		.type = DP_VNF_TYPE_LB_ALIAS_PFX,
 		.alias_pfx.length = prefix_len,
-		.alias_pfx.ol = *prefix_ip,
+		.alias_pfx.ol = {0},
 	};
+	
+	vnf.alias_pfx.ol = *prefix_ip;
 
 	return dp_vnf_value_exists(&vnf);
 }
@@ -203,15 +205,21 @@ int dp_del_vnf_by_value(struct dp_vnf *target_vnf)
 
 	ret = rte_hash_lookup_data(vnf_value_tbl, target_vnf, (void **)&vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
-		DP_LOG_VNF_WARNING("VNF value key lookup failed", target_vnf)
-		return DP_ERROR;
+		if (ret == -ENOENT)
+			return DP_GRPC_ERR_NOT_FOUND;
+		DP_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", target_vnf)
+		return DP_GRPC_ERR_VNF_DELETE;
 	}
 
 	ret = dp_del_vnf(vnf_ul_addr6);
-	if (DP_FAILED(ret))
-		return ret;
+	if (DP_FAILED(ret)) {
+		if (ret == -ENOENT)
+			return DP_GRPC_ERR_NOT_FOUND;
+		DP_LOG_VNF_WARNING("VNF underlying IPv6 as key lookup failed due to invalid parameters", target_vnf)
+		return DP_GRPC_ERR_VNF_DELETE;
+	}
 
-	return DP_OK;
+	return DP_GRPC_OK;
 }
 
 int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct dp_grpc_responder *responder)
