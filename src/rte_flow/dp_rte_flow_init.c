@@ -64,7 +64,7 @@ int dp_install_isolated_mode_virtsvc(uint16_t port_id, uint8_t proto_id, const u
 	// create match pattern: IPv6 packets from selected addresses
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6));
 	dp_set_ipv6_src_flow_item(&pattern[pattern_cnt++], &ipv6_spec, svc_ipv6, proto_id);
-	if (proto_id == DP_IP_PROTO_TCP) {
+	if (proto_id == IPPROTO_TCP) {
 		dp_set_tcp_src_flow_item(&pattern[pattern_cnt++], &tcp_spec, svc_port);
 	} else if (proto_id == IPPROTO_UDP) {
 		dp_set_udp_src_flow_item(&pattern[pattern_cnt++], &udp_spec, svc_port);

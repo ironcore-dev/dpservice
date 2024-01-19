@@ -722,7 +722,7 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 			return "Invalid loadbalanced_ports.port";
 		request->add_lb.lbports[i].port = (uint16_t)request_.loadbalanced_ports(i).port();
 		if (request_.loadbalanced_ports(i).protocol() == TCP)
-			request->add_lb.lbports[i].protocol = DP_IP_PROTO_TCP;
+			request->add_lb.lbports[i].protocol = IPPROTO_TCP;
 		else if (request_.loadbalanced_ports(i).protocol() == UDP)
 			request->add_lb.lbports[i].protocol = IPPROTO_UDP;
 		else
@@ -780,7 +780,7 @@ void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 			continue;
 		lb_port = reply_.add_loadbalanced_ports();
 		lb_port->set_port(reply->lb.lbports[i].port);
-		if (reply->lb.lbports[i].protocol == DP_IP_PROTO_TCP)
+		if (reply->lb.lbports[i].protocol == IPPROTO_TCP)
 			lb_port->set_protocol(TCP);
 		if (reply->lb.lbports[i].protocol == IPPROTO_UDP)
 			lb_port->set_protocol(UDP);

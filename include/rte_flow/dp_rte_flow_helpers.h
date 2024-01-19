@@ -377,7 +377,7 @@ int dp_set_l4_flow_item(struct rte_flow_item *item,
 						union dp_flow_item_l4 *l4_spec,
 						const struct dp_flow *df)
 {
-	if (df->l4_type == DP_IP_PROTO_TCP)
+	if (df->l4_type == IPPROTO_TCP)
 		dp_set_tcp_src_dst_noctrl_flow_item(item, &l4_spec->tcp,
 											df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	else if (df->l4_type == IPPROTO_UDP)
