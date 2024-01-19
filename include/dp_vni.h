@@ -21,7 +21,6 @@ extern "C" {
 extern struct rte_hash *vni_handle_tbl;
 
 #define DP_VNI_MAX_TABLE_SIZE	512
-#define DP_IP_PROTO_IPV4		DP_IP_PROTO_IPv4_ENCAP
 #define DP_IP_PROTO_IPV6		DP_IP_PROTO_IPv6_ENCAP
 
 // Protect array access
@@ -52,7 +51,7 @@ struct rte_rib *dp_get_vni_route4_table(uint32_t vni)
 	ret = rte_hash_lookup_data(vni_handle_tbl, &vni_key, (void **)&vni_data);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
-			DPS_LOG_ERR("VNI lookup error", DP_LOG_VNI(vni), DP_LOG_VNI_TYPE(DP_IP_PROTO_IPV4));
+			DPS_LOG_ERR("VNI lookup error", DP_LOG_VNI(vni), DP_LOG_VNI_TYPE(IPPROTO_IPIP));
 		return NULL;
 	}
 

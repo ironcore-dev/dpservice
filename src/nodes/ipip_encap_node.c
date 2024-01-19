@@ -32,7 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	uint32_t packet_type;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		df->tun_info.proto_id = DP_IP_PROTO_IPv4_ENCAP;
+		df->tun_info.proto_id = IPPROTO_IPIP;
 		payload_len = dp_get_ipv4_hdr(m)->total_length;
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4 | RTE_PTYPE_L2_ETHER;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {

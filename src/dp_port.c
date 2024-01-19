@@ -373,7 +373,7 @@ void dp_ports_free(void)
 static int dp_port_install_isolated_mode(uint16_t port_id)
 {
 	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
-	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv4_ENCAP))
+	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPIP))
 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, DP_IP_PROTO_IPv6_ENCAP)))
 		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC

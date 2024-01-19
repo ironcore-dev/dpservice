@@ -36,7 +36,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	df->nxt_hop = vnf->port_id;  // already validated above
 
 	switch (df->tun_info.proto_id) {
-	case DP_IP_PROTO_IPv4_ENCAP:
+	case IPPROTO_IPIP:
 		l3_type = RTE_PTYPE_L3_IPV4;
 		break;
 	case DP_IP_PROTO_IPv6_ENCAP:
