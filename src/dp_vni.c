@@ -38,7 +38,7 @@ bool dp_is_vni_route_table_available(uint32_t vni, int type)
 		return false;
 	}
 
-	return (type == DP_IP_PROTO_IPV4 && vni_data->ipv4[DP_SOCKETID(vni_data->socket_id)])
+	return (type == IPPROTO_IPIP && vni_data->ipv4[DP_SOCKETID(vni_data->socket_id)])
 		|| (type == DP_IP_PROTO_IPV6 && vni_data->ipv6[DP_SOCKETID(vni_data->socket_id)]);
 }
 

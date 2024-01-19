@@ -19,7 +19,6 @@ extern "C" {
 #endif
 
 #define DP_IP_PROTO_SIPSR   0x2b
-#define DP_IP_PROTO_IPv4_ENCAP 0x04
 #define DP_IP_PROTO_IPv6_ENCAP 0x29
 
 #define IP6_HDR_ROUTING_TYPE_SEGMENT_ROUTING 0x04
