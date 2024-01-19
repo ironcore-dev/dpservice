@@ -126,7 +126,7 @@ void trigger_nd_unsol_adv(void)
 	rte_memcpy(eth_hdr->dst_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->dst_addr.addr_bytes));
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
-	ipv6_hdr->proto = DP_IP_PROTO_ICMPV6;
+	ipv6_hdr->proto = IPPROTO_ICMPV6;
 	ipv6_hdr->vtc_flow = htonl(0x60000000);
 	ipv6_hdr->hop_limits = 255;
 	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));
@@ -180,7 +180,7 @@ void trigger_nd_ra(void)
 	rte_memcpy(eth_hdr->dst_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->dst_addr.addr_bytes));
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
-	ipv6_hdr->proto = DP_IP_PROTO_ICMPV6;
+	ipv6_hdr->proto = IPPROTO_ICMPV6;
 	ipv6_hdr->vtc_flow = htonl(0x60000000);
 	ipv6_hdr->hop_limits = 255;
 	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));

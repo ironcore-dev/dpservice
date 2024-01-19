@@ -43,7 +43,7 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 
 		DP_STATS_NAT_INC_USED_PORT_CNT(port);
 
-		if (df->l4_type == DP_IP_PROTO_ICMP) {
+		if (df->l4_type == IPPROTO_ICMP) {
 			dp_change_icmp_identifier(m, nat_port);
 			cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
 			cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
@@ -193,7 +193,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
-			if (df->l4_type == DP_IP_PROTO_ICMP)
+			if (df->l4_type == IPPROTO_ICMP)
 				dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);
 			else
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst);

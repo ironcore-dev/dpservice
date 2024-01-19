@@ -20,7 +20,7 @@ void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_
 
 	df = dp_get_flow_ptr(m);
 
-	if (df->l4_type == DP_IP_PROTO_ICMP) {
+	if (df->l4_type == IPPROTO_ICMP) {
 		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr+1);
 
 		if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
