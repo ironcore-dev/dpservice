@@ -39,7 +39,7 @@ bool dp_is_vni_route_table_available(uint32_t vni, int type)
 	}
 
 	return (type == IPPROTO_IPIP && vni_data->ipv4[DP_SOCKETID(vni_data->socket_id)])
-		|| (type == DP_IP_PROTO_IPV6 && vni_data->ipv6[DP_SOCKETID(vni_data->socket_id)]);
+		|| (type == IPPROTO_IPV6 && vni_data->ipv6[DP_SOCKETID(vni_data->socket_id)]);
 }
 
 static __rte_always_inline void dp_free_rib6(struct dp_vni_data *vni_data)
