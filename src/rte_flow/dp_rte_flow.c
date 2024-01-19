@@ -25,7 +25,7 @@ void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_
 
 		if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
 			err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr+1);
-			if (err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP
+			if (err_ip_info->err_ipv4_hdr->next_proto_id == IPPROTO_TCP
 				|| err_ip_info->err_ipv4_hdr->next_proto_id == IPPROTO_UDP) {
 
 				rte_memcpy(&(err_ip_info->l4_src_port), (char *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, 2);
@@ -47,7 +47,7 @@ void dp_change_icmp_err_l4_src_port(struct rte_mbuf *m, struct dp_icmp_err_ip_in
 
 	if (icmp_hdr->icmp_type == DP_IP_ICMP_TYPE_ERROR) {
 		err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr + 1);
-		if (err_ip_info->err_ipv4_hdr->next_proto_id == DP_IP_PROTO_TCP
+		if (err_ip_info->err_ipv4_hdr->next_proto_id == IPPROTO_TCP
 			|| err_ip_info->err_ipv4_hdr->next_proto_id == IPPROTO_UDP) {
 
 			rte_memcpy((char *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, &new_src_port, sizeof(new_src_port));
@@ -64,7 +64,7 @@ void dp_change_l4_hdr_port(struct rte_mbuf *m, uint8_t port_type, uint16_t new_v
 	rte_be16_t new_port = htons(new_val);
 
 	ipv4_hdr = dp_get_ipv4_hdr(m);
-	if (df->l4_type == DP_IP_PROTO_TCP) {
+	if (df->l4_type == IPPROTO_TCP) {
 		tcp_hdr = (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 		if (port_type == DP_L4_PORT_DIR_SRC)
 			tcp_hdr->src_port = new_port;
