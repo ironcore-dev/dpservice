@@ -41,13 +41,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		dp_extract_ipv4_header(df, ipv4_hdr);
 		if (DP_FAILED(dp_extract_l4_header(df, ipv4_hdr + 1)))
 			return CONNTRACK_NEXT_DROP;
-		if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
+		if (df->l4_type == IPPROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 			return CONNTRACK_NEXT_DNAT;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		dp_extract_ipv6_header(df, ipv6_hdr);
 		if (DP_FAILED(dp_extract_l4_header(df, ipv6_hdr + 1)))
 			return CONNTRACK_NEXT_DROP;
-		if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
+		if (df->l4_type == IPPROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 			return CONNTRACK_NEXT_DHCPV6;
 	}
 
