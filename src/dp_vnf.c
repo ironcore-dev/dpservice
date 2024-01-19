@@ -28,7 +28,7 @@ int dp_vnf_init(int socket_id)
 	if (!vnf_handle_tbl)
 		return DP_ERROR;
 
-	vnf_value_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, sizeof(struct dp_vnf),
+	vnf_value_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, sizeof(struct dp_vnf_value_key),
 										  "vnf_value_table", socket_id);
 	if (!vnf_value_tbl) {
 		dp_free_jhash_table(vnf_handle_tbl); // rollback
@@ -43,10 +43,25 @@ void dp_vnf_free(void)
 	dp_free_jhash_table(vnf_handle_tbl);
 }
 
+static void dp_convert_vnf_to_packed_value(const struct dp_vnf *vnf, struct dp_vnf_value_key *key)
+{
+	key->type = vnf->type;
+	key->vni = vnf->vni;
+	key->port_id = vnf->port_id;
+	key->ip_type = vnf->alias_pfx.ol.ip_type;
+
+	if (vnf->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV4) {
+		memset(key->ipv6, 0, DP_IPV6_ADDR_SIZE); //
+		key->ipv4 = vnf->alias_pfx.ol.ipv4;
+	} else
+		memcpy(key->ipv6, vnf->alias_pfx.ol.ipv6, DP_IPV6_ADDR_SIZE);
+}
+
 static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	int ret;
 	uint8_t *vnf_ul_addr6;
+	struct dp_vnf_value_key value_key = {};
 
 	vnf_ul_addr6 = rte_zmalloc("vnf_value_mapping", (size_t)DP_VNF_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
 	if (!vnf_ul_addr6) {
@@ -56,7 +71,9 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 
 	memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
 
-	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
+	dp_convert_vnf_to_packed_value(vnf, &value_key);
+
+	ret = rte_hash_add_key_data(vnf_value_tbl, &value_key, vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add VNF value and the corresponding underlying IPv6 address to table", DP_LOG_RET(ret));
 		rte_free(vnf_ul_addr6);
@@ -70,15 +87,17 @@ static int dp_delete_vnf_value(struct dp_vnf *vnf)
 {
 	int ret;
 	uint8_t *ul_addr6 = NULL;
+	struct dp_vnf_value_key value_key = {};
 
+	dp_convert_vnf_to_packed_value(vnf, &value_key);
 
-	ret = rte_hash_lookup_data(vnf_value_tbl, vnf, (void **)&ul_addr6);
+	ret = rte_hash_lookup_data(vnf_value_tbl, &value_key, (void **)&ul_addr6);
 	if (DP_FAILED(ret)) {
 		DP_LOG_VNF_WARNING("VNF value lookup failed", vnf)
 		return DP_ERROR;
 	}
 
-	ret = rte_hash_del_key(vnf_value_tbl, vnf);
+	ret = rte_hash_del_key(vnf_value_tbl, &value_key);
 	if (DP_FAILED(ret)) {
 		DPGRPC_LOG_WARNING("Cannot remove VNF for a underlying IPv6 address", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
@@ -91,8 +110,11 @@ static int dp_delete_vnf_value(struct dp_vnf *vnf)
 static bool dp_vnf_value_exists(const struct dp_vnf *vnf)
 {
 	int ret;
+	struct dp_vnf_value_key value_key = {};
 
-	ret = rte_hash_lookup(vnf_value_tbl, vnf);
+	dp_convert_vnf_to_packed_value(vnf, &value_key);
+
+	ret = rte_hash_lookup(vnf_value_tbl, &value_key);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
 			DPS_LOG_ERR("Cannot lookup VNF value in table", DP_LOG_RET(ret));
@@ -190,10 +212,8 @@ bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address
 		.vni = vni,
 		.type = DP_VNF_TYPE_LB_ALIAS_PFX,
 		.alias_pfx.length = prefix_len,
-		.alias_pfx.ol = {0},
+		.alias_pfx.ol = *prefix_ip,
 	};
-	
-	vnf.alias_pfx.ol = *prefix_ip;
 
 	return dp_vnf_value_exists(&vnf);
 }
@@ -202,8 +222,11 @@ int dp_del_vnf_by_value(struct dp_vnf *target_vnf)
 {
 	uint8_t *vnf_ul_addr6;
 	int32_t ret;
+	struct dp_vnf_value_key value_key = {};
 
-	ret = rte_hash_lookup_data(vnf_value_tbl, target_vnf, (void **)&vnf_ul_addr6);
+	dp_convert_vnf_to_packed_value(target_vnf, &value_key);
+
+	ret = rte_hash_lookup_data(vnf_value_tbl, &value_key, (void **)&vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_GRPC_ERR_NOT_FOUND;

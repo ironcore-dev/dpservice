@@ -40,6 +40,17 @@ struct dp_vnf {
 	uint32_t				vni;
 	uint16_t				port_id;
 	struct dp_vnf_prefix	alias_pfx;
+};
+
+struct dp_vnf_value_key {
+	enum dp_vnf_type		type;
+	uint32_t				vni;
+	uint16_t				port_id;
+	uint16_t				ip_type;
+	union {
+		uint32_t			ipv4;
+		uint8_t				ipv6[DP_IPV6_ADDR_SIZE];
+	};
 } __rte_packed;
 
 int dp_vnf_init(int socket_id);
