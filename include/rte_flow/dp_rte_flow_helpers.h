@@ -383,9 +383,9 @@ int dp_set_l4_flow_item(struct rte_flow_item *item,
 	else if (df->l4_type == DP_IP_PROTO_UDP)
 		dp_set_udp_src_dst_flow_item(item, &l4_spec->udp,
 									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_ICMP)
+	else if (df->l4_type == IPPROTO_ICMP)
 		dp_set_icmp_flow_item(item, &l4_spec->icmp, df->l4_info.icmp_field.icmp_type);
-	else if (df->l4_type == DP_IP_PROTO_ICMPV6)
+	else if (df->l4_type == IPPROTO_ICMPV6)
 		dp_set_icmp6_flow_item(item, &l4_spec->icmp6, df->l4_info.icmp_field.icmp_type);
 	else {
 		DPS_LOG_ERR("Invalid L4 protocol", DP_LOG_PROTO(df->l4_type));

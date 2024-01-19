@@ -44,11 +44,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			// if it is a network nat pkt
 			if (dnat_data->dnat_ip == 0) {
 				// extrack identifier field from icmp reply pkt, which is a reply to VM's icmp request
-				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
+				if (df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
 					df->l4_info.trans_port.dst_port = df->l4_info.icmp_field.icmp_identifier;
 
 				// it is icmp request targeting scalable nat
-				if (df->l4_type == DP_IP_PROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+				if (df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
 					cntrack->nf_info.nat_type = DP_FLOW_NAT_AS_TARGET;
 					return DNAT_NEXT_PACKET_RELAY;
 				}
@@ -96,7 +96,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
-		&& (df->l4_type == DP_IP_PROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
+		&& (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
 		&& (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST))
 		return DNAT_NEXT_PACKET_RELAY;
 
@@ -114,7 +114,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
-			if (df->l4_type == DP_IP_PROTO_ICMP) {
+			if (df->l4_type == IPPROTO_ICMP) {
 				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
 					dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
 				} else if (df->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {

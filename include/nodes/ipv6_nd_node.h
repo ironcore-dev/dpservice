@@ -12,7 +12,6 @@ extern "C" {
 #endif
 
 
-#define DP_IP_PROTO_ICMPV6 0x3a
 /*
  *	ICMP codes for neighbour discovery messages
  */
