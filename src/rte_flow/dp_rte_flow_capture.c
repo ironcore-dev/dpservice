@@ -86,7 +86,7 @@ void dp_configure_pkt_capture_action(uint8_t *encaped_mirror_hdr,
 	rte_memcpy(new_ipv6_hdr->dst_addr, capture_hdr_config->capture_node_ipv6_addr, sizeof(new_ipv6_hdr->dst_addr));
 	new_ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 	new_ipv6_hdr->payload_len = 0;
-	new_ipv6_hdr->proto = DP_IP_PROTO_UDP;
+	new_ipv6_hdr->proto = IPPROTO_UDP;
 	new_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
 
 	udp_hdr->dst_port = htons(capture_hdr_config->capture_udp_dst_port);

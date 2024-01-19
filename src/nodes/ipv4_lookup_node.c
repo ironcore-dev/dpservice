@@ -32,7 +32,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const struct dp_port *out_port;
 
 	// TODO: add broadcast routes when machine is added
-	if (df->l4_type == DP_IP_PROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
+	if (df->l4_type == IPPROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return IPV4_LOOKUP_NEXT_DHCP;
 
 	out_port = dp_get_ip4_out_port(in_port, df->tun_info.dst_vni, df, &route, &route_key);

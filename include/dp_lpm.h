@@ -18,7 +18,6 @@
 extern "C" {
 #endif
 
-#define DP_IP_PROTO_UDP		0x11
 #define DP_IP_PROTO_TCP		0x06
 #define DP_IP_PROTO_SIPSR   0x2b
 #define DP_IP_PROTO_IPv4_ENCAP 0x04

@@ -380,7 +380,7 @@ int dp_set_l4_flow_item(struct rte_flow_item *item,
 	if (df->l4_type == DP_IP_PROTO_TCP)
 		dp_set_tcp_src_dst_noctrl_flow_item(item, &l4_spec->tcp,
 											df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
-	else if (df->l4_type == DP_IP_PROTO_UDP)
+	else if (df->l4_type == IPPROTO_UDP)
 		dp_set_udp_src_dst_flow_item(item, &l4_spec->udp,
 									 df->l4_info.trans_port.src_port, df->l4_info.trans_port.dst_port);
 	else if (df->l4_type == IPPROTO_ICMP)
