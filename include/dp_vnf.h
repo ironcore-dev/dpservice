@@ -56,6 +56,18 @@ int dp_del_vnf_by_value(struct dp_vnf *target_vnf);
 
 int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct dp_grpc_responder *responder);
 
+static __rte_always_inline
+void dp_assign_ip_address(struct dp_ip_address *dest, const struct dp_ip_address *src)
+{
+	if (src->ip_type == RTE_ETHER_TYPE_IPV4) {
+		memset(dest->ipv6, 0, DP_IPV6_ADDR_SIZE);
+		dest->ip_type = src->ip_type;
+		dest->ipv4 = src->ipv4;
+		return;
+	}
+	*dest = *src;
+}
+
 #ifdef __cplusplus
 }
 #endif
