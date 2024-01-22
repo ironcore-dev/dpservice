@@ -92,9 +92,9 @@ struct dpgrpc_iface_id {
 };
 
 struct dpgrpc_prefix {
+	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	struct dp_ip_address	addr;
 	uint8_t					length;
-	char					iface_id[DP_IFACE_ID_MAX_LEN];
 };
 
 struct dpgrpc_route {
