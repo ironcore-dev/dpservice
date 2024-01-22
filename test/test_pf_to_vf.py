@@ -16,9 +16,9 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
 	lbpfx_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_pfx)
 	grpc_client.addlbtarget(lb_name, lbpfx_ul_ipv6)
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
 
 	threading.Thread(target=send_lb_pkt_to_pf, args=(lb_ul_ipv6,)).start()
-	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
 	pkt = sniff_packet(VM1.tap, is_tcp_pkt)
 	dst_ip = pkt[IP].dst
 	dport = pkt[TCP].dport
@@ -45,9 +45,9 @@ def test_pf_to_vf_lb_ipv6_tcp(prepare_ifaces, grpc_client):
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/8080")
 	lbpfx_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_ip6_pfx)
 	grpc_client.addlbtarget(lb_name, lbpfx_ul_ipv6)
+	#grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=8080, dst_port_max=8080)
 
 	threading.Thread(target=send_lb_ipv6_pkt_to_pf, args=(lb_ul_ipv6,)).start()
-	#grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=8080, dst_port_max=8080)
 	pkt = sniff_packet(VM1.tap, is_ipv6_tcp_pkt)
 	dst_ip = pkt[IPv6].dst
 	dport = pkt[TCP].dport
