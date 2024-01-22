@@ -11,12 +11,12 @@
 #define DP_VNF_MAX_TABLE_SIZE 1000
 
 #define DP_LOG_VNF_WARNING(MESSAGE, VNF) \
-		if (VNF->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV4) {\
-			DPS_LOG_WARNING(MESSAGE, DP_LOG_VNF_TYPE(VNF->type), DP_LOG_VNI(VNF->vni), \
-							DP_LOG_PORTID(VNF->port_id), DP_LOG_IPV4(VNF->alias_pfx.ol.ipv4), DP_LOG_PREFLEN(VNF->alias_pfx.length)); } \
+		if ((VNF)->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV4) {\
+			DPS_LOG_WARNING(MESSAGE, DP_LOG_VNF_TYPE((VNF)->type), DP_LOG_VNI((VNF)->vni), \
+							DP_LOG_PORTID((VNF)->port_id), DP_LOG_IPV4((VNF)->alias_pfx.ol.ipv4), DP_LOG_PREFLEN((VNF)->alias_pfx.length)); } \
 		else {\
-			DPS_LOG_WARNING(MESSAGE, DP_LOG_VNF_TYPE(VNF->type), DP_LOG_VNI(VNF->vni), \
-							DP_LOG_PORTID(VNF->port_id), DP_LOG_IPV6(VNF->alias_pfx.ol.ipv6), DP_LOG_PREFLEN(VNF->alias_pfx.length)); } \
+			DPS_LOG_WARNING(MESSAGE, DP_LOG_VNF_TYPE((VNF)->type), DP_LOG_VNI((VNF)->vni), \
+							DP_LOG_PORTID((VNF)->port_id), DP_LOG_IPV6((VNF)->alias_pfx.ol.ipv6), DP_LOG_PREFLEN((VNF)->alias_pfx.length)); } \
 
 static struct rte_hash *vnf_handle_tbl = NULL;
 static struct rte_hash *vnf_value_tbl = NULL;
@@ -41,6 +41,23 @@ int dp_vnf_init(int socket_id)
 void dp_vnf_free(void)
 {
 	dp_free_jhash_table(vnf_handle_tbl);
+}
+
+static __rte_always_inline
+void dp_fill_vnf_data(struct dp_vnf *vnf, enum dp_vnf_type type, uint16_t port_id, uint32_t vni,
+						const struct dp_ip_address *src, uint8_t prefix_len)
+{
+	memset(vnf, 0, sizeof(*vnf)); // set all bits to 0, including possible padding bits
+
+	vnf->type = type;
+	vnf->port_id = port_id;
+	vnf->vni = vni;
+	vnf->alias_pfx.length = prefix_len;
+	if (src->ip_type == RTE_ETHER_TYPE_IPV4) {
+		vnf->alias_pfx.ol.ip_type = src->ip_type;
+		vnf->alias_pfx.ol.ipv4 = src->ipv4;
+	} else
+		vnf->alias_pfx.ol = *src;
 }
 
 static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
@@ -122,11 +139,7 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 		return DP_ERROR;
 	}
 
-	vnf->type = type;
-	vnf->vni = vni;
-	vnf->port_id = port_id;
-	dp_assign_ip_address(&vnf->alias_pfx.ol, prefix);
-	vnf->alias_pfx.length = prefix_len;
+	dp_fill_vnf_data(vnf, type, port_id, vni, prefix, prefix_len);
 
 	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, vnf);
 	if (DP_FAILED(ret)) {
@@ -185,27 +198,26 @@ int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 
 bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix_ip, uint8_t prefix_len)
 {
-	struct dp_vnf vnf = {
-		.port_id = port_id,
-		.vni = vni,
-		.type = DP_VNF_TYPE_LB_ALIAS_PFX,
-		.alias_pfx.length = prefix_len,
-	};
+	struct dp_vnf vnf;
 
-	dp_assign_ip_address(&vnf.alias_pfx.ol, prefix_ip);
+	dp_fill_vnf_data(&vnf, DP_VNF_TYPE_LB_ALIAS_PFX, port_id, vni, prefix_ip, prefix_len);
+
 	return dp_vnf_value_exists(&vnf);
 }
 
-int dp_del_vnf_by_value(struct dp_vnf *target_vnf)
+int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, struct dp_ip_address *prefix_ip, uint8_t prefix_len)
 {
 	uint8_t *vnf_ul_addr6;
 	int32_t ret;
+	struct dp_vnf target_vnf;
 
-	ret = rte_hash_lookup_data(vnf_value_tbl, target_vnf, (void **)&vnf_ul_addr6);
+	dp_fill_vnf_data(&target_vnf, type, port_id, vni, prefix_ip, prefix_len);
+
+	ret = rte_hash_lookup_data(vnf_value_tbl, &target_vnf, (void **)&vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_GRPC_ERR_NOT_FOUND;
-		DP_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", target_vnf)
+		DP_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", &target_vnf)
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
 
@@ -213,7 +225,7 @@ int dp_del_vnf_by_value(struct dp_vnf *target_vnf)
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_GRPC_ERR_NOT_FOUND;
-		DP_LOG_VNF_WARNING("VNF underlying IPv6 as key lookup failed due to invalid parameters", target_vnf)
+		DP_LOG_VNF_WARNING("VNF underlying IPv6 as key lookup failed due to invalid parameters", &target_vnf)
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
 
