@@ -97,6 +97,9 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	uint16_t dest_port = 0;
 	uint16_t src_port = 0;
 
+	if ((rule->src_ip.ip_type != df->l3_type) && (rule->dest_ip.ip_type != df->l3_type))
+		return false;
+
 	switch (df->l4_type) {
 	case IPPROTO_TCP:
 		if ((rule->protocol != IPPROTO_TCP) && (rule->protocol != DP_FWALL_MATCH_ANY_PROTOCOL))
@@ -107,8 +110,13 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 			return false;
 		break;
 	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
 		if ((rule->protocol != IPPROTO_ICMP) && (rule->protocol != DP_FWALL_MATCH_ANY_PROTOCOL))
 			return false;
+		// Till we introduce an ICMPv6 type for the firewall API, rules with IPv6 Addresses will behave like ICMPv6 rule
+		// even the rule was set as ICMP type
+		if (df->l3_type == RTE_ETHER_TYPE_IPV6)
+			protocol = IPPROTO_ICMP;
 		if (((rule->filter.icmp.icmp_type == DP_FWALL_MATCH_ANY_ICMP_TYPE) ||
 			(df->l4_info.icmp_field.icmp_type == rule->filter.icmp.icmp_type)) &&
 			((rule->filter.icmp.icmp_code == DP_FWALL_MATCH_ANY_ICMP_CODE) ||
@@ -120,7 +128,6 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 		return false;
 	}
 
-	/* TODO Improve for NAT64 firewall ip match */
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		if (!((src_ip & rule->src_mask.ip4) == (r_src_ip & rule->src_mask.ip4) &&
 			(dest_ip & rule->dest_mask.ip4) == (r_dest_ip & rule->dest_mask.ip4)))

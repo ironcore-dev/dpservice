@@ -92,6 +92,8 @@ def vf_to_vf_icmp_responder(vf_tap):
 
 # send icmp packet from vm1 to vm2, vm2 replies back, for twice
 def test_vf_to_vf_icmp(prepare_ipv4, grpc_client):
+	grpc_client.addfwallrule(VM2.name, "fw0-vm-icmp", proto="icmp")
+	grpc_client.addfwallrule(VM1.name, "fw0-vm-icmp", proto="icmp")
 	icmp_respond_thread = threading.Thread(target=vf_to_vf_icmp_responder, args=(VM2.tap,))
 	icmp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) / IP(dst=VM2.ip, src=VM1.ip) / ICMP(type=8, id=0x0040))
 	icmp_respond_thread.start()
@@ -100,6 +102,8 @@ def test_vf_to_vf_icmp(prepare_ipv4, grpc_client):
 
 	delayed_sendp(icmp_pkt, VM1.tap)
 	sniff_packet(VM1.tap, is_icmp_pkt)
+	grpc_client.delfwallrule(VM2.name, "fw0-vm-icmp")
+	grpc_client.delfwallrule(VM1.name, "fw0-vm-icmp")
 
 def vf_to_vf_icmpv6_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_icmpv6_echo_pkt)
@@ -110,6 +114,8 @@ def vf_to_vf_icmpv6_responder(vf_tap):
 
 # send icmpv6 packet from vm1 to vm2, vm2 replies back, for twice
 def test_vf_to_vf_icmpv6(prepare_ipv4, grpc_client):
+	grpc_client.addfwallrule(VM2.name, "fw0-vm-icmp", src_prefix="::/0", dst_prefix="::/0", proto="icmp")
+	grpc_client.addfwallrule(VM1.name, "fw0-vm-icmp", src_prefix="::/0", dst_prefix="::/0", proto="icmp")
 	icmpv6_respond_thread = threading.Thread(target=vf_to_vf_icmpv6_responder, args=(VM2.tap,))
 	icmpv6_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x86DD) / IPv6(dst=VM2.ipv6, src=VM1.ipv6, nh=58) / ICMPv6EchoRequest())
 	icmpv6_respond_thread.start()
@@ -118,6 +124,8 @@ def test_vf_to_vf_icmpv6(prepare_ipv4, grpc_client):
 
 	delayed_sendp(icmpv6_pkt, VM1.tap)
 	sniff_packet(VM1.tap, is_icmpv6echo_reply_pkt)
+	grpc_client.delfwallrule(VM2.name, "fw0-vm-icmp")
+	grpc_client.delfwallrule(VM1.name, "fw0-vm-icmp")
 
 def vf_to_vf_ipv6_tcp_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_ipv6_tcp_pkt)
@@ -130,10 +138,12 @@ def vf_to_vf_ipv6_tcp_responder(vf_tap):
 def test_vf_to_vf_ipv6_tcp(prepare_ipv4, grpc_client):
 
 	threading.Thread(target=vf_to_vf_ipv6_tcp_responder, args=(VM2.tap,)).start()
+	grpc_client.addfwallrule(VM2.name, "fw0-vm6" , src_prefix="::/0", dst_prefix="::/0", proto="tcp", dst_port_min=1235, dst_port_max=1235)
 
 	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x86DD) /
 			   IPv6(dst=VM2.ipv6, src=VM1.ipv6) /
-			   TCP(dport=1234))
+			   TCP(dport=1235))
 	delayed_sendp(tcp_pkt, VM1.tap)
 
 	sniff_packet(VM1.tap, is_ipv6_tcp_pkt)
+	grpc_client.delfwallrule(VM2.name, "fw0-vm6")
