@@ -89,7 +89,7 @@ static int get_num_of_vfs_pattern(void)
 
 int dp_get_num_of_vfs(void)
 {
-	int vfs = dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP
+	int vfs = dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_MELLANOX
 		? get_num_of_vfs_pattern()
 		: get_num_of_vfs_sriov();
 

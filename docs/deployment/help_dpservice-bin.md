@@ -14,7 +14,7 @@
 | --udp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 UDP service |  |
 | --tcp-virtsvc | IPv4,port,IPv6,port | map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service |  |
 | --wcmp | PERCENTAGE | weighted-cost-multipath percentage for pf0 (0 - 100) |  |
-| --nic-type | NICTYPE | NIC type to use | 'hw' (default) or 'tap' |
+| --nic-type | NICTYPE | NIC type to use | 'mellanox' (default), 'tap' or 'bluefield2' |
 | --no-stats | None | do not print periodic statistics to stdout |  |
 | --no-conntrack | None | disable connection tracking |  |
 | --enable-ipv6-overlay | None | enable IPv6 overlay addresses |  |

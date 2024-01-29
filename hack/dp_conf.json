@@ -80,8 +80,8 @@
       "help": "NIC type to use",
       "var": "nic_type",
       "type": "enum",
-      "choices": [ "hw", "tap" ],
-      "default": "hw"
+      "choices": [ "mellanox", "tap", "bluefield2" ],
+      "default": "mellanox"
     },
     {
       "lgopt": "no-stats",

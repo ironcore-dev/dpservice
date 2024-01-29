@@ -9,8 +9,9 @@
 /***********************************************************************/
 
 enum dp_conf_nic_type {
-	DP_CONF_NIC_TYPE_HW,
+	DP_CONF_NIC_TYPE_MELLANOX,
 	DP_CONF_NIC_TYPE_TAP,
+	DP_CONF_NIC_TYPE_BLUEFIELD2,
 };
 
 enum dp_conf_color {
