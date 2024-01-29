@@ -506,8 +506,12 @@ static int dp_port_public_flow_meter_config(struct dp_port *port, uint64_t publi
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap)
 {
-	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_MELLANOX) {
+		if (public_flow_rate_cap != 0 || total_flow_rate_cap != 0)
+			DPS_LOG_WARNING("Metering config will not take effect due to the NIC type",
+							DP_LOG_PORT(port), DP_LOG_METER_TOTAL(total_flow_rate_cap), DP_LOG_METER_PUBLIC(public_flow_rate_cap));
 		return DP_OK;
+	}
 
 	if (public_flow_rate_cap > total_flow_rate_cap) {
 		DPS_LOG_ERR("Public flow rate cap cannot be greater than total flow rate cap",

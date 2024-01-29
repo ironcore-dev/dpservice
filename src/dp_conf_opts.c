@@ -85,8 +85,9 @@ static const struct option dp_conf_longopts[] = {
 };
 
 static const char *nic_type_choices[] = {
-	"hw",
+	"mellanox",
 	"tap",
+	"bluefield2",
 };
 
 static const char *color_choices[] = {
@@ -105,7 +106,7 @@ static char pf1_name[IF_NAMESIZE];
 static char vf_pattern[IF_NAMESIZE];
 static int dhcp_mtu = 1500;
 static int wcmp_perc = 100;
-static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_HW;
+static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_MELLANOX;
 static bool stats_enabled = true;
 static bool conntrack_enabled = true;
 static bool ipv6_overlay_enabled = false;
@@ -233,7 +234,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --tcp-virtsvc=IPv4,port,IPv6,port  map a VM-accessible IPv4 endpoint to an outside IPv6 TCP service\n"
 #endif
 		"     --wcmp=PERCENTAGE                  weighted-cost-multipath percentage for pf0 (0 - 100)\n"
-		"     --nic-type=NICTYPE                 NIC type to use: 'hw' (default) or 'tap'\n"
+		"     --nic-type=NICTYPE                 NIC type to use: 'mellanox' (default), 'tap' or 'bluefield2'\n"
 		"     --no-stats                         do not print periodic statistics to stdout\n"
 		"     --no-conntrack                     disable connection tracking\n"
 		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
