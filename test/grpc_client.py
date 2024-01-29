@@ -200,12 +200,18 @@ class GrpcClient:
 	def addfwallrule(self, vm_name, rule_id,
 				     src_prefix="0.0.0.0/0", dst_prefix="0.0.0.0/0", proto=None,
 				     src_port_min=-1, src_port_max=-1, dst_port_min=-1, dst_port_max=-1,
-				     action="accept", direction="ingress", priority=None):
+				     action="accept", direction="ingress", priority=None,
+				     icmp_code=-1, icmp_type=-1):
 		protospec = "" if proto is None else f"--protocol={proto}"
 		priospec = "" if priority is None else f"--priority={priority}"
+		l4spec = f" --src-port-min={src_port_min} --src-port-max={src_port_max} --dst-port-min={dst_port_min} --dst-port-max={dst_port_max}"
+
+		if proto == "icmp":
+			l4spec = f"--icmp-code={icmp_code} --icmp-type={icmp_type}"
+
 		self._call(f"add fwrule --interface-id={vm_name} --rule-id={rule_id} --src={src_prefix} --dst={dst_prefix} {protospec}"
-				  f" --src-port-min={src_port_min} --src-port-max={src_port_max} --dst-port-min={dst_port_min} --dst-port-max={dst_port_max}"
-				  f" --action={action} --direction={direction} {priospec}")
+				   f" {l4spec} "
+				   f" --action={action} --direction={direction} {priospec}")
 
 	def getfwallrule(self, vm_name, rule_id):
 		return self._getSpec(f"get fwrule --interface-id={vm_name} --rule-id={rule_id}")

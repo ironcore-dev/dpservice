@@ -111,6 +111,7 @@ def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_pfx)
 	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
 	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 100, 101)
+	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
 
 	# Create another VM on the same VNI behind the same NAT and communicate
 	VM4.ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
@@ -120,6 +121,7 @@ def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 	grpc_client.delnat(VM4.name)
 	grpc_client.delinterface(VM4.name)
 
+	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
 	grpc_client.delnat(VM1.name)
 	grpc_client.dellbtarget(lb_name, lb_vm1_ul_ipv6)
 	grpc_client.dellbprefix(VM1.name, lb_pfx)
