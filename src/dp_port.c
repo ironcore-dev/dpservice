@@ -515,10 +515,10 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 		return DP_ERROR;
 	}
 
-	if (DP_FAILED(dp_port_total_flow_meter_config(port, total_flow_rate_cap))) {
-		DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port));
-		return DP_ERROR;
-	}
+	// if (DP_FAILED(dp_port_total_flow_meter_config(port, total_flow_rate_cap))) {
+	// 	DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port));
+	// 	return DP_ERROR;
+	// }
 	port->iface.total_flow_rate_cap = total_flow_rate_cap;
 
 	if (DP_FAILED(dp_port_public_flow_meter_config(port, public_flow_rate_cap))) {
