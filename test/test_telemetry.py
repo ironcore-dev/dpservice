@@ -23,13 +23,18 @@ def get_telemetry(request):
 	return response
 
 def check_tel_graph(key):
+	expected_tel_rx_node_count = 6
 	tel = get_telemetry(f"/dp_service/graph/{key}")
 	assert tel is not None, \
 		"Missing graph telemetry"
 	assert "Node_0_to_255" in tel, \
 		f"Missing nodes in {key} graph telemetry"
-	assert "rx-0-0" in tel["Node_0_to_255"], \
-		f"Missing PF0 Rx node in {key} graph telemetry"
+	# Check for rx-X-0 pattern where X can be any number
+	rx_nodes = [node for node in tel["Node_0_to_255"] if re.match(r'rx-\d+-0', node)]
+
+	assert len(rx_nodes) == expected_tel_rx_node_count, \
+		f"Expected {expected_tel_rx_node_count} 'rx-X-0' nodes, found {len(rx_nodes)} in {key} graph telemetry"
+
 
 def test_telemetry_graph(prepare_ifaces):
 	check_tel_graph("obj_count")
