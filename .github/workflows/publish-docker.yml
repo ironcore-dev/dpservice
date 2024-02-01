@@ -20,6 +20,9 @@ on:
 jobs:
   buildAndPush:
     runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            os: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
         with:

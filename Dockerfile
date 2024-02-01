@@ -1,10 +1,12 @@
 # Build image with DPDK, etc.
-FROM debian:12-slim AS builder
+FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
 
+ARG TARGETARCH
 ARG DPDK_VER=22.11
 ARG DPSERVICE_FEATURES=""
 ARG CLI_VERSION=0.3.0
 ARG EXPORTER_VERSION=0.1.8
+ENV OSARCH=${TARGETARCH}
 
 WORKDIR /workspace
 
@@ -41,8 +43,7 @@ pkg-config \
 protobuf-compiler-grpc \
 libgrpc++1.51 \
 libgrpc++-dev \
-libpcap0.8-dev \
-linux-headers-${OSARCH}
+libpcap0.8-dev
 
 # Download DPDK
 ADD http://fast.dpdk.org/rel/dpdk-${DPDK_VER}.tar.xz dpdk.tar.xz
