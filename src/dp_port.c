@@ -506,6 +506,8 @@ static int dp_port_public_flow_meter_config(struct dp_port *port, uint64_t publi
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap)
 {
+	int err;
+
 	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_MELLANOX) {
 		if (public_flow_rate_cap != 0 || total_flow_rate_cap != 0)
 			DPS_LOG_WARNING("Metering config will not take effect due to the NIC type",
@@ -519,11 +521,17 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 		return DP_ERROR;
 	}
 
-	if (DP_FAILED(dp_port_total_flow_meter_config(port, total_flow_rate_cap))) {
-		DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port));
-		return DP_ERROR;
+	err = dp_port_total_flow_meter_config(port, total_flow_rate_cap);
+	if (DP_FAILED(err)) {
+		if (err == -ENOENT)
+			DPS_LOG_WARNING("Cannot find sysfs path or file to regulate traffic rate, thus total flow rate metering is ignored", DP_LOG_PORT(port));
+		else {
+			DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port));
+			return DP_ERROR;
+		}
+	} else {
+		port->iface.total_flow_rate_cap = total_flow_rate_cap;
 	}
-	port->iface.total_flow_rate_cap = total_flow_rate_cap;
 
 	if (DP_FAILED(dp_port_public_flow_meter_config(port, public_flow_rate_cap))) {
 		DPS_LOG_ERR("Cannot set public flow meter", DP_LOG_PORT(port));
