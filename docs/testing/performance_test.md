@@ -2,17 +2,45 @@
 Performace testing of dp-service can be carried out in several ways, including more traditional methods (iperf) and stress-tests relying on DPDK (pktgen).
 
 ## iPerf
-On one VM (server):
+We developed a testing script that is able to utilize multiple current flows to saturate the connection between two VMs. It is due to the fact that iperf3 is single threaded in terms of sending and receiving packets, and using multiple iperf3 instacnes is able to significantly increase the overall traffic rates among VMs. Currently this script supports TCP flows, and it is future consideration to support other types of flows. This script synchorizes the behavior on both the server and client sides, and starts/terminates iperf3 automatically.
+
+In order to initiate multiple current iperf3 flows, it is necessary to allocate more CPU cores for VMs, and copy the Python script, `flow_test.py` from the directory `hack/connectiviy_test`, into VMs. On the VM chosen to run iperf3 servers, run the following command to start it in the server mode:
+
+
 ```
-iperf -s
+IPv4:
+python3 flow_test.py --role server --server-ip=192.168.129.5 --flow-count 3
+IPv6
+python3 flow_test.py --role server --server-ip=2002::123 --flow-count 3
+```
+`--flow-count` stands for the number of concurrent flows to be expected.
+
+On the VM chosen to run iperf3 clients, run the following command to start it in the client mode:
+```
+python3 flow_test.py --role client --server-ip=[server IPv4/IPv6 address] --flow-count 3 --run-time 3 --round-count 5 --payload-length 1000 --output-file-prefix first_test
 ```
 
-On the other VM (client):
+`--flow-count` should be the same as specified for the server script. `--run-time` is an exposed parameter of iperf3, `-t`, which specifies the running time of each flow. `--payload-length` is also an exposed parameter of iperf3, `-M`, which sets TCP's maximum segment size. `--round-count` specifies how many rounds of tests are needed, which is useful when a user whants to compute average throughput to get more convicible results. `--output-file-prefix` specifies the output files' name's prefix. A txt file logs the aggregated throughput for each test, and a csv file stores the configurations, like flow count and round count, as well as throughput value in both Mbits/s and Gbits/s.
+
+The generated csv files can be further aggregated to a csv files, when the number of current flows changes for 1 to N. But note, for each different configuration of flow count, the round-count should remain the same. To aggregate the csv files for one scenario, call the sh script `aggregate_results.sh` under the directory `hack/connectiviy_test` as following:
+
 ```
-iperf -c <server IP> -i1
+./aggregate_results.sh --name-prefix first_test --max-servers 3 --round 5
 ```
 
-> Iperf tests usually cannot generate traffic at line rate to fully discover the capacity of DPDK applications.
+`--name-prefix` should be the same as specified when the client script is started. The other two parameters should also match the values used the previous tests. In the end, an aggregated csv file named, for example, `first_test_20240202_1039.csv` will be generated for either further processing or plotting. An example file could look like:
+
+```
+Flow Count,Round Number,Throughput Mbps,Throughput Gbps
+1,0,22094.28,22.094
+1,1,21848.91,21.849
+1,2,22596.25,22.596
+2,0,28909.99,28.910
+2,1,24409.83,24.410
+2,2,28733.73,28.734
+```
+
+The performance measurement for VM2VM either on the same hypervisor or cross hypervisors can be found [here](./performance_result).
 
 ## Pktgen
 To perform stress tests, the current solution is to use [pktgen](https://pktgen-dpdk.readthedocs.io/en/latest/) inside virtual machines. One is for generating traffic and the other one is for observing incoming flow rates.
