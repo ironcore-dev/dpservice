@@ -197,6 +197,9 @@ int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate)
 		return DP_ERROR;
 	}
 
+	if (access(filename, F_OK) == -1)
+		return -ENOENT; // Log as warning is done in the caller
+
 	fp = fopen(filename, "w+");
 	if (!fp) {
 		DPS_LOG_ERR("Cannot open SR-IOV sysfs path to vf's max tx rate", DP_LOG_RET(errno));

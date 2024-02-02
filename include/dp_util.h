@@ -10,6 +10,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <net/if.h>
 #include <rte_byteorder.h>
 #include <rte_ethdev.h>
