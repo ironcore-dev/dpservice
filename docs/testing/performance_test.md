@@ -9,15 +9,15 @@ In order to initiate multiple current iperf3 flows, it is necessary to allocate 
 
 ```
 IPv4:
-python3 flow_test.py --role server --server-ip=192.168.129.5 --flow-count 3
+python3 flow_test.py server --server-ip=192.168.129.5 --flow-count 3
 IPv6
-python3 flow_test.py --role server --server-ip=2002::123 --flow-count 3
+python3 flow_test.py server --server-ip=2002::123 --flow-count 3
 ```
 `--flow-count` stands for the number of concurrent flows to be expected.
 
 On the VM chosen to run iperf3 clients, run the following command to start it in the client mode:
 ```
-python3 flow_test.py --role client --server-ip=[server IPv4/IPv6 address] --flow-count 3 --run-time 3 --round-count 5 --payload-length 1000 --output-file-prefix first_test
+python3 flow_test.py client --server-ip=[server IPv4/IPv6 address] --flow-count 3 --run-time 3 --round-count 5 --payload-length 1000 --output-file-prefix first_test
 ```
 
 `--flow-count` should be the same as specified for the server script. `--run-time` is an exposed parameter of iperf3, `-t`, which specifies the running time of each flow. `--payload-length` is also an exposed parameter of iperf3, `-M`, which sets TCP's maximum segment size. `--round-count` specifies how many rounds of tests are needed, which is useful when a user whants to compute average throughput to get more convicible results. `--output-file-prefix` specifies the output files' name's prefix. A txt file logs the aggregated throughput for each test, and a csv file stores the configurations, like flow count and round count, as well as throughput value in both Mbits/s and Gbits/s.

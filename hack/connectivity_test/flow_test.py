@@ -18,11 +18,11 @@ def command_exists(cmd):
 
 
 def determine_address_family(ip_address):
-    try:
-        socket.inet_aton(ip_address)
-        return socket.AF_INET
-    except OSError:
-        return socket.AF_INET6
+	try:
+		socket.inet_aton(ip_address)
+		return socket.AF_INET
+	except OSError:
+		return socket.AF_INET6
 
 # Server functions
 pids = []
@@ -40,7 +40,7 @@ def start_servers(flow_count):
 		pids.append(proc.pid)
 		print(f"Started iperf3 server on port {port}")
 
-def test_server(bind_host,flow_count):
+def start_server(bind_host,flow_count):
 	start_servers(flow_count)
 	ip_family = determine_address_family(bind_host)
 	with socket.socket(ip_family, socket.SOCK_STREAM) as s:
@@ -188,7 +188,7 @@ def process_data(round_count, flow_count, output_file_prefix):
 			writer.writerow({'Flow Count': flow_count, 'Round Number': round, 'Throughput Mbps': throughput_mbps_formatted, 'Throughput Gbps': throughput_gbps_formatted})
 
 
-def test_client(server_ip, flow_count, run_time, msg_length, round_count, output_file_prefix):
+def start_client(server_ip, output_file_prefix, flow_count, run_time=10, msg_length=1400, round_count=5):
 	if not ping_with_backoff(server_ip, max_attempts=5, max_interval=64):
 		print("Server is not reachable.")
 		sys.exit(1)
@@ -200,25 +200,48 @@ def test_client(server_ip, flow_count, run_time, msg_length, round_count, output
 		sock.sendall("done".encode('utf-8'))
 	sock.close()
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description="Run iperf3 tests as either server or client.")
-parser.add_argument('--role', choices=['server', 'client'], required=True, help="Role to perform ('server' or 'client').")
-parser.add_argument('--server-ip', required=True, help="IP address of the iperf3 server (required for client).")
-parser.add_argument('--flow-count', type=int, required=True, help="Number of iperf3 concurrent flows to generate.")
-parser.add_argument('--run-time', type=int, help="Duration (in seconds) for each iperf3 test (required for client).")
-parser.add_argument('--payload-length', type=int, help="Specify the maximum payload length of a tcp packet (required for client)")
-parser.add_argument('--round-count', type=int, help="Number of test rounds to execute (required for client).")
-parser.add_argument('--output-file-prefix', help="Prefix of output files for both csv and txt.")
-args = parser.parse_args()
+def test_server(args):
+	start_server(args.server_ip, args.flow_count)
+
+def test_client(args):
+	start_client(args.server_ip, args.output_file_prefix, args.flow_count, args.run_time, args.payload_length, args.round_count)
+
+def add_shared_subparser_args(parser):
+	parser.add_argument('--server-ip', required=True, help="IP address of the iperf3 server.")
+	parser.add_argument('--flow-count', type=int, required=True, help="Number of iperf3 concurrent flows to generate.")
+
+
+def add_arg_parser():
+	# Create the top-level parser
+	parser = argparse.ArgumentParser(description="Run iperf3 tests as either server or client.")
+	subparsers = parser.add_subparsers(help='commands', dest='command')
+
+	# Create the parser for the "server" command
+	parser_server = subparsers.add_parser('server', help='Run as an iperf3 server')
+	add_shared_subparser_args(parser_server)
+	parser_server.set_defaults(func=test_server)
+
+	# Create the parser for the "client" command
+	parser_client = subparsers.add_parser('client', help='Run as an iperf3 client')
+	add_shared_subparser_args(parser_client)
+	parser_client.add_argument('--run-time', type=int, help="Duration (in seconds) for each iperf3 test.")
+	parser_client.add_argument('--payload-length', type=int, help="Specify the maximum payload length of a tcp packet.")
+	parser_client.add_argument('--round-count', type=int, help="Number of test rounds to execute.")
+	parser_client.add_argument('--output-file-prefix', required=True, help="Prefix of output files for both csv and txt.")
+	parser_client.set_defaults(func=test_client)
+
+	# Parse the args and call whatever function was selected
+	args = parser.parse_args()
+	if hasattr(args, 'func'):
+		args.func(args)
+	else:
+		parser.print_help()
+
 
 if __name__ == "__main__":
 	if not command_exists("iperf3"):
 		print("iperf3 could not be found")
 		sys.exit(1)
 
-	if args.role == "server":
-		test_server(args.server_ip, args.flow_count)
-	elif args.role == "client":
-		if not args.server_ip or not args.run_time or not args.round_count or not args.payload_length:
-			parser.error("--server-ip, --run-time, --round-count, and --payload-length are required for client role")
-		test_client(args.server_ip, args.flow_count, args.run_time, args.payload_length, args.round_count, args.output_file_prefix)
+	add_arg_parser()
+
