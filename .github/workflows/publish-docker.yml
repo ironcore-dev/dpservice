@@ -1,5 +1,8 @@
 name: Build and Publish Docker Image
 
+env:
+  platforms: ${{ (github.event_name == 'pull_request' && 'linux/amd64') || 'linux/amd64,linux/arm64' }}
+
 on:
   push:
     branches:
@@ -13,13 +16,16 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Manual build trigger for arm64 architecture'
+        required: false
+        default: 'linux/arm64'
 
 jobs:
   buildAndPush:
     runs-on: ubuntu-latest
-    strategy:
-        matrix:
-            platform: [linux/amd64,linux/arm64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,7 +48,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:latest
-          platforms: ${{ matrix.platform }}
+          platforms: ${{env.platforms}}
       # workaround for self-hosted runner
       # https://github.com/mumoshu/actions-runner-controller-ci/commit/e91c8c0f6ca82aa7618010c6d2f417aa46c4a4bf
       - name: Set up Docker Context for Buildx
@@ -69,8 +75,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ matrix.platform }}
-          push: ${{ github.event_name != 'pull_request' }}
+          platforms: ${{env.platforms}}
+          push: ${{ github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: production
