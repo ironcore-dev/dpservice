@@ -175,10 +175,7 @@ def test_external_lb_icmp_error_relay(prepare_ipv4, grpc_client):
 	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
 	grpc_client.dellb(lb_name)
 
-def test_network_lb_external_icmpv6_echo(prepare_ipv4, grpc_client):
-
-	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/443")
-
+def network_lb_external_icmpv6_ping(lb_ul_ipv6):
 	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
 				IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6, nh=0x29) /
 				IPv6(dst=lb_ip6, src=public_ipv6, nh=58) /
@@ -187,6 +184,13 @@ def test_network_lb_external_icmpv6_echo(prepare_ipv4, grpc_client):
 	validate_checksums(answer)
 	assert answer and is_icmpv6echo_reply_pkt(answer), \
 		"No ECHO reply"
+
+def test_network_lb_external_icmpv6_echo(prepare_ipv4, grpc_client):
+
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip6, "tcp/443")
+
+	network_lb_external_icmpv6_ping(lb_ul_ipv6)
+	network_lb_external_icmpv6_ping(lb_ul_ipv6)
 
 	grpc_client.dellb(lb_name)
 

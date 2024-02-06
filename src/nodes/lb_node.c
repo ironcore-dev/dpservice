@@ -90,7 +90,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return LB_NEXT_IPIP_ENCAP;
 	}
 
-	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && df->l4_type == IPPROTO_ICMP) {
+	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)) {
 		df->nat_type = DP_CHG_UL_DST_IP;
 		return LB_NEXT_PACKET_RELAY;
 	}
