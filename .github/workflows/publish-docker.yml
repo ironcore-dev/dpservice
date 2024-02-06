@@ -1,8 +1,5 @@
 name: Build and Publish Docker Image
 
-env:
-  platforms: linux/amd64,linux/arm64
-
 on:
   push:
     branches:
@@ -22,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
         matrix:
-            os: [amd64, arm64]
+            platform: [linux/amd64,linux/arm64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,7 +42,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:latest
-          platforms: ${{env.platforms}}
+          platforms: ${{ matrix.platform }}
       # workaround for self-hosted runner
       # https://github.com/mumoshu/actions-runner-controller-ci/commit/e91c8c0f6ca82aa7618010c6d2f417aa46c4a4bf
       - name: Set up Docker Context for Buildx
@@ -72,7 +69,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{env.platforms}}
+          platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
