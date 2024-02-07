@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from helpers import *
+import pytest
 
 def test_grpc_addinterface_already_exists(prepare_ifaces, grpc_client):
 	# Try to add using an existing vm identifier
@@ -10,6 +11,9 @@ def test_grpc_addinterface_already_exists(prepare_ifaces, grpc_client):
 def test_grpc_addinterface_bad_interface(prepare_ifaces, grpc_client):
 	# Try to add without specifying PCI address or using a bad one
 	grpc_client.expect_error(201).addinterface("new_vm", "invalid", VM2.vni, VM2.ip, VM2.ipv6)
+	# Try to add with zero IPs
+	with pytest.raises(RuntimeError, match="Grpc client failed"):
+		grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, "0.0.0.0", "::")
 
 def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
