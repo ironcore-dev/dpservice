@@ -116,11 +116,16 @@ def run_iperf3_clients(server_ip, flow_count, run_time, msg_length, round_count,
 		print(f"Starting Round {round}")
 		pids = []
 
+		if msg_length < 0:
+			maximum_seg_length_arg = ''
+		else:
+			maximum_seg_length_arg = f"-M {msg_length}"
+
 		# Start iperf3 clients and connect to servers
 		for i in range(flow_count):
 			port = START_PORT + i
 			result_file_name = f"test_tcp_{round}_{i}.json"
-			cmd = ["iperf3", "-c", server_ip, "-p", str(port), "-t", str(run_time), "-M", str(msg_length), "--json"]
+			cmd = ["iperf3", "-c", server_ip, "-p", str(port), "-t", str(run_time), maximum_seg_length_arg, "--json"]
 			with open(result_file_name, 'w') as result_file:
 				p = subprocess.Popen(cmd, stdout=result_file)
 				pids.append(p)
@@ -188,7 +193,7 @@ def process_data(round_count, flow_count, output_file_prefix):
 			writer.writerow({'Flow Count': flow_count, 'Round Number': round, 'Throughput Mbps': throughput_mbps_formatted, 'Throughput Gbps': throughput_gbps_formatted})
 
 
-def start_client(server_ip, output_file_prefix, flow_count, run_time=10, msg_length=1400, round_count=5):
+def start_client(server_ip, output_file_prefix, flow_count, run_time=10, msg_length=1448, round_count=1):
 	if not ping_with_backoff(server_ip, max_attempts=5, max_interval=64):
 		print("Server is not reachable.")
 		sys.exit(1)
@@ -208,7 +213,7 @@ def test_client(args):
 
 def add_shared_subparser_args(parser):
 	parser.add_argument('--server-ip', required=True, help="IP address of the iperf3 server.")
-	parser.add_argument('--flow-count', type=int, required=True, help="Number of iperf3 concurrent flows to generate.")
+	parser.add_argument('--flow-count', type=int, default=1, help="Number of iperf3 concurrent flows to generate.")
 
 
 def add_arg_parser():
@@ -224,10 +229,10 @@ def add_arg_parser():
 	# Create the parser for the "client" command
 	parser_client = subparsers.add_parser('client', help='Run as an iperf3 client')
 	add_shared_subparser_args(parser_client)
-	parser_client.add_argument('--run-time', type=int, help="Duration (in seconds) for each iperf3 test.")
-	parser_client.add_argument('--payload-length', type=int, help="Specify the maximum payload length of a tcp packet.")
-	parser_client.add_argument('--round-count', type=int, help="Number of test rounds to execute.")
-	parser_client.add_argument('--output-file-prefix', required=True, help="Prefix of output files for both csv and txt.")
+	parser_client.add_argument('--run-time', type=int, default=10, help="Duration (in seconds) for each iperf3 test.")
+	parser_client.add_argument('--payload-length', type=int, default=-1,help="Specify the maximum segment size of a tcp packet.")
+	parser_client.add_argument('--round-count', type=int, default=1, help="Number of test rounds to execute.")
+	parser_client.add_argument('--output-file-prefix', default='my_test', help="Prefix of output files for both csv and txt.")
 	parser_client.set_defaults(func=test_client)
 
 	# Parse the args and call whatever function was selected
