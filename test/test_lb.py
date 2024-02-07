@@ -5,10 +5,7 @@ import pytest
 
 from helpers import *
 
-def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
-
-	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-
+def network_lb_external_icmpv4_ping(lb_ul_ipv6):
 	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
 				IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6, nh=4) /
 				IP(dst=lb_ip, src=public_ip) /
@@ -17,6 +14,13 @@ def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
 	validate_checksums(answer)
 	assert answer and is_icmp_pkt(answer), \
 		"No ECHO reply"
+
+def test_network_lb_external_icmp_echo(prepare_ipv4, grpc_client):
+
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+
+	network_lb_external_icmpv4_ping(lb_ul_ipv6)
+	network_lb_external_icmpv4_ping(lb_ul_ipv6)
 
 	grpc_client.dellb(lb_name)
 
