@@ -491,12 +491,17 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
 	port->iface.cfg.pxe_ip = request->ip4_pxe_addr;
 
-	ret = dp_add_route(port, request->vni, 0, request->ip4_addr, NULL, 32);
-	if (DP_FAILED(ret))
-		goto iface_err;
-	ret = dp_add_route6(port, request->vni, 0, request->ip6_addr, NULL, 128);
-	if (DP_FAILED(ret))
-		goto route_err;
+	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
+	if (request->ip4_addr != 0) {
+		ret = dp_add_route(port, request->vni, 0, request->ip4_addr, NULL, 32);
+		if (DP_FAILED(ret))
+			goto iface_err;
+	}
+	if (!dp_is_ipv6_addr_zero(request->ip6_addr)) {
+		ret = dp_add_route6(port, request->vni, 0, request->ip6_addr, NULL, 128);
+		if (DP_FAILED(ret))
+			goto route_err;
+	}
 
 	if (!port->is_pf)
 		if (DP_FAILED(dp_port_meter_config(port, request->total_flow_rate_cap, request->public_flow_rate_cap))) {

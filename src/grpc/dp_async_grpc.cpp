@@ -233,6 +233,10 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 	request->add_iface.vni = request_.vni();
 	if (!GrpcConv::StrToIpv4(request_.ipv4_config().primary_address(), &request->add_iface.ip4_addr))
 		return "Invalid ipv4_config.primary_address";
+	if (!GrpcConv::StrToIpv6(request_.ipv6_config().primary_address(), request->add_iface.ip6_addr))
+		return "Invalid ipv6_config.primary_address";
+	if (request->add_iface.ip4_addr == 0 && dp_is_ipv6_addr_zero(request->add_iface.ip6_addr))
+		return "Invalid ipv4_config.primary_address and ipv6_config.primary_address combination";
 	if (!request_.pxe_config().next_server().empty()) {
 		DPGRPC_LOG_INFO("Setting PXE",
 						DP_LOG_IFACE(request_.interface_id().c_str()),
@@ -245,8 +249,6 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 	}
 	if (SNPRINTF_FAILED(request->add_iface.pci_name, request_.device_name()))
 		return "Invalid device_name";
-	if (!GrpcConv::StrToIpv6(request_.ipv6_config().primary_address(), request->add_iface.ip6_addr))
-		return "Invalid ipv6_config.primary_address";
 	if (SNPRINTF_FAILED(request->add_iface.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
 
