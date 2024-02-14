@@ -71,8 +71,12 @@ int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 	lb_key.vni = lb->vni;
 	dp_copy_ipaddr(&lb_key.ip, &lb->addr);
 
-	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key)))
+	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key))) {
+		if (!DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val)))
+			DPS_LOG_WARNING("Loadbalancer for this IP already exists",
+				DP_LOG_IPV4(lb->addr.ipv4), DP_LOG_VNI(lb->vni), DP_LOG_LBID(lb_val->lb_id));
 		return DP_GRPC_ERR_ALREADY_EXISTS;
+	}
 
 	lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 	if (!lb_val)
