@@ -6,11 +6,13 @@
 
 #include <stdint.h>
 #include <rte_ether.h>
+#include "nodes/dhcp_node.h"
 
 #define	DHCPV6_CLIENT_PORT	546
 #define	DHCPV6_SERVER_PORT	547
 
 #define DHCPV6_INFINITY 0xffffffff
+#define DHCPV6_BOOT_FILE_BUF_LEN 96
 
 /*
  * Message types
@@ -53,9 +55,12 @@
 #define DHCPV6_OPT_IAADDR		5
 #define DHCPV6_OPT_STATUS_CODE	13
 #define DHCPV6_OPT_RAPID_COMMIT	14
+#define DHCPV6_OPT_USER_CLASS	15
+#define DHCPV6_OPT_VENDOR_CLASS	16
 #define DHCPV6_OPT_DNS			23
 #define DHCPV6_OPT_IA_PD		25
 #define DHCPV6_OPT_IAPREFIX		26
+#define DHCPV6_OPT_BOOT_FILE	59
 
 // General definitions as per RFC
 struct dhcpv6_packet {
@@ -94,6 +99,21 @@ struct dhcpv6_opt_ia_na {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_na ia_na;
+} __rte_packed;
+
+struct dhcpv6_opt_vnd_cls {
+	rte_be16_t op_code;
+	rte_be16_t op_len;
+	rte_be32_t entp_id;
+	rte_be16_t opq_data_len;
+	uint8_t opq_data[];
+} __rte_packed;
+
+struct dhcpv6_opt_usr_cls {
+	rte_be16_t op_code;
+	rte_be16_t op_len;
+	rte_be16_t sub_opt_len;
+	uint8_t sub_opt_data[];
 } __rte_packed;
 
 struct dhcpv6_ia_addr {
@@ -153,6 +173,12 @@ struct dhcpv6_opt_ia_na_single_addr_status {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_na_single_addr_status ia_na;
+} __rte_packed;
+
+struct dhcpv6_opt_boot_file_url {
+	rte_be16_t op_code;
+	rte_be16_t op_len;
+	char boot_file_url[DHCPV6_BOOT_FILE_BUF_LEN];
 } __rte_packed;
 
 #endif

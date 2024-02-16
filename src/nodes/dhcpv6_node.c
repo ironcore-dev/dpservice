@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#define _GNU_SOURCE
+#include <string.h>  // need memmem()
+
 #include "nodes/dhcpv6_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
@@ -25,6 +28,9 @@ struct dp_dhcpv6_reply_options {
 	struct dhcpv6_opt_ia_na_single_addr_status opt_iana;
 	int opt_cid_len;
 	struct dhcpv6_opt_client_id opt_cid;
+	int opt_boot_file_len;
+	struct dhcpv6_opt_boot_file_url boot_file_url;
+	enum dp_pxe_mode pxe_mode;
 	int opt_rapid_len;
 	struct dhcpv6_option opt_rapid;
 };
@@ -78,9 +84,14 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 											 size_t options_len,
 											 struct dp_dhcpv6_reply_options *reply_options)
 {
+	char ipv6_str[INET6_ADDRSTRLEN];
 	uint16_t op_code;
 	uint16_t op_len = 0;
+	uint16_t url_len = 0;
 	const struct dhcpv6_option *opt;
+	const struct dhcpv6_opt_vnd_cls *opt_vnd;
+	const struct dhcpv6_opt_usr_cls *opt_usr;
+	struct dp_port *port = dp_get_in_port(m);
 
 	for (size_t i = 0;
 		 i + sizeof(struct dhcpv6_option) < (size_t)options_len;  // len already checked for being positive
@@ -123,6 +134,36 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 			reply_options->opt_rapid.op_code = opt->op_code;
 			reply_options->opt_rapid.op_len = 0;
 			reply_options->opt_rapid_len = sizeof(struct dhcpv6_option);
+			break;
+		case DHCPV6_OPT_VENDOR_CLASS:
+			opt_vnd = (const struct dhcpv6_opt_vnd_cls *)opt;
+			if (opt_vnd->opq_data_len >= DP_VND_CLASS_ID_LEN
+				&& memmem(opt_vnd->opq_data, op_len, DP_VND_CLASS_ID_COMP_STR, DP_VND_CLASS_ID_LEN)
+			) {
+				reply_options->pxe_mode = DP_PXE_MODE_TFTP;
+				reply_options->boot_file_url.op_code = htons(DHCPV6_OPT_BOOT_FILE);
+				inet_ntop(AF_INET6, port->iface.cfg.pxe_ip.ipv6, ipv6_str, sizeof(ipv6_str));
+				url_len = (uint16_t)snprintf(reply_options->boot_file_url.boot_file_url, DHCPV6_BOOT_FILE_BUF_LEN,
+											 "tftp://[%s]/%s", ipv6_str, DP_PXE_TFTP_PATH);
+				reply_options->boot_file_url.op_len = htons(url_len);
+				reply_options->opt_boot_file_len = (int)sizeof(reply_options->boot_file_url.op_code) +
+													(int)sizeof(reply_options->boot_file_url.op_len) + url_len;
+			}
+			break;
+		case DHCPV6_OPT_USER_CLASS:
+			opt_usr = (const struct dhcpv6_opt_usr_cls *)opt;
+			if (ntohs(opt_usr->sub_opt_len) == DP_USER_CLASS_INF_LEN
+				&& !memcmp(opt_usr->sub_opt_data, DP_USER_CLASS_INF_COMP_STR, DP_USER_CLASS_INF_LEN)
+			) {
+				reply_options->pxe_mode = DP_PXE_MODE_HTTP;
+				reply_options->boot_file_url.op_code = htons(DHCPV6_OPT_BOOT_FILE);
+				inet_ntop(AF_INET6, port->iface.cfg.pxe_ip.ipv6, ipv6_str, sizeof(ipv6_str));
+				url_len = (uint16_t)snprintf(reply_options->boot_file_url.boot_file_url, DHCPV6_BOOT_FILE_BUF_LEN,
+											 "http://[%s]/%s", ipv6_str, port->iface.cfg.pxe_str);
+				reply_options->boot_file_url.op_len = htons(url_len);
+				reply_options->opt_boot_file_len = (int)sizeof(reply_options->boot_file_url.op_code) +
+													(int)sizeof(reply_options->boot_file_url.op_len) + url_len;
+			}
 			break;
 		default:
 			break;
@@ -177,6 +218,9 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	reply_options_len = (int)sizeof(opt_sid) + reply_options.opt_cid_len + reply_options.opt_iana_len + reply_options.opt_rapid_len;
 	reply_options_len += (int)(sizeof(dns_opt.opt_code) + sizeof(dns_opt.opt_len) + ntohs(dns_opt.opt_len));
 
+	if (reply_options.pxe_mode != DP_PXE_MODE_NONE)
+		reply_options_len += reply_options.opt_boot_file_len;
+
 	if (DP_FAILED(resize_packet(m, reply_options_len - options_len)))
 		return DP_ERROR;
 
@@ -200,6 +244,10 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	memcpy(options, &dns_opt.opt_len, sizeof(dns_opt.opt_len));
 	options += sizeof(dns_opt.opt_len);
 	memcpy(options, dhcpv6_dns->array, dhcpv6_dns->len);
+	options += dhcpv6_dns->len;
+
+	if (reply_options.pxe_mode != DP_PXE_MODE_NONE)
+		memcpy(options, &reply_options.boot_file_url, reply_options.opt_boot_file_len);
 
 	return reply_options_len;
 }
@@ -244,6 +292,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
 		break;
 	case DHCPV6_REQUEST:
+	case DHCPV6_RELEASE:
 		dhcp_pkt->msg_type = DHCPV6_REPLY;
 		reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
 		break;

@@ -28,7 +28,7 @@ struct dp_iface_cfg {
 	uint8_t					dhcp_ipv6[DP_IPV6_ADDR_SIZE];
 	uint8_t					own_ipv6[DP_IPV6_ADDR_SIZE];
 	uint8_t					ip6_depth;
-	uint32_t				pxe_ip;
+	struct dp_ip_address	pxe_ip;
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
 };
 
