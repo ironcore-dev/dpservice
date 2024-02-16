@@ -489,7 +489,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
-	port->iface.cfg.pxe_ip = request->ip4_pxe_addr;
+	port->iface.cfg.pxe_ip = request->pxe_addr;
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {

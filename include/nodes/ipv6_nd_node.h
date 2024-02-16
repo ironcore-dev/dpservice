@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <netinet/in.h>
+#include <rte_ip.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,13 +85,20 @@ struct rs_msg {
 };
 
 struct ra_msg {
-        struct icmp6hdr		icmph;
-	uint32_t	reachable_time;
-	uint32_t	retrans_timer;
+	struct icmp6hdr icmph;
+	uint32_t reachable_time;
+	uint32_t retrans_timer;
+	uint8_t options[];
 };
 
+struct nd_opt_source_link_layer {
+	uint8_t type;
+	uint8_t length;
+	uint8_t addr[6];
+};
 
 int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name);
+uint16_t dp_ipv6_fill_ra(struct rte_ipv6_hdr *ipv6_hdr, struct ra_msg *ra_msg, const uint8_t *src_mac_addr);
 
 #ifdef __cplusplus
 }

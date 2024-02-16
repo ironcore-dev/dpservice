@@ -116,6 +116,9 @@ class GrpcClient:
 	def addinterface(self, vm_name, pci, vni, ipv4, ipv6):
 		return self._getUnderlayRoute(f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6}")
 
+	def addinterface_with_pxe(self, vm_name, pci, vni, ipv4, ipv6, pxe_server, ipxe_file):
+		return self._getUnderlayRoute(f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6} --pxe-file-name={ipxe_file} --pxe-server={pxe_server}")
+
 	def getinterface(self, vm_name):
 		return self._getSpec(f"get interface --id={vm_name}")
 

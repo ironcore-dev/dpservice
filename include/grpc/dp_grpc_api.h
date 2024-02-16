@@ -79,7 +79,7 @@ struct dpgrpc_iface {
 	uint32_t				ip4_addr;
 	uint8_t					ip6_addr[DP_IPV6_ADDR_SIZE];
 	uint32_t				vni;
-	uint32_t				ip4_pxe_addr;						// request (create) only
+	struct dp_ip_address	pxe_addr;							// request (create) only
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only

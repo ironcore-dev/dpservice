@@ -242,7 +242,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (pxe_mode != DP_PXE_MODE_NONE) {
 		memset(&incoming_eth_hdr->dst_addr, ~0, sizeof(incoming_eth_hdr->dst_addr));
 		incoming_ipv4_hdr->dst_addr = 0xFFFFFFFF;
-		pxe_srv_ip = htonl(port->iface.cfg.pxe_ip);
+		pxe_srv_ip = htonl(port->iface.cfg.pxe_ip.ipv4);
 		dhcp_hdr->siaddr = pxe_srv_ip;
 		switch (pxe_mode) {
 		case DP_PXE_MODE_TFTP:

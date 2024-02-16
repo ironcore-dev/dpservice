@@ -242,8 +242,15 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 						DP_LOG_IFACE(request_.interface_id().c_str()),
 						DP_LOG_PXE_SRV(request_.pxe_config().next_server().c_str()),
 						DP_LOG_PXE_PATH(request_.pxe_config().boot_filename().c_str()));
-		if (!GrpcConv::StrToIpv4(request_.pxe_config().next_server(), &request->add_iface.ip4_pxe_addr))
-			return "Invalid pxe_config.next_server";
+		if (dp_is_ipv6_addr_zero(request->add_iface.ip6_addr)) {
+			if (!GrpcConv::StrToIpv4(request_.pxe_config().next_server(), &request->add_iface.pxe_addr.ipv4))
+				return "Invalid ipv4 pxe_config.next_server";
+			request->add_iface.pxe_addr.ip_type = RTE_ETHER_TYPE_IPV4;
+		} else {
+			if (!GrpcConv::StrToIpv6(request_.pxe_config().next_server(), request->add_iface.pxe_addr.ipv6))
+				return "Invalid ipv6 pxe_config.next_server";
+			request->add_iface.pxe_addr.ip_type = RTE_ETHER_TYPE_IPV6;
+		}
 		if (SNPRINTF_FAILED(request->add_iface.pxe_str, request_.pxe_config().boot_filename()))
 			return "Invalid pxe_config.boot_filename";
 	}

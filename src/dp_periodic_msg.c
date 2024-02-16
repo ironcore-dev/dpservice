@@ -23,12 +23,16 @@ static __rte_always_inline bool dp_is_ip_set(struct dp_port *port, uint16_t eth_
 
 void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 {
+	struct nd_opt_source_link_layer *src_ll_addr;
 	struct dp_flow *df;
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_arp_hdr *arp_hdr;
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
 	const struct dp_ports *ports = dp_get_ports();
 	struct rte_mbuf *clone_buf;
+	struct rte_ipv6_hdr *ipv6_hdr;
+	struct ra_msg *ra_msg;
+	struct icmp6hdr *icmp6_hdr;
 	int ret;
 
 	DP_FOREACH_PORT(ports, port) {
@@ -54,6 +58,18 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 			rte_ether_addr_copy(&port->own_mac, &arp_hdr->arp_data.arp_sha);
 			if (dp_arp_cycle_needed(port))
 				arp_hdr->arp_data.arp_tip = htonl(port->iface.cfg.own_ip);
+		}
+
+		if (eth_type == RTE_ETHER_TYPE_IPV6) {
+			ipv6_hdr = (struct rte_ipv6_hdr *)(eth_hdr + 1);
+			ra_msg = (struct ra_msg *)(ipv6_hdr + 1);
+			icmp6_hdr = &(ra_msg->icmph);
+			if (icmp6_hdr->icmp6_type == NDISC_ROUTER_ADVERTISEMENT) {
+				src_ll_addr = (struct nd_opt_source_link_layer *)(ra_msg + 1);
+				rte_memcpy(src_ll_addr->addr, port->own_mac.addr_bytes, sizeof(src_ll_addr->addr));
+				icmp6_hdr->icmp6_cksum = 0;
+				icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp6_hdr);
+			}
 		}
 
 		dp_init_pkt_mark(clone_buf);
@@ -160,8 +176,6 @@ void trigger_nd_ra(void)
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
 	struct ra_msg *ra_msg;
-	struct icmp6hdr *icmp6_hdr;
-	uint16_t pkt_size;
 	struct rte_mbuf *pkt;
 	const uint8_t *rt_ip = dp_get_gw_ip6();
 
@@ -186,24 +200,8 @@ void trigger_nd_ra(void)
 	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));
 	rte_memcpy(ipv6_hdr->dst_addr, dp_mc_ipv6, sizeof(ipv6_hdr->dst_addr));
 
-	icmp6_hdr = &(ra_msg->icmph);
-	memset(icmp6_hdr, 0, sizeof(struct icmp6hdr));
-	icmp6_hdr->icmp6_type = NDISC_ROUTER_ADVERTISEMENT;
-	icmp6_hdr->icmp6_managed = 1;
-	icmp6_hdr->icmp6_other = 1;
-	icmp6_hdr->icmp6_rt_lifetime = 0xffff;
-	ra_msg->reachable_time = 0;
-	ra_msg->retrans_timer = 0;
-	ipv6_hdr->payload_len = htons(sizeof(struct ra_msg));
-	icmp6_hdr->icmp6_hop_limit = 255;
-
-	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) + sizeof(struct ra_msg);
-	pkt->data_len = pkt_size;
-	pkt->pkt_len = pkt_size;
-
-	// L4 cksum calculation
-	icmp6_hdr->icmp6_cksum = 0;
-	icmp6_hdr->icmp6_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp6_hdr);
+	pkt->data_len = dp_ipv6_fill_ra(ipv6_hdr, ra_msg, NULL);
+	pkt->pkt_len = pkt->data_len;
 
 	send_to_all_vfs(pkt, RTE_ETHER_TYPE_IPV6);
 	rte_pktmbuf_free(pkt);
