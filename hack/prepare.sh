@@ -9,7 +9,7 @@ set -Eeuo pipefail
 # Use as /usr/local/sbin/dp-prepare.sh
 #
 
-BLUEFIELD_IDENTIFIERS=("MT_0000000543")
+BLUEFIELD_IDENTIFIERS=("MT_0000000543", "MT_0000000541")
 NUMVFS=126
 CONFIG="/tmp/dp_service.conf"
 IS_BLUEFIELD=false
