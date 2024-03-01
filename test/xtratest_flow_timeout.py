@@ -132,3 +132,37 @@ def test_external_lb_relay_timeout(prepare_ipv4, grpc_client, fast_flow_timeout)
 
 	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
 	grpc_client.dellb(lb_name)
+
+
+def test_external_lb_relay_algorithm(prepare_ipv4, grpc_client):
+
+	# TODO dellb() is not properly cleanin up so the previous example poisons the result
+	age_out_flows()
+
+	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
+	grpc_client.addlbtarget(lb_name, "fc00:2::1")
+	grpc_client.addlbtarget(lb_name, "fc00:2::2")
+	grpc_client.addlbtarget(lb_name, "fc00:2::3")
+	grpc_client.addlbtarget(lb_name, "fc00:2::4")
+	grpc_client.addlbtarget(lb_name, "fc00:2::5")
+	grpc_client.dellbtarget(lb_name, "fc00:2::1")
+	grpc_client.dellbtarget(lb_name, "fc00:2::3")
+
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
+
+	dst_ip = pkt[IPv6].dst
+	# print(pkt[IPv6].dst)
+
+	age_out_flows()
+
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
+	# print(pkt[IPv6].dst)
+	assert dst_ip == pkt[IPv6].dst, \
+		f"Loadbalancer target selection algorithm is not consistent"
+
+	grpc_client.dellbtarget(lb_name, "fc00:2::5")
+	grpc_client.dellbtarget(lb_name, "fc00:2::4")
+	grpc_client.dellbtarget(lb_name, "fc00:2::2")
+	grpc_client.dellb(lb_name)

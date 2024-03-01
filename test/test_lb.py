@@ -83,7 +83,7 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 
 	# NAT should behave the same, just test once (watch out for round-robin from before)
 	nat_ipv6 = grpc_client.addnat(VM3.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1240)
+	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1238)
 	grpc_client.delnat(VM3.name)
 
 	grpc_client.dellbtarget(lb_name, lb_vm2_ul_ipv6)

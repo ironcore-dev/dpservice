@@ -198,10 +198,41 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const uint8_t *b_ip)
 	return false;
 }
 
-static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
+// TODO(plague): hotfix - simple checksum and modulo to ensure the same target will be selected for each quintuple
+//  - no uniformity test has been done,
+//    (the assumption is that the fact that client port changes for each connection will be enough)
+//  - since LB IP is a constant, only a quadruple is actually used
+static __rte_always_inline int dp_lb_modulo_backend(struct lb_value *val, struct lb_port *lb_port, uint32_t src_ip, rte_be16_t src_port)
+{
+	uint64_t chksum, pos;
+
+	// dest(lb) IP/VNI are constant for every LB
+	chksum = lb_port->protocol;		// LB supports multiple protocols per LB
+	chksum += ntohs(lb_port->port);	// LB supports multiple dest ports per LB
+	chksum += src_ip;				// source of course can change
+	chksum += ntohs(src_port);		// hoping this will ensuse some uniformity as it should just increase linearly
+	pos = chksum % val->back_end_cnt;
+
+	// need to actually count the used slots in the whole DP_LB_MAX_IPS_PER_VIP table
+	// otherwise the algorithm would always overshoot and then select the first target
+	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i)
+		if (val->back_end_ips[i][0] != 0)
+			if (pos-- == 0)
+				return i;
+
+	DPS_LOG_ERR("No LoadBalancer backing IP found even though it should be there", DP_LOG_LBID(val->lb_id));
+	return -1;
+}
+
+static int dp_lb_rr_backend(struct lb_value *val, struct lb_port *lb_port, uint32_t src_ip, rte_be16_t src_port)
 {
 	int ret = -1, k;
 
+	// TODO(plague): not sure this the right place (investigate more), but there can be a situation where there is a LB without any targets
+	if (val->back_end_cnt == 0)
+		return ret;
+
+	// TODO(plague): this should be separated and doen in the caller as it does not concern the round-robin algorithm
 	for (k = 0; k < DP_LB_MAX_PORTS; k++) {
 		if ((val->ports[k].port == lb_port->port) && (val->ports[k].protocol == lb_port->protocol))
 			break;
@@ -209,6 +240,7 @@ static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
 			return ret;
 	}
 
+	// TODO(plague): again, this would be shared for all algorithms
 	if (val->back_end_cnt == 1) {
 		for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++)
 			if (val->back_end_ips[k][0] != 0)
@@ -216,18 +248,23 @@ static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
 		if (k != DP_LB_MAX_IPS_PER_VIP)
 			ret = k;
 	} else {
+		// TODO(plague): only this single part is actual round-robin
+		// TODO(plague): disabled as a hotfix for long connections on LB flows
+		/*
 		for (k = val->last_sel_pos; k < DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos; k++)
 			if ((val->back_end_ips[k % DP_LB_MAX_IPS_PER_VIP][0] != 0) && (k != val->last_sel_pos))
 				break;
 
 		if (k != (DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos))
 			ret = k % DP_LB_MAX_IPS_PER_VIP;
+		*/
+		ret = dp_lb_modulo_backend(val, lb_port, src_ip, src_port);
 	}
 
 	return ret;
 }
 
-uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uint8_t proto)
+uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uint8_t proto, uint32_t src_ip, rte_be16_t src_port)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key nkey = {
@@ -246,7 +283,7 @@ uint8_t *dp_lb_get_backend_ip(uint32_t ol_ip, uint32_t vni, rte_be16_t port, uin
 	   backend selection */
 	lb_port.port = port;
 	lb_port.protocol = proto;
-	pos = dp_lb_rr_backend(lb_val, &lb_port);
+	pos = dp_lb_rr_backend(lb_val, &lb_port, src_ip, src_port);
 	if (pos < 0)
 		return NULL;
 
