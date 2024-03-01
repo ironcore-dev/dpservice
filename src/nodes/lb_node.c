@@ -64,7 +64,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				return LB_NEXT_DROP;
 		}
 
-		target_ip6 = dp_lb_get_backend_ip(&cntrack->flow_key[DP_FLOW_DIR_ORG], vni);
+		target_ip6 = dp_lb_get_backend_ip(&cntrack->flow_key[DP_FLOW_DIR_ORG], vni,
+										  ntohl(df->src.src_addr), df->l4_info.trans_port.src_port);
 		if (!target_ip6)
 			return LB_NEXT_DROP;
 
