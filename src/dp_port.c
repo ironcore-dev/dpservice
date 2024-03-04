@@ -100,14 +100,18 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	/* Default config */
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
-	nr_hairpin_queues = port->is_pf
-		? (uint16_t)(DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs)
-		: DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
+	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+		nr_hairpin_queues = 0;
+	else
+		nr_hairpin_queues = port->is_pf
+			? (uint16_t)(DP_NR_PF_HAIRPIN_RX_TX_QUEUES + DP_NR_VF_HAIRPIN_RX_TX_QUEUES * dp_layer->num_of_vfs)
+			: DP_NR_VF_HAIRPIN_RX_TX_QUEUES;
 
 	ret = rte_eth_dev_configure(port->port_id,
 								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
 								&port_conf);
+
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
