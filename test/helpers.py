@@ -51,7 +51,12 @@ def is_ipv6_tcp_pkt(pkt):
 	return IPv6 in pkt and TCP in pkt
 
 def is_tcp_pkt(pkt):
-	return TCP in pkt
+	if TCP in pkt:
+		for option in pkt[TCP].options:
+			if option[0] == 'MSS':
+				return False
+		return True
+	return False
 
 def is_tcp_vip_src_pkt(pkt):
 	return TCP in pkt and pkt[IP].src == vip_vip
