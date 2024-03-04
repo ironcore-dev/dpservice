@@ -9,11 +9,11 @@
 #include "dp_log.h"
 #include "grpc/dp_grpc_service.h"
 
-static pthread_t grpc_thread_id;
+static rte_thread_t grpc_thread_id;
 // pthread_t is opaque, must use another value for checking
 static bool grpc_thread_started = false;
 
-static void *dp_grpc_main_loop(__rte_unused void *arg)
+static uint32_t dp_grpc_main_loop(__rte_unused void *arg)
 {
 	GRPCService *grpc_svc;
 	char addr[12];  // '[::]:65535\0'
@@ -29,7 +29,8 @@ static void *dp_grpc_main_loop(__rte_unused void *arg)
 		rte_exit(EXIT_FAILURE, "Cannot run without working gRPC server\n");
 
 	GRPCService::Cleanup();
-	return NULL;
+
+	return 0;
 }
 
 int dp_grpc_thread_start(void)
@@ -41,7 +42,7 @@ int dp_grpc_thread_start(void)
 		return DP_ERROR;
 	}
 
-	ret = rte_ctrl_thread_create(&grpc_thread_id, "grpc-thread", NULL, dp_grpc_main_loop, NULL);
+	ret = rte_thread_create_control(&grpc_thread_id, "grpc-thread", dp_grpc_main_loop, NULL);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot create gRPC thread", DP_LOG_RET(ret));
 		return ret;
@@ -59,7 +60,7 @@ int dp_grpc_thread_cancel(void)
 	if (!grpc_thread_started)
 		return DP_OK;
 
-	ret = pthread_cancel(grpc_thread_id);  // returns errno on failure
+	ret = pthread_cancel((pthread_t)grpc_thread_id.opaque_id);  // returns errno on failure
 	if (ret) {
 		DPS_LOG_ERR("Cannot cancel gRPC thread", DP_LOG_RET(ret));
 		return ret;

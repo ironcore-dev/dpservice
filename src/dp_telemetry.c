@@ -72,9 +72,11 @@ static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,
 			tel_callback_ret = -ENOMEM;
 			return tel_callback_ret;
 		}
+
 		tel_callback_ret = rte_tel_data_start_dict(tel_curr_block);
 		if (DP_FAILED(tel_callback_ret))
 			return tel_callback_ret;
+
 		snprintf(dict_name, sizeof(dict_name), "Node_%hd_to_%hd",
 				(uint16_t)(tel_graph_node_index-1), (uint16_t)(tel_graph_node_index + (RTE_TEL_MAX_DICT_ENTRIES-2)));
 		tel_callback_ret = rte_tel_data_add_dict_container(tel_data, dict_name, tel_curr_block, 0);
@@ -82,7 +84,7 @@ static int dp_telemetry_graph_stats_cb(__rte_unused bool is_first,
 			return tel_callback_ret;
 	}
 
-	tel_callback_ret = rte_tel_data_add_dict_u64(tel_curr_block, stats->name, get_stat_value(stats));
+	tel_callback_ret = rte_tel_data_add_dict_uint(tel_curr_block, stats->name, get_stat_value(stats));
 	if (DP_FAILED(tel_callback_ret))
 		return tel_callback_ret;
 

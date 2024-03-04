@@ -1,8 +1,7 @@
-diff --git a/lib/eal/common/eal_common_log.c b/lib/eal/common/eal_common_log.c
-index 1be35f5397..159beb63ab 100644
---- a/lib/eal/common/eal_common_log.c
-+++ b/lib/eal/common/eal_common_log.c
-@@ -28,11 +28,14 @@ static struct rte_logs {
+diff --color -ruN dpdk-23.11/lib/log/log.c dpdk-23.11-patch/lib/log/log.c
+--- dpdk-23.11/lib/log/log.c	2023-11-28 14:35:41.000000000 +0000
++++ dpdk-23.11-patch/lib/log/log.c	2024-03-04 15:01:39.318300347 +0000
+@@ -31,11 +31,14 @@
  	uint32_t type;  /**< Bitfield with enabled logs. */
  	uint32_t level; /**< Log level. */
  	FILE *file;     /**< Output file set by rte_openlog_stream, or NULL. */
@@ -17,7 +16,7 @@ index 1be35f5397..159beb63ab 100644
  };
  
  struct rte_eal_opt_loglevel {
-@@ -77,6 +80,13 @@ rte_openlog_stream(FILE *f)
+@@ -80,6 +83,13 @@
  	return 0;
  }
  
@@ -31,7 +30,7 @@ index 1be35f5397..159beb63ab 100644
  FILE *
  rte_log_get_stream(void)
  {
-@@ -499,7 +509,7 @@ rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
+@@ -501,7 +511,7 @@
  	RTE_PER_LCORE(log_cur_msg).loglevel = level;
  	RTE_PER_LCORE(log_cur_msg).logtype = logtype;
  
@@ -40,15 +39,13 @@ index 1be35f5397..159beb63ab 100644
  	fflush(f);
  	return ret;
  }
-diff --git a/lib/eal/include/rte_log.h b/lib/eal/include/rte_log.h
-index 319e4044a5..ee17cf93a0 100644
---- a/lib/eal/include/rte_log.h
-+++ b/lib/eal/include/rte_log.h
-@@ -87,6 +87,18 @@ extern "C" {
-  */
+diff --color -ruN dpdk-23.11/lib/log/rte_log.h dpdk-23.11-patch/lib/log/rte_log.h
+--- dpdk-23.11/lib/log/rte_log.h	2023-11-28 14:35:41.000000000 +0000
++++ dpdk-23.11-patch/lib/log/rte_log.h	2024-03-04 15:03:08.442486094 +0000
+@@ -88,6 +88,18 @@
  int rte_openlog_stream(FILE *f);
  
-+/**
+ /**
 + * Change the print function that will be used by the logging system.
 + *
 + * This can be done at any time. The func argument represents
@@ -60,18 +57,18 @@ index 319e4044a5..ee17cf93a0 100644
 + */
 +void rte_log_set_print_func(int (*func)(FILE *stream, const char *format, va_list ap));
 +
- /**
++/**
   * Retrieve the stream used by the logging system (see rte_openlog_stream()
   * to change it).
-diff --git a/lib/eal/version.map b/lib/eal/version.map
-index ab28c22791..72c8a18111 100644
---- a/lib/eal/version.map
-+++ b/lib/eal/version.map
-@@ -155,6 +155,7 @@ DPDK_23 {
- 	rte_log_set_level;
+  *
+diff --color -ruN dpdk-23.11/lib/log/version.map dpdk-23.11-patch/lib/log/version.map
+--- dpdk-23.11/lib/log/version.map	2023-11-28 14:35:41.000000000 +0000
++++ dpdk-23.11-patch/lib/log/version.map	2024-03-04 15:03:23.118516680 +0000
+@@ -17,6 +17,7 @@
  	rte_log_set_level_pattern;
  	rte_log_set_level_regexp;
+ 	rte_openlog_stream;
 +	rte_log_set_print_func;
- 	rte_malloc;
- 	rte_malloc_dump_heaps;
- 	rte_malloc_dump_stats;
+ 	rte_vlog;
+
+ 	local: *;
