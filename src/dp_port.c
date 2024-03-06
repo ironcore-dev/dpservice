@@ -111,7 +111,6 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 								DP_NR_STD_RX_QUEUES + nr_hairpin_queues,
 								DP_NR_STD_TX_QUEUES + nr_hairpin_queues,
 								&port_conf);
-
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		return DP_ERROR;
@@ -349,16 +348,12 @@ int dp_ports_init(void)
 
 static int dp_stop_eth_port(uint16_t port_id)
 {
-	int ret, ret2;
+	int ret;
 
-	// error already logged
-	ret = rx_node_set_enabled(port_id, false);
 
-	ret2 = rte_eth_dev_stop(port_id);
-	if (DP_FAILED(ret2)) {
-		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret2));
-		ret = ret2;
-	}
+	ret = rte_eth_dev_stop(port_id);
+	if (DP_FAILED(ret))
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 
 	return ret;
 }
@@ -414,8 +409,6 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 
 static int dp_init_port(struct dp_port *port)
 {
-	if (DP_FAILED(rx_node_set_enabled(port->port_id, true)))
-		return DP_ERROR;
 
 	// TAP devices do not support offloading/isolation
 	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
