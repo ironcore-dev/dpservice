@@ -92,8 +92,8 @@ class DpService:
 		if not self.hardware:  # see above
 			interface_init(PF1.tap, self.port_redundancy)
 		grpc_client.init()
-		VM1.ul_ipv6 = grpc_client.addinterface_with_pxe(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name)
-		VM2.ul_ipv6 = grpc_client.addinterface_with_pxe(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name)
+		VM1.ul_ipv6 = grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name)
+		VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name)
 		VM3.ul_ipv6 = grpc_client.addinterface(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6)
 		grpc_client.addroute(vni1, neigh_vni1_ov_ip_route, 0, neigh_vni1_ul_ipv6)
 		grpc_client.addroute(vni1, neigh_vni1_ov_ipv6_route, 0, neigh_vni1_ul_ipv6)
