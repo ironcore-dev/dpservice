@@ -29,7 +29,6 @@ static uint32_t dp_grpc_main_loop(__rte_unused void *arg)
 		rte_exit(EXIT_FAILURE, "Cannot run without working gRPC server\n");
 
 	GRPCService::Cleanup();
-
 	return 0;
 }
 

@@ -19,15 +19,11 @@ DP_NODE_REGISTER_SOURCE(RX, rx, NEXT_NODES);
 
 // there are multiple Tx nodes, one per port, node context is needed
 struct rx_node_ctx {
-	uint16_t	port_id;
+	struct dp_port *port;
 	uint16_t	queue_id;
-	bool		enabled;
 };
 static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ,
 			  "Rx node context will not fit into the node");
-
-// need to access nodes' context to enable/disable them
-static struct rx_node_ctx *node_contexts[DP_MAX_PORTS];
 
 // also some way to map ports to nodes is needed
 static rte_node_t rx_node_ids[DP_MAX_PORTS];
@@ -53,21 +49,11 @@ int rx_node_create(uint16_t port_id, uint16_t queue_id)
 	return DP_OK;
 }
 
-int rx_node_set_enabled(uint16_t port_id, bool enabled)
-{
-	if (port_id >= RTE_DIM(node_contexts)) {
-		DPS_LOG_ERR("Port id too high for Rx nodes", DP_LOG_VALUE(port_id), DP_LOG_MAX(RTE_DIM(node_contexts)));
-		return DP_ERROR;
-	}
-	node_contexts[port_id]->enabled = enabled;
-	return DP_OK;
-}
-
-
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
 	uint16_t port_id;
+	struct dp_port *port;
 
 	// Find this node's dedicated port to be used in processing
 	for (port_id = 0; port_id < RTE_DIM(rx_node_ids); ++port_id)
@@ -79,12 +65,16 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 		return DP_ERROR;
 	}
 
-	// save pointer to this node's context for enabling/disabling
-	node_contexts[port_id] = ctx;
-	ctx->port_id = port_id;
+	port = dp_get_port_by_id(port_id);
+	if (!port) {
+		DPNODE_LOG_ERR(node, "Failed to get dp_port during rx_node initialization");
+		return DP_ERROR;
+	}
+
+	// save dp_port to this node's context for accessing its id and the status of allocation
+	ctx->port = port;
 	ctx->queue_id = graph->id;
-	ctx->enabled = false;
-	DPNODE_LOG_INFO(node, "Initialized", DP_LOG_PORTID(ctx->port_id), DP_LOG_QUEUEID(ctx->queue_id));
+	DPNODE_LOG_INFO(node, "Initialized", DP_LOG_PORTID(ctx->port->port_id), DP_LOG_QUEUEID(ctx->queue_id));
 	return DP_OK;
 }
 
@@ -98,10 +88,10 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 
 	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
-	if (unlikely(!ctx->enabled))
+	if (unlikely(!ctx->port->allocated))
 		return 0;
 
-	n_pkts = rte_eth_rx_burst(ctx->port_id,
+	n_pkts = rte_eth_rx_burst(ctx->port->port_id,
 							  ctx->queue_id,
 							  (struct rte_mbuf **)objs,
 							  RTE_GRAPH_BURST_SIZE);
