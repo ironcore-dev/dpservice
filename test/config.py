@@ -83,7 +83,7 @@ pfx_ip6 = "2a10:defe:dede:f4::1"
 lb_ip6 = "2a10:defe:e01f:f4::2"
 lb_ip6_pfx = "2a10:defe:e01f:f4::2/128"
 
-#PXE realted
+#PXE related
 pxe_file_name = "ipxe/x86_64/ipxe.new"
 ipxe_file_name = "ipxe"
 pxe_server = "2001:dede::1"
