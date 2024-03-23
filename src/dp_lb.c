@@ -13,6 +13,7 @@
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
+#include "dp_maglev.h"
 #include "grpc/dp_grpc_responder.h"
 
 static struct rte_hash *ipv4_lb_tbl = NULL;
@@ -168,32 +169,6 @@ bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key));
 }
 
-static int dp_lb_last_free_pos(struct lb_value *val)
-{
-	int ret = -1, k;
-
-	for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++) {
-		if (val->back_end_ips[k][0] == 0)
-			break;
-	}
-	if (k != DP_LB_MAX_IPS_PER_VIP)
-		ret = k;
-
-	return ret;
-}
-
-static int dp_lb_delete_back_ip(struct lb_value *val, const uint8_t *b_ip)
-{
-	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
-		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[i][0], b_ip)) {
-			memset(&val->back_end_ips[i][0], 0, 16);
-			val->back_end_cnt--;
-			return DP_GRPC_OK;
-		}
-	}
-	return DP_GRPC_ERR_NOT_FOUND;
-}
-
 static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const uint8_t *b_ip)
 {
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i)
@@ -202,41 +177,12 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const uint8_t *b_ip)
 	return false;
 }
 
-static int dp_lb_rr_backend(struct lb_value *val, const struct lb_port *lb_port)
-{
-	int ret = -1, k;
-
-	for (k = 0; k < DP_LB_MAX_PORTS; k++) {
-		if ((val->ports[k].port == lb_port->port) && (val->ports[k].protocol == lb_port->protocol))
-			break;
-		if (val->ports[k].port == 0)
-			return ret;
-	}
-
-	if (val->back_end_cnt == 1) {
-		for (k = 0; k < DP_LB_MAX_IPS_PER_VIP; k++)
-			if (val->back_end_ips[k][0] != 0)
-				break;
-		if (k != DP_LB_MAX_IPS_PER_VIP)
-			ret = k;
-	} else {
-		for (k = val->last_sel_pos; k < DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos; k++)
-			if ((val->back_end_ips[k % DP_LB_MAX_IPS_PER_VIP][0] != 0) && (k != val->last_sel_pos))
-				break;
-
-		if (k != (DP_LB_MAX_IPS_PER_VIP + val->last_sel_pos))
-			ret = k % DP_LB_MAX_IPS_PER_VIP;
-	}
-
-	return ret;
-}
-
 uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_port lb_port;
 	struct lb_key lb_key;
-	int pos;
+	int pos, k;
 
 	lb_key.vni = vni;
 	dp_copy_ipaddr(&lb_key.ip, &flow_key->l3_dst);
@@ -244,17 +190,21 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val) < 0)
 		return NULL;
 
-	/* TODO This is just temporary. Round robin.
-	   This doesn't distribute the load evenly.
-	   Use maglev hashing and 5 Tuple flow_key for
-	   backend selection */
-	lb_port.port = htons(flow_key->port_dst);
-	lb_port.protocol = flow_key->proto;
-	pos = dp_lb_rr_backend(lb_val, &lb_port);
-	if (pos < 0)
+	if (lb_val->back_end_cnt == 0)
 		return NULL;
 
-	lb_val->last_sel_pos = (uint16_t)pos;
+	for (k = 0; k < DP_LB_MAX_PORTS; k++) {
+		if ((lb_val->ports[k].port == htons(flow_key->port_dst)) && (lb_val->ports[k].protocol == flow_key->proto))
+			break;
+		if (lb_val->ports[k].port == 0)
+			return NULL;
+	}
+	/* Port table full and we didnt get a port match */
+	if (k == DP_LB_MAX_PORTS)
+		return NULL;
+
+	pos = lb_val->maglev_hash[dp_get_conntrack_flow_hash_value(flow_key) % DP_LB_MAGLEV_LOOKUP_SIZE];
+
 	return (uint8_t *)&lb_val->back_end_ips[pos][0];
 }
 
@@ -286,11 +236,10 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
-int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip, uint8_t ip_size)
+int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
-	int32_t pos;
 
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NO_LB;
@@ -301,13 +250,9 @@ int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip, uint8_t ip_siz
 	if (dp_lb_is_back_ip_inserted(lb_val, back_ip))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
-	pos = dp_lb_last_free_pos(lb_val);
-	if (pos < 0)
-		return DP_GRPC_ERR_LIMIT_REACHED;
+	if (DP_FAILED(dp_add_maglev_backend(lb_val, back_ip)))
+		return DP_GRPC_ERR_BACKIP_ADD_FAILED;
 
-	rte_memcpy(&lb_val->back_end_ips[pos][0], back_ip, ip_size);
-
-	lb_val->back_end_cnt++;
 	return DP_GRPC_OK;
 }
 
@@ -322,5 +267,8 @@ int dp_del_lb_back_ip(const void *id_key, const uint8_t *back_ip)
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	return dp_lb_delete_back_ip(lb_val, back_ip);
+	if (DP_FAILED(dp_delete_maglev_backend(lb_val, back_ip)))
+		return DP_GRPC_ERR_BACKIP_DEL_FAILED;
+
+	return DP_GRPC_OK;
 }
