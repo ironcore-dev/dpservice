@@ -32,7 +32,7 @@ struct lb_port {
 struct lb_value {
 	uint8_t				lb_id[DP_LB_ID_MAX_LEN];
 	struct lb_port		ports[DP_LB_MAX_PORTS];
-	uint32_t			back_end_ips[DP_LB_MAX_IPS_PER_VIP][4];
+	uint8_t				back_end_ips[DP_LB_MAX_IPS_PER_VIP][DP_IPV6_ADDR_SIZE];
 	uint16_t			last_sel_pos;
 	uint16_t			back_end_cnt;
 	uint8_t				lb_ul_addr[DP_IPV6_ADDR_SIZE];
