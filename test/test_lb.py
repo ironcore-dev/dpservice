@@ -77,18 +77,16 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	vip_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
 	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=80, dst_port_max=80)
 	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
-	# Also test round-robin
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1235)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1236)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1237)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1237)
+
+	# Also test basic maglev behaviour
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1234)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1234)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1242)
 	grpc_client.delvip(VM3.name)
 
 	# NAT should behave the same, just test once (watch out for round-robin from before)
 	nat_ipv6 = grpc_client.addnat(VM3.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1240)
+	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1235)
 	grpc_client.delnat(VM3.name)
 
 	grpc_client.dellbtarget(lb_name, lb_vm2_ul_ipv6)
