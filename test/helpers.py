@@ -48,7 +48,7 @@ def is_udp_pkt(pkt):
 	return UDP in pkt
 
 def is_ipv6_tcp_pkt(pkt):
-	return IPv6 in pkt and TCP in pkt
+	return IPv6 in pkt and TCP in pkt and 'MSS' not in [ option[0] for option in pkt[TCP].options ]
 
 def is_tcp_pkt(pkt):
 	return TCP in pkt and 'MSS' not in [ option[0] for option in pkt[TCP].options ]

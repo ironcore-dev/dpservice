@@ -154,7 +154,7 @@ static int dp_process_create_lbtarget(struct dp_grpc_responder *responder)
 	if (!request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6, sizeof(request->addr.ipv6));
+	return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6);
 }
 
 static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
