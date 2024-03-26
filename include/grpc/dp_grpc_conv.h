@@ -8,7 +8,7 @@
 #include "dp_grpc_api.h"
 #include "../proto/dpdk.pb.h"
 
-using namespace dpdkironcore::v1;
+using namespace dpdkonmetal::v1;
 
 namespace GrpcConv
 {
