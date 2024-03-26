@@ -3,7 +3,7 @@ FROM debian:12-slim AS builder
 
 ARG DPDK_VER=22.11
 ARG DPSERVICE_FEATURES=""
-ARG CLI_VERSION=0.1.9
+ARG CLI_VERSION=0.1.7
 ARG EXPORTER_VERSION=0.1.8
 
 WORKDIR /workspace
@@ -76,7 +76,7 @@ RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
 
 # Get companion binaries from other repos
-ADD https://github.com/ironcore-dev/dpservice-cli/releases/download/v${CLI_VERSION}/github.com.ironcore-dev.dpservice-cli_${CLI_VERSION}_linux_amd64.tar.gz dpservice-cli.tgz
+ADD https://github.com/ironcore-dev/dpservice-cli/releases/download/v${CLI_VERSION}/github.com.onmetal.dpservice-cli_${CLI_VERSION}_linux_amd64.tar.gz dpservice-cli.tgz
 ADD https://github.com/ironcore-dev/prometheus-dpdk-exporter/releases/download/v${EXPORTER_VERSION}/prometheus-dpdk-exporter_${EXPORTER_VERSION}_linux_amd64.tar.gz exporter.tgz
 RUN tar -xzf dpservice-cli.tgz && tar -xzf exporter.tgz
 
@@ -132,9 +132,9 @@ python3-scapy \
 WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
 COPY --from=testbuilder /workspace/build/src/dpservice-bin ./build/src/dpservice-bin
-COPY --from=testbuilder /workspace/github.com/ironcore-dev/dpservice-cli ./build
+COPY --from=testbuilder /workspace/github.com/onmetal/dpservice-cli ./build
 COPY --from=testbuilder /workspace/xtratest_build/src/dpservice-bin ./xtratest_build/src/dpservice-bin
-COPY --from=testbuilder /workspace/github.com/ironcore-dev/dpservice-cli ./xtratest_build
+COPY --from=testbuilder /workspace/github.com/onmetal/dpservice-cli ./xtratest_build
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
 
@@ -165,7 +165,7 @@ WORKDIR /
 COPY --from=builder \
 /workspace/build/src/dpservice-bin \
 /workspace/build/tools/dump/dpservice-dump \
-/workspace/github.com/ironcore-dev/dpservice-cli \
+/workspace/github.com/onmetal/dpservice-cli \
 /workspace/prometheus-dpdk-exporter \
 /workspace/hack/prepare.sh \
 /usr/local/bin
