@@ -138,7 +138,7 @@ static int dp_process_create_lbtarget(struct dp_grpc_responder *responder)
 	struct dpgrpc_lb_target *request = &responder->request.add_lbtrgt;
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV6)
-		return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6, sizeof(request->addr.ipv6));
+		return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6);
 	else
 		return DP_GRPC_ERR_BAD_IPVER;
 }

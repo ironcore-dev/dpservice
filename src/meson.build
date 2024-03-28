@@ -48,6 +48,7 @@ dp_sources = [
   'dp_lb.c',
   'dp_log.c',
   'dp_lpm.c',
+  'dp_maglev.c',
   'dp_mbuf_dyn.c',
   'dp_multi_path.c',
   'dp_nat.c',
