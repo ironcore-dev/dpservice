@@ -22,6 +22,10 @@ extern "C"
 
 #define DP_AGE_TIMEOUT_24BIT_MASK 0x00FFFFFF
 
+#define DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE (sizeof(struct rte_ether_hdr) \
+										  + sizeof(struct rte_ipv6_hdr) \
+										  + sizeof(struct rte_udp_hdr))
+
 union dp_flow_item_l3 {
 	struct rte_flow_item_ipv4 ipv4;
 	struct rte_flow_item_ipv6 ipv6;

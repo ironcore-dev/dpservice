@@ -9,10 +9,6 @@
 #include "dp_conf.h"
 #include "monitoring/dp_monitoring.h"
 
-#define DP_RTE_FLOW_CAPTURE_PKT_HDR_SIZE (sizeof(struct rte_ether_hdr) \
-											 + sizeof(struct rte_ipv6_hdr) \
-											 + sizeof(struct rte_udp_hdr))
-
 // this attribute value is used to install a flow rule in the default group of a VF to switch between the capturing group and vnet group
 static const struct rte_flow_attr dp_flow_attr_default_jump_ingress = {
 	.group = DP_RTE_FLOW_DEFAULT_GROUP,
