@@ -84,6 +84,13 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 
 	assert(!memcmp(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE));
 
+	uint8_t *stored_vnf_ul_addr6;
+
+	ret = rte_hash_lookup_data(vnf_value_tbl, vnf, (void **)&stored_vnf_ul_addr6);
+	assert(!DP_FAILED(ret));
+	assert(stored_vnf_ul_addr6 == vnf_ul_addr6);
+	assert(!memcmp(vnf_ul_addr6, stored_vnf_ul_addr6, DP_IPV6_ADDR_SIZE));
+
 	return DP_OK;
 }
 
@@ -224,6 +231,8 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 		DP_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", &target_vnf)
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
+
+	assert(!memcmp(vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
 	ret = dp_del_vnf(vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
