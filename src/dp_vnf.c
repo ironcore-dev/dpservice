@@ -73,12 +73,16 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 
 	memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
 
+	assert(!memcmp(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE));
+
 	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add VNF value and the corresponding underlying IPv6 address to table", DP_LOG_RET(ret));
 		rte_free(vnf_ul_addr6);
 		return DP_ERROR;
 	}
+
+	assert(!memcmp(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE));
 
 	return DP_OK;
 }
