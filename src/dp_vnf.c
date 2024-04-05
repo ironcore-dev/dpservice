@@ -129,10 +129,11 @@ static bool dp_vnf_value_exists(const struct dp_vnf *vnf)
 int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type type,
 			   uint16_t port_id, uint32_t vni, const struct dp_ip_address *prefix, uint8_t prefix_len)
 {
+	hash_sig_t hash = rte_hash_hash(vnf_handle_tbl, ul_addr6);
 	struct dp_vnf *vnf;
 	int ret;
 
-	if (rte_hash_lookup(vnf_handle_tbl, ul_addr6) != -ENOENT)
+	if (rte_hash_lookup_with_hash(vnf_handle_tbl, ul_addr6, hash) != -ENOENT)
 		return DP_ERROR;
 
 	vnf = rte_malloc("vnf_handle_mapping", sizeof(struct dp_vnf), RTE_CACHE_LINE_SIZE);
@@ -143,7 +144,7 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 
 	dp_fill_vnf_data(vnf, type, port_id, vni, prefix, prefix_len);
 
-	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, vnf);
+	ret = rte_hash_add_key_with_hash_data(vnf_handle_tbl, ul_addr6, hash, vnf);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_VNF_WARNING("VNF handle addition failed", vnf);
 		rte_free(vnf);
@@ -171,17 +172,17 @@ const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 
 int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 {
+	hash_sig_t hash = rte_hash_hash(vnf_handle_tbl, ul_addr6);
 	struct dp_vnf *vnf;
 	int ret;
-	// TODO hash
 
-	ret = rte_hash_lookup_data(vnf_handle_tbl, ul_addr6, (void **)&vnf);
+	ret = rte_hash_lookup_with_hash_data(vnf_handle_tbl, ul_addr6, hash, (void **)&vnf);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Cannot lookup VNF to delete", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
 	}
 
-	ret = rte_hash_del_key(vnf_handle_tbl, ul_addr6);
+	ret = rte_hash_del_key_with_hash(vnf_handle_tbl, ul_addr6, hash);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Cannot remove VNF", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
