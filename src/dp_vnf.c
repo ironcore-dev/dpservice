@@ -71,9 +71,11 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 		return DP_ERROR;
 	}
 
+	assert(!memcmp(ul_addr6, dp_conf_get_underlay_ip(), 8));
 	memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
 
 	assert(!memcmp(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE));
+	assert(!memcmp(vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
 	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
@@ -83,6 +85,7 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	}
 
 	assert(!memcmp(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE));
+	assert(!memcmp(vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
 	uint8_t *stored_vnf_ul_addr6;
 
@@ -90,6 +93,7 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	assert(!DP_FAILED(ret));
 	assert(stored_vnf_ul_addr6 == vnf_ul_addr6);
 	assert(!memcmp(vnf_ul_addr6, stored_vnf_ul_addr6, DP_IPV6_ADDR_SIZE));
+	assert(!memcmp(stored_vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
 	return DP_OK;
 }
