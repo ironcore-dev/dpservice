@@ -72,13 +72,13 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	int ret;
 	uint8_t *vnf_ul_addr6;
 
-	vnf_ul_addr6 = rte_malloc("vnf_value_mapping", (size_t)DP_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
+	vnf_ul_addr6 = rte_malloc("vnf_value_mapping", DP_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
 	if (!vnf_ul_addr6) {
 		DPS_LOG_WARNING("VNF value allocation failed", DP_LOG_IPV6(ul_addr6));
 		return DP_ERROR;
 	}
 
-	memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
+	rte_memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
 
 	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
