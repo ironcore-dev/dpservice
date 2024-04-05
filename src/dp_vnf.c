@@ -10,13 +10,8 @@
 
 #define DP_VNF_MAX_TABLE_SIZE 1000
 
-#define DP_LOG_VNF_WARNING(MESSAGE, VNF) \
-		if ((VNF)->alias_pfx.ol.ip_type == RTE_ETHER_TYPE_IPV4) {\
-			DPS_LOG_WARNING(MESSAGE, DP_LOG_VNF_TYPE((VNF)->type), DP_LOG_VNI((VNF)->vni), \
-							DP_LOG_PORTID((VNF)->port_id), DP_LOG_IPV4((VNF)->alias_pfx.ol.ipv4), DP_LOG_PREFLEN((VNF)->alias_pfx.length)); } \
-		else {\
-			DPS_LOG_WARNING(MESSAGE, DP_LOG_VNF_TYPE((VNF)->type), DP_LOG_VNI((VNF)->vni), \
-							DP_LOG_PORTID((VNF)->port_id), DP_LOG_IPV6((VNF)->alias_pfx.ol.ipv6), DP_LOG_PREFLEN((VNF)->alias_pfx.length)); } \
+#define DPS_LOG_VNF_WARNING(MESSAGE, VNF) \
+	dp_vnf_log_warning(MESSAGE, (VNF)->type, (VNF)->vni, (VNF)->port_id, &(VNF)->alias_pfx.ol, (VNF)->alias_pfx.length)
 
 static struct rte_hash *vnf_handle_tbl = NULL;
 static struct rte_hash *vnf_value_tbl = NULL;
@@ -24,14 +19,14 @@ static struct rte_hash *vnf_value_tbl = NULL;
 int dp_vnf_init(int socket_id)
 {
 	vnf_handle_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, DP_VNF_IPV6_ADDR_SIZE,
-										     "vnf_handle_table", socket_id);
+										   "vnf_handle_table", socket_id);
 	if (!vnf_handle_tbl)
 		return DP_ERROR;
 
 	vnf_value_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, sizeof(struct dp_vnf),
 										  "vnf_value_table", socket_id);
 	if (!vnf_value_tbl) {
-		dp_free_jhash_table(vnf_handle_tbl); // rollback
+		dp_free_jhash_table(vnf_handle_tbl);
 		return DP_ERROR;
 	}
 
@@ -41,6 +36,18 @@ int dp_vnf_init(int socket_id)
 void dp_vnf_free(void)
 {
 	dp_free_jhash_table(vnf_handle_tbl);
+}
+
+static inline void dp_vnf_log_warning(const char *message,
+									  enum dp_vnf_type type, uint32_t vni, uint16_t port_id,
+									  const struct dp_ip_address *prefix, uint8_t length)
+{
+	if (prefix->ip_type == RTE_ETHER_TYPE_IPV4)
+		DPS_LOG_WARNING(message, DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
+						DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix->ipv4), DP_LOG_PREFLEN(length));
+	else
+		DPS_LOG_WARNING(message, DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
+						DP_LOG_PORTID(port_id), DP_LOG_IPV6(prefix->ipv6), DP_LOG_PREFLEN(length));
 }
 
 static __rte_always_inline
@@ -86,18 +93,17 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 static int dp_delete_vnf_value(struct dp_vnf *vnf)
 {
 	int ret;
-	uint8_t *ul_addr6 = NULL;
-
+	uint8_t *ul_addr6;
 
 	ret = rte_hash_lookup_data(vnf_value_tbl, vnf, (void **)&ul_addr6);
 	if (DP_FAILED(ret)) {
-		DP_LOG_VNF_WARNING("VNF value lookup failed", vnf)
+		DPS_LOG_VNF_WARNING("VNF value lookup failed", vnf);
 		return DP_ERROR;
 	}
 
 	ret = rte_hash_del_key(vnf_value_tbl, vnf);
 	if (DP_FAILED(ret)) {
-		DPGRPC_LOG_WARNING("Cannot remove VNF for a underlying IPv6 address", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("Cannot remove VNF for a underlying IPv6 address", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -130,12 +136,7 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 
 	vnf = rte_zmalloc("vnf_handle_mapping", sizeof(struct dp_vnf), RTE_CACHE_LINE_SIZE);
 	if (!vnf) {
-		if (prefix->ip_type == RTE_ETHER_TYPE_IPV4)
-			DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-							DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix->ipv4), DP_LOG_PREFLEN(prefix_len));
-		else
-			DPS_LOG_WARNING("VNF handle allocation failed", DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-							DP_LOG_PORTID(port_id), DP_LOG_IPV6(prefix->ipv6), DP_LOG_PREFLEN(prefix_len));
+		dp_vnf_log_warning("VNF handle allocation failed", type, vni, port_id, prefix, prefix_len);
 		return DP_ERROR;
 	}
 
@@ -143,14 +144,14 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 
 	ret = rte_hash_add_key_data(vnf_handle_tbl, ul_addr6, vnf);
 	if (DP_FAILED(ret)) {
-		DP_LOG_VNF_WARNING("VNF handle addition failed", vnf)
+		DPS_LOG_VNF_WARNING("VNF handle addition failed", vnf);
 		rte_free(vnf);
 		return DP_ERROR;
 	}
 
 	if (DP_FAILED(dp_add_vnf_value(vnf, ul_addr6))) {
-		DP_LOG_VNF_WARNING("Adding VNF value failed", vnf)
-		dp_del_vnf(ul_addr6); //rollback
+		DPS_LOG_VNF_WARNING("Adding VNF value failed", vnf);
+		dp_del_vnf(ul_addr6);
 		return DP_ERROR;
 	}
 
@@ -174,19 +175,19 @@ int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 
 	ret = rte_hash_lookup_data(vnf_handle_tbl, ul_addr6, (void **)&vnf);
 	if (DP_FAILED(ret)) {
-		DPGRPC_LOG_WARNING("Cannot lookup VNF to delete", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("Cannot lookup VNF to delete", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
 	}
 
 	ret = rte_hash_del_key(vnf_handle_tbl, ul_addr6);
 	if (DP_FAILED(ret)) {
-		DPGRPC_LOG_WARNING("Cannot remove VNF", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
+		DPS_LOG_WARNING("Cannot remove VNF", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
 	}
 
 	ret = dp_delete_vnf_value(vnf);
 	if (DP_FAILED(ret)) {
-		DPGRPC_LOG_WARNING("Cannot delete VNF value record");
+		DPS_LOG_WARNING("Cannot delete VNF value record");
 		rte_free(vnf);
 		return ret;
 	}
@@ -217,7 +218,7 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_GRPC_ERR_NOT_FOUND;
-		DP_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", &target_vnf)
+		DPS_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", &target_vnf);
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
 
@@ -225,7 +226,7 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_GRPC_ERR_NOT_FOUND;
-		DP_LOG_VNF_WARNING("VNF underlying IPv6 as key lookup failed due to invalid parameters", &target_vnf)
+		DPS_LOG_VNF_WARNING("VNF underlying IPv6 as key lookup failed due to invalid parameters", &target_vnf);
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
 

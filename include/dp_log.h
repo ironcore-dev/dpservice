@@ -16,7 +16,7 @@ extern "C" {
 #define RTE_LOGTYPE_DPGRAPH   RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_DPGRPC    RTE_LOGTYPE_USER3
 
-// using canary values for format type should prevent at least some calling convetion bugs
+// using canary values for format type should prevent at least some calling convention bugs
 #define _DP_LOG_FMT_CANARY_PRE  0x12300000
 #define _DP_LOG_FMT_CANARY_POST 0x00000321
 #define _DP_LOG_FMT_CREATE(VALUE) (_DP_LOG_FMT_CANARY_PRE | ((VALUE) << 12) | _DP_LOG_FMT_CANARY_POST)
@@ -111,7 +111,6 @@ extern "C" {
 #define DP_LOG_NETLINK(VALUE) _DP_LOG_STR("netlink_msg", VALUE)
 // compound macros
 #define DP_LOG_PORT(VALUE) DP_LOG_PORTID((VALUE)->port_id), DP_LOG_SOCKID((VALUE)->socket_id)
-
 
 #define DP_STRUCTURED_LOG(LEVEL, LOGTYPE, MESSAGE, ...) \
 	_dp_log(RTE_LOG_##LEVEL, RTE_LOGTYPE_DP##LOGTYPE, \
