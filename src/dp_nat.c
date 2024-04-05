@@ -128,7 +128,7 @@ static void dp_delete_snat_data(uint32_t iface_ip, uint32_t vni, struct snat_dat
 }
 
 int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
-						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+						const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
@@ -146,7 +146,7 @@ int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
 }
 
 int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
-						const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+						const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE])
 {
 	struct snat_data *data;
 
@@ -480,7 +480,7 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t 
 
 static __rte_always_inline bool dp_is_network_nat_ip(const struct network_nat_entry *entry,
 													 uint32_t nat_ipv4,
-													 const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni)
+													 const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE], uint32_t vni)
 {
 	return entry->vni == vni
 			&& ((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
@@ -489,7 +489,7 @@ static __rte_always_inline bool dp_is_network_nat_ip(const struct network_nat_en
 
 static __rte_always_inline bool dp_is_network_nat_entry(const struct network_nat_entry *entry,
 														uint32_t nat_ipv4,
-														const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
+														const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE], uint32_t vni,
 														uint16_t min_port, uint16_t max_port)
 {
 	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
@@ -500,7 +500,7 @@ static __rte_always_inline bool dp_is_network_nat_entry(const struct network_nat
 // check if a port falls into the range of external nat's port range
 static __rte_always_inline bool dp_is_network_nat_port(const struct network_nat_entry *entry,
 													   uint32_t nat_ipv4,
-													   const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE], uint32_t vni,
+													   const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE], uint32_t vni,
 													   uint16_t port)
 {
 	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
@@ -521,9 +521,9 @@ void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
 	dp_del_dnat_ip(d_ip, vni);
 }
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
+int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
-								const uint8_t ul_ipv6[DP_VNF_IPV6_ADDR_SIZE])
+								const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE])
 {
 	network_nat_entry *next, *new_entry;
 
@@ -559,7 +559,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IP
 
 }
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
+int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
 							 uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *item, *tmp_item;
@@ -575,7 +575,7 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IP
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_VNF_IPV6_ADDR_SIZE],
+const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
 											  uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *current;

@@ -18,7 +18,7 @@ static struct rte_hash *vnf_value_tbl = NULL;
 
 int dp_vnf_init(int socket_id)
 {
-	vnf_handle_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, DP_VNF_IPV6_ADDR_SIZE,
+	vnf_handle_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, DP_IPV6_ADDR_SIZE,
 										   "vnf_handle_table", socket_id);
 	if (!vnf_handle_tbl)
 		return DP_ERROR;
@@ -67,18 +67,18 @@ void dp_fill_vnf_data(struct dp_vnf *vnf, enum dp_vnf_type type, uint16_t port_i
 		vnf->alias_pfx.ol = *src;
 }
 
-static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
+static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])
 {
 	int ret;
 	uint8_t *vnf_ul_addr6;
 
-	vnf_ul_addr6 = rte_malloc("vnf_value_mapping", (size_t)DP_VNF_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
+	vnf_ul_addr6 = rte_malloc("vnf_value_mapping", (size_t)DP_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
 	if (!vnf_ul_addr6) {
 		DPS_LOG_WARNING("VNF value allocation failed", DP_LOG_IPV6(ul_addr6));
 		return DP_ERROR;
 	}
 
-	memcpy(vnf_ul_addr6, ul_addr6, DP_VNF_IPV6_ADDR_SIZE);
+	memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
 
 	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
@@ -126,7 +126,7 @@ static bool dp_vnf_value_exists(const struct dp_vnf *vnf)
 	return true;
 }
 
-int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type type,
+int dp_add_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE], enum dp_vnf_type type,
 			   uint16_t port_id, uint32_t vni, const struct dp_ip_address *prefix, uint8_t prefix_len)
 {
 	hash_sig_t hash = rte_hash_hash(vnf_handle_tbl, ul_addr6);
@@ -160,7 +160,7 @@ int dp_add_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE], enum dp_vnf_type t
 	return DP_OK;
 }
 
-const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
+const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])
 {
 	struct dp_vnf *vnf;
 
@@ -170,7 +170,7 @@ const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 	return vnf;
 }
 
-int dp_del_vnf(const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
+int dp_del_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])
 {
 	hash_sig_t hash = rte_hash_hash(vnf_handle_tbl, ul_addr6);
 	struct dp_vnf *vnf;
@@ -211,9 +211,9 @@ bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, const struct dp_ip_a
 
 int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, const struct dp_ip_address *prefix_ip, uint8_t prefix_len)
 {
+	struct dp_vnf target_vnf;
 	uint8_t *vnf_ul_addr6;
 	int32_t ret;
-	struct dp_vnf target_vnf;
 
 	dp_fill_vnf_data(&target_vnf, type, port_id, vni, prefix_ip, prefix_len);
 
@@ -265,7 +265,7 @@ int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct d
 
 		reply->pfx_addr = vnf->alias_pfx.ol;
 		reply->pfx_length = vnf->alias_pfx.length;
-		static_assert(sizeof(reply->trgt_addr.ipv6) == DP_VNF_IPV6_ADDR_SIZE,
+		static_assert(sizeof(reply->trgt_addr.ipv6) == DP_IPV6_ADDR_SIZE,
 					  "Invalid size of VNF hash table key");
 		rte_memcpy(reply->trgt_addr.ipv6, ul_addr6, sizeof(reply->trgt_addr.ipv6));
 	}

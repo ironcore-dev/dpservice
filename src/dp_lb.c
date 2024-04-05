@@ -90,7 +90,7 @@ int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 	if (DP_FAILED(dp_map_lb_handle(lb->lb_id, &lb_key, lb_val)))
 		goto err_free;
 
-	rte_memcpy(lb_val->lb_ul_addr, ul_ip, DP_VNF_IPV6_ADDR_SIZE);
+	rte_memcpy(lb_val->lb_ul_addr, ul_ip, DP_IPV6_ADDR_SIZE);
 	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
 		lb_val->ports[i].port = htons(lb->lbports[i].port);
 		lb_val->ports[i].protocol = lb->lbports[i].protocol;
@@ -124,7 +124,7 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 	else
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_VNF_IPV6_ADDR_SIZE);
+	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
 		out_lb->lbports[i].port = ntohs(lb_val->ports[i].port);

@@ -25,13 +25,13 @@
 
 static uint32_t pfx_counter = 0;
 
-static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_IPV6_ADDR_SIZE])
+static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_IPV6_ADDR_SIZE])
 {
 	rte_be32_t local;
 	uint8_t random_byte;
 
 	/* First 8 bytes for host */
-	rte_memcpy(route, dp_conf_get_underlay_ip(), DP_VNF_IPV6_ADDR_SIZE);
+	rte_memcpy(route, dp_conf_get_underlay_ip(), DP_IPV6_ADDR_SIZE);
 	/* Following 2 bytes for kernel routing and 1 byte reserved */
 	memset(route + 8, 0, 3);
 
@@ -57,7 +57,7 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_VNF_I
 	rte_memcpy(route + 12, &local, 4);
 }
 
-static int dp_create_vnf_route(uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE] /* out */,
+static int dp_create_vnf_route(uint8_t ul_addr6[DP_IPV6_ADDR_SIZE] /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
 							   struct dp_ip_address *pfx_ip, uint8_t prefix_len)
 {
@@ -73,7 +73,7 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 		.ip_type = request->addr.ip_type
 	};
 
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	int ret = DP_GRPC_OK;
 
 	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4 || request->addr.ip_type == RTE_ETHER_TYPE_IPV6) {
@@ -245,7 +245,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	struct dpgrpc_vip *request = &responder->request.add_vip;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
 		.ip_type = request->addr.ip_type
 	};
@@ -352,7 +352,7 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	struct dpgrpc_route *reply = dp_grpc_single_reply(responder);
 
 	struct dp_port *port;
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 
 	if (request->addr.ip_type != RTE_ETHER_TYPE_IPV4 && request->addr.ip_type != RTE_ETHER_TYPE_IPV6)
 		return DP_GRPC_ERR_BAD_IPVER;
@@ -391,7 +391,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 	struct dpgrpc_prefix *request = &responder->request.add_pfx;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_port *port;
 	uint32_t iface_vni;
 	int ret;
@@ -454,7 +454,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
 
 	struct dp_port *port;
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
 		.ip_type = RTE_ETHER_TYPE_IPV4 // Just pick a random valid type, not relevant for this VNF
 	};
@@ -628,7 +628,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	struct dpgrpc_nat *request = &responder->request.add_nat;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
 		.ip_type = request->addr.ip_type
 	};

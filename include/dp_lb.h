@@ -39,7 +39,7 @@ struct lb_value {
 	uint32_t			back_end_ips[DP_LB_MAX_IPS_PER_VIP][4];
 	uint16_t			last_sel_pos;
 	uint16_t			back_end_cnt;
-	uint8_t				lb_ul_addr[DP_VNF_IPV6_ADDR_SIZE];
+	uint8_t				lb_ul_addr[DP_IPV6_ADDR_SIZE];
 };
 
 int dp_lb_init(int socket_id);
