@@ -60,6 +60,22 @@ void dp_fill_vnf_data(struct dp_vnf *vnf, enum dp_vnf_type type, uint16_t port_i
 		vnf->alias_pfx.ol = *src;
 }
 
+static void dp_vnf_debug_print_value_table(void)
+{
+	uint8_t *ul_addr6;
+	const struct dp_vnf *vnf;
+	uint32_t iter = 0;
+	int32_t ret;
+
+	while ((ret = rte_hash_iterate(vnf_value_tbl, (const void **)&vnf, (void **)&ul_addr6, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot iterate VNF value table", DP_LOG_RET(ret));
+			return;
+		}
+		DPS_LOG_INFO("VNF Value table entry", DP_LOG_IPV6(ul_addr6));
+	}
+}
+
 static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_VNF_IPV6_ADDR_SIZE])
 {
 	int ret;
@@ -98,6 +114,8 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	assert(stored_vnf_ul_addr6 == vnf_ul_addr6);
 	assert(!memcmp(vnf_ul_addr6, stored_vnf_ul_addr6, DP_IPV6_ADDR_SIZE));
 	assert(!memcmp(stored_vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
+
+	dp_vnf_debug_print_value_table();
 
 	return DP_OK;
 }
@@ -241,6 +259,7 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 	}
 
 	DPS_LOG_INFO("Value found in table", _DP_LOG_PTR("ptr", vnf_ul_addr6), DP_LOG_IPV6(vnf_ul_addr6));
+	dp_vnf_debug_print_value_table();
 	assert(!memcmp(vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
 	ret = dp_del_vnf(vnf_ul_addr6);
