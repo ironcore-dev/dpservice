@@ -65,6 +65,8 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	int ret;
 	uint8_t *vnf_ul_addr6;
 
+	DPS_LOG_INFO("Value to be used", _DP_LOG_PTR("ptr", ul_addr6), DP_LOG_IPV6(ul_addr6));
+
 	vnf_ul_addr6 = rte_zmalloc("vnf_value_mapping", (size_t)DP_VNF_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
 	if (!vnf_ul_addr6) {
 		DPS_LOG_WARNING("VNF value allocation failed", DP_LOG_IPV6(ul_addr6));
@@ -77,6 +79,7 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	assert(!memcmp(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE));
 	assert(!memcmp(vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
+	DPS_LOG_INFO("Value sending to table", _DP_LOG_PTR("ptr", vnf_ul_addr6), DP_LOG_IPV6(vnf_ul_addr6));
 	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add VNF value and the corresponding underlying IPv6 address to table", DP_LOG_RET(ret));
@@ -91,6 +94,7 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 
 	ret = rte_hash_lookup_data(vnf_value_tbl, vnf, (void **)&stored_vnf_ul_addr6);
 	assert(!DP_FAILED(ret));
+	DPS_LOG_INFO("Value stored in table", _DP_LOG_PTR("ptr", stored_vnf_ul_addr6), DP_LOG_IPV6(stored_vnf_ul_addr6));
 	assert(stored_vnf_ul_addr6 == vnf_ul_addr6);
 	assert(!memcmp(vnf_ul_addr6, stored_vnf_ul_addr6, DP_IPV6_ADDR_SIZE));
 	assert(!memcmp(stored_vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
@@ -236,6 +240,7 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, s
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
 
+	DPS_LOG_INFO("Value found in table", _DP_LOG_PTR("ptr", vnf_ul_addr6), DP_LOG_IPV6(vnf_ul_addr6));
 	assert(!memcmp(vnf_ul_addr6, dp_conf_get_underlay_ip(), 8));
 
 	ret = dp_del_vnf(vnf_ul_addr6);
