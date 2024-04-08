@@ -208,6 +208,9 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */)
 {
 	if (l3_type == RTE_ETHER_TYPE_IPV4) {
+		// TODO this could be optimized to just zero the sizeof(ipv6)-sizeof(ipv4) bytes
+		memset(inv_key->l3_dst.ip6, 0, sizeof(inv_key->l3_dst.ip6));
+		memset(inv_key->l3_src.ip6, 0, sizeof(inv_key->l3_src.ip6));
 		inv_key->l3_src.ip4 = key->l3_dst.ip4;
 		inv_key->l3_dst.ip4 = key->l3_src.ip4;
 	} else {
