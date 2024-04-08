@@ -717,30 +717,32 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 {
 	struct netnat_portmap_key portmap_key = {0};
 	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
+	const struct flow_key *flow_key_org = &cntrack->flow_key[DP_FLOW_DIR_ORG];
+	const struct flow_key *flow_key_reply = &cntrack->flow_key[DP_FLOW_DIR_REPLY];
 	struct netnat_portmap_data *portmap_data;
 	struct dp_port *created_port;
 	int ret;
 
-	portoverload_tbl_key.nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4;
-	portoverload_tbl_key.dst_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4;
-	portoverload_tbl_key.nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
-	portoverload_tbl_key.dst_port = cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst;
-	portoverload_tbl_key.l4_type = cntrack->flow_key[DP_FLOW_DIR_ORG].proto;
+	portoverload_tbl_key.nat_ip = flow_key_reply->l3_dst.ip4;
+	portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ip4;
+	portoverload_tbl_key.nat_port = flow_key_reply->port_dst;
+	portoverload_tbl_key.dst_port = flow_key_org->port_dst;
+	portoverload_tbl_key.l4_type = flow_key_org->proto;
 
 	// forcefully delete, if it was never there, it's fine
 	ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
-	if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_type == RTE_ETHER_TYPE_IPV4)
-		portmap_key.src_ipv4 = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4;
-	else if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_type == RTE_ETHER_TYPE_IPV6)
-		rte_memcpy(portmap_key.src_ipv6, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip6, sizeof(portmap_key.src_ipv6));
+	if (flow_key_org->l3_type == RTE_ETHER_TYPE_IPV4)
+		portmap_key.src_ipv4 = flow_key_org->l3_src.ip4;
+	else if (flow_key_org->l3_type == RTE_ETHER_TYPE_IPV6)
+		rte_memcpy(portmap_key.src_ipv6, flow_key_org->l3_src.ip6, sizeof(portmap_key.src_ipv6));
 	else
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	portmap_key.src_type = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_type;
-	portmap_key.iface_src_port = cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src;
+	portmap_key.src_type = flow_key_org->l3_type;
+	portmap_key.iface_src_port = flow_key_org->src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
