@@ -54,9 +54,9 @@ struct netnat_portmap_key {
 		uint8_t		src_ipv6[DP_IPV6_ADDR_SIZE];
 		uint32_t	src_ipv4;
 	};
-	uint16_t		src_type;
-	uint16_t		iface_src_port;
 	uint32_t		vni;
+	uint16_t		iface_src_port;
+	bool			src_is_v6;
 } __rte_packed;
 
 struct netnat_portmap_data {

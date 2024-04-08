@@ -44,10 +44,10 @@
 
 #define DP_LOG_DEBUG_FLOW_KEY(key, message) \
 	do { \
-		if ((key)->l3_type == RTE_ETHER_TYPE_IPV4) \
-			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY4(key)); \
-		else \
+		if ((key)->is_v6) \
 			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY6(key)); \
+		else \
+			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY4(key)); \
 	} while (0)
 
 
@@ -124,7 +124,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 	struct dp_ip_address pfx_ip;
 
 	memset(&pfx_ip, 0, sizeof(pfx_ip));
-	pfx_ip.ip_type = RTE_ETHER_TYPE_IPV4;
+	pfx_ip.is_v6 = false;
 	pfx_ip.ipv4 = key->l3_src.ip4;
 
 	if (port->is_pf) {
@@ -132,7 +132,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 			key->vnf_type = df->vnf_type;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
-	} else if (key->l3_type == RTE_ETHER_TYPE_IPV6) {
+	} else if (key->is_v6) {
 		if (dp_is_ip6_in_nat64_range(key->l3_dst.ip6))
 			key->vnf_type = DP_VNF_TYPE_NAT;
 	} else {
@@ -152,10 +152,9 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	const struct dp_port *port = dp_get_in_port(m);
 	int ret = DP_OK;
 
-	key->l3_type = df->l3_type;
-
 	switch (df->l3_type) {
 	case RTE_ETHER_TYPE_IPV4:
+		key->is_v6 = false;
 		// TODO could be optimized by only setting the non-ipv4 bytes to zero
 		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
 		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
@@ -163,10 +162,14 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 		key->l3_src.ip4 = ntohl(df->src.src_addr);
 		break;
 	case RTE_ETHER_TYPE_IPV6:
+		key->is_v6 = true;
 		rte_memcpy(key->l3_dst.ip6, df->dst.dst_addr6, sizeof(key->l3_dst.ip6));
 		rte_memcpy(key->l3_src.ip6, df->src.src_addr6, sizeof(key->l3_src.ip6));
 		break;
 	default:
+		// actually an invalid setup
+		// TODO discuss returning an error!
+		key->is_v6 = true;
 		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
 		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
 		break;
@@ -200,6 +203,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	default:
 		key->port_dst = 0;
 		key->src.port_src = 0;
+		// TODO why not error?
 		break;
 	}
 
@@ -208,6 +212,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */)
 {
+	// TODO discuss why this is asking l3_type instead of using the key->is_v6
 	if (l3_type == RTE_ETHER_TYPE_IPV4) {
 		// TODO this could be optimized to just zero the sizeof(ipv6)-sizeof(ipv4) bytes
 		memset(inv_key->l3_dst.ip6, 0, sizeof(inv_key->l3_dst.ip6));
@@ -221,7 +226,7 @@ void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /*
 	inv_key->vni = key->vni;
 	inv_key->vnf_type = key->vnf_type;
 	inv_key->proto = key->proto;
-	inv_key->l3_type = key->l3_type;
+	inv_key->is_v6 = key->is_v6;
 
 	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
 		inv_key->src.port_src = key->port_dst;

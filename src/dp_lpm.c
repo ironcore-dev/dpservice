@@ -175,13 +175,13 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 
 		rte_rib_get_ip(node, &ipv4);
 		rte_rib_get_depth(node, &depth);
-		reply->pfx_addr.ip_type = RTE_ETHER_TYPE_IPV4;
+		reply->pfx_addr.is_v6 = false;
 		reply->pfx_addr.ipv4 = ipv4;
 		reply->pfx_length = depth;
 
 		if (ext_routes) {
 			route = (struct dp_iface_route *)rte_rib_get_ext(node);
-			reply->trgt_addr.ip_type = RTE_ETHER_TYPE_IPV6;
+			reply->trgt_addr.is_v6 = true;
 			reply->trgt_vni = route->vni;
 			rte_memcpy(reply->trgt_addr.ipv6, route->nh_ipv6, sizeof(reply->trgt_addr.ipv6));
 		}

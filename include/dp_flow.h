@@ -83,7 +83,7 @@ struct flow_key {
 		uint16_t type_src; /* ICMP */
 	} src;
 	uint32_t vni;
-	uint16_t l3_type;
+	bool     is_v6;
 	uint8_t  proto;
 	enum dp_vnf_type vnf_type;
 } __rte_packed;

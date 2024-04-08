@@ -6,8 +6,8 @@ import threading
 
 from helpers import *
 
-def reply_icmp_pkt_from_vm1(nat_ul_ipv6):
-	pkt = sniff_packet(PF0.tap, is_icmp_pkt)
+def reply_icmp_pkt_from_vm1(nat_ul_ipv6, pf_tap):
+	pkt = sniff_packet(pf_tap, is_icmp_pkt)
 	src_ip = pkt[IP].src
 	assert src_ip == nat_vip, \
 		f"Bad ICMP request (src ip: {src_ip})"
@@ -16,12 +16,13 @@ def reply_icmp_pkt_from_vm1(nat_ul_ipv6):
 				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
-	delayed_sendp(reply_pkt, PF0.tap)
+	delayed_sendp(reply_pkt, pf_tap)
 
-def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
+def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client, port_redundancy):
+	pf_tap = PF1.tap if port_redundancy else PF0.tap
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
-	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
+	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6, pf_tap)).start()
 
 	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			    IP(dst=public_ip3, src=VM1.ip) /
@@ -38,7 +39,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client):
 def test_vf_to_pf_network_nat_icmpv6(prepare_ipv4, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
-	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
+	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6, PF0.tap)).start()
 
 	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
 					 IPv6(dst=public_nat64_ipv6, src=VM1.ipv6, nh=58) /
@@ -104,6 +105,8 @@ def send_tcp_through_port_with_ipv6(port):
 
 
 def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redundancy):
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported")
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1_max_port, args=(nat_ul_ipv6,)).start()
 	send_tcp_through_port(1246)
@@ -183,7 +186,7 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	request_icmperr(501, PF0.tap, nat_ul_ipv6)
 	if port_redundancy:
-		request_icmperr(565, PF1.tap, nat_ul_ipv6)
+		request_icmperr(505, PF1.tap, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)
 
 def test_vf_to_pf_firewall_tcp_block(prepare_ipv4, grpc_client):

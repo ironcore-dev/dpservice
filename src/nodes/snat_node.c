@@ -133,7 +133,7 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4 = snat64_data.nat_ip;
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].proto = df->l4_type;
-	cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_type = RTE_ETHER_TYPE_IPV4;
+	cntrack->flow_key[DP_FLOW_DIR_REPLY].is_v6 = false;
 
 	if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 		return DP_ERROR;

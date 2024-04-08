@@ -162,7 +162,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = port->port_id;
 
-	pfx_ip.ip_type = RTE_ETHER_TYPE_IPV4;
+	pfx_ip.is_v6 = false;
 	pfx_ip.ipv4 = key->l3_dst.ip4;
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
@@ -245,14 +245,15 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		return ret;
 
 	// highly optimized comparator for a specific key size
-	static_assert(sizeof(struct flow_key) == 44, "struct flow_key changed size");
+	static_assert(sizeof(struct flow_key) == 43, "struct flow_key changed size");
 	if (prev_key
 		&& ((const uint64_t *)curr_key)[0] == ((const uint64_t *)prev_key)[0]
 		&& ((const uint64_t *)curr_key)[1] == ((const uint64_t *)prev_key)[1]
 		&& ((const uint64_t *)curr_key)[2] == ((const uint64_t *)prev_key)[2]
 		&& ((const uint64_t *)curr_key)[3] == ((const uint64_t *)prev_key)[3]
 		&& ((const uint64_t *)curr_key)[4] == ((const uint64_t *)prev_key)[4]
-		&& ((const uint32_t *)curr_key)[20] == ((const uint32_t *)prev_key)[20]
+		&& ((const uint16_t *)curr_key)[20] == ((const uint16_t *)prev_key)[20]
+		&& ((const uint8_t *)curr_key)[42] == ((const uint8_t *)prev_key)[42]
 	) {
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;

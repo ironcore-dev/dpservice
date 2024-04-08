@@ -63,7 +63,7 @@ def test_neighnat_table_flush(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
 	global nat_only_port
-	nat_only_port = nat_local_min_port+1
+	nat_only_port = nat_local_min_port
 	tester = TCPTesterPublic(VM1, 12345, nat_ul_ipv6, PF0, public_ip, 443, server_pkt_check=tcp_server_nat_pkt_check)
 	tester.communicate()
 

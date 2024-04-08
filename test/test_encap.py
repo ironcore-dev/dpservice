@@ -29,7 +29,7 @@ def send_ipv4_icmp(dst_ip, pf_name, responder, vm_ipv6):
 		"Wrong ICMP reply"
 
 def test_ipv4_in_ipv6(prepare_ipv4, port_redundancy):
-	send_ipv4_icmp(f"{neigh_vni1_ov_ip_prefix}.102", PF0.tap, ipv4_in_ipv6_icmp_responder, VM1.ul_ipv6)
+	send_ipv4_icmp(f"{neigh_vni1_ov_ip_prefix}.101", PF0.tap, ipv4_in_ipv6_icmp_responder, VM1.ul_ipv6)
 	if port_redundancy:
 		send_ipv4_icmp(f"{neigh_vni1_ov_ip_prefix}.125", PF1.tap, ipv4_in_ipv6_icmp_responder, VM1.ul_ipv6)
 

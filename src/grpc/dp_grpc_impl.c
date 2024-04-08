@@ -69,28 +69,24 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb *request = &responder->request.add_lb;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
-	struct dp_ip_address pfx_ip = {
-		.ip_type = request->addr.ip_type
-	};
 
+	struct dp_ip_address pfx_ip = {
+		.is_v6 = request->addr.is_v6,
+		// address is intentionally set to zero here
+	};
 	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	int ret = DP_GRPC_OK;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4 || request->addr.ip_type == RTE_ETHER_TYPE_IPV6) {
-		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
-			ret = DP_GRPC_ERR_VNF_INSERT;
-			goto err;
-		}
-		ret = dp_create_lb(request, ul_addr6);
-		if (DP_FAILED(ret))
-			goto err_vnf;
-		if (DP_FAILED(dp_create_vni_route_tables(request->vni, dp_get_pf0()->socket_id))) {
-			ret = DP_GRPC_ERR_VNI_INIT4;
-			goto err_lb;
-		}
-	} else {
-		ret = DP_GRPC_ERR_BAD_IPVER;
+	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
+		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
+	}
+	ret = dp_create_lb(request, ul_addr6);
+	if (DP_FAILED(ret))
+		goto err_vnf;
+	if (DP_FAILED(dp_create_vni_route_tables(request->vni, dp_get_pf0()->socket_id))) {
+		ret = DP_GRPC_ERR_VNI_INIT4;
+		goto err_lb;
 	}
 	rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
 	return DP_GRPC_OK;
@@ -137,20 +133,20 @@ static int dp_process_create_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.add_lbtrgt;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV6)
-		return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6, sizeof(request->addr.ipv6));
-	else
+	if (!request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
+
+	return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6, sizeof(request->addr.ipv6));
 }
 
 static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.del_lbtrgt;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV6)
-		return dp_del_lb_back_ip(request->lb_id, request->addr.ipv6);
-	else
+	if (!request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
+
+	return dp_del_lb_back_ip(request->lb_id, request->addr.ipv6);
 }
 
 static int dp_process_initialize(__rte_unused struct dp_grpc_responder *responder)
@@ -247,7 +243,8 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 
 	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
-		.ip_type = request->addr.ip_type
+		.is_v6 = request->addr.is_v6
+		// address is intentionally set to zero here
 	};
 	uint32_t iface_ip, iface_vni;
 	struct dp_port *port;
@@ -260,7 +257,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 		goto err;
 	}
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!request->addr.is_v6) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
 		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_VIP, iface_vni, port, &pfx_ip, 0))) {
@@ -313,7 +310,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 
 	dp_del_vnf(s_data->ul_vip_ip6);
 
-	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+	reply->addr.is_v6 = false;
 	reply->addr.ipv4 = s_data->vip_ip;
 
 	// always delete, i.e. do not use dp_del_vip_from_dnat(),
@@ -340,7 +337,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+	reply->addr.is_v6 = false;
 	reply->addr.ipv4 = s_data->vip_ip;
 	rte_memcpy(reply->ul_addr6, s_data->ul_vip_ip6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
@@ -353,9 +350,6 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 
 	struct dp_port *port;
 	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
-
-	if (request->addr.ip_type != RTE_ETHER_TYPE_IPV4 && request->addr.ip_type != RTE_ETHER_TYPE_IPV6)
-		return DP_GRPC_ERR_BAD_IPVER;
 
 	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
@@ -375,9 +369,6 @@ static int dp_process_delete_lbprefix(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_prefix *request = &responder->request.del_lbpfx;
 	struct dp_port *port;
-
-	if (request->addr.ip_type != RTE_ETHER_TYPE_IPV4 && request->addr.ip_type != RTE_ETHER_TYPE_IPV6)
-		return DP_GRPC_ERR_BAD_IPVER;
 
 	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
@@ -401,7 +392,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_NO_VM;
 
 	iface_vni = port->iface.vni;
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!request->addr.is_v6) {
 		ret = dp_add_route(port, iface_vni, 0, request->addr.ipv4, NULL, request->length);
 		if (DP_FAILED(ret))
 			return ret;
@@ -410,7 +401,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 			dp_del_route(port, iface_vni, request->addr.ipv4, request->length);
 			return DP_GRPC_ERR_VNF_INSERT;
 		}
-	} else if (request->addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+	} else {
 		ret = dp_add_route6(port, iface_vni, 0, request->addr.ipv6, NULL, request->length);
 		if (DP_FAILED(ret))
 			return ret;
@@ -419,8 +410,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 			dp_del_route6(port, iface_vni, request->addr.ipv6, request->length);
 			return DP_GRPC_ERR_VNF_INSERT;
 		}
-	} else
-		return DP_GRPC_ERR_BAD_IPVER;
+	}
 	rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
 	return DP_GRPC_OK;
 }
@@ -435,14 +425,11 @@ static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		ret = dp_del_route(port, port->iface.vni, request->addr.ipv4, request->length);
-		// ignore the error and try to delete the vnf entry anyway
-	} else if (request->addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+	if (request->addr.is_v6)
 		ret = dp_del_route6(port, port->iface.vni, request->addr.ipv6, request->length);
-		// ignore the error and try to delete the vnf entry anyway
-	} else
-		return DP_GRPC_ERR_BAD_IPVER;
+	else
+		ret = dp_del_route(port, port->iface.vni, request->addr.ipv4, request->length);
+	// ignore the error and try to delete the vnf entry anyway
 
 	ret2 = dp_del_vnf_by_value(DP_VNF_TYPE_ALIAS_PFX, port->port_id, port->iface.vni, &request->addr, request->length);
 	return DP_FAILED(ret) ? ret : ret2;
@@ -456,7 +443,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	struct dp_port *port;
 	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
-		.ip_type = RTE_ETHER_TYPE_IPV4 // Just pick a random valid type, not relevant for this VNF
+		.is_v6 = false  // not actually relevant for this VNF
 	};
 	int ret = DP_GRPC_OK;
 
@@ -596,31 +583,27 @@ static int dp_process_create_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.add_route;
 
-	if (request->trgt_addr.ip_type != RTE_ETHER_TYPE_IPV6)
+	if (!request->trgt_addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		return dp_add_route(dp_get_pf0(), request->vni, request->trgt_vni,
-							request->pfx_addr.ipv4, request->trgt_addr.ipv6,
-							request->pfx_length);
-	} else if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+	if (request->pfx_addr.is_v6)
 		return dp_add_route6(dp_get_pf0(), request->vni, request->trgt_vni,
 							 request->pfx_addr.ipv6, request->trgt_addr.ipv6,
 							 request->pfx_length);
-	} else
-		return DP_GRPC_ERR_BAD_IPVER;
+	else
+		return dp_add_route(dp_get_pf0(), request->vni, request->trgt_vni,
+							request->pfx_addr.ipv4, request->trgt_addr.ipv6,
+							request->pfx_length);
 }
 
 static int dp_process_delete_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.del_route;
 
-	if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
-		return dp_del_route(dp_get_pf0(), request->vni, request->pfx_addr.ipv4, request->pfx_length);
-	} else if (request->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+	if (request->pfx_addr.is_v6)
 		return dp_del_route6(dp_get_pf0(), request->vni, request->pfx_addr.ipv6, request->pfx_length);
-	} else
-		return DP_GRPC_ERR_BAD_IPVER;
+	else
+		return dp_del_route(dp_get_pf0(), request->vni, request->pfx_addr.ipv4, request->pfx_length);
 }
 
 static int dp_process_create_nat(struct dp_grpc_responder *responder)
@@ -630,7 +613,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 
 	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
-		.ip_type = request->addr.ip_type
+		.is_v6 = request->addr.is_v6
 	};
 	struct dp_port *port;
 	uint32_t iface_ip, iface_vni;
@@ -642,7 +625,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 		goto err;
 	}
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!request->addr.is_v6) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
 		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_NAT, iface_vni, port, &pfx_ip, 0))) {
@@ -699,7 +682,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 
 	dp_del_vnf(s_data->ul_nat_ip6);
 
-	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+	reply->addr.is_v6 = false;
 	reply->addr.ipv4 = s_data->nat_ip;
 	dp_del_vip_from_dnat(s_data->nat_ip, iface_vni);
 	port->iface.nat_ip = 0;
@@ -725,7 +708,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+	reply->addr.is_v6 = false;
 	reply->addr.ipv4 = s_data->nat_ip;
 	reply->min_port = s_data->nat_port_range[0];
 	reply->max_port = s_data->nat_port_range[1];
@@ -738,7 +721,7 @@ static int dp_process_create_neighnat(struct dp_grpc_responder *responder)
 	struct dpgrpc_nat *request = &responder->request.add_nat;
 	int ret;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!request->addr.is_v6) {
 		ret = dp_add_network_nat_entry(request->addr.ipv4, NULL,
 									   request->vni,
 									   request->min_port,
@@ -766,7 +749,7 @@ static int dp_process_delete_neighnat(struct dp_grpc_responder *responder)
 	struct dpgrpc_nat *request = &responder->request.del_neighnat;
 	int ret = DP_GRPC_OK;
 
-	if (request->addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!request->addr.is_v6) {
 		ret = dp_del_network_nat_entry(request->addr.ipv4, NULL,
 									   request->vni,
 									   request->min_port,
@@ -861,20 +844,20 @@ static int dp_process_list_localnats(struct dp_grpc_responder *responder)
 {
 	struct dp_ip_address *request = &responder->request.list_localnat;
 
-	if (request->ip_type == RTE_ETHER_TYPE_IPV4)
-		return dp_list_nat_local_entries(request->ipv4, responder);
-	else
+	if (request->is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
+
+	return dp_list_nat_local_entries(request->ipv4, responder);
 }
 
 static int dp_process_list_neighnats(struct dp_grpc_responder *responder)
 {
 	struct dp_ip_address *request = &responder->request.list_neighnat;
 
-	if (request->ip_type == RTE_ETHER_TYPE_IPV4)
-		return dp_list_nat_neigh_entries(request->ipv4, responder);
-	else
+	if (request->is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
+
+	return dp_list_nat_neigh_entries(request->ipv4, responder);
 }
 
 

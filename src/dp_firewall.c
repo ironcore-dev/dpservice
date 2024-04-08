@@ -96,8 +96,10 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	uint8_t protocol = df->l4_type;
 	uint16_t dest_port = 0;
 	uint16_t src_port = 0;
+	uint16_t src_type = rule->src_ip.is_v6 ? RTE_ETHER_TYPE_IPV6 : RTE_ETHER_TYPE_IPV4;
+	uint16_t dest_type = rule->dest_ip.is_v6 ? RTE_ETHER_TYPE_IPV6 : RTE_ETHER_TYPE_IPV4;
 
-	if ((rule->src_ip.ip_type != df->l3_type) && (rule->dest_ip.ip_type != df->l3_type))
+	if (src_type != df->l3_type && dest_type != df->l3_type)
 		return false;
 
 	switch (df->l4_type) {

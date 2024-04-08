@@ -619,15 +619,17 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	uint64_t timestamp;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+		portmap_key.src_is_v6 = false;
 		portmap_key.src_ipv4 = iface_src_ip;
 		portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
+		portmap_key.src_is_v6 = true;
 		rte_memcpy(portmap_key.src_ipv6, df->src.src_addr6, sizeof(portmap_key.src_ipv6));
 		portoverload_tbl_key.dst_ip = ntohl(*(rte_be32_t *)&df->dst.dst_addr6[12]);
 	} else {
 		return DP_GRPC_ERR_BAD_IPVER;
 	}
-	portmap_key.src_type = df->l3_type;
+
 	portmap_key.iface_src_port = iface_src_port;
 	portmap_key.vni = vni;
 
@@ -734,14 +736,12 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
-	if (flow_key_org->l3_type == RTE_ETHER_TYPE_IPV4)
-		portmap_key.src_ipv4 = flow_key_org->l3_src.ip4;
-	else if (flow_key_org->l3_type == RTE_ETHER_TYPE_IPV6)
+	portmap_key.src_is_v6 = flow_key_org->is_v6;
+	if (flow_key_org->is_v6)
 		rte_memcpy(portmap_key.src_ipv6, flow_key_org->l3_src.ip6, sizeof(portmap_key.src_ipv6));
 	else
-		return DP_GRPC_ERR_BAD_IPVER;
+		portmap_key.src_ipv4 = flow_key_org->l3_src.ip4;
 
-	portmap_key.src_type = flow_key_org->l3_type;
 	portmap_key.iface_src_port = flow_key_org->src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 
@@ -792,7 +792,7 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			reply->min_port = data->nat_port_range[0];
 			reply->max_port = data->nat_port_range[1];
-			reply->addr.ip_type = RTE_ETHER_TYPE_IPV4;
+			reply->addr.is_v6 = false;
 			reply->addr.ipv4 = nkey->ip;
 			reply->vni = nkey->vni;
 		}

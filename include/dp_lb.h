@@ -24,8 +24,8 @@ struct lb_key {
 		uint8_t		v6[DP_IPV6_ADDR_SIZE];
 		uint32_t	v4;
 	} ip;
-	uint16_t	ip_type;
 	uint32_t	vni;
+	bool		is_v6;
 } __rte_packed;
 
 struct lb_port {

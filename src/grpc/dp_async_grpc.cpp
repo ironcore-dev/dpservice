@@ -245,11 +245,11 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 		if (dp_is_ipv6_addr_zero(request->add_iface.ip6_addr)) {
 			if (!GrpcConv::StrToIpv4(request_.pxe_config().next_server(), &request->add_iface.pxe_addr.ipv4))
 				return "Invalid ipv4 pxe_config.next_server";
-			request->add_iface.pxe_addr.ip_type = RTE_ETHER_TYPE_IPV4;
+			request->add_iface.pxe_addr.is_v6 = false;
 		} else {
 			if (!GrpcConv::StrToIpv6(request_.pxe_config().next_server(), request->add_iface.pxe_addr.ipv6))
 				return "Invalid ipv6 pxe_config.next_server";
-			request->add_iface.pxe_addr.ip_type = RTE_ETHER_TYPE_IPV6;
+			request->add_iface.pxe_addr.is_v6 = true;
 		}
 		if (SNPRINTF_FAILED(request->add_iface.pxe_str, request_.pxe_config().boot_filename()))
 			return "Invalid pxe_config.boot_filename";
@@ -382,15 +382,14 @@ void ListPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 	FOREACH_MESSAGE(route, reply) {
 		pfx = reply_.add_prefixes();
 		pfx_ip = new IpAddress();
-		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (!route->pfx_addr.is_v6) {
 			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
-		} else if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+		} else {
 			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
 			pfx_ip->set_address(strbuf);
 			pfx_ip->set_ipver(IpVersion::IPV6);
-		} else
-			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4 || route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6);
+		}
 		pfx->set_length(route->pfx_length);
 		inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
 		pfx->set_underlay_route(strbuf);
@@ -462,7 +461,7 @@ void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
 		grpc_route->set_nexthop_vni(route->trgt_vni);
 
 		nh_ip = new IpAddress();
-		if (route->trgt_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (!route->trgt_addr.is_v6) {
 			nh_ip->set_address(GrpcConv::Ipv4ToStr(route->trgt_addr.ipv4));
 			nh_ip->set_ipver(IpVersion::IPV4);
 		} else {
@@ -473,7 +472,7 @@ void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
 		grpc_route->set_allocated_nexthop_address(nh_ip);
 
 		pfx_ip = new IpAddress();
-		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (!route->pfx_addr.is_v6) {
 			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
 		} else {
@@ -775,7 +774,7 @@ void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 
 	reply_.set_vni(reply->lb.vni);
 	lb_ip = new IpAddress();
-	if (reply->lb.addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!reply->lb.addr.is_v6) {
 		lb_ip->set_ipver(IpVersion::IPV4);
 		lb_ip->set_address(GrpcConv::Ipv4ToStr(reply->lb.addr.ipv4));
 	} else {
@@ -912,18 +911,17 @@ void ListLoadBalancerPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 	FOREACH_MESSAGE(route, reply) {
 		pfx = reply_.add_prefixes();
 		pfx_ip = new IpAddress();
-		if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4) {
+		if (!route->pfx_addr.is_v6) {
 			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
 			pfx_ip->set_ipver(IpVersion::IPV4);
 			pfx->set_length(route->pfx_length);
 			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
 			pfx->set_underlay_route(strbuf);
-		} else if (route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6) {
+		} else {
 			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
 			pfx_ip->set_address(strbuf);
 			pfx_ip->set_ipver(IpVersion::IPV6);
-		} else
-			assert(route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV4 || route->pfx_addr.ip_type == RTE_ETHER_TYPE_IPV6);
+		}
 		pfx->set_length(route->pfx_length);
 		inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
 		pfx->set_underlay_route(strbuf);
@@ -960,13 +958,13 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 			return "Invalid source_prefix.length";
 		if (!GrpcConv::StrToIpv4(grpc_rule.source_prefix().ip().address(), &dp_rule->src_ip.ipv4))
 			return "Invalid source_prefix.ip";
-		dp_rule->src_ip.ip_type = RTE_ETHER_TYPE_IPV4;
+		dp_rule->src_ip.is_v6 = false;
 	} else {
 		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.source_prefix().length(), dp_rule->src_mask.ip6))
 			return "Invalid ip6 source_prefix.length";
 		if (!GrpcConv::StrToIpv6(grpc_rule.source_prefix().ip().address(), dp_rule->src_ip.ipv6))
 			return "Invalid source_prefix.ip6";
-		dp_rule->src_ip.ip_type = RTE_ETHER_TYPE_IPV6;
+		dp_rule->src_ip.is_v6 = true;
 	}
 	if (grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV4 && grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV6)
 		return "Invalid destination_prefix.ip.ipver";
@@ -975,13 +973,13 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 			return "Invalid destination_prefix.length";
 		if (!GrpcConv::StrToIpv4(grpc_rule.destination_prefix().ip().address(), &dp_rule->dest_ip.ipv4))
 			return "Invalid destination_prefix.ip";
-		dp_rule->dest_ip.ip_type =  RTE_ETHER_TYPE_IPV4;
+		dp_rule->dest_ip.is_v6 = false;
 	} else {
 		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.destination_prefix().length(), dp_rule->dest_mask.ip6))
 			return "Invalid ip6 destination_prefix.length";
 		if (!GrpcConv::StrToIpv6(grpc_rule.destination_prefix().ip().address(), dp_rule->dest_ip.ipv6))
 			return "Invalid destination_prefix.ip6";
-		dp_rule->dest_ip.ip_type =  RTE_ETHER_TYPE_IPV6;
+		dp_rule->dest_ip.is_v6 = true;
 	}
 	if (!GrpcConv::GrpcToDpFwallDirection(grpc_rule.direction(), &dp_rule->dir))
 		return "Invalid direction";

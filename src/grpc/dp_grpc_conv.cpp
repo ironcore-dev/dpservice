@@ -48,10 +48,10 @@ bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr)
 {
 	switch (grpc_addr.ipver()) {
 	case IpVersion::IPV4:
-		dp_addr->ip_type = RTE_ETHER_TYPE_IPV4;
+		dp_addr->is_v6 = false;
 		return StrToIpv4(grpc_addr.address(), &dp_addr->ipv4);
 	case IpVersion::IPV6:
-		dp_addr->ip_type = RTE_ETHER_TYPE_IPV6;
+		dp_addr->is_v6 = true;
 		return StrToIpv6(grpc_addr.address(), dp_addr->ipv6);
 	default:
 		return false;
@@ -211,7 +211,7 @@ void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip, Prefix
 	auto& rule_ip = is_source ? dp_rule->src_ip : dp_rule->dest_ip;
 	auto& rule_mask = is_source ? dp_rule->src_mask : dp_rule->dest_mask;
 
-	if (rule_ip.ip_type == RTE_ETHER_TYPE_IPV4) {
+	if (!rule_ip.is_v6) {
 		ip->set_ipver(IpVersion::IPV4);
 		ip->set_address(GrpcConv::Ipv4ToStr(rule_ip.ipv4));
 		pfx->set_length(__builtin_popcount(rule_mask.ip4));

@@ -42,12 +42,12 @@ static inline void dp_vnf_log_warning(const char *message,
 									  enum dp_vnf_type type, uint32_t vni, uint16_t port_id,
 									  const struct dp_ip_address *prefix, uint8_t length)
 {
-	if (prefix->ip_type == RTE_ETHER_TYPE_IPV4)
-		DPS_LOG_WARNING(message, DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
-						DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix->ipv4), DP_LOG_PREFLEN(length));
-	else
+	if (prefix->is_v6)
 		DPS_LOG_WARNING(message, DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
 						DP_LOG_PORTID(port_id), DP_LOG_IPV6(prefix->ipv6), DP_LOG_PREFLEN(length));
+	else
+		DPS_LOG_WARNING(message, DP_LOG_VNF_TYPE(type), DP_LOG_VNI(vni),
+						DP_LOG_PORTID(port_id), DP_LOG_IPV4(prefix->ipv4), DP_LOG_PREFLEN(length));
 }
 
 static __rte_always_inline
@@ -60,11 +60,12 @@ void dp_fill_vnf_data(struct dp_vnf *vnf, enum dp_vnf_type type, uint16_t port_i
 	vnf->port_id = port_id;
 	vnf->vni = vni;
 	vnf->alias_pfx.length = prefix_len;
-	if (src->ip_type == RTE_ETHER_TYPE_IPV4) {
-		vnf->alias_pfx.ol.ip_type = src->ip_type;
-		vnf->alias_pfx.ol.ipv4 = src->ipv4;
-	} else
+	if (src->is_v6) {
 		vnf->alias_pfx.ol = *src;
+	} else {
+		vnf->alias_pfx.ol.is_v6 = false;
+		vnf->alias_pfx.ol.ipv4 = src->ipv4;
+	}
 }
 
 static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])

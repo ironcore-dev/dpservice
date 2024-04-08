@@ -66,16 +66,14 @@ int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key lb_key = {
-		.ip_type = lb->addr.ip_type,
-		.vni = lb->vni
+		.vni = lb->vni,
+		.is_v6 = lb->addr.is_v6
 	};
 
-	if (lb->addr.ip_type == RTE_ETHER_TYPE_IPV4)
-		lb_key.ip.v4 = lb->addr.ipv4;
-	else if (lb->addr.ip_type == RTE_ETHER_TYPE_IPV6)
+	if (lb->addr.is_v6)
 		rte_memcpy(lb_key.ip.v6, lb->addr.ipv6, sizeof(lb_key.ip.v6));
 	else
-		return DP_GRPC_ERR_BAD_IPVER;
+		lb_key.ip.v4 = lb->addr.ipv4;
 
 	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
@@ -116,13 +114,11 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	out_lb->vni = lb_k->vni;
-	out_lb->addr.ip_type = lb_k->ip_type;
-	if (lb_k->ip_type == RTE_ETHER_TYPE_IPV4)
-		out_lb->addr.ipv4 = lb_k->ip.v4;
-	else if (lb_k->ip_type == RTE_ETHER_TYPE_IPV6)
+	out_lb->addr.is_v6 = lb_k->is_v6;
+	if (lb_k->is_v6)
 		rte_memcpy(out_lb->addr.ipv6, lb_k->ip.v6, sizeof(out_lb->addr.ipv6));
 	else
-		return DP_GRPC_ERR_BAD_IPVER;
+		out_lb->addr.ipv4 = lb_k->ip.v4;
 
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_IPV6_ADDR_SIZE);
 
@@ -169,15 +165,16 @@ bool dp_is_lb_enabled(void)
 bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 {
 	struct lb_key lb_key = {
-		.ip_type = df->l3_type,
 		.vni = vni
 	};
 
-	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
+	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+		lb_key.is_v6 = false;
 		lb_key.ip.v4 = ntohl(df->dst.dst_addr);
-	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
+	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
+		lb_key.is_v6 = true;
 		rte_memcpy(lb_key.ip.v6, df->dst.dst_addr6, sizeof(lb_key.ip.v6));
-	else
+	} else
 		return false;
 
 	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key));
@@ -251,17 +248,15 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 	struct lb_value *lb_val = NULL;
 	struct lb_port lb_port;
 	struct lb_key lb_key = {
-		.ip_type = flow_key->l3_type,
-		.vni = vni
+		.vni = vni,
+		.is_v6 = flow_key->is_v6
 	};
 	int pos;
 
-	if (flow_key->l3_type == RTE_ETHER_TYPE_IPV4)
-		lb_key.ip.v4 = flow_key->l3_dst.ip4;
-	else if (flow_key->l3_type == RTE_ETHER_TYPE_IPV6)
+	if (flow_key->is_v6)
 		rte_memcpy(lb_key.ip.v6, flow_key->l3_dst.ip6, sizeof(lb_key.ip.v6));
 	else
-		return NULL;
+		lb_key.ip.v4 = flow_key->l3_dst.ip4;
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val) < 0)
 		return NULL;
