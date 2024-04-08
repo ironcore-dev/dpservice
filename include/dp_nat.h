@@ -27,8 +27,8 @@ struct nat_key {
 
 typedef struct network_nat_entry {
 	union {
-		uint32_t	nat_ip4;
 		uint8_t		nat_ip6[DP_IPV6_ADDR_SIZE];
+		uint32_t	nat_ip4;
 	} nat_ip;
 	uint16_t	port_range[2];
 	uint32_t	vni;

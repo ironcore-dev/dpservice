@@ -27,8 +27,8 @@ extern "C"
 										  + sizeof(struct rte_udp_hdr))
 
 union dp_flow_item_l3 {
-	struct rte_flow_item_ipv4 ipv4;
 	struct rte_flow_item_ipv6 ipv6;
+	struct rte_flow_item_ipv4 ipv4;
 };
 
 union dp_flow_item_l4 {

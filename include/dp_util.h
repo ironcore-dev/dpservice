@@ -43,8 +43,8 @@ extern "C" {
 struct dp_ip_address {
 	uint16_t		ip_type;
 	union {
-		uint32_t	ipv4;
 		uint8_t		ipv6[DP_IPV6_ADDR_SIZE];
+		uint32_t	ipv4;
 	};
 };
 

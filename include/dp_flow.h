@@ -70,12 +70,12 @@ enum dp_flow_tcp_state {
 
 struct flow_key {
 	union {
-		uint32_t	ip4;
 		uint8_t		ip6[DP_IPV6_ADDR_SIZE];
+		uint32_t	ip4;
 	} l3_dst;
 	union {
-		uint32_t	ip4;
 		uint8_t		ip6[DP_IPV6_ADDR_SIZE];
+		uint32_t	ip4;
 	} l3_src;
 	uint16_t port_dst;
 	union {

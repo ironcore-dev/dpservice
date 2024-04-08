@@ -47,8 +47,8 @@ struct dp_port_filter {
 
 struct dp_ip_mask {
 	union {
+		uint8_t  ip6[DP_IPV6_ADDR_SIZE];
 		uint32_t ip4;
-		uint8_t ip6[DP_IPV6_ADDR_SIZE];
 	};
 };
 
@@ -61,8 +61,8 @@ struct dp_fwall_rule {
 	uint16_t				priority;
 	uint8_t					protocol;
 	union {
-		struct dp_icmp_filter icmp;
 		struct dp_port_filter tcp_udp;
+		struct dp_icmp_filter icmp;
 	} filter;
 	enum dp_fwall_action action;
 	enum dp_fwall_direction dir;

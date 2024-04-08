@@ -58,12 +58,12 @@ struct dp_flow {
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	uint32_t	l3_payload_length;  //layer-3 playload length for inner packets.
 	union {
-		rte_be32_t	dst_addr;
 		uint8_t		dst_addr6[16];
+		rte_be32_t	dst_addr;
 	} dst;
 	union {
-		rte_be32_t	src_addr;
 		uint8_t		src_addr6[16];
+		rte_be32_t	src_addr;
 	} src;
 	rte_be32_t	nat_addr;
 	uint16_t	nat_port;

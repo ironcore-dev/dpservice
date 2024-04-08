@@ -21,8 +21,8 @@ extern "C" {
 
 struct lb_key {
 	union {
-		uint32_t	v4;
 		uint8_t		v6[DP_IPV6_ADDR_SIZE];
+		uint32_t	v4;
 	} ip;
 	uint16_t	ip_type;
 	uint32_t	vni;
