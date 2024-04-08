@@ -156,6 +156,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 	switch (df->l3_type) {
 	case RTE_ETHER_TYPE_IPV4:
+		// TODO could be optimized by only setting the non-ipv4 bytes to zero
 		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
 		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
 		key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
@@ -166,8 +167,8 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 		rte_memcpy(key->l3_src.ip6, df->src.src_addr6, sizeof(key->l3_src.ip6));
 		break;
 	default:
-		key->l3_dst.ip4 = 0;
-		key->l3_src.ip4 = 0;
+		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
+		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
 		break;
 	}
 
