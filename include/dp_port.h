@@ -10,9 +10,9 @@
 #include <rte_pci.h>
 #include <rte_meter.h>
 #include "dp_conf.h"
-#include "dp_util.h"
 #include "dp_firewall.h"
 #include "dp_internal_stats.h"
+#include "dp_util.h"
 #include "dpdk_layer.h"
 
 #ifdef __cplusplus

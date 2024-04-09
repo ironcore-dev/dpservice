@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <rte_common.h>
-#include "dp_util.h"
+#include "dp_ipaddr.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -9,7 +9,6 @@
 #include <rte_common.h>
 #include <rte_mbuf.h>
 #include "dp_flow.h"
-#include "dp_util.h"
 #include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus

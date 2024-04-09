@@ -9,8 +9,8 @@
 #include <rte_flow.h>
 #include <rte_malloc.h>
 #include "dpdk_layer.h"
+#include "dp_ipaddr.h"
 #include "dp_firewall.h"
-#include "dp_util.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_refcount.h"
 #include "dp_timers.h"

@@ -11,7 +11,6 @@
 #include <rte_flow.h>
 #include "dpdk_layer.h"
 #include "dp_mbuf_dyn.h"
-#include "dp_util.h"
 #include "dp_firewall.h"
 
 #ifdef __cplusplus

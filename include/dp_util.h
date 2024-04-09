@@ -18,11 +18,9 @@ extern "C" {
 #include <rte_log.h>
 #include <rte_mbuf.h>
 
-#define DP_FIREWALL_ID_MAX_LEN	64
 #define DP_IFACE_PXE_MAX_LEN	32
 #define DP_LB_ID_MAX_LEN		64
 #define DP_LB_MAX_PORTS			16
-#define DP_IPV6_ADDR_SIZE		16
 
 #define DP_MAC_EQUAL(mac1, mac2) (((mac1)->addr_bytes[0] == (mac2)->addr_bytes[0]) && \
 								((mac1)->addr_bytes[1] == (mac2)->addr_bytes[1]) && \
@@ -40,13 +38,6 @@ extern "C" {
 #define DP_TCP_PKT_FLAG_SYNACK(FLAGS) \
 	(((FLAGS) & (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG)) == (RTE_TCP_SYN_FLAG|RTE_TCP_ACK_FLAG))
 
-struct dp_ip_address {
-	bool			is_v6;
-	union {
-		uint8_t		ipv6[DP_IPV6_ADDR_SIZE];
-		uint32_t	ipv4;
-	};
-};
 
 int dp_get_dev_info(uint16_t port_id, struct rte_eth_dev_info *dev_info, char ifname[IF_NAMESIZE]);
 
@@ -59,24 +50,6 @@ void dp_free_jhash_table(struct rte_hash *table);
 
 int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate);
 
-
-// inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
-// network byte-order!
-#define DP_IPV4_PRINT_FMT       "%u.%u.%u.%u"
-#define DP_IPV4_PRINT_BYTES(ip) (ip) & 0xFF, \
-								((ip) >> 8) & 0xFF, \
-								((ip) >> 16) & 0xFF, \
-								((ip) >> 24) & 0xFF
-
-#define DP_IPV6_PRINT_FMT       "%x:%x:%x:%x:%x:%x:%x:%x"
-#define DP_IPV6_PRINT_BYTES(ip) rte_cpu_to_be_16(((uint16_t *)(ip))[0]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[1]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[2]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[3]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[4]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[5]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[6]), \
-								rte_cpu_to_be_16(((uint16_t *)(ip))[7])
 
 #ifdef __cplusplus
 }
