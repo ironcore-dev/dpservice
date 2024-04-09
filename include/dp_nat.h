@@ -50,9 +50,13 @@ struct dnat_data {
 };
 
 struct netnat_portmap_key {
-	struct dp_ip_address	src_ip;
-	uint32_t				vni;
-	uint16_t				iface_src_port;
+	union {
+		uint8_t		src_ipv6[DP_IPV6_ADDR_SIZE];
+		uint32_t	src_ipv4;
+	};
+	uint16_t		src_type;
+	uint16_t		iface_src_port;
+	uint32_t		vni;
 } __rte_packed;
 
 struct netnat_portmap_data {
