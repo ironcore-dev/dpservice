@@ -80,7 +80,7 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 
 	rte_memcpy(vnf_ul_addr6, ul_addr6, DP_IPV6_ADDR_SIZE);
 
-	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, vnf_ul_addr6);
+	ret = rte_hash_add_key_data(vnf_value_tbl, vnf, (void *)vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add VNF value and the corresponding underlying IPv6 address to table", DP_LOG_IPV6(vnf_ul_addr6), DP_LOG_RET(ret));
 		rte_free(vnf_ul_addr6);
