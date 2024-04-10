@@ -20,12 +20,8 @@ extern "C" {
 #define DP_LB_DLB	3
 
 struct lb_key {
-	union {
-		uint8_t		v6[DP_IPV6_ADDR_SIZE];
-		uint32_t	v4;
-	} ip;
-	uint32_t	vni;
-	bool		is_v6;
+	uint32_t				vni;
+	struct dp_ip_addr_key	ip;
 } __rte_packed;
 
 struct lb_port {

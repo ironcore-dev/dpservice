@@ -9,6 +9,7 @@
 #include <rte_common.h>
 #include <rte_mbuf.h>
 #include "dp_flow.h"
+#include "dp_ipaddr.h"
 #include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
@@ -49,13 +50,9 @@ struct dnat_data {
 };
 
 struct netnat_portmap_key {
-	union {
-		uint8_t		src_ipv6[DP_IPV6_ADDR_SIZE];
-		uint32_t	src_ipv4;
-	};
-	uint32_t		vni;
-	uint16_t		iface_src_port;
-	bool			src_is_v6;
+	uint32_t				vni;
+	struct dp_ip_addr_key	src_ip;
+	uint16_t				iface_src_port;
 } __rte_packed;
 
 struct netnat_portmap_data {

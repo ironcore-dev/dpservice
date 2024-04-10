@@ -65,15 +65,10 @@ static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, stru
 int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 {
 	struct lb_value *lb_val = NULL;
-	struct lb_key lb_key = {
-		.vni = lb->vni,
-		.is_v6 = lb->addr.is_v6
-	};
+	struct lb_key lb_key;
 
-	if (lb->addr.is_v6)
-		rte_memcpy(lb_key.ip.v6, lb->addr.ipv6, sizeof(lb_key.ip.v6));
-	else
-		lb_key.ip.v4 = lb->addr.ipv4;
+	lb_key.vni = lb->vni;
+	dp_fill_ipkey(&lb_key.ip, &lb->addr);
 
 	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
@@ -114,12 +109,7 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	out_lb->vni = lb_k->vni;
-	out_lb->addr.is_v6 = lb_k->is_v6;
-	if (lb_k->is_v6)
-		rte_memcpy(out_lb->addr.ipv6, lb_k->ip.v6, sizeof(out_lb->addr.ipv6));
-	else
-		out_lb->addr.ipv4 = lb_k->ip.v4;
-
+	dp_fill_ipaddr(&out_lb->addr, &lb_k->ip);
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
@@ -164,16 +154,14 @@ bool dp_is_lb_enabled(void)
 
 bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 {
-	struct lb_key lb_key = {
-		.vni = vni
-	};
+	struct lb_key lb_key;
+
+	lb_key.vni = vni;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		lb_key.is_v6 = false;
-		lb_key.ip.v4 = ntohl(df->dst.dst_addr);
+		DP_FILL_IPKEY4(lb_key.ip, ntohl(df->dst.dst_addr));
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		lb_key.is_v6 = true;
-		rte_memcpy(lb_key.ip.v6, df->dst.dst_addr6, sizeof(lb_key.ip.v6));
+		DP_FILL_IPKEY6(lb_key.ip, df->dst.dst_addr6);
 	} else
 		return false;
 
@@ -247,16 +235,15 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_port lb_port;
-	struct lb_key lb_key = {
-		.vni = vni,
-		.is_v6 = flow_key->is_v6
-	};
+	struct lb_key lb_key;
 	int pos;
 
+	lb_key.vni = vni;
+	// TODO this could be a copy constructor once flow_key is converted
 	if (flow_key->is_v6)
-		rte_memcpy(lb_key.ip.v6, flow_key->l3_dst.ip6, sizeof(lb_key.ip.v6));
+		DP_FILL_IPKEY6(lb_key.ip, flow_key->l3_dst.ip6);
 	else
-		lb_key.ip.v4 = flow_key->l3_dst.ip4;
+		DP_FILL_IPKEY4(lb_key.ip, flow_key->l3_dst.ip4);
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val) < 0)
 		return NULL;
