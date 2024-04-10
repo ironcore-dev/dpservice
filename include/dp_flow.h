@@ -69,6 +69,9 @@ enum dp_flow_tcp_state {
 };
 
 struct flow_key {
+	// my proposed refactor would be much simpler if there could be l3_type for *both* l3_src and l3_dst
+	// (as part of a common packed struct dp_ip_addr_key)
+	// I realize that having DST and SRC types differ makes no sense, so it would waste one byte, but all handling functions would be cleaner
 	union {
 		uint32_t	ip4;
 		uint8_t		ip6[DP_IPV6_ADDR_SIZE];

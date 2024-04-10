@@ -162,6 +162,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = port->port_id;
 
+	// what if key->l3_type == RTE_ETHER_TYPE_IPV6?
 	pfx_ip.ip_type = RTE_ETHER_TYPE_IPV4;
 	pfx_ip.ipv4 = key->l3_dst.ip4;
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */

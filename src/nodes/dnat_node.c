@@ -83,6 +83,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			// l3_type can be IPV6 in theory
 			cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ip4 = ntohl(ipv4_hdr->dst_addr);
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 				return DNAT_NEXT_DROP;
@@ -102,6 +103,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
+		// l3_type can be IPV6 in theory
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ip4);
 		df->nat_type = DP_NAT_CHG_DST_IP;
 		df->nat_addr = df->dst.dst_addr;
@@ -112,6 +114,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_REPLY) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
+		// l3_type can be IPV6 in theory
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == IPPROTO_ICMP) {
@@ -122,6 +125,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 					if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port)
 						return DNAT_NEXT_DROP;
+					// l3_type can be IPV6 in theory
 					icmp_err_ip_info.err_ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ip4);
 					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nf_info.icmp_err_ip_cksum;
 					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);

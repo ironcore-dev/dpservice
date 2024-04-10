@@ -65,6 +65,7 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+	// l3_type can be IPV6 in theory
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4 = ntohl(ipv4_hdr->src_addr);
 	if (snat_data->nat_ip != 0)
 		cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
@@ -189,6 +190,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
+		// l3_type can be IPV6 in theory
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4);
 
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
@@ -208,6 +210,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		&& (df->flow_dir == DP_FLOW_DIR_REPLY)) {
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		df->src.src_addr = ipv4_hdr->src_addr;
+		// l3_type can be IPV6 in theory
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4);
 		df->nat_addr = ipv4_hdr->src_addr;
 		df->nat_type = DP_NAT_CHG_SRC_IP;

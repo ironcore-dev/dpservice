@@ -721,6 +721,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	struct dp_port *created_port;
 	int ret;
 
+	// what if cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_type == RTE_ETHER_TYPE_IPV6?
 	portoverload_tbl_key.nat_ip = cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4;
 	portoverload_tbl_key.dst_ip = cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4;
 	portoverload_tbl_key.nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;

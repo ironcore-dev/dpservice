@@ -100,6 +100,7 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 			return DP_ERROR;
 		}
 
+		// changing l3_dst and l3_src without setting l3_type to IPV4
 		key->l3_dst.ip4 = ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr);
 		key->l3_src.ip4 = ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr);
 
@@ -123,6 +124,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 	struct snat_data *s_data;
 	struct dp_ip_address pfx_ip;
 
+	// what if key->l3_type == RTE_ETHER_TYPE_IPV6? (see caller)
 	memset(&pfx_ip, 0, sizeof(pfx_ip));
 	pfx_ip.ip_type = RTE_ETHER_TYPE_IPV4;
 	pfx_ip.ipv4 = key->l3_src.ip4;
@@ -133,6 +135,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
 	} else if (key->l3_type == RTE_ETHER_TYPE_IPV6) {
+		// does this need both l3_src and l3_dst to be IPV6 or only l3_dst (important for a proposed solution to other problems)
 		if (dp_is_ip6_in_nat64_range(key->l3_dst.ip6))
 			key->vnf_type = DP_VNF_TYPE_NAT;
 	} else {
@@ -166,6 +169,8 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 		rte_memcpy(key->l3_src.ip6, df->src.src_addr6, sizeof(key->l3_src.ip6));
 		break;
 	default:
+		// what if key->l3_type == RTE_ETHER_TYPE_IPV6?
+		// also, whouldn't this just return DP_ERROR?
 		key->l3_dst.ip4 = 0;
 		key->l3_src.ip4 = 0;
 		break;
@@ -199,6 +204,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 	default:
 		key->port_dst = 0;
 		key->src.port_src = 0;
+		// should this not return DP_ERROR?
 		break;
 	}
 
@@ -207,6 +213,7 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */)
 {
+	// since we are inverting the key, couldn't this ask key->l3_type instead? (will make more stuff easier)
 	if (l3_type == RTE_ETHER_TYPE_IPV4) {
 		inv_key->l3_src.ip4 = key->l3_dst.ip4;
 		inv_key->l3_dst.ip4 = key->l3_src.ip4;
@@ -294,6 +301,7 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2)
 {
 	return key1->proto == key2->proto
+		// this should compare ipv6 too
 		&& key1->l3_src.ip4 == key2->l3_src.ip4
 		&& key1->l3_dst.ip4 == key2->l3_dst.ip4
 		&& key1->port_dst == key2->port_dst
@@ -511,6 +519,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
 			return;
 		}
+		// what if key->l3_type == RTE_ETHER_TYPE_IPV6?
 		if (next_key->vni == vni && next_key->l3_dst.ip4 == ipv4
 			&& next_key->port_dst >= min_port && next_key->port_dst < max_port
 		) {
@@ -531,6 +540,7 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 			DPS_LOG_ERR("Iterating flow table failed while removing VM flows", DP_LOG_RET(ret));
 			return;
 		}
+		// what if key->l3_type == RTE_ETHER_TYPE_IPV6?
 		if (flow_val->created_port_id == port_id
 			|| (next_key->vni == vni && flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4 == ipv4)
 		) {
