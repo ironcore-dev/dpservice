@@ -114,7 +114,9 @@ def test_vf_to_pf_network_nat_max_port_tcp(prepare_ipv4, grpc_client, port_redun
 	grpc_client.delnat(VM1.name)
 
 
-def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client):
+def test_vf_to_pf_network_nat_tcp(prepare_ipv4, grpc_client, port_redundancy):
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported")
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_tcp_pkt_from_vm1, args=(nat_ul_ipv6,)).start()
 	send_tcp_through_port(1246)
@@ -145,7 +147,7 @@ def request_tcp(dport, pf_name, vip_ul_ipv6):
 
 def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 	vip_ul_ipv6 = grpc_client.addvip(VM2.name, vip_vip)
-	request_tcp(180, PF0.tap, vip_ul_ipv6)
+	request_tcp(100, PF0.tap, vip_ul_ipv6)
 	if port_redundancy:
 		request_tcp(120, PF1.tap, vip_ul_ipv6)
 	grpc_client.delvip(VM2.name)
@@ -184,7 +186,7 @@ def request_icmperr(dport, pf_name, nat_ul_ipv6):
 
 def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	request_icmperr(501, PF0.tap, nat_ul_ipv6)
+	request_icmperr(503, PF0.tap, nat_ul_ipv6)
 	if port_redundancy:
 		request_icmperr(505, PF1.tap, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)

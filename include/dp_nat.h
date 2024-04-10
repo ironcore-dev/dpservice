@@ -94,7 +94,7 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
 int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip, rte_be32_t *dest_ip /* out */);
-int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr);
+int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const uint8_t *ipv6_addr);
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
 

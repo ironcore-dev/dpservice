@@ -11,6 +11,7 @@ extern "C" {
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "dp_error.h"
 
 #define DP_IPV6_ADDR_SIZE 16
 
@@ -28,15 +29,21 @@ struct dp_ip_address {
 // To be used for hash keys needing dp_ip_address
 static_assert(sizeof(uint32_t)*4 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
 struct dp_ip_addr_key {
-	uint32_t	_data[4];
-	// TODO also hide using underscore?
-	bool		is_v6;
+	union {
+		uint32_t		_data[DP_IPV6_ADDR_SIZE/sizeof(uint32_t)];
+		const uint8_t	ipv6[DP_IPV6_ADDR_SIZE];
+		const uint32_t	ipv4;
+	};
+	union {
+		bool			_is_v6;
+		const bool		is_v6;
+	};
 } __rte_packed;
 
 static __rte_always_inline
 void dp_fill_ipaddr(struct dp_ip_address *dst_addr, const struct dp_ip_addr_key *src_key)
 {
-	dst_addr->is_v6 = src_key->is_v6;
+	dst_addr->is_v6 = src_key->_is_v6;
 	dst_addr->_data[0] = src_key->_data[0];
 	dst_addr->_data[1] = src_key->_data[1];
 	dst_addr->_data[2] = src_key->_data[2];
@@ -46,18 +53,28 @@ void dp_fill_ipaddr(struct dp_ip_address *dst_addr, const struct dp_ip_addr_key 
 static __rte_always_inline
 void dp_fill_ipkey(struct dp_ip_addr_key *dst_key, const struct dp_ip_address *src_addr)
 {
-	dst_key->is_v6 = src_addr->is_v6;
+	dst_key->_is_v6 = src_addr->is_v6;
 	dst_key->_data[0] = src_addr->_data[0];
 	dst_key->_data[1] = src_addr->_data[1];
 	dst_key->_data[2] = src_addr->_data[2];
 	dst_key->_data[3] = src_addr->_data[3];
+}
+
+static __rte_always_inline
+void dp_copy_ipkey(struct dp_ip_addr_key *dst_key, const struct dp_ip_addr_key *src_key)
+{
+	dst_key->_is_v6 = src_key->_is_v6;
+	dst_key->_data[0] = src_key->_data[0];
+	dst_key->_data[1] = src_key->_data[1];
+	dst_key->_data[2] = src_key->_data[2];
+	dst_key->_data[3] = src_key->_data[3];
 }
 // TODO macro/inline to copy the array
 
 // These cannot be inlines due to sizeof() being checked here
 #define DP_FILL_IPKEY6(KEY, IPV6) do { \
 	static_assert(sizeof(IPV6) == DP_IPV6_ADDR_SIZE, "Invalid IPv6 byte array passed to DP_FILL_IPKEY6()"); \
-	(KEY).is_v6 = true; \
+	(KEY)._is_v6 = true; \
 	(KEY)._data[0] = ((const uint32_t *)(IPV6))[0]; \
 	(KEY)._data[1] = ((const uint32_t *)(IPV6))[1]; \
 	(KEY)._data[2] = ((const uint32_t *)(IPV6))[2]; \
@@ -65,7 +82,7 @@ void dp_fill_ipkey(struct dp_ip_addr_key *dst_key, const struct dp_ip_address *s
 } while (0)
 
 #define DP_FILL_IPKEY4(KEY, IPV4) do { \
-	(KEY).is_v6 = false; \
+	(KEY)._is_v6 = false; \
 	(KEY)._data[0] = (IPV4); \
 	(KEY)._data[1] = (KEY)._data[2] = (KEY)._data[3] = 0; \
 } while (0)

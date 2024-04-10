@@ -399,7 +399,7 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	return DP_OK;
 }
 
-int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, uint8_t *ipv6_addr)
+int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const uint8_t *ipv6_addr)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -723,8 +723,13 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	struct dp_port *created_port;
 	int ret;
 
-	portoverload_tbl_key.nat_ip = flow_key_reply->l3_dst.ip4;
-	portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ip4;
+	if (flow_key_org->l3_dst.is_v6 || flow_key_reply->l3_dst.is_v6) {
+		DPS_LOG_ERR("NAT flow key with IPv6 addresses");  // TODO log them
+		return DP_ERROR;
+	}
+
+	portoverload_tbl_key.nat_ip = flow_key_reply->l3_dst.ipv4;
+	portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ipv4;
 	portoverload_tbl_key.nat_port = flow_key_reply->port_dst;
 	portoverload_tbl_key.dst_port = flow_key_org->port_dst;
 	portoverload_tbl_key.l4_type = flow_key_org->proto;
@@ -734,12 +739,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	if (DP_FAILED(ret) && ret != -ENOENT)
 		return ret;
 
-	// TODO this could be a copy constructor once flow_key is converted
-	if (flow_key_org->is_v6)
-		DP_FILL_IPKEY6(portmap_key.src_ip, flow_key_org->l3_src.ip6);
-	else
-		DP_FILL_IPKEY4(portmap_key.src_ip, flow_key_org->l3_src.ip4);
-
+	dp_copy_ipkey(&portmap_key.src_ip, &flow_key_org->l3_src);
 	portmap_key.iface_src_port = flow_key_org->src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 

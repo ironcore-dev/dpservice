@@ -157,13 +157,14 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 		goto error_alloc;
 	}
 
-	flow_val->flow_key[DP_FLOW_DIR_ORG] = *key;
+	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_ORG], key, sizeof(*key));
 	flow_val->flow_flags = DP_FLOW_FLAG_NONE;
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = port->port_id;
 
-	pfx_ip.is_v6 = false;
-	pfx_ip.ipv4 = key->l3_dst.ip4;
+	// TODO think about dropping the key structure and only have dp_ip_address everywhere to prevent these copies
+	// TODO if done, then add test for l3_dst is not IPv6 as no IPv6 LBs exist
+	dp_fill_ipaddr(&pfx_ip, &key->l3_dst);
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
 	/* Details can be found in https://github.com/ironcore-dev/dpservice/pull/341 */
@@ -190,8 +191,8 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	// Implicit casting from hash_sig_t to uint32_t!
 	df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
 
-	dp_invert_flow_key(key, df->l3_type, &inverted_key);
-	flow_val->flow_key[DP_FLOW_DIR_REPLY] = inverted_key;
+	dp_invert_flow_key(key, &inverted_key);
+	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_REPLY], &inverted_key, sizeof(inverted_key));
 	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
 		goto error_add_inv;
 
@@ -244,17 +245,7 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 	if (unlikely(DP_FAILED(ret)))
 		return ret;
 
-	// highly optimized comparator for a specific key size
-	static_assert(sizeof(struct flow_key) == 43, "struct flow_key changed size");
-	if (prev_key
-		&& ((const uint64_t *)curr_key)[0] == ((const uint64_t *)prev_key)[0]
-		&& ((const uint64_t *)curr_key)[1] == ((const uint64_t *)prev_key)[1]
-		&& ((const uint64_t *)curr_key)[2] == ((const uint64_t *)prev_key)[2]
-		&& ((const uint64_t *)curr_key)[3] == ((const uint64_t *)prev_key)[3]
-		&& ((const uint64_t *)curr_key)[4] == ((const uint64_t *)prev_key)[4]
-		&& ((const uint16_t *)curr_key)[20] == ((const uint16_t *)prev_key)[20]
-		&& ((const uint8_t *)curr_key)[42] == ((const uint8_t *)prev_key)[42]
-	) {
+	if (prev_key && dp_are_flows_identical(curr_key, prev_key)) {
 		// flow is the same as it was for the previous packet
 		*p_flow_val = cached_flow_val;
 		dp_set_pkt_flow_direction(curr_key, cached_flow_val, df);

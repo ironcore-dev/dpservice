@@ -29,8 +29,8 @@
 	DP_LOG_PROTO((KEY)->proto), \
 	DP_LOG_VNI((KEY)->vni), \
 	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
-	DP_LOG_SRC_IPV4((KEY)->l3_src.ip4), \
-	DP_LOG_DST_IPV4((KEY)->l3_dst.ip4), \
+	/*DP_LOG_SRC_IPV4((KEY)->l3_src.ip4), \
+	DP_LOG_DST_IPV4((KEY)->l3_dst.ip4),*/ \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
 #define DP_LOG_FLOW_KEY6(KEY) \
@@ -38,10 +38,14 @@
 	DP_LOG_PROTO((KEY)->proto), \
 	DP_LOG_VNI((KEY)->vni), \
 	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
-	DP_LOG_SRC_IPV6((KEY)->l3_src.ip6), \
-	DP_LOG_DST_IPV6((KEY)->l3_dst.ip6), \
+	/*DP_LOG_SRC_IPV6((KEY)->l3_src.ip6), \
+	DP_LOG_DST_IPV6((KEY)->l3_dst.ip6),*/ \
 	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
 
+// TODO fix IPv4/IPv6 logging
+#if 1
+#define DP_LOG_DEBUG_FLOW_KEY(key, message) DPS_LOG_DEBUG(message)
+#else
 #define DP_LOG_DEBUG_FLOW_KEY(key, message) \
 	do { \
 		if ((key)->is_v6) \
@@ -49,6 +53,7 @@
 		else \
 			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY4(key)); \
 	} while (0)
+#endif
 
 
 static struct rte_hash *ipv4_flow_tbl = NULL;
@@ -100,8 +105,10 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 			return DP_ERROR;
 		}
 
-		key->l3_dst.ip4 = ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr);
-		key->l3_src.ip4 = ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr);
+		// This is only called for ICMP, not for ICMPv6, so use IPv4 directly
+		// TODO not sure if we want to skip the is_v6 assignment by another macro (maybe?)
+		DP_FILL_IPKEY4(key->l3_dst, ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr));
+		DP_FILL_IPKEY4(key->l3_src, ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr));
 
 		key->proto = icmp_err_ip_info.err_ipv4_hdr->next_proto_id;
 
@@ -123,20 +130,18 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 	struct snat_data *s_data;
 	struct dp_ip_address pfx_ip;
 
-	memset(&pfx_ip, 0, sizeof(pfx_ip));
-	pfx_ip.is_v6 = false;
-	pfx_ip.ipv4 = key->l3_src.ip4;
-
 	if (port->is_pf) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
 			key->vnf_type = df->vnf_type;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
-	} else if (key->is_v6) {
-		if (dp_is_ip6_in_nat64_range(key->l3_dst.ip6))
+	} else if (key->l3_dst.is_v6) {
+		if (dp_is_ip6_in_nat64_range(key->l3_dst.ipv6))
 			key->vnf_type = DP_VNF_TYPE_NAT;
 	} else {
-		s_data = dp_get_iface_snat_data(key->l3_src.ip4, key->vni);
+		// TODO think about using dp_ip_addr_key instead of dp_ip_address everywhere to prevent these copies all the time
+		dp_fill_ipaddr(&pfx_ip, &key->l3_src);
+		s_data = dp_get_iface_snat_data(pfx_ip.ipv4, key->vni);
 		if (s_data && s_data->nat_ip != 0)
 			key->vnf_type = DP_VNF_TYPE_NAT;
 		else if (dp_vnf_lbprefix_exists(port->port_id, key->vni, &pfx_ip, 32))
@@ -154,25 +159,15 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 	switch (df->l3_type) {
 	case RTE_ETHER_TYPE_IPV4:
-		key->is_v6 = false;
-		// TODO could be optimized by only setting the non-ipv4 bytes to zero
-		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
-		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
-		key->l3_dst.ip4 = ntohl(df->dst.dst_addr);
-		key->l3_src.ip4 = ntohl(df->src.src_addr);
+		DP_FILL_IPKEY4(key->l3_dst, ntohl(df->dst.dst_addr));
+		DP_FILL_IPKEY4(key->l3_src, ntohl(df->src.src_addr));
 		break;
 	case RTE_ETHER_TYPE_IPV6:
-		key->is_v6 = true;
-		rte_memcpy(key->l3_dst.ip6, df->dst.dst_addr6, sizeof(key->l3_dst.ip6));
-		rte_memcpy(key->l3_src.ip6, df->src.src_addr6, sizeof(key->l3_src.ip6));
+		DP_FILL_IPKEY6(key->l3_dst, df->dst.dst_addr6);
+		DP_FILL_IPKEY6(key->l3_src, df->src.src_addr6);
 		break;
 	default:
-		// actually an invalid setup
-		// TODO discuss returning an error!
-		key->is_v6 = true;
-		memset(key->l3_src.ip6, 0, sizeof(key->l3_src.ip6));
-		memset(key->l3_dst.ip6, 0, sizeof(key->l3_dst.ip6));
-		break;
+		return DP_ERROR;
 	}
 
 	key->proto = df->l4_type;
@@ -201,32 +196,20 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 		key->src.type_src = df->l4_info.icmp_field.icmp_type;
 		break;
 	default:
-		key->port_dst = 0;
-		key->src.port_src = 0;
-		// TODO why not error?
+		ret = DP_ERROR;
 		break;
 	}
 
 	return ret;
 }
 
-void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */)
+void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */)
 {
-	// TODO discuss why this is asking l3_type instead of using the key->is_v6
-	if (l3_type == RTE_ETHER_TYPE_IPV4) {
-		// TODO this could be optimized to just zero the sizeof(ipv6)-sizeof(ipv4) bytes
-		memset(inv_key->l3_dst.ip6, 0, sizeof(inv_key->l3_dst.ip6));
-		memset(inv_key->l3_src.ip6, 0, sizeof(inv_key->l3_src.ip6));
-		inv_key->l3_src.ip4 = key->l3_dst.ip4;
-		inv_key->l3_dst.ip4 = key->l3_src.ip4;
-	} else {
-		rte_memcpy(inv_key->l3_src.ip6, key->l3_dst.ip6, sizeof(inv_key->l3_src.ip6));
-		rte_memcpy(inv_key->l3_dst.ip6, key->l3_src.ip6, sizeof(inv_key->l3_dst.ip6));
-	}
+	dp_copy_ipkey(&inv_key->l3_dst, &key->l3_src);
+	dp_copy_ipkey(&inv_key->l3_src, &key->l3_dst);
 	inv_key->vni = key->vni;
 	inv_key->vnf_type = key->vnf_type;
 	inv_key->proto = key->proto;
-	inv_key->is_v6 = key->is_v6;
 
 	if ((key->proto == IPPROTO_TCP) || (key->proto == IPPROTO_UDP)) {
 		inv_key->src.port_src = key->port_dst;
@@ -300,17 +283,6 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 	return ret;
 }
 
-bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2)
-{
-	return key1->proto == key2->proto
-		&& key1->l3_src.ip4 == key2->l3_src.ip4
-		&& key1->l3_dst.ip4 == key2->l3_dst.ip4
-		&& key1->port_dst == key2->port_dst
-		&& key1->src.port_src == key2->src.port_src
-		&& key1->vni == key2->vni
-		&& key1->vnf_type == key2->vnf_type;
-}
-
 void dp_free_flow(struct dp_ref *ref)
 {
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
@@ -331,7 +303,7 @@ void dp_free_network_nat_port(const struct flow_value *cntrack)
 		ret = dp_remove_network_snat_port(cntrack);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to remove an allocated NAT port",
-						DP_LOG_DST_IPV4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ip4),
+						// TODO special log I guess DP_LOG_DST_IPV4(dp_get_ipkey_ipv4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst)),
 						DP_LOG_DST_PORT(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst),
 						DP_LOG_RET(ret));
 	}
@@ -520,7 +492,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
 			return;
 		}
-		if (next_key->vni == vni && next_key->l3_dst.ip4 == ipv4
+		if (next_key->vni == vni && !next_key->l3_dst.is_v6 && next_key->l3_dst.ipv4 == ipv4
 			&& next_key->port_dst >= min_port && next_key->port_dst < max_port
 		) {
 			dp_remove_flow(flow_val);
@@ -541,7 +513,7 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 			return;
 		}
 		if (flow_val->created_port_id == port_id
-			|| (next_key->vni == vni && flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.ip4 == ipv4)
+			|| (next_key->vni == vni && !flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.is_v6 && flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.ipv4 == ipv4)
 		) {
 			dp_remove_flow(flow_val);
 		}

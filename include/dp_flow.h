@@ -69,23 +69,16 @@ enum dp_flow_tcp_state {
 };
 
 struct flow_key {
-	union {
-		uint8_t		ip6[DP_IPV6_ADDR_SIZE];
-		uint32_t	ip4;
-	} l3_dst;
-	union {
-		uint8_t		ip6[DP_IPV6_ADDR_SIZE];
-		uint32_t	ip4;
-	} l3_src;
+	struct dp_ip_addr_key l3_dst;
+	uint8_t  proto;
 	uint16_t port_dst;
+	struct dp_ip_addr_key l3_src;
+	enum dp_vnf_type vnf_type;
 	union {
 		uint16_t port_src;
 		uint16_t type_src; /* ICMP */
 	} src;
 	uint32_t vni;
-	bool     is_v6;
-	uint8_t  proto;
-	enum dp_vnf_type vnf_type;
 } __rte_packed;
 static_assert(sizeof(((struct flow_key *)0)->vnf_type) == 1,
 			  "enum dp_vnf_type is unnecessarily big");
@@ -132,12 +125,23 @@ struct flow_age_ctx {
 	struct rte_flow_action_handle *handle;
 };
 
-bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2);
+static __rte_always_inline
+bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *key2)
+{
+	static_assert(sizeof(struct flow_key) == 44, "Size of struct_flow_key has changed");
+	return ((const uint64_t *)key1)[0] == ((const uint64_t *)key2)[0]
+		&& ((const uint64_t *)key1)[1] == ((const uint64_t *)key2)[1]
+		&& ((const uint64_t *)key1)[2] == ((const uint64_t *)key2)[2]
+		&& ((const uint64_t *)key1)[3] == ((const uint64_t *)key2)[3]
+		&& ((const uint64_t *)key1)[4] == ((const uint64_t *)key2)[4]
+		&& ((const uint32_t *)key1)[10] == ((const uint32_t *)key2)[10];  // 8 * 5 = 40 = 4 * 10
+}
+
 int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val);
 int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val);
 void dp_delete_flow(const struct flow_key *key);
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
-void dp_invert_flow_key(const struct flow_key *key /* in */, uint16_t l3_type /* in */, struct flow_key *inv_key /* out */);
+void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
 int dp_flow_init(int socket_id);
 void dp_flow_free(void);
 void dp_process_aged_flows(uint16_t port_id);

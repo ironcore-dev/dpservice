@@ -44,14 +44,14 @@ static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, stru
 	struct lb_key *lb_k;
 	int ret;
 
-	lb_k = rte_zmalloc("lb_id_mapping", sizeof(struct lb_key), RTE_CACHE_LINE_SIZE);
+	lb_k = rte_malloc("lb_id_mapping", sizeof(struct lb_key), RTE_CACHE_LINE_SIZE);
 	if (!lb_k) {
 		DPS_LOG_ERR("Cannot allocate LB id mapping data");
 		return DP_ERROR;
 	}
 
 	rte_memcpy(l_val->lb_id, id_key, sizeof(l_val->lb_id));
-	*lb_k = *l_key;
+	rte_memcpy(lb_k, l_key, sizeof(*lb_k));
 	ret = rte_hash_add_key_data(id_map_lb_tbl, id_key, lb_k);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot insert LB id mapping data", DP_LOG_RET(ret));
@@ -239,11 +239,7 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 	int pos;
 
 	lb_key.vni = vni;
-	// TODO this could be a copy constructor once flow_key is converted
-	if (flow_key->is_v6)
-		DP_FILL_IPKEY6(lb_key.ip, flow_key->l3_dst.ip6);
-	else
-		DP_FILL_IPKEY4(lb_key.ip, flow_key->l3_dst.ip4);
+	dp_copy_ipkey(&lb_key.ip, &flow_key->l3_dst);
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val) < 0)
 		return NULL;
