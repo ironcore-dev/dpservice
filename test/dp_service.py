@@ -36,7 +36,7 @@ class DpService:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8'
+		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8 --huge-unlink '
 		if not self.hardware:
 			self.cmd += (f' --no-pci'
 						 f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
