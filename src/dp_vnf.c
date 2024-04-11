@@ -72,7 +72,7 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 	int ret;
 	uint8_t *vnf_ul_addr6;
 
-	vnf_ul_addr6 = rte_malloc("vnf_value_mapping", DP_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
+	vnf_ul_addr6 = rte_zmalloc("vnf_value_mapping", DP_IPV6_ADDR_SIZE, RTE_CACHE_LINE_SIZE);
 	if (!vnf_ul_addr6) {
 		DPS_LOG_WARNING("VNF value allocation failed", DP_LOG_IPV6(ul_addr6));
 		return DP_ERROR;
@@ -86,6 +86,8 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_
 		rte_free(vnf_ul_addr6);
 		return DP_ERROR;
 	}
+
+	DPS_LOG_WARNING("Place 6", DP_LOG_IPV6(vnf_ul_addr6));
 
 	return DP_OK;
 }
@@ -172,15 +174,18 @@ const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])
 
 int dp_del_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])
 {
+	DPS_LOG_WARNING("Place 1", DP_LOG_IPV6(ul_addr6));
 	hash_sig_t hash = rte_hash_hash(vnf_handle_tbl, ul_addr6);
 	struct dp_vnf *vnf;
 	int ret;
 
+	DPS_LOG_WARNING("Place 2", DP_LOG_IPV6(ul_addr6));
 	ret = rte_hash_lookup_with_hash_data(vnf_handle_tbl, ul_addr6, hash, (void **)&vnf);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Cannot lookup VNF to delete", DP_LOG_IPV6(ul_addr6), DP_LOG_RET(ret));
 		return ret;
 	}
+	DPS_LOG_WARNING("Place 3", DP_LOG_IPV6(ul_addr6));
 
 	ret = rte_hash_del_key_with_hash(vnf_handle_tbl, ul_addr6, hash);
 	if (DP_FAILED(ret)) {
@@ -214,17 +219,19 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, c
 	struct dp_vnf target_vnf;
 	uint8_t *vnf_ul_addr6;
 	int32_t ret;
+	hash_sig_t hash;
 
 	dp_fill_vnf_data(&target_vnf, type, port_id, vni, prefix_ip, prefix_len);
-
-	ret = rte_hash_lookup_data(vnf_value_tbl, &target_vnf, (void **)&vnf_ul_addr6);
+	// ret = rte_hash_lookup_data(vnf_value_tbl, &target_vnf, (void **)&vnf_ul_addr6);
+	hash = rte_hash_hash(vnf_value_tbl, &target_vnf);
+	ret = rte_hash_lookup_with_hash_data(vnf_value_tbl, &target_vnf, hash, (void **)&vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_GRPC_ERR_NOT_FOUND;
 		DPS_LOG_VNF_WARNING("VNF value key lookup failed due to invalid parameters", &target_vnf);
 		return DP_GRPC_ERR_VNF_DELETE;
 	}
-
+	DPS_LOG_WARNING("Place 5", DP_LOG_IPV6(vnf_ul_addr6));
 	// This actually does the lookup again, but as this function is rarely called (orchestration only), it does nto matter
 	ret = dp_del_vnf(vnf_ul_addr6);
 	if (DP_FAILED(ret)) {
