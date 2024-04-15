@@ -723,8 +723,12 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	struct dp_port *created_port;
 	int ret;
 
-	if (flow_key_org->l3_dst.is_v6 || flow_key_reply->l3_dst.is_v6) {
-		DPS_LOG_ERR("NAT flow key with IPv6 addresses");  // TODO log them
+	if (unlikely(flow_key_org->l3_dst.is_v6)) {
+		DPS_LOG_ERR("NAT original flow key with IPv6 address", DP_LOG_IPV6(flow_key_org->l3_dst.ipv6));
+		return DP_ERROR;
+	}
+	if (unlikely(flow_key_reply->l3_dst.is_v6)) {
+		DPS_LOG_ERR("NAT reply flow key with IPv6 address", DP_LOG_IPV6(flow_key_reply->l3_dst.ipv6));
 		return DP_ERROR;
 	}
 

@@ -21,41 +21,6 @@
 
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
-// TODO(Tao?): this debug logging should be removed once the code stabilizes as it does happen quite often in the critical path
-// As this is really specific to this module **and** is calling a function,
-// this is a locally-defined macro for now (macro to preserve call-stack in logging)
-#define DP_LOG_FLOW_KEY4(KEY) \
-	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
-	DP_LOG_PROTO((KEY)->proto), \
-	DP_LOG_VNI((KEY)->vni), \
-	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
-	/*DP_LOG_SRC_IPV4((KEY)->l3_src.ip4), \
-	DP_LOG_DST_IPV4((KEY)->l3_dst.ip4),*/ \
-	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
-
-#define DP_LOG_FLOW_KEY6(KEY) \
-	_DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(KEY)), \
-	DP_LOG_PROTO((KEY)->proto), \
-	DP_LOG_VNI((KEY)->vni), \
-	DP_LOG_VNF_TYPE((KEY)->vnf_type), \
-	/*DP_LOG_SRC_IPV6((KEY)->l3_src.ip6), \
-	DP_LOG_DST_IPV6((KEY)->l3_dst.ip6),*/ \
-	DP_LOG_SRC_PORT((KEY)->src.port_src), DP_LOG_DST_PORT((KEY)->port_dst)
-
-// TODO fix IPv4/IPv6 logging
-#if 1
-#define DP_LOG_DEBUG_FLOW_KEY(key, message) DPS_LOG_DEBUG(message)
-#else
-#define DP_LOG_DEBUG_FLOW_KEY(key, message) \
-	do { \
-		if ((key)->is_v6) \
-			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY6(key)); \
-		else \
-			DPS_LOG_DEBUG(message, DP_LOG_FLOW_KEY4(key)); \
-	} while (0)
-#endif
-
-
 static struct rte_hash *ipv4_flow_tbl = NULL;
 static bool offload_mode_enabled = 0;
 
@@ -74,6 +39,20 @@ int dp_flow_init(int socket_id)
 void dp_flow_free(void)
 {
 	dp_free_jhash_table(ipv4_flow_tbl);
+}
+
+static inline void dp_flow_log_key(const struct flow_key *key, const char *message)
+{
+	char src_ip[INET6_ADDRSTRLEN];
+	char dst_ip[INET6_ADDRSTRLEN];
+
+	DP_IPKEY_TO_STR(&key->l3_src, src_ip);
+	DP_IPKEY_TO_STR(&key->l3_dst, dst_ip);
+
+	DPS_LOG_DEBUG(message, _DP_LOG_UINT("flow_hash", dp_get_conntrack_flow_hash_value(key)),
+		DP_LOG_PROTO(key->proto), DP_LOG_VNI(key->vni), DP_LOG_VNF_TYPE(key->vnf_type),
+		DP_LOG_SRC_IPSTR(src_ip), DP_LOG_DST_IPSTR(dst_ip),
+		DP_LOG_SRC_PORT(key->src.port_src), DP_LOG_DST_PORT(key->port_dst));
 }
 
 static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, struct flow_key *key /* out */, struct rte_mbuf *m /* in */)
@@ -243,12 +222,14 @@ static void dp_delete_flow_no_flush(const struct flow_key *key)
 	ret = rte_hash_del_key(ipv4_flow_tbl, key);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
-			DP_LOG_DEBUG_FLOW_KEY(key, "Attempt to delete a non-existing hash key");
+			dp_flow_log_key(key, "Attempt to delete a non-existing hash key");
 		else
 			DPS_LOG_ERR("Cannot delete key from flow table", DP_LOG_RET(ret));
 		return;
 	}
-	DP_LOG_DEBUG_FLOW_KEY(key, "Successfully deleted an existing hash key");
+#ifdef ENABLE_PYTEST
+	dp_flow_log_key(key, "Successfully deleted an existing hash key");
+#endif
 }
 
 void dp_delete_flow(const struct flow_key *key)
@@ -276,9 +257,9 @@ int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 
 #ifdef ENABLE_PYTEST
 	if (DP_FAILED(ret))
-		DP_LOG_DEBUG_FLOW_KEY(key, "Cannot find data in flow table");
+		dp_flow_log_key(key, "Cannot find data in flow table");
 	else
-		DP_LOG_DEBUG_FLOW_KEY(key, "Successfully found data in flow table");
+		dp_flow_log_key(key, "Successfully found data in flow table");
 #endif
 	return ret;
 }
@@ -303,7 +284,7 @@ void dp_free_network_nat_port(const struct flow_value *cntrack)
 		ret = dp_remove_network_snat_port(cntrack);
 		if (DP_FAILED(ret))
 			DPS_LOG_ERR("Failed to remove an allocated NAT port",
-						// TODO special log I guess DP_LOG_DST_IPV4(dp_get_ipkey_ipv4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst)),
+						DP_LOG_DST_IPV4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ipv4),
 						DP_LOG_DST_PORT(cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst),
 						DP_LOG_RET(ret));
 	}

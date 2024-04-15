@@ -59,6 +59,8 @@ extern "C" {
 #define DP_LOG_DST_IPV4(VALUE) _DP_LOG_IPV4("dst_ipv4", VALUE)
 #define DP_LOG_SRC_IPV6(VALUE) _DP_LOG_IPV6("src_ipv6", VALUE)
 #define DP_LOG_DST_IPV6(VALUE) _DP_LOG_IPV6("dst_ipv6", VALUE)
+#define DP_LOG_SRC_IPSTR(VALUE) _DP_LOG_STR("src_ip", VALUE)
+#define DP_LOG_DST_IPSTR(VALUE) _DP_LOG_STR("dst_ip", VALUE)
 #define DP_LOG_L4PORT(VALUE) _DP_LOG_UINT("port", VALUE)
 #define DP_LOG_SRC_PORT(VALUE) _DP_LOG_UINT("src_port", VALUE)
 #define DP_LOG_DST_PORT(VALUE) _DP_LOG_UINT("dst_port", VALUE)

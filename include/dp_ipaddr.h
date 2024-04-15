@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+#include <arpa/inet.h>
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -39,6 +40,24 @@ struct dp_ip_addr_key {
 		const bool		is_v6;
 	};
 } __rte_packed;
+
+// TODO temporary till key merges with IP address
+static inline void _dp_ipkey_to_str_unsafe(const struct dp_ip_addr_key *key, char *dest)
+{
+	uint32_t net_ipv4;
+
+	// inet_ntop() can only fail on invalid AF_ (constant here) and insufficient buffer size (checked in the macro)
+	if (key->is_v6) {
+		inet_ntop(AF_INET6, &key->ipv6, dest, INET6_ADDRSTRLEN);
+	} else {
+		net_ipv4 = htonl(key->ipv4);
+		inet_ntop(AF_INET, &net_ipv4, dest, INET_ADDRSTRLEN);
+	}
+}
+#define DP_IPKEY_TO_STR(KEY, DST) do { \
+	static_assert(sizeof(DST) >= INET6_ADDRSTRLEN, "Insufficient buffer size for dp_ip_key_to_str()"); \
+	_dp_ipkey_to_str_unsafe((KEY), (DST)); \
+} while (0)
 
 static __rte_always_inline
 void dp_fill_ipaddr(struct dp_ip_address *dst_addr, const struct dp_ip_addr_key *src_key)
@@ -88,6 +107,7 @@ void dp_copy_ipkey(struct dp_ip_addr_key *dst_key, const struct dp_ip_addr_key *
 } while (0)
 
 
+// TODO these should be obsolete by now (logging already provides this)
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
 // network byte-order!
 #define DP_IPV4_PRINT_FMT       "%u.%u.%u.%u"
