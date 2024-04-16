@@ -149,7 +149,6 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 {
 	struct flow_value *flow_val;
 	struct flow_key inverted_key;
-	struct dp_ip_address pfx_ip;
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val) {
@@ -162,15 +161,13 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = port->port_id;
 
-	// TODO think about dropping the key structure and only have dp_ip_address everywhere to prevent these copies
-	// TODO if done, then add test for l3_dst is not IPv6 as no IPv6 LBs exist
-	dp_fill_ipaddr(&pfx_ip, &key->l3_dst);
 	/* Target ip of the traffic is an alias prefix of a VM in the same VNI on this dp-service */
 	/* This will be an uni-directional traffic, which does not expect its corresponding reverse traffic */
 	/* Details can be found in https://github.com/ironcore-dev/dpservice/pull/341 */
 	if (offload_mode_enabled
 		&& !port->is_pf
-		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->vni, &pfx_ip, 32)
+		&& !key->l3_dst.is_v6
+		&& dp_vnf_lbprefix_exists(DP_VNF_MATCH_ALL_PORT_IDS, key->vni, &key->l3_dst, 32)
 	)
 		flow_val->nf_info.nat_type = DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC;
 	else

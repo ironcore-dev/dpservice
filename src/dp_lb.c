@@ -64,11 +64,11 @@ static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, stru
 
 int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 {
-	struct lb_value *lb_val = NULL;
+	struct lb_value *lb_val;
 	struct lb_key lb_key;
 
 	lb_key.vni = lb->vni;
-	dp_fill_ipkey(&lb_key.ip, &lb->addr);
+	dp_copy_ipaddr(&lb_key.ip, &lb->addr);
 
 	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
@@ -109,7 +109,7 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	out_lb->vni = lb_k->vni;
-	dp_fill_ipaddr(&out_lb->addr, &lb_k->ip);
+	dp_copy_ipaddr(&out_lb->addr, &lb_k->ip);
 	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_IPV6_ADDR_SIZE);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
@@ -159,9 +159,9 @@ bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 	lb_key.vni = vni;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		DP_FILL_IPKEY4(lb_key.ip, ntohl(df->dst.dst_addr));
+		DP_SET_IPADDR4(lb_key.ip, ntohl(df->dst.dst_addr));
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		DP_FILL_IPKEY6(lb_key.ip, df->dst.dst_addr6);
+		DP_SET_IPADDR6(lb_key.ip, df->dst.dst_addr6);
 	} else
 		return false;
 
@@ -239,7 +239,7 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 	int pos;
 
 	lb_key.vni = vni;
-	dp_copy_ipkey(&lb_key.ip, &flow_key->l3_dst);
+	dp_copy_ipaddr(&lb_key.ip, &flow_key->l3_dst);
 
 	if (rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val) < 0)
 		return NULL;
@@ -277,7 +277,7 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			rte_memcpy(reply->addr.ipv6, &lb_val->back_end_ips[i][0], sizeof(reply->addr.ipv6));
+			DP_SET_IPADDR6(reply->addr, lb_val->back_end_ips[i]);
 		}
 	}
 

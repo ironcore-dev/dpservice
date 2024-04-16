@@ -15,21 +15,9 @@ extern "C" {
 #include "dp_error.h"
 
 #define DP_IPV6_ADDR_SIZE 16
+static_assert(sizeof(uint32_t)*4 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
 
 struct dp_ip_address {
-	bool			is_v6;
-	union {
-		// TODO maybe define this so there is no code duplication
-		uint32_t	_data[4];
-		// TODO should this be visible or not?
-		uint8_t		ipv6[DP_IPV6_ADDR_SIZE];
-		uint32_t	ipv4;
-	};
-};
-
-// To be used for hash keys needing dp_ip_address
-static_assert(sizeof(uint32_t)*4 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
-struct dp_ip_addr_key {
 	union {
 		uint32_t		_data[DP_IPV6_ADDR_SIZE/sizeof(uint32_t)];
 		const uint8_t	ipv6[DP_IPV6_ADDR_SIZE];
@@ -41,70 +29,57 @@ struct dp_ip_addr_key {
 	};
 } __rte_packed;
 
-// TODO temporary till key merges with IP address
-static inline void _dp_ipkey_to_str_unsafe(const struct dp_ip_addr_key *key, char *dest)
+static inline void _dp_ipaddr_to_str_unsafe(const struct dp_ip_address *addr, char *dest)
 {
 	uint32_t net_ipv4;
 
 	// inet_ntop() can only fail on invalid AF_ (constant here) and insufficient buffer size (checked in the macro)
-	if (key->is_v6) {
-		inet_ntop(AF_INET6, &key->ipv6, dest, INET6_ADDRSTRLEN);
+	if (addr->is_v6) {
+		inet_ntop(AF_INET6, &addr->ipv6, dest, INET6_ADDRSTRLEN);
 	} else {
-		net_ipv4 = htonl(key->ipv4);
+		net_ipv4 = htonl(addr->ipv4);
 		inet_ntop(AF_INET, &net_ipv4, dest, INET_ADDRSTRLEN);
 	}
 }
-#define DP_IPKEY_TO_STR(KEY, DST) do { \
-	static_assert(sizeof(DST) >= INET6_ADDRSTRLEN, "Insufficient buffer size for dp_ip_key_to_str()"); \
-	_dp_ipkey_to_str_unsafe((KEY), (DST)); \
+#define DP_IPADDR_TO_STR(KEY, DST) do { \
+	static_assert(sizeof(DST) >= INET6_ADDRSTRLEN, "Insufficient buffer size for DP_IPADDR_TO_STR()"); \
+	_dp_ipaddr_to_str_unsafe((KEY), (DST)); \
 } while (0)
 
 static __rte_always_inline
-void dp_fill_ipaddr(struct dp_ip_address *dst_addr, const struct dp_ip_addr_key *src_key)
+void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 {
-	dst_addr->is_v6 = src_key->_is_v6;
-	dst_addr->_data[0] = src_key->_data[0];
-	dst_addr->_data[1] = src_key->_data[1];
-	dst_addr->_data[2] = src_key->_data[2];
-	dst_addr->_data[3] = src_key->_data[3];
+	dst->_is_v6 = src->_is_v6;
+	dst->_data[0] = src->_data[0];
+	dst->_data[1] = src->_data[1];
+	dst->_data[2] = src->_data[2];
+	dst->_data[3] = src->_data[3];
 }
+// TODO macro/inline to copy the array??
+// TODO actually a helpful macro to copy IPv6 and guard the sizeof!
 
-static __rte_always_inline
-void dp_fill_ipkey(struct dp_ip_addr_key *dst_key, const struct dp_ip_address *src_addr)
-{
-	dst_key->_is_v6 = src_addr->is_v6;
-	dst_key->_data[0] = src_addr->_data[0];
-	dst_key->_data[1] = src_addr->_data[1];
-	dst_key->_data[2] = src_addr->_data[2];
-	dst_key->_data[3] = src_addr->_data[3];
-}
+// TODO move the is_addr_zero here
 
-static __rte_always_inline
-void dp_copy_ipkey(struct dp_ip_addr_key *dst_key, const struct dp_ip_addr_key *src_key)
-{
-	dst_key->_is_v6 = src_key->_is_v6;
-	dst_key->_data[0] = src_key->_data[0];
-	dst_key->_data[1] = src_key->_data[1];
-	dst_key->_data[2] = src_key->_data[2];
-	dst_key->_data[3] = src_key->_data[3];
-}
-// TODO macro/inline to copy the array
-
-// These cannot be inlines due to sizeof() being checked here
-#define DP_FILL_IPKEY6(KEY, IPV6) do { \
-	static_assert(sizeof(IPV6) == DP_IPV6_ADDR_SIZE, "Invalid IPv6 byte array passed to DP_FILL_IPKEY6()"); \
-	(KEY)._is_v6 = true; \
-	(KEY)._data[0] = ((const uint32_t *)(IPV6))[0]; \
-	(KEY)._data[1] = ((const uint32_t *)(IPV6))[1]; \
-	(KEY)._data[2] = ((const uint32_t *)(IPV6))[2]; \
-	(KEY)._data[3] = ((const uint32_t *)(IPV6))[3]; \
+// These cannot be inlines due to sizeof() being checked for IPv6
+#define DP_SET_IPADDR6(ADDR, IPV6) do { \
+	static_assert(sizeof(IPV6) == DP_IPV6_ADDR_SIZE, "Invalid IPv6 byte array passed to DP_FILL_IPADDR6()"); \
+	DP_SET_IPADDR6_UNSAFE((ADDR), (IPV6)); \
+} while (0)
+#define DP_SET_IPADDR6_UNSAFE(ADDR, IPV6) do { \
+	(ADDR)._is_v6 = true; \
+	(ADDR)._data[0] = ((const uint32_t *)(IPV6))[0]; \
+	(ADDR)._data[1] = ((const uint32_t *)(IPV6))[1]; \
+	(ADDR)._data[2] = ((const uint32_t *)(IPV6))[2]; \
+	(ADDR)._data[3] = ((const uint32_t *)(IPV6))[3]; \
 } while (0)
 
-#define DP_FILL_IPKEY4(KEY, IPV4) do { \
-	(KEY)._is_v6 = false; \
-	(KEY)._data[0] = (IPV4); \
-	(KEY)._data[1] = (KEY)._data[2] = (KEY)._data[3] = 0; \
+#define DP_SET_IPADDR4(ADDR, IPV4) do { \
+	(ADDR)._is_v6 = false; \
+	(ADDR)._data[0] = (IPV4); \
+	(ADDR)._data[1] = (ADDR)._data[2] = (ADDR)._data[3] = 0; \
 } while (0)
+
+// TODO move NAT64 here?
 
 
 // TODO these should be obsolete by now (logging already provides this)

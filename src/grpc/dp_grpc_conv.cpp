@@ -44,18 +44,30 @@ bool StrToIpv6(const std::string& str, uint8_t *dst)
 	return inet_pton(AF_INET6, str.c_str(), dst) == 1;
 }
 
-bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr)
+bool StrToDpAddress(const std::string& str, struct dp_ip_address *dp_addr, IpVersion ipver)
 {
-	switch (grpc_addr.ipver()) {
+	uint32_t ipv4;
+	uint8_t ipv6[DP_IPV6_ADDR_SIZE];
+
+	switch (ipver) {
 	case IpVersion::IPV4:
-		dp_addr->is_v6 = false;
-		return StrToIpv4(grpc_addr.address(), &dp_addr->ipv4);
+		if (!StrToIpv4(str, &ipv4))
+			return false;
+		DP_SET_IPADDR4(*dp_addr, ipv4);
+		return true;
 	case IpVersion::IPV6:
-		dp_addr->is_v6 = true;
-		return StrToIpv6(grpc_addr.address(), dp_addr->ipv6);
+		if (!StrToIpv6(str, ipv6))
+			return false;
+		DP_SET_IPADDR6(*dp_addr, ipv6);
+		return true;
 	default:
 		return false;
 	}
+}
+
+bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr)
+{
+	return StrToDpAddress(grpc_addr.address(), dp_addr, grpc_addr.ipver());
 }
 
 bool GrpcToDpVniType(const VniType& grpc_type, enum dpgrpc_vni_type *dp_type)

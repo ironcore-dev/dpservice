@@ -83,7 +83,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-			DP_FILL_IPKEY4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));
+			DP_SET_IPADDR4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 				return DNAT_NEXT_DROP;
 		}

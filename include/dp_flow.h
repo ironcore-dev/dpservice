@@ -69,10 +69,10 @@ enum dp_flow_tcp_state {
 };
 
 struct flow_key {
-	struct dp_ip_addr_key l3_dst;
+	struct dp_ip_address l3_dst;
 	uint8_t  proto;
 	uint16_t port_dst;
-	struct dp_ip_addr_key l3_src;
+	struct dp_ip_address l3_src;
 	enum dp_vnf_type vnf_type;
 	union {
 		uint16_t port_src;

@@ -10,7 +10,7 @@ enum dpgrpc_request_type dp_grpc_init_responder(struct dp_grpc_responder *respon
 
 	// request mbuf will be reused to prevent unnecessarry free(request)+alloc(response)
 	// so create a copy of the request first
-	responder->request = *(struct dpgrpc_request *)req_payload;
+	rte_memcpy(&responder->request, (struct dpgrpc_request *)req_payload, sizeof(responder->request));
 	responder->replies[0] = req_mbuf;
 	responder->repcount = 1;
 

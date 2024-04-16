@@ -38,6 +38,7 @@ void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *po
 	ether_hdr->ether_type = htons(ether_type);
 }
 
+// TODO move this to ipaddr.h
 static __rte_always_inline
 bool dp_is_ipv6_addr_zero(const uint8_t *addr)
 {

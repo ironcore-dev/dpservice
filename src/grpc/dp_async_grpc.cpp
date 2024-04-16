@@ -85,7 +85,7 @@ int BaseCall::WriteRequest(struct dpgrpc_request *request)
 	}
 
 	assert((size_t)m->buf_len - m->data_off >= sizeof(struct dpgrpc_request));
-	*rte_pktmbuf_mtod(m, struct dpgrpc_request *) = *request;
+	rte_memcpy(rte_pktmbuf_mtod(m, struct dpgrpc_request *), request, sizeof(*request));
 
 	ret = rte_ring_sp_enqueue(get_dpdk_layer()->grpc_tx_queue, m);
 	if (DP_FAILED(ret)) {
@@ -242,15 +242,9 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 						DP_LOG_IFACE(request_.interface_id().c_str()),
 						DP_LOG_PXE_SRV(request_.pxe_config().next_server().c_str()),
 						DP_LOG_PXE_PATH(request_.pxe_config().boot_filename().c_str()));
-		if (dp_is_ipv6_addr_zero(request->add_iface.ip6_addr)) {
-			if (!GrpcConv::StrToIpv4(request_.pxe_config().next_server(), &request->add_iface.pxe_addr.ipv4))
-				return "Invalid ipv4 pxe_config.next_server";
-			request->add_iface.pxe_addr.is_v6 = false;
-		} else {
-			if (!GrpcConv::StrToIpv6(request_.pxe_config().next_server(), request->add_iface.pxe_addr.ipv6))
-				return "Invalid ipv6 pxe_config.next_server";
-			request->add_iface.pxe_addr.is_v6 = true;
-		}
+		if (!GrpcConv::StrToDpAddress(request_.pxe_config().next_server(), &request->add_iface.pxe_addr,
+			dp_is_ipv6_addr_zero(request->add_iface.ip6_addr) ? IpVersion::IPV4 : IpVersion::IPV6))
+			return "Invalid pxe_config.next_server";
 		if (SNPRINTF_FAILED(request->add_iface.pxe_str, request_.pxe_config().boot_filename()))
 			return "Invalid pxe_config.boot_filename";
 	}
@@ -953,33 +947,25 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid rule id";
 	if (grpc_rule.source_prefix().ip().ipver() != IpVersion::IPV4 && grpc_rule.source_prefix().ip().ipver() != IpVersion::IPV6)
 		return "Invalid source_prefix.ip.ipver";
+	if (!GrpcConv::GrpcToDpAddress(grpc_rule.source_prefix().ip(), &dp_rule->src_ip))
+		return "Invalid source_prefix.ip";
 	if (grpc_rule.source_prefix().ip().ipver() == IpVersion::IPV4) {
 		if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length(), &dp_rule->src_mask.ip4))
 			return "Invalid source_prefix.length";
-		if (!GrpcConv::StrToIpv4(grpc_rule.source_prefix().ip().address(), &dp_rule->src_ip.ipv4))
-			return "Invalid source_prefix.ip";
-		dp_rule->src_ip.is_v6 = false;
 	} else {
 		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.source_prefix().length(), dp_rule->src_mask.ip6))
 			return "Invalid ip6 source_prefix.length";
-		if (!GrpcConv::StrToIpv6(grpc_rule.source_prefix().ip().address(), dp_rule->src_ip.ipv6))
-			return "Invalid source_prefix.ip6";
-		dp_rule->src_ip.is_v6 = true;
 	}
 	if (grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV4 && grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV6)
 		return "Invalid destination_prefix.ip.ipver";
+	if (!GrpcConv::GrpcToDpAddress(grpc_rule.destination_prefix().ip(), &dp_rule->dest_ip))
+		return "Invalid destination_prefix.ip";
 	if (grpc_rule.destination_prefix().ip().ipver() == IpVersion::IPV4) {
 		if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length(), &dp_rule->dest_mask.ip4))
 			return "Invalid destination_prefix.length";
-		if (!GrpcConv::StrToIpv4(grpc_rule.destination_prefix().ip().address(), &dp_rule->dest_ip.ipv4))
-			return "Invalid destination_prefix.ip";
-		dp_rule->dest_ip.is_v6 = false;
 	} else {
 		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.destination_prefix().length(), dp_rule->dest_mask.ip6))
 			return "Invalid ip6 destination_prefix.length";
-		if (!GrpcConv::StrToIpv6(grpc_rule.destination_prefix().ip().address(), dp_rule->dest_ip.ipv6))
-			return "Invalid destination_prefix.ip6";
-		dp_rule->dest_ip.is_v6 = true;
 	}
 	if (!GrpcConv::GrpcToDpFwallDirection(grpc_rule.direction(), &dp_rule->dir))
 		return "Invalid direction";

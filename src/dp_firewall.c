@@ -22,7 +22,7 @@ int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *p
 	if (!rule)
 		return DP_ERROR;
 
-	*rule = *new_rule;
+	rte_memcpy(rule, new_rule, sizeof(*rule));
 	TAILQ_INSERT_TAIL(&port->iface.fwall_head, rule, next_rule);
 
 	return DP_OK;
@@ -68,7 +68,7 @@ int dp_list_firewall_rules(const struct dp_port *port, struct dp_grpc_responder 
 		reply = dp_grpc_add_reply(responder);
 		if (!reply)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
-		reply->rule = *rule;
+		rte_memcpy(&reply->rule, rule, sizeof(reply->rule));
 	}
 
 	return DP_GRPC_OK;

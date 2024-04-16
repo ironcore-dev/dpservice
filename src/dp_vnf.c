@@ -60,12 +60,7 @@ void dp_fill_vnf_data(struct dp_vnf *vnf, enum dp_vnf_type type, uint16_t port_i
 	vnf->port_id = port_id;
 	vnf->vni = vni;
 	vnf->alias_pfx.length = prefix_len;
-	if (src->is_v6) {
-		vnf->alias_pfx.ol = *src;
-	} else {
-		vnf->alias_pfx.ol.is_v6 = false;
-		vnf->alias_pfx.ol.ipv4 = src->ipv4;
-	}
+	dp_copy_ipaddr(&vnf->alias_pfx.ol, src);
 }
 
 static int dp_add_vnf_value(const struct dp_vnf *vnf, const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE])
@@ -264,11 +259,10 @@ int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct d
 		if (!reply)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
-		reply->pfx_addr = vnf->alias_pfx.ol;
+		dp_copy_ipaddr(&reply->pfx_addr, &vnf->alias_pfx.ol);
 		reply->pfx_length = vnf->alias_pfx.length;
-		static_assert(sizeof(reply->trgt_addr.ipv6) == DP_IPV6_ADDR_SIZE,
-					  "Invalid size of VNF hash table key");
-		rte_memcpy(reply->trgt_addr.ipv6, ul_addr6, sizeof(reply->trgt_addr.ipv6));
+		// unsafe because the static_assert for sizeof(ul_addr6) needs to be skipped
+		DP_SET_IPADDR6_UNSAFE(reply->trgt_addr, ul_addr6);
 	}
 
 	return DP_GRPC_OK;

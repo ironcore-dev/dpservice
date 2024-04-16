@@ -207,7 +207,7 @@ static int dp_process_get_fwrule(struct dp_grpc_responder *responder)
 	if (!rule)
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	reply->rule = *rule;
+	rte_memcpy(&reply->rule, rule, sizeof(reply->rule));
 	return DP_GRPC_OK;
 }
 
@@ -310,8 +310,7 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 
 	dp_del_vnf(s_data->ul_vip_ip6);
 
-	reply->addr.is_v6 = false;
-	reply->addr.ipv4 = s_data->vip_ip;
+	DP_SET_IPADDR4(reply->addr, s_data->vip_ip);
 
 	// always delete, i.e. do not use dp_del_vip_from_dnat(),
 	// because 1:1 VIP is not shared with anything
@@ -337,8 +336,7 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	reply->addr.is_v6 = false;
-	reply->addr.ipv4 = s_data->vip_ip;
+	DP_SET_IPADDR4(reply->addr, s_data->vip_ip);
 	rte_memcpy(reply->ul_addr6, s_data->ul_vip_ip6, sizeof(reply->ul_addr6));
 	return DP_GRPC_OK;
 }
@@ -361,7 +359,7 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, &request->addr, request->length)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
-	rte_memcpy(reply->trgt_addr.ipv6, ul_addr6, sizeof(reply->trgt_addr.ipv6));
+	DP_SET_IPADDR6(reply->trgt_addr, ul_addr6);
 	return DP_GRPC_OK;
 }
 
@@ -476,7 +474,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
-	port->iface.cfg.pxe_ip = request->pxe_addr;
+	dp_copy_ipaddr(&port->iface.cfg.pxe_ip, &request->pxe_addr);
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {
@@ -614,6 +612,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
 		.is_v6 = request->addr.is_v6
+		// address is intentionally set to zero here
 	};
 	struct dp_port *port;
 	uint32_t iface_ip, iface_vni;
@@ -682,8 +681,7 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 
 	dp_del_vnf(s_data->ul_nat_ip6);
 
-	reply->addr.is_v6 = false;
-	reply->addr.ipv4 = s_data->nat_ip;
+	DP_SET_IPADDR4(reply->addr, s_data->nat_ip);
 	dp_del_vip_from_dnat(s_data->nat_ip, iface_vni);
 	port->iface.nat_ip = 0;
 	port->iface.nat_port_range[0] = 0;
@@ -708,8 +706,7 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	reply->addr.is_v6 = false;
-	reply->addr.ipv4 = s_data->nat_ip;
+	DP_SET_IPADDR4(reply->addr, s_data->nat_ip);
 	reply->min_port = s_data->nat_port_range[0];
 	reply->max_port = s_data->nat_port_range[1];
 	rte_memcpy(reply->ul_addr6, s_data->ul_nat_ip6, sizeof(reply->ul_addr6));

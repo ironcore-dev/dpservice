@@ -19,6 +19,7 @@ namespace GrpcConv
 	bool StrToIpv4(const std::string& str, uint32_t *dst);
 	bool StrToIpv6(const std::string& str, uint8_t *dst);
 
+	bool StrToDpAddress(const std::string& str, struct dp_ip_address *dp_addr, IpVersion ipver);
 	bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr);
 
 	bool GrpcToDpVniType(const VniType& grpc_type, enum dpgrpc_vni_type *dp_type);
