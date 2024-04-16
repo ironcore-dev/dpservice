@@ -32,7 +32,7 @@ bool dp_is_ipv6_addr_zero(const uint8_t *addr)
 // made read-only without the right macro to prevent uninitialized bytes due to the the use of this structure in hash keys
 struct dp_ip_address {
 	union {
-		uint64_t		_data[DP_IPV6_ADDR_SIZE/sizeof(uint64_t)];
+		uint8_t			_data[DP_IPV6_ADDR_SIZE];
 		const uint8_t	ipv6[DP_IPV6_ADDR_SIZE];
 		const uint32_t	ipv4;
 	};
@@ -63,8 +63,8 @@ static __rte_always_inline
 void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 {
 	dst->_is_v6 = src->_is_v6;
-	dst->_data[0] = src->_data[0];
-	dst->_data[1] = src->_data[1];
+	((uint64_t *)dst->_data)[0] = ((const uint64_t *)src->_data)[0];
+	((uint64_t *)dst->_data)[1] = ((const uint64_t *)src->_data)[1];
 }
 
 // These cannot be inlines due to sizeof() being checked for IPv6
@@ -74,14 +74,14 @@ void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 } while (0)
 #define DP_SET_IPADDR6_UNSAFE(ADDR, IPV6) do { \
 	(ADDR)._is_v6 = true; \
-	(ADDR)._data[0] = ((const uint64_t *)(IPV6))[0]; \
-	(ADDR)._data[1] = ((const uint64_t *)(IPV6))[1]; \
+	((uint64_t *)(ADDR)._data)[0] = ((const uint64_t *)(IPV6))[0]; \
+	((uint64_t *)(ADDR)._data)[1] = ((const uint64_t *)(IPV6))[1]; \
 } while (0)
 
 #define DP_SET_IPADDR4(ADDR, IPV4) do { \
 	(ADDR)._is_v6 = false; \
-	(ADDR)._data[0] = (ADDR)._data[1] = 0; \
-	*(uint32_t *)(ADDR)._data = (IPV4); \
+	((uint64_t *)(ADDR)._data)[0] = ((uint64_t *)(ADDR)._data)[1] = 0; \
+	((uint32_t *)(ADDR)._data)[0] = (IPV4); \
 } while (0)
 
 
