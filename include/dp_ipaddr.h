@@ -15,11 +15,24 @@ extern "C" {
 #include "dp_error.h"
 
 #define DP_IPV6_ADDR_SIZE 16
-static_assert(sizeof(uint32_t)*4 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
+static_assert(sizeof(uint64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
 
+// TODO(plague): do something for naked ipv6, that uses uint8_t, thus cannot check size properly
+
+// TODO(plague): move NAT64 handling here (part of the above)
+
+// TODO(plague): This either needs to be a macro to enable checking for sizeof(addr) (or see above for the proposed ipv6 type)
+static __rte_always_inline
+bool dp_is_ipv6_addr_zero(const uint8_t *addr)
+{
+	return *((const uint64_t *)addr) == 0 && *((const uint64_t *)(addr + sizeof(uint64_t))) == 0;
+}
+
+// structure for holding dual IP addresses
+// made read-only without the right macro to prevent uninitialized bytes due to the the use of this structure in hash keys
 struct dp_ip_address {
 	union {
-		uint32_t		_data[DP_IPV6_ADDR_SIZE/sizeof(uint32_t)];
+		uint64_t		_data[DP_IPV6_ADDR_SIZE/sizeof(uint64_t)];
 		const uint8_t	ipv6[DP_IPV6_ADDR_SIZE];
 		const uint32_t	ipv4;
 	};
@@ -52,11 +65,7 @@ void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 	dst->_is_v6 = src->_is_v6;
 	dst->_data[0] = src->_data[0];
 	dst->_data[1] = src->_data[1];
-	dst->_data[2] = src->_data[2];
-	dst->_data[3] = src->_data[3];
 }
-// TODO macro/inline to copy the array??
-// TODO actually a helpful macro to copy IPv6 and guard the sizeof!
 
 // These cannot be inlines due to sizeof() being checked for IPv6
 #define DP_SET_IPADDR6(ADDR, IPV6) do { \
@@ -65,29 +74,16 @@ void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 } while (0)
 #define DP_SET_IPADDR6_UNSAFE(ADDR, IPV6) do { \
 	(ADDR)._is_v6 = true; \
-	(ADDR)._data[0] = ((const uint32_t *)(IPV6))[0]; \
-	(ADDR)._data[1] = ((const uint32_t *)(IPV6))[1]; \
-	(ADDR)._data[2] = ((const uint32_t *)(IPV6))[2]; \
-	(ADDR)._data[3] = ((const uint32_t *)(IPV6))[3]; \
+	(ADDR)._data[0] = ((const uint64_t *)(IPV6))[0]; \
+	(ADDR)._data[1] = ((const uint64_t *)(IPV6))[1]; \
 } while (0)
 
 #define DP_SET_IPADDR4(ADDR, IPV4) do { \
 	(ADDR)._is_v6 = false; \
-	(ADDR)._data[0] = (IPV4); \
-	(ADDR)._data[1] = (ADDR)._data[2] = (ADDR)._data[3] = 0; \
+	(ADDR)._data[0] = (ADDR)._data[1] = 0; \
+	*(uint32_t *)(ADDR)._data = (IPV4); \
 } while (0)
-// TODO why not use uint64_t ??
 
-// TODO move NAT64 here?
-
-
-// TODO(plague): This needs to be a macro to enable checking for sizeof(addr)
-static __rte_always_inline
-bool dp_is_ipv6_addr_zero(const uint8_t *addr)
-{
-	static_assert(DP_IPV6_ADDR_SIZE == 2 * sizeof(uint64_t), "uint64_t doesn't have the expected size");
-	return *((const uint64_t *)addr) == 0 && *((const uint64_t *)(addr + sizeof(uint64_t))) == 0;
-}
 
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
 // network byte-order!
