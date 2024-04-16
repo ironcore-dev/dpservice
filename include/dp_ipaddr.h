@@ -58,8 +58,6 @@ void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 // TODO macro/inline to copy the array??
 // TODO actually a helpful macro to copy IPv6 and guard the sizeof!
 
-// TODO move the is_addr_zero here
-
 // These cannot be inlines due to sizeof() being checked for IPv6
 #define DP_SET_IPADDR6(ADDR, IPV6) do { \
 	static_assert(sizeof(IPV6) == DP_IPV6_ADDR_SIZE, "Invalid IPv6 byte array passed to DP_FILL_IPADDR6()"); \
@@ -78,11 +76,19 @@ void dp_copy_ipaddr(struct dp_ip_address *dst, const struct dp_ip_address *src)
 	(ADDR)._data[0] = (IPV4); \
 	(ADDR)._data[1] = (ADDR)._data[2] = (ADDR)._data[3] = 0; \
 } while (0)
+// TODO why not use uint64_t ??
 
 // TODO move NAT64 here?
 
 
-// TODO these should be obsolete by now (logging already provides this)
+// TODO(plague): This needs to be a macro to enable checking for sizeof(addr)
+static __rte_always_inline
+bool dp_is_ipv6_addr_zero(const uint8_t *addr)
+{
+	static_assert(DP_IPV6_ADDR_SIZE == 2 * sizeof(uint64_t), "uint64_t doesn't have the expected size");
+	return *((const uint64_t *)addr) == 0 && *((const uint64_t *)(addr + sizeof(uint64_t))) == 0;
+}
+
 // inspired by DPDK's RTE_ETHER_ADDR_PRT_FMT and RTE_ETHER_ADDR_BYTES
 // network byte-order!
 #define DP_IPV4_PRINT_FMT       "%u.%u.%u.%u"

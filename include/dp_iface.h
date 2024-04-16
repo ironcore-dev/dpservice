@@ -38,14 +38,6 @@ void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *po
 	ether_hdr->ether_type = htons(ether_type);
 }
 
-// TODO move this to ipaddr.h
-static __rte_always_inline
-bool dp_is_ipv6_addr_zero(const uint8_t *addr)
-{
-	static_assert(DP_IPV6_ADDR_SIZE == 2 * sizeof(uint64_t), "uint64_t doesn't have the expected size");
-	return *((const uint64_t *)addr) == 0 && *((const uint64_t *)(addr + sizeof(uint64_t))) == 0;
-}
-
 #ifdef __cplusplus
 }
 #endif
