@@ -19,7 +19,7 @@ static_assert(sizeof(uint64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is i
 
 // TODO(plague): do something for naked ipv6, that uses uint8_t, thus cannot check size properly
 
-// TODO(plague): move NAT64 handling here (part of the above)
+// TODO(plague): move NAT64 handling here (part of the above) + grep for [12] which means NAT64 ipv6 -> ipv4 conversion and wrap it
 
 // TODO(plague): This either needs to be a macro to enable checking for sizeof(addr) (or see above for the proposed ipv6 type)
 static __rte_always_inline
