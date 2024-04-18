@@ -18,6 +18,37 @@ def reply_icmp_pkt_from_vm1(nat_ul_ipv6, pf_tap):
 				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
 	delayed_sendp(reply_pkt, pf_tap)
 
+def reply_icmp_pkt_from_vm1_identifier_check(nat_ul_ipv6):
+	pkt = sniff_packet(PF0.tap, is_icmp_pkt)
+	src_ip = pkt[IP].src
+	assert src_ip == nat_vip, \
+		f"Bad ICMP request (src ip: {src_ip})"
+
+	icmp_id_1 = pkt[ICMP].id
+	print(f"icmp_id_1: {icmp_id_1}")
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
+	delayed_sendp(reply_pkt, PF0.tap)
+
+	# prepare to reply to the second icmp packets to different IP, and check icmp ids
+	pkt = sniff_packet(PF0.tap, is_icmp_pkt)
+	src_ip = pkt[IP].src
+	assert src_ip == nat_vip, \
+		f"Bad ICMP request (src ip: {src_ip})"
+
+	icmp_id_2 = pkt[ICMP].id
+	print(f"icmp_id_2: {icmp_id_2}")
+	assert icmp_id_1 != icmp_id_2, \
+		f"Got the same ICMP identifier (icmp id 1: {icmp_id_1}, icmp id 2: {icmp_id_2})"
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
+	delayed_sendp(reply_pkt, PF0.tap)
+
+
 def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client, port_redundancy):
 	pf_tap = PF1.tap if port_redundancy else PF0.tap
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
@@ -32,6 +63,35 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client, port_redundancy):
 	pkt = sniff_packet(VM1.tap, is_icmp_pkt)
 	dst_ip = pkt[IP].dst
 	assert dst_ip == VM1.ip, \
+		f"Bad ECHO reply (dst ip: {dst_ip})"
+
+	grpc_client.delnat(VM1.name)
+
+def test_vf_to_pf_network_nat_icmp_identifier_check(prepare_ipv4, grpc_client, port_redundancy):
+	if port_redundancy:
+		pytest.skip()
+
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	threading.Thread(target=reply_icmp_pkt_from_vm1_identifier_check, args=(nat_ul_ipv6,)).start()
+
+	icmp_pkt_1 = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+			    IP(dst=public_ip3, src=VM1.ip) /
+			    ICMP(type=8, id=0x0040))
+	delayed_sendp(icmp_pkt_1, VM1.tap)
+
+	pkt = sniff_packet(VM1.tap, is_icmp_pkt)
+	dst_ip = pkt[IP].dst
+	assert dst_ip == VM1.ip and pkt[ICMP].id == 0x0040, \
+		f"Bad ECHO reply (dst ip: {dst_ip})"
+
+	icmp_pkt_2 = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+			    IP(dst=public_ip2, src=VM1.ip) /
+			    ICMP(type=8, id=0x0050))
+	delayed_sendp(icmp_pkt_2, VM1.tap)
+
+	pkt = sniff_packet(VM1.tap, is_icmp_pkt)
+	dst_ip = pkt[IP].dst
+	assert dst_ip == VM1.ip and pkt[ICMP].id == 0x0050, \
 		f"Bad ECHO reply (dst ip: {dst_ip})"
 
 	grpc_client.delnat(VM1.name)
