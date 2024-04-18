@@ -595,8 +595,11 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 	uint32_t dst_ip;
 
 	dst_ip = ntohl(df->dst.dst_addr);
-	dst_port = ntohs(df->l4_info.trans_port.dst_port);
 	dst_vni = df->tun_info.dst_vni;
+	if (df->l4_type == IPPROTO_ICMP)
+		dst_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
+	else
+		dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (dp_is_network_nat_port(current, dst_ip, NULL, dst_vni, dst_port))
@@ -615,7 +618,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	int ret;
 	bool need_to_find_new_port = true;
 	uint32_t iface_src_ip = ntohl(df->src.src_addr);
-	uint16_t iface_src_port = ntohs(df->l4_info.trans_port.src_port);
+	uint16_t iface_src_port;
 	uint64_t timestamp;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
@@ -628,12 +631,20 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		return DP_GRPC_ERR_BAD_IPVER;
 	}
 
+	if (df->l4_type == IPPROTO_ICMP)
+		iface_src_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
+	else
+		iface_src_port = ntohs(df->l4_info.trans_port.src_port);
+
 	portmap_key.iface_src_port = iface_src_port;
 	portmap_key.vni = vni;
 
 	portoverload_tbl_key.nat_ip = snat_data->nat_ip;
-	portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 	portoverload_tbl_key.l4_type = df->l4_type;
+	if (df->l4_type == IPPROTO_ICMP)
+		portoverload_tbl_key.dst_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
+	else
+		portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
 	if (ret != -ENOENT) {
@@ -745,6 +756,11 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	dp_copy_ipaddr(&portmap_key.src_ip, &flow_key_org->l3_src);
 	portmap_key.iface_src_port = flow_key_org->src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
+	if (flow_key_org->proto == IPPROTO_ICMP)
+		//flow_key[DP_FLOW_DIR_ORG].port_dst is already a converted icmp identifier
+		portmap_key.iface_src_port = flow_key_org->port_dst;
+	else
+		portmap_key.iface_src_port = flow_key_org->src.port_src;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
 	if (DP_FAILED(ret))

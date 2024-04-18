@@ -43,10 +43,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (dnat_data) {
 			// if it is a network nat pkt
 			if (dnat_data->dnat_ip == 0) {
-				// extrack identifier field from icmp reply pkt, which is a reply to VM's icmp request
-				if (df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
-					df->l4_info.trans_port.dst_port = df->l4_info.icmp_field.icmp_identifier;
-
 				// it is icmp request targeting scalable nat
 				if (df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
 					cntrack->nf_info.nat_type = DP_FLOW_NAT_AS_TARGET;
