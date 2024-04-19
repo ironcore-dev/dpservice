@@ -65,6 +65,24 @@ static int dp_create_vnf_route(uint8_t ul_addr6[DP_IPV6_ADDR_SIZE] /* out */,
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
 }
 
+static __rte_always_inline int dp_grpc_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni,
+												 const struct dp_ip_address *addr, const uint8_t *t_ip6, uint8_t depth)
+{
+	if (addr->is_v6)
+		return dp_add_route6(port, vni, t_vni, addr->ipv6, t_ip6, depth);
+	else
+		return dp_add_route(port, vni, t_vni, addr->ipv4, t_ip6, depth);
+}
+
+static __rte_always_inline int dp_grpc_del_route(const struct dp_port *port, uint32_t vni,
+												 const struct dp_ip_address *addr, uint8_t depth)
+{
+	if (addr->is_v6)
+		return dp_del_route6(port, vni, addr->ipv6, depth);
+	else
+		return dp_del_route(port, vni, addr->ipv4, depth);
+}
+
 static int dp_process_create_lb(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb *request = &responder->request.add_lb;
@@ -390,25 +408,15 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_NO_VM;
 
 	iface_vni = port->iface.vni;
-	if (!request->addr.is_v6) {
-		ret = dp_add_route(port, iface_vni, 0, request->addr.ipv4, NULL, request->length);
-		if (DP_FAILED(ret))
-			return ret;
+	ret = dp_grpc_add_route(port, iface_vni, 0, &request->addr, NULL, request->length);
+	if (DP_FAILED(ret))
+		return ret;
 
-		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
-			dp_del_route(port, iface_vni, request->addr.ipv4, request->length);
-			return DP_GRPC_ERR_VNF_INSERT;
-		}
-	} else {
-		ret = dp_add_route6(port, iface_vni, 0, request->addr.ipv6, NULL, request->length);
-		if (DP_FAILED(ret))
-			return ret;
-
-		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
-			dp_del_route6(port, iface_vni, request->addr.ipv6, request->length);
-			return DP_GRPC_ERR_VNF_INSERT;
-		}
+	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
+		dp_grpc_del_route(port, iface_vni, &request->addr, request->length);
+		return DP_GRPC_ERR_VNF_INSERT;
 	}
+
 	rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
 	return DP_GRPC_OK;
 }
@@ -423,13 +431,10 @@ static int dp_process_delete_prefix(struct dp_grpc_responder *responder)
 	if (!port)
 		return DP_GRPC_ERR_NO_VM;
 
-	if (request->addr.is_v6)
-		ret = dp_del_route6(port, port->iface.vni, request->addr.ipv6, request->length);
-	else
-		ret = dp_del_route(port, port->iface.vni, request->addr.ipv4, request->length);
+	ret = dp_grpc_del_route(port, port->iface.vni, &request->addr, request->length);
 	// ignore the error and try to delete the vnf entry anyway
-
 	ret2 = dp_del_vnf_by_value(DP_VNF_TYPE_ALIAS_PFX, port->port_id, port->iface.vni, &request->addr, request->length);
+
 	return DP_FAILED(ret) ? ret : ret2;
 }
 
@@ -584,24 +589,16 @@ static int dp_process_create_route(struct dp_grpc_responder *responder)
 	if (!request->trgt_addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	if (request->pfx_addr.is_v6)
-		return dp_add_route6(dp_get_pf0(), request->vni, request->trgt_vni,
-							 request->pfx_addr.ipv6, request->trgt_addr.ipv6,
+	return dp_grpc_add_route(dp_get_pf0(), request->vni, request->trgt_vni,
+							 &request->pfx_addr, request->trgt_addr.ipv6,
 							 request->pfx_length);
-	else
-		return dp_add_route(dp_get_pf0(), request->vni, request->trgt_vni,
-							request->pfx_addr.ipv4, request->trgt_addr.ipv6,
-							request->pfx_length);
 }
 
 static int dp_process_delete_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.del_route;
 
-	if (request->pfx_addr.is_v6)
-		return dp_del_route6(dp_get_pf0(), request->vni, request->pfx_addr.ipv6, request->pfx_length);
-	else
-		return dp_del_route(dp_get_pf0(), request->vni, request->pfx_addr.ipv4, request->pfx_length);
+	return dp_grpc_del_route(dp_get_pf0(), request->vni, &request->pfx_addr, request->pfx_length);
 }
 
 static int dp_process_create_nat(struct dp_grpc_responder *responder)

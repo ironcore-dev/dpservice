@@ -54,10 +54,10 @@ uint32_t dp_get_gw_ip4(void);
 const uint8_t *dp_get_gw_ip6(void);
 
 int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 const uint8_t *ip6, uint8_t depth);
+				 const uint8_t *t_ip6, uint8_t depth);
 int dp_del_route(const struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth);
 int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
-				  const uint8_t *ext_ip6, uint8_t depth);
+				  const uint8_t *t_ip6, uint8_t depth);
 int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth);
 int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes, struct dp_grpc_responder *responder);
 

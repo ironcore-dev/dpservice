@@ -82,7 +82,7 @@ const uint8_t *dp_get_gw_ip6(void)
 }
 
 int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 const uint8_t *ip6, uint8_t depth)
+				 const uint8_t *t_ip6, uint8_t depth)
 {
 	struct dp_iface_route *route = NULL;
 	struct rte_rib_node *node;
@@ -106,7 +106,7 @@ int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint3
 	if (port->is_pf) {
 		route = rte_rib_get_ext(node);
 		route->vni = t_vni;
-		rte_memcpy(route->nh_ipv6, ip6, sizeof(route->nh_ipv6));
+		rte_memcpy(route->nh_ipv6, t_ip6, sizeof(route->nh_ipv6));
 	}
 
 	return DP_GRPC_OK;
@@ -219,7 +219,7 @@ int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
 }
 
 int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
-				  const uint8_t *ext_ip6, uint8_t depth)
+				  const uint8_t *t_ip6, uint8_t depth)
 {
 	struct dp_iface_route *route = NULL;
 	struct rte_rib6_node *node;
@@ -243,7 +243,7 @@ int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, cons
 	if (port->is_pf) {
 		route = rte_rib6_get_ext(node);
 		route->vni = t_vni;
-		rte_memcpy(route->nh_ipv6, ext_ip6, sizeof(route->nh_ipv6));
+		rte_memcpy(route->nh_ipv6, t_ip6, sizeof(route->nh_ipv6));
 	}
 
 	return DP_GRPC_OK;
