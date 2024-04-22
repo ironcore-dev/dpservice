@@ -596,7 +596,7 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 
 	dst_ip = ntohl(df->dst.dst_addr);
 	dst_vni = df->tun_info.dst_vni;
-	if (df->l4_type == IPPROTO_ICMP)
+	if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
 		dst_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
 	else
 		dst_port = ntohs(df->l4_info.trans_port.dst_port);
@@ -631,7 +631,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		return DP_GRPC_ERR_BAD_IPVER;
 	}
 
-	if (df->l4_type == IPPROTO_ICMP)
+	if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
 		iface_src_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
 	else
 		iface_src_port = ntohs(df->l4_info.trans_port.src_port);
@@ -641,7 +641,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 
 	portoverload_tbl_key.nat_ip = snat_data->nat_ip;
 	portoverload_tbl_key.l4_type = df->l4_type;
-	if (df->l4_type == IPPROTO_ICMP)
+	if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
 		portoverload_tbl_key.dst_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
 	else
 		portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
@@ -756,7 +756,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	dp_copy_ipaddr(&portmap_key.src_ip, &flow_key_org->l3_src);
 	portmap_key.iface_src_port = flow_key_org->src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
-	if (flow_key_org->proto == IPPROTO_ICMP)
+	if (flow_key_org->proto == IPPROTO_ICMP || flow_key_org->proto == IPPROTO_ICMPV6)
 		//flow_key[DP_FLOW_DIR_ORG].port_dst is already a converted icmp identifier
 		portmap_key.iface_src_port = flow_key_org->port_dst;
 	else
