@@ -177,12 +177,20 @@ static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const uint8_t *b_ip)
 	return false;
 }
 
+static __rte_always_inline bool dp_lb_port_match(struct lb_value *lb_val, uint16_t port_dst, uint8_t proto)
+{
+	for (struct lb_port *port = lb_val->ports;
+			port < lb_val->ports + DP_LB_MAX_PORTS && port->port != 0;
+			++port)
+		if (port->port == port_dst && port->protocol == proto)
+			return true;
+	return false;
+}
+
 uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
-	struct lb_port lb_port;
 	struct lb_key lb_key;
-	int pos, k;
 
 	lb_key.vni = vni;
 	dp_copy_ipaddr(&lb_key.ip, &flow_key->l3_dst);
@@ -193,17 +201,10 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 	if (lb_val->back_end_cnt == 0)
 		return NULL;
 
-	for (k = 0; k < DP_LB_MAX_PORTS; k++) {
-		if ((lb_val->ports[k].port == htons(flow_key->port_dst)) && (lb_val->ports[k].protocol == flow_key->proto))
-			break;
-		if (lb_val->ports[k].port == 0)
-			return NULL;
-	}
-	/* Port table full and we didnt get a port match */
-	if (k == DP_LB_MAX_PORTS)
+	if (!dp_lb_port_match(lb_val, htons(flow_key->port_dst), flow_key->proto))
 		return NULL;
 
-	pos = lb_val->maglev_hash[dp_get_conntrack_flow_hash_value(flow_key) % DP_LB_MAGLEV_LOOKUP_SIZE];
+	int pos = lb_val->maglev_hash[dp_get_conntrack_flow_hash_value(flow_key) % DP_LB_MAGLEV_LOOKUP_SIZE];
 
 	return (uint8_t *)&lb_val->back_end_ips[pos][0];
 }
@@ -251,7 +252,7 @@ int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip)
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	if (DP_FAILED(dp_add_maglev_backend(lb_val, back_ip)))
-		return DP_GRPC_ERR_BACKIP_ADD_FAILED;
+		return DP_GRPC_ERR_BACKIP_ADD;
 
 	return DP_GRPC_OK;
 }
@@ -268,7 +269,7 @@ int dp_del_lb_back_ip(const void *id_key, const uint8_t *back_ip)
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	if (DP_FAILED(dp_delete_maglev_backend(lb_val, back_ip)))
-		return DP_GRPC_ERR_BACKIP_DEL_FAILED;
+		return DP_GRPC_ERR_BACKIP_DEL;
 
 	return DP_GRPC_OK;
 }

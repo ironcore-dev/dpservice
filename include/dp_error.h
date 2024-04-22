@@ -70,8 +70,8 @@ const char *dp_strerror_verbose(int error);
 	ERR(VNF_DELETE,							403) \
 	ERR(NO_BACKIP,							421) \
 	ERR(NO_LB,								422) \
-	ERR(BACKIP_ADD_FAILED,					423) \
-	ERR(BACKIP_DEL_FAILED,					424) \
+	ERR(BACKIP_ADD,							423) \
+	ERR(BACKIP_DEL,							424) \
 	ERR(NO_DROP_SUPPORT,					441) \
 
 #define _DP_GRPC_ERROR_ENUM(NAME, NUMBER) \
