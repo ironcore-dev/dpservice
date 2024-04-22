@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 
+/* Implementation is based on maglev paper pseudo-code */
 #define DP_MURMURHASH2_MAGIC	0x5bd1e995
 #define DP_DJB_HASH_MAGIC		5381
 #define DP_MAGLEV_POS_FREE		-1
@@ -80,8 +81,10 @@ static int *dp_maglev_permutation(struct lb_value *lbval)
 	size = lbval->back_end_cnt * DP_LB_MAGLEV_LOOKUP_SIZE;
 	permutation = rte_zmalloc("maglev_perm", sizeof(int) * size, RTE_CACHE_LINE_SIZE);
 
-	if (!permutation)
+	if (!permutation) {
+		DPS_LOG_ERR("Memory allocation failed");
 		return NULL;
+	}
 
 	for (i = 0; i < lbval->back_end_cnt; i++) {
 		offset = dp_murmur_hash2(lbval->back_end_ips[i]) % DP_LB_MAGLEV_LOOKUP_SIZE;
@@ -93,34 +96,47 @@ static int *dp_maglev_permutation(struct lb_value *lbval)
 	return permutation;
 }
 
-static int dp_maglev_populate(struct lb_value *lbval, int *permutation)
+static __rte_always_inline bool dp_maglev_populate_iteration(struct lb_value *lbval, int *permutation, int *next, int *num)
 {
-	int *next = rte_zmalloc("maglev_hash", lbval->back_end_cnt * sizeof(int), RTE_CACHE_LINE_SIZE);
-	int i, j, pos, num = 0;
+	int i, j, pos;
 
-	if (!next)
-		return DP_ERROR;
-
-	for (i = 0; i < DP_LB_MAGLEV_LOOKUP_SIZE; i++)
-		lbval->maglev_hash[i] = DP_MAGLEV_POS_FREE;
-
-	while (true) {
-		for (i = 0; i < lbval->back_end_cnt; i++) {
-			for (j = next[i]; j < DP_LB_MAGLEV_LOOKUP_SIZE; j++) {
-				pos = permutation[i*DP_LB_MAGLEV_LOOKUP_SIZE + j];
-				next[i]++;
-				if (lbval->maglev_hash[pos] == DP_MAGLEV_POS_FREE) {
-					lbval->maglev_hash[pos] = (int16_t)i;
-					num++;
-					if (num == DP_LB_MAGLEV_LOOKUP_SIZE)
-						goto out;
-					break;
-				}
+	for (i = 0; i < lbval->back_end_cnt; i++) {
+		for (j = next[i]; j < DP_LB_MAGLEV_LOOKUP_SIZE; j++) {
+			pos = permutation[i * DP_LB_MAGLEV_LOOKUP_SIZE + j];
+			next[i]++;
+			if (lbval->maglev_hash[pos] == DP_MAGLEV_POS_FREE) {
+				lbval->maglev_hash[pos] = (int16_t)i;
+				(*num)++;
+				if (*num == DP_LB_MAGLEV_LOOKUP_SIZE)
+					return false;
+				break;
 			}
 		}
 	}
+	return true;
+}
 
-out:
+static int dp_maglev_populate(struct lb_value *lbval, int *permutation)
+{
+	int *next = rte_zmalloc("maglev_hash", lbval->back_end_cnt * sizeof(int), RTE_CACHE_LINE_SIZE);
+	int num = 0;
+
+	if (!next) {
+		DPS_LOG_ERR("Memory allocation failed");
+		return DP_ERROR;
+	}
+
+	for (int i = 0; i < DP_LB_MAGLEV_LOOKUP_SIZE; i++)
+		lbval->maglev_hash[i] = DP_MAGLEV_POS_FREE;
+
+	while (dp_maglev_populate_iteration(lbval, permutation, next, &num))
+		;
+
+	/* In case there was a non-filled spot, fill it randomly */
+	for (int i = 0; i < DP_LB_MAGLEV_LOOKUP_SIZE; i++)
+		if (lbval->maglev_hash[i] == DP_MAGLEV_POS_FREE)
+			lbval->maglev_hash[i] = (int16_t)(i % lbval->back_end_cnt);
+
 	rte_free(next);
 	return DP_OK;
 }
@@ -167,34 +183,34 @@ static void dp_shift_back_end_ips(uint8_t ips[][DP_IPV6_ADDR_SIZE], int start_po
 			rte_memcpy(&ips[i], &ips[i + 1], DP_IPV6_ADDR_SIZE);
 }
 
-int dp_add_maglev_backend(struct lb_value *lbval, const uint8_t *new_server)
+int dp_add_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip)
 {
 	int i, insert_pos = lbval->back_end_cnt;
 
 	if (lbval->back_end_cnt >= DP_LB_MAX_IPS_PER_VIP)
 		return DP_ERROR;
 
-	/* Find the correct position to insert the new server */
+	/* Find the correct position to insert the new back ip */
 	for (i = 0; i < lbval->back_end_cnt; i++) {
-		if (dp_is_ip_greater(lbval->back_end_ips[i], new_server)) {
+		if (dp_is_ip_greater(lbval->back_end_ips[i], back_ip)) {
 			insert_pos = i;
 			break;
 		}
 	}
 
 	dp_shift_back_end_ips(lbval->back_end_ips, insert_pos, lbval->back_end_cnt, DP_SHIFT_UP);
-	rte_memcpy(&lbval->back_end_ips[insert_pos], new_server, DP_IPV6_ADDR_SIZE);
+	rte_memcpy(&lbval->back_end_ips[insert_pos], back_ip, DP_IPV6_ADDR_SIZE);
 	lbval->back_end_cnt++;
 
 	return dp_maglev_calc_hash_lookup_table(lbval);
 }
 
-int dp_delete_maglev_backend(struct lb_value *lbval, const uint8_t *delete_server)
+int dp_delete_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip)
 {
 	int i;
 
 	for (i = 0; i < lbval->back_end_cnt; i++) {
-		if (memcmp(&lbval->back_end_ips[i], delete_server, DP_IPV6_ADDR_SIZE) == 0) {
+		if (memcmp(&lbval->back_end_ips[i], back_ip, DP_IPV6_ADDR_SIZE) == 0) {
 			dp_shift_back_end_ips(lbval->back_end_ips, i, lbval->back_end_cnt - 1, DP_SHIFT_DOWN);
 			memset(&lbval->back_end_ips[lbval->back_end_cnt - 1], 0, DP_IPV6_ADDR_SIZE);
 			lbval->back_end_cnt--;

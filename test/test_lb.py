@@ -4,6 +4,7 @@
 import pytest
 
 from helpers import *
+from lb_tester import *
 
 def network_lb_external_icmpv4_ping(lb_ul_ipv6):
 	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /

@@ -5,6 +5,7 @@ import pytest
 
 from config import *
 from helpers import *
+from lb_tester import *
 from tcp_tester import TCPTesterPublic
 from tcp_tester import TCPTesterVirtsvc
 
@@ -149,11 +150,11 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
 
 	# Also test basic maglev behaviour
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1242)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1242)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
 	age_out_flows()
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1242)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1242)
 
 	# Add/Remove dummy lb targets and the test the traffic againg
 	grpc_client.addlbtarget(lb_name, "cafe:dede::1")
@@ -167,14 +168,14 @@ def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy
 	grpc_client.dellbtarget(lb_name, "cafe:dede::ff")
 
 	age_out_flows()
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1242)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1234)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
+	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1242)
 
 	grpc_client.delvip(VM3.name)
 
 	# NAT should behave the same, just test once (watch out for round-robin from before)
 	nat_ipv6 = grpc_client.addnat(VM3.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1233)
+	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1234)
 	grpc_client.delnat(VM3.name)
 
 	grpc_client.dellbtarget(lb_name, lb_vm2_ul_ipv6)
