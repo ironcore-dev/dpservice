@@ -8,6 +8,7 @@ import os
 import random
 import sys
 import subprocess
+import shutil
 
 from grpc_client import GrpcClient
 
@@ -77,10 +78,12 @@ def testDpService(build_path, print_header):
 	env['MALLOC_PERTURB_'] = str(random.randint(1, 255))
 	print(f"MALLOC_PERTURB_={env['MALLOC_PERTURB_']}")
 
+	pytest_command = 'pytest-3' if shutil.which('pytest-3') else 'pytest'
+
 	to_run = [ suite for suite in suites if not args.suite or args.suite.lower() == suite.label.lower() ]
 	for i, suite in enumerate(to_run):
 		print(f"\n{print_header} TEST {i+1}/{len(to_run)}: {suite.label} tests")
-		command = ['pytest-3', '-x', '-v'] + suite.args + suite.files
+		command = [pytest_command, '-x', '-v'] + suite.args + suite.files
 		print(' '.join(command))
 		result = subprocess.run(command, env=env)
 		if result.returncode != 0:
