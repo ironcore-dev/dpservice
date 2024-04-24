@@ -5,7 +5,6 @@ import pytest
 
 from config import *
 from helpers import *
-from lb_tester import *
 from tcp_tester import TCPTesterPublic
 from tcp_tester import TCPTesterVirtsvc
 
@@ -126,66 +125,68 @@ def test_external_lb_relay_timeout(prepare_ipv4, grpc_client, fast_flow_timeout)
 	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
 	sniff_lb_pkt(neigh_ul_ipv6)
 
-	age_out_flows()
-	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
-	sniff_lb_pkt(neigh_ul_ipv6)
-
-
 	grpc_client.dellbtarget(lb_name, neigh_ul_ipv6)
 	grpc_client.dellb(lb_name)
 
-def test_vip_nat_to_lb_on_another_vni(prepare_ipv4, grpc_client, port_redundancy):
 
-	if port_redundancy:
-		pytest.skip("Port redundancy is not supported for LB(vni1) <-> VIP/NAT(vni2) test")
+def test_external_lb_relay_algorithm(prepare_ipv4, grpc_client, fast_flow_timeout):
+	if not fast_flow_timeout:
+		pytest.skip("Fast flow timeout needs to be enabled")
 
+	# TODO dellbtarget() is not properly cleanin up so the previous example poisons the result
+	age_out_flows()
+
+	targets = [ f"fc00:2::{i}" for i in range(1, 7) ]
+
+	# Create a lb with multiple targets
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
-	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_pfx)
-	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
-	lb_vm2_ul_ipv6 = grpc_client.addlbprefix(VM2.name, lb_pfx)
-	grpc_client.addlbtarget(lb_name, lb_vm2_ul_ipv6)
+	for target in targets:
+		grpc_client.addlbtarget(lb_name, target)
+	# Create "holes" in the target table
+	grpc_client.dellbtarget(lb_name, targets[2])
+	grpc_client.dellbtarget(lb_name, targets[0])
 
-	vip_ipv6 = grpc_client.addvip(VM3.name, vip_vip)
-	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=80, dst_port_max=80)
-	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
 
-	# Also test basic maglev behaviour
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
-	age_out_flows()
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1242)
+	target_ul = pkt[IPv6].dst
+	assert target_ul != targets[2] and target_ul != targets[0], \
+		"Loadbalancer selected a previously deleted target"
 
-	# Add/Remove dummy lb targets and the test the traffic againg
-	grpc_client.addlbtarget(lb_name, "cafe:dede::1")
-	grpc_client.addlbtarget(lb_name, "cafe:dede::ab")
-	grpc_client.addlbtarget(lb_name, "cafe:dede::de")
-	grpc_client.addlbtarget(lb_name, "cafe:dede::ff")
-
-	grpc_client.dellbtarget(lb_name, "cafe:dede::1")
-	grpc_client.dellbtarget(lb_name, "cafe:dede::ab")
-	grpc_client.dellbtarget(lb_name, "cafe:dede::de")
-	grpc_client.dellbtarget(lb_name, "cafe:dede::ff")
+	del targets[2]
+	del targets[0]
 
 	age_out_flows()
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM1.tap, 1252)
-	communicate_vip_lb(VM3, lb_ul_ipv6, vip_ipv6, vip_vip, VM2.tap, 1242)
 
-	grpc_client.delvip(VM3.name)
+	# Selected target should be always the same for this pentuple, even after conntrack times out
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
+	assert target_ul == pkt[IPv6].dst, \
+		f"Loadbalancer target selection algorithm is not consistent"
 
-	# NAT should behave the same, just test once (watch out for round-robin from before)
-	nat_ipv6 = grpc_client.addnat(VM3.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	communicate_vip_lb(VM3, lb_ul_ipv6, nat_ipv6, nat_vip, VM2.tap, 1234)
-	grpc_client.delnat(VM3.name)
+	age_out_flows()
 
-	grpc_client.dellbtarget(lb_name, lb_vm2_ul_ipv6)
-	grpc_client.dellbprefix(VM2.name, lb_pfx)
-	grpc_client.dellbtarget(lb_name, lb_vm1_ul_ipv6)
-	grpc_client.dellbprefix(VM1.name, lb_pfx)
+	# Delete one target (not this one) to try to break the selection
+	other_ul = next(target for target in targets if target != target_ul)
+	grpc_client.dellbtarget(lb_name, other_ul)
+	targets.remove(other_ul)
+
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
+	assert target_ul == pkt[IPv6].dst, \
+		f"Loadbalancer target selection algorithm did not survive other target deletion"
+
+	# Delete the target itself (no need to age out, should be clean)
+	# TODO this should not be needed, see above
+	age_out_flows()
+	grpc_client.dellbtarget(lb_name, target_ul)
+	targets.remove(target_ul)
+
+	threading.Thread(target=send_bounce_pkt_to_pf, args=(lb_ul_ipv6,)).start()
+	pkt = sniff_packet(PF0.tap, is_tcp_pkt, skip=1)
+	assert target_ul != pkt[IPv6].dst, \
+		f"Loadbalancer target selection chose a deleted target"
+
+	for target in targets:
+		grpc_client.dellbtarget(lb_name, target)
 	grpc_client.dellb(lb_name)
-
-	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
-	grpc_client.delfwallrule(VM1.name, "fw0-vm1")
-
-	# NOTE: this test, just like in test_pf_to_vf.py
-	# cannot be run twice in a row, since the flows need to age-out
