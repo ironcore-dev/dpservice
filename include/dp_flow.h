@@ -87,11 +87,9 @@ struct flow_nf_info {
 	uint32_t vni;
 	uint16_t icmp_err_ip_cksum;
 	enum dp_flow_nat_type nat_type;
-	uint8_t underlay_dst[16];
+	union dp_ipv6 underlay_dst;
 	uint8_t l4_type;
-} __rte_packed;
-static_assert(sizeof(((struct flow_nf_info *)0)->nat_type) == 1,
-			  "enum dp_flow_nat_type is unnecessarily big");
+};
 
 struct flow_value {
 	struct flow_key	flow_key[DP_FLOW_DIR_CAPACITY];
@@ -151,7 +149,7 @@ void dp_free_network_nat_port(const struct flow_value *cntrack);
 void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type);
 void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port);
 void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni);
-void dp_remove_lbtarget_flows(const uint8_t *ul_addr);
+void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key);
 

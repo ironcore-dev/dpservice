@@ -64,11 +64,11 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	if (df->nat_type == DP_LB_RECIRC)
 		// store the original ipv6 dst address in the packet
-		rte_memcpy(ipv6_hdr->src_addr, df->tun_info.ul_src_addr6, sizeof(ipv6_hdr->src_addr));
+		dp_set_src_ipv6(ipv6_hdr, &df->tun_info.ul_src_addr6);
 	else
-		rte_memcpy(ipv6_hdr->src_addr, dp_get_port_ul_ipv6(dp_get_in_port(m)), sizeof(ipv6_hdr->src_addr));
+		dp_set_src_ipv6(ipv6_hdr, dp_get_port_ul_ipv6(dp_get_in_port(m)));
 
-	rte_memcpy(ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(ipv6_hdr->dst_addr));
+	dp_set_dst_ipv6(ipv6_hdr, &df->tun_info.ul_dst_addr6);
 	ipv6_hdr->proto = df->tun_info.proto_id;
 
 	m->packet_type = packet_type;

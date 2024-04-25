@@ -103,8 +103,8 @@ static int dp_virtsvc_ipv6_comparator(const void *p1, const void *p2)
 	const struct dp_virtsvc *l = *(const struct dp_virtsvc * const *)p1;
 	const struct dp_virtsvc *r = *(const struct dp_virtsvc * const *)p2;
 
-	return dp_virtsvc_ipv6_cmp(l->proto, l->service_addr, l->service_port,
-							   r->proto, r->service_addr, r->service_port);
+	return dp_virtsvc_ipv6_cmp(l->proto, &l->service_addr, l->service_port,
+							   r->proto, &r->service_addr, r->service_port);
 }
 
 static int dp_virtsvc_create_trees(void)
@@ -166,7 +166,7 @@ int dp_virtsvc_init(int socket_id)
 		dp_virtservices_end->virtual_addr = rule->virtual_addr;
 		dp_virtservices_end->virtual_port = rule->virtual_port;
 		dp_virtservices_end->service_port = rule->service_port;
-		rte_memcpy(dp_virtservices_end->service_addr, rule->service_addr, sizeof(rule->service_addr));
+		dp_copy_ipv6(&dp_virtservices_end->service_addr, &rule->service_addr);
 		// last_assigned_port is 0 due to zmalloc()
 		snprintf(hashtable_name, sizeof(hashtable_name), "virtsvc_table_%u", i);
 		dp_virtservices_end->open_ports = dp_create_jhash_table(DP_VIRTSVC_PORTCOUNT,
@@ -229,7 +229,7 @@ int dp_virtsvc_install_isolation_rules(uint16_t port_id)
 	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
 		ret = dp_install_isolated_mode_virtsvc(port_id,
 											   service->proto,
-											   service->service_addr,
+											   &service->service_addr,
 											   service->service_port);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot create isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));

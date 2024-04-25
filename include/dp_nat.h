@@ -26,23 +26,24 @@ struct nat_key {
 } __rte_packed;
 
 typedef struct network_nat_entry {
+	// TODO(plague) struct dp_ip_address! migrate
 	union {
 		uint8_t		nat_ip6[DP_IPV6_ADDR_SIZE];
 		uint32_t	nat_ip4;
 	} nat_ip;
 	uint16_t	port_range[2];
 	uint32_t	vni;
-	uint8_t		dst_ipv6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6	dst_ipv6;
 	TAILQ_ENTRY(network_nat_entry) entries;
 } network_nat_entry;
 
 struct snat_data {
-	uint32_t	vip_ip;
-	uint32_t	nat_ip;
-	uint16_t	nat_port_range[2];
-	uint8_t		ul_vip_ip6[DP_IPV6_ADDR_SIZE]; /* VIP underlay */
-	uint8_t		ul_nat_ip6[DP_IPV6_ADDR_SIZE]; /* NAT Gateway underlay */
-	uint64_t	log_timestamp;
+	uint32_t		vip_ip;
+	uint32_t		nat_ip;
+	uint16_t		nat_port_range[2];
+	union dp_ipv6	ul_vip_ip6;
+	union dp_ipv6	ul_nat_ip6;
+	uint64_t		log_timestamp;
 };
 
 struct dnat_data {
@@ -78,12 +79,12 @@ int dp_nat_init(int socket_id);
 void dp_nat_free(void);
 
 int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
-						const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE]);
+						const union dp_ipv6 *ul_ipv6);
 int dp_del_iface_vip_ip(uint32_t iface_ip, uint32_t vni);
 
 uint32_t dp_get_iface_nat_ip(uint32_t iface_ip, uint32_t vni);
 int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
-						const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE]);
+						const union dp_ipv6 *ul_ipv6);
 int dp_del_iface_nat_ip(uint32_t iface_ip, uint32_t vni);
 
 int dp_del_dnat_ip(uint32_t d_ip, uint32_t vni);
@@ -94,22 +95,22 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 				   struct rte_mbuf *m);
 
 int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t nat_ip, rte_be32_t *dest_ip /* out */);
-int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const uint8_t *ipv6_addr);
+int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const union dp_ipv6 *ipv6_addr);
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
 
 int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
 							 uint32_t vni, uint16_t min_port, uint16_t max_port,
-							 const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE]);
+							 const union dp_ipv6 *ul_ipv6);
 
 int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
 							 uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
-											  uint32_t vni, uint16_t min_port, uint16_t max_port);
+const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
+													uint32_t vni, uint16_t min_port, uint16_t max_port);
 
 int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni);
-const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
+const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
 
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);
@@ -119,7 +120,7 @@ void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
 
 static __rte_always_inline bool dp_is_ip6_in_nat64_range(const uint8_t *ipv6_addr)
 {
-	return memcmp(ipv6_addr, DP_NAT64_PREFIX, 12) == 0;
+	return memcmp(ipv6_addr, DP_NAT64_PREFIX, 12) == 0;  // TODO migrate NAT64
 }
 
 #ifdef __cplusplus

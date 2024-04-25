@@ -233,9 +233,9 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 	request->add_iface.vni = request_.vni();
 	if (!GrpcConv::StrToIpv4(request_.ipv4_config().primary_address(), &request->add_iface.ip4_addr))
 		return "Invalid ipv4_config.primary_address";
-	if (!GrpcConv::StrToIpv6(request_.ipv6_config().primary_address(), request->add_iface.ip6_addr))
+	if (!GrpcConv::StrToIpv6(request_.ipv6_config().primary_address(), &request->add_iface.ip6_addr))
 		return "Invalid ipv6_config.primary_address";
-	if (request->add_iface.ip4_addr == 0 && dp_is_ipv6_addr_zero(request->add_iface.ip6_addr))
+	if (request->add_iface.ip4_addr == 0 && dp_is_ipv6_zero(&request->add_iface.ip6_addr))
 		return "Invalid ipv4_config.primary_address and ipv6_config.primary_address combination";
 	if (!request_.pxe_config().next_server().empty()) {
 		DPGRPC_LOG_INFO("Setting PXE",
@@ -243,7 +243,7 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 						DP_LOG_PXE_SRV(request_.pxe_config().next_server().c_str()),
 						DP_LOG_PXE_PATH(request_.pxe_config().boot_filename().c_str()));
 		if (!GrpcConv::StrToDpAddress(request_.pxe_config().next_server(), &request->add_iface.pxe_addr,
-			dp_is_ipv6_addr_zero(request->add_iface.ip6_addr) ? IpVersion::IPV4 : IpVersion::IPV6))
+			dp_is_ipv6_zero(&request->add_iface.ip6_addr) ? IpVersion::IPV4 : IpVersion::IPV6))
 			return "Invalid pxe_config.next_server";
 		if (SNPRINTF_FAILED(request->add_iface.pxe_str, request_.pxe_config().boot_filename()))
 			return "Invalid pxe_config.boot_filename";
@@ -266,7 +266,7 @@ void CreateInterfaceCall::ParseReply(struct dpgrpc_reply* reply)
 	vf = new VirtualFunction();
 	vf->set_name(reply->vf_pci.name);
 	reply_.set_allocated_vf(vf);
-	inet_ntop(AF_INET6, reply->vf_pci.ul_addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->vf_pci.ul_addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -335,7 +335,7 @@ void CreatePrefixCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	char strbuf[INET6_ADDRSTRLEN];
 
-	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->ul_addr.addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -376,16 +376,9 @@ void ListPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 	FOREACH_MESSAGE(route, reply) {
 		pfx = reply_.add_prefixes();
 		pfx_ip = new IpAddress();
-		if (!route->pfx_addr.is_v6) {
-			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
-			pfx_ip->set_ipver(IpVersion::IPV4);
-		} else {
-			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
-			pfx_ip->set_address(strbuf);
-			pfx_ip->set_ipver(IpVersion::IPV6);
-		}
+		GrpcConv::DpToGrpcAddress(&route->pfx_addr, pfx_ip);
 		pfx->set_length(route->pfx_length);
-		inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+		DP_IPADDR_TO_STR(&route->trgt_addr, strbuf);
 		pfx->set_underlay_route(strbuf);
 		pfx->set_allocated_ip(pfx_ip);
 	}
@@ -448,32 +441,18 @@ void ListRoutesCall::ParseReply(struct dpgrpc_reply* reply)
 	IpAddress *nh_ip;
 	Prefix *pfx;
 	IpAddress *pfx_ip;
-	char strbuf[INET6_ADDRSTRLEN];
 
 	FOREACH_MESSAGE(route, reply) {
 		grpc_route = reply_.add_routes();
 		grpc_route->set_nexthop_vni(route->trgt_vni);
 
 		nh_ip = new IpAddress();
-		if (!route->trgt_addr.is_v6) {
-			nh_ip->set_address(GrpcConv::Ipv4ToStr(route->trgt_addr.ipv4));
-			nh_ip->set_ipver(IpVersion::IPV4);
-		} else {
-			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
-			nh_ip->set_address(strbuf);
-			nh_ip->set_ipver(IpVersion::IPV6);
-		}
+		GrpcConv::DpToGrpcAddress(&route->trgt_addr, nh_ip);
 		grpc_route->set_allocated_nexthop_address(nh_ip);
 
 		pfx_ip = new IpAddress();
-		if (!route->pfx_addr.is_v6) {
-			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
-			pfx_ip->set_ipver(IpVersion::IPV4);
-		} else {
-			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
-			pfx_ip->set_address(strbuf);
-			pfx_ip->set_ipver(IpVersion::IPV6);
-		}
+		GrpcConv::DpToGrpcAddress(&route->pfx_addr, pfx_ip);
+
 		pfx = new Prefix();
 		pfx->set_allocated_ip(pfx_ip);
 		pfx->set_length(route->pfx_length);
@@ -497,7 +476,7 @@ void CreateVipCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	char strbuf[INET6_ADDRSTRLEN];
 
-	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->ul_addr.addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -527,9 +506,8 @@ void GetVipCall::ParseReply(struct dpgrpc_reply* reply)
 	char strbuf[INET6_ADDRSTRLEN];
 
 	vip_ip = new IpAddress();
-	vip_ip->set_ipver(IpVersion::IPV4);
-	vip_ip->set_address(GrpcConv::Ipv4ToStr(reply->vip.addr.ipv4));
-	inet_ntop(AF_INET6, reply->vip.ul_addr6, strbuf, sizeof(strbuf));
+	GrpcConv::DpToGrpcAddress(&reply->vip.addr, vip_ip);
+	DP_IPV6_TO_STR(&reply->vip.ul_addr6, strbuf);
 	reply_.set_allocated_vip_ip(vip_ip);
 	reply_.set_underlay_route(strbuf);
 }
@@ -560,7 +538,7 @@ void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	char strbuf[INET6_ADDRSTRLEN];
 
-	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->ul_addr.addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -578,12 +556,11 @@ void GetNatCall::ParseReply(struct dpgrpc_reply* reply)
 	char strbuf[INET6_ADDRSTRLEN];
 
 	nat_ip = new IpAddress();
-	nat_ip->set_address(GrpcConv::Ipv4ToStr(reply->nat.addr.ipv4));
-	nat_ip->set_ipver(IpVersion::IPV4);
+	GrpcConv::DpToGrpcAddress(&reply->nat.addr, nat_ip);
 	reply_.set_allocated_nat_ip(nat_ip);
 	reply_.set_max_port(reply->nat.max_port);
 	reply_.set_min_port(reply->nat.min_port);
-	inet_ntop(AF_INET6, reply->nat.ul_addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->nat.ul_addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -616,8 +593,7 @@ void ListLocalNatsCall::ParseReply(struct dpgrpc_reply* reply)
 	FOREACH_MESSAGE(nat, reply) {
 		nat_entry = reply_.add_nat_entries();
 		nat_ip = new IpAddress();
-		nat_ip->set_ipver(IpVersion::IPV4);
-		nat_ip->set_address(GrpcConv::Ipv4ToStr(nat->addr.ipv4));
+		GrpcConv::DpToGrpcAddress(&nat->addr, nat_ip);
 		nat_entry->set_allocated_nat_ip(nat_ip);
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
@@ -644,7 +620,7 @@ const char* CreateNeighborNatCall::FillRequest(struct dpgrpc_request* request)
 	request->add_neighnat.min_port = (uint16_t)request_.min_port();
 	request->add_neighnat.max_port = (uint16_t)request_.max_port();
 	request->add_neighnat.vni = request_.vni();
-	if (!GrpcConv::StrToIpv6(request_.underlay_route(), request->add_neighnat.neigh_addr6))
+	if (!GrpcConv::StrToIpv6(request_.underlay_route(), &request->add_neighnat.neigh_addr6))
 		return "Invalid underlay_route";
 	return NULL;
 }
@@ -693,7 +669,7 @@ void ListNeighborNatsCall::ParseReply(struct dpgrpc_reply* reply)
 
 	FOREACH_MESSAGE(nat, reply) {
 		nat_entry = reply_.add_nat_entries();
-		inet_ntop(AF_INET6, nat->ul_addr6, strbuf, sizeof(strbuf));
+		DP_IPV6_TO_STR(&nat->ul_addr6, strbuf);
 		nat_entry->set_underlay_route(strbuf);
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
@@ -736,7 +712,7 @@ void CreateLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	char strbuf[INET6_ADDRSTRLEN];
 
-	inet_ntop(AF_INET6, reply->ul_addr.addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->ul_addr.addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -768,14 +744,7 @@ void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 
 	reply_.set_vni(reply->lb.vni);
 	lb_ip = new IpAddress();
-	if (!reply->lb.addr.is_v6) {
-		lb_ip->set_ipver(IpVersion::IPV4);
-		lb_ip->set_address(GrpcConv::Ipv4ToStr(reply->lb.addr.ipv4));
-	} else {
-		lb_ip->set_ipver(IpVersion::IPV6);
-		inet_ntop(AF_INET6, reply->lb.addr.ipv6, strbuf, sizeof(strbuf));
-		lb_ip->set_address(strbuf);
-	}
+	GrpcConv::DpToGrpcAddress(&reply->lb.addr, lb_ip);
 	reply_.set_allocated_loadbalanced_ip(lb_ip);
 	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
 		if (reply->lb.lbports[i].port == 0)
@@ -787,7 +756,7 @@ void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 		if (reply->lb.lbports[i].protocol == IPPROTO_UDP)
 			lb_port->set_protocol(UDP);
 	}
-	inet_ntop(AF_INET6, reply->lb.ul_addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&reply->lb.ul_addr6, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -834,13 +803,10 @@ void ListLoadBalancerTargetsCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	struct dpgrpc_lb_target *lb_target;
 	IpAddress *target_ip;
-	char strbuf[INET6_ADDRSTRLEN];
 
 	FOREACH_MESSAGE(lb_target, reply) {
 		target_ip = reply_.add_target_ips();
-		inet_ntop(AF_INET6, lb_target->addr.ipv6, strbuf, sizeof(strbuf));
-		target_ip->set_address(strbuf);
-		target_ip->set_ipver(IpVersion::IPV6);
+		GrpcConv::DpToGrpcAddress(&lb_target->addr, target_ip);
 	}
 }
 
@@ -864,7 +830,7 @@ void CreateLoadBalancerPrefixCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	char strbuf[INET6_ADDRSTRLEN];
 
-	inet_ntop(AF_INET6, reply->route.trgt_addr.ipv6, strbuf, sizeof(strbuf));
+	DP_IPADDR_TO_STR(&reply->route.trgt_addr, strbuf);
 	reply_.set_underlay_route(strbuf);
 }
 
@@ -905,19 +871,9 @@ void ListLoadBalancerPrefixesCall::ParseReply(struct dpgrpc_reply* reply)
 	FOREACH_MESSAGE(route, reply) {
 		pfx = reply_.add_prefixes();
 		pfx_ip = new IpAddress();
-		if (!route->pfx_addr.is_v6) {
-			pfx_ip->set_address(GrpcConv::Ipv4ToStr(route->pfx_addr.ipv4));
-			pfx_ip->set_ipver(IpVersion::IPV4);
-			pfx->set_length(route->pfx_length);
-			inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
-			pfx->set_underlay_route(strbuf);
-		} else {
-			inet_ntop(AF_INET6, route->pfx_addr.ipv6, strbuf, sizeof(strbuf));
-			pfx_ip->set_address(strbuf);
-			pfx_ip->set_ipver(IpVersion::IPV6);
-		}
+		GrpcConv::DpToGrpcAddress(&route->pfx_addr, pfx_ip);
 		pfx->set_length(route->pfx_length);
-		inet_ntop(AF_INET6, route->trgt_addr.ipv6, strbuf, sizeof(strbuf));
+		DP_IPADDR_TO_STR(&route->trgt_addr, strbuf);
 		pfx->set_underlay_route(strbuf);
 		pfx->set_allocated_ip(pfx_ip);
 	}
@@ -950,10 +906,10 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 	if (!GrpcConv::GrpcToDpAddress(grpc_rule.source_prefix().ip(), &dp_rule->src_ip))
 		return "Invalid source_prefix.ip";
 	if (grpc_rule.source_prefix().ip().ipver() == IpVersion::IPV4) {
-		if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length(), &dp_rule->src_mask.ip4))
+		if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.source_prefix().length(), &dp_rule->src_mask))
 			return "Invalid source_prefix.length";
 	} else {
-		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.source_prefix().length(), dp_rule->src_mask.ip6))
+		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.source_prefix().length(), &dp_rule->src_mask))
 			return "Invalid ip6 source_prefix.length";
 	}
 	if (grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV4 && grpc_rule.destination_prefix().ip().ipver() != IpVersion::IPV6)
@@ -961,10 +917,10 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 	if (!GrpcConv::GrpcToDpAddress(grpc_rule.destination_prefix().ip(), &dp_rule->dest_ip))
 		return "Invalid destination_prefix.ip";
 	if (grpc_rule.destination_prefix().ip().ipver() == IpVersion::IPV4) {
-		if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length(), &dp_rule->dest_mask.ip4))
+		if (!GrpcConv::Ipv4PrefixLenToMask(grpc_rule.destination_prefix().length(), &dp_rule->dest_mask))
 			return "Invalid destination_prefix.length";
 	} else {
-		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.destination_prefix().length(), dp_rule->dest_mask.ip6))
+		if (!GrpcConv::Ipv6PrefixLenToMask(grpc_rule.destination_prefix().length(), &dp_rule->dest_mask))
 			return "Invalid ip6 destination_prefix.length";
 	}
 	if (!GrpcConv::GrpcToDpFwallDirection(grpc_rule.direction(), &dp_rule->dir))
@@ -1143,7 +1099,7 @@ const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid udp_src_port";
 	if (request_.capture_config().udp_dst_port() > UINT16_MAX)
 		return "Invalid udp_dst_port";
-	if (!GrpcConv::StrToIpv6(request_.capture_config().sink_node_ip().address(), request->capture_start.dst_addr6))
+	if (!GrpcConv::StrToIpv6(request_.capture_config().sink_node_ip().address(), &request->capture_start.dst_addr6))
 		return "Invalid sink_node_ip";
 
 	request->capture_start.udp_src_port = (uint16_t)request_.capture_config().udp_src_port();
@@ -1214,7 +1170,7 @@ void CaptureStatusCall::ParseReply(struct dpgrpc_reply* reply)
 		capture_config->set_udp_dst_port(capture_get.udp_dst_port);
 
 		sink_ip = new IpAddress();
-		inet_ntop(AF_INET6, capture_get.dst_addr6, strbuf, sizeof(strbuf));
+		DP_IPV6_TO_STR(&capture_get.dst_addr6, strbuf);
 		sink_ip->set_address(strbuf);
 		sink_ip->set_ipver(IpVersion::IPV6);
 		capture_config->set_allocated_sink_node_ip(sink_ip);

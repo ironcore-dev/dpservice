@@ -26,9 +26,9 @@ void dp_process_event_msg(struct rte_mbuf *m)
 	rte_pktmbuf_free(m);
 }
 
-void dp_set_capture_hdr_config(uint8_t *addr, uint16_t udp_src_port, uint16_t udp_dst_port)
+void dp_set_capture_hdr_config(const union dp_ipv6 *addr, uint16_t udp_src_port, uint16_t udp_dst_port)
 {
-	rte_memcpy(capture_hdr_config.capture_node_ipv6_addr, addr, sizeof(capture_hdr_config.capture_node_ipv6_addr));
+	dp_copy_ipv6(&capture_hdr_config.capture_node_ipv6_addr, addr);
 	capture_hdr_config.capture_udp_src_port = udp_src_port;
 	capture_hdr_config.capture_udp_dst_port = udp_dst_port;
 }

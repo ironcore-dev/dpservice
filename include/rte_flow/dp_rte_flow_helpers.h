@@ -171,10 +171,10 @@ void dp_set_ipv6_flow_item(struct rte_flow_item *item,
 static __rte_always_inline
 void dp_set_ipv6_src_flow_item(struct rte_flow_item *item,
 							   struct rte_flow_item_ipv6 *ipv6_spec,
-							   const uint8_t *src,
+							   const union dp_ipv6 *src,
 							   uint8_t proto)
 {
-	memcpy(ipv6_spec->hdr.src_addr, src, 16);
+	dp_set_src_ipv6(&ipv6_spec->hdr, src);
 	ipv6_spec->hdr.proto = proto;
 	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
 	item->spec = ipv6_spec;
@@ -185,10 +185,10 @@ void dp_set_ipv6_src_flow_item(struct rte_flow_item *item,
 static __rte_always_inline
 void dp_set_ipv6_dst_flow_item(struct rte_flow_item *item,
 							   struct rte_flow_item_ipv6 *ipv6_spec,
-							   const uint8_t *dst,
+							   const union dp_ipv6 *dst,
 							   uint8_t proto)
 {
-	memcpy(ipv6_spec->hdr.dst_addr, dst, 16);
+	dp_set_dst_ipv6(&ipv6_spec->hdr, dst);
 	ipv6_spec->hdr.proto = proto;
 	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
 	item->spec = ipv6_spec;
@@ -464,9 +464,9 @@ void dp_set_ipv4_set_dst_action(struct rte_flow_action *action,
 static __rte_always_inline
 void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
-								const uint8_t *ipv6)
+								const union dp_ipv6 *ipv6)
 {
-	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
+	DP_ARRAY_FROM_IPV6(ipv6_action->ipv6_addr, ipv6);
 	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_SRC;
 	action->conf = ipv6_action;
 }
@@ -474,9 +474,9 @@ void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
 static __rte_always_inline
 void dp_set_ipv6_set_dst_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
-								const uint8_t *ipv6)
+								const union dp_ipv6 *ipv6)
 {
-	memcpy(ipv6_action->ipv6_addr, ipv6, sizeof(ipv6_action->ipv6_addr));
+	DP_ARRAY_FROM_IPV6(ipv6_action->ipv6_addr, ipv6);
 	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_DST;
 	action->conf = ipv6_action;
 }

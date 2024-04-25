@@ -25,13 +25,14 @@
 
 static uint32_t pfx_counter = 0;
 
+// TODO(plague): adapt faster code from dp_ipaddr.h to use here
 static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_IPV6_ADDR_SIZE])
 {
 	rte_be32_t local;
 	uint8_t random_byte;
 
 	/* First 8 bytes for host */
-	rte_memcpy(route, dp_conf_get_underlay_ip(), DP_IPV6_ADDR_SIZE);
+	rte_memcpy(route, dp_conf_get_underlay_ip()->bytes, DP_IPV6_ADDR_SIZE);
 	/* Following 2 bytes for kernel routing and 1 byte reserved */
 	memset(route + 8, 0, 3);
 
@@ -57,30 +58,39 @@ static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_IPV6_
 	rte_memcpy(route + 12, &local, 4);
 }
 
-static int dp_create_vnf_route(uint8_t ul_addr6[DP_IPV6_ADDR_SIZE] /* out */,
+static int dp_create_vnf_route(union dp_ipv6 *ul_addr6 /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
 							   struct dp_ip_address *pfx_ip, uint8_t prefix_len)
 {
-	dp_generate_underlay_ipv6(ul_addr6);
+	uint8_t ipv6[DP_IPV6_ADDR_SIZE];
+
+	// TODO this should be temporary till the union is used everywhere, then also migrate this one
+	dp_generate_underlay_ipv6(ipv6);
+	DP_IPV6_FROM_ARRAY(ul_addr6, ipv6);  // TODO migrate - separate commit to rework the above and introduce prefix+suffix
+
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
 }
 
 static __rte_always_inline int dp_grpc_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni,
-												 const struct dp_ip_address *addr, const uint8_t *t_ip6, uint8_t depth)
+												 const struct dp_ip_address *addr, const union dp_ipv6 *t_ip6, uint8_t depth)
 {
-	if (addr->is_v6)
-		return dp_add_route6(port, vni, t_vni, addr->ipv6, t_ip6, depth);
-	else
+	union dp_ipv6 ipv6;
+
+	if (DP_FAILED(dp_ipv6_from_ipaddr(&ipv6, addr)))
 		return dp_add_route(port, vni, t_vni, addr->ipv4, t_ip6, depth);
+
+	return dp_add_route6(port, vni, t_vni, &ipv6, t_ip6, depth);
 }
 
 static __rte_always_inline int dp_grpc_del_route(const struct dp_port *port, uint32_t vni,
 												 const struct dp_ip_address *addr, uint8_t depth)
 {
-	if (addr->is_v6)
-		return dp_del_route6(port, vni, addr->ipv6, depth);
-	else
+	union dp_ipv6 ipv6;
+
+	if (DP_FAILED(dp_ipv6_from_ipaddr(&ipv6, addr)))
 		return dp_del_route(port, vni, addr->ipv4, depth);
+
+	return dp_del_route6(port, vni, &ipv6, depth);
 }
 
 static int dp_process_create_lb(struct dp_grpc_responder *responder)
@@ -92,27 +102,27 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 		.is_v6 = request->addr.is_v6,
 		// address is intentionally set to zero here
 	};
-	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6 ul_addr6;
 	int ret = DP_GRPC_OK;
 
-	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
+	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
-	ret = dp_create_lb(request, ul_addr6);
+	ret = dp_create_lb(request, &ul_addr6);
 	if (DP_FAILED(ret))
 		goto err_vnf;
 	if (DP_FAILED(dp_create_vni_route_tables(request->vni, dp_get_pf0()->socket_id))) {
 		ret = DP_GRPC_ERR_VNI_INIT4;
 		goto err_lb;
 	}
-	rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
+	dp_copy_ipv6(&reply->addr6, &ul_addr6);
 	return DP_GRPC_OK;
 
 err_lb:
 	dp_delete_lb((void *)request->lb_id);
 err_vnf:
-	dp_del_vnf(ul_addr6);
+	dp_del_vnf(&ul_addr6);
 err:
 	return ret;
 }
@@ -127,7 +137,7 @@ static int dp_process_delete_lb(struct dp_grpc_responder *responder)
 	if (DP_FAILED(ret))
 		return ret;
 
-	dp_del_vnf(lb.ul_addr6);
+	dp_del_vnf(&lb.ul_addr6);
 
 	ret = dp_delete_lb(request->lb_id);
 	if (DP_FAILED(ret))
@@ -150,22 +160,24 @@ static int dp_process_get_lb(struct dp_grpc_responder *responder)
 static int dp_process_create_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.add_lbtrgt;
+	union dp_ipv6 ipv6;
 
-	if (!request->addr.is_v6)
+	if (DP_FAILED(dp_ipv6_from_ipaddr(&ipv6, &request->addr)))
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	return dp_add_lb_back_ip(request->lb_id, request->addr.ipv6);
+	return dp_add_lb_back_ip(request->lb_id, &ipv6);
 }
 
 static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.del_lbtrgt;
+	union dp_ipv6 ipv6;
 
-	if (!request->addr.is_v6)
+	if (DP_FAILED(dp_ipv6_from_ipaddr(&ipv6, &request->addr)))
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	dp_remove_lbtarget_flows(request->addr.ipv6);
-	return dp_del_lb_back_ip(request->lb_id, request->addr.ipv6);
+	dp_remove_lbtarget_flows(&ipv6);
+	return dp_del_lb_back_ip(request->lb_id, &ipv6);
 }
 
 static int dp_process_initialize(__rte_unused struct dp_grpc_responder *responder)
@@ -260,11 +272,11 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	struct dpgrpc_vip *request = &responder->request.add_vip;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
 		.is_v6 = request->addr.is_v6
 		// address is intentionally set to zero here
 	};
+	union dp_ipv6 ul_addr6;
 	uint32_t iface_ip, iface_vni;
 	struct dp_port *port;
 	uint32_t vip;
@@ -279,12 +291,12 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	if (!request->addr.is_v6) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
-		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_VIP, iface_vni, port, &pfx_ip, 0))) {
+		if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_VIP, iface_vni, port, &pfx_ip, 0))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
 		vip = request->addr.ipv4;
-		ret = dp_set_iface_vip_ip(iface_ip, vip, iface_vni, ul_addr6);
+		ret = dp_set_iface_vip_ip(iface_ip, vip, iface_vni, &ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
@@ -292,7 +304,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 		if (DP_FAILED(ret))
 			goto err_snat;
 
-		rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
+		dp_copy_ipv6(&reply->addr6, &ul_addr6);
 	} else {
 		ret = DP_GRPC_ERR_BAD_IPVER;
 		goto err;
@@ -302,7 +314,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 err_snat:
 	dp_del_iface_vip_ip(iface_ip, iface_vni);
 err_vnf:
-	dp_del_vnf(ul_addr6);
+	dp_del_vnf(&ul_addr6);
 err:
 	return ret;
 }
@@ -327,9 +339,9 @@ static int dp_process_delete_vip(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	dp_del_vnf(s_data->ul_vip_ip6);
+	dp_del_vnf(&s_data->ul_vip_ip6);
 
-	DP_SET_IPADDR4(reply->addr, s_data->vip_ip);
+	dp_set_ipaddr4(&reply->addr, s_data->vip_ip);
 
 	// always delete, i.e. do not use dp_del_vip_from_dnat(),
 	// because 1:1 VIP is not shared with anything
@@ -355,8 +367,8 @@ static int dp_process_get_vip(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->vip_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	DP_SET_IPADDR4(reply->addr, s_data->vip_ip);
-	rte_memcpy(reply->ul_addr6, s_data->ul_vip_ip6, sizeof(reply->ul_addr6));
+	dp_set_ipaddr4(&reply->addr, s_data->vip_ip);
+	dp_copy_ipv6(&reply->ul_addr6, &s_data->ul_vip_ip6);
 	return DP_GRPC_OK;
 }
 
@@ -366,7 +378,7 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	struct dpgrpc_route *reply = dp_grpc_single_reply(responder);
 
 	struct dp_port *port;
-	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6 ul_addr6;
 
 	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
@@ -375,10 +387,10 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (dp_vnf_lbprefix_exists(port->port_id, port->iface.vni, &request->addr, request->length))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
-	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, &request->addr, request->length)))
+	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, &request->addr, request->length)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
-	DP_SET_IPADDR6(reply->trgt_addr, ul_addr6);
+	dp_set_ipaddr6(&reply->trgt_addr, &ul_addr6);
 	return DP_GRPC_OK;
 }
 
@@ -399,7 +411,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 	struct dpgrpc_prefix *request = &responder->request.add_pfx;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6 ul_addr6;
 	struct dp_port *port;
 	uint32_t iface_vni;
 	int ret;
@@ -413,12 +425,12 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 	if (DP_FAILED(ret))
 		return ret;
 
-	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
+	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
 		dp_grpc_del_route(port, iface_vni, &request->addr, request->length);
 		return DP_GRPC_ERR_VNF_INSERT;
 	}
 
-	rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
+	dp_copy_ipv6(&reply->addr6, &ul_addr6);
 	return DP_GRPC_OK;
 }
 
@@ -445,7 +457,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
 
 	struct dp_port *port;
-	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6 ul_addr6;
 	struct dp_ip_address pfx_ip = {
 		.is_v6 = false  // not actually relevant for this VNF
 	};
@@ -460,7 +472,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_ALREADY_EXISTS;
 		goto err;
 	}
-	if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_INTERFACE_IP, request->vni, port, &pfx_ip, 0))) {
+	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_INTERFACE_IP, request->vni, port, &pfx_ip, 0))) {
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
@@ -473,10 +485,10 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		goto handle_err;
 	}
 
-	rte_memcpy(port->iface.ul_ipv6, ul_addr6, sizeof(port->iface.ul_ipv6));
+	dp_copy_ipv6(&port->iface.ul_ipv6, &ul_addr6);
 	port->iface.cfg.own_ip = request->ip4_addr;
 	port->iface.cfg.ip_depth = DP_LPM_DHCP_IP_DEPTH;
-	rte_memcpy(port->iface.cfg.dhcp_ipv6, request->ip6_addr, sizeof(port->iface.cfg.dhcp_ipv6));
+	dp_copy_ipv6(&port->iface.cfg.dhcp_ipv6, &request->ip6_addr);
 	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
@@ -488,8 +500,8 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		if (DP_FAILED(ret))
 			goto iface_err;
 	}
-	if (!dp_is_ipv6_addr_zero(request->ip6_addr)) {
-		ret = dp_add_route6(port, request->vni, 0, request->ip6_addr, NULL, 128);
+	if (!dp_is_ipv6_zero(&request->ip6_addr)) {
+		ret = dp_add_route6(port, request->vni, 0, &request->ip6_addr, NULL, 128);
 		if (DP_FAILED(ret))
 			goto route_err;
 	}
@@ -505,14 +517,14 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		goto meter_err;
 	}
 
-	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
+	dp_copy_ipv6(&reply->ul_addr6, &port->iface.ul_ipv6);
 	snprintf(reply->name, sizeof(reply->name), "%s", port->vf_name);
 	return DP_GRPC_OK;
 
 meter_err:
 	dp_port_meter_config(port, 0, 0);
 route6_err:
-	dp_del_route6(port, request->vni, request->ip6_addr, 128);
+	dp_del_route6(port, request->vni, &request->ip6_addr, 128);
 route_err:
 	dp_del_route(port, request->vni, request->ip4_addr, 32);
 iface_err:
@@ -520,7 +532,7 @@ iface_err:
 handle_err:
 	dp_unmap_iface_id(request->iface_id);
 err_vnf:
-	dp_del_vnf(ul_addr6);
+	dp_del_vnf(&ul_addr6);
 err:
 	return ret;
 }
@@ -545,7 +557,7 @@ static int dp_process_delete_interface(struct dp_grpc_responder *responder)
 		if (DP_FAILED(dp_port_meter_config(port, 0, 0)))
 			ret = DP_GRPC_ERR_PORT_METER;
 
-	dp_del_vnf(port->iface.ul_ipv6);
+	dp_del_vnf(&port->iface.ul_ipv6);
 	if (DP_FAILED(dp_stop_port(port)))
 		ret = DP_GRPC_ERR_PORT_STOP;
 	// carry on with cleanup though
@@ -571,13 +583,13 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_NOT_FOUND;
 
 	reply->ip4_addr = port->iface.cfg.own_ip;
-	rte_memcpy(reply->ip6_addr, port->iface.cfg.dhcp_ipv6, sizeof(reply->ip6_addr));
+	dp_copy_ipv6(&reply->ip6_addr, &port->iface.cfg.dhcp_ipv6);
 	reply->vni = port->iface.vni;
 	static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
 	rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
 	static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 	rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
-	rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
+	dp_copy_ipv6(&reply->ul_addr6, &port->iface.ul_ipv6);
 	reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 	reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
 	return DP_GRPC_OK;
@@ -586,12 +598,13 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 static int dp_process_create_route(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_route *request = &responder->request.add_route;
+	union dp_ipv6 t_ipv6;
 
-	if (!request->trgt_addr.is_v6)
+	if (DP_FAILED(dp_ipv6_from_ipaddr(&t_ipv6, &request->trgt_addr)))
 		return DP_GRPC_ERR_BAD_IPVER;
 
 	return dp_grpc_add_route(dp_get_pf0(), request->vni, request->trgt_vni,
-							 &request->pfx_addr, request->trgt_addr.ipv6,
+							 &request->pfx_addr, &t_ipv6,
 							 request->pfx_length);
 }
 
@@ -607,11 +620,11 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	struct dpgrpc_nat *request = &responder->request.add_nat;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	uint8_t ul_addr6[DP_IPV6_ADDR_SIZE];
 	struct dp_ip_address pfx_ip = {
 		.is_v6 = request->addr.is_v6
 		// address is intentionally set to zero here
 	};
+	union dp_ipv6 ul_addr6;
 	struct dp_port *port;
 	uint32_t iface_ip, iface_vni;
 	int ret;
@@ -625,13 +638,13 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	if (!request->addr.is_v6) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
-		if (DP_FAILED(dp_create_vnf_route(ul_addr6, DP_VNF_TYPE_NAT, iface_vni, port, &pfx_ip, 0))) {
+		if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_NAT, iface_vni, port, &pfx_ip, 0))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
 		ret = dp_set_iface_nat_ip(iface_ip, request->addr.ipv4, iface_vni,
 										request->min_port, request->max_port,
-										ul_addr6);
+										&ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
@@ -641,7 +654,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 		port->iface.nat_ip = request->addr.ipv4;
 		port->iface.nat_port_range[0] = request->min_port;
 		port->iface.nat_port_range[1] = request->max_port;
-		rte_memcpy(reply->addr6, ul_addr6, sizeof(reply->addr6));
+		dp_copy_ipv6(&reply->addr6, &ul_addr6);
 	} else {
 		ret = DP_GRPC_ERR_BAD_IPVER;
 		goto err;
@@ -651,7 +664,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 err_dnat:
 	dp_del_iface_nat_ip(iface_ip, iface_vni);
 err_vnf:
-	dp_del_vnf(ul_addr6);
+	dp_del_vnf(&ul_addr6);
 err:
 	return ret;
 
@@ -677,9 +690,9 @@ static int dp_process_delete_nat(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	dp_del_vnf(s_data->ul_nat_ip6);
+	dp_del_vnf(&s_data->ul_nat_ip6);
 
-	DP_SET_IPADDR4(reply->addr, s_data->nat_ip);
+	dp_set_ipaddr4(&reply->addr, s_data->nat_ip);
 	dp_del_vip_from_dnat(s_data->nat_ip, iface_vni);
 	port->iface.nat_ip = 0;
 	port->iface.nat_port_range[0] = 0;
@@ -704,10 +717,10 @@ static int dp_process_get_nat(struct dp_grpc_responder *responder)
 	if (!s_data || !s_data->nat_ip)
 		return DP_GRPC_ERR_SNAT_NO_DATA;
 
-	DP_SET_IPADDR4(reply->addr, s_data->nat_ip);
+	dp_set_ipaddr4(&reply->addr, s_data->nat_ip);
 	reply->min_port = s_data->nat_port_range[0];
 	reply->max_port = s_data->nat_port_range[1];
-	rte_memcpy(reply->ul_addr6, s_data->ul_nat_ip6, sizeof(reply->ul_addr6));
+	dp_copy_ipv6(&reply->ul_addr6, &s_data->ul_nat_ip6);
 	return DP_GRPC_OK;
 }
 
@@ -721,7 +734,7 @@ static int dp_process_create_neighnat(struct dp_grpc_responder *responder)
 									   request->vni,
 									   request->min_port,
 									   request->max_port,
-									   request->neigh_addr6);
+									   &request->neigh_addr6);
 		if (DP_FAILED(ret))
 			return ret;
 
@@ -777,13 +790,13 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
 		reply->ip4_addr = port->iface.cfg.own_ip;
-		rte_memcpy(reply->ip6_addr, port->iface.cfg.dhcp_ipv6, sizeof(reply->ip6_addr));
+		dp_copy_ipv6(&reply->ip6_addr, &port->iface.cfg.dhcp_ipv6);
 		reply->vni = port->iface.vni;
 		static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
 		rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
 		static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 		rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
-		rte_memcpy(reply->ul_addr6, port->iface.ul_ipv6, sizeof(reply->ul_addr6));
+		dp_copy_ipv6(&reply->ul_addr6, &port->iface.ul_ipv6);
 		reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 		reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
 	}
@@ -882,7 +895,7 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 	if (dp_is_capture_enabled())
 		return DP_GRPC_ERR_ALREADY_ACTIVE;
 
-	dp_set_capture_hdr_config(request->dst_addr6, request->udp_src_port, request->udp_dst_port);
+	dp_set_capture_hdr_config(&request->dst_addr6, request->udp_src_port, request->udp_dst_port);
 
 	for (int i = 0; i < request->interface_count; ++i) {
 		switch (request->interfaces[i].type) {
@@ -972,7 +985,7 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 		count++;
 	}
 
-	rte_memcpy(reply->dst_addr6, capture_hdr_config->capture_node_ipv6_addr, sizeof(reply->dst_addr6));
+	dp_copy_ipv6(&reply->dst_addr6, &capture_hdr_config->capture_node_ipv6_addr);
 	reply->udp_src_port = capture_hdr_config->capture_udp_src_port;
 	reply->udp_dst_port = capture_hdr_config->capture_udp_dst_port;
 	reply->interface_count = count;

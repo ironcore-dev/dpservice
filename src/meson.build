@@ -45,6 +45,7 @@ dp_sources = [
   'dp_hairpin.c',
   'dp_iface.c',
   'dp_internal_stats.c',
+  'dp_ipaddr.c',
   'dp_lb.c',
   'dp_log.c',
   'dp_lpm.c',

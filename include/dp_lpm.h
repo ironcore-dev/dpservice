@@ -35,8 +35,8 @@ extern "C" {
 #define DP_LIST_INT_ROUTES false
 
 struct dp_iface_route {
-	uint32_t vni;
-	uint8_t  nh_ipv6[16];
+	uint32_t		vni;
+	union dp_ipv6	nh_ipv6;
 };
 
 const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
@@ -49,16 +49,16 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint8_t route_key[DP_IPV6_ADDR_SIZE]);
+										  uint8_t route_key[DP_IPV6_ADDR_SIZE]);  // TODO migrate in separate commit
 uint32_t dp_get_gw_ip4(void);
-const uint8_t *dp_get_gw_ip6(void);
+const union dp_ipv6 *dp_get_gw_ip6(void);
 
 int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
-				 const uint8_t *t_ip6, uint8_t depth);
+				 const union dp_ipv6 *t_ip6, uint8_t depth);
 int dp_del_route(const struct dp_port *port, uint32_t vni, uint32_t ip, uint8_t depth);
-int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const uint8_t *ipv6,
-				  const uint8_t *t_ip6, uint8_t depth);
-int dp_del_route6(const struct dp_port *port, uint32_t vni, const uint8_t *ipv6, uint8_t depth);
+int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const union dp_ipv6 *ipv6,
+				  const union dp_ipv6 *t_ip6, uint8_t depth);
+int dp_del_route6(const struct dp_port *port, uint32_t vni, const union dp_ipv6 *ipv6, uint8_t depth);
 int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes, struct dp_grpc_responder *responder);
 
 int dp_lpm_reset_all_route_tables(void);

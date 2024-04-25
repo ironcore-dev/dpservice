@@ -65,7 +65,7 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-	DP_SET_IPADDR4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, ntohl(ipv4_hdr->src_addr));
+	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, ntohl(ipv4_hdr->src_addr));
 	if (snat_data->nat_ip != 0)
 		cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 
@@ -127,8 +127,8 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT64;
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-	DP_SET_IPADDR4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(dest_ip4));
-	DP_SET_IPADDR4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, snat64_data.nat_ip);
+	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(dest_ip4));
+	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, snat64_data.nat_ip);
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].proto = df->l4_type;
 
@@ -174,7 +174,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				return SNAT_NEXT_DROP;
 		}
 
-		if (df->l3_type == RTE_ETHER_TYPE_IPV6 && port->iface.nat_ip && dp_is_ip6_in_nat64_range(df->dst.dst_addr6)
+		if (df->l3_type == RTE_ETHER_TYPE_IPV6 && port->iface.nat_ip && dp_is_ip6_in_nat64_range(df->dst.dst_addr6.bytes)  // TODO migrate NAT64
 		    && df->flow_type == DP_FLOW_SOUTH_NORTH) {
 			if (DP_FAILED(dp_process_ipv6_nat64(m, df, cntrack, port)))
 				return SNAT_NEXT_DROP;

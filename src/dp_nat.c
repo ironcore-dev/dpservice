@@ -128,7 +128,7 @@ static void dp_delete_snat_data(uint32_t iface_ip, uint32_t vni, struct snat_dat
 }
 
 int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
-						const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE])
+						const union dp_ipv6 *ul_ipv6)
 {
 	struct snat_data *data;
 
@@ -141,12 +141,12 @@ int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
 		return DP_GRPC_ERR_SNAT_EXISTS;
 
 	data->vip_ip = vip_ip;
-	rte_memcpy(data->ul_vip_ip6, ul_ipv6, sizeof(data->ul_vip_ip6));
+	dp_copy_ipv6(&data->ul_vip_ip6, ul_ipv6);
 	return DP_GRPC_OK;
 }
 
 int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
-						const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE])
+						const union dp_ipv6 *ul_ipv6)
 {
 	struct snat_data *data;
 
@@ -158,7 +158,7 @@ int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16
 	} else if (data->nat_ip != 0)
 		return DP_GRPC_ERR_SNAT_EXISTS;
 
-	rte_memcpy(data->ul_nat_ip6, ul_ipv6, sizeof(data->ul_vip_ip6));
+	dp_copy_ipv6(&data->ul_nat_ip6, ul_ipv6);
 	data->nat_ip = nat_ip;
 	data->nat_port_range[0] = min_port;
 	data->nat_port_range[1] = max_port;
@@ -399,7 +399,7 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	return DP_OK;
 }
 
-int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const uint8_t *ipv6_addr)
+int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const union dp_ipv6 *ipv6_addr)
 {
 	struct rte_ether_hdr *eth_hdr;
 	struct rte_ipv4_hdr *ipv4_hdr;
@@ -432,10 +432,10 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const ui
 	ipv6_hdr->hop_limits = ipv4_hdr->time_to_live;
 
 	// Set the source and destination IPv6 addresses
-	rte_memcpy(ipv6_hdr->src_addr, DP_NAT64_PREFIX, 12);
+	rte_memcpy(ipv6_hdr->src_addr, DP_NAT64_PREFIX, 12);  // TODO migrate NAT64
 	*(uint32_t *)&ipv6_hdr->src_addr[12] = src_ipv4;
-	rte_memcpy(ipv6_hdr->dst_addr, ipv6_addr, DP_IPV6_ADDR_SIZE);
-	rte_memcpy(df->dst.dst_addr6, ipv6_addr, DP_IPV6_ADDR_SIZE);
+	dp_set_dst_ipv6(ipv6_hdr, ipv6_addr);
+	dp_copy_ipv6(&df->dst.dst_addr6, ipv6_addr);
 
 	m->packet_type = (m->packet_type & ~RTE_PTYPE_L3_MASK) | RTE_PTYPE_L3_IPV6;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6;
@@ -523,7 +523,7 @@ void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
 
 int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
 								uint32_t vni, uint16_t min_port, uint16_t max_port,
-								const uint8_t ul_ipv6[DP_IPV6_ADDR_SIZE])
+								const union dp_ipv6 *ul_ipv6)
 {
 	network_nat_entry *next, *new_entry;
 
@@ -551,7 +551,7 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_A
 	new_entry->vni = vni;
 	new_entry->port_range[0] = min_port;
 	new_entry->port_range[1] = max_port;
-	memcpy(new_entry->dst_ipv6, ul_ipv6, sizeof(new_entry->dst_ipv6));
+	dp_copy_ipv6(&new_entry->dst_ipv6, ul_ipv6);
 
 	TAILQ_INSERT_TAIL(&nat_headp, new_entry, entries);
 
@@ -575,19 +575,19 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_A
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-const uint8_t *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
-											  uint32_t vni, uint16_t min_port, uint16_t max_port)
+const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
+													uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	network_nat_entry *current;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (dp_is_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port))
-			return current->dst_ipv6;
+			return &current->dst_ipv6;
 	}
 	return NULL;
 }
 
-const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
+const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 {
 	struct network_nat_entry *current;
 	uint16_t dst_port;
@@ -603,7 +603,7 @@ const uint8_t *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
 		if (dp_is_network_nat_port(current, dst_ip, NULL, dst_vni, dst_port))
-			return current->dst_ipv6;
+			return &current->dst_ipv6;
 	}
 	return NULL;
 }
@@ -622,11 +622,11 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	uint64_t timestamp;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		DP_SET_IPADDR4(portmap_key.src_ip, iface_src_ip);
+		dp_set_ipaddr4(&portmap_key.src_ip, iface_src_ip);
 		portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		DP_SET_IPADDR6(portmap_key.src_ip, df->src.src_addr6);
-		portoverload_tbl_key.dst_ip = ntohl(*(rte_be32_t *)&df->dst.dst_addr6[12]);
+		dp_set_ipaddr6(&portmap_key.src_ip, &df->src.src_addr6);
+		portoverload_tbl_key.dst_ip = ntohl(*(const rte_be32_t *)&df->dst.dst_addr6.bytes[12]);  // TODO migrate NAT64
 	} else {
 		return DP_GRPC_ERR_BAD_IPVER;
 	}
@@ -740,7 +740,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	}
 
 	if (flow_key_org->l3_dst.is_v6)
-		portoverload_tbl_key.dst_ip = ntohl(*(const rte_be32_t *)&flow_key_org->l3_dst.ipv6[12]);
+		portoverload_tbl_key.dst_ip = ntohl(*(const rte_be32_t *)&flow_key_org->l3_dst.ipv6.bytes[12]);  // TODO NAT64 func in ipaddr.h
 	else
 		portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ipv4;
 	portoverload_tbl_key.nat_ip = flow_key_reply->l3_dst.ipv4;
@@ -809,7 +809,7 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			reply->min_port = data->nat_port_range[0];
 			reply->max_port = data->nat_port_range[1];
-			DP_SET_IPADDR4(reply->addr, nkey->ip);
+			dp_set_ipaddr4(&reply->addr, nkey->ip);
 			reply->vni = nkey->vni;
 		}
 	}
@@ -831,7 +831,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply->min_port = current->port_range[0];
 			reply->max_port = current->port_range[1];
 			reply->vni = current->vni;
-			rte_memcpy(reply->ul_addr6, current->dst_ipv6, sizeof(current->dst_ipv6));
+			dp_copy_ipv6(&reply->ul_addr6, &current->dst_ipv6);
 		}
 	}
 	return DP_GRPC_OK;

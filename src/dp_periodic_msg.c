@@ -12,12 +12,16 @@
 #include "nodes/arp_node.h"
 #include "nodes/ipv6_nd_node.h"
 
-static uint8_t dp_mc_ipv6[16] = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 };
-static uint8_t dp_mc_mac[6] = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x01 };
+static const union dp_ipv6 dp_multicast_ipv6 = {
+	.bytes = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 }
+};
+static const struct rte_ether_addr dp_mc_mac = {
+	.addr_bytes = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x01 }
+};
 
 static __rte_always_inline bool dp_is_ip_set(struct dp_port *port, uint16_t eth_type)
 {
-	return (eth_type == RTE_ETHER_TYPE_IPV6 && !dp_is_ipv6_addr_zero(port->iface.cfg.dhcp_ipv6)) ||
+	return (eth_type == RTE_ETHER_TYPE_IPV6 && !dp_is_ipv6_zero(&port->iface.cfg.dhcp_ipv6)) ||
 		   (eth_type == RTE_ETHER_TYPE_ARP && port->iface.cfg.own_ip != 0);
 }
 
@@ -126,7 +130,7 @@ void trigger_nd_unsol_adv(void)
 	struct icmp6hdr *icmp6_hdr;
 	uint16_t pkt_size;
 	struct rte_mbuf *pkt;
-	const uint8_t *rt_ip = dp_get_gw_ip6();
+	const union dp_ipv6 *gw_ip = dp_get_gw_ip6();
 
 	pkt = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
 	if (!pkt) {
@@ -139,14 +143,14 @@ void trigger_nd_unsol_adv(void)
 	ipv6_hdr = (struct rte_ipv6_hdr *)(eth_hdr + 1);
 	ns_msg = (struct nd_msg *)(ipv6_hdr + 1);
 
-	rte_memcpy(eth_hdr->dst_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->dst_addr.addr_bytes));
+	rte_ether_addr_copy(&dp_mc_mac, &eth_hdr->dst_addr);
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = IPPROTO_ICMPV6;
 	ipv6_hdr->vtc_flow = htonl(0x60000000);
 	ipv6_hdr->hop_limits = 255;
-	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));
-	rte_memcpy(ipv6_hdr->dst_addr, dp_mc_ipv6, sizeof(ipv6_hdr->dst_addr));
+	dp_set_src_ipv6(ipv6_hdr, gw_ip);
+	dp_set_dst_ipv6(ipv6_hdr, &dp_multicast_ipv6);
 	ipv6_hdr->payload_len = htons(sizeof(struct icmp6hdr) + sizeof(struct in6_addr));
 
 	icmp6_hdr = &(ns_msg->icmph);
@@ -157,7 +161,7 @@ void trigger_nd_unsol_adv(void)
 	icmp6_hdr->icmp6_router = 1;
 	icmp6_hdr->icmp6_hop_limit = 255;
 
-	rte_memcpy(&ns_msg->target, rt_ip, sizeof(ns_msg->target));
+	DP_ARRAY_FROM_IPV6(ns_msg->target, gw_ip);
 	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) +
 			   sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 	pkt->data_len = pkt_size;
@@ -177,7 +181,7 @@ void trigger_nd_ra(void)
 	struct rte_ipv6_hdr *ipv6_hdr;
 	struct ra_msg *ra_msg;
 	struct rte_mbuf *pkt;
-	const uint8_t *rt_ip = dp_get_gw_ip6();
+	const union dp_ipv6 *gw_ip = dp_get_gw_ip6();
 
 	pkt = rte_pktmbuf_alloc(get_dpdk_layer()->rte_mempool);
 	if (!pkt) {
@@ -191,14 +195,14 @@ void trigger_nd_ra(void)
 	ra_msg = (struct ra_msg *)(ipv6_hdr + 1);
 
 	memset(&eth_hdr->src_addr, 0xff, RTE_ETHER_ADDR_LEN);
-	rte_memcpy(eth_hdr->dst_addr.addr_bytes, dp_mc_mac, sizeof(eth_hdr->dst_addr.addr_bytes));
+	rte_ether_addr_copy(&dp_mc_mac, &eth_hdr->dst_addr);
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr->proto = IPPROTO_ICMPV6;
 	ipv6_hdr->vtc_flow = htonl(0x60000000);
 	ipv6_hdr->hop_limits = 255;
-	rte_memcpy(ipv6_hdr->src_addr, rt_ip, sizeof(ipv6_hdr->src_addr));
-	rte_memcpy(ipv6_hdr->dst_addr, dp_mc_ipv6, sizeof(ipv6_hdr->dst_addr));
+	dp_set_src_ipv6(ipv6_hdr, gw_ip);
+	dp_set_dst_ipv6(ipv6_hdr, &dp_multicast_ipv6);
 
 	pkt->data_len = dp_ipv6_fill_ra(ipv6_hdr, ra_msg, NULL);
 	pkt->pkt_len = pkt->data_len;

@@ -28,37 +28,35 @@ bool IsInterfaceIdValid(const std::string& id)
 
 bool StrToIpv4(const std::string& str, uint32_t *dst)
 {
-	struct in_addr addr;
-
-	// man(3) inet_aton: 'inet_aton() returns nonzero if the address is valid, zero if not.'
-	if (inet_aton(str.c_str(), &addr) == 0)
+	if (DP_FAILED(dp_str_to_ipv4(str.c_str(), dst)))
 		return false;
 
-	*dst = ntohl(addr.s_addr);
 	return true;
 }
 
-bool StrToIpv6(const std::string& str, uint8_t *dst)
+bool StrToIpv6(const std::string& str, union dp_ipv6 *dst)
 {
-	// man(3) inet_pton: 'inet_pton() returns 1 on success ...'
-	return inet_pton(AF_INET6, str.c_str(), dst) == 1;
+	if (DP_FAILED(dp_str_to_ipv6(str.c_str(), dst)))
+		return false;
+
+	return true;
 }
 
 bool StrToDpAddress(const std::string& str, struct dp_ip_address *dp_addr, IpVersion ipver)
 {
 	uint32_t ipv4;
-	uint8_t ipv6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6 ipv6 = {{0},};  // C++ tries to use deleted default constructor otherwise
 
 	switch (ipver) {
 	case IpVersion::IPV4:
 		if (!StrToIpv4(str, &ipv4))
 			return false;
-		DP_SET_IPADDR4(*dp_addr, ipv4);
+		dp_set_ipaddr4(dp_addr, ipv4);
 		return true;
 	case IpVersion::IPV6:
-		if (!StrToIpv6(str, ipv6))
+		if (!StrToIpv6(str, &ipv6))
 			return false;
-		DP_SET_IPADDR6(*dp_addr, ipv6);
+		dp_set_ipaddr6(dp_addr, &ipv6);
 		return true;
 	default:
 		return false;
@@ -153,55 +151,57 @@ bool DpCaptureInterfaceTypeToGrpc(CaptureInterfaceType& grpc_type, enum dpgrpc_c
 	}
 }
 
-const char *Ipv4ToStr(uint32_t ipv4)
-{
-	struct in_addr addr = {
-		.s_addr = htonl(ipv4)
-	};
-
-	// cannot fail, the range is known and fully defined and the buffer is static
-	return inet_ntoa(addr);
-}
-
-bool Ipv4PrefixLenToMask(uint32_t prefix_length, uint32_t *mask)
+bool Ipv4PrefixLenToMask(uint32_t prefix_length, struct dp_ip_mask *mask)
 {
 	if (prefix_length > 32)
 		return false;
 
 	if (prefix_length == DP_FWALL_MATCH_ANY_LENGTH)
-		*mask = DP_FWALL_MATCH_ANY_LENGTH;
+		mask->ip4 = DP_FWALL_MATCH_ANY_LENGTH;
 	else
-		*mask = ~((1 << (32 - prefix_length)) - 1);
+		mask->ip4 = ~((1 << (32 - prefix_length)) - 1);
 
 	return true;
 }
 
-bool Ipv6PrefixLenToMask(uint32_t prefix_length, uint8_t *mask) {
+bool Ipv6PrefixLenToMask(uint32_t prefix_length, struct dp_ip_mask *mask)
+{
 	if (prefix_length > 128)
 		return false;
 
-	memset(mask, 0, DP_IPV6_ADDR_SIZE); // Initialize mask to all zeros
+	uint8_t ipv6[DP_IPV6_ADDR_SIZE] = { 0, };
 
 	for (uint32_t i = 0; i < prefix_length; i++) {
-		mask[i / 8] |= (uint8_t)(1 << (7 - (i % 8)));
+		ipv6[i / 8] |= (uint8_t)(1 << (7 - (i % 8)));
 	}
 
+	DP_IPV6_FROM_ARRAY(&mask->ip6, ipv6);  // TODO migrate mask
 	return true;
 }
 
+
+void DpToGrpcAddress(const struct dp_ip_address *dp_addr, IpAddress *grpc_addr)
+{
+	char strbuf[INET6_ADDRSTRLEN];
+
+	DP_IPADDR_TO_STR(dp_addr, strbuf);
+	grpc_addr->set_address(strbuf);
+	grpc_addr->set_ipver(dp_addr->is_v6 ? IpVersion::IPV6 : IpVersion::IPV4);
+}
 
 void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface)
 {
 	char strbuf[INET6_ADDRSTRLEN];
 	MeteringParams *metering_params;
 
-	grpc_iface->set_primary_ipv4(GrpcConv::Ipv4ToStr(dp_iface->ip4_addr));
-	inet_ntop(AF_INET6, dp_iface->ip6_addr, strbuf, sizeof(strbuf));
+	DP_IPV4_TO_STR(dp_iface->ip4_addr, strbuf);
+	grpc_iface->set_primary_ipv4(strbuf);
+	DP_IPV6_TO_STR(&dp_iface->ip6_addr, strbuf);
 	grpc_iface->set_primary_ipv6(strbuf);
 	grpc_iface->set_id(dp_iface->iface_id);
 	grpc_iface->set_vni(dp_iface->vni);
 	grpc_iface->set_pci_name(dp_iface->pci_name);
-	inet_ntop(AF_INET6, dp_iface->ul_addr6, strbuf, sizeof(strbuf));
+	DP_IPV6_TO_STR(&dp_iface->ul_addr6, strbuf);
 	grpc_iface->set_underlay_route(strbuf);
 	metering_params = new MeteringParams();
 	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
@@ -209,30 +209,18 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	grpc_iface->set_allocated_meteringparams(metering_params);
 }
 
-uint32_t DpIpv6MaskToPrefixLen(const uint8_t *mask)
+static void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip, Prefix* pfx, bool is_source)
 {
-	uint64_t high = rte_be_to_cpu_64(*((const uint64_t *)(mask)));
-	uint64_t low = rte_be_to_cpu_64(*((const uint64_t *)(mask + 8)));
-
-	return __builtin_popcountll(high) + __builtin_popcountll(low);
-}
-
-void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip, Prefix* pfx, bool is_source)
-{
-	char strbuf[INET6_ADDRSTRLEN];
 	auto& rule_ip = is_source ? dp_rule->src_ip : dp_rule->dest_ip;
 	auto& rule_mask = is_source ? dp_rule->src_mask : dp_rule->dest_mask;
 
-	if (!rule_ip.is_v6) {
-		ip->set_ipver(IpVersion::IPV4);
-		ip->set_address(GrpcConv::Ipv4ToStr(rule_ip.ipv4));
+	// NOTE: This assumes the mask is valid (i.e. starting from the left, no holes)
+	GrpcConv::DpToGrpcAddress(&rule_ip, ip);
+	if (!rule_ip.is_v6)
 		pfx->set_length(__builtin_popcount(rule_mask.ip4));
-	} else {
-		ip->set_ipver(IpVersion::IPV6);
-		inet_ntop(AF_INET6, rule_ip.ipv6, strbuf, sizeof(strbuf));
-		ip->set_address(strbuf);
-		pfx->set_length(DpIpv6MaskToPrefixLen(rule_mask.ip6));
-	}
+	else
+		// TODO (plague): migrate; revisit after dp_generate_underlay_ipv6() uses prefix/suffix
+		pfx->set_length(__builtin_popcountll(rule_mask.ip6._prefix) + __builtin_popcountll(rule_mask.ip6._suffix));
 	pfx->set_allocated_ip(ip);
 }
 

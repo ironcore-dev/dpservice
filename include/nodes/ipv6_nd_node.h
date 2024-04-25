@@ -5,7 +5,6 @@
 #define __INCLUDE_IPV6_ND_NODE_H__
 
 #include <stdint.h>
-#include <netinet/in.h>
 #include <rte_ip.h>
 
 #ifdef __cplusplus
@@ -75,7 +74,7 @@ struct icmp6hdr {
 
 struct nd_msg {
 	struct icmp6hdr	icmph;
-	struct in6_addr	target;
+	uint8_t	target[16];
 	uint8_t	opt[];
 };
 

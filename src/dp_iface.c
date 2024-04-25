@@ -84,7 +84,7 @@ void dp_delete_iface(struct dp_port *port)
 	uint32_t vni = port->iface.vni;
 
 	dp_del_route(port, vni, port->iface.cfg.own_ip, 32);
-	dp_del_route6(port, vni, port->iface.cfg.dhcp_ipv6, 128);
+	dp_del_route6(port, vni, &port->iface.cfg.dhcp_ipv6, 128);
 
 	if (DP_FAILED(dp_delete_vni_route_tables(vni)))
 		DPS_LOG_WARNING("Unable to delete route tables", DP_LOG_VNI(vni));

@@ -63,7 +63,7 @@ static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, stru
 	return DP_OK;
 }
 
-int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
+int dp_create_lb(struct dpgrpc_lb *lb, const union dp_ipv6 *ul_ip)
 {
 	struct lb_value *lb_val;
 	struct lb_key lb_key;
@@ -84,7 +84,7 @@ int dp_create_lb(struct dpgrpc_lb *lb, const uint8_t *ul_ip)
 	if (DP_FAILED(dp_map_lb_handle(lb->lb_id, &lb_key, lb_val)))
 		goto err_free;
 
-	rte_memcpy(lb_val->lb_ul_addr, ul_ip, DP_IPV6_ADDR_SIZE);
+	dp_copy_ipv6(&lb_val->lb_ul_addr, ul_ip);
 	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
 		lb_val->ports[i].port = htons(lb->lbports[i].port);
 		lb_val->ports[i].protocol = lb->lbports[i].protocol;
@@ -111,7 +111,7 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 
 	out_lb->vni = lb_k->vni;
 	dp_copy_ipaddr(&out_lb->addr, &lb_k->ip);
-	rte_memcpy(out_lb->ul_addr6, lb_val->lb_ul_addr, DP_IPV6_ADDR_SIZE);
+	dp_copy_ipv6(&out_lb->ul_addr6, &lb_val->lb_ul_addr);
 
 	for (i = 0; i < DP_LB_MAX_PORTS; i++) {
 		out_lb->lbports[i].port = ntohs(lb_val->ports[i].port);
@@ -160,19 +160,19 @@ bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 	lb_key.vni = vni;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
-		DP_SET_IPADDR4(lb_key.ip, ntohl(df->dst.dst_addr));
+		dp_set_ipaddr4(&lb_key.ip, ntohl(df->dst.dst_addr));
 	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-		DP_SET_IPADDR6(lb_key.ip, df->dst.dst_addr6);
+		dp_set_ipaddr6(&lb_key.ip, &df->dst.dst_addr6);
 	else
 		return false;
 
 	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key));
 }
 
-static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const uint8_t *b_ip)
+static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const union dp_ipv6 *b_ip)
 {
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i)
-		if (rte_rib6_is_equal((uint8_t *)&val->back_end_ips[i][0], b_ip))
+		if (dp_ipv6_match(&val->back_end_ips[i], b_ip))
 			return true;
 	return false;
 }
@@ -187,7 +187,7 @@ static __rte_always_inline bool dp_lb_port_match(struct lb_value *lb_val, uint16
 	return false;
 }
 
-uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
+const union dp_ipv6 *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key lb_key;
@@ -206,7 +206,7 @@ uint8_t *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vni)
 
 	int pos = lb_val->maglev_hash[dp_get_conntrack_flow_hash_value(flow_key) % DP_LB_MAGLEV_LOOKUP_SIZE];
 
-	return (uint8_t *)&lb_val->back_end_ips[pos][0];
+	return &lb_val->back_end_ips[pos];
 }
 
 int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
@@ -224,18 +224,18 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
-		if (lb_val->back_end_ips[i][0] != 0) {
+		if (!dp_is_ipv6_zero(&lb_val->back_end_ips[i])) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			DP_SET_IPADDR6(reply->addr, lb_val->back_end_ips[i]);
+			dp_set_ipaddr6(&reply->addr, &lb_val->back_end_ips[i]);
 		}
 	}
 
 	return DP_GRPC_OK;
 }
 
-int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip)
+int dp_add_lb_back_ip(const void *id_key, const union dp_ipv6 *back_ip)
 {
 	struct lb_value *lb_val = NULL;
 	struct lb_key *lb_k;
@@ -255,7 +255,7 @@ int dp_add_lb_back_ip(const void *id_key, const uint8_t *back_ip)
 	return DP_GRPC_OK;
 }
 
-int dp_del_lb_back_ip(const void *id_key, const uint8_t *back_ip)
+int dp_del_lb_back_ip(const void *id_key, const union dp_ipv6 *back_ip)
 {
 	struct lb_value *lb_val;
 	struct lb_key *lb_k;

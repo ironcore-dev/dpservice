@@ -178,8 +178,8 @@ static __rte_always_inline void dp_create_ipip_encap_header(uint8_t raw_hdr[DP_I
 	encap_ipv6_hdr->payload_len = 0;
 	encap_ipv6_hdr->proto = df->tun_info.proto_id;
 	encap_ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
-	rte_memcpy(encap_ipv6_hdr->src_addr, dp_get_port_ul_ipv6(incoming_port), sizeof(encap_ipv6_hdr->src_addr));
-	rte_memcpy(encap_ipv6_hdr->dst_addr, df->tun_info.ul_dst_addr6, sizeof(encap_ipv6_hdr->dst_addr));
+	dp_set_src_ipv6(encap_ipv6_hdr, dp_get_port_ul_ipv6(incoming_port));
+	dp_set_dst_ipv6(encap_ipv6_hdr, &df->tun_info.ul_dst_addr6);
 }
 
 static __rte_always_inline
@@ -238,7 +238,7 @@ int dp_offload_handle_tunnel_encap_traffic(struct dp_flow *df,
 
 	// encapsulating, there is only overlay addressing
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, &df->dst.dst_addr6, df->l4_type);
 	else
 		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, df->dst.dst_addr, df->l4_type);
 	if (cross_pf_port)
@@ -389,15 +389,15 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 
 	// restore the actual incoming pkt's ipv6 dst addr
 	if (is_recirc)
-		rte_memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
+		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &df->tun_info.ul_src_addr6);
 
 	// create flow match patterns
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
 
-	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, df->tun_info.ul_dst_addr6, df->tun_info.proto_id);
+	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &df->tun_info.ul_dst_addr6, df->tun_info.proto_id);
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, &df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
 		actual_ol_ipv4_addr = df->nat_type == DP_NAT_CHG_DST_IP
@@ -529,7 +529,7 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, &df->dst.dst_addr6, df->l4_type);
 	} else {
 		// if this flow is the returned vip-natted flow, inner ipv4 addr shall be the VIP (NAT addr)
 		actual_ol_ipv4_dst_addr = df->nat_type == DP_NAT_CHG_DST_IP
@@ -618,11 +618,11 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
 
 	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt
-	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, df->tun_info.ul_src_addr6, df->tun_info.proto_id);
+	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &df->tun_info.ul_src_addr6, df->tun_info.proto_id);
 
 	// inner packet matching (L3+L4)
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
-		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, df->dst.dst_addr6, df->l4_type);
+		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, &df->dst.dst_addr6, df->l4_type);
 	else
 		dp_set_ipv4_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv4, df->dst.dst_addr, df->l4_type);
 
@@ -639,7 +639,7 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 	dp_set_dst_mac_set_action(&actions[action_cnt++], &set_dst_mac, &outgoing_port->neigh_mac);
 
 	// set the right underlay address
-	dp_set_ipv6_set_dst_action(&actions[action_cnt++], &set_ipv6, df->tun_info.ul_dst_addr6);
+	dp_set_ipv6_set_dst_action(&actions[action_cnt++], &set_ipv6, &df->tun_info.ul_dst_addr6);
 
 	// make flow aging work
 	agectx = allocate_agectx();
