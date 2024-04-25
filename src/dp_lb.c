@@ -228,9 +228,7 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
-			// TODO(plague): revisit this after LB algorithm changes, currently fixing this would make a mess
-			rte_memcpy(reply->addr._data, &lb_val->back_end_ips[i][0], DP_IPV6_ADDR_SIZE);
-			reply->addr._is_v6 = true;
+			DP_SET_IPADDR6(reply->addr, lb_val->back_end_ips[i]);
 		}
 	}
 
