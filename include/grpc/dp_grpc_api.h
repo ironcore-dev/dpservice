@@ -77,12 +77,12 @@ enum dpgrpc_capture_iface_type {
 struct dpgrpc_iface {
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	uint32_t				ip4_addr;
-	uint8_t					ip6_addr[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6			ip6_addr;
 	uint32_t				vni;
 	struct dp_ip_address	pxe_addr;							// request (create) only
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
-	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
+	union dp_ipv6			ul_addr6;							// reply only
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
 };
@@ -108,17 +108,17 @@ struct dpgrpc_route {
 struct dpgrpc_vip {
 	struct dp_ip_address	addr;
 	char					iface_id[DP_IFACE_ID_MAX_LEN];
-	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
+	union dp_ipv6			ul_addr6;						// reply only
 };
 
 struct dpgrpc_nat {
-	char					iface_id[DP_IFACE_ID_MAX_LEN];		// local only
+	char					iface_id[DP_IFACE_ID_MAX_LEN];	// local only
 	struct dp_ip_address	addr;
 	uint16_t				min_port;
 	uint16_t				max_port;
-	uint32_t				vni;								// neighnat or reply only
-	uint8_t					neigh_addr6[DP_IPV6_ADDR_SIZE];	// neighnat only
-	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
+	uint32_t				vni;							// neighnat or reply only
+	union dp_ipv6			neigh_addr6;					// neighnat only
+	union dp_ipv6			ul_addr6;						// reply only
 };
 
 struct dpgrpc_lb_port {
@@ -127,11 +127,11 @@ struct dpgrpc_lb_port {
 };
 
 struct dpgrpc_lb {
-	char					lb_id[DP_LB_ID_MAX_LEN];			// request only
+	char					lb_id[DP_LB_ID_MAX_LEN];		// request only
 	struct dp_ip_address	addr;
 	uint32_t				vni;
 	struct dpgrpc_lb_port	lbports[DP_LB_MAX_PORTS];
-	uint8_t					ul_addr6[DP_IPV6_ADDR_SIZE];	// reply only
+	union dp_ipv6			ul_addr6;						// reply only
 };
 
 struct dpgrpc_lb_id {
@@ -167,13 +167,13 @@ struct dpgrpc_versions {
 struct dpgrpc_capture_interface {
 	enum dpgrpc_capture_iface_type	type;
 	union {
-		char	iface_id[DP_IFACE_ID_MAX_LEN];
-		uint8_t pf_index;
+		char		iface_id[DP_IFACE_ID_MAX_LEN];
+		uint8_t		pf_index;
 	} spec;
 };
 
 struct dpgrpc_capture {
-	uint8_t			dst_addr6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6	dst_addr6;
 	uint8_t			interface_count;
 	uint16_t		udp_src_port;
 	uint16_t		udp_dst_port;
@@ -182,7 +182,7 @@ struct dpgrpc_capture {
 };
 
 struct dpgrpc_capture_stop {
-	uint16_t						port_cnt;
+	uint16_t		port_cnt;
 };
 
 struct dpgrpc_request {
@@ -228,20 +228,20 @@ struct dpgrpc_request {
 };
 
 struct dpgrpc_vf_pci {
-	char		name[RTE_ETH_NAME_MAX_LEN];
-	uint8_t		ul_addr6[DP_IPV6_ADDR_SIZE];
+	char			name[RTE_ETH_NAME_MAX_LEN];
+	union dp_ipv6	ul_addr6;
 };
 
 struct dpgrpc_ul_addr {
-	uint8_t		addr6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6	addr6;
 };
 
 struct dpgrpc_fwrule_info {
-	struct dp_fwall_rule rule;
+	struct dp_fwall_rule	rule;
 };
 
 struct dpgrpc_vni_in_use {
-	uint8_t		in_use;
+	uint8_t			in_use;
 };
 
 struct dpgrpc_reply {

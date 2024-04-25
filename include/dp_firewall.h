@@ -50,8 +50,8 @@ struct dp_port_filter {
 
 struct dp_ip_mask {
 	union {
-		uint8_t  ip6[DP_IPV6_ADDR_SIZE];
-		uint32_t ip4;
+		union dp_ipv6 ip6;
+		uint32_t      ip4;
 	};
 };
 

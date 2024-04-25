@@ -218,7 +218,7 @@ void _dp_log(unsigned int level, unsigned int logtype,
 	int format;
 	char escaped[3072];  // worst-case: 512 encoded characters (\u1234)
 	const char *str_value;
-	rte_be32_t ipv4_value;
+	uint32_t ipv4_value;
 
 	if (!rte_log_can_log(logtype, level))
 		return;
@@ -269,7 +269,7 @@ void _dp_log(unsigned int level, unsigned int logtype,
 			fprintf(f, FORMAT_UINT, key, va_arg(args, unsigned int));
 			break;
 		case _DP_LOG_FMT_IPV4:
-			ipv4_value = va_arg(args, rte_be32_t);
+			ipv4_value = va_arg(args, uint32_t);
 			fprintf(f, FORMAT_IPV4, key, ((ipv4_value) >> 24) & 0xFF,
 										 ((ipv4_value) >> 16) & 0xFF,
 										 ((ipv4_value) >> 8) & 0xFF,
@@ -277,8 +277,8 @@ void _dp_log(unsigned int level, unsigned int logtype,
 			break;
 		case _DP_LOG_FMT_IPV6:
 			// re-use the escaping buffer for IP conversion
-			str_value = inet_ntop(AF_INET6, va_arg(args, const uint8_t *), escaped, INET6_ADDRSTRLEN);
-			fprintf(f, FORMAT_STR, key, str_value);
+			DP_IPV6_TO_STR(va_arg(args, const union dp_ipv6 *), escaped);
+			fprintf(f, FORMAT_STR, key, escaped);
 			break;
 		case _DP_LOG_FMT_PTR:
 			fprintf(f, FORMAT_PTR, key, va_arg(args, const void *));

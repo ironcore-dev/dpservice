@@ -23,7 +23,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_port *dst_port;
 	uint32_t l3_type;
 
-	vnf = dp_get_vnf(df->tun_info.ul_dst_addr6);
+	vnf = dp_get_vnf(&df->tun_info.ul_dst_addr6);
 	if (!vnf)
 		return IPIP_DECAP_NEXT_DROP;
 

@@ -25,7 +25,7 @@ static __rte_always_inline void dp_lb_set_next_hop(struct dp_flow *df, uint16_t 
 {
 	const struct dp_vnf *vnf;
 
-	vnf = dp_get_vnf(df->tun_info.ul_dst_addr6);
+	vnf = dp_get_vnf(&df->tun_info.ul_dst_addr6);
 	if (!vnf || vnf->type != DP_VNF_TYPE_LB_ALIAS_PFX) {
 		df->nxt_hop = port_id;  // needs to validated by the caller (but it's always m->port)
 		df->nat_type = DP_CHG_UL_DST_IP;
@@ -37,7 +37,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
-	uint8_t *target_ip6;
+	const union dp_ipv6 *target_ip6;
 	uint32_t vni;
 
 	if (!cntrack)
@@ -68,9 +68,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (!target_ip6)
 			return LB_NEXT_DROP;
 
-		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6)); // same trick as in packet_relay_node.c
-		rte_memcpy(df->tun_info.ul_dst_addr6, target_ip6, sizeof(df->tun_info.ul_dst_addr6));
-		rte_memcpy(cntrack->nf_info.underlay_dst, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_dst_addr6));
+		dp_copy_ipv6(&df->tun_info.ul_src_addr6, &df->tun_info.ul_dst_addr6);  // same trick as in packet_relay_node.c
+		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, target_ip6);
+		dp_copy_ipv6(&cntrack->nf_info.underlay_dst, target_ip6);
 		cntrack->flow_flags |= DP_FLOW_FLAG_DST_LB;
 		dp_lb_set_next_hop(df, m->port);
 
@@ -84,8 +84,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (DP_FLOW_HAS_FLAG_DST_LB(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
-		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));
-		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
+		dp_copy_ipv6(&df->tun_info.ul_src_addr6, &df->tun_info.ul_dst_addr6);
+		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &cntrack->nf_info.underlay_dst);
 		dp_lb_set_next_hop(df, m->port);
 		return LB_NEXT_IPIP_ENCAP;
 	}

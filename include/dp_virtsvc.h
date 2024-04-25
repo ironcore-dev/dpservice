@@ -11,6 +11,7 @@ extern "C" {
 #include <rte_byteorder.h>
 #include <rte_hash.h>
 #include <rte_telemetry.h>
+#include "dp_ipaddr.h"
 
 // limit number of services to one byte due to various implementation reasons
 #define DP_VIRTSVC_MAX 256
@@ -37,13 +38,13 @@ struct dp_virtsvc_conn {
 };
 
 struct dp_virtsvc {
-	rte_be32_t virtual_addr;
-	uint8_t    service_addr[16];
-	rte_be16_t virtual_port;
-	rte_be16_t service_port;
-	uint8_t    proto;
-	uint16_t   last_assigned_port;
-	struct rte_hash *open_ports;
+	rte_be32_t		virtual_addr;
+	union dp_ipv6	service_addr;
+	rte_be16_t		virtual_port;
+	rte_be16_t		service_port;
+	uint8_t			proto;
+	uint16_t		last_assigned_port;
+	struct rte_hash	*open_ports;
 	struct dp_virtsvc_conn connections[DP_VIRTSVC_PORTCOUNT];
 };
 
@@ -78,8 +79,8 @@ int dp_virtsvc_ipv4_cmp(uint8_t proto1, rte_be32_t addr1, rte_be16_t port1,
 }
 
 static __rte_always_inline
-int dp_virtsvc_ipv6_cmp(uint8_t proto1, const uint8_t addr1[16], rte_be16_t port1,
-						uint8_t proto2, const uint8_t addr2[16], rte_be16_t port2)
+int dp_virtsvc_ipv6_cmp(uint8_t proto1, const union dp_ipv6 *addr1, rte_be16_t port1,
+						uint8_t proto2, const union dp_ipv6 *addr2, rte_be16_t port2)
 {
 	int diff;
 	// dtto, see above

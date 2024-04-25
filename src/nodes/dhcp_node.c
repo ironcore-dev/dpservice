@@ -178,7 +178,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	// TODO(gg): Once PXE is tested, possibly remove 'static' if not needed
 	static enum dp_pxe_mode pxe_mode = DP_PXE_MODE_NONE;
 	rte_be32_t pxe_srv_ip;
-	char pxe_srv_ip_str[INET_ADDRSTRLEN];
+	char pxe_srv_ip_str[INET6_ADDRSTRLEN];
 	uint8_t response_type;
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
@@ -242,6 +242,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	if (pxe_mode != DP_PXE_MODE_NONE) {
 		memset(&incoming_eth_hdr->dst_addr, ~0, sizeof(incoming_eth_hdr->dst_addr));
 		incoming_ipv4_hdr->dst_addr = 0xFFFFFFFF;
+		assert(!port->iface.cfg.pxe_ip.is_v6);
 		pxe_srv_ip = htonl(port->iface.cfg.pxe_ip.ipv4);
 		dhcp_hdr->siaddr = pxe_srv_ip;
 		switch (pxe_mode) {
@@ -249,11 +250,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s", DP_PXE_TFTP_PATH);
 			break;
 		case DP_PXE_MODE_HTTP:
-			if (!inet_ntop(AF_INET, &pxe_srv_ip, pxe_srv_ip_str, INET_ADDRSTRLEN)) {
-				DPNODE_LOG_WARNING(node, "Cannot convert PXE server IP",
-								   DP_LOG_IPV4(ntohl(pxe_srv_ip)), DP_LOG_RET(errno));
-				return DHCP_NEXT_DROP;
-			}
+			// already asserted this is IPv4
+			DP_IPADDR_TO_STR(&port->iface.cfg.pxe_ip, pxe_srv_ip_str);
 			snprintf(dhcp_hdr->file, sizeof(dhcp_hdr->file), "%s%s%s",
 					"http://", pxe_srv_ip_str, port->iface.cfg.pxe_str);
 			break;

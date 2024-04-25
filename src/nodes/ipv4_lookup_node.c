@@ -42,7 +42,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (out_port->is_pf) {
 		if (in_port->is_pf)
 			return IPV4_LOOKUP_NEXT_DROP;
-		rte_memcpy(df->tun_info.ul_dst_addr6, route.nh_ipv6, sizeof(df->tun_info.ul_dst_addr6));
+		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &route.nh_ipv6);
 		out_port = dp_multipath_get_pf(df->dp_flow_hash);
 	} else {
 		// next hop is known, fill in Ether header

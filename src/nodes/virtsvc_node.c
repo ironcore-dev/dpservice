@@ -26,7 +26,7 @@ int virtsvc_node_append_tx(uint16_t port_id, const char *tx_node_name)
 }
 
 // runtime constant, precompute
-static const uint8_t *service_ul_ip;
+static const union dp_ipv6 *service_ul_ip;
 
 static int virtsvc_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
@@ -102,8 +102,8 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	ipv6_hdr->payload_len = htons((uint16_t)(hdr_total_len - sizeof(struct rte_ipv4_hdr)));
 	ipv6_hdr->proto = proto;
 	ipv6_hdr->hop_limits = ttl;
-	rte_memcpy(ipv6_hdr->src_addr, service_ul_ip, sizeof(ipv6_hdr->src_addr));
-	rte_memcpy(ipv6_hdr->dst_addr, virtsvc->service_addr, sizeof(virtsvc->service_addr));
+	dp_set_src_ipv6(ipv6_hdr, service_ul_ip);
+	dp_set_dst_ipv6(ipv6_hdr, &virtsvc->service_addr);
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6;
 	m->tx_offload = 0;
 	m->l2_len = sizeof(struct rte_ether_hdr);

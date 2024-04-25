@@ -11,8 +11,8 @@ extern "C" {
 #include "dp_util.h"
 #include "dp_lb.h"
 
-int dp_delete_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip);
-int dp_add_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip);
+int dp_delete_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip);
+int dp_add_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip);
 
 #ifdef __cplusplus
 }

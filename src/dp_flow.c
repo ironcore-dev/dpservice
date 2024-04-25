@@ -85,8 +85,8 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 		}
 
 		// This is only called for ICMP, not for ICMPv6, so use IPv4 directly
-		DP_SET_IPADDR4(key->l3_dst, ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr));
-		DP_SET_IPADDR4(key->l3_src, ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr));
+		dp_set_ipaddr4(&key->l3_dst, ntohl(icmp_err_ip_info.err_ipv4_hdr->src_addr));
+		dp_set_ipaddr4(&key->l3_src, ntohl(icmp_err_ip_info.err_ipv4_hdr->dst_addr));
 
 		key->proto = icmp_err_ip_info.err_ipv4_hdr->next_proto_id;
 
@@ -113,7 +113,7 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
 	} else if (key->l3_src.is_v6 && key->l3_dst.is_v6) {
-		if (dp_is_ip6_in_nat64_range(key->l3_dst.ipv6))
+		if (dp_is_ip6_in_nat64_range(key->l3_dst.ipv6.bytes))  // TODO migrate NAT64
 			key->vnf_type = DP_VNF_TYPE_NAT;
 	} else {
 		s_data = dp_get_iface_snat_data(key->l3_src.ipv4, key->vni);
@@ -134,12 +134,12 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 
 	switch (df->l3_type) {
 	case RTE_ETHER_TYPE_IPV4:
-		DP_SET_IPADDR4(key->l3_dst, ntohl(df->dst.dst_addr));
-		DP_SET_IPADDR4(key->l3_src, ntohl(df->src.src_addr));
+		dp_set_ipaddr4(&key->l3_dst, ntohl(df->dst.dst_addr));
+		dp_set_ipaddr4(&key->l3_src, ntohl(df->src.src_addr));
 		break;
 	case RTE_ETHER_TYPE_IPV6:
-		DP_SET_IPADDR6(key->l3_dst, df->dst.dst_addr6);
-		DP_SET_IPADDR6(key->l3_src, df->src.src_addr6);
+		dp_set_ipaddr6(&key->l3_dst, &df->dst.dst_addr6);
+		dp_set_ipaddr6(&key->l3_src, &df->src.src_addr6);
 		break;
 	default:
 		return DP_ERROR;
@@ -497,9 +497,9 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 	}
 }
 
-void dp_remove_lbtarget_flows(const uint8_t *ul_addr)
+void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr)
 {
-	struct flow_value *flow_val = NULL;
+	struct flow_value *flow_val;
 	const struct flow_key *next_key;
 	uint32_t iter = 0;
 	int ret;
@@ -509,7 +509,7 @@ void dp_remove_lbtarget_flows(const uint8_t *ul_addr)
 			DPS_LOG_ERR("Iterating flow table failed while removing LB target flows", DP_LOG_RET(ret));
 			return;
 		}
-		if (dp_ipv6_match(flow_val->nf_info.underlay_dst, ul_addr))
+		if (dp_ipv6_match(&flow_val->nf_info.underlay_dst, ul_addr))
 			dp_remove_flow(flow_val);
 	}
 }

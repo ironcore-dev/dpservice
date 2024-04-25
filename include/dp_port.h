@@ -25,8 +25,8 @@ struct dp_iface_cfg {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
 	uint8_t					ip_depth;
-	uint8_t					dhcp_ipv6[DP_IPV6_ADDR_SIZE];
-	uint8_t					own_ipv6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6			dhcp_ipv6;
+	union dp_ipv6			own_ipv6;
 	uint8_t					ip6_depth;
 	struct dp_ip_address	pxe_ip;
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
@@ -37,7 +37,7 @@ struct dp_port_iface {
 	struct dp_iface_cfg		cfg;
 	uint32_t				vni;
 	char					id[DP_IFACE_ID_MAX_LEN];
-	uint8_t					ul_ipv6[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6			ul_ipv6;
 	uint32_t				nat_ip;
 	uint16_t				nat_port_range[2];
 	bool					ready;
@@ -95,9 +95,9 @@ int dp_load_mac(struct dp_port *port)
 }
 
 static __rte_always_inline
-const uint8_t *dp_get_port_ul_ipv6(const struct dp_port *port)
+const union dp_ipv6 *dp_get_port_ul_ipv6(const struct dp_port *port)
 {
-	return port->iface.ready ? port->iface.ul_ipv6 : dp_conf_get_underlay_ip();
+	return port->iface.ready ? &port->iface.ul_ipv6 : dp_conf_get_underlay_ip();
 }
 
 static __rte_always_inline

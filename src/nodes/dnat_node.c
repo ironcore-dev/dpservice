@@ -26,9 +26,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct flow_value *cntrack = df->conntrack;
 	struct rte_ipv4_hdr *ipv4_hdr;
 	uint32_t dst_ip, vni;
-	const uint8_t *underlay_dst;
+	const union dp_ipv6 *underlay_dst;
 	struct dp_icmp_err_ip_info icmp_err_ip_info;
 	struct dnat_data *dnat_data;
+	union dp_ipv6 nat_ipv6;
 
 	if (!cntrack)
 		goto out;
@@ -55,7 +56,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
 					df->nat_type = DP_CHG_UL_DST_IP;
 					cntrack->nf_info.l4_type = df->l4_type;
-					memcpy(cntrack->nf_info.underlay_dst, underlay_dst, sizeof(cntrack->nf_info.underlay_dst));
+					dp_copy_ipv6(&cntrack->nf_info.underlay_dst, underlay_dst);
 
 					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
 					return DNAT_NEXT_PACKET_RELAY;
@@ -79,7 +80,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
-			DP_SET_IPADDR4(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));
+			dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 				return DNAT_NEXT_DROP;
 		}
@@ -148,8 +149,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 			}
 		}
-		if (!cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.is_v6
-			|| DP_FAILED(dp_nat_chg_ipv4_to_ipv6_hdr(df, m, cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ipv6)))
+		if (DP_FAILED(dp_ipv6_from_ipaddr(&nat_ipv6, &cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src))
+			|| DP_FAILED(dp_nat_chg_ipv4_to_ipv6_hdr(df, m, &nat_ipv6)))
 			return DNAT_NEXT_DROP;
 
 		return DNAT_NEXT_IPV6_LOOKUP;

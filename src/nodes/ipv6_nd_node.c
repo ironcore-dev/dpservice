@@ -20,8 +20,12 @@ int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 	return dp_node_append_vf_tx(DP_NODE_GET_SELF(ipv6_nd), next_tx_index, port_id, tx_node_name);
 }
 
-static const uint8_t dp_unspecified_ipv6[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-static const uint8_t dp_multicast_ipv6[16] = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 };
+static const union dp_ipv6 dp_unspecified_ipv6 = {
+	.bytes = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+static const union dp_ipv6 dp_multicast_ipv6 = {
+	.bytes = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 }
+};
 
 uint16_t dp_ipv6_fill_ra(struct rte_ipv6_hdr *ipv6_hdr, struct ra_msg *ra_msg, const uint8_t *src_mac_addr)
 {
@@ -55,37 +59,39 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct rte_ipv6_hdr *req_ipv6_hdr = (struct rte_ipv6_hdr *)(req_eth_hdr + 1);
 	struct icmp6hdr *req_icmp6_hdr = (struct icmp6hdr *)(req_ipv6_hdr + 1);
 	uint8_t icmp_type = req_icmp6_hdr->icmp6_type;
-	const uint8_t *rt_ip = dp_get_gw_ip6();
+	const union dp_ipv6 *rt_ip = dp_get_gw_ip6();
 	struct nd_msg *nd_msg;
 	struct ra_msg *req_ra_msg;
 	struct dp_port *port = dp_get_in_port(m);
+	const union dp_ipv6 *src_ipv6 = dp_get_src_ipv6(req_ipv6_hdr);
 
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_ether_addr_copy(&port->own_mac, &req_eth_hdr->src_addr);
 
-	if (!memcmp(req_ipv6_hdr->src_addr, dp_unspecified_ipv6, sizeof(req_ipv6_hdr->src_addr)))
-		rte_memcpy(req_ipv6_hdr->dst_addr, dp_multicast_ipv6, sizeof(req_ipv6_hdr->dst_addr));
+	if (dp_ipv6_match(src_ipv6, &dp_unspecified_ipv6))
+		dp_set_dst_ipv6(req_ipv6_hdr, &dp_multicast_ipv6);
 	else
-		rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr, sizeof(req_ipv6_hdr->dst_addr));
+		dp_set_dst_ipv6(req_ipv6_hdr, src_ipv6);
 
-	rte_memcpy(req_ipv6_hdr->src_addr, rt_ip, sizeof(req_ipv6_hdr->src_addr));
+	dp_set_src_ipv6(req_ipv6_hdr, rt_ip);
 
 	if (icmp_type != NDISC_NEIGHBOUR_SOLICITATION && icmp_type != NDISC_ROUTER_SOLICITATION)
 		return IPV6_ND_NEXT_DROP;
 
 	if (icmp_type == NDISC_NEIGHBOUR_SOLICITATION) {
 		nd_msg = (struct nd_msg *)(req_ipv6_hdr + 1);
-		if (memcmp(&nd_msg->target, rt_ip, sizeof(nd_msg->target)))
+		static_assert(sizeof(nd_msg->target) == sizeof(rt_ip->bytes), "Incompatible IPv6 format in ND message structure");
+		if (memcmp(nd_msg->target, rt_ip->bytes, sizeof(nd_msg->target)))
 			return IPV6_ND_NEXT_DROP;
 		rte_ether_addr_copy(&req_eth_hdr->dst_addr, &port->neigh_mac);
-		rte_memcpy(port->iface.cfg.own_ipv6, req_ipv6_hdr->dst_addr, sizeof(port->iface.cfg.own_ipv6));
+		dp_copy_ipv6(&port->iface.cfg.own_ipv6, dp_get_dst_ipv6(req_ipv6_hdr));
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
 		req_icmp6_hdr->icmp6_solicited = 1;
 		req_icmp6_hdr->icmp6_override = 1;
 		// set target lladdr option and MAC
 		nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
 		nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
-		rte_memcpy(&nd_msg->opt[2], req_eth_hdr->src_addr.addr_bytes, 6);
+		rte_ether_addr_copy(&req_eth_hdr->src_addr, (struct rte_ether_addr *)&nd_msg->opt[2]);
 	} else if (icmp_type == NDISC_ROUTER_SOLICITATION) {
 		req_ra_msg = (struct ra_msg *)(req_ipv6_hdr + 1);
 		m->data_len = dp_ipv6_fill_ra(req_ipv6_hdr, req_ra_msg, port->own_mac.addr_bytes);

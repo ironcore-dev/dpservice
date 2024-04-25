@@ -33,7 +33,7 @@ extern "C" {
 #define _DP_LOG_INT(KEY, VALUE) KEY, _DP_LOG_FMT_INT, VALUE
 #define _DP_LOG_UINT(KEY, VALUE) KEY, _DP_LOG_FMT_UINT, VALUE
 #define _DP_LOG_IPV4(KEY, VALUE) KEY, _DP_LOG_FMT_IPV4, VALUE
-#define _DP_LOG_IPV6(KEY, VALUE) KEY, _DP_LOG_FMT_IPV6, VALUE
+#define _DP_LOG_IPV6(KEY, VALUE) KEY, _DP_LOG_FMT_IPV6, (VALUE).bytes
 #define _DP_LOG_PTR(KEY, VALUE) KEY, _DP_LOG_FMT_PTR, VALUE
 
 // Macros to generate key-value pairs for structured logging

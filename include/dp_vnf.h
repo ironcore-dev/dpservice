@@ -29,8 +29,8 @@ enum dp_vnf_type {
 } __rte_packed;  // for 'struct dp_flow' and 'struct flow_key'
 
 struct dp_vnf_prefix {
-	struct dp_ip_address ol;
-	uint8_t				  length;
+	struct dp_ip_address	ol;
+	uint8_t					length;
 };
 
 struct dp_vnf {
@@ -43,10 +43,10 @@ struct dp_vnf {
 int dp_vnf_init(int socket_id);
 void dp_vnf_free(void);
 
-int dp_add_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE], enum dp_vnf_type type,
+int dp_add_vnf(const union dp_ipv6 *ul_addr6, enum dp_vnf_type type,
 			   uint16_t port_id, uint32_t vni, const struct dp_ip_address *pfx_ip, uint8_t prefix_len);
-const struct dp_vnf *dp_get_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE]);
-int dp_del_vnf(const uint8_t ul_addr6[DP_IPV6_ADDR_SIZE]);
+const struct dp_vnf *dp_get_vnf(const union dp_ipv6 *ul_addr6);
+int dp_del_vnf(const union dp_ipv6 *ul_addr6);
 
 bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, const struct dp_ip_address *prefix_ip, uint8_t prefix_len);
 

@@ -135,13 +135,13 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 			(dest_ip & rule->dest_mask.ip4) == (r_dest_ip & rule->dest_mask.ip4)))
 			return false;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		dp_apply_ipv6_mask(df->src.src_addr6, rule->src_mask.ip6, masked_src_ip6);
-		dp_apply_ipv6_mask(df->dst.dst_addr6, rule->dest_mask.ip6, masked_dest_ip6);
-		dp_apply_ipv6_mask(rule->src_ip.ipv6, rule->src_mask.ip6, masked_r_src_ip6);
-		dp_apply_ipv6_mask(rule->dest_ip.ipv6, rule->dest_mask.ip6, masked_r_dest_ip6);
+		dp_apply_ipv6_mask(df->src.src_addr6.bytes, rule->src_mask.ip6.bytes, masked_src_ip6);  // TODO Migrate as separate commit
+		dp_apply_ipv6_mask(df->dst.dst_addr6.bytes, rule->dest_mask.ip6.bytes, masked_dest_ip6);  // TODO Migrate as separate commit
+		dp_apply_ipv6_mask(rule->src_ip.ipv6.bytes, rule->src_mask.ip6.bytes, masked_r_src_ip6);  // TODO accept dp_ipv6 as separate commit
+		dp_apply_ipv6_mask(rule->dest_ip.ipv6.bytes, rule->dest_mask.ip6.bytes, masked_r_dest_ip6);  // TODO accept dp_ipv6 as separate commit
 
 		if (!(rte_rib6_is_equal(masked_src_ip6, masked_r_src_ip6) &&
-					rte_rib6_is_equal(masked_dest_ip6, masked_r_dest_ip6)))
+					rte_rib6_is_equal(masked_dest_ip6, masked_r_dest_ip6)))  // TODO migrate as separate commit
 			return false;
 	} else {
 		return false;

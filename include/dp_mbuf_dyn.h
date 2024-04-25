@@ -58,12 +58,12 @@ struct dp_flow {
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	uint32_t	l3_payload_length;  //layer-3 playload length for inner packets.
 	union {
-		uint8_t		dst_addr6[16];
-		rte_be32_t	dst_addr;
+		union dp_ipv6	dst_addr6;
+		rte_be32_t		dst_addr;
 	} dst;
 	union {
-		uint8_t		src_addr6[16];
-		rte_be32_t	src_addr;
+		union dp_ipv6	src_addr6;
+		rte_be32_t		src_addr;
 	} src;
 	rte_be32_t	nat_addr;
 	uint16_t	nat_port;
@@ -84,11 +84,11 @@ struct dp_flow {
 	uint32_t		dp_flow_hash;  // this can be brought down to 1-bit if needed (only chooses PF0/PF1 in ipv4_lookup)
 
 	struct {
-		uint8_t		ul_src_addr6[16];
-		uint8_t		ul_dst_addr6[16];
-		uint16_t 	l3_type;	//layer-3 type in ethernet header of outer packets
-		uint8_t		proto_id;	//proto_id in outer ipv6 header
-		uint32_t	dst_vni;
+		union dp_ipv6	ul_src_addr6;
+		union dp_ipv6	ul_dst_addr6;
+		uint16_t		l3_type;	//layer-3 type in ethernet header of outer packets
+		uint8_t			proto_id;	//proto_id in outer ipv6 header
+		uint32_t		dst_vni;
 	} tun_info;
 
 	uint16_t		nxt_hop;  // this can be brought down to only one byte (low DP_MAX_PORTS)
@@ -125,7 +125,7 @@ static __rte_always_inline struct dp_flow *dp_init_flow_ptr(struct rte_mbuf *m)
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 
-	memset(df, 0, sizeof(*df));
+	memset((void *)df, 0, sizeof(*df));  // explicit cast to stop compiler warning about clearing a struct with 'const' members
 
 	return df;
 }
@@ -153,8 +153,8 @@ static __rte_always_inline void dp_extract_ipv4_header(struct dp_flow *df, const
 
 static __rte_always_inline void dp_extract_ipv6_header(struct dp_flow *df, const struct rte_ipv6_hdr *ipv6_hdr)
 {
-	rte_memcpy(df->dst.dst_addr6, ipv6_hdr->dst_addr, sizeof(df->dst.dst_addr6));
-	rte_memcpy(df->src.src_addr6, ipv6_hdr->src_addr, sizeof(df->src.src_addr6));
+	dp_copy_ipv6(&df->dst.dst_addr6, dp_get_dst_ipv6(ipv6_hdr));
+	dp_copy_ipv6(&df->src.src_addr6, dp_get_src_ipv6(ipv6_hdr));
 	df->l4_type = ipv6_hdr->proto;
 }
 
@@ -180,8 +180,8 @@ static __rte_always_inline int dp_extract_l4_header(struct dp_flow *df, const vo
 
 static __rte_always_inline void dp_extract_underlay_header(struct dp_flow *df, const struct rte_ipv6_hdr *ipv6_hdr)
 {
-	rte_memcpy(df->tun_info.ul_src_addr6, ipv6_hdr->src_addr, sizeof(df->tun_info.ul_src_addr6));
-	rte_memcpy(df->tun_info.ul_dst_addr6, ipv6_hdr->dst_addr, sizeof(df->tun_info.ul_dst_addr6));
+	dp_copy_ipv6(&df->tun_info.ul_src_addr6, dp_get_src_ipv6(ipv6_hdr));
+	dp_copy_ipv6(&df->tun_info.ul_dst_addr6, dp_get_dst_ipv6(ipv6_hdr));
 	df->tun_info.proto_id = ipv6_hdr->proto;
 }
 

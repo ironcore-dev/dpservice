@@ -41,7 +41,7 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	ipv4_hdr->src_addr = temp_ip;
 	df->nxt_hop = m->port;
 	dp_nat_chg_ip(df, ipv4_hdr, m);
-	memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
+	dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &df->tun_info.ul_src_addr6);
 
 	return PACKET_RELAY_NEXT_IPIP_ENCAP;
 }
@@ -50,7 +50,7 @@ static __rte_always_inline rte_edge_t lb_nnat_icmpv6_reply(struct dp_flow *df, s
 {
 	struct rte_ipv6_hdr *ipv6_hdr = dp_get_ipv6_hdr(m);
 	struct rte_icmp_hdr *icmp6_hdr = (struct rte_icmp_hdr *)(ipv6_hdr + 1);
-	uint8_t temp_addr[DP_IPV6_ADDR_SIZE];
+	union dp_ipv6 temp_addr;
 
 	if (icmp6_hdr->icmp_type != DP_ICMPV6_ECHO_REQUEST)
 		return PACKET_RELAY_NEXT_DROP;
@@ -60,12 +60,12 @@ static __rte_always_inline rte_edge_t lb_nnat_icmpv6_reply(struct dp_flow *df, s
 	icmp6_hdr->icmp_cksum = 0;
 	icmp6_hdr->icmp_cksum = rte_ipv6_udptcp_cksum(ipv6_hdr, icmp6_hdr);
 
-	rte_memcpy(temp_addr, ipv6_hdr->dst_addr, DP_IPV6_ADDR_SIZE);
-	rte_memcpy(ipv6_hdr->dst_addr, ipv6_hdr->src_addr, DP_IPV6_ADDR_SIZE);
-	rte_memcpy(ipv6_hdr->src_addr, temp_addr, DP_IPV6_ADDR_SIZE);
+	dp_copy_ipv6(&temp_addr, dp_get_dst_ipv6(ipv6_hdr));
+	dp_set_dst_ipv6(ipv6_hdr, dp_get_src_ipv6(ipv6_hdr));
+	dp_set_src_ipv6(ipv6_hdr, &temp_addr);
 
 	df->nxt_hop = m->port;
-	memcpy(df->tun_info.ul_dst_addr6, df->tun_info.ul_src_addr6, sizeof(df->tun_info.ul_dst_addr6));
+	dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &df->tun_info.ul_src_addr6);
 
 	return PACKET_RELAY_NEXT_IPIP_ENCAP;
 }
@@ -81,8 +81,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df->nxt_hop = m->port;
 		// trick: use src place to store old dst address for offloading
-		rte_memcpy(df->tun_info.ul_src_addr6, df->tun_info.ul_dst_addr6, sizeof(df->tun_info.ul_src_addr6));
-		rte_memcpy(df->tun_info.ul_dst_addr6, cntrack->nf_info.underlay_dst, sizeof(df->tun_info.ul_dst_addr6));
+		dp_copy_ipv6(&df->tun_info.ul_src_addr6, &df->tun_info.ul_dst_addr6);
+		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &cntrack->nf_info.underlay_dst);
 		return PACKET_RELAY_NEXT_IPIP_ENCAP;
 	}
 

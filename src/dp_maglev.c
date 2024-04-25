@@ -19,10 +19,10 @@
 #define DP_SHIFT_UP				true
 #define DP_SHIFT_DOWN			false
 
-static uint32_t dp_murmur_hash2(const uint8_t ipv6[])
+static uint32_t dp_murmur_hash2(const union dp_ipv6 *ipv6)
 {
-	uint32_t len = DP_IPV6_ADDR_SIZE;
-	const uint8_t *data = ipv6;
+	uint32_t len = sizeof(ipv6->bytes);
+	const uint8_t *data = ipv6->bytes;
 	uint32_t h = 0 ^ len;
 	uint32_t k;
 
@@ -60,12 +60,13 @@ static uint32_t dp_murmur_hash2(const uint8_t ipv6[])
 	return h;
 }
 
-static uint32_t dp_djb_hash(const uint8_t ipv6[])
+static uint32_t dp_djb_hash(const union dp_ipv6 *ipv6)
 {
 	uint32_t hash = DP_DJB_HASH_MAGIC;
-	const uint8_t *byte = ipv6;
+	const uint8_t *byte = ipv6->bytes;
 	int c;
 
+	// TODO FIX in separate commit
 	while ((c = *byte++))
 		hash = ((hash << 5) + hash) + c;
 
@@ -80,15 +81,14 @@ static int *dp_maglev_permutation(struct lb_value *lbval)
 
 	size = lbval->back_end_cnt * DP_LB_MAGLEV_LOOKUP_SIZE;
 	permutation = rte_zmalloc("maglev_perm", sizeof(int) * size, RTE_CACHE_LINE_SIZE);
-
 	if (!permutation) {
-		DPS_LOG_ERR("Memory allocation failed");
+		DPS_LOG_ERR("Maglev permutation memory allocation failed");
 		return NULL;
 	}
 
 	for (i = 0; i < lbval->back_end_cnt; i++) {
-		offset = dp_murmur_hash2(lbval->back_end_ips[i]) % DP_LB_MAGLEV_LOOKUP_SIZE;
-		skip = (dp_djb_hash(lbval->back_end_ips[i]) % (DP_LB_MAGLEV_LOOKUP_SIZE - 1)) + 1;
+		offset = dp_murmur_hash2(&lbval->back_end_ips[i]) % DP_LB_MAGLEV_LOOKUP_SIZE;
+		skip = (dp_djb_hash(&lbval->back_end_ips[i]) % (DP_LB_MAGLEV_LOOKUP_SIZE - 1)) + 1;
 
 		for (j = 0; j < DP_LB_MAGLEV_LOOKUP_SIZE; j++)
 			permutation[i * DP_LB_MAGLEV_LOOKUP_SIZE + j] = (offset + j * skip) % DP_LB_MAGLEV_LOOKUP_SIZE;
@@ -122,7 +122,7 @@ static int dp_maglev_populate(struct lb_value *lbval, int *permutation)
 	int num = 0;
 
 	if (!next) {
-		DPS_LOG_ERR("Memory allocation failed");
+		DPS_LOG_ERR("Maglev hash memory allocation failed");
 		return DP_ERROR;
 	}
 
@@ -158,32 +158,30 @@ static int dp_maglev_calc_hash_lookup_table(struct lb_value *lbval)
 	return ret;
 }
 
-static bool dp_is_ip_greater(const uint8_t *ip1, const uint8_t *ip2)
+static bool dp_is_ipv6_greater(const union dp_ipv6 *ip1, const union dp_ipv6 *ip2)
 {
-	int i;
-
-	for (i = 0; i < DP_IPV6_ADDR_SIZE; i++) {
-		if (ip1[i] < ip2[i])
+	for (size_t i = 0; i < sizeof(ip1->bytes); ++i) {
+		if (ip1->bytes[i] < ip2->bytes[i])
 			return false;
-		if (ip1[i] > ip2[i])
+		if (ip1->bytes[i] > ip2->bytes[i])
 			return true;
 	}
 	return false;
 }
 
-static void dp_shift_back_end_ips(uint8_t ips[][DP_IPV6_ADDR_SIZE], int start_pos, int end_pos, bool shift_up)
+static void dp_shift_back_end_ips(union dp_ipv6 ips[], int start_pos, int end_pos, bool shift_up)
 {
 	int i;
 
 	if (shift_up)
 		for (i = end_pos; i > start_pos; i--)
-			rte_memcpy(&ips[i], &ips[i - 1], DP_IPV6_ADDR_SIZE);
+			dp_copy_ipv6(&ips[i], &ips[i - 1]);
 	else
 		for (i = start_pos; i < end_pos; i++)
-			rte_memcpy(&ips[i], &ips[i + 1], DP_IPV6_ADDR_SIZE);
+			dp_copy_ipv6(&ips[i], &ips[i + 1]);
 }
 
-int dp_add_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip)
+int dp_add_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 {
 	int i, insert_pos = lbval->back_end_cnt;
 
@@ -192,27 +190,28 @@ int dp_add_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip)
 
 	/* Find the correct position to insert the new back ip */
 	for (i = 0; i < lbval->back_end_cnt; i++) {
-		if (dp_is_ip_greater(lbval->back_end_ips[i], back_ip)) {
+		if (dp_is_ipv6_greater(&lbval->back_end_ips[i], back_ip)) {
 			insert_pos = i;
 			break;
 		}
 	}
 
 	dp_shift_back_end_ips(lbval->back_end_ips, insert_pos, lbval->back_end_cnt, DP_SHIFT_UP);
-	rte_memcpy(&lbval->back_end_ips[insert_pos], back_ip, DP_IPV6_ADDR_SIZE);
+	dp_copy_ipv6(&lbval->back_end_ips[insert_pos], back_ip);
 	lbval->back_end_cnt++;
 
 	return dp_maglev_calc_hash_lookup_table(lbval);
 }
 
-int dp_delete_maglev_backend(struct lb_value *lbval, const uint8_t *back_ip)
+int dp_delete_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 {
+	static union dp_ipv6 zero_ipv6 = { 0, };
 	int i;
 
 	for (i = 0; i < lbval->back_end_cnt; i++) {
-		if (memcmp(&lbval->back_end_ips[i], back_ip, DP_IPV6_ADDR_SIZE) == 0) {
+		if (dp_ipv6_match(&lbval->back_end_ips[i], back_ip)) {
 			dp_shift_back_end_ips(lbval->back_end_ips, i, lbval->back_end_cnt - 1, DP_SHIFT_DOWN);
-			memset(&lbval->back_end_ips[lbval->back_end_cnt - 1], 0, DP_IPV6_ADDR_SIZE);
+			dp_copy_ipv6(&lbval->back_end_ips[lbval->back_end_cnt - 1], &zero_ipv6);
 			lbval->back_end_cnt--;
 			break;
 		}

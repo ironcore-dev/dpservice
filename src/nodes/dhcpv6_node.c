@@ -47,7 +47,7 @@ int dhcpv6_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 
 
 // constant after init
-static const uint8_t *own_ip6;
+static const union dp_ipv6 *own_ip6;
 static struct dhcpv6_opt_server_id_ll opt_sid_template;
 static struct dhcpv6_opt_ia_na_single_addr_status opt_iana_template;
 
@@ -87,7 +87,8 @@ static void dp_fill_boot_file_option(struct dp_dhcpv6_reply_options *reply_optio
 
 	reply_options->pxe_mode = MODE;
 	reply_options->boot_file_url.op_code = htons(DHCPV6_OPT_BOOT_FILE);
-	inet_ntop(AF_INET6, port->iface.cfg.pxe_ip.ipv6, ipv6_str, sizeof(ipv6_str));
+	assert(port->iface.cfg.pxe_ip.is_v6);
+	DP_IPADDR_TO_STR(&port->iface.cfg.pxe_ip, ipv6_str);
 
 	if (MODE == DP_PXE_MODE_TFTP)
 		url_len = (uint16_t)snprintf(reply_options->boot_file_url.boot_file_url, DHCPV6_BOOT_FILE_BUF_LEN,
@@ -146,7 +147,10 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 			}
 			reply_options->opt_iana = opt_iana_template;
 			reply_options->opt_iana.ia_na.iaid = ((const struct dhcpv6_ia_na *)&opt->data)->iaid;
-			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_in_port(m)->iface.cfg.dhcp_ipv6, DP_IPV6_ADDR_SIZE);
+			// cannot use optimized function here due to the destination being packed (can cause alignment problems)
+			static_assert(sizeof(reply_options->opt_iana.ia_na.options[0].addr.ipv6) == sizeof(dp_get_in_port(m)->iface.cfg.dhcp_ipv6),
+						  "Incompatible IPv6 array for IA_NA options");
+			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes, DP_IPV6_ADDR_SIZE);
 			reply_options->opt_iana_len = sizeof(opt_iana_template);
 			break;
 		case DHCPV6_OPT_RAPID_COMMIT:
@@ -270,7 +274,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	int reply_options_len;
 	size_t payload_len;
 
-	if (dp_is_ipv6_addr_zero(dp_get_in_port(m)->iface.cfg.dhcp_ipv6))
+	if (dp_is_ipv6_zero(&dp_get_in_port(m)->iface.cfg.dhcp_ipv6))
 		return DHCPV6_NEXT_DROP;
 
 	// packet length is uint16_t, negative value means it's less than the required length
@@ -288,8 +292,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_ether_addr_copy(&dp_get_in_port(m)->own_mac, &req_eth_hdr->src_addr);
 
-	rte_memcpy(req_ipv6_hdr->dst_addr, req_ipv6_hdr->src_addr, sizeof(req_ipv6_hdr->dst_addr));
-	rte_memcpy(req_ipv6_hdr->src_addr, own_ip6, sizeof(req_ipv6_hdr->src_addr));
+	dp_set_dst_ipv6(req_ipv6_hdr, dp_get_src_ipv6(req_ipv6_hdr));
+	dp_set_src_ipv6(req_ipv6_hdr, own_ip6);
 	req_udp_hdr->src_port = htons(DHCPV6_SERVER_PORT);
 	req_udp_hdr->dst_port = htons(DHCPV6_CLIENT_PORT);
 

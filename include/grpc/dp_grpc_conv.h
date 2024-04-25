@@ -17,7 +17,7 @@ namespace GrpcConv
 	bool IsInterfaceIdValid(const std::string& id);
 
 	bool StrToIpv4(const std::string& str, uint32_t *dst);
-	bool StrToIpv6(const std::string& str, uint8_t *dst);
+	bool StrToIpv6(const std::string& str, union dp_ipv6 *dst);
 
 	bool StrToDpAddress(const std::string& str, struct dp_ip_address *dp_addr, IpVersion ipver);
 	bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr);
@@ -31,11 +31,11 @@ namespace GrpcConv
 	bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType & grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type);
 	CaptureInterfaceType CaptureInterfaceTypeToGrpc(enum dpgrpc_capture_iface_type dp_capture_iface_type);
 
-	const char *Ipv4ToStr(uint32_t ipv4);
+	bool Ipv4PrefixLenToMask(uint32_t prefix_length, struct dp_ip_mask *mask);
 
-	bool Ipv4PrefixLenToMask(uint32_t prefix_length, uint32_t *mask);
+	bool Ipv6PrefixLenToMask(uint32_t prefix_length, struct dp_ip_mask *mask);
 
-	bool Ipv6PrefixLenToMask(uint32_t prefix_length, uint8_t *mask);
+	void DpToGrpcAddress(const struct dp_ip_address *dp_addr, IpAddress *grpc_addr);
 
 	void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface);
 
