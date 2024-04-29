@@ -28,6 +28,12 @@ bool dp_is_ipv6_addr_zero(const uint8_t *addr)
 	return *((const uint64_t *)addr) == 0 && *((const uint64_t *)(addr + sizeof(uint64_t))) == 0;
 }
 
+static __rte_always_inline
+bool dp_ipv6_match(const uint8_t *l, const uint8_t *r)
+{
+	return *((const uint64_t *)l) == *((const uint64_t *)r) && *((const uint64_t *)(l + sizeof(uint64_t))) == *((const uint64_t *)(r + sizeof(uint64_t)));
+}
+
 // structure for holding dual IP addresses
 // made read-only without the right macro to prevent uninitialized bytes due to the the use of this structure in hash keys
 struct dp_ip_address {

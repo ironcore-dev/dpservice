@@ -466,7 +466,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 
 	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
+			DPS_LOG_ERR("Iterating flow table failed while removing neighboring NAT flows", DP_LOG_RET(ret));
 			return;
 		}
 		if (next_key->vni == vni && !next_key->l3_dst.is_v6 && next_key->l3_dst.ipv4 == ipv4
@@ -494,6 +494,23 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 		) {
 			dp_remove_flow(flow_val);
 		}
+	}
+}
+
+void dp_remove_lbtarget_flows(const uint8_t *ul_addr)
+{
+	struct flow_value *flow_val = NULL;
+	const struct flow_key *next_key;
+	uint32_t iter = 0;
+	int ret;
+
+	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Iterating flow table failed while removing LB target flows", DP_LOG_RET(ret));
+			return;
+		}
+		if (dp_ipv6_match(flow_val->nf_info.underlay_dst, ul_addr))
+			dp_remove_flow(flow_val);
 	}
 }
 
