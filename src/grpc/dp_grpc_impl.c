@@ -164,6 +164,7 @@ static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 	if (!request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
+	dp_remove_lbtarget_flows(request->addr.ipv6);
 	return dp_del_lb_back_ip(request->lb_id, request->addr.ipv6);
 }
 

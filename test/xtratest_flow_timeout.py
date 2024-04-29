@@ -133,9 +133,6 @@ def test_external_lb_relay_algorithm(prepare_ipv4, grpc_client, fast_flow_timeou
 	if not fast_flow_timeout:
 		pytest.skip("Fast flow timeout needs to be enabled")
 
-	# TODO dellbtarget() is not properly cleanin up so the previous example poisons the result
-	age_out_flows()
-
 	targets = [ f"fc00:2::{i}" for i in range(1, 7) ]
 
 	# Create a lb with multiple targets
@@ -177,8 +174,6 @@ def test_external_lb_relay_algorithm(prepare_ipv4, grpc_client, fast_flow_timeou
 		f"Loadbalancer target selection algorithm did not survive other target deletion"
 
 	# Delete the target itself (no need to age out, should be clean)
-	# TODO this should not be needed, see above
-	age_out_flows()
 	grpc_client.dellbtarget(lb_name, target_ul)
 	targets.remove(target_ul)
 

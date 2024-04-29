@@ -151,6 +151,7 @@ void dp_free_network_nat_port(const struct flow_value *cntrack);
 void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type);
 void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port);
 void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni);
+void dp_remove_lbtarget_flows(const uint8_t *ul_addr);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key);
 
