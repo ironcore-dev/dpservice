@@ -172,6 +172,12 @@ def process_data(round_count, flow_count, output_file_prefix):
 		aggregated_throughputs_mbps.append(round_throughput_mbps)
 		aggregated_throughputs_gbps.append(round_throughput_gbps)
 
+	# Calculate and print average throughput after all rounds
+	average_throughput_mbps = sum(aggregated_throughputs_mbps) / round_count
+	average_throughput_gbps = sum(aggregated_throughputs_gbps) / round_count
+	print(f"Average Throughput (Mbits/sec): {average_throughput_mbps:.2f}")
+	print(f"Average Throughput (Gbits/sec): {average_throughput_gbps:.3f} Gbits/sec)")
+
 	prefix = output_file_prefix
 	if output_file_prefix == '':
 		prefix = f"test_tcp_{date_str}"
@@ -194,11 +200,11 @@ def process_data(round_count, flow_count, output_file_prefix):
 
 
 def start_client(server_ip, output_file_prefix, flow_count, run_time=10, msg_length=1448, round_count=1):
-	if not ping_with_backoff(server_ip, max_attempts=5, max_interval=64):
+	if not ping_with_backoff(server_ip, max_attempts=5, max_interval=32):
 		print("Server is not reachable.")
 		sys.exit(1)
 
-	sock = connect_with_backoff(server_ip, max_attempts=5, max_interval=64)
+	sock = connect_with_backoff(server_ip, max_attempts=5, max_interval=32)
 	ready = sock.recv(1024).decode('utf-8')
 	if ready == "ready":
 		run_iperf3_clients(server_ip, flow_count, run_time, msg_length, round_count, output_file_prefix)
