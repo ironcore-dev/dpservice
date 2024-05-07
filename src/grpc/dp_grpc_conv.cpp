@@ -175,7 +175,7 @@ bool Ipv6PrefixLenToMask(uint32_t prefix_length, struct dp_ip_mask *mask)
 		ipv6[i / 8] |= (uint8_t)(1 << (7 - (i % 8)));
 	}
 
-	DP_IPV6_FROM_ARRAY(&mask->ip6, ipv6);  // TODO migrate mask
+	DP_IPV6_FROM_ARRAY(&mask->ip6, ipv6);
 	return true;
 }
 
