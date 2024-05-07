@@ -1,4 +1,5 @@
 #include "dp_ipaddr.h"
+#include "dp_conf.h"
 
 int dp_str_to_ipv4(const char *src, uint32_t *dest)
 {
@@ -45,4 +46,23 @@ int dp_ipaddr_to_str(const struct dp_ip_address *addr, char *dest, int dest_len)
 		return dp_ipv4_to_str(addr->ipv4, dest, dest_len);
 
 	return dp_ipv6_to_str(&ipv6, dest, dest_len);
+}
+
+
+void dp_generate_ul_ipv6(union dp_ipv6 *dest)
+{
+	static uint32_t ul_counter = 0;
+
+	dest->_ul.prefix = dp_conf_get_underlay_ip()->_prefix;  // Use the same prefix as the host
+	dest->_ul.kernel = dest->_ul.reserved = 0;
+#ifdef ENABLE_STATIC_UNDERLAY_IP
+	dest->_ul.random = 1;
+#else
+	dest->_ul.random = (uint8_t)(rand() % 256);
+
+	// Start the counter from a random value to increase the randomness of dpservice startup
+	if (ul_counter == 0)
+		ul_counter = rand() % 256;
+#endif
+	dest->_ul.local = htonl(++ul_counter);
 }

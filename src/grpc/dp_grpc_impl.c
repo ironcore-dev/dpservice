@@ -23,51 +23,12 @@
 #include "monitoring/dp_monitoring.h"
 #include "rte_flow/dp_rte_flow_capture.h"
 
-static uint32_t pfx_counter = 0;
-
-// TODO(plague): adapt faster code from dp_ipaddr.h to use here
-static __rte_always_inline void dp_generate_underlay_ipv6(uint8_t route[DP_IPV6_ADDR_SIZE])
-{
-	rte_be32_t local;
-	uint8_t random_byte;
-
-	/* First 8 bytes for host */
-	rte_memcpy(route, dp_conf_get_underlay_ip()->bytes, DP_IPV6_ADDR_SIZE);
-	/* Following 2 bytes for kernel routing and 1 byte reserved */
-	memset(route + 8, 0, 3);
-
-#ifdef ENABLE_STATIC_UNDERLAY_IP
-	random_byte = 1;
-#else
-	random_byte = (uint8_t)(rand() % 256);
-#endif
-
-	/* 1 byte random value */
-	rte_memcpy(route + 11, &random_byte, 1);
-
-#ifndef ENABLE_STATIC_UNDERLAY_IP
-	/* Start the counter from a random value as well to increase the randomness of the address */
-	if (pfx_counter == 0)
-		pfx_counter = rand() % 256;
-#endif
-
-	pfx_counter++;
-	local = htonl(pfx_counter);
-
-	/* 4 byte counter */
-	rte_memcpy(route + 12, &local, 4);
-}
 
 static int dp_create_vnf_route(union dp_ipv6 *ul_addr6 /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
 							   struct dp_ip_address *pfx_ip, uint8_t prefix_len)
 {
-	uint8_t ipv6[DP_IPV6_ADDR_SIZE];
-
-	// TODO this should be temporary till the union is used everywhere, then also migrate this one
-	dp_generate_underlay_ipv6(ipv6);
-	DP_IPV6_FROM_ARRAY(ul_addr6, ipv6);  // TODO migrate - separate commit to rework the above and introduce prefix+suffix
-
+	dp_generate_ul_ipv6(ul_addr6);
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
 }
 

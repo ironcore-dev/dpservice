@@ -31,6 +31,13 @@ union dp_ipv6 {
 		uint8_t		prefix[DP_IPV6_ADDR_SIZE - sizeof(rte_be32_t)];
 		rte_be32_t	ipv4;
 	} _nat64;
+	struct __rte_packed {
+		rte_be64_t	prefix;
+		rte_be16_t	kernel;
+		uint8_t		reserved;
+		uint8_t		random;
+		rte_be32_t	local;
+	} _ul;
 };
 static_assert(sizeof(union dp_ipv6) == DP_IPV6_ADDR_SIZE, "union dp_ipv6 has padding");
 
@@ -49,7 +56,6 @@ void dp_copy_ipv6(union dp_ipv6 *dst, const union dp_ipv6 *src)
 	dst->_suffix = src->_suffix;
 }
 
-// TODO reduce use of these as much as possible (re-check at the end
 #define DP_IPV6_FROM_ARRAY(IPV6, ARRAY) do { \
 	static_assert(sizeof(ARRAY) == sizeof(union dp_ipv6), "Invalid array size for DP_SET_IPV6"); \
 	dp_copy_ipv6((IPV6), (const union dp_ipv6 *)(ARRAY)); \
@@ -140,6 +146,8 @@ int dp_ipv4_to_str(uint32_t ipv4, char *dest, int dest_len);
 
 int dp_str_to_ipv4(const char *src, uint32_t *dest);
 int dp_str_to_ipv6(const char *src, union dp_ipv6 *dest);
+
+void dp_generate_ul_ipv6(union dp_ipv6 *dest);
 
 
 // structure for holding dual IP addresses
