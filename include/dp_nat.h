@@ -16,8 +16,6 @@
 extern "C" {
 #endif
 
-#define DP_NAT64_PREFIX		"\x00\x64\xff\x9b\x00\x00\x00\x00\x00\x00\x00\x00"
-
 #define DP_NETWORK_NAT_ALL_VNI		0
 
 struct nat_key {
@@ -117,11 +115,6 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);
 struct snat_data *dp_get_iface_snat_data(uint32_t iface_ip, uint32_t vni);
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni);
-
-static __rte_always_inline bool dp_is_ip6_in_nat64_range(const uint8_t *ipv6_addr)
-{
-	return memcmp(ipv6_addr, DP_NAT64_PREFIX, 12) == 0;  // TODO migrate NAT64
-}
 
 #ifdef __cplusplus
 }

@@ -205,7 +205,7 @@ int dp_add_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 
 int dp_delete_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 {
-	static union dp_ipv6 zero_ipv6 = { 0, };
+	static const union dp_ipv6 zero_ipv6 = { 0, };
 	int i;
 
 	for (i = 0; i < lbval->back_end_cnt; i++) {
