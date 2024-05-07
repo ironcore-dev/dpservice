@@ -106,16 +106,19 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struct dp_port *port, struct flow_key *key)
 {
 	struct snat_data *s_data;
+	union dp_ipv6 dst_ipv6;
 
 	if (port->is_pf) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
 			key->vnf_type = df->vnf_type;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
-	} else if (key->l3_src.is_v6 && key->l3_dst.is_v6) {
-		if (dp_is_ip6_in_nat64_range(key->l3_dst.ipv6.bytes))  // TODO migrate NAT64
+	} else if (!DP_FAILED(dp_ipv6_from_ipaddr(&dst_ipv6, &key->l3_dst))) {
+		// assuming key->l3_src is also IPv6 (no IPv4<->IPv6 packets exist)
+		if (dp_is_ipv6_nat64(&dst_ipv6))
 			key->vnf_type = DP_VNF_TYPE_NAT;
 	} else {
+		// assuming key->l3_src is also IPv4 (no IPv4<->IPv6 packets exist)
 		s_data = dp_get_iface_snat_data(key->l3_src.ipv4, key->vni);
 		if (s_data && s_data->nat_ip != 0)
 			key->vnf_type = DP_VNF_TYPE_NAT;

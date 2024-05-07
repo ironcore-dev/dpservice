@@ -174,8 +174,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				return SNAT_NEXT_DROP;
 		}
 
-		if (df->l3_type == RTE_ETHER_TYPE_IPV6 && port->iface.nat_ip && dp_is_ip6_in_nat64_range(df->dst.dst_addr6.bytes)  // TODO migrate NAT64
-		    && df->flow_type == DP_FLOW_SOUTH_NORTH) {
+		if (df->l3_type == RTE_ETHER_TYPE_IPV6
+			&& port->iface.nat_ip
+			&& df->flow_type == DP_FLOW_SOUTH_NORTH
+			&& dp_is_ipv6_nat64(&df->dst.dst_addr6)
+		) {
 			if (DP_FAILED(dp_process_ipv6_nat64(m, df, cntrack, port)))
 				return SNAT_NEXT_DROP;
 

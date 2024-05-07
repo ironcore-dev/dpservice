@@ -27,8 +27,20 @@ union dp_ipv6 {
 		rte_be64_t	_suffix;
 	};
 	const uint8_t	bytes[DP_IPV6_ADDR_SIZE];
+	struct __rte_packed {
+		uint8_t		prefix[DP_IPV6_ADDR_SIZE - sizeof(rte_be32_t)];
+		rte_be32_t	ipv4;
+	} _nat64;
 };
 static_assert(sizeof(union dp_ipv6) == DP_IPV6_ADDR_SIZE, "union dp_ipv6 has padding");
+
+static const union dp_ipv6 dp_nat64_prefix = {
+	.bytes = { 0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+
+static const union dp_ipv6 dp_nat64_mask = {
+	.bytes = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0 }
+};
 
 static __rte_always_inline
 void dp_copy_ipv6(union dp_ipv6 *dst, const union dp_ipv6 *src)
@@ -93,6 +105,25 @@ bool dp_masked_ipv6_match(const union dp_ipv6 *l, const union dp_ipv6 *r, const 
 		&& (l->_suffix & mask->_suffix) == (r->_suffix & mask->_suffix);
 }
 
+static __rte_always_inline
+bool dp_is_ipv6_nat64(const union dp_ipv6 *ipv6)
+{
+	return dp_masked_ipv6_match(&dp_nat64_prefix, ipv6, &dp_nat64_mask);
+}
+
+static __rte_always_inline
+void dp_set_ipv6_nat64(union dp_ipv6 *ipv6, rte_be32_t ipv4)
+{
+	dp_copy_ipv6(ipv6, &dp_nat64_prefix);
+	ipv6->_nat64.ipv4 = ipv4;
+}
+
+static __rte_always_inline
+rte_be32_t dp_get_ipv6_nat64(const union dp_ipv6 *ipv6)
+{
+	return ipv6->_nat64.ipv4;
+}
+
 int dp_ipv6_to_str(const union dp_ipv6 *ipv6, char *dest, int dest_len);
 #define DP_IPV6_TO_STR(IPV6, DST) do { \
 	static_assert(sizeof(DST) >= INET6_ADDRSTRLEN, "Insufficient buffer size for DP_IPV6_TO_STR()"); \
@@ -109,8 +140,6 @@ int dp_ipv4_to_str(uint32_t ipv4, char *dest, int dest_len);
 
 int dp_str_to_ipv4(const char *src, uint32_t *dest);
 int dp_str_to_ipv6(const char *src, union dp_ipv6 *dest);
-
-// TODO(plague): move NAT64 handling here (part of the above) + grep for [12] which means NAT64 ipv6 -> ipv4 conversion and wrap it
 
 
 // structure for holding dual IP addresses

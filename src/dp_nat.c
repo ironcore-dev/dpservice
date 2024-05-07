@@ -330,7 +330,7 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 	eth_hdr->ether_type = htons(RTE_ETHER_TYPE_IPV4);
 
 	ipv6_hdr = dp_get_ipv6_hdr(m);
-	*dest_ip = *(int *)&ipv6_hdr->dst_addr[12];
+	*dest_ip = dp_get_ipv6_nat64(dp_get_dst_ipv6(ipv6_hdr));
 	l4_proto = ipv6_hdr->proto;
 
 	// Adjust the packet data to fit IPv4
@@ -407,7 +407,8 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const un
 	struct rte_icmp_hdr *icmp_hdr;
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
-	uint32_t src_ipv4;
+	union dp_ipv6 src_nat64;
+	rte_be32_t src_ipv4;
 	uint8_t l4_proto;
 
 	eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
@@ -432,8 +433,8 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const un
 	ipv6_hdr->hop_limits = ipv4_hdr->time_to_live;
 
 	// Set the source and destination IPv6 addresses
-	rte_memcpy(ipv6_hdr->src_addr, DP_NAT64_PREFIX, 12);  // TODO migrate NAT64
-	*(uint32_t *)&ipv6_hdr->src_addr[12] = src_ipv4;
+	dp_set_ipv6_nat64(&src_nat64, src_ipv4);
+	dp_set_src_ipv6(ipv6_hdr, &src_nat64);
 	dp_set_dst_ipv6(ipv6_hdr, ipv6_addr);
 	dp_copy_ipv6(&df->dst.dst_addr6, ipv6_addr);
 
@@ -626,7 +627,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		dp_set_ipaddr6(&portmap_key.src_ip, &df->src.src_addr6);
-		portoverload_tbl_key.dst_ip = ntohl(*(const rte_be32_t *)&df->dst.dst_addr6.bytes[12]);  // TODO migrate NAT64
+		portoverload_tbl_key.dst_ip = ntohl(dp_get_ipv6_nat64(&df->dst.dst_addr6));
 	} else {
 		return DP_GRPC_ERR_BAD_IPVER;
 	}
@@ -732,6 +733,7 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	const struct flow_key *flow_key_reply = &cntrack->flow_key[DP_FLOW_DIR_REPLY];
 	struct netnat_portmap_data *portmap_data;
 	struct dp_port *created_port;
+	union dp_ipv6 dst_nat64;
 	int ret;
 
 	if (unlikely(flow_key_reply->l3_dst.is_v6)) {
@@ -739,10 +741,10 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 		return DP_ERROR;
 	}
 
-	if (flow_key_org->l3_dst.is_v6)
-		portoverload_tbl_key.dst_ip = ntohl(*(const rte_be32_t *)&flow_key_org->l3_dst.ipv6.bytes[12]);  // TODO NAT64 func in ipaddr.h
-	else
+	if (DP_FAILED(dp_ipv6_from_ipaddr(&dst_nat64, &flow_key_org->l3_dst)))
 		portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ipv4;
+	else
+		portoverload_tbl_key.dst_ip = ntohl(dp_get_ipv6_nat64(&dst_nat64));
 	portoverload_tbl_key.nat_ip = flow_key_reply->l3_dst.ipv4;
 	portoverload_tbl_key.nat_port = flow_key_reply->port_dst;
 	portoverload_tbl_key.dst_port = flow_key_org->port_dst;
