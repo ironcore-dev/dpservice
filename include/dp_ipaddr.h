@@ -86,6 +86,13 @@ bool dp_ipv6_match(const union dp_ipv6 *l, const union dp_ipv6 *r)
 	return l->_prefix == r->_prefix && l->_suffix == r->_suffix;
 }
 
+static __rte_always_inline
+bool dp_masked_ipv6_match(const union dp_ipv6 *l, const union dp_ipv6 *r, const union dp_ipv6 *mask)
+{
+	return (l->_prefix & mask->_prefix) == (r->_prefix & mask->_prefix)
+		&& (l->_suffix & mask->_suffix) == (r->_suffix & mask->_suffix);
+}
+
 int dp_ipv6_to_str(const union dp_ipv6 *ipv6, char *dest, int dest_len);
 #define DP_IPV6_TO_STR(IPV6, DST) do { \
 	static_assert(sizeof(DST) >= INET6_ADDRSTRLEN, "Insufficient buffer size for DP_IPV6_TO_STR()"); \

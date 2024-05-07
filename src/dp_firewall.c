@@ -74,33 +74,16 @@ int dp_list_firewall_rules(const struct dp_port *port, struct dp_grpc_responder 
 	return DP_GRPC_OK;
 }
 
-static __rte_always_inline void dp_apply_ipv6_mask(const uint8_t *addr, const uint8_t *mask, uint8_t *result)
-{
-	for (int i = 0; i < DP_IPV6_ADDR_SIZE; i++)
-		result[i] = addr[i] & mask[i];
-}
-
 static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *rule,
 													const struct dp_flow *df)
 {
-	uint32_t dest_ip = ntohl(df->dst.dst_addr);
-	uint32_t src_ip = ntohl(df->src.src_addr);
 	uint32_t src_port_lower, src_port_upper = 0;
 	uint32_t dst_port_lower, dst_port_upper = 0;
-	uint8_t masked_src_ip6[DP_IPV6_ADDR_SIZE];
-	uint8_t masked_dest_ip6[DP_IPV6_ADDR_SIZE];
-	uint8_t masked_r_src_ip6[DP_IPV6_ADDR_SIZE];
-	uint8_t masked_r_dest_ip6[DP_IPV6_ADDR_SIZE];
-	uint32_t r_dest_ip = rule->dest_ip.ipv4;
-	uint32_t r_src_ip = rule->src_ip.ipv4;
+	union dp_ipv6 r_src_ip6;
+	union dp_ipv6 r_dest_ip6;
 	uint8_t protocol = df->l4_type;
 	uint16_t dest_port = 0;
 	uint16_t src_port = 0;
-	uint16_t src_type = rule->src_ip.is_v6 ? RTE_ETHER_TYPE_IPV6 : RTE_ETHER_TYPE_IPV4;
-	uint16_t dest_type = rule->dest_ip.is_v6 ? RTE_ETHER_TYPE_IPV6 : RTE_ETHER_TYPE_IPV4;
-
-	if (src_type != df->l3_type && dest_type != df->l3_type)
-		return false;
 
 	switch (df->l4_type) {
 	case IPPROTO_TCP:
@@ -131,17 +114,15 @@ static __rte_always_inline bool dp_is_rule_matching(const struct dp_fwall_rule *
 	}
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		if (!((src_ip & rule->src_mask.ip4) == (r_src_ip & rule->src_mask.ip4) &&
-			(dest_ip & rule->dest_mask.ip4) == (r_dest_ip & rule->dest_mask.ip4)))
+		if (rule->src_ip.is_v6 || rule->dest_ip.is_v6
+			|| (ntohl(df->src.src_addr) & rule->src_mask.ip4) != (rule->src_ip.ipv4 & rule->src_mask.ip4)
+			|| (ntohl(df->dst.dst_addr) & rule->dest_mask.ip4) != (rule->dest_ip.ipv4 & rule->dest_mask.ip4))
 			return false;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
-		dp_apply_ipv6_mask(df->src.src_addr6.bytes, rule->src_mask.ip6.bytes, masked_src_ip6);  // TODO Migrate as separate commit
-		dp_apply_ipv6_mask(df->dst.dst_addr6.bytes, rule->dest_mask.ip6.bytes, masked_dest_ip6);  // TODO Migrate as separate commit
-		dp_apply_ipv6_mask(rule->src_ip.ipv6.bytes, rule->src_mask.ip6.bytes, masked_r_src_ip6);  // TODO accept dp_ipv6 as separate commit
-		dp_apply_ipv6_mask(rule->dest_ip.ipv6.bytes, rule->dest_mask.ip6.bytes, masked_r_dest_ip6);  // TODO accept dp_ipv6 as separate commit
-
-		if (!(rte_rib6_is_equal(masked_src_ip6, masked_r_src_ip6) &&
-					rte_rib6_is_equal(masked_dest_ip6, masked_r_dest_ip6)))  // TODO migrate as separate commit
+		if (DP_FAILED(dp_ipv6_from_ipaddr(&r_src_ip6, &rule->src_ip))
+			|| DP_FAILED(dp_ipv6_from_ipaddr(&r_dest_ip6, &rule->dest_ip))
+			|| !dp_masked_ipv6_match(&df->src.src_addr6, &r_src_ip6, &rule->src_mask.ip6)
+			|| !dp_masked_ipv6_match(&df->dst.dst_addr6, &r_dest_ip6, &rule->dest_mask.ip6))
 			return false;
 	} else {
 		return false;
