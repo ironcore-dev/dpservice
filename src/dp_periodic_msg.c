@@ -12,9 +12,6 @@
 #include "nodes/arp_node.h"
 #include "nodes/ipv6_nd_node.h"
 
-static const union dp_ipv6 dp_multicast_ipv6 = {
-	.bytes = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 }
-};
 static const struct rte_ether_addr dp_mc_mac = {
 	.addr_bytes = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x01 }
 };

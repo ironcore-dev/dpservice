@@ -382,7 +382,7 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_NO_VM;
 
 	iface_vni = port->iface.vni;
-	ret = dp_grpc_add_route(port, iface_vni, 0, &request->addr, NULL, request->length);
+	ret = dp_grpc_add_route(port, iface_vni, 0, &request->addr, &dp_empty_ipv6, request->length);
 	if (DP_FAILED(ret))
 		return ret;
 
@@ -457,12 +457,12 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {
-		ret = dp_add_route(port, request->vni, 0, request->ip4_addr, NULL, 32);
+		ret = dp_add_route(port, request->vni, 0, request->ip4_addr, &dp_empty_ipv6, 32);
 		if (DP_FAILED(ret))
 			goto iface_err;
 	}
 	if (!dp_is_ipv6_zero(&request->ip6_addr)) {
-		ret = dp_add_route6(port, request->vni, 0, &request->ip6_addr, NULL, 128);
+		ret = dp_add_route6(port, request->vni, 0, &request->ip6_addr, &dp_empty_ipv6, 128);
 		if (DP_FAILED(ret))
 			goto route_err;
 	}

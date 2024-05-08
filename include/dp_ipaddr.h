@@ -41,13 +41,10 @@ union dp_ipv6 {
 };
 static_assert(sizeof(union dp_ipv6) == DP_IPV6_ADDR_SIZE, "union dp_ipv6 has padding");
 
-static const union dp_ipv6 dp_nat64_prefix = {
-	.bytes = { 0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-};
-
-static const union dp_ipv6 dp_nat64_mask = {
-	.bytes = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0 }
-};
+extern const union dp_ipv6 dp_empty_ipv6;
+extern const union dp_ipv6 dp_multicast_ipv6;
+extern const union dp_ipv6 dp_nat64_prefix;
+extern const union dp_ipv6 dp_nat64_mask;
 
 static __rte_always_inline
 void dp_copy_ipv6(union dp_ipv6 *dst, const union dp_ipv6 *src)
