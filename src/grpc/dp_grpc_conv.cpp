@@ -217,10 +217,9 @@ static void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip,
 	// NOTE: This assumes the mask is valid (i.e. starting from the left, no holes)
 	GrpcConv::DpToGrpcAddress(&rule_ip, ip);
 	if (!rule_ip.is_v6)
-		pfx->set_length(__builtin_popcount(rule_mask.ip4));
+		pfx->set_length(dp_ipv6_popcount(&rule_mask.ip6));
 	else
-		// TODO (plague): migrate; revisit after dp_generate_underlay_ipv6() uses prefix/suffix
-		pfx->set_length(__builtin_popcountll(rule_mask.ip6._prefix) + __builtin_popcountll(rule_mask.ip6._suffix));
+		pfx->set_length(__builtin_popcount(rule_mask.ip4));
 	pfx->set_allocated_ip(ip);
 }
 
