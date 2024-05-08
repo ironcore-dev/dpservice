@@ -63,12 +63,9 @@ static uint32_t dp_murmur_hash2(const union dp_ipv6 *ipv6)
 static uint32_t dp_djb_hash(const union dp_ipv6 *ipv6)
 {
 	uint32_t hash = DP_DJB_HASH_MAGIC;
-	const uint8_t *byte = ipv6->bytes;
-	int c;
 
-	// TODO FIX in separate commit
-	while ((c = *byte++))
-		hash = ((hash << 5) + hash) + c;
+	for (size_t i = 0; i < sizeof(ipv6->bytes); ++i)
+		hash = ((hash << 5) + hash) + ipv6->bytes[i];
 
 	hash &= ~(1 << 31);
 	return hash;
