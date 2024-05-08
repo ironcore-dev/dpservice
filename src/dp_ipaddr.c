@@ -1,6 +1,23 @@
 #include "dp_ipaddr.h"
 #include "dp_conf.h"
 
+
+const union dp_ipv6 dp_empty_ipv6 = {
+	.bytes = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+
+const union dp_ipv6 dp_multicast_ipv6 = {
+	.bytes = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 }
+};
+
+const union dp_ipv6 dp_nat64_prefix = {
+	.bytes = { 0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+};
+const union dp_ipv6 dp_nat64_mask = {
+	.bytes = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0 }
+};
+
+
 int dp_str_to_ipv4(const char *src, uint32_t *dest)
 {
 	struct in_addr addr;

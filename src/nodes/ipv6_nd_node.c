@@ -20,13 +20,6 @@ int ipv6_nd_node_append_vf_tx(uint16_t port_id, const char *tx_node_name)
 	return dp_node_append_vf_tx(DP_NODE_GET_SELF(ipv6_nd), next_tx_index, port_id, tx_node_name);
 }
 
-static const union dp_ipv6 dp_unspecified_ipv6 = {
-	.bytes = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
-};
-static const union dp_ipv6 dp_multicast_ipv6 = {
-	.bytes = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01 }
-};
-
 uint16_t dp_ipv6_fill_ra(struct rte_ipv6_hdr *ipv6_hdr, struct ra_msg *ra_msg, const uint8_t *src_mac_addr)
 {
 	struct icmp6hdr *icmp6_hdr = &(ra_msg->icmph);
@@ -68,7 +61,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	rte_ether_addr_copy(&req_eth_hdr->src_addr, &req_eth_hdr->dst_addr);
 	rte_ether_addr_copy(&port->own_mac, &req_eth_hdr->src_addr);
 
-	if (dp_ipv6_match(src_ipv6, &dp_unspecified_ipv6))
+	if (dp_ipv6_match(src_ipv6, &dp_empty_ipv6))
 		dp_set_dst_ipv6(req_ipv6_hdr, &dp_multicast_ipv6);
 	else
 		dp_set_dst_ipv6(req_ipv6_hdr, src_ipv6);

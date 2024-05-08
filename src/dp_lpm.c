@@ -22,11 +22,11 @@ static __rte_always_inline int dp_lpm_fill_route_tables(const struct dp_port *po
 {
 	int ret;
 
-	ret = dp_add_route(port, port->iface.vni, 0, port->iface.cfg.own_ip, NULL, 32);
+	ret = dp_add_route(port, port->iface.vni, 0, port->iface.cfg.own_ip, &dp_empty_ipv6, 32);
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = dp_add_route6(port, port->iface.vni, 0, &port->iface.cfg.dhcp_ipv6, NULL, 128);
+	ret = dp_add_route6(port, port->iface.vni, 0, &port->iface.cfg.dhcp_ipv6, &dp_empty_ipv6, 128);
 	if (DP_FAILED(ret))
 		return ret;
 
@@ -86,7 +86,7 @@ const union dp_ipv6 *dp_get_gw_ip6(void)
 int dp_add_route(const struct dp_port *port, uint32_t vni, uint32_t t_vni, uint32_t ip,
 				 const union dp_ipv6 *t_ip6, uint8_t depth)
 {
-	struct dp_iface_route *route = NULL;
+	struct dp_iface_route *route;
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 
@@ -193,7 +193,7 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
 				   struct dp_grpc_responder *responder)
 {
-	struct rte_rib_node *node = NULL;
+	struct rte_rib_node *node;
 	struct rte_rib *root;
 	int ret;
 
@@ -223,7 +223,7 @@ int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
 int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const union dp_ipv6 *ipv6,
 				  const union dp_ipv6 *t_ip6, uint8_t depth)
 {
-	struct dp_iface_route *route = NULL;
+	struct dp_iface_route *route;
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 

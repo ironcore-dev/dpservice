@@ -205,13 +205,12 @@ int dp_add_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 
 int dp_delete_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 {
-	static const union dp_ipv6 zero_ipv6 = { 0, };
 	int i;
 
 	for (i = 0; i < lbval->back_end_cnt; i++) {
 		if (dp_ipv6_match(&lbval->back_end_ips[i], back_ip)) {
 			dp_shift_back_end_ips(lbval->back_end_ips, i, lbval->back_end_cnt - 1, DP_SHIFT_DOWN);
-			dp_copy_ipv6(&lbval->back_end_ips[lbval->back_end_cnt - 1], &zero_ipv6);
+			dp_copy_ipv6(&lbval->back_end_ips[lbval->back_end_cnt - 1], &dp_empty_ipv6);
 			lbval->back_end_cnt--;
 			break;
 		}
