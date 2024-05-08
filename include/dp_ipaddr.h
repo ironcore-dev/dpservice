@@ -109,6 +109,12 @@ bool dp_masked_ipv6_match(const union dp_ipv6 *l, const union dp_ipv6 *r, const 
 }
 
 static __rte_always_inline
+int dp_ipv6_popcount(const union dp_ipv6 *ipv6)
+{
+	return __builtin_popcountll(ipv6->_prefix) + __builtin_popcountll(ipv6->_suffix);
+}
+
+static __rte_always_inline
 bool dp_is_ipv6_nat64(const union dp_ipv6 *ipv6)
 {
 	return dp_masked_ipv6_match(&dp_nat64_prefix, ipv6, &dp_nat64_mask);

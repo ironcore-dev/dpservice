@@ -43,13 +43,13 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint32_t *route_key);
+										  uint32_t *p_ip);
 
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint8_t route_key[DP_IPV6_ADDR_SIZE]);  // TODO migrate in separate commit
+										  union dp_ipv6 *p_ipv6);
 uint32_t dp_get_gw_ip4(void);
 const union dp_ipv6 *dp_get_gw_ip6(void);
 

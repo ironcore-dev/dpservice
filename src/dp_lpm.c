@@ -278,7 +278,7 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint32_t *route_key)
+										  uint32_t *p_ip)
 {
 	uint32_t dst_ip = ntohl(df->dst.dst_addr);
 	struct rte_rib_node *node;
@@ -307,7 +307,7 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 	if (dst_port->is_pf)
 		rte_memcpy(route, rte_rib_get_ext(node), sizeof(*route));
 
-	if (DP_FAILED(rte_rib_get_ip(node, route_key)))
+	if (DP_FAILED(rte_rib_get_ip(node, p_ip)))
 		return NULL;
 
 	return dst_port;
@@ -317,12 +317,13 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint8_t route_key[DP_IPV6_ADDR_SIZE])
+										  union dp_ipv6 *p_ipv6)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 	uint64_t next_hop;
 	struct dp_port *dst_port;
+	uint8_t ip[RTE_RIB6_IPV6_ADDR_SIZE];
 
 	if (t_vni == 0)
 		t_vni = in_port->iface.vni;
@@ -345,8 +346,9 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	if (dst_port->is_pf)
 		rte_memcpy(route, rte_rib6_get_ext(node), sizeof(*route));
 
-	if (DP_FAILED(rte_rib6_get_ip(node, route_key)))
+	if (DP_FAILED(rte_rib6_get_ip(node, ip)))
 		return NULL;
 
+	DP_IPV6_FROM_ARRAY(p_ipv6, ip);
 	return dst_port;
 }
