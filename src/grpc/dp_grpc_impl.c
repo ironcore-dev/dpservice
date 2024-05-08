@@ -690,25 +690,25 @@ static int dp_process_create_neighnat(struct dp_grpc_responder *responder)
 	struct dpgrpc_nat *request = &responder->request.add_nat;
 	int ret;
 
-	if (!request->addr.is_v6) {
-		ret = dp_add_network_nat_entry(request->addr.ipv4, NULL,
-									   request->vni,
-									   request->min_port,
-									   request->max_port,
-									   &request->neigh_addr6);
-		if (DP_FAILED(ret))
-			return ret;
-
-		ret = dp_set_dnat_ip(request->addr.ipv4, 0, request->vni);
-		if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS) {
-			dp_del_network_nat_entry(request->addr.ipv4, NULL,
-									 request->vni,
-									 request->min_port,
-									 request->max_port);
-			return ret;
-		}
-	} else
+	if (request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
+
+	ret = dp_add_network_nat_entry(request->addr.ipv4,
+								   request->vni,
+								   request->min_port,
+								   request->max_port,
+								   &request->neigh_addr6);
+	if (DP_FAILED(ret))
+		return ret;
+
+	ret = dp_set_dnat_ip(request->addr.ipv4, 0, request->vni);
+	if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS) {
+		dp_del_network_nat_entry(request->addr.ipv4,
+								 request->vni,
+								 request->min_port,
+								 request->max_port);
+		return ret;
+	}
 
 	return DP_GRPC_OK;
 }
@@ -718,18 +718,18 @@ static int dp_process_delete_neighnat(struct dp_grpc_responder *responder)
 	struct dpgrpc_nat *request = &responder->request.del_neighnat;
 	int ret = DP_GRPC_OK;
 
-	if (!request->addr.is_v6) {
-		ret = dp_del_network_nat_entry(request->addr.ipv4, NULL,
-									   request->vni,
-									   request->min_port,
-									   request->max_port);
-		if (ret == DP_GRPC_ERR_NOT_FOUND)
-			return ret;
-
-		dp_del_vip_from_dnat(request->addr.ipv4, request->vni);
-		dp_remove_neighnat_flows(request->addr.ipv4, request->vni, request->min_port, request->max_port);
-	} else
+	if (request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
+
+	ret = dp_del_network_nat_entry(request->addr.ipv4,
+								   request->vni,
+								   request->min_port,
+								   request->max_port);
+	if (ret == DP_GRPC_ERR_NOT_FOUND)
+		return ret;
+
+	dp_del_vip_from_dnat(request->addr.ipv4, request->vni);
+	dp_remove_neighnat_flows(request->addr.ipv4, request->vni, request->min_port, request->max_port);
 
 	return ret;
 

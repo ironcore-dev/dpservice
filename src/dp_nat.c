@@ -26,14 +26,14 @@
 // To prevent it from being too large, this is assuming 2048 ports per NAT range (32 ranges/IP)
 #define DP_NAT_TABLE_MAX (DP_MAX_VF_PORTS * 32)
 
-TAILQ_HEAD(network_nat_head, network_nat_entry);
+TAILQ_HEAD(nat_head, nat_entry);
 
 static struct rte_hash *ipv4_dnat_tbl = NULL;
 static struct rte_hash *ipv4_snat_tbl = NULL;
 
 static struct rte_hash *ipv4_netnat_portmap_tbl = NULL;
 static struct rte_hash *ipv4_netnat_portoverload_tbl = NULL;
-static struct network_nat_head nat_headp;
+static struct nat_head nat_headp;
 
 static uint64_t dp_nat_full_log_delay;
 
@@ -479,76 +479,61 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const un
 	return DP_OK;
 }
 
-static __rte_always_inline bool dp_is_network_nat_ip(const struct network_nat_entry *entry,
-													 uint32_t nat_ipv4,
-													 const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE], uint32_t vni)
-{
-	return entry->vni == vni
-			&& ((nat_ipv4 != 0 && entry->nat_ip.nat_ip4 == nat_ipv4)
-				|| (nat_ipv6 != NULL && memcmp(nat_ipv6, entry->nat_ip.nat_ip6, sizeof(entry->nat_ip.nat_ip6)) == 0));
-}
-
-static __rte_always_inline bool dp_is_network_nat_entry(const struct network_nat_entry *entry,
-														uint32_t nat_ipv4,
-														const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE], uint32_t vni,
+static __rte_always_inline bool dp_is_network_nat_entry(const struct nat_entry *entry,
+														uint32_t nat_ip, uint32_t vni,
 														uint16_t min_port, uint16_t max_port)
 {
-	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
-			&& entry->port_range[0] == min_port
-			&& entry->port_range[1] == max_port;
+	return entry->vni == vni
+		&& entry->nat_ip == nat_ip
+		&& entry->port_range[0] == min_port
+		&& entry->port_range[1] == max_port;
 }
 
 // check if a port falls into the range of external nat's port range
-static __rte_always_inline bool dp_is_network_nat_port(const struct network_nat_entry *entry,
-													   uint32_t nat_ipv4,
-													   const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE], uint32_t vni,
+static __rte_always_inline bool dp_is_network_nat_port(const struct nat_entry *entry,
+													   uint32_t nat_ip, uint32_t vni,
 													   uint16_t port)
 {
-	return dp_is_network_nat_ip(entry, nat_ipv4, nat_ipv6, vni)
-			&& entry->port_range[0] <= port
-			&& entry->port_range[1] > port;
+	return entry->vni == vni
+		&& entry->nat_ip == nat_ip
+		&& entry->port_range[0] <= port
+		&& entry->port_range[1] > port;
 }
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
 {
-	network_nat_entry *item;
+	struct nat_entry *entry;
 
 	// only delete the DNAT entry when this is the only range present for this IP
 	// (i.e. if there still is an entry in the list, do nothing!)
-	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = TAILQ_NEXT(item, entries))
-		if (dp_is_network_nat_ip(item, d_ip, NULL, vni))
+	for (entry = TAILQ_FIRST(&nat_headp); entry != NULL; entry = TAILQ_NEXT(entry, entries))
+		if (entry->vni == vni && entry->nat_ip == d_ip)
 			return;
 
 	dp_del_dnat_ip(d_ip, vni);
 }
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
-								uint32_t vni, uint16_t min_port, uint16_t max_port,
-								const union dp_ipv6 *ul_ipv6)
+int dp_add_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
+							 const union dp_ipv6 *ul_ipv6)
 {
-	network_nat_entry *next, *new_entry;
+	struct nat_entry *next, *new_entry;
 
 	TAILQ_FOREACH(next, &nat_headp, entries) {
-		if (dp_is_network_nat_entry(next, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
-			DPS_LOG_ERR("Cannot add a redundant nat entry", DP_LOG_IPV4(nat_ipv4), DP_LOG_VNI(vni),
+		if (dp_is_network_nat_entry(next, nat_ip, vni, min_port, max_port)) {
+			DPS_LOG_ERR("Cannot add a redundant nat entry", DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni),
 						DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
 			return DP_GRPC_ERR_ALREADY_EXISTS;
 		}
 	}
 
-	new_entry = (network_nat_entry *)rte_zmalloc("network_nat_array", sizeof(network_nat_entry), RTE_CACHE_LINE_SIZE);
+	new_entry = rte_zmalloc("network_nat_array", sizeof(struct nat_entry), RTE_CACHE_LINE_SIZE);
 	if (!new_entry) {
-		DPS_LOG_ERR("Failed to allocate nat entry", DP_LOG_IPV4(nat_ipv4), DP_LOG_VNI(vni),
+		DPS_LOG_ERR("Failed to allocate nat entry", DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni),
 					DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
 		return DP_GRPC_ERR_OUT_OF_MEMORY;
 	}
 
-	if (nat_ipv4)
-		new_entry->nat_ip.nat_ip4 = nat_ipv4;
-
-	if (nat_ipv6)
-		memcpy(new_entry->nat_ip.nat_ip6, nat_ipv6, sizeof(new_entry->nat_ip.nat_ip6));
-
+	new_entry->nat_ip = nat_ip;
 	new_entry->vni = vni;
 	new_entry->port_range[0] = min_port;
 	new_entry->port_range[1] = max_port;
@@ -560,14 +545,13 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_A
 
 }
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
-							 uint32_t vni, uint16_t min_port, uint16_t max_port)
+int dp_del_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
-	network_nat_entry *item, *tmp_item;
+	struct nat_entry *item, *tmp_item;
 
 	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
-		if (dp_is_network_nat_entry(item, nat_ipv4, nat_ipv6, vni, min_port, max_port)) {
+		if (dp_is_network_nat_entry(item, nat_ip, vni, min_port, max_port)) {
 			TAILQ_REMOVE(&nat_headp, item, entries);
 			rte_free(item);
 			return DP_GRPC_OK;
@@ -576,13 +560,12 @@ int dp_del_network_nat_entry(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_A
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uint8_t nat_ipv6[DP_IPV6_ADDR_SIZE],
-													uint32_t vni, uint16_t min_port, uint16_t max_port)
+const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
-	network_nat_entry *current;
+	struct nat_entry *current;
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_is_network_nat_entry(current, nat_ipv4, nat_ipv6, vni, min_port, max_port))
+		if (dp_is_network_nat_entry(current, nat_ip, vni, min_port, max_port))
 			return &current->dst_ipv6;
 	}
 	return NULL;
@@ -590,7 +573,7 @@ const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4, const uin
 
 const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 {
-	struct network_nat_entry *current;
+	struct nat_entry *current;
 	uint16_t dst_port;
 	uint32_t dst_vni;
 	uint32_t dst_ip;
@@ -603,7 +586,7 @@ const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 		dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_is_network_nat_port(current, dst_ip, NULL, dst_vni, dst_port))
+		if (dp_is_network_nat_port(current, dst_ip, dst_vni, dst_port))
 			return &current->dst_ipv6;
 	}
 	return NULL;
@@ -820,13 +803,13 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 
 int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder)
 {
-	struct network_nat_entry *current;
+	struct nat_entry *current;
 	struct dpgrpc_nat *reply;
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (current->nat_ip.nat_ip4 == nat_ip) {
+		if (current->nat_ip == nat_ip) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
@@ -841,7 +824,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)
 {
-	network_nat_entry *item, *tmp_item;
+	struct nat_entry *item, *tmp_item;
 
 	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
