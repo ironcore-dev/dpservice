@@ -26,6 +26,7 @@ class GrpcClient:
 
 	def __init__(self, build_path):
 		self.expectedError = 0
+		self.expectFailure = False
 		self.cmd = build_path + "/cli/dpservice-cli/dpservice-cli"
 		if not os.access(self.cmd, os.X_OK):
 			raise RuntimeError("dpservice-cli is missing (see meson options: 'enable_tests' or 'build_dpservice_cli')")
@@ -37,9 +38,15 @@ class GrpcClient:
 		self.expectedError = errcode
 		return self
 
+	def expect_failure(self):
+		self.expectFailure = True
+		return self
+
 	def _call(self, args):
 		expectedError = self.expectedError
 		self.expectedError = 0
+		expectFailure = self.expectFailure
+		self.expectFailure = False
 
 		print("dpservice-cli", args)
 		p = subprocess.run([self.cmd, '-o', 'json'] + shlex.split(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -47,6 +54,8 @@ class GrpcClient:
 		if p.returncode != 0 and p.returncode != 2:
 			if len(p.stderr):
 				print(" !", p.stderr.decode('utf8').strip().replace("\n", "\n ! "))
+			if expectFailure:
+				return None
 			raise RuntimeError("Grpc client failed")
 		output = p.stdout.decode('utf8').strip()
 		if len(output) == 0:
