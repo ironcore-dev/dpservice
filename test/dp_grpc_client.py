@@ -22,20 +22,32 @@ class DpGrpcClient:
 		self.cmd = build_path + "/tools/dp_grpc_client"
 		self.re_ipv6 = re.compile(r'(?:^|[\n\r])Received underlay route : ([a-f0-9:]+)(?:$|[\n\r])')
 		self.re_error = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' reply with error code ([1-9][0-9][0-9]), message \'[A-Z_]*\'(?:$|[\n\r])')
+		self.re_failure = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' failed with error code ([1-9]), message \'[^\']*\'(?:$|[\n\r])')
 		self.expectedError = 0
+		self.expectFailure = False
 
 	def expect_error(self, errcode):
 		self.expectedError = errcode
 		return self
 
+	def expect_failure(self):
+		self.expectFailure = True
+		return self
+
 	def _call(self, args, req_output, negate=False):
 		expectedError = self.expectedError
 		self.expectedError = 0
+		expectFailure = self.expectFailure
+		self.expectFailure = False
 
 		ipv6_address = ""
 		print("dp_grpc_client", args)
 		output = subprocess.check_output([self.cmd] + shlex.split(args)).decode('utf8').strip()
 		print(" >", output.replace("\n", "\n > "))
+
+		failure = self.re_failure.search(output)
+		if failure:
+			return None
 
 		errors = self.re_error.search(output)
 		if errors:
@@ -59,11 +71,19 @@ class DpGrpcClient:
 			return None
 		return self.re_ipv6.search(output).group(1)
 
+	def _getIpSpec(self, ip):
+		return f"--ipv6 {ip}" if ':' in ip else f"--ipv4 {ip}"
+
 	def init(self):
 		self._call("--init", "Initialized")
 
-	def addinterface(self, vm_name, pci, vni, ipv4, ipv6):
-		return self._getUnderlayRoute(f"--addmachine {vm_name} --vm_pci {pci} --vni {vni} --ipv4 {ipv4} --ipv6 {ipv6}",
+	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None):
+		cmd = f"--addmachine {vm_name} --vm_pci {pci} --vni {vni} --ipv4 {ipv4} --ipv6 {ipv6}"
+		if pxe_server:
+			cmd += f" --pxe_ip={pxe_server}"
+		if ipxe_file:
+			cmd += f" --pxe_str={ipxe_file}"
+		return self._getUnderlayRoute(cmd,
 			f"Allocated VF for you")
 
 	def getinterface(self, vm_name):
@@ -71,7 +91,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		match = re.search(r'(?:^|[\n\r])Interface with ipv4 ([0-9\.]+) ipv6 ([0-9a-fA-F:]+) vni ([0-9]+) pci ([^ ]+) underlayroute ([0-9a-fA-F:]+)', output)
-		return { 'vni': int(match.group(3)), 'device': match.group(4), 'primary_ipv4': match.group(1), 'primary_ipv6': match.group(2), 'underlay_route': match.group(5) }
+		return { 'vni': int(match.group(3)), 'device': match.group(4), 'primary_ipv4': match.group(1), 'primary_ipv6': match.group(2), 'underlay_route': match.group(5), 'metering': {} }
 
 	def delinterface(self, vm_name):
 		self._call(f"--delmachine {vm_name}", "Interface deleted")
@@ -82,22 +102,20 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])Interface [a-zA-Z0-9_]+ ipv4 ([0-9\.]+) ipv6 ([0-9a-fA-F:]+) vni ([0-9]+) pci ([^ ]+) underlayroute ([0-9a-fA-F:]+)', output):
-			specs.append({ 'vni': int(match.group(3)), 'device': match.group(4), 'primary_ipv4': match.group(1), 'primary_ipv6': match.group(2), 'underlay_route': match.group(5) })
+			specs.append({ 'vni': int(match.group(3)), 'device': match.group(4), 'primary_ipv4': match.group(1), 'primary_ipv6': match.group(2), 'underlay_route': match.group(5), 'metering': {} })
 		return specs
 
 	def addroute(self, vni, prefix, t_vni, t_ipv6):
 		pfx_addr, pfx_len = prefix.split('/')
-		if ':' in pfx_addr:
-			self._call(f"--addroute --vni {vni} --ipv6 {pfx_addr} --length {pfx_len} --t_vni {t_vni} --t_ipv6 {t_ipv6}",
-				f"target ipv6 {pfx_addr} target vni {t_vni}")
-		else:
-			self._call(f"--addroute --vni {vni} --ipv4 {pfx_addr} --length {pfx_len} --t_vni {t_vni} --t_ipv6 {t_ipv6}",
-				f"Route ip {pfx_addr} length {pfx_len} vni {vni}")
+		__pfx_addr = self._getIpSpec(pfx_addr)
+		print(pfx_addr, __pfx_addr)
+		self._call(f"--addroute --vni {vni} {__pfx_addr} --length {pfx_len} --t_vni {t_vni} --t_ipv6 {t_ipv6}",
+			f"Route ip {pfx_addr} length {pfx_len} vni {vni}")
 
 	def delroute(self, vni, prefix):
 		pfx_addr, pfx_len = prefix.split('/')
-		ipver = '--ipv6' if ':' in pfx_addr else '--ipv4'
-		self._call(f"--delroute --vni {vni} {ipver} {pfx_addr} --length {pfx_len}",
+		__pfx_addr = self._getIpSpec(pfx_addr)
+		self._call(f"--delroute --vni {vni} {__pfx_addr} --length {pfx_len}",
 			"Route deleted")
 
 	def listroutes(self, vni):
@@ -111,24 +129,27 @@ class DpGrpcClient:
 
 	def addprefix(self, vm_name, prefix):
 		pfx_addr, pfx_len = prefix.split('/')
-		return self._getUnderlayRoute(f"--addpfx {vm_name} --ipv4 {pfx_addr} --length {pfx_len}", "")
+		__pfx_addr = self._getIpSpec(pfx_addr)
+		return self._getUnderlayRoute(f"--addpfx {vm_name} {__pfx_addr} --length {pfx_len}", "")
 
 	def delprefix(self, vm_name, prefix):
 		pfx_addr, pfx_len = prefix.split('/')
-		self._call(f"--delpfx {vm_name} --ipv4 {pfx_addr} --length {pfx_len}", "")
+		__pfx_addr = self._getIpSpec(pfx_addr)
+		self._call(f"--delpfx {vm_name} {__pfx_addr} --length {pfx_len}", "")
 
 	def listprefixes(self, vm_name):
 		output = self._call(f"--listpfx {vm_name}", "")
 		if not output:
 			return None
 		specs = []
-		for match in re.finditer(r'(?:^|[\n\r])Route prefix ([0-9\.]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
+		for match in re.finditer(r'(?:^|[\n\r])Route prefix ([0-9a-f\.:]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
 			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlay_route": match.group(3) })
 		return specs
 
 	def createlb(self, name, vni, vip, portspecs):
 		proto, port = portspecs.split('/')
-		return self._getUnderlayRoute(f"--createlb {name} --vni {vni} --ipv4 {vip} --port {port} --protocol {proto}",
+		__vip = self._getIpSpec(vip)
+		return self._getUnderlayRoute(f"--createlb {name} --vni {vni} {__vip} --port {port} --protocol {proto}",
 			f"VIP {vip}, vni {vni}")
 
 	def getlb(self, name):
@@ -168,11 +189,15 @@ class DpGrpcClient:
 		return specs
 
 	def addlbprefix(self, vm_name, vip):
-		return self._getUnderlayRoute(f"--addlbpfx {vm_name} --ipv4 {vip} --length 32",
+		prefix, length = vip.split('/')
+		__prefix = self._getIpSpec(prefix)
+		return self._getUnderlayRoute(f"--addlbpfx {vm_name} {__prefix} --length {length}",
 			"Received underlay route : ")
 
 	def dellbprefix(self, vm_name, vip):
-		self._call(f"--dellbpfx {vm_name} --ipv4 {vip} --length 32",
+		prefix, length = vip.split('/')
+		__prefix = self._getIpSpec(prefix)
+		self._call(f"--dellbpfx {vm_name} {__prefix} --length {length}",
 			"LB prefix deleted")
 
 	def listlbprefixes(self, vm_name):
@@ -180,7 +205,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		specs = []
-		for match in re.finditer(r'(?:^|[\n\r])LB Route prefix ([0-9\.]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
+		for match in re.finditer(r'(?:^|[\n\r])LB Route prefix ([0-9a-f\.:]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
 			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlay_route": match.group(3) })
 		return specs
 
@@ -217,7 +242,7 @@ class DpGrpcClient:
 		if not output:
 			return None
 		specs = []
-		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: min_port ([0-9]+), max_port ([0-9]+), vni ([0-9]+) --> Underlay IPv6 ([a-f0-9:]+)(?:$|[\n\r])', output):
+		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: min_port ([0-9]+), max_port ([0-9]+), vni ([0-9]+) --> Underlay IPv6 ([a-f0-9:]+)', output):
 			specs.append({ 'underlay_route': match.group(4), 'min_port': int(match.group(1)), 'max_port': int(match.group(2)), 'vni': int(match.group(3)) })
 		return specs
 

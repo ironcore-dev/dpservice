@@ -819,16 +819,14 @@ public:
 			else
 				rule->set_action(FirewallAction::DROP);
 
-			src_ip->set_ipver(version);
-			if (version == IpVersion::IPV4)
-				src_ip->set_address(src_ip_str);
+			src_ip->set_ipver(strchr(src_ip_str, ':') ? IpVersion::IPV6 : IpVersion::IPV4);
+			src_ip->set_address(src_ip_str);
 			src_pfx->set_allocated_ip(src_ip);
 			src_pfx->set_length(src_length);
 			rule->set_allocated_source_prefix(src_pfx);
 
-			dst_ip->set_ipver(version);
-			if (version == IpVersion::IPV4)
-				dst_ip->set_address(dst_ip_str);
+			dst_ip->set_ipver(strchr(dst_ip_str, ':') ? IpVersion::IPV6 : IpVersion::IPV4);
+			dst_ip->set_address(dst_ip_str);
 			dst_pfx->set_allocated_ip(dst_ip);
 			dst_pfx->set_length(dst_length);
 			rule->set_allocated_destination_prefix(dst_pfx);
@@ -1012,6 +1010,8 @@ public:
 			pfx_ip->set_ipver(version);
 			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
+			else
+				pfx_ip->set_address(ip6_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
@@ -1030,6 +1030,8 @@ public:
 			pfx_ip->set_ipver(version);
 			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
+			else
+				pfx_ip->set_address(ip6_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
@@ -1051,8 +1053,11 @@ public:
 
 			request.set_loadbalancer_id(lb_id_str);
 			request.set_vni(vni);
-			lb_ip->set_ipver(IpVersion::IPV4);
-			lb_ip->set_address(ip_str);
+			lb_ip->set_ipver(version);
+			if (version == IpVersion::IPV4)
+				lb_ip->set_address(ip_str);
+			else
+				lb_ip->set_address(ip6_str);
 			request.set_allocated_loadbalanced_ip(lb_ip);
 
 			pt = strtok(port_str,",");
@@ -1156,6 +1161,8 @@ public:
 			pfx_ip->set_ipver(version);
 			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
+			else
+				pfx_ip->set_address(ip6_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
@@ -1191,6 +1198,8 @@ public:
 			pfx_ip->set_ipver(version);
 			if (version == IpVersion::IPV4)
 				pfx_ip->set_address(ip_str);
+			else
+				pfx_ip->set_address(ip6_str);
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
@@ -1464,7 +1473,7 @@ int main(int argc, char** argv)
 	case DP_CMD_ADD_ROUTE:
 		dpdk_client.CreateRoute();
 		std::cout << "Addroute called " << std::endl;
-		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", ip_str, length, vni, ip6_str, t_vni);
+		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", *ip_str ? ip_str : ip6_str, length, vni, ip6_str, t_vni);
 		break;
 	case DP_CMD_GET_ROUTE:
 		std::cout << "Listroute called " << std::endl;
@@ -1565,7 +1574,7 @@ int main(int argc, char** argv)
 	case DP_CMD_CREATE_LB:
 		std::cout << "Create Loadbalancer called " << std::endl;
 		dpdk_client.CreateLB();
-		printf("VIP %s, vni %s\n", ip_str, vni_str);
+		printf("VIP %s, vni %s\n", *ip_str ? ip_str : ip6_str, vni_str);
 		break;
 	case DP_CMD_GET_LB:
 		std::cout << "Get Loadbalancer called " << std::endl;
