@@ -16,4 +16,4 @@ scapy-script/*
 code_check/_checkpatch.pl
 .out
 s/*
-test/flow_test/access_details.json
+test/benchmark_test/access_details.json
