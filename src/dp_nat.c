@@ -479,7 +479,7 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const un
 	return DP_OK;
 }
 
-static __rte_always_inline bool dp_is_network_nat_entry(const struct nat_entry *entry,
+static __rte_always_inline bool dp_is_same_network_nat_entry(const struct nat_entry *entry,
 														uint32_t nat_ip, uint32_t vni,
 														uint16_t min_port, uint16_t max_port)
 {
@@ -487,6 +487,11 @@ static __rte_always_inline bool dp_is_network_nat_entry(const struct nat_entry *
 		&& entry->nat_ip == nat_ip
 		&& entry->port_range[0] == min_port
 		&& entry->port_range[1] == max_port;
+}
+
+static __rte_always_inline bool dp_is_network_nat_entry_port_overlap(const struct nat_entry *entry, uint32_t nat_ip, uint16_t min_port, uint16_t max_port)
+{
+	return entry->nat_ip == nat_ip && (max_port > entry->port_range[0]) && (min_port < entry->port_range[1]);
 }
 
 // check if a port falls into the range of external nat's port range
@@ -519,8 +524,8 @@ int dp_add_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, u
 	struct nat_entry *next, *new_entry;
 
 	TAILQ_FOREACH(next, &nat_headp, entries) {
-		if (dp_is_network_nat_entry(next, nat_ip, vni, min_port, max_port)) {
-			DPS_LOG_ERR("Cannot add a redundant nat entry", DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni),
+		if (dp_is_network_nat_entry_port_overlap(next, nat_ip, min_port, max_port)) {
+			DPS_LOG_ERR("Cannot add a nat entry that has an overlapping port range with an existing one", DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni),
 						DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
 			return DP_GRPC_ERR_ALREADY_EXISTS;
 		}
@@ -551,24 +556,13 @@ int dp_del_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, u
 
 	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
-		if (dp_is_network_nat_entry(item, nat_ip, vni, min_port, max_port)) {
+		if (dp_is_same_network_nat_entry(item, nat_ip, vni, min_port, max_port)) {
 			TAILQ_REMOVE(&nat_headp, item, entries);
 			rte_free(item);
 			return DP_GRPC_OK;
 		}
 	}
 	return DP_GRPC_ERR_NOT_FOUND;
-}
-
-const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
-{
-	struct nat_entry *current;
-
-	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (dp_is_network_nat_entry(current, nat_ip, vni, min_port, max_port))
-			return &current->dst_ipv6;
-	}
-	return NULL;
 }
 
 const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
