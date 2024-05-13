@@ -16,9 +16,22 @@ class SSHManager:
 		self.max_retries = max_retries
 		self.pid_file = "/tmp/pids.txt"  # a file to store all PIDs
 
+	def connect_one_shot(self, timeout=None):
+		try:
+			if self.proxy:
+				proxy_sock = self.proxy.client.get_transport().open_channel(
+						'direct-tcpip', (self.host_address, self.port), ('127.0.0.1', 0))
+				self.client.connect(self.host_address, port=self.port, username=self.username,
+											pkey=self.pkey, sock=proxy_sock, timeout=timeout)
+			else:
+				self.client.connect(self.host_address, port=self.port, username=self.username,
+											pkey=self.pkey, timeout=timeout)
+		except Exception:
+			raise ConnectionError("")
+
 	def connect(self):
 		"""Establish an SSH connection using a key file. Uses a proxy if specified."""
-		pkey = paramiko.RSAKey.from_private_key_file(self.key_file)
+		self.pkey = paramiko.RSAKey.from_private_key_file(self.key_file)
 		self.client = paramiko.SSHClient()
 		self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 		initial_delay = 1  # Initial delay in seconds before the first retry
@@ -29,15 +42,10 @@ class SSHManager:
 					if not self.proxy.client:
 						if not self.proxy.connect():
 							raise Exception("Unable to connect through proxy")
-					proxy_sock = self.proxy.client.get_transport().open_channel(
-						'direct-tcpip', (self.host_address, self.port), ('127.0.0.1', 0))
-					self.client.connect(self.host_address, port=self.port, username=self.username,
-										pkey=pkey, sock=proxy_sock)
-				else:
-					self.client.connect(self.host_address, port=self.port, username=self.username,
-										pkey=pkey)
+
+				self.connect_one_shot()
 				print(f"Connection established successfully on attempt {attempt} to IP {self.host_address}")
-				return True
+				break
 			except Exception as e:
 				print(f"Attempt {attempt} failed: {e}")
 				if attempt < self.max_retries:
@@ -45,8 +53,7 @@ class SSHManager:
 					print(f"Retrying in {time_to_sleep} seconds...")
 					time.sleep(time_to_sleep)
 				else:
-					print("Failed to establish SSH connection after multiple attempts.")
-		return False
+					raise ConnectionError("Failed to establish SSH connection after multiple attempts.")
 	
 	def command_exists(self, command):
 		"""Check if a command exists on the remote system."""
@@ -65,8 +72,9 @@ class SSHManager:
 				command = f"sudo {command}"
 			if background:
 				if command_output_name == '':
-					raise ValueError(f"For a background process, its output log file name is needed: {command}")
-				command = f"bash -c 'nohup {command} > /tmp/{command_output_name}.log 2>&1 & echo $! >> {self.pid_file}'"
+					command = f"bash -c '{command}'"
+				else:
+					command = f"bash -c 'nohup {command} > /tmp/{command_output_name}.log 2>&1 & echo $! >> {self.pid_file}'"
 			print(command)
 			stdin, stdout, stderr = self.client.exec_command(command)
 			if not background:
@@ -180,10 +188,17 @@ class RemoteMachine:
 		self.ssh_manager = SSHManager(config["host_address"], config["port"], config["user_name"], key_file=key_file, proxy= None if not parent_machine else self.parent_machine.get_connection())
 	
 	def start(self):
+		print(f"Connecting to {self.machine_name}...")
 		try:
 			self.ssh_manager.connect()
 		except Exception as e:
 			print(f"Failed to connect to {self.machine_name}: {e}")
+
+	def probe_connect(self):
+		try:
+			self.ssh_manager.connect_one_shot(1)
+		except ConnectionError:
+			raise ConnectionError("")
 
 	def stop(self):
 		self.ssh_manager.terminate_all_processes()
@@ -232,7 +247,14 @@ def get_remote_machine(machine_name):
 		raise ValueError(f"Failed to get machine for {machine_name}")
 	return machine
 
+def add_remote_machine(machine, is_vm):
+	vm_machines.append(machine) if is_vm else hypervisor_machines.append(machine)
 
+def cleanup_remote_machine():
+	vm_machines.clear()
+	hypervisor_machines.clear()
+	
+		
 def add_vm_config_info(machine_name, ipv4, ipv6, pci, underly_ip, vni):
 	try:
 		machine = get_remote_machine(machine_name)
@@ -246,3 +268,4 @@ def get_vm_config_detail(machine_name):
 		return machine.get_vm_config()
 	except Exception as e:
 		print(f"Failed to get stored vm {machine_name} config due to {e} ")
+

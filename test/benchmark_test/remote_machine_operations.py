@@ -31,7 +31,8 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 		if machine.parent_machine:
 			raise NotImplementedError(f"Cannot start dpservice on a vm machine {machine_name}")
 		
-		flag = '--  --no-offload' if not offload else ''
+		flag = '--  --no-offload ' if not offload else '-- '
+		flag += '--enable-ipv6-overlay '
 		parameters = f"-l 0,1 {flag}"
 
 		if is_docker:
@@ -80,6 +81,7 @@ def remote_machine_op_dpservice_init(machine_name, path_to_bin="/tmp/dpservice-c
 				{"command": path_to_bin, "parameters": "init", "delay": 5},
 		]
 		machine.exec_task(cli_task)
+		time.sleep(1)
 	except Exception as e:
 		print(f"Failed to init dpservice on hypervisor {machine_name} due to {e}")	
 
@@ -96,16 +98,16 @@ def remote_machine_op_dpservice_create_interface(machine_name, if_id, vni, ipv4,
 	except Exception as e:
 		print(f"Failed to create interface on hypervisor {machine_name} due to {e}")
 
-def remote_machine_op_dpservice_add_vms(config, env_name, path_to_cli_bin="/tmp/dpservice-cli"):
-	env_config = next((env for env in config['environments'] if env['name'] == env_name), None)
+def remote_machine_op_dpservice_add_vms(env_config, path_to_cli_bin="/tmp/dpservice-cli"):
 	try:
 		for hypervisor_info in env_config['hypervisors']:
 			for vm_info in hypervisor_info['vms']:
 				if_config = vm_info["if_config"]
 				output = remote_machine_op_dpservice_create_interface(hypervisor_info["machine_name"], vm_info["machine_name"], if_config["vni"], if_config["ipv4"], if_config["ipv6"], if_config["pci_addr"], path_to_cli_bin)
 				if_config["underly_ip"] = get_underly_ip(output)
-				print(env_config['hypervisors'])
 				add_vm_config_info(vm_info["machine_name"], if_config["ipv4"], if_config["ipv6"], if_config["pci_addr"], if_config["underly_ip"], if_config["vni"])
+				vm_name = vm_info["machine_name"]
+				print(f"added vm interface {vm_name}")
 	except Exception as e:
 		print(f"Failed to add vm interfaces via dpservice cli due to {e} ")
 		sys.exit(1)
@@ -122,19 +124,40 @@ def remote_machine_op_dpservice_create_route(machine_name, prefix, nxt_hop_vni, 
 		]
 		machine.exec_task(cli_task)
 	except Exception as e:
-		print(f"Failed to create route on hypervisor {machine_name} due to {e}")	
+		print(f"Failed to create route on hypervisor {machine_name} due to {e}")
+
+def remote_machine_op_dpservice_delete_route(machine_name, prefix, vni, path_to_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice on a vm machine {machine_name}")
+		parameters = f"delete route --prefix={prefix} --vni={vni}"
+		cli_task = [
+				{"command": path_to_bin, "parameters": parameters},
+		]
+		machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to delete route on hypervisor {machine_name} due to {e}")
 
 def remote_machine_op_reboot(machine_name):
 	try:
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
 			raise NotImplementedError(f"Cannot reboot a non-vm machine {machine_name}")
+	
+		
 		reboot_task = [
-				{"command": "reboot"}
+				{"command": "sleep 3 && reboot", "background": True}
 		]
 		machine.exec_task(reboot_task)
+
+		ssh_stop_command = [
+			{"command": "systemctl", "parameters": "stop ssh"}
+		]
+		machine.exec_task(ssh_stop_command)
 		machine.stop()
-		time.sleep(5) # Need to wait a bit otherwise next call will succeed immediately
+
+		print(f"Waiting for {machine_name} to reboot...")
 		machine.start()
 	except Exception as e:
 		print(f"Failed to reboot vm {machine_name} due to {e}")
@@ -143,6 +166,7 @@ def remote_machine_op_terminate_processes(machine_name):
 	try:
 		machine = get_remote_machine(machine_name)
 		machine.terminate_processes()
+		time.sleep(1)
 	except Exception as e:
 		print(f"Failed to terminate processes on {machine_name} due to {e}")
 
@@ -185,27 +209,6 @@ def remote_machine_op_flow_test(machine_name, is_server, server_ip, flow_count, 
 		print(f"Failed to invoke flow test on vm {machine_name} due to {e}")
 
 
-
 def get_underly_ip(output_string):
 	re_ipv6 = re.compile(r"(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}") # dpservice only generate uncompressed ipv6 address. Enhance it when necessary.
 	return re_ipv6.search(output_string).group(0)
-
-# result checking functions
-def result_checking_ping_failed(result, query):
-	return query in result
-
-def result_checking_throughput_higher_than(result, minimum_throughput):
-	# Regex to find the "Average Throughput (Gbits/sec):" followed by a number
-	match = re.search(r"Average Throughput \(Gbits/sec\):\s+(\d+\.\d+)", result)
-	if match:
-		# Convert the found string to a float
-		average_throughput = float(match.group(1))
-		# Compare it to the minimum threshold
-		if average_throughput >= minimum_throughput:
-			return True
-		else:
-			return False
-	else:
-		# If no matching throughput is found, handle it accordingly
-		print("No average throughput found in the result.")
-		return False
