@@ -100,9 +100,6 @@ int dp_add_network_nat_entry(uint32_t nat_ipv4,
 int dp_del_network_nat_entry(uint32_t nat_ipv4,
 							 uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-const union dp_ipv6 *dp_get_network_nat_underlay_ip(uint32_t nat_ipv4,
-													uint32_t vni, uint16_t min_port, uint16_t max_port);
-
 int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni);
 const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
