@@ -151,6 +151,9 @@ class GrpcClient:
 	def getlb(self, name):
 		return self._getSpec(f"get loadbalancer --id={name}")
 
+	def listlbs(self):
+		return self._getSpecList("list loadbalancers")
+
 	def dellb(self, name):
 		self._call(f"delete loadbalancer --id={name}")
 

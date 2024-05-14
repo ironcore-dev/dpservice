@@ -148,6 +148,43 @@ int dp_delete_lb(const void *id_key)
 	return DP_GRPC_OK;
 }
 
+int dp_list_lbs(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_lb *reply;
+	uint32_t iter = 0;
+	const struct lb_key *lb_key;
+	struct lb_value *lb_val;
+	int ret;
+
+	if (rte_hash_count(id_map_lb_tbl) == 0)
+		return DP_GRPC_OK;
+
+	dp_grpc_set_multireply(responder, sizeof(*reply));
+
+	while ((ret = rte_hash_iterate(ipv4_lb_tbl, (const void **)&lb_key, (void **)&lb_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret))
+			return DP_GRPC_ERR_ITERATOR;
+
+		reply = dp_grpc_add_reply(responder);
+		if (!reply)
+			return DP_GRPC_ERR_OUT_OF_MEMORY;
+
+		static_assert(sizeof(reply->lb_id) == sizeof(lb_val->lb_id), "Incompatible Loadbalancer ID fields");
+		memcpy(reply->lb_id, lb_val->lb_id, sizeof(reply->lb_id));
+
+		reply->vni = lb_key->vni;
+		dp_copy_ipaddr(&reply->addr, &lb_key->ip);
+		dp_copy_ipv6(&reply->ul_addr6, &lb_val->lb_ul_addr);
+
+		for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
+			reply->lbports[i].port = ntohs(lb_val->ports[i].port);
+			reply->lbports[i].protocol = lb_val->ports[i].protocol;
+		}
+	}
+
+	return DP_GRPC_OK;
+}
+
 bool dp_is_lb_enabled(void)
 {
 	return rte_hash_count(ipv4_lb_tbl) > 0;

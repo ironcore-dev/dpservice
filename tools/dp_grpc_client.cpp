@@ -74,6 +74,7 @@ typedef enum {
 	DP_CMD_CREATE_LB,
 	DP_CMD_DEL_LB,
 	DP_CMD_GET_LB,
+	DP_CMD_LIST_LB,
 	DP_CMD_ADD_FWALL_RULE,
 	DP_CMD_GET_FWALL_RULE,
 	DP_CMD_DEL_FWALL_RULE,
@@ -160,6 +161,7 @@ static uint32_t priority = 1000;
 #define CMD_LINE_OPT_CREATE_LB		"createlb"
 #define CMD_LINE_OPT_DEL_LB			"dellb"
 #define CMD_LINE_OPT_GET_LB			"getlb"
+#define CMD_LINE_OPT_LIST_LB		"listlbs"
 #define CMD_LINE_OPT_PFX_LB			"lb_pfx"
 #define CMD_LINE_OPT_ADD_NAT_VIP	"addnat"
 #define CMD_LINE_OPT_DEL_NAT_VIP	"delnat"
@@ -239,6 +241,7 @@ enum {
 	CMD_LINE_OPT_CREATE_LB_NUM,
 	CMD_LINE_OPT_DEL_LB_NUM,
 	CMD_LINE_OPT_GET_LB_NUM,
+	CMD_LINE_OPT_LIST_LB_NUM,
 	CMD_LINE_OPT_PFX_LB_NUM,
 	CMD_LINE_OPT_GET_FWALL_RULE_NUM,
 	CMD_LINE_OPT_DEL_FWALL_RULE_NUM,
@@ -311,6 +314,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_CREATE_LB, 1, 0, CMD_LINE_OPT_CREATE_LB_NUM},
 	{CMD_LINE_OPT_DEL_LB, 1, 0, CMD_LINE_OPT_DEL_LB_NUM},
 	{CMD_LINE_OPT_GET_LB, 1, 0, CMD_LINE_OPT_GET_LB_NUM},
+	{CMD_LINE_OPT_LIST_LB, 0, 0, CMD_LINE_OPT_LIST_LB_NUM},
 	{CMD_LINE_OPT_PFX_LB, 0, 0, CMD_LINE_OPT_PFX_LB_NUM},
 	{CMD_LINE_OPT_ADD_FWALL_RULE, 1, 0, CMD_LINE_OPT_ADD_FWALL_RULE_NUM},
 	{CMD_LINE_OPT_DEL_FWALL_RULE, 1, 0, CMD_LINE_OPT_DEL_FWALL_RULE_NUM},
@@ -502,6 +506,9 @@ static int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_GET_LB_NUM:
 			command = DP_CMD_GET_LB;
 			strncpy(lb_id_str, optarg, 63);
+			break;
+		case CMD_LINE_OPT_LIST_LB_NUM:
+			command = DP_CMD_LIST_LB;
 			break;
 		case CMD_LINE_OPT_PFX_LB_NUM:
 			pfx_lb_enabled = true;
@@ -1115,6 +1122,27 @@ public:
 				printf("\n");
 	}
 
+	void ListLB() {
+		ListLoadBalancersRequest request;
+		ListLoadBalancersResponse reply;
+		ClientContext context;
+		Loadbalancer lb;
+		int i, j;
+
+		CALL_GRPC(ListLoadBalancers, &context, request, &reply);
+		for (i = 0; i < reply.loadbalancers_size(); i++) {
+			lb = reply.loadbalancers(i);
+			printf("Loadbalancer %s: vni %d, ip %s, ports", lb.id().c_str(), lb.vni(), lb.ip().address().c_str());
+			for (j = 0; j < lb.ports_size(); j++) {
+				if (lb.ports(j).protocol() == TCP)
+					printf(" %d/%s", lb.ports(j).port(), "tcp");
+				if (lb.ports(j).protocol() == UDP)
+					printf(" %d/%s", lb.ports(j).port(), "udp");
+			}
+			printf(", underlayroute %s\n", lb.underlay_route().c_str());
+		}
+	}
+
 	void DelLB() {
 			DeleteLoadBalancerRequest request;
 			DeleteLoadBalancerResponse reply;
@@ -1482,7 +1510,7 @@ int main(int argc, char** argv)
 		printf("Route ip %s length %d vni %d target ipv6 %s target vni %d\n", *ip_str ? ip_str : ip6_str, length, vni, ip6_str, t_vni);
 		break;
 	case DP_CMD_GET_ROUTE:
-		std::cout << "Listroute called " << std::endl;
+		std::cout << "Getroute called " << std::endl;
 		dpdk_client.ListRoutes();
 		break;
 	case DP_CMD_GET_VNI:
@@ -1585,6 +1613,10 @@ int main(int argc, char** argv)
 	case DP_CMD_GET_LB:
 		std::cout << "Get Loadbalancer called " << std::endl;
 		dpdk_client.GetLB();
+		break;
+	case DP_CMD_LIST_LB:
+		std::cout << "List Loadbalancers called " << std::endl;
+		dpdk_client.ListLB();
 		break;
 	case DP_CMD_DEL_LB:
 		std::cout << "Delete Loadbalancer called " << std::endl;

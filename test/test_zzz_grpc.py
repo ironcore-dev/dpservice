@@ -291,6 +291,23 @@ def test_grpc_lb(prepare_ifaces, grpc_client):
 	grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
 	grpc_client.dellb(lb_name)
 
+def test_grpc_lb_list(prepare_ifaces, grpc_client):
+	lb1_ul = grpc_client.createlb("lb1", vni1, "1.2.3.4", "tcp/80,udp/80")
+	lb2_ul = grpc_client.createlb("lb2", vni1, "1234::1", "tcp/80")
+	lb1spec = grpc_client.getlb("lb1")
+	lb2spec = grpc_client.getlb("lb2")
+	specs = grpc_client.listlbs()
+	assert specs == [ lb1spec, lb2spec ], \
+		"Loadbalancers not properly added to a list"
+	grpc_client.dellb("lb1")
+	specs = grpc_client.listlbs()
+	assert specs == [ lb2spec ], \
+		"Loadbalancer not properly removed from a list"
+	grpc_client.dellb("lb2")
+	specs = grpc_client.listlbs()
+	assert specs == [], \
+		"Loadbalancers not properly removed from a list"
+
 def test_grpc_lb_errors(prepare_ifaces, grpc_client):
 	# Try to use an invalid port specification
 	grpc_client.expect_failure().createlb(lb_name, vni1, lb_ip, "invalid")

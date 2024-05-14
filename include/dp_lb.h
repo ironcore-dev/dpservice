@@ -46,6 +46,7 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder);
 int dp_create_lb(struct dpgrpc_lb *lb, const union dp_ipv6 *ul_ip);
 int dp_delete_lb(const void *id_key);
 int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb);
+int dp_list_lbs(struct dp_grpc_responder *responder);
 
 #ifdef __cplusplus
 }

@@ -179,7 +179,7 @@ class DpGrpcClient:
 		output = self._call(f"--getlb {name}", "")
 		if not output:
 			return None
-		match = re.search(r'(?:^|[\n\r])Received LB with vni: ([0-9]+) UL: ([0-9a-fA-F:]+) LB ip: ([0-9\.]+) with ports: ([^\r\n]+)', output)
+		match = re.search(r'(?:^|[\n\r])Received LB with vni: ([0-9]+) UL: ([0-9a-fA-F:]+) LB ip: ([0-9a-fA-F:\.]+) with ports: ([^\r\n]+)', output)
 		portspecs = match.group(4)
 		lbports = []
 		for portspec in portspecs.split(' '):
@@ -192,6 +192,27 @@ class DpGrpcClient:
 				proto = 1
 			lbports.append({ 'protocol': proto, 'port': int(port) })
 		return { "vni": int(match.group(1)), "loadbalanced_ip": match.group(3), "loadbalanced_ports": lbports, "underlay_route": match.group(2) }
+
+	def listlbs(self):
+		output = self._call(f"--listlbs", "")
+		if not output:
+			return None
+		specs = []
+		for match in re.finditer(r'(?:^|[\n\r])Loadbalancer ([^:]+): vni ([0-9]+), ip ([0-9a-fA-F\.:]+), ports ([0-9/a-z ]+), underlayroute ([0-9a-fA-F\:]+)', output):
+			portspecs = match.group(4)
+			lbports = []
+			for portspec in portspecs.split(' '):
+				port, proto = portspec.split('/')
+				if proto.lower() == 'tcp':
+					proto = 6
+				elif proto.lower() == 'udp':
+					proto = 17
+				elif proto.lower() == 'icmp':
+					proto = 1
+				lbports.append({ 'protocol': proto, 'port': int(port) })
+			specs.append({ 'vni': int(match.group(2)), 'loadbalanced_ip': match.group(3), 'loadbalanced_ports': lbports, 'underlay_route': match.group(5) })
+		specs.sort(key=lambda spec: spec['loadbalanced_ip'])
+		return specs
 
 	def dellb(self, name):
 		self._call(f"--dellb {name}", "LB deleted")

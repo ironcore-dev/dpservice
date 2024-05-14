@@ -118,6 +118,11 @@ static int dp_process_get_lb(struct dp_grpc_responder *responder)
 	return dp_get_lb(request->lb_id, reply);
 }
 
+static int dp_process_list_lbs(struct dp_grpc_responder *responder)
+{
+	return dp_list_lbs(responder);
+}
+
 static int dp_process_create_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.add_lbtrgt;
@@ -1039,6 +1044,9 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_GetLoadBalancer:
 		ret = dp_process_get_lb(&responder);
+		break;
+	case DP_REQ_TYPE_ListLoadBalancers:
+		ret = dp_process_list_lbs(&responder);
 		break;
 	case DP_REQ_TYPE_CreateLoadBalancerTarget:
 		ret = dp_process_create_lbtarget(&responder);

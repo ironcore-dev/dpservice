@@ -100,6 +100,7 @@ void GRPCService::HandleRpcs()
 	new GetInterfaceCall();
 	new CreateLoadBalancerCall();
 	new GetLoadBalancerCall();
+	new ListLoadBalancersCall();
 	new DeleteLoadBalancerCall();
 	new CreateNatCall();
 	new GetNatCall();

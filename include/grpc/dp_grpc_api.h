@@ -45,6 +45,7 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_CreateLoadBalancer,
 	DP_REQ_TYPE_DeleteLoadBalancer,
 	DP_REQ_TYPE_GetLoadBalancer,
+	DP_REQ_TYPE_ListLoadBalancers,
 	DP_REQ_TYPE_CreateLoadBalancerTarget,
 	DP_REQ_TYPE_DeleteLoadBalancerTarget,
 	DP_REQ_TYPE_ListLoadBalancerTargets,

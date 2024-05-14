@@ -209,6 +209,31 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	grpc_iface->set_allocated_meteringparams(metering_params);
 }
 
+void DpToGrpcLoadBalancer(const struct dpgrpc_lb *dp_lb, Loadbalancer *grpc_lb)
+{
+	LbPort *lb_port;
+	IpAddress *lb_ip;
+	char strbuf[INET6_ADDRSTRLEN];
+
+	grpc_lb->set_id(dp_lb->lb_id);
+	grpc_lb->set_vni(dp_lb->vni);
+	lb_ip = new IpAddress();
+	GrpcConv::DpToGrpcAddress(&dp_lb->addr, lb_ip);
+	grpc_lb->set_allocated_ip(lb_ip);
+	for (int i = 0; i < DP_LB_MAX_PORTS; ++i) {
+		if (dp_lb->lbports[i].port == 0)
+			continue;
+		lb_port = grpc_lb->add_ports();
+		lb_port->set_port(dp_lb->lbports[i].port);
+		if (dp_lb->lbports[i].protocol == IPPROTO_TCP)
+			lb_port->set_protocol(TCP);
+		if (dp_lb->lbports[i].protocol == IPPROTO_UDP)
+			lb_port->set_protocol(UDP);
+	}
+	DP_IPV6_TO_STR(&dp_lb->ul_addr6, strbuf);
+	grpc_lb->set_underlay_route(strbuf);
+}
+
 static void SetupIpAndPrefix(const struct dp_fwall_rule *dp_rule, IpAddress* ip, Prefix* pfx, bool is_source)
 {
 	auto& rule_ip = is_source ? dp_rule->src_ip : dp_rule->dest_ip;

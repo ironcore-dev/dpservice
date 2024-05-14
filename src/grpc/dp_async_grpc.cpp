@@ -760,6 +760,25 @@ void GetLoadBalancerCall::ParseReply(struct dpgrpc_reply* reply)
 	reply_.set_underlay_route(strbuf);
 }
 
+const char* ListLoadBalancersCall::FillRequest(__rte_unused struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Listing loadbalancers");
+	return NULL;
+}
+void ListLoadBalancersCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_lb *dp_lb;
+	Loadbalancer *grpc_lb;
+
+	FOREACH_MESSAGE(dp_lb, reply) {
+		grpc_lb = reply_.add_loadbalancers();
+		// TODO GetLoadBalancerCall should use this in the future
+		// (it's currently not as to not break backward-compatibility)
+		GrpcConv::DpToGrpcLoadBalancer(dp_lb, grpc_lb);
+	}
+}
+
+
 
 const char* CreateLoadBalancerTargetCall::FillRequest(struct dpgrpc_request* request)
 {

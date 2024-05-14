@@ -112,6 +112,14 @@ message Route {
 	uint32 weight = 4;
 }
 
+message Loadbalancer {
+	bytes id = 1;
+	uint32 vni = 2;
+	IpAddress ip = 3;
+	repeated LbPort ports = 4;
+	bytes underlay_route = 5;
+}
+
 message IcmpFilter {
 	int32 icmp_type = 1; // -1 matches all ICMP Codes
 	int32 icmp_code = 2; // -1 matches all ICMP Types
@@ -324,6 +332,7 @@ message DeleteVipResponse {
 }
 
 message CreateLoadBalancerRequest {
+	// TODO use Loadbalancer message here in the next breaking change
 	bytes loadbalancer_id = 1;
 	IpAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
@@ -341,6 +350,7 @@ message GetLoadBalancerRequest {
 
 message GetLoadBalancerResponse {
 	Status status = 1;
+	// TODO use Loadbalancer message here in the next breaking change
 	IpAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
 	repeated LbPort loadbalanced_ports = 4;
@@ -353,6 +363,14 @@ message DeleteLoadBalancerRequest {
 
 message DeleteLoadBalancerResponse {
 	Status status = 1;
+}
+
+message ListLoadBalancersRequest {
+}
+
+message ListLoadBalancersResponse {
+	Status status = 1;
+	repeated Loadbalancer loadbalancers = 2;
 }
 
 message CreateLoadBalancerTargetRequest {
@@ -627,6 +645,7 @@ service DPDKironcore {
 	rpc CreateLoadBalancer(CreateLoadBalancerRequest) returns (CreateLoadBalancerResponse) {}
 	rpc GetLoadBalancer(GetLoadBalancerRequest) returns (GetLoadBalancerResponse) {}
 	rpc DeleteLoadBalancer(DeleteLoadBalancerRequest) returns (DeleteLoadBalancerResponse) {}
+	rpc ListLoadBalancers(ListLoadBalancersRequest) returns (ListLoadBalancersResponse) {}
 
 	// create/list/del Loadbalancer Targets for a given Loadbalancer ID
 	rpc CreateLoadBalancerTarget(CreateLoadBalancerTargetRequest) returns (CreateLoadBalancerTargetResponse) {}

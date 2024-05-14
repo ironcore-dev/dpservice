@@ -39,6 +39,8 @@ namespace GrpcConv
 
 	void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_iface);
 
+	void DpToGrpcLoadBalancer(const struct dpgrpc_lb *dp_lb, Loadbalancer *grpc_lb);
+
 	void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule);
 }
 

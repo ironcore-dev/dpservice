@@ -169,6 +169,7 @@ CREATE_CALLCLASS(ListNeighborNats, MultiReplyCall);
 CREATE_CALLCLASS(CreateLoadBalancer, SingleReplyCall);
 CREATE_CALLCLASS(DeleteLoadBalancer, SingleReplyCall);
 CREATE_CALLCLASS(GetLoadBalancer, SingleReplyCall);
+CREATE_CALLCLASS(ListLoadBalancers, MultiReplyCall);
 
 CREATE_CALLCLASS(CreateLoadBalancerTarget, SingleReplyCall);
 CREATE_CALLCLASS(DeleteLoadBalancerTarget, SingleReplyCall);
