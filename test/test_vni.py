@@ -66,6 +66,9 @@ def test_vni_neighnats(prepare_ipv4, grpc_client):
 	assert len(neighnats) == 2, \
 		"Neighbor NATs removed prematurely"
 
+	grpc_client.delneighnat(nat_vip, vni1, 3000, 4000)
+	grpc_client.delneighnat(nat_vip, vni1, 4000, 5000)
+
 	# Need to add the VMs back before removing the LB otherwise the VNI will get cleaned up
 	VM1.ul_ipv6 = grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6)
 	VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
