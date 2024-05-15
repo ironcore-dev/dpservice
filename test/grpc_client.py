@@ -25,6 +25,7 @@ class GrpcError(Exception):
 class GrpcClient:
 
 	def __init__(self, build_path):
+		self.uuid = None
 		self.expectedError = 0
 		self.expectFailure = False
 		self.cmd = build_path + "/cli/dpservice-cli/dpservice-cli"
@@ -99,7 +100,15 @@ class GrpcClient:
 		return spec['underlay_route'] if spec else None
 
 	def init(self):
-		self._call("init")
+		spec = self._getSpec("init")
+		if spec:
+			self.uuid = spec['uuid']
+
+	def getinit(self):
+		return self._getSpec("get init")
+
+	def getversion(self):
+		return self._getSpec("get version")
 
 	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None):
 		cmd = f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6}"
@@ -180,6 +189,9 @@ class GrpcClient:
 
 	def delnat(self, vm_name):
 		self._call(f"del nat --interface-id={vm_name}")
+
+	def listlocalnats(self, nat_vip):
+		return self._getSpecList(f"list nats --nat-ip={nat_vip} --nat-type=local")
 
 	def listneighnats(self, nat_vip):
 		return self._getSpecList(f"list nats --nat-ip={nat_vip} --nat-type=neigh")

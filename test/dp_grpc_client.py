@@ -23,6 +23,7 @@ class DpGrpcClient:
 		self.re_ipv6 = re.compile(r'(?:^|[\n\r])Received underlay route : ([a-f0-9:]+)(?:$|[\n\r])')
 		self.re_error = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' reply with error code ([1-9][0-9][0-9]), message \'[A-Z_]*\'(?:$|[\n\r])')
 		self.re_failure = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' failed with error code ([1-9]), message \'[^\']*\'(?:$|[\n\r])')
+		self.uuid = None
 		self.expectedError = 0
 		self.expectFailure = False
 
@@ -75,7 +76,23 @@ class DpGrpcClient:
 		return f"--ipv6 {ip}" if ':' in ip else f"--ipv4 {ip}"
 
 	def init(self):
-		self._call("--init", "Initialized")
+		spec = self.getinit()
+		if spec:
+			self.uuid = spec['uuid']
+		else:
+			output = self._call("--init", "Initialized")
+			match = re.search(r'(?:^|[\n\r])Received UUID ([0-9A-F\-]+)', output)
+			self.uuid = match.group(1)
+
+	def getinit(self):
+		output = self._call("--is_initialized", "Initialized")
+		match = re.search(r'(?:^|[\n\r])Received UUID ([0-9A-F\-]+)', output)
+		return { 'uuid': match.group(1) } if match else None
+
+	def getversion(self):
+		output = self._call("--getver", "")
+		match = re.search(f"(?:^|[\n\r])Got protocol '([^']+)' on service '([^']+)'", output)
+		return { 'service_protocol': match.group(1), 'service_version': match.group(2) }
 
 	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None):
 		cmd = f"--addmachine {vm_name} --vm_pci {pci} --vni {vni} --ipv4 {ipv4} --ipv6 {ipv6}"
@@ -144,12 +161,18 @@ class DpGrpcClient:
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])Route prefix ([0-9a-f\.:]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
 			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlay_route": match.group(3) })
+		specs.sort(key=lambda spec: spec['prefix'])
 		return specs
 
 	def createlb(self, name, vni, vip, portspecs):
-		proto, port = portspecs.split('/')
+		try:
+			specs = portspecs.split(',')
+			protos = ','.join([ spec.split('/')[0] for spec in specs ])
+			ports = ','.join([ spec.split('/')[1] for spec in specs ])
+		except:
+			return None
 		__vip = self._getIpSpec(vip)
-		return self._getUnderlayRoute(f"--createlb {name} --vni {vni} {__vip} --port {port} --protocol {proto}",
+		return self._getUnderlayRoute(f"--createlb {name} --vni {vni} {__vip} --port {ports} --protocol {protos}",
 			f"VIP {vip}, vni {vni}")
 
 	def getlb(self, name):
@@ -207,6 +230,7 @@ class DpGrpcClient:
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r])LB Route prefix ([0-9a-f\.:]+) len ([0-9]+) underlayroute ([0-9a-fA-F:]+)', output):
 			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "underlay_route": match.group(3) })
+		specs.sort(key=lambda spec: spec['prefix'])
 		return specs
 
 	def addvip(self, vm_name, vip):
@@ -236,6 +260,15 @@ class DpGrpcClient:
 
 	def delnat(self, vm_name):
 		self._call(f"--delnat {vm_name}", "NAT deleted")
+
+	def listlocalnats(self, nat_vip):
+		output = self._call(f"--getnatinfo local --ipv4 {nat_vip}", "")
+		if not output:
+			return None
+		specs = []
+		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: IP ([0-9\.]+), min_port ([0-9]+), max_port ([0-9]+), vni: ([0-9]+)', output):
+			specs.append({ 'nat_ip': match.group(1), 'min_port': int(match.group(2)), 'max_port': int(match.group(3)), 'vni': int(match.group(4)) })
+		return specs
 
 	def listneighnats(self, nat_vip):
 		output = self._call(f"--getnatinfo neigh --ipv4 {nat_vip}", "")

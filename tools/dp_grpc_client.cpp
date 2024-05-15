@@ -1050,6 +1050,7 @@ public:
 			uint16_t final_count = 0;
 			char protos[DP_MAX_LB_PORTS][4];
 			char *pt;
+			unsigned int portno;
 
 			request.set_loadbalancer_id(lb_id_str);
 			request.set_vni(vni);
@@ -1064,7 +1065,12 @@ public:
 			while (pt != NULL) {
 				if (countp == DP_MAX_LB_PORTS)
 					break;
-				ports[countp++] = (uint16_t)atoi(pt);
+				portno = atoi(pt);
+				if (portno > UINT16_MAX) {
+					printf("gRPC call 'CreateLB' failed with error code 2, message 'Invalid port number'\n");
+					return;
+				}
+				ports[countp++] = (uint16_t)portno;
 				pt = strtok(NULL, ",");
 			}
 
