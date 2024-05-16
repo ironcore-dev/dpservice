@@ -303,8 +303,5 @@ int dp_del_lb_back_ip(const void *id_key, const union dp_ipv6 *back_ip)
 	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
-	if (DP_FAILED(dp_delete_maglev_backend(lb_val, back_ip)))
-		return DP_GRPC_ERR_BACKIP_DEL;
-
-	return DP_GRPC_OK;
+	return dp_delete_maglev_backend(lb_val, back_ip);
 }

@@ -327,8 +327,7 @@ def test_grpc_lbtarget(prepare_ifaces, grpc_client):
 	grpc_client.addlbtarget(lb_name, target_ul)
 	grpc_client.expect_error(202).addlbtarget(lb_name, target_ul)
 	grpc_client.dellbtarget(lb_name, target_ul)
-	# TODO not failing atm.
-	grpc_client.dellbtarget(lb_name, target_ul)
+	grpc_client.expect_error(201).dellbtarget(lb_name, target_ul)
 	grpc_client.addlbtarget(lb_name, target_ul)
 	grpc_client.dellbtarget(lb_name, target_ul)
 	grpc_client.dellb(lb_name)
