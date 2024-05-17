@@ -16,18 +16,18 @@
 #include "dp_maglev.h"
 #include "grpc/dp_grpc_responder.h"
 
-static struct rte_hash *ipv4_lb_tbl = NULL;
+static struct rte_hash *lb_table = NULL;
 static struct rte_hash *id_map_lb_tbl = NULL;
 
 int dp_lb_init(int socket_id)
 {
-	ipv4_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, sizeof(struct lb_key),
-										"ipv4_lb_table", socket_id);
-	if (!ipv4_lb_tbl)
+	lb_table = dp_create_jhash_table(DP_LB_TABLE_MAX, sizeof(struct lb_key),
+									 "loadbalancer_table", socket_id);
+	if (!lb_table)
 		return DP_ERROR;
 
 	id_map_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, DP_LB_ID_MAX_LEN,
-										  "lb_id_map_table", socket_id);
+										  "loadbalancer_id_table", socket_id);
 	if (!id_map_lb_tbl)
 		return DP_ERROR;
 
@@ -37,7 +37,7 @@ int dp_lb_init(int socket_id)
 void dp_lb_free(void)
 {
 	dp_free_jhash_table(id_map_lb_tbl);
-	dp_free_jhash_table(ipv4_lb_tbl);
+	dp_free_jhash_table(lb_table);
 }
 
 static int dp_map_lb_handle(const void *id_key, const struct lb_key *l_key, struct lb_value *l_val)
@@ -71,14 +71,14 @@ int dp_create_lb(struct dpgrpc_lb *lb, const union dp_ipv6 *ul_ip)
 	lb_key.vni = lb->vni;
 	dp_copy_ipaddr(&lb_key.ip, &lb->addr);
 
-	if (!DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key)))
+	if (!DP_FAILED(rte_hash_lookup(lb_table, &lb_key)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
 	if (!lb_val)
 		goto err;
 
-	if (DP_FAILED(rte_hash_add_key_data(ipv4_lb_tbl, &lb_key, lb_val)))
+	if (DP_FAILED(rte_hash_add_key_data(lb_table, &lb_key, lb_val)))
 		goto err_free;
 
 	if (DP_FAILED(dp_map_lb_handle(lb->lb_id, &lb_key, lb_val)))
@@ -106,7 +106,7 @@ int dp_get_lb(const void *id_key, struct dpgrpc_lb *out_lb)
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
+	if (DP_FAILED(rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	out_lb->vni = lb_k->vni;
@@ -130,12 +130,12 @@ int dp_delete_lb(const void *id_key)
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NOT_FOUND;
 
-	ret = rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val);
+	ret = rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Cannot get LB backing IP", DP_LOG_RET(ret));
 	} else {
 		rte_free(lb_val);
-		ret = rte_hash_del_key(ipv4_lb_tbl, lb_k);
+		ret = rte_hash_del_key(lb_table, lb_k);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Cannot delete LB key", DP_LOG_RET(ret));
 	}
@@ -161,7 +161,7 @@ int dp_list_lbs(struct dp_grpc_responder *responder)
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
-	while ((ret = rte_hash_iterate(ipv4_lb_tbl, (const void **)&lb_key, (void **)&lb_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(lb_table, (const void **)&lb_key, (void **)&lb_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret))
 			return DP_GRPC_ERR_ITERATOR;
 
@@ -187,7 +187,7 @@ int dp_list_lbs(struct dp_grpc_responder *responder)
 
 bool dp_is_lb_enabled(void)
 {
-	return rte_hash_count(ipv4_lb_tbl) > 0;
+	return rte_hash_count(lb_table) > 0;
 }
 
 bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
@@ -203,7 +203,7 @@ bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 	else
 		return false;
 
-	return !DP_FAILED(rte_hash_lookup(ipv4_lb_tbl, &lb_key));
+	return !DP_FAILED(rte_hash_lookup(lb_table, &lb_key));
 }
 
 static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const union dp_ipv6 *b_ip)
@@ -232,7 +232,7 @@ const union dp_ipv6 *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vn
 	lb_key.vni = vni;
 	dp_copy_ipaddr(&lb_key.ip, &flow_key->l3_dst);
 
-	if (rte_hash_lookup_data(ipv4_lb_tbl, &lb_key, (void **)&lb_val) < 0)
+	if (rte_hash_lookup_data(lb_table, &lb_key, (void **)&lb_val) < 0)
 		return NULL;
 
 	if (lb_val->back_end_cnt == 0)
@@ -255,7 +255,7 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NO_LB;
 
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
+	if (DP_FAILED(rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
@@ -280,7 +280,7 @@ int dp_add_lb_back_ip(const void *id_key, const union dp_ipv6 *back_ip)
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NO_LB;
 
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
+	if (DP_FAILED(rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	if (dp_lb_is_back_ip_inserted(lb_val, back_ip))
@@ -300,7 +300,7 @@ int dp_del_lb_back_ip(const void *id_key, const union dp_ipv6 *back_ip)
 	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
 		return DP_GRPC_ERR_NO_LB;
 
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_lb_tbl, lb_k, (void **)&lb_val)))
+	if (DP_FAILED(rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val)))
 		return DP_GRPC_ERR_NO_BACKIP;
 
 	return dp_delete_maglev_backend(lb_val, back_ip);

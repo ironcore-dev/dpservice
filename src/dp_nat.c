@@ -40,23 +40,23 @@ static uint64_t dp_nat_full_log_delay;
 int dp_nat_init(int socket_id)
 {
 	ipv4_snat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct nat_key),
-										  "ipv4_snat_table", socket_id);
+										  "snat_table", socket_id);
 	if (!ipv4_snat_tbl)
 		return DP_ERROR;
 
 	ipv4_dnat_tbl = dp_create_jhash_table(DP_NAT_TABLE_MAX, sizeof(struct nat_key),
-										  "ipv4_dnat_table", socket_id);
+										  "dnat_table", socket_id);
 	if (!ipv4_dnat_tbl)
 		return DP_ERROR;
 
 	ipv4_netnat_portmap_tbl = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct netnat_portmap_key),
-												  "ipv4_netnat_portmap_table", socket_id);
+													"nat_portmap_table", socket_id);
 
 	if (!ipv4_netnat_portmap_tbl)
 		return DP_ERROR;
 
 	ipv4_netnat_portoverload_tbl = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct netnat_portoverload_tbl_key),
-												  "ipv4_netnat_portoverload_tbl", socket_id);
+														 "nat_portoverload_table", socket_id);
 
 	if (!ipv4_netnat_portoverload_tbl)
 		return DP_ERROR;

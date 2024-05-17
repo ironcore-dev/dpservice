@@ -21,14 +21,14 @@
 
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
-static struct rte_hash *ipv4_flow_tbl = NULL;
+static struct rte_hash *flow_table = NULL;
 static bool offload_mode_enabled = 0;
 
 int dp_flow_init(int socket_id)
 {
-	ipv4_flow_tbl = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct flow_key),
-										  "ipv4_flow_table", socket_id);
-	if (!ipv4_flow_tbl)
+	flow_table = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct flow_key),
+									   "conntrack_table", socket_id);
+	if (!flow_table)
 		return DP_ERROR;
 
 	offload_mode_enabled = dp_conf_is_offload_enabled();
@@ -38,7 +38,7 @@ int dp_flow_init(int socket_id)
 
 void dp_flow_free(void)
 {
-	dp_free_jhash_table(ipv4_flow_tbl);
+	dp_free_jhash_table(flow_table);
 }
 
 static inline void dp_flow_log_key(const struct flow_key *key, const char *message)
@@ -218,7 +218,7 @@ static void dp_delete_flow_no_flush(const struct flow_key *key)
 {
 	int ret;
 
-	ret = rte_hash_del_key(ipv4_flow_tbl, key);
+	ret = rte_hash_del_key(flow_table, key);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			dp_flow_log_key(key, "Attempt to delete a non-existing hash key");
@@ -241,7 +241,7 @@ void dp_delete_flow(const struct flow_key *key)
 
 int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val)
 {
-	int ret = rte_hash_add_key_data(ipv4_flow_tbl, key, flow_val);
+	int ret = rte_hash_add_key_data(flow_table, key, flow_val);
 
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add data to flow table", DP_LOG_RET(ret));
@@ -252,7 +252,7 @@ int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val)
 
 int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val)
 {
-	int ret = rte_hash_lookup_data(ipv4_flow_tbl, key, (void **)p_flow_val);
+	int ret = rte_hash_lookup_data(flow_table, key, (void **)p_flow_val);
 
 #ifdef ENABLE_PYTEST
 	if (DP_FAILED(ret))
@@ -417,7 +417,7 @@ void dp_process_aged_flows_non_offload(void)
 	uint64_t timer_hz = rte_get_timer_hz();
 	int	ret;
 
-	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(flow_table, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Iterating flow table failed while aging flows", DP_LOG_RET(ret));
 			return;
@@ -449,7 +449,7 @@ void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type)
 	uint32_t iter = 0;
 	int ret;
 
-	while ((ret = rte_hash_iterate(ipv4_flow_tbl, &next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(flow_table, &next_key, (void **)&flow_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Iterating flow table failed while removing NAT flows", DP_LOG_RET(ret));
 			return;
@@ -467,7 +467,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 	uint32_t iter = 0;
 	int ret;
 
-	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(flow_table, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Iterating flow table failed while removing neighboring NAT flows", DP_LOG_RET(ret));
 			return;
@@ -487,7 +487,7 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 	uint32_t iter = 0;
 	int ret;
 
-	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(flow_table, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Iterating flow table failed while removing VM flows", DP_LOG_RET(ret));
 			return;
@@ -507,7 +507,7 @@ void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr)
 	uint32_t iter = 0;
 	int ret;
 
-	while ((ret = rte_hash_iterate(ipv4_flow_tbl, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+	while ((ret = rte_hash_iterate(flow_table, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Iterating flow table failed while removing LB target flows", DP_LOG_RET(ret));
 			return;
@@ -522,7 +522,7 @@ hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key)
 {
 	//It is not necessary to first test if this key exists, since for now, this function
 	// is always called after either a flow is checked or added in the firewall node.
-	return rte_hash_hash(ipv4_flow_tbl, key);
+	return rte_hash_hash(flow_table, key);
 }
 
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx)

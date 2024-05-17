@@ -9,7 +9,7 @@ static struct rte_hash *iface_id_table = NULL;
 int dp_ifaces_init(int socket_id)
 {
 	iface_id_table = dp_create_jhash_table(DP_MAX_PORTS, DP_IFACE_ID_MAX_LEN,
-										   "iface_id_table", socket_id);
+										   "interface_table", socket_id);
 	if (!iface_id_table)
 		return DP_ERROR;
 
