@@ -163,6 +163,8 @@ class VMConfig:
 		self.vm_pci = pci
 		self.underly_ip = underly_ip
 		self.vni = vni
+		self.nat_ip = None
+		self.nat_port = None
 
 	def get_ip(self):
 		return self.vm_ip
@@ -178,6 +180,22 @@ class VMConfig:
 
 	def get_vni(self):
 		return self.vni
+	
+	def set_nat(self, ip, ports):
+		self.nat_ip = ip
+		self.nat_ports = ports
+
+	def get_nat_ip(self):
+		return self.nat_ip
+	
+	def get_nat_ports(self):
+		return self.nat_ports
+	
+	# def get_nat_underly_ip(self):
+	# 	return self.nat_underly_ip
+
+	def get_nat(self):
+		return self.nat
 
 
 class RemoteMachine:
@@ -254,13 +272,22 @@ def cleanup_remote_machine():
 	vm_machines.clear()
 	hypervisor_machines.clear()
 	
-		
+
 def add_vm_config_info(machine_name, ipv4, ipv6, pci, underly_ip, vni):
 	try:
 		machine = get_remote_machine(machine_name)
 		machine.set_vm_config(ipv4, ipv6, pci, underly_ip, vni)
 	except Exception as e:
 		print(f"Failed to store vm config for {machine_name} due to {e} ")
+
+
+def add_vm_nat_config(machine_name, ip, ports):
+	try:
+		machine = get_remote_machine(machine_name)
+		machine.get_vm_config().set_nat(ip, ports)
+	except Exception as e:
+		print(f"Failed to store {machine_name} vm's nat configuration due to {e}")
+
 
 def get_vm_config_detail(machine_name):
 	try:
