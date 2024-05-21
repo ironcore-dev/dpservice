@@ -2,7 +2,7 @@ import time
 import re
 import sys
 
-from remote_machine_management import get_remote_machine, add_vm_config_info
+from remote_machine_management import get_remote_machine, add_vm_config_info, add_vm_nat_config
 
 def remote_machine_op_upload(machine_name, local_path, remote_path):
 	try:
@@ -98,6 +98,35 @@ def remote_machine_op_dpservice_create_interface(machine_name, if_id, vni, ipv4,
 	except Exception as e:
 		print(f"Failed to create interface on hypervisor {machine_name} due to {e}")
 
+
+def remote_machine_op_dpservice_create_nat(machine_name, if_id, ip, ports, path_to_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and create nat on a vm machine {machine_name}")
+		parameters = f"create nat --interface-id={if_id} --nat-ip={ip} --minport={ports[0]} --maxport={ports[1]}"
+		cli_task = [
+				{"command": path_to_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to create nat on hypervisor {machine_name} due to {e}")
+
+
+def remote_machine_op_dpservice_delete_nat(machine_name, if_id, path_to_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and delete nat on a vm machine {machine_name}")
+		parameters = f"delete nat --interface-id={if_id} "
+		cli_task = [
+				{"command": path_to_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to delete nat on hypervisor {machine_name} due to {e}")
+
+
 def remote_machine_op_dpservice_add_vms(env_config, path_to_cli_bin="/tmp/dpservice-cli"):
 	try:
 		for hypervisor_info in env_config['hypervisors']:
@@ -106,8 +135,10 @@ def remote_machine_op_dpservice_add_vms(env_config, path_to_cli_bin="/tmp/dpserv
 				output = remote_machine_op_dpservice_create_interface(hypervisor_info["machine_name"], vm_info["machine_name"], if_config["vni"], if_config["ipv4"], if_config["ipv6"], if_config["pci_addr"], path_to_cli_bin)
 				if_config["underly_ip"] = get_underly_ip(output)
 				add_vm_config_info(vm_info["machine_name"], if_config["ipv4"], if_config["ipv6"], if_config["pci_addr"], if_config["underly_ip"], if_config["vni"])
-				vm_name = vm_info["machine_name"]
-				print(f"added vm interface {vm_name}")
+				
+				if "nat"in vm_info:
+					add_vm_nat_config(vm_info["machine_name"], vm_info["nat"]["ip"], vm_info["nat"]["ports"])
+				
 	except Exception as e:
 		print(f"Failed to add vm interfaces via dpservice cli due to {e} ")
 		sys.exit(1)
@@ -144,7 +175,6 @@ def remote_machine_op_reboot(machine_name):
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
 			raise NotImplementedError(f"Cannot reboot a non-vm machine {machine_name}")
-	
 		
 		reboot_task = [
 				{"command": "sleep 3 && reboot", "background": True}
