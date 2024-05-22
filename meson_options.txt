@@ -8,3 +8,6 @@ option('enable_static_underlay_ip', type: 'boolean', value: false, description:
        'Build with generating underlay ipv6 address without randomness')
 option('compiler_suggestions', type: 'boolean', value: false, description:
        'Show various compiler suggestions (warnings)')
+option('build_dpservice_cli', type: 'boolean', value: false, description:
+       'Enable building dpservice-cli')
+

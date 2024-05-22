@@ -79,6 +79,10 @@ subdir('include')
 subdir('src')
 subdir('tools')
 
+if get_option('build_dpservice_cli')
+  subdir('cli/dpservice-cli')
+endif
+
 cppcheck = find_program('cppcheck', required: false)
 if cppcheck.found()
   run_target('cppcheck', command: [cppcheck, '--project=' +
