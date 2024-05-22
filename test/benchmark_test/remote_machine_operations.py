@@ -42,7 +42,7 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 				{"command": docker_kill_command, "parameters": docker_container_name, "background": False, "sudo": True}
 			]
 			machine.exec_task(docker_kill_task)
-			time.sleep(3)
+			time.sleep(1)
 
 			log_file = f"/tmp/dpservice.log"
 			docker_run_command = f"docker run"
@@ -62,7 +62,7 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 				# If running, kill the existing process
 				kill_command = f"kill {running_pid.strip()}"
 				machine.ssh_manager.run_command(kill_command, sudo=True)
-				time.sleep(3)
+				time.sleep(1)
 				print(f"Existing dpservice process killed: PID {running_pid.strip()}")
 
 			dpservice_task = [
@@ -127,6 +127,86 @@ def remote_machine_op_dpservice_delete_nat(machine_name, if_id, path_to_bin="/tm
 		print(f"Failed to delete nat on hypervisor {machine_name} due to {e}")
 
 
+def remote_machine_op_dpservice_create_lb(machine_name, lb_name, lb_vni, lb_ip, lb_ports, path_to_cli_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and create lb on a vm machine {machine_name}")
+		parameters = f"create loadbalancer --id={lb_name} --vni={lb_vni} --vip={lb_ip} --lbports={lb_ports}"
+		cli_task = [
+				{"command": path_to_cli_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to create lb on hypervisor {machine_name} due to {e}")
+
+def remote_machine_op_dpservice_delete_lb(machine_name, lb_name, path_to_cli_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and delete lb on a vm machine {machine_name}")
+		parameters = f"delete loadbalancer --id={lb_name}"
+		cli_task = [
+				{"command": path_to_cli_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to delete lb on hypervisor {machine_name} due to {e}")
+
+def remote_machine_op_dpservice_create_lbpfx(machine_name, prefix, if_id, path_to_cli_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and create lbpfx on a vm machine {machine_name}")
+		parameters = f"create lbprefix --interface-id={if_id} --prefix={prefix}"
+		cli_task = [
+				{"command": path_to_cli_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to create lbpfx on hypervisor {machine_name} due to {e}")
+
+def remote_machine_op_dpservice_delete_lbpfx(machine_name, prefix, if_id, path_to_cli_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and delete lbpfx on a vm machine {machine_name}")
+		parameters = f"delete lbprefix --interface-id={if_id} --prefix={prefix}"
+		cli_task = [
+				{"command": path_to_cli_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to delete lbpfx on hypervisor {machine_name} due to {e}")
+
+
+def remote_machine_op_dpservice_create_lbtarget(machine_name, target_ip, lb_name, path_to_cli_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and create lbtarget on a vm machine {machine_name}")
+		parameters = f"create lbtarget --target-ip={target_ip} --lb-id={lb_name}"
+		cli_task = [
+				{"command": path_to_cli_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to delete lbpfx on hypervisor {machine_name} due to {e}")
+
+def remote_machine_op_dpservice_delete_lbtarget(machine_name, target_ip, lb_name, path_to_cli_bin="/tmp/dpservice-cli"):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(f"Cannot configure dpservice and delete lbtarget on a vm machine {machine_name}")
+		parameters = f"delete lbtarget --target-ip={target_ip} --lb-id={lb_name}"
+		cli_task = [
+				{"command": path_to_cli_bin, "parameters": parameters},
+		]
+		return machine.exec_task(cli_task)
+	except Exception as e:
+		print(f"Failed to delete lbpfx on hypervisor {machine_name} due to {e}")
+
+
 def remote_machine_op_dpservice_add_vms(env_config, path_to_cli_bin="/tmp/dpservice-cli"):
 	try:
 		for hypervisor_info in env_config['hypervisors']:
@@ -136,7 +216,7 @@ def remote_machine_op_dpservice_add_vms(env_config, path_to_cli_bin="/tmp/dpserv
 				if_config["underly_ip"] = get_underly_ip(output)
 				add_vm_config_info(vm_info["machine_name"], if_config["ipv4"], if_config["ipv6"], if_config["pci_addr"], if_config["underly_ip"], if_config["vni"])
 				
-				if "nat"in vm_info:
+				if "nat" in vm_info:
 					add_vm_nat_config(vm_info["machine_name"], vm_info["nat"]["ip"], vm_info["nat"]["ports"])
 				
 	except Exception as e:
@@ -157,6 +237,7 @@ def remote_machine_op_dpservice_create_route(machine_name, prefix, nxt_hop_vni, 
 	except Exception as e:
 		print(f"Failed to create route on hypervisor {machine_name} due to {e}")
 
+
 def remote_machine_op_dpservice_delete_route(machine_name, prefix, vni, path_to_bin="/tmp/dpservice-cli"):
 	try:
 		machine = get_remote_machine(machine_name)
@@ -169,6 +250,7 @@ def remote_machine_op_dpservice_delete_route(machine_name, prefix, vni, path_to_
 		machine.exec_task(cli_task)
 	except Exception as e:
 		print(f"Failed to delete route on hypervisor {machine_name} due to {e}")
+
 
 def remote_machine_op_reboot(machine_name):
 	try:
@@ -237,6 +319,44 @@ def remote_machine_op_flow_test(machine_name, is_server, server_ip, flow_count, 
 		return machine.exec_task(test_task)
 	except Exception as e:
 		print(f"Failed to invoke flow test on vm {machine_name} due to {e}")
+
+
+def remote_machine_op_add_ip_addr(machine_name, ip, dev, is_v6):
+	try:
+		machine = get_remote_machine(machine_name)
+		if not machine.parent_machine:
+			raise NotImplementedError(f"Cannot add hypervisor's ip address {machine_name}")
+		
+		if is_v6:
+			parameters = f"-6 addr add {ip} dev {dev}"
+		else:
+			parameters = f"addr add {ip} dev {dev}"
+
+		test_task = [
+				{"command": "ip", "parameters": parameters},
+		]
+		return machine.exec_task(test_task)
+	except Exception as e:
+		print(f"Failed to add ip address to vm {machine_name} due to {e}")
+
+
+def remote_machine_op_delete_ip_addr(machine_name, ip, dev, is_v6):
+	try:
+		machine = get_remote_machine(machine_name)
+		if not machine.parent_machine:
+			raise NotImplementedError(f"Cannot delete hypervisor's ip address {machine_name}")
+		
+		if is_v6:
+			parameters = f"-6 addr del {ip} dev {dev}"
+		else:
+			parameters = f"addr del {ip} dev {dev}"
+
+		test_task = [
+				{"command": "ip", "parameters": parameters},
+		]
+		return machine.exec_task(test_task)
+	except Exception as e:
+		print(f"Failed to delete ip address to vm {machine_name} due to {e}")
 
 
 def get_underly_ip(output_string):

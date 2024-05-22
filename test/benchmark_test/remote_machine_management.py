@@ -190,12 +190,56 @@ class VMConfig:
 	
 	def get_nat_ports(self):
 		return self.nat_ports
-	
+
 	# def get_nat_underly_ip(self):
 	# 	return self.nat_underly_ip
 
 	def get_nat(self):
 		return self.nat
+
+class LBConfig:
+
+	def __init__(self, name, ip, ports, vni, nodes, vms):
+		self.lb_id = name
+		self.ip = ip
+		self.ports = ports
+		self.vni = vni
+		self.lb_underly_ip = {}
+		self.vm_pfx = {}
+		for node in nodes:
+			self.lb_underly_ip[node] = ""
+		for vm in vms:
+			self.vm_pfx[vm] = ""
+
+	def get_id(self):
+		return self.lb_id
+	
+	def get_ip(self):
+		return self.ip
+	
+	def get_ports(self):
+		return self.ports
+	
+	def get_vni(self):
+		return self.vni
+	
+	def get_nodes(self):
+		return self.lb_underly_ip.keys()
+	
+	def get_lb_underly_ip(self, node):
+		return self.lb_underly_ip[node]
+	
+	def set_lb_underly_ip(self, node, underly_ip):
+		self.lb_underly_ip[node] = underly_ip
+	
+	def get_vms(self):
+		return self.vm_pfx.keys()
+	
+	def get_vm_lb_pfx(self, vm):
+		return self.vm_pfx[vm]
+	
+	def set_vm_lb_pfx(self, vm, underly_ip):
+		self.vm_pfx[vm] = underly_ip
 
 
 class RemoteMachine:
@@ -223,6 +267,15 @@ class RemoteMachine:
 		if not self.parent_machine:
 			self.ssh_manager.terminate_all_containers()
 		self.ssh_manager.disconnect()
+
+	def get_machine_name(self):
+		return self.machine_name
+
+	def get_parent_machine_name(self):
+		if not self.parent_machine:
+			return ""
+		else:
+			return self.parent_machine.get_machine_name()
 
 	def terminate_processes(self):
 		self.ssh_manager.terminate_all_processes()
@@ -272,7 +325,6 @@ def cleanup_remote_machine():
 	vm_machines.clear()
 	hypervisor_machines.clear()
 	
-
 def add_vm_config_info(machine_name, ipv4, ipv6, pci, underly_ip, vni):
 	try:
 		machine = get_remote_machine(machine_name)
@@ -280,14 +332,12 @@ def add_vm_config_info(machine_name, ipv4, ipv6, pci, underly_ip, vni):
 	except Exception as e:
 		print(f"Failed to store vm config for {machine_name} due to {e} ")
 
-
 def add_vm_nat_config(machine_name, ip, ports):
 	try:
 		machine = get_remote_machine(machine_name)
 		machine.get_vm_config().set_nat(ip, ports)
 	except Exception as e:
 		print(f"Failed to store {machine_name} vm's nat configuration due to {e}")
-
 
 def get_vm_config_detail(machine_name):
 	try:
