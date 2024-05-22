@@ -8,11 +8,13 @@
 			"expected_throughput": {
 				"sw": {
 					"local_vm2vm": 10,
-					"remote_vm2vm": 8
+					"remote_vm2vm": 8,
+					"lb": 5
 				},
 				"hw": {
-					"local_vm2vm": 20,
-					"remote_vm2vm": 20
+					"local_vm2vm": 22,
+					"remote_vm2vm": 22,
+					"lb": 16
 				}
 			},
 			"hypervisors": [
@@ -74,57 +76,15 @@
 						}
 					]
 				}
-			]
-		},
-		{
-			"name": "another_setup",
-			"key_file": "<whatever path>/id_rsa",
-			"default_dpservice_image": "whatever docker image of dpservice",
-			"concurrent_flow_count": 5,
-			"expected_throughput": {
-				"sw": {
-					"local_vm2vm": 6,
-					"remote_vm2vm": 3
-				},
-				"hw": {
-					"local_vm2vm": 15,
-					"remote_vm2vm": 10
-				}
-			},
-			"hypervisors": [
-				{
-					"machine_name": "hypervisor-100",
-					"host_address": "192.168.23.166",
-					"user_name": "xyz",
-					"port": 22,
-					"vms": [
-						{
-							"machine_name": "vm1",
-							"host_address": "192.168.122.47",
-							"user_name": "root",
-							"port": 22,
-							"if_config":{
-								"ipv4": "192.168.111.2",
-								"ipv6": "2002::321",
-								"vni": 66,
-								"pci_addr": "0000:3a:00.0_representor_vf1"
-							}
-						},
-						{
-							"machine_name": "vm2",
-							"host_address": "192.168.122.48",
-							"user_name": "root",
-							"port": 22,
-							"if_config":{
-								"ipv4": "192.168.111.3",
-								"ipv6": "2002::323",
-								"vni": 66,
-								"pci_addr": "0000:3a:00.0_representor_vf2"
-							}
-						}
-					]
-				}
-			]
+			],
+			"lb": {
+				"name": "test_lb",
+				"ip": "10.20.30.30",
+				"ports": "TCP/5201,TCP/50007",
+				"vni": 66,
+				"lb_nodes": ["hypervisor-2"],
+				"lb_machines": ["vm3"]
+			}
 		}
 	]
 }

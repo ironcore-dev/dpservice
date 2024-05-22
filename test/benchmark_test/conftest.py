@@ -3,7 +3,7 @@ import sys, os
 import signal
 import json
 
-from benchmark_test_config import prepare_test_environment, tear_down_test_environment
+from benchmark_test_config import prepare_test_environment, tear_down_test_environment, init_lb
 
 def pytest_addoption(parser):
 	script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -73,6 +73,14 @@ def test_min_throughput_hw_local(test_config):
 @pytest.fixture(scope="package")
 def test_min_throughput_hw_remote(test_config):
 	return test_config["expected_throughput"]["hw"]["remote_vm2vm"]
+
+@pytest.fixture(scope="package")
+def test_min_throughput_sw_lb(test_config):
+	return test_config["expected_throughput"]["sw"]["lb"]
+
+@pytest.fixture(scope="package")
+def test_min_throughput_hw_lb(test_config):
+	return test_config["expected_throughput"]["hw"]["lb"]
 
 @pytest.fixture(scope="package", autouse=True)
 def benchmark_test_setup(request, test_config, test_mode):
