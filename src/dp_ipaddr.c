@@ -1,4 +1,5 @@
 #include "dp_ipaddr.h"
+#include <stdlib.h>
 #include "dp_conf.h"
 
 
