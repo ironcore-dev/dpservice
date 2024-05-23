@@ -17,7 +17,7 @@ def test_grpc_addinterface_bad_interface(prepare_ifaces, grpc_client):
 
 def test_grpc_getmachine_single(prepare_ifaces, grpc_client):
 	# Try to get a single existing interface(machine)
-	myspec = { "vni": VM2.vni, "device": VM2.pci, "primary_ipv4": VM2.ip, "primary_ipv6": VM2.ipv6, "underlay_route": VM2.ul_ipv6 }
+	myspec = { "vni": VM2.vni, "device": VM2.pci, "primary_ipv4": VM2.ip, "primary_ipv6": VM2.ipv6, "underlay_route": VM2.ul_ipv6, "metering": {} }
 	spec = grpc_client.getinterface(VM2.name)
 	assert spec == myspec, \
 		f"Invalid getmachine output for {VM2.name}"
@@ -33,7 +33,7 @@ def test_grpc_delinterface_not_found(prepare_ifaces, grpc_client):
 def test_grpc_add_list_delinterface(prepare_ifaces, grpc_client):
 	# Try to add a new machine, list it, delete it and confirm the deletion with list again
 	vm4_ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
-	myspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6 }
+	myspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6, "metering": {} }
 	specs = grpc_client.listinterfaces()
 	assert myspec in specs, \
 		f"Interface {VM4.name} not properly added"
