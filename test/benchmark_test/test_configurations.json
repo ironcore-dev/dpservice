@@ -12,9 +12,9 @@
 					"lb": 5
 				},
 				"hw": {
-					"local_vm2vm": 22,
-					"remote_vm2vm": 22,
-					"lb": 16
+					"local_vm2vm": 20,
+					"remote_vm2vm": 20,
+					"lb": 12
 				}
 			},
 			"hypervisors": [

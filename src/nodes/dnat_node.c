@@ -127,6 +127,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nf_info.icmp_err_ip_cksum;
 					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 				}
+				df->offload_state = DP_FLOW_NON_OFFLOAD;
 			} else {
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 			}
