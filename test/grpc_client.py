@@ -224,7 +224,7 @@ class GrpcClient:
 
 	@staticmethod
 	def wait_for_port():
-		for i in range(50):
+		for i in range(100):
 			if GrpcClient.port_open():
 				return
 			time.sleep(0.1)
