@@ -57,6 +57,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			    || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST
 			) {
 				df->nat_type = DP_CHG_UL_DST_IP;
+				cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
+				cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
+				df->offload_state = DP_FLOW_NON_OFFLOAD;
 				return LB_NEXT_PACKET_RELAY;
 			}
 			/* ICMP error types conntrack keys are built from original TCP/UDP header, so let them slip */
