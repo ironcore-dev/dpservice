@@ -9,5 +9,5 @@ option('enable_static_underlay_ip', type: 'boolean', value: false, description:
 option('compiler_suggestions', type: 'boolean', value: false, description:
        'Show various compiler suggestions (warnings)')
 option('build_dpservice_cli', type: 'boolean', value: false, description:
-       'Enable building dpservice-cli')
+       'Enable building of dpservice-cli golang gRPC client')
 

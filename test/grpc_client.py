@@ -26,30 +26,9 @@ class GrpcClient:
 
 	def __init__(self, build_path):
 		self.expectedError = 0
-		self.cmd = build_path + "/dpservice-cli"
+		self.cmd = build_path + "/cli/dpservice-cli/dpservice-cli"
 		if not os.access(self.cmd, os.X_OK):
-			self._downloadCli()
-
-	def _downloadCli(self):
-		print("dpservice-cli is missing, downloading from Github")
-		cli_version = None
-		script_path = os.path.dirname(os.path.abspath(__file__))
-		# Use the same version as the resulting docker images
-		with open(f"{script_path}/../Dockerfile") as f:
-			for line in f.readlines():
-				if "CLI_VERSION=" in line:
-					cli_version = line.split('=')[1].strip()
-					break
-		if not cli_version:
-			raise RuntimeError("no gRPC client - cannot determine a version to download")
-		cli_url = f"https://github.com/ironcore-dev/dpservice-cli/releases/download/v{cli_version}/github.com.ironcore-dev.dpservice-cli_{cli_version}_linux_amd64.tar.gz"
-		urllib.request.urlretrieve(cli_url, f"{self.cmd}.tgz")
-		with tarfile.open(f"{self.cmd}.tgz", mode="r:gz") as tarobj:
-			with tarobj.extractfile("github.com/ironcore-dev/dpservice-cli") as packed:
-				with open(self.cmd, "wb") as outfile:
-					outfile.write(packed.read());
-					os.chmod(self.cmd, 0o755)
-		os.remove(f"{self.cmd}.tgz")
+			raise RuntimeError("dpservice-cli is missing (see meson options: 'enable_tests' or 'build_dpservice_cli')")
 
 	def getClientVersion(self):
 		return subprocess.check_output([self.cmd, '-v']).decode('utf-8').strip()
