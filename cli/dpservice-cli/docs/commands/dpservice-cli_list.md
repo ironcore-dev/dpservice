@@ -28,7 +28,7 @@ dpservice-cli list [flags]
 
 ### SEE ALSO
 
-* [dpservice-cli](dpservice-cli.md)	 - 
+* [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli list firewallrules](dpservice-cli_list_firewallrules.md)	 - List firewall rules on interface
 * [dpservice-cli list interfaces](dpservice-cli_list_interfaces.md)	 - List all interfaces
 * [dpservice-cli list lbprefixes](dpservice-cli_list_lbprefixes.md)	 - List loadbalancer prefixes on interface.

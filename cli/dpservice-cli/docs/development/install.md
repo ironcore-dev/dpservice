@@ -1,6 +1,7 @@
 # Compile and install
 
-Go version 1.18 or newer is needed. \"make\" tool is also needed to utilize the Makefile.  
+Go version 1.18 or newer is needed. \"make\" tool is also needed to utilize the Makefile.
+
 To run the dpservice-cli client build the binary first and then use it with commands and flags:
 ```bash
 make build
