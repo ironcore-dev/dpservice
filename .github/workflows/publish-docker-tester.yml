@@ -97,7 +97,34 @@ jobs:
           else
             echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
           fi
+      # dpservice-bin tests
       - name: Run tests
         id: run_tests
         run: |
           docker run --rm --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/ironcore-dev/dpservice-tester:${{ env.DOCKER_IMAGE_SHA }}
+      - name: Docker cleanup
+        if: always()
+        run: |
+          for i in $(docker ps -q); do docker stop $i; done
+      # dpservice-go tests
+      - name: Run checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DOCKER_IMAGE_SHA }}
+      - name: Run dpservice
+        run: docker run --rm --entrypoint ./dp_service.py --privileged -p1337:1337 --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/ironcore-dev/dpservice-tester:${{ env.DOCKER_IMAGE_SHA }} --no-init &
+      - name: Wait for gRPC port
+        run: timeout 15 bash -c 'until echo > /dev/tcp/localhost/1337 2>/dev/null; do sleep 1; done' 2>/dev/null
+      - name: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go/dpservice-go/go.mod'
+      - name: Run dpservice-go tests
+        id: run_dpservice-go_tests
+        run: |
+          make test
+        working-directory: go/dpservice-go
+      - name: Docker cleanup
+        if: always()
+        run: |
+          for i in $(docker ps -q); do docker stop $i; done
