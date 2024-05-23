@@ -75,3 +75,12 @@ run: fmt lint ## Run a controller from your host.
 .PHONY: release
 release: fmt lint
 	goreleaser release --snapshot --rm-dist
+
+.PHONY: meson
+meson: build
+ifeq ($(MESON_OUTPUT),)
+	@echo "MESON_OUTPUT not set"
+	@false
+else
+	cp bin/dpservice-cli $(MESON_OUTPUT)
+endif

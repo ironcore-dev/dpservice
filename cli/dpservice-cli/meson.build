@@ -1,7 +1,9 @@
-if get_option('build_dpservice_cli')
-  custom_target('build_and_copy_dpservice_cli',
-    output: 'dpservice-cli',
-    command: [meson.source_root() / 'cli' / 'dpservice-cli' / 'build_dpservice_cli.sh'],
-    build_by_default: true
-  )
-endif
+make = find_program('make')
+find_program('go')
+
+custom_target('dpservice-cli',
+  output: 'dpservice-cli',
+  command: [ make, '-s', '-C', '@CURRENT_SOURCE_DIR@', 'meson', 'MESON_OUTPUT='+meson.build_root()/'@OUTPUT@' ],
+  build_by_default: true,
+  build_always: true,
+)
