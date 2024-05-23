@@ -28,7 +28,7 @@ dpservice-cli get [flags]
 
 ### SEE ALSO
 
-* [dpservice-cli](dpservice-cli.md)	 - 
+* [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli get firewallrule](dpservice-cli_get_firewallrule.md)	 - Get firewall rule
 * [dpservice-cli get init](dpservice-cli_get_init.md)	 - Indicates if the DPDK app has been initialized already
 * [dpservice-cli get interface](dpservice-cli_get_interface.md)	 - Get interface

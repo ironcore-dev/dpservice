@@ -10,12 +10,13 @@ sudo ./test/dp_service.py
 ```
 If there is error about number of hugepages run this as root:
 ```bash
-echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages 
+echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
 ```
 
 
 # Running dpservice-cli
-When you are running dpservice on the same VM you don't need to specify the address and defaults are used (localhost:1337).  
+When you are running dpservice on the same VM you don't need to specify the address and defaults are used (localhost:1337).
+
 If dpservice is running on different machine or you changed the default settings, use **--address \<string\>** flag:
 ```bash
 ./bin/dpservice-cli --address <IP:port> [command] [flags]

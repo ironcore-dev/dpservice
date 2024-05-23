@@ -29,7 +29,7 @@ dpservice-cli delete [flags]
 
 ### SEE ALSO
 
-* [dpservice-cli](dpservice-cli.md)	 - 
+* [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli delete firewallrule](dpservice-cli_delete_firewallrule.md)	 - Delete firewall rule from interface
 * [dpservice-cli delete interface](dpservice-cli_delete_interface.md)	 - Delete interface
 * [dpservice-cli delete lbprefix](dpservice-cli_delete_lbprefix.md)	 - Delete a loadbalancer prefix

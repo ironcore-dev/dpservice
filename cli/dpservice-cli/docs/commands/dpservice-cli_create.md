@@ -29,7 +29,7 @@ dpservice-cli create [flags]
 
 ### SEE ALSO
 
-* [dpservice-cli](dpservice-cli.md)	 - 
+* [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli create firewallrule](dpservice-cli_create_firewallrule.md)	 - Create a FirewallRule on interface
 * [dpservice-cli create interface](dpservice-cli_create_interface.md)	 - Create an interface
 * [dpservice-cli create lbprefix](dpservice-cli_create_lbprefix.md)	 - Create a loadbalancer prefix
