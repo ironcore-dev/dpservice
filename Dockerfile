@@ -4,7 +4,6 @@ FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
 ARG TARGETARCH
 ARG DPDK_VER=23.11
 ARG DPSERVICE_FEATURES=""
-ARG CLI_VERSION=0.3.0
 ARG EXPORTER_VERSION=0.1.8
 ENV OSARCH=${TARGETARCH}
 
@@ -45,6 +44,10 @@ libgrpc++1.51 \
 libgrpc++-dev \
 libpcap0.8-dev
 
+# Need at least Golang 1.20 which is not part of Debian-12 stable
+RUN curl -Ls https://golang.org/dl/go1.20.14.linux-${TARGETARCH}.tar.gz | tar xz -C /usr/local/
+ENV PATH="${PATH}:/usr/local/go/bin"
+
 # Download DPDK
 ADD http://fast.dpdk.org/rel/dpdk-${DPDK_VER}.tar.xz dpdk.tar.xz
 RUN tar -xJf dpdk.tar.xz
@@ -76,24 +79,25 @@ RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
 
 # Get companion binaries from other repos
-ADD https://github.com/ironcore-dev/dpservice-cli/releases/download/v${CLI_VERSION}/github.com.ironcore-dev.dpservice-cli_${CLI_VERSION}_linux_${OSARCH}.tar.gz dpservice-cli.tgz
 ADD https://github.com/ironcore-dev/prometheus-dpdk-exporter/releases/download/v${EXPORTER_VERSION}/prometheus-dpdk-exporter_${EXPORTER_VERSION}_linux_${OSARCH}.tar.gz exporter.tgz
-RUN tar -xzf dpservice-cli.tgz && tar -xzf exporter.tgz
+RUN tar -xzf exporter.tgz
 
 # Prepare tools and sources
 COPY meson.build meson.build
 COPY meson_options.txt meson_options.txt
-COPY src/ src/
-COPY include/ include/
-COPY test/ test/
 COPY hack/* hack/
 COPY proto/ proto/
+COPY go/ go/
+COPY cli/ cli/
 COPY tools/ tools/
+COPY test/ test/
+COPY src/ src/
+COPY include/ include/
 # Needed for version extraction by meson
 COPY .git/ .git/
 
-# Compile dpservice-bin itself
-RUN meson setup build $DPSERVICE_FEATURES && ninja -C build
+# Compile dpservice itself
+RUN meson setup build -Dbuild_dpservice_cli=true $DPSERVICE_FEATURES && ninja -C build
 
 
 # Extended build image for test-image
@@ -132,9 +136,9 @@ python3-scapy \
 WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
 COPY --from=testbuilder /workspace/build/src/dpservice-bin ./build/src/dpservice-bin
-COPY --from=testbuilder /workspace/github.com/ironcore-dev/dpservice-cli ./build
+COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./build/cli/dpservice-cli/dpservice-cli
 COPY --from=testbuilder /workspace/xtratest_build/src/dpservice-bin ./xtratest_build/src/dpservice-bin
-COPY --from=testbuilder /workspace/github.com/ironcore-dev/dpservice-cli ./xtratest_build
+COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./xtratest_build/cli/dpservice-cli/dpservice-cli
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
 
@@ -165,7 +169,7 @@ WORKDIR /
 COPY --from=builder \
 /workspace/build/src/dpservice-bin \
 /workspace/build/tools/dump/dpservice-dump \
-/workspace/github.com/ironcore-dev/dpservice-cli \
+/workspace/build/cli/dpservice-cli/dpservice-cli \
 /workspace/prometheus-dpdk-exporter \
 /workspace/hack/prepare.sh \
 /usr/local/bin/
