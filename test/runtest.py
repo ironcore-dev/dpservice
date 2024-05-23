@@ -71,7 +71,15 @@ def testDpService(build_path, print_header):
 		return
 
 	# Run tests
-	print("Testing using", queryDpService(dpservice, '--version'), "and", grpc_client.getClientVersion())
+	bin_ver = queryDpService(dpservice, '--version')
+	cli_ver = grpc_client.getClientVersion()
+	assert bin_ver.startswith('DP Service version '), \
+		"Invalid dpservice-bin version string"
+	assert cli_ver.startswith('dpservice-cli version '), \
+		"Invalid dpservice-cli version string"
+	assert bin_ver[19:] == cli_ver[22:], \
+		"Version mismatch between dpservice-bin and dpservice-cli"
+	print(f"Testing using {bin_ver}")
 
 	# Improve memory allocation randomness
 	env = dict(os.environ)
