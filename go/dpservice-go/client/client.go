@@ -9,9 +9,9 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/ironcore-dev/dpservice-go/api"
-	"github.com/ironcore-dev/dpservice-go/errors"
-	dpdkproto "github.com/ironcore-dev/dpservice-go/proto"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/errors"
+	dpdkproto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 )
 
 type Client interface {

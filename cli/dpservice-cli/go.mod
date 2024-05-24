@@ -1,11 +1,11 @@
-module github.com/ironcore-dev/dpservice-cli
+module github.com/ironcore-dev/dpservice/cli/dpservice-cli
 
 go 1.21
 
 require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/addlicense v1.1.1
-	github.com/ironcore-dev/dpservice-go v0.3.2
+	github.com/ironcore-dev/dpservice/go/dpservice-go v0.3.2
 	github.com/jedib0t/go-pretty/v6 v6.5.3
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.1
@@ -37,4 +37,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/ironcore-dev/dpservice-go => ../../go/dpservice-go
+replace github.com/ironcore-dev/dpservice/go/dpservice-go => ../../go/dpservice-go

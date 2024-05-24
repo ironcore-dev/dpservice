@@ -7,9 +7,9 @@ import (
 	"context"
 	"net/netip"
 
-	"github.com/ironcore-dev/dpservice-go/api"
-	"github.com/ironcore-dev/dpservice-go/errors"
-	dpdkproto "github.com/ironcore-dev/dpservice-go/proto"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/errors"
+	dpdkproto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	proto "github.com/ironcore-dev/dpservice-go/proto"
+	proto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 )
 
 func ProtoLoadBalancerToLoadBalancer(dpdkLB *proto.GetLoadBalancerResponse, lbID string) (*LoadBalancer, error) {

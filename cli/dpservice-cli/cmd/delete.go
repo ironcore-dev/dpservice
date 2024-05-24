@@ -10,10 +10,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/ironcore-dev/dpservice-cli/dpdk/client/dynamic"
-	"github.com/ironcore-dev/dpservice-cli/dpdk/runtime"
-	"github.com/ironcore-dev/dpservice-cli/sources"
-	"github.com/ironcore-dev/dpservice-go/errors"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/dpdk/client/dynamic"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/dpdk/runtime"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/sources"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/errors"
 	"github.com/spf13/cobra"
 )
 

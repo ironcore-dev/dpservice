@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ironcore-dev/dpservice-cli/cmd"
-	"github.com/ironcore-dev/dpservice-cli/util"
-	"github.com/ironcore-dev/dpservice-go/errors"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/cmd"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/util"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/errors"
 )
 
 var version = "unknown"
