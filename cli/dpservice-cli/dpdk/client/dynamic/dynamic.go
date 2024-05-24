@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/ironcore-dev/dpservice-go/api"
-	structured "github.com/ironcore-dev/dpservice-go/client"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
+	structured "github.com/ironcore-dev/dpservice/go/dpservice-go/client"
 )
 
 type ObjectKey interface {

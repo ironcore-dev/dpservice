@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	dpdkproto "github.com/ironcore-dev/dpservice-go/proto"
+	dpdkproto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 	//+kubebuilder:scaffold:imports
 )
 

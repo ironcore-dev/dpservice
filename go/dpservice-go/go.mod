@@ -1,4 +1,4 @@
-module github.com/ironcore-dev/dpservice-go
+module github.com/ironcore-dev/dpservice/go/dpservice-go
 
 go 1.21
 

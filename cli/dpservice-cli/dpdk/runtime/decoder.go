@@ -9,7 +9,7 @@ import (
 	"io"
 
 	yaml2 "github.com/ghodss/yaml"
-	dpsvcio "github.com/ironcore-dev/dpservice-cli/io"
+	dpsvcio "github.com/ironcore-dev/dpservice/cli/dpservice-cli/io"
 	"gopkg.in/yaml.v2"
 )
 

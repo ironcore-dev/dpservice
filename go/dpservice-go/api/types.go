@@ -8,7 +8,7 @@ import (
 	"net/netip"
 	"reflect"
 
-	proto "github.com/ironcore-dev/dpservice-go/proto"
+	proto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 )
 
 type Object interface {
