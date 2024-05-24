@@ -1,5 +1,5 @@
 import sys
-import os
+import os, subprocess
 import json
 
 from remote_machine_management import hypervisor_machines, vm_machines, RemoteMachine, LBConfig, add_remote_machine, cleanup_remote_machine
@@ -26,10 +26,13 @@ def init_machines(env_config, ssh_key_file):
 		print(f"Failed to start machine due to {e}")
 		raise e
 
-def init_dpservice(env_config, is_dev, docker_image, build_path, is_offload = False):
+def init_dpservice(env_config, stage, docker_image, build_path, is_offload = False, docker_file=""):
 	try:
 		for hypervisor_info in env_config['hypervisors']:
-			if is_dev and hypervisor_info["role"] == "local":
+			check_dpservice_cli(hypervisor_info["machine_name"], build_path)
+			if stage == "deploy":
+				upload_and_import_docker_image(hypervisor_info["machine_name"], docker_image, build_path, docker_file)
+			if stage == "dev" and hypervisor_info["role"] == "local":
 				binary_path = os.path.abspath(f'{build_path}/src/dpservice-bin')
 				remote_machine_op_dpservice_start(hypervisor_info["machine_name"], offload=is_offload, is_docker=False, path_to_bin= binary_path)
 			else:
@@ -41,9 +44,12 @@ def init_dpservice(env_config, is_dev, docker_image, build_path, is_offload = Fa
 		print(f"Failed to start dpservice due to {e} ")
 		raise e
 
-def init_vms(env_config):
+def init_vms(env_config, reboot_vm):
 	remote_machine_op_dpservice_add_vms(env_config)
 	
+	if not reboot_vm:
+		return
+
 	script_path_to_upload = os.path.abspath('../../hack/connectivity_test/flow_test.py')
 	script_path_to_land = '/tmp/flow_test.py'
 	
@@ -83,13 +89,11 @@ def init_lb(env_config):
 
 	return config
 
-
 def tear_down_lb(lb_config):
 	for node in lb_config.get_nodes():
 		for vm in lb_config.get_vms():
 			vm_pfx_underly_ip = lb_config.get_vm_lb_pfx(vm)
 			remote_machine_op_dpservice_delete_lbtarget(node, vm_pfx_underly_ip, lb_config.get_id())
-	
 
 	for vm in lb_config.get_vms():
 		parent_machine = get_remote_machine(vm).get_parent_machine_name()
@@ -99,18 +103,66 @@ def tear_down_lb(lb_config):
 		remote_machine_op_dpservice_delete_lb(node, lb_config.get_id())
 
 
-def prepare_test_environment(is_offload, is_dev, docker_image_url, config, build_path):
+def check_dpservice_cli(machine_name, build_dir):
+	downloaded_cli_path = f"{build_dir}/dpservice-cli"
+	target_cli_path = "/tmp/dpservice-cli"
+	try:
+		if not remote_machine_op_file_exists(machine_name, target_cli_path):
+			remote_machine_op_upload(machine_name, downloaded_cli_path, target_cli_path)
+			remote_machine_op_make_runnable(machine_name, target_cli_path)
+	except Exception as e:
+		print(f"Failed to prepare dpservice cli on hypervisors due to {e}")
+
+
+def prepare_test_environment(is_offload, stage, docker_image_url, reboot_vm, config, build_path):
 	key_file = os.path.expanduser(config['key_file'])
+	docker_image_name = "dpservice_tester"
+	docker_image_file = "dpservice_image.tar"
 	if not key_file:
 		raise RuntimeError(f"Failed to get ssh key file with name {config['key_file']}")
 
 	try:
 		init_machines(config, key_file)
-		init_dpservice(config, is_dev, docker_image_url, build_path, is_offload)
-		init_vms(config)
+		if stage == "deploy":
+			prepare_local_docker_image(docker_image_name, docker_image_file, build_path)
+			init_dpservice(config, stage, docker_image_name, build_path, is_offload, docker_image_file)
+		else:
+			init_dpservice(config, stage, docker_image_url, build_path, is_offload)
+		init_vms(config, reboot_vm)
 	except Exception as e:
 		tear_down_test_environment()
 		raise RuntimeError(f"failed to prepare test environment due to: {e}")
+
+
+def prepare_local_docker_image(image_name, output_file, build_dir):
+	main_dir = f"{script_dir}/../../"
+	os.chdir(main_dir)
+
+	# Build the Docker image
+	build_command = ['sudo', 'docker', 'build', '-t', image_name, '.']
+	subprocess.run(build_command, check=True)
+
+	# Export the Docker image to a tar file
+	save_command = ['sudo', 'docker', 'save', '-o', f"{build_dir}/{output_file}", image_name]
+	subprocess.run(save_command, check=True)
+
+	mode_change_command = ['sudo', 'chmod', 'a+r', f"{build_dir}/{output_file}"]
+	subprocess.run(mode_change_command, check=True)
+
+	print(f"Image {image_name} built and exported to {output_file}")
+	os.chdir(script_dir)
+
+
+def upload_and_import_docker_image(machine_name, image_name, build_dir, output_file):
+	generated_image_file = f"{build_dir}/{output_file}"
+	target_image_file = f"/tmp/{output_file}"
+	try:
+		remote_machine_op_docker_rm_image(machine_name, image_name)
+		remote_machine_op_upload(machine_name, generated_image_file, target_image_file)
+		remote_machine_op_docker_load_image(machine_name, target_image_file)
+	except Exception as e:
+		print(f"Failed to prepare dpservice cli on hypervisors due to {e}")
+
 
 def tear_down_test_environment():
 	try:

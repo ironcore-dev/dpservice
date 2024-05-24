@@ -12,10 +12,13 @@ def pytest_addoption(parser):
 		"--mode", action="store", default = "non-offload", choices=['offload', 'non-offload'], help="Benchmarking tests in the non-offloading/offloading mode."
 	)
 	parser.addoption(
-		"--stage", action="store", default = "dev", choices=['dev', 'cicd'], help="Benchmarking tests to assist local development (local development machine will not run docker container). "
+		"--stage", action="store", default = "dev", choices=['dev', 'deploy', 'cicd'], help="Benchmarking tests to assist local development (local development machine will not run docker container). "
 	)
 	parser.addoption(
 		"--docker-image", action="store", help="Container image to be deployed to almost all hypervsiors"
+	)
+	parser.addoption(
+		"--reboot", action = "store_true", help="Reboot VMs to obtain new configurations such as IPs"
 	)
 	parser.addoption(
 		"--env-config-file", action="store", default="./test_configurations.json", help="Specify the file containing setup information"
@@ -86,13 +89,14 @@ def test_min_throughput_hw_lb(test_config):
 def benchmark_test_setup(request, test_config, test_mode):
 	config = request.config
 	
-	is_dev = True if config.getoption("--stage") == "dev" else False
+	stage = config.getoption("--stage")
 	docker_iamge_url = config.getoption("--docker-image")
 	build_path = config.getoption("--dpservice-bin-path")
+	reboot_vm = config.getoption("--reboot")
 
 	signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame))
 	try:
-		prepare_test_environment(test_mode, is_dev, docker_iamge_url, test_config, build_path)
+		prepare_test_environment(test_mode, stage, docker_iamge_url, reboot_vm, test_config, build_path)
 	except Exception as e:
 		print(f"Failed to prepare test environment due to: {e}")
 
