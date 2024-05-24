@@ -3,7 +3,7 @@
 
 package runtime
 
-import "github.com/ironcore-dev/dpservice-go/api"
+import "github.com/ironcore-dev/dpservice/go/dpservice-go/api"
 
 var DefaultScheme = NewScheme()
 

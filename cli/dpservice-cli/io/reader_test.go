@@ -6,7 +6,7 @@ package io_test
 import (
 	"bytes"
 
-	. "github.com/ironcore-dev/dpservice-cli/io"
+	. "github.com/ironcore-dev/dpservice/cli/dpservice-cli/io"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

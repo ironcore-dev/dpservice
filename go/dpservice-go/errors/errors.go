@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	dpdkproto "github.com/ironcore-dev/dpservice-go/proto"
+	dpdkproto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 )
 
 const (

@@ -2,7 +2,7 @@
 
 To communicate with the `dpservice-bin` process, you need to use GRPC (running on localhost at default port 1337).
 
-There is a golang command-line client [dpservice-cli](https://github.com/ironcore-dev/dpservice-cli/), with full [command-line documentation](https://github.com/ironcore-dev/dpservice-cli/tree/osc-main/docs/commands#dpservice-cli-commands).
+There is a golang command-line client [dpservice-cli](https://github.com/ironcore-dev/dpservice/cli/dpservice-cli/), with full [command-line documentation](https://github.com/ironcore-dev/dpservice/cli/dpservice-cli/tree/osc-main/docs/commands#dpservice-cli-commands).
 
 
 ## Sample commands for testing

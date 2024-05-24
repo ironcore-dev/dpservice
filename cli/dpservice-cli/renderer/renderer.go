@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
-	"github.com/ironcore-dev/dpservice-go/api"
-	dpdkproto "github.com/ironcore-dev/dpservice-go/proto"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
+	dpdkproto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 

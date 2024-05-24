@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ironcore-dev/dpservice-cli/util"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

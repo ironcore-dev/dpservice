@@ -9,10 +9,10 @@ import (
 	"net/netip"
 	"os"
 
-	"github.com/ironcore-dev/dpservice-cli/flag"
-	"github.com/ironcore-dev/dpservice-cli/util"
-	"github.com/ironcore-dev/dpservice-go/api"
-	dpdkproto "github.com/ironcore-dev/dpservice-go/proto"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/flag"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/util"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
+	dpdkproto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

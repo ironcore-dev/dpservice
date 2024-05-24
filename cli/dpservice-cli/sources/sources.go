@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ironcore-dev/dpservice-cli/dpdk/runtime"
+	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/dpdk/runtime"
 )
 
 type Iterator struct {
