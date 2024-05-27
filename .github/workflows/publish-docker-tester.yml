@@ -110,7 +110,7 @@ jobs:
       - name: Run checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ env.DOCKER_IMAGE_SHA }}
       - name: Run dpservice
         run: docker run --rm --entrypoint ./dp_service.py --privileged -p1337:1337 --mount type=bind,source=/dev/hugepages,target=/dev/hugepages ghcr.io/ironcore-dev/dpservice-tester:${{ env.DOCKER_IMAGE_SHA }} --no-init &
       - name: Wait for gRPC port
