@@ -200,6 +200,28 @@ type LBPort struct {
 	Port     uint32 `json:"port"`
 }
 
+type LoadBalancerList struct {
+	TypeMeta             `json:",inline"`
+	LoadBalancerListMeta `json:"metadata"`
+	Status               Status         `json:"status"`
+	Items                []LoadBalancer `json:"items"`
+}
+
+type LoadBalancerListMeta struct {
+}
+
+func (l *LoadBalancerList) GetItems() []Object {
+	res := make([]Object, len(l.Items))
+	for i := range l.Items {
+		res[i] = &l.Items[i]
+	}
+	return res
+}
+
+func (m *LoadBalancerList) GetStatus() Status {
+	return m.Status
+}
+
 type LoadBalancerTarget struct {
 	TypeMeta               `json:",inline"`
 	LoadBalancerTargetMeta `json:"metadata"`
@@ -633,6 +655,7 @@ var (
 	InterfaceKind              = reflect.TypeOf(Interface{}).Name()
 	InterfaceListKind          = reflect.TypeOf(InterfaceList{}).Name()
 	LoadBalancerKind           = reflect.TypeOf(LoadBalancer{}).Name()
+	LoadBalancerListKind       = reflect.TypeOf(LoadBalancerList{}).Name()
 	LoadBalancerTargetKind     = reflect.TypeOf(LoadBalancerTarget{}).Name()
 	LoadBalancerTargetListKind = reflect.TypeOf(LoadBalancerTargetList{}).Name()
 	LoadBalancerPrefixKind     = reflect.TypeOf(LoadBalancerPrefix{}).Name()

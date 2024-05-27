@@ -16,6 +16,7 @@ import (
 
 type Client interface {
 	GetLoadBalancer(ctx context.Context, id string, ignoredErrors ...[]uint32) (*api.LoadBalancer, error)
+	ListLoadBalancers(ctx context.Context, ignoredErrors ...[]uint32) (*api.LoadBalancerList, error)
 	CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, ignoredErrors ...[]uint32) (*api.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, id string, ignoredErrors ...[]uint32) (*api.LoadBalancer, error)
 
@@ -93,7 +94,30 @@ func (c *client) GetLoadBalancer(ctx context.Context, id string, ignoredErrors .
 	if res.GetStatus().GetCode() != 0 {
 		return retLoadBalancer, errors.GetError(res.Status, ignoredErrors)
 	}
-	return api.ProtoLoadBalancerToLoadBalancer(res, id)
+	return api.ProtoLoadBalancerRequestToLoadBalancer(res, id)
+}
+
+func (c *client) ListLoadBalancers(ctx context.Context, ignoredErrors ...[]uint32) (*api.LoadBalancerList, error) {
+	res, err := c.DPDKironcoreClient.ListLoadBalancers(ctx, &dpdkproto.ListLoadBalancersRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	lbs := make([]api.LoadBalancer, len(res.GetLoadbalancers()))
+	for i, dpdkLb := range res.GetLoadbalancers() {
+		lb, err := api.ProtoLoadBalancerToLoadBalancer(dpdkLb)
+		if err != nil {
+			return nil, err
+		}
+
+		lbs[i] = *lb
+	}
+
+	return &api.LoadBalancerList{
+		TypeMeta: api.TypeMeta{Kind: api.LoadBalancerListKind},
+		Items:    lbs,
+		Status:   api.ProtoStatusToStatus(res.Status),
+	}, nil
 }
 
 func (c *client) CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, ignoredErrors ...[]uint32) (*api.LoadBalancer, error) {

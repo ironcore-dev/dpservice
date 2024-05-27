@@ -12,7 +12,7 @@ import (
 	proto "github.com/ironcore-dev/dpservice/go/dpservice-go/proto"
 )
 
-func ProtoLoadBalancerToLoadBalancer(dpdkLB *proto.GetLoadBalancerResponse, lbID string) (*LoadBalancer, error) {
+func ProtoLoadBalancerRequestToLoadBalancer(dpdkLB *proto.GetLoadBalancerResponse, lbID string) (*LoadBalancer, error) {
 
 	var underlayRoute netip.Addr
 	if underlayRouteString := string(dpdkLB.GetUnderlayRoute()); underlayRouteString != "" {
@@ -54,6 +54,48 @@ func ProtoLoadBalancerToLoadBalancer(dpdkLB *proto.GetLoadBalancerResponse, lbID
 		Status: Status{
 			Code:    dpdkLB.Status.Code,
 			Message: dpdkLB.Status.Message,
+		},
+	}, nil
+}
+
+func ProtoLoadBalancerToLoadBalancer(dpdkLB *proto.Loadbalancer) (*LoadBalancer, error) {
+
+	var underlayRoute netip.Addr
+	if underlayRouteString := string(dpdkLB.GetUnderlayRoute()); underlayRouteString != "" {
+		var err error
+		underlayRoute, err = netip.ParseAddr(string(dpdkLB.GetUnderlayRoute()))
+		if err != nil {
+			return nil, fmt.Errorf("error parsing underlay ip: %w", err)
+		}
+	}
+	var lbip netip.Addr
+	if lbipString := string(dpdkLB.GetIp().GetAddress()); lbipString != "" {
+		var err error
+		lbip, err = netip.ParseAddr(string(dpdkLB.GetIp().GetAddress()))
+		if err != nil {
+			return nil, fmt.Errorf("error parsing lb ip: %w", err)
+		}
+	}
+	var lbports = make([]LBPort, 0, len(dpdkLB.GetPorts()))
+	var p LBPort
+	for _, lbport := range dpdkLB.GetPorts() {
+		p.Protocol = uint32(lbport.Protocol)
+		p.Port = lbport.Port
+		lbports = append(lbports, p)
+	}
+
+	return &LoadBalancer{
+		TypeMeta: TypeMeta{
+			Kind: LoadBalancerKind,
+		},
+		LoadBalancerMeta: LoadBalancerMeta{
+			ID: string(dpdkLB.Id),
+		},
+		Spec: LoadBalancerSpec{
+			VNI:           dpdkLB.Vni,
+			LbVipIP:       &lbip,
+			Lbports:       lbports,
+			UnderlayRoute: &underlayRoute,
 		},
 	}, nil
 }

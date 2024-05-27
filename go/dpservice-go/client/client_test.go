@@ -607,6 +607,15 @@ var _ = Describe("loadbalancer related", func() {
 			Expect(res.Spec.Lbports[0].Port).To(Equal(uint32(443)))
 		})
 
+		It("should list successfully", func() {
+			res, err := dpdkClient.ListLoadBalancers(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(len(res.Items)).To(Equal(1))
+			Expect(res.Items[0].Spec.LbVipIP.String()).To(Equal("10.20.30.40"))
+			Expect(res.Items[0].Spec.Lbports[0].Port).To(Equal(uint32(443)))
+		})
+
 		It("should delete successfully", func() {
 			res, err = dpdkClient.DeleteLoadBalancer(ctx, lb.ID)
 			Expect(err).ToNot(HaveOccurred())
