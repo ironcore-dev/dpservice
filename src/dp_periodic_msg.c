@@ -156,7 +156,6 @@ void trigger_nd_unsol_adv(void)
 	icmp6_hdr->icmp6_solicited = 0;
 	icmp6_hdr->icmp6_override = 1;
 	icmp6_hdr->icmp6_router = 1;
-	icmp6_hdr->icmp6_hop_limit = 255;
 
 	DP_ARRAY_FROM_IPV6(ns_msg->target, gw_ip);
 	pkt_size = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) +
