@@ -81,6 +81,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
 		req_icmp6_hdr->icmp6_solicited = 1;
 		req_icmp6_hdr->icmp6_override = 1;
+		req_icmp6_hdr->icmp6_router = 1;
 		// set target lladdr option and MAC
 		nd_msg->opt[0] = ND_OPT_TARGET_LL_ADDR;
 		nd_msg->opt[1] = ND_OPT_LEN_OCTET_1;
