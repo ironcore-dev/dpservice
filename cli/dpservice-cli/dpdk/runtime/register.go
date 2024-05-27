@@ -17,6 +17,7 @@ func init() {
 		&api.RouteList{},
 		&api.VirtualIP{},
 		&api.LoadBalancer{},
+		&api.LoadBalancerList{},
 		&api.LoadBalancerTarget{},
 		&api.LoadBalancerPrefix{},
 		&api.LoadBalancerTargetList{},

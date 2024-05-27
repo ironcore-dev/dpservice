@@ -264,7 +264,7 @@ var (
 	PrefixAliases             = []string{"prefix", "prefixes", "prfx", "prfxs"}
 	RouteAliases              = []string{"route", "routes", "rt", "rts"}
 	VirtualIPAliases          = []string{"virtualip", "virtualips", "vip", "vips"}
-	LoadBalancerAliases       = []string{"loadbalancer", "loadbalancers", "loadbalancer", "lbs", "lb"}
+	LoadBalancerAliases       = []string{"loadbalancer", "loadbalancers", "lbs", "lb"}
 	LoadBalancerPrefixAliases = []string{"loadbalancer-prefix", "loadbalancer-prefixes", "lbprefix", "lbprfx", "lbprfxs"}
 	LoadBalancerTargetAliases = []string{"loadbalancer-target", "loadbalancer-targets", "lbtrgt", "lbtrgts", "lbtarget"}
 	NatAliases                = []string{"nat", "translation"}

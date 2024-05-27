@@ -164,7 +164,9 @@ var DefaultTableConverter = defaultTableConverter{}
 func (t defaultTableConverter) ConvertToTable(v any) (*TableData, error) {
 	switch obj := v.(type) {
 	case *api.LoadBalancer:
-		return t.loadBalancerTable(*obj)
+		return t.loadBalancerTable([]api.LoadBalancer{*obj})
+	case *api.LoadBalancerList:
+		return t.loadBalancerTable(obj.Items)
 	case *api.LoadBalancerTarget:
 		return t.loadBalancerTargetTable([]api.LoadBalancerTarget{*obj})
 	case *api.LoadBalancerTargetList:
@@ -210,17 +212,18 @@ func (t defaultTableConverter) ConvertToTable(v any) (*TableData, error) {
 	}
 }
 
-func (t defaultTableConverter) loadBalancerTable(lb api.LoadBalancer) (*TableData, error) {
+func (t defaultTableConverter) loadBalancerTable(lbs []api.LoadBalancer) (*TableData, error) {
 	headers := []any{"ID", "VNI", "LbVipIP", "Lbports", "UnderlayRoute"}
 
-	columns := make([][]any, 1)
-
-	var ports = make([]string, 0, len(lb.Spec.Lbports))
-	for _, port := range lb.Spec.Lbports {
-		p := dpdkproto.Protocol_name[int32(port.Protocol)] + "/" + strconv.Itoa(int(port.Port))
-		ports = append(ports, p)
+	columns := make([][]any, len(lbs))
+	for i, lb := range lbs {
+		var ports = make([]string, 0, len(lb.Spec.Lbports))
+		for _, port := range lb.Spec.Lbports {
+			p := dpdkproto.Protocol_name[int32(port.Protocol)] + "/" + strconv.Itoa(int(port.Port))
+			ports = append(ports, p)
+		}
+		columns[i] = []any{lb.ID, lb.Spec.VNI, lb.Spec.LbVipIP, ports, lb.Spec.UnderlayRoute}
 	}
-	columns[0] = []any{lb.ID, lb.Spec.VNI, lb.Spec.LbVipIP, ports, lb.Spec.UnderlayRoute}
 
 	return &TableData{
 		Headers: headers,

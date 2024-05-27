@@ -51,11 +51,6 @@ func (o *GetLoadBalancerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *GetLoadBalancerOptions) MarkRequiredFlags(cmd *cobra.Command) error {
-	for _, name := range []string{"id"} {
-		if err := cmd.MarkFlagRequired(name); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -71,10 +66,19 @@ func RunGetLoadBalancer(
 	}
 	defer DpdkClose(cleanup)
 
-	lb, err := client.GetLoadBalancer(ctx, opts.ID)
-	if err != nil && lb.Status.Code == 0 {
-		return fmt.Errorf("error getting loadbalancer: %w", err)
-	}
+	if opts.ID == "" {
+		return RunListLoadBalancers(
+			ctx,
+			dpdkClientFactory,
+			rendererFactory,
+			ListLoadBalancersOptions{},
+		)
+	} else {
+		lb, err := client.GetLoadBalancer(ctx, opts.ID)
+		if err != nil && lb.Status.Code == 0 {
+			return fmt.Errorf("error getting loadbalancer: %w", err)
+		}
 
-	return rendererFactory.RenderObject("", os.Stdout, lb)
+		return rendererFactory.RenderObject("", os.Stdout, lb)
+	}
 }
