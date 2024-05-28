@@ -30,13 +30,11 @@ def init_dpservice(env_config, stage, docker_image, build_path, is_offload = Fal
 	try:
 		for hypervisor_info in env_config['hypervisors']:
 			check_dpservice_cli(hypervisor_info["machine_name"], build_path)
-			if stage == "deploy":
+			
+			if stage == "dev":
 				upload_and_import_docker_image(hypervisor_info["machine_name"], docker_image, build_path, docker_file)
-			if stage == "dev" and hypervisor_info["role"] == "local":
-				binary_path = os.path.abspath(f'{build_path}/src/dpservice-bin')
-				remote_machine_op_dpservice_start(hypervisor_info["machine_name"], offload=is_offload, is_docker=False, path_to_bin= binary_path)
-			else:
-				remote_machine_op_dpservice_start(hypervisor_info["machine_name"], offload=is_offload, is_docker=True, docker_image_url=docker_image)
+		
+			remote_machine_op_dpservice_start(hypervisor_info["machine_name"], offload=is_offload, is_docker=True, docker_image_url=docker_image)
 			machine_name = hypervisor_info["machine_name"]
 			print(f"init on machine {machine_name}")
 			remote_machine_op_dpservice_init(hypervisor_info["machine_name"])
@@ -46,9 +44,6 @@ def init_dpservice(env_config, stage, docker_image, build_path, is_offload = Fal
 
 def init_vms(env_config, reboot_vm):
 	remote_machine_op_dpservice_add_vms(env_config)
-	
-	if not reboot_vm:
-		return
 
 	script_path_to_upload = os.path.abspath('../../hack/connectivity_test/flow_test.py')
 	script_path_to_land = '/tmp/flow_test.py'
@@ -56,8 +51,10 @@ def init_vms(env_config, reboot_vm):
 	try:
 		for hypervisor_info in env_config['hypervisors']:
 			for vm_info in hypervisor_info['vms']:
-				remote_machine_op_reboot(vm_info['machine_name'])
+				if reboot_vm:
+					remote_machine_op_reboot(vm_info['machine_name'])
 				remote_machine_op_vm_config_rm_default_route(vm_info['machine_name'])
+				remote_machine_op_terminate_processes(vm_info['machine_name'])
 				remote_machine_op_upload(vm_info['machine_name'], script_path_to_upload, script_path_to_land)
 				remote_machine_op_make_runnable(vm_info['machine_name'], script_path_to_land)
 	except Exception as e:
@@ -104,10 +101,11 @@ def tear_down_lb(lb_config):
 
 
 def check_dpservice_cli(machine_name, build_dir):
-	downloaded_cli_path = f"{build_dir}/dpservice-cli"
+	downloaded_cli_path = f"{build_dir}/cli/dpservice-cli/dpservice-cli"
 	target_cli_path = "/tmp/dpservice-cli"
 	try:
 		if not remote_machine_op_file_exists(machine_name, target_cli_path):
+			print("need to upload dpservice-cli")
 			remote_machine_op_upload(machine_name, downloaded_cli_path, target_cli_path)
 			remote_machine_op_make_runnable(machine_name, target_cli_path)
 	except Exception as e:
@@ -123,7 +121,7 @@ def prepare_test_environment(is_offload, stage, docker_image_url, reboot_vm, con
 
 	try:
 		init_machines(config, key_file)
-		if stage == "deploy":
+		if stage == "dev":
 			prepare_local_docker_image(docker_image_name, docker_image_file, build_path)
 			init_dpservice(config, stage, docker_image_name, build_path, is_offload, docker_image_file)
 		else:

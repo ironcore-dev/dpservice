@@ -29,7 +29,7 @@ def remote_machine_op_file_exists(machine_name, path):
 			{"command": f'test -e {path} && echo "exists" || echo "not exists"'}
 		]
 		result = machine.exec_task(task)
-		return result == 'exists'
+		return result == "exists"
 	except Exception as e:
 		print(f"Failed to test {path} on machine {machine_name} due to {e}")
 

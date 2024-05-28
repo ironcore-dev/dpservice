@@ -1,9 +1,9 @@
 import paramiko
 import time
+from helper import remove_last_empty_line
 
 hypervisor_machines = []
 vm_machines = []
-
 
 class SSHManager:
 	def __init__(self, host_address, port, user_name, key_file, proxy=None, max_retries=10):
@@ -295,6 +295,7 @@ class RemoteMachine:
 	def exec_task(self,tasks):
 		task = tasks[0]
 		output = self.ssh_manager.run_command(task['command'], parameters = task.get('parameters', ''), background=task.get('background', False), sudo=task.get('sudo', False), delay=task.get('delay',0), command_output_name=task.get('cmd_output_name', ''))
+		output = remove_last_empty_line(output)
 		print(output)
 		return output
 	
