@@ -12,7 +12,7 @@ def pytest_addoption(parser):
 		"--mode", action="store", default = "non-offload", choices=['offload', 'non-offload'], help="Benchmarking tests in the non-offloading/offloading mode."
 	)
 	parser.addoption(
-		"--stage", action="store", default = "dev", choices=['dev', 'deploy', 'cicd'], help="Benchmarking tests to assist local development (local development machine will not run docker container). "
+		"--stage", action="store", default = "dev", choices=['dev', 'cicd'], help="Benchmarking tests to assist local development (local development machine will not run docker container). "
 	)
 	parser.addoption(
 		"--docker-image", action="store", help="Container image to be deployed to almost all hypervsiors"
@@ -27,7 +27,7 @@ def pytest_addoption(parser):
 		"--env-config-name", action="store", default="regular_setup", help="Specify the name of environment configuration that fits to hardware and VM setup. "
 	)
 	parser.addoption(
-		"--dpservice-bin-path", action="store", default=f"{script_dir}/../../build", help="Path to the root build directory"
+		"--dpservice-build-path", action="store", default=f"{script_dir}/../../build", help="Path to the root build directory"
 	)
 
 
@@ -91,7 +91,7 @@ def benchmark_test_setup(request, test_config, test_mode):
 	
 	stage = config.getoption("--stage")
 	docker_iamge_url = config.getoption("--docker-image")
-	build_path = config.getoption("--dpservice-bin-path")
+	build_path = config.getoption("--dpservice-build-path")
 	reboot_vm = config.getoption("--reboot")
 
 	signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame))

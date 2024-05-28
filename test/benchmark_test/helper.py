@@ -1,5 +1,12 @@
 import re
 
+# string processing functions
+def remove_last_empty_line(output):
+	lines = output.splitlines()
+	if lines and lines[-1] == '':
+		lines.pop()
+	return '\n'.join(lines)
+
 # result checking functions
 def result_checking_ping_failed(result, query):
 	return query in result
