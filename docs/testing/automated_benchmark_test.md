@@ -9,8 +9,8 @@ This benchmarking testing suite is built upon and utilises 1) dpservice-cli to c
 ./runtest.py --mode both --stage dev -v
 ```
 
-# Required hypervisor and VM setup 
-To successfully run these automated benchmarking tests, currently, 2 hypervisors and 3 VMs need to be prepared beforehand, especially putting the ssh key of the machine executing the benchmarking tests into the above mentioned hypervisors and VMs. 
+# Required hypervisor and VM setup
+To successfully run these automated benchmarking tests, currently, 2 hypervisors and 3 VMs need to be prepared beforehand, especially putting the ssh key of the machine executing the benchmarking tests into the above mentioned hypervisors and VMs.
 
 ## Interface configuration in VMs
 To ssh into VMs, QEMU's default networking needs to be activated, and VMs need to be configured to have two interfaces, one using NIC's VF and one connecting to qemu's network bridge. Here is an example of the libvirt default networking configuration file.
@@ -87,7 +87,7 @@ The configuration file, `/test/benchmark_test/test_configurations.json` for the 
 
 
 # Execution of test script
-This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`. 
+This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`.
 
 ## dpservice-cli
 The testing script assumes that dpservice-cli exists under '/tmp' on hypervisors. If you have never run this test suite before, please first compile your local dpservice project by using `meson` and `ninja` commands. Because dpservice-cli is already included in the dpservice repository, the compiled dpservice-cli binary will be transferred to hypervisors automatically.
@@ -98,7 +98,7 @@ This script accepts several parameters, which are explained as follows.
 
 1. "--mode". This option specifies which operation mode of dpservice needs to be tested. Select from 'offload', 'non-offload' and 'both'. It must be specified.
 
-2. "--stage". This option specifies which testing stage needs to be used. Choose its value from 'dev' and 'cicd'. The stage of 'dev' is intended for carrying out tests during the development. If this option is set to 'dev', a docker image will be generated from the local repository of dpservice, and this image will be transferred to the hypervisors and executed. For example, a command like `./runtest.py --mode non-offloading --stage deploy -v` will achieve this purpose. 
+2. "--stage". This option specifies which testing stage needs to be used. Choose its value from 'dev' and 'cicd'. The stage of 'dev' is intended for carrying out tests during the development. If this option is set to 'dev', a docker image will be generated from the local repository of dpservice, and this image will be transferred to the hypervisors and executed. For example, a command like `./runtest.py --mode non-offloading --stage deploy -v` will achieve this purpose.
 Alternatively, if this option is set as 'cicd', the above described docker image generating process will not happen. Instead, a docker image specified by the option "--docker-image" will be used on hypervisors. This is a required option.
 
 3. "--docker-image". This option specifies the container image to be deployed to hypervisors. It is optional but required for the 'cicd' stage.
