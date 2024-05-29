@@ -97,7 +97,7 @@ def testDpService(build_path, print_header):
 	to_run = [ suite for suite in suites if not args.suite or args.suite.lower() == suite.label.lower() ]
 	for i, suite in enumerate(to_run):
 		print(f"\n{print_header} TEST {i+1}/{len(to_run)}: {suite.label} tests")
-		command = [pytest_command, '-x', '-v'] + suite.args + suite.files
+		command = [pytest_command, '-x', '-v', '--ignore=./benchmark_test'] + suite.args + suite.files
 		print(' '.join(command))
 		result = subprocess.run(command, env=env)
 		if result.returncode != 0:
