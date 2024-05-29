@@ -1,7 +1,7 @@
 name: Build and Publish Docker Image
 
 env:
-  platforms: ${{ (github.event_name == 'pull_request' && 'linux/amd64') || 'linux/amd64,linux/arm64' }}
+  platforms: ${{ 'linux/amd64,linux/arm64' }}
 
 on:
   push:
@@ -9,10 +9,6 @@ on:
       - main
     tags:
       - v*
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-  pull_request:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -29,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
+          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref }}
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -64,7 +60,6 @@ jobs:
           version: latest
           endpoint: ${{ env.CONTEXT_NAME }} # self-hosted
       - name: Login to GHCR
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -76,7 +71,7 @@ jobs:
         with:
           context: .
           platforms: ${{env.platforms}}
-          push: ${{ github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch' }}
+          push: ${{ github.event_name != 'workflow_dispatch' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: production
