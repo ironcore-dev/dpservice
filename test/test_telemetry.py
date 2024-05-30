@@ -3,19 +3,32 @@
 
 import json
 import pytest
+from urllib.request import urlopen
+
+from exporter import Exporter
 from helpers import *
 
 
 BUFSIZE = 10240
+TELEMETRY_SOCKET = "/var/run/dpdk/rte/dpdk_telemetry.v2"
 
-def get_telemetry(output, client, node):
-	client.send(f"{node},0\n".encode())
-	output[node] = json.loads(client.recv(BURSTSIZE).decode())[node]
-	json.dumps(output[node])
+GRAPH_NODES = (
+	'rx-0-0', 'rx-1-0', 'rx-2-0', 'rx-3-0', 'rx-4-0', 'rx-5-0', 'rx_periodic',
+	'arp', 'cls', 'conntrack', 'dhcp', 'dhcpv6', 'dnat', 'drop', 'firewall', 'lb', 'packet_relay', 'snat',
+	'ipip_decap', 'ipip_encap', 'ipv4_lookup', 'ipv6_lookup', 'ipv6_nd',
+	'tx-0', 'tx-1', 'tx-2', 'tx-3', 'tx-4', 'tx-5',
+)
+HEAP_INFO = ( 'Heap_id', 'Heap_size', 'Alloc_count', 'Free_count', 'Alloc_size', 'Free_size', 'Greatest_free_size' )
+IFACE_STATS = (
+	'rx_q0_errors', 'rx_q0_bytes', 'tx_q0_bytes', 'rx_q0_packets', 'tx_q0_packets',
+	'rx_good_bytes', 'tx_good_bytes', 'rx_good_packets', 'tx_good_packets',
+	'rx_errors', 'tx_errors', 'rx_missed_errors', 'rx_mbuf_allocation_errors',
+	'nat_used_port_count',
+)
 
 def get_telemetry(request):
 	with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
-		client.connect("/var/run/dpdk/rte/dpdk_telemetry.v2")
+		client.connect(TELEMETRY_SOCKET)
 		client.recv(BUFSIZE)
 		client.send(f"{request},0\n".encode())
 		response = json.loads(client.recv(BUFSIZE).decode())[request]
@@ -59,3 +72,20 @@ def test_telemetry_virtsvc(request, prepare_ifaces):
 		"Missing UDP virtual service port count"
 	assert f"TCP:{virtsvc_tcp_virtual_ip}:{virtsvc_tcp_virtual_port}" in tel, \
 		"Missing UDP virtual service port count"
+
+def test_telemetry_exporter(prepare_ifaces, start_exporter):
+	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
+	graph_stats, heap_info, interface_stats = set(), set(), set()
+	for metric in metrics.splitlines():
+		if metric.startswith('dpdk_graph_stat'):
+			graph_stats.add(metric.split('"')[1])
+		elif metric.startswith('dpdk_heap_info'):
+			heap_info.add(metric.split('"')[1])
+		elif metric.startswith('dpdk_interface_stat'):
+			interface_stats.add(metric.split('"')[3])
+	assert graph_stats == set(GRAPH_NODES) or graph_stats == set(GRAPH_NODES + ('virtsvc',)), \
+		"Unexpected graph telemetry in exporter output"
+	assert heap_info == set(HEAP_INFO), \
+		"Unexpected heap info in exporter output"
+	assert interface_stats == set(IFACE_STATS) or interface_stats == set(IFACE_STATS + ('virtsvc_used_port_count',)), \
+		"Unexpected interface statistics in exporter output"

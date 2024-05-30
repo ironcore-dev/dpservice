@@ -10,7 +10,7 @@ from scapy.arch import get_if_hwaddr
 
 from config import *
 from grpc_client import GrpcClient
-from helpers import interface_init
+from helpers import interface_init, stop_process
 
 
 class DpService:
@@ -77,12 +77,7 @@ class DpService:
 		self.process = subprocess.Popen(shlex.split(self.cmd), env=env)
 
 	def stop(self):
-		self.process.terminate()
-		try:
-			self.process.wait(5)
-		except subprocess.TimeoutExpired:
-			self.process.kill()
-			self.process.wait()
+		stop_process(self.process)
 
 	def init_ifaces(self, grpc_client):
 		interface_init(VM1.tap)

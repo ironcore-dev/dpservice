@@ -7,8 +7,9 @@ import os
 from config import *
 from dp_grpc_client import DpGrpcClient
 from dp_service import DpService
+from exporter import Exporter
 from grpc_client import GrpcClient
-from helpers import request_ip
+from helpers import request_ip, wait_for_port, is_port_open
 
 
 def pytest_addoption(parser):
@@ -72,21 +73,21 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
-		GrpcClient.wait_for_port()
+		wait_for_port(grpc_port)
 		return dp_service
 
-	if GrpcClient.port_open():
+	if is_port_open(grpc_port):
 		raise AssertionError("Another service already running")
-
-	print("------ Service init ------")
-	print(dp_service.get_cmd())
-	dp_service.start()
-	GrpcClient.wait_for_port()
-	print("--------------------------")
 
 	def tear_down():
 		dp_service.stop()
 	request.addfinalizer(tear_down)
+
+	print("------ Service init ------")
+	print(dp_service.get_cmd())
+	dp_service.start()
+	wait_for_port(grpc_port, 10)
+	print("--------------------------")
 
 	return dp_service
 
@@ -111,3 +112,16 @@ def prepare_ipv4(prepare_ifaces):
 	request_ip(VM3)
 	print("--------------------------")
 	return prepare_ifaces
+
+
+# Telemetry tests require a running prometheus exporter
+@pytest.fixture(scope="package")
+def start_exporter(request, build_path):
+	print("-------- Exporter init --------")
+	exporter = Exporter(build_path)
+	def tear_down():
+		exporter.stop()
+	request.addfinalizer(tear_down)
+	exporter.start()
+	wait_for_port(exporter_port)
+	print("-------------------------------")

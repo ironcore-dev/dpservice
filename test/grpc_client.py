@@ -235,21 +235,3 @@ class GrpcClient:
 
 	def resetvni(self, vni):
 		self._call(f"reset vni --vni={vni}")
-
-	@staticmethod
-	def port_open():
-		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-			try:
-				s.connect(("localhost", grpc_port))
-				s.close()
-				return True
-			except ConnectionRefusedError:
-				return False
-
-	@staticmethod
-	def wait_for_port():
-		for i in range(100):
-			if GrpcClient.port_open():
-				return
-			time.sleep(0.1)
-		raise TimeoutError("Waiting for GRPC port timed out")

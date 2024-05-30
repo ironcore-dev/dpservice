@@ -165,3 +165,29 @@ def age_out_flows():
 	delay = flow_timeout+1  # timers run every 1s, this should always work
 	print(f"Waiting {delay}s for flows to age-out...")
 	time.sleep(delay)
+
+
+def is_port_open(port):
+	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+		try:
+			s.connect(("localhost", port))
+			s.close()
+			return True
+		except ConnectionRefusedError:
+			return False
+
+def wait_for_port(port, timeout=5):
+	for i in range(timeout*10):
+		if is_port_open(port):
+			return
+		time.sleep(0.1)
+	raise TimeoutError(f"Waiting for port {port} timed out ({timeout}s)")
+
+
+def stop_process(process):
+	process.terminate()
+	try:
+		process.wait(5)
+	except subprocess.TimeoutExpired:
+		process.kill()
+		process.wait()
