@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
@@ -22,6 +23,8 @@ const (
 	sleepTime  = 10 * time.Second
 )
 
+var version = "unknown"
+
 func main() {
 	var conn net.Conn
 	var err error
@@ -34,7 +37,13 @@ func main() {
 	flag.StringVar(&hostnameFlag, "hostname", "", "Hostname to use (defaults to current hostname)")
 	flag.IntVar(&pollIntervalFlag, "poll-interval", 20, "Polling interval in seconds")
 	flag.Uint64Var(&exporterPort, "port", 9064, "Port on which exporter will be running.")
+	getVersion := flag.Bool("v", false, "Print version and exit")
 	flag.Parse()
+
+	if *getVersion {
+		fmt.Printf("dpservice-exporter version %s\n", version)
+		return
+	}
 
 	log := logrus.New()
 	log.Formatter = new(logrus.JSONFormatter)

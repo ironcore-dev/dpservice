@@ -88,7 +88,7 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 
 .PHONY: build
 build: fmt vet ## Build binary.
-	go build -o bin/dpservice-exporter main.go
+	go build -ldflags "-X 'main.version=${shell git describe --tags}'" -o bin/dpservice-exporter main.go
 
 .PHONY: install
 install:
