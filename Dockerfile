@@ -4,8 +4,6 @@ FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
 ARG TARGETARCH
 ARG DPDK_VER=23.11
 ARG DPSERVICE_FEATURES=""
-ARG EXPORTER_VERSION=0.1.8
-ENV OSARCH=${TARGETARCH}
 
 WORKDIR /workspace
 
@@ -77,10 +75,6 @@ crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddi
 vhost,gpudev build -Ddisable_apps="*" -Dtests=false
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
-
-# Get companion binaries from other repos
-ADD https://github.com/ironcore-dev/prometheus-dpdk-exporter/releases/download/v${EXPORTER_VERSION}/prometheus-dpdk-exporter_${EXPORTER_VERSION}_linux_${OSARCH}.tar.gz exporter.tgz
-RUN tar -xzf exporter.tgz
 
 # Prepare tools and sources
 COPY meson.build meson.build
@@ -170,7 +164,7 @@ COPY --from=builder \
 /workspace/build/src/dpservice-bin \
 /workspace/build/tools/dump/dpservice-dump \
 /workspace/build/cli/dpservice-cli/dpservice-cli \
-/workspace/prometheus-dpdk-exporter \
+/workspace/build/cli/dpservice-exporter/dpservice-exporter \
 /workspace/hack/prepare.sh \
 /usr/local/bin/
 COPY --from=builder /usr/local/lib /usr/local/lib
