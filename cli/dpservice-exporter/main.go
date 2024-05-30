@@ -31,23 +31,13 @@ func main() {
 	var exporterPort uint64
 	var exporterAddr netip.AddrPort
 
-	log := logrus.New()
-	log.Formatter = new(logrus.JSONFormatter)
-
-	r := prometheus.NewRegistry()
-	r.MustRegister(metrics.InterfaceStat)
-	r.MustRegister(metrics.CallCount)
-	r.MustRegister(metrics.HeapInfo)
-
-	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
-
-	conn = connectToDpdkTelemetry(log)
-	defer conn.Close()
-
-	flag.StringVar(&hostnameFlag, "hostname", "", "Hostname to use")
+	flag.StringVar(&hostnameFlag, "hostname", "", "Hostname to use (defaults to current hostname)")
 	flag.IntVar(&pollIntervalFlag, "poll-interval", 20, "Polling interval in seconds")
 	flag.Uint64Var(&exporterPort, "port", 9064, "Port on which exporter will be running.")
 	flag.Parse()
+
+	log := logrus.New()
+	log.Formatter = new(logrus.JSONFormatter)
 
 	if exporterPort < 1024 || exporterPort > 65535 {
 		log.Fatal("port must be in range 1024 - 65535")
@@ -59,6 +49,16 @@ func main() {
 		log.Fatal("could not get hostname")
 	}
 	log.Infof("Hostname: %s", host)
+
+	r := prometheus.NewRegistry()
+	r.MustRegister(metrics.InterfaceStat)
+	r.MustRegister(metrics.CallCount)
+	r.MustRegister(metrics.HeapInfo)
+
+	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
+
+	conn = connectToDpdkTelemetry(log)
+	defer conn.Close()
 
 	go func() {
 		for {
