@@ -78,10 +78,7 @@ subdir('proto')
 subdir('include')
 subdir('src')
 subdir('tools')
-
-if get_option('enable_tests') or get_option('build_dpservice_cli')
-  subdir('cli/dpservice-cli')
-endif
+subdir('cli')
 
 cppcheck = find_program('cppcheck', required: false)
 if cppcheck.found()
