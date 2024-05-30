@@ -131,8 +131,10 @@ WORKDIR /
 COPY --from=testbuilder /workspace/test ./test
 COPY --from=testbuilder /workspace/build/src/dpservice-bin ./build/src/dpservice-bin
 COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./build/cli/dpservice-cli/dpservice-cli
+COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-exporter ./build/cli/dpservice-exporter/dpservice-exporter
 COPY --from=testbuilder /workspace/xtratest_build/src/dpservice-bin ./xtratest_build/src/dpservice-bin
 COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./xtratest_build/cli/dpservice-cli/dpservice-cli
+COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-exporter ./xtratest_build/cli/dpservice-exporter/dpservice-exporter
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
 

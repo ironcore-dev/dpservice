@@ -77,7 +77,8 @@ class DpService:
 		self.process = subprocess.Popen(shlex.split(self.cmd), env=env)
 
 	def stop(self):
-		stop_process(self.process)
+		if self.process:
+			stop_process(self.process)
 
 	def init_ifaces(self, grpc_client):
 		interface_init(VM1.tap)
@@ -143,6 +144,7 @@ class DpService:
 # If run manually:
 import argparse
 import signal
+from helpers import wait_for_port
 
 def silent_sigint(sig, frame):
 	pass
@@ -176,7 +178,7 @@ if __name__ == '__main__':
 
 	print(dp_service.get_cmd())
 	dp_service.start()
-	GrpcClient.wait_for_port()
+	wait_for_port(grpc_port, 10)
 	if not args.no_init:
 		dp_service.init_ifaces(GrpcClient(args.build_path))
 
@@ -185,3 +187,4 @@ if __name__ == '__main__':
 		print(f"Killed with signal {-ret}")
 	elif ret > 0:
 		print(f"Failed with code {ret}")
+

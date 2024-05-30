@@ -14,4 +14,8 @@ class Exporter:
 		self.process = subprocess.Popen([self.cmd, f"-port={exporter_port}"])
 
 	def stop(self):
-		stop_process(self.process)
+		if self.process:
+			stop_process(self.process)
+
+	def getVersion(self):
+		return subprocess.check_output([self.cmd, '-v']).decode('utf-8').strip()

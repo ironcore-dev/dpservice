@@ -10,6 +10,7 @@ import sys
 import subprocess
 import shutil
 
+from exporter import Exporter
 from grpc_client import GrpcClient
 
 class TestSuite:
@@ -73,12 +74,17 @@ def testDpService(build_path, print_header):
 	# Run tests
 	bin_ver = queryDpService(dpservice, '--version')
 	cli_ver = grpc_client.getClientVersion()
+	exporter_ver = Exporter(build_path).getVersion()
 	assert bin_ver.startswith('DP Service version '), \
 		"Invalid dpservice-bin version string"
 	assert cli_ver.startswith('dpservice-cli version '), \
 		"Invalid dpservice-cli version string"
 	assert bin_ver[19:] == cli_ver[22:], \
-		"Version mismatch between dpservice-bin and dpservice-cli"
+		f"Version mismatch between dpservice-bin and dpservice-cli ({bin_ver} != {cli_ver})"
+	assert exporter_ver.startswith('dpservice-exporter version '), \
+		"Invalid dpservice-exporter version string"
+	assert bin_ver[19:] == exporter_ver[27:], \
+		f"Version mismatch between dpservice-bin and dpservice-exporter ({bin_ver} != {exporter_ver})"
 	print(f"Testing using {bin_ver}")
 
 	# Improve memory allocation randomness
