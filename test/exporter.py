@@ -1,4 +1,3 @@
-import shlex
 import socket
 import subprocess
 import time
@@ -9,10 +8,10 @@ from helpers import stop_process
 class Exporter:
 
 	def __init__(self, build_path):
-		self.cmd = f"{build_path}/cli/dpservice-exporter/dpservice-exporter -port {exporter_port}"
+		self.cmd = build_path + "/cli/dpservice-exporter/dpservice-exporter"
 
 	def start(self):
-		self.process = subprocess.Popen(shlex.split(self.cmd))
+		self.process = subprocess.Popen([self.cmd, f"-port={exporter_port}"])
 
 	def stop(self):
 		stop_process(self.process)

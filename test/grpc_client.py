@@ -50,7 +50,7 @@ class GrpcClient:
 		self.expectFailure = False
 
 		print("dpservice-cli", args)
-		p = subprocess.run([self.cmd, '-o', 'json'] + shlex.split(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		p = subprocess.run([self.cmd, f"--address=localhost:{grpc_port}", '-o', 'json'] + shlex.split(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		# server errors (retcode 2) are handled as a JSON response too
 		if p.returncode != 0 and p.returncode != 2:
 			if len(p.stderr):
