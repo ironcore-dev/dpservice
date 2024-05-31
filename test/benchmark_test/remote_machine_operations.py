@@ -9,7 +9,9 @@ from remote_machine_management import get_remote_machine, add_vm_config_info, ad
 def remote_machine_op_upload(machine_name, local_path, remote_path):
 	try:
 		machine = get_remote_machine(machine_name)
-		machine.upload(local_path, remote_path)
+		machine.upload("sftp", local_path, remote_path)
+		if not remote_machine_op_file_exists(machine_name, remote_path):
+			machine.upload("scp", local_path, remote_path)
 	except Exception as e:
 		print(
 			f"Failed to copy {local_path} to {remote_path} on machine {machine_name}")
@@ -71,6 +73,7 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 			f"docker image url is required if dpservice is running in docker env")
 
 	try:
+		docker_container_name = f"dpservice_{machine_name}"
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
 			raise NotImplementedError(
@@ -81,21 +84,10 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 		parameters = f"-l 0,1 {flag}"
 
 		if is_docker:
-			docker_container_name = f"dpservice_{machine_name}"
-			docker_kill_command = f"docker stop"
-			docker_kill_task = [
-				{"command": docker_kill_command, "parameters": docker_container_name,
-					"background": False, "sudo": True}
-			]
-			machine.exec_task(docker_kill_task)
-			time.sleep(1)
-
-			log_file = f"/tmp/dpservice.log"
 			docker_run_command = f"docker run"
-			docker_run_parameters = f"-d --rm --privileged --network host --name {docker_container_name} " \
+			docker_run_parameters = f"-d --privileged --network host --name {docker_container_name} " \
 				f"--mount type=bind,source=/dev/hugepages,target=/dev/hugepages " \
-				f"--mount type=bind,source=/tmp,target=/tmp {docker_image_url}  {parameters} " \
-				f"> {log_file} 2>&1"
+				f"--mount type=bind,source=/tmp,target=/tmp {docker_image_url}  {parameters} "
 			docker_run_task = [
 				{"command": docker_run_command, "parameters": docker_run_parameters,
 					"background": False, "sudo": True}
@@ -122,6 +114,25 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 		print(
 			f"Failed to start dpservice on hypervisor {machine_name} due to {e}")
 
+def remote_machine_op_fetch_dpservice_container_log(machine_name):
+	try:
+		machine = get_remote_machine(machine_name)
+		if machine.parent_machine:
+			raise NotImplementedError(
+				f"Cannot fetch dpservice container log on a vm machine {machine_name}")
+
+		log_file = f"/tmp/dpservice.log"
+		docker_container_name = f"dpservice_{machine_name}"
+		docker_log_command = f"docker logs"
+		docker_log_parameters = f"-f --tail 150 {docker_container_name} > {log_file} 2>&1 "
+		docker_run_task = [
+			{"command": docker_log_command, "parameters": docker_log_parameters,
+				"background": False, "sudo": True}
+		]
+		machine.exec_task(docker_run_task)
+	except Exception as e:
+		print(
+			f"Failed to get dpservice container log from {machine_name} due to {e}")
 
 def remote_machine_op_dpservice_init(machine_name):
 	try:
@@ -339,12 +350,12 @@ def remote_machine_op_reboot(machine_name):
 				f"Cannot reboot a non-vm machine {machine_name}")
 
 		reboot_task = [
-			{"command": "sleep 3 && reboot", "background": True}
+			{"command": "sleep 3 && sudo reboot", "background": True}
 		]
 		machine.exec_task(reboot_task)
 
 		ssh_stop_command = [
-			{"command": "systemctl", "parameters": "stop ssh"}
+			{"command": "systemctl", "parameters": "stop ssh", "sudo": True}
 		]
 		machine.exec_task(ssh_stop_command)
 		machine.stop()
@@ -372,7 +383,6 @@ def remote_machine_op_terminate_containers(machine_name):
 		print(
 			f"Failed to terminate containers on hypervisor {machine_name} due to {e}")
 
-
 def remote_machine_op_vm_config_rm_default_route(machine_name, default_gw="192.168.122.1"):
 	try:
 		machine = get_remote_machine(machine_name)
@@ -380,13 +390,27 @@ def remote_machine_op_vm_config_rm_default_route(machine_name, default_gw="192.1
 			raise NotImplementedError(
 				f"Cannot rm default route on a non-vm machine {machine_name}")
 		vm_task = [
-			{"command": f"ip r del default via {default_gw}"}
+			{"command": f"ip r del default via {default_gw}", "sudo": True}
 		]
 		machine.exec_task(vm_task)
 	except Exception as e:
 		print(
 			f"Failed to remove the default route from vm {machine_name} due to {e}")
 
+
+def remote_machine_op_vm_config_tmp_dir(machine_name):
+	try:
+		machine = get_remote_machine(machine_name)
+		if not machine.parent_machine:
+			raise NotImplementedError(
+				f"Cannot change ownership of tmp dir on a non-vm machine {machine_name}")
+		vm_task = [
+			{"command": f"chown 777 /tmp", "sudo": True}
+		]
+		machine.exec_task(vm_task)
+	except Exception as e:
+		print(
+			f"Failed to change ownership of tmp dir from vm {machine_name} due to {e}")
 
 def remote_machine_op_flow_test(machine_name, is_server, server_ip, flow_count, run_time=5, round_count=3, payload_length=1000, output_file_name="test", test_script='/tmp/flow_test.py'):
 	try:
@@ -422,7 +446,7 @@ def remote_machine_op_add_ip_addr(machine_name, ip, dev, is_v6):
 			parameters = f"addr add {ip} dev {dev}"
 
 		test_task = [
-			{"command": "ip", "parameters": parameters},
+			{"command": "ip", "parameters": parameters, "sudo": True},
 		]
 		return machine.exec_task(test_task)
 	except Exception as e:
