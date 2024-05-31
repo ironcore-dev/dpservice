@@ -25,6 +25,13 @@ IFACE_STATS = (
 	'rx_errors', 'tx_errors', 'rx_missed_errors', 'rx_mbuf_allocation_errors',
 	'nat_used_port_count',
 )
+HASH_TABLES = (
+	'interface_table',
+	'conntrack_table', 'dnat_table', 'snat_table',
+	'nat_portmap_table', 'nat_portoverload_table',
+	'loadbalancer_table', 'loadbalancer_id_table',
+	'vni_table', 'vnf_table', 'reverse_vnf_table',
+)
 
 def get_telemetry(request):
 	with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
@@ -73,9 +80,14 @@ def test_telemetry_virtsvc(request, prepare_ifaces):
 	assert f"TCP:{virtsvc_tcp_virtual_ip}:{virtsvc_tcp_virtual_port}" in tel, \
 		"Missing UDP virtual service port count"
 
+def test_telemetry_htables(dp_service):
+	tel = get_telemetry("/dp_service/table/saturation")
+	assert set(tel.keys()) == set(HASH_TABLES) or set(tel.keys()) == set(HASH_TABLES + ('virtsvc_table_0', 'virtsvc_table_1')), \
+		"Unexpected hash table saturation info"
+
 def test_telemetry_exporter(prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
-	graph_stats, heap_info, interface_stats = set(), set(), set()
+	graph_stats, heap_info, interface_stats, htable_saturation = set(), set(), set(), set()
 	for metric in metrics.splitlines():
 		if metric.startswith('dpdk_graph_stat'):
 			graph_stats.add(metric.split('"')[1])
@@ -83,9 +95,16 @@ def test_telemetry_exporter(prepare_ifaces, start_exporter):
 			heap_info.add(metric.split('"')[1])
 		elif metric.startswith('dpdk_interface_stat'):
 			interface_stats.add(metric.split('"')[3])
+		elif metric.startswith('hash_table_saturation'):
+			htable_saturation.add(metric.split('"')[3])
+		else:
+			assert metric.startswith("#"), \
+				f"Unknown exported metric '{metric.split('{')[0]}' found"
 	assert graph_stats == set(GRAPH_NODES) or graph_stats == set(GRAPH_NODES + ('virtsvc',)), \
 		"Unexpected graph telemetry in exporter output"
 	assert heap_info == set(HEAP_INFO), \
 		"Unexpected heap info in exporter output"
 	assert interface_stats == set(IFACE_STATS) or interface_stats == set(IFACE_STATS + ('virtsvc_used_port_count',)), \
 		"Unexpected interface statistics in exporter output"
+	assert htable_saturation == set(HASH_TABLES) or htable_saturation == set(HASH_TABLES + ('virtsvc_table_0', 'virtsvc_table_1')), \
+		"Unexpected hash table info in exporter output"
