@@ -52,6 +52,7 @@ def init_dpservice(
 					docker_file,
 				)
 
+			remote_machine_op_terminate_containers(hypervisor_info["machine_name"])
 			remote_machine_op_dpservice_start(
 				hypervisor_info["machine_name"],
 				offload=is_offload,
@@ -80,6 +81,7 @@ def init_vms(env_config, reboot_vm):
 					remote_machine_op_reboot(vm_info["machine_name"])
 				remote_machine_op_vm_config_rm_default_route(
 					vm_info["machine_name"])
+				remote_machine_op_vm_config_tmp_dir(vm_info["machine_name"])
 				remote_machine_op_terminate_processes(vm_info["machine_name"])
 				remote_machine_op_upload(
 					vm_info["machine_name"], script_path_to_upload, script_path_to_land
@@ -235,6 +237,8 @@ def upload_and_import_docker_image(machine_name, image_name, build_dir, output_f
 def tear_down_test_environment():
 	try:
 		for machine in hypervisor_machines:
+			machine.stop_containers()
+			remote_machine_op_fetch_dpservice_container_log(machine.get_machine_name())
 			dpservice_log = machine.fetch_log("dpservice")
 			print(dpservice_log)
 

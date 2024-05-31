@@ -99,12 +99,15 @@ class SSHManager:
 		if self.client:
 			self.client.close()
 
-	def upload(self, local_path, remote_path):
+	def upload(self, proto, local_path, remote_path):
 		"""Upload a file to a remote location"""
 		try:
-			sftp = self.client.open_sftp()
-			sftp.put(local_path, remote_path)
-			sftp.close()
+			if proto == "sftp":
+				upload_chan = self.client.open_sftp()
+			if proto == "scp":
+				upload_chan = paramiko.SCPClient(self.client.get_transport())
+			upload_chan.put(local_path, remote_path)
+			upload_chan.close()
 		except Exception as e:
 			return f"Error uploading a file: {e}"
 
@@ -116,35 +119,41 @@ class SSHManager:
 			self.run_command(f"kill {pid_v}", sudo=True)
 		self.run_command(f"echo '' > {self.pid_file}")  # Clear the PID file
 
+	def stop_all_containers(self):
+		"""stop all possible running docker containers"""
+		# Command to list all running container IDs
+		list_running_containers_command = "sudo docker ps -q"
+		running_containers = self.run_command(
+			list_running_containers_command)
+
+		if running_containers.strip():  # Check if there is any output
+			# Command to stop all running Docker containers
+			stop_command = "sudo docker stop $(sudo docker ps -q)"
+			stop_output = self.run_command(stop_command)
+			print(
+				f"All containers stopped on {self.host_address}: {stop_output}")
+		else:
+			print("No running containers to stop.")
+
+	def remove_all_containers(self):
+		"""remove all possible running docker containers"""
+		# Command to list all container IDs
+		list_all_containers_command = "sudo docker ps -a -q"
+		all_containers = self.run_command(list_all_containers_command)
+
+		if all_containers.strip():  # Check if there is any output
+			# Command to remove all stopped containers
+			remove_command = "sudo docker rm $(sudo docker ps -a -q)"
+			remove_output = self.run_command(remove_command)
+			print(
+				f"All containers removed on {self.host_address}: {remove_output}")
+		else:
+			print("No containers to remove.")
+
 	def terminate_all_containers(self):
 		"""Terminate all possible running docker containers"""
-		if self.command_exists("docker"):
-			# Command to list all running container IDs
-			list_running_containers_command = "sudo docker ps -q"
-			running_containers = self.run_command(
-				list_running_containers_command)
-
-			if running_containers.strip():  # Check if there is any output
-				# Command to stop all running Docker containers
-				stop_command = "sudo docker stop $(sudo docker ps -q)"
-				stop_output = self.run_command(stop_command)
-				print(
-					f"All containers stopped on {self.host_address}: {stop_output}")
-			else:
-				print("No running containers to stop.")
-
-			# Command to list all container IDs
-			list_all_containers_command = "sudo docker ps -a -q"
-			all_containers = self.run_command(list_all_containers_command)
-
-			if all_containers.strip():  # Check if there is any output
-				# Command to remove all stopped containers
-				remove_command = "sudo docker rm $(sudo docker ps -a -q)"
-				remove_output = self.run_command(remove_command)
-				print(
-					f"All containers removed on {self.host_address}: {remove_output}")
-			else:
-				print("No containers to remove.")
+		self.stop_all_containers()
+		self.remove_all_containers()
 
 	def fetch_logs(self, log_file_name):
 		"""Fetch the logs of the DPDK application."""
@@ -291,7 +300,11 @@ class RemoteMachine:
 		self.ssh_manager.terminate_all_processes()
 
 	def terminate_containers(self):
-		self.ssh_manager.terminate_all_containers()
+		if not self.parent_machine:
+			self.ssh_manager.terminate_all_containers()
+
+	def stop_containers(self):
+		self.ssh_manager.stop_all_containers()
 
 	def fetch_log(self, log_name):
 		return self.ssh_manager.fetch_logs(log_name)
@@ -299,8 +312,8 @@ class RemoteMachine:
 	def get_connection(self):
 		return self.ssh_manager
 
-	def upload(self, local_path, remote_path):
-		self.ssh_manager.upload(local_path, remote_path)
+	def upload(self, proto, local_path, remote_path):
+		self.ssh_manager.upload(proto, local_path, remote_path)
 
 	def exec_task(self, tasks):
 		task = tasks[0]

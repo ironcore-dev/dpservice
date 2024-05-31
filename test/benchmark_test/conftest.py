@@ -38,6 +38,7 @@ def signal_handler(sig, frame):
 	tear_down_test_environment()
 	sys.exit(0)
 
+signal.signal(signal.SIGINT, signal_handler)
 
 @pytest.fixture(scope="package")
 def test_config(request):
@@ -108,7 +109,6 @@ def benchmark_test_setup(request, test_config, test_mode):
 	build_path = config.getoption("--dpservice-build-path")
 	reboot_vm = config.getoption("--reboot")
 
-	signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame))
 	try:
 		prepare_test_environment(
 			test_mode, stage, docker_iamge_url, reboot_vm, test_config, build_path)
@@ -116,3 +116,5 @@ def benchmark_test_setup(request, test_config, test_mode):
 		print(f"Failed to prepare test environment due to: {e}")
 
 	request.addfinalizer(tear_down_test_environment)
+
+	yield

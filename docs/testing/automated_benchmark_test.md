@@ -4,9 +4,9 @@ This benchmarking testing suite is built upon and utilises 1) dpservice-cli to c
 
 # Examplary command to invoke tests
 ```
-./runtest.py --mode offload --stage cicd --docker-image ghcr.io/ironcore-dev/dpservice:sha-e9b4272 -v
+./run_benchmarktest.py --mode offload --stage cicd --docker-image ghcr.io/ironcore-dev/dpservice:sha-e9b4272 -v
 
-./runtest.py --mode both --stage dev -v
+./run_benchmarktest.py --mode both --stage dev -v
 ```
 
 # Required hypervisor and VM setup
@@ -96,15 +96,15 @@ The testing script assumes that dpservice-cli exists under '/tmp' on hypervisors
 
 This script accepts several parameters, which are explained as follows.
 
-1. "--mode". This option specifies which operation mode of dpservice needs to be tested. Select from 'offload', 'non-offload' and 'both'. It must be specified.
+1. `--mode`. This option specifies which operation mode of dpservice needs to be tested. Select from 'offload', 'non-offload' and 'both'. It must be specified.
 
-2. "--stage". This option specifies which testing stage needs to be used. Choose its value from 'dev' and 'cicd'. The stage of 'dev' is intended for carrying out tests during the development. If this option is set to 'dev', a docker image will be generated from the local repository of dpservice, and this image will be transferred to the hypervisors and executed. For example, a command like `./runtest.py --mode non-offloading --stage deploy -v` will achieve this purpose.
+2. `--stage`. This option specifies which testing stage needs to be used. Choose its value from 'dev' and 'cicd'. The stage of 'dev' is intended for carrying out tests during the development. If this option is set to 'dev', a docker image will be generated from the local repository of dpservice, and this image will be transferred to the hypervisors and executed. For example, a command like `./runtest.py --mode non-offloading --stage deploy -v` will achieve this purpose.
 Alternatively, if this option is set as 'cicd', the above described docker image generating process will not happen. Instead, a docker image specified by the option "--docker-image" will be used on hypervisors. This is a required option.
 
-3. "--docker-image". This option specifies the container image to be deployed to hypervisors. It is optional but required for the 'cicd' stage.
+3. `--docker-image`. This option specifies the container image to be deployed to hypervisors. It is optional but required for the 'cicd' stage.
 
-4. "--reboot". This option specifies if a reboot process needs to be performed on VMs. It is needed if test configurations have changed, e.g., private IP addresses of VMs, and VMs need to obtain new configurations. If you want to ensure a fresh start of VMs, this option can also be enabled. It is optional.
+4. `--reboot`. This option specifies if a reboot process needs to be performed on VMs. It is needed if test configurations have changed, e.g., private IP addresses of VMs, and VMs need to obtain new configurations. If you want to ensure a fresh start of VMs, this option can also be enabled. It is optional.
 
-5. "--env-config-file" and "--env-config-name". They provide information of the above described `test_configurations.json`. It is possible this file is renamed or located somewhere else. And it is also possible to create several configurations within this file and specify one of them for the tests.
+5. `--env-config-file` and `--env-config-name`. They provide information of the above described `test_configurations.json`. It is possible this file is renamed or located somewhere else. And it is also possible to create several configurations within this file and specify one of them for the tests.
 
-6. "--verbose". Specify if pytest runs in the verbose mode to see all steps and results during test execution.
+6. `--verbose`. Specify if pytest runs in the verbose mode to see all steps and results during test execution.
