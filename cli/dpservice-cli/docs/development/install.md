@@ -31,17 +31,8 @@ dpservice-cli completion -h
 ```
 
 # Dependency
-This client uses golang bindings from repo [dpservice-go](https://github.com/ironcore-dev/dpservice/go/dpservice-go).
+This client uses golang bindings from module [/go/dpservice-go](https://github.com/ironcore-dev/dpservice/go/dpservice-go).
 
-Definition go files in [proto](https://github.com/ironcore-dev/dpservice/go/dpservice-go/tree/main/proto) folder are auto-generated from [dpdk.proto](https://github.com/ironcore-dev/dpservice/blob/osc/main/proto/dpdk.proto) file in [dpservice](https://github.com/ironcore-dev/dpservice/) repo.
-
-In case of upgrade of dpservice-go, it is needed to pull the latest version:
-```
-go get github.com/ironcore-dev/dpservice/go/dpservice-go@[<version>|latest]
-```
-In order to pull from private repository set the **GOPRIVATE** variable:
-```
-export GOPRIVATE=github.com/ironcore-dev/*
-```
+Definition go files in [proto](https://github.com/ironcore-dev/dpservice/tree/main/go/dpservice-go/proto) folder are auto-generated from [dpdk.proto](https://github.com/ironcore-dev/dpservice/blob/main/proto/dpdk.proto) file in [dpservice](https://github.com/ironcore-dev/dpservice/) repo.
 
 More info about gRPC can be found [here](https://grpc.io/docs/what-is-grpc/introduction/).

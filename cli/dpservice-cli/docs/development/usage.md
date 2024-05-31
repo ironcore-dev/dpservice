@@ -2,7 +2,7 @@
 
 Before using dpservice-cli client, you need to have dpservice instance running.
 
-Please refer to this guide [dpservice](https://github.com/ironcore-dev/dpservice/blob/osc/grpc_docs/docs/development/building.md) on how to build dpservice from source.
+Please refer to this guide [dpservice](https://github.com/ironcore-dev/dpservice/blob/main/docs/development/building.md) on how to build dpservice from source.
 
 You can then run python script **/test/dp_service.py** that will start the dpservice with preloaded config.
 ```bash
@@ -27,13 +27,6 @@ To change the output format of commands you can use **-o, --output** flag with o
   -  **yaml**   - shows output in yaml
   -  **table**  - shows output in predefined table format (you can use **-w, --wide** for more information)
   -  **name**   - shows only short output with type/name
-
-Add and Delete commands also support file input with **-f, --filename** flag:
-```bash
-./bin/dpservice-cli [add|delete] -f /<path>/<filename>.[json|yaml]
-```
-Filename, directory, or URL can be used.
-One file can contain multiple objects of any kind.
 
 # Command-line guidance
 

@@ -1,12 +1,12 @@
 # dpservice-cli commands:
 
-You can browse help for all commands starting in main command [here](/docs/commands/dpservice-cli.md)
+You can browse help for all commands starting in the main command [here](/docs/commands/dpservice-cli.md)](/docs/commands/dpservice-cli.md)
 
 # Available commands:
 
-Most of the validation is done on server side (dpservice).
+Most of the validation is done on the server side (dpservice).
 All parameters are validated based on their type (see below).
-In some cases there is validation also on client side (dpservice-cli) user is then notified with proper usage.
+In some cases there is validation also on the client side (dpservice-cli) user is then notified with proper usage.
 
 ## Initialization/check for initialized service, check version and generating auto-completion:
 ```
@@ -16,7 +16,7 @@ get version
 completion [bash|zsh|fish|powershell]
 ```
 
-## Create/delete/list network interfaces:
+## Create/delete/get/list network interfaces:
 ```
 create interface --id=<string> --ipv4=<netip.Addr> --ipv6=<netip.Addr> --vni=<uint32> --device=<string>
 delete interface --id=<string>
@@ -43,6 +43,7 @@ list prefixes --interface-id=<string> --sort-by=<string>
 create loadbalancer --id=<string> --vni=<uint32> --vip=<netip.Addr> --lbports=<string>
 delete loadbalancer --id=<string>
 get loadbalancer --id=<string>
+list loadbancers
 ```
 
 ## Create/delete/list loadbalancer backing IPs:
