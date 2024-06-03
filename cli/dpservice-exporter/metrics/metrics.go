@@ -87,4 +87,12 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) {
 	for graphNodeName, callCount := range dpserviceCallCount.GraphCallCnt.Node_0_to_255 {
 		CallCount.With(prometheus.Labels{"node_name": hostname, "graph_node": graphNodeName}).Set(callCount)
 	}
+
+	var dpServiceHashTableSaturation DpServiceHashTableSaturation
+	queryTelemetry(conn, log, "/dp_service/table/saturation", &dpServiceHashTableSaturation)
+
+	for table, saturation := range dpServiceHashTableSaturation.Value {
+		HashTableSaturation.With(prometheus.Labels{"table_name": table, "stat_name": "capacity"}).Set(saturation.Capacity)
+		HashTableSaturation.With(prometheus.Labels{"table_name": table, "stat_name": "entries"}).Set(saturation.Entries)
+	}
 }

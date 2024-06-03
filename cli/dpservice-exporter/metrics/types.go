@@ -29,6 +29,14 @@ var (
 		},
 		[]string{"node_name", "info"},
 	)
+
+	HashTableSaturation = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hash_table_saturation",
+			Help: "Dp-Service hash table saturation",
+		},
+		[]string{"table_name", "stat_name"},
+	)
 )
 
 type EthdevList struct {
@@ -65,4 +73,13 @@ type DpServiceGraphCallCount struct {
 
 type DpServiceHeapInfo struct {
 	Value map[string]any `json:"/eal/heap_info"`
+}
+
+type DpServiceHashTableSaturation struct {
+	Value map[string]HashTable `json:"/dp_service/table/saturation"`
+}
+
+type HashTable struct {
+	Capacity float64 `json:"capacity"`
+	Entries  float64 `json:"entries"`
 }

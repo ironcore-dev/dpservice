@@ -63,6 +63,7 @@ func main() {
 	r.MustRegister(metrics.InterfaceStat)
 	r.MustRegister(metrics.CallCount)
 	r.MustRegister(metrics.HeapInfo)
+	r.MustRegister(metrics.HashTableSaturation)
 
 	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
 
