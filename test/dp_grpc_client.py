@@ -19,7 +19,7 @@ class DpGrpcError(Exception):
 class DpGrpcClient:
 
 	def __init__(self, build_path):
-		self.cmd = build_path + "/tools/dp_grpc_client"
+		self.cmd = build_path + "/cli/dp_grpc_client/dp_grpc_client"
 		self.re_ipv6 = re.compile(r'(?:^|[\n\r])Received underlay route : ([a-f0-9:]+)(?:$|[\n\r])')
 		self.re_error = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' reply with error code ([1-9][0-9][0-9]), message \'[A-Z_]*\'(?:$|[\n\r])')
 		self.re_failure = re.compile(r'(?:^|[\n\r])gRPC call \'[^\']*\' failed with error code ([1-9]), message \'[^\']*\'(?:$|[\n\r])')
