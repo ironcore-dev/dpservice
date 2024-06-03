@@ -11,7 +11,7 @@ BASEDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 DPSERVICE_DIR="../.."
 cd "$DPSERVICE_DIR"
-git describe --tags > ./go/dpservice-go/proto/generated_from.txt
+./hack/get_version.sh > ./go/dpservice-go/proto/generated_from.txt
 cd ./go/dpservice-go/
 
 echo "Generating protobuf"

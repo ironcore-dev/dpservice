@@ -62,7 +62,7 @@ test: fmt vet ## Run tests.
 
 .PHONY: build
 build: fmt vet ## Build binary.
-	go build -ldflags "-X 'main.version=${shell git describe --tags}'" -o bin/dpservice-cli main.go
+	go build -ldflags "-X 'main.version=${shell ../../hack/get_version.sh}'" -o bin/dpservice-cli main.go
 
 .PHONY: install
 install:
