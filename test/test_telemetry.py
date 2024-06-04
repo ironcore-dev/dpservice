@@ -85,6 +85,19 @@ def test_telemetry_htables(dp_service):
 	assert set(tel.keys()) == set(HASH_TABLES) or set(tel.keys()) == set(HASH_TABLES + ('virtsvc_table_0', 'virtsvc_table_1')), \
 		"Unexpected hash table saturation info"
 
+def test_telemetry_fwall(prepare_ifaces, grpc_client):
+	tel = get_telemetry("/dp_service/firewall/rule_count")
+	assert tel == { VM1.name: 0, VM2.name: 0, VM3.name: 0 }, \
+		"Unexpected firewall rule count"
+	grpc_client.addfwallrule(VM1.name, "vm1-fw1")
+	tel = get_telemetry("/dp_service/firewall/rule_count")
+	assert tel == { VM1.name: 1, VM2.name: 0, VM3.name: 0 }, \
+		"Unexpected firewall rule count"
+	grpc_client.delfwallrule(VM1.name, "vm1-fw1")
+	tel = get_telemetry("/dp_service/firewall/rule_count")
+	assert tel == { VM1.name: 0, VM2.name: 0, VM3.name: 0 }, \
+		"Unexpected firewall rule count"
+
 def test_telemetry_exporter(prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
 	graph_stats, heap_info, interface_stats, htable_saturation = set(), set(), set(), set()

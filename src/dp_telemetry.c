@@ -233,6 +233,16 @@ static int dp_telemetry_handle_table_saturation(const char *cmd,
 	return DP_OK;
 }
 
+static int dp_telemetry_handle_firewall_rule_count(const char *cmd,
+												   __rte_unused const char *params,
+												   struct rte_tel_data *data)
+{
+	if (DP_FAILED(dp_telemetry_start_dict(data, cmd))
+		|| DP_FAILED(dp_fwall_get_rule_count_telemetry(data)))
+		return DP_ERROR;
+	return DP_OK;
+}
+
 //
 // Entrypoints
 //
@@ -254,6 +264,7 @@ int dp_telemetry_init(void)
 		DP_TELEMETRY_REGISTER_COMMAND(virtsvc, used_port_count, "Returns the number of ports in use by each virtual service."),
 #endif
 		DP_TELEMETRY_REGISTER_COMMAND(table, saturation, "Returns the current and maximal capacity of each hash table."),
+		DP_TELEMETRY_REGISTER_COMMAND(firewall, rule_count, "Returns the number of firewall rules for each VF interface (attached VM)."),
 	};
 
 	if (!rte_graph_has_stats_feature())

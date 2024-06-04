@@ -29,6 +29,8 @@ struct dp_port_stats {
 
 int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict);
 
+int dp_fwall_get_rule_count_telemetry(struct rte_tel_data *dict);
+
 #ifdef __cplusplus
 }
 #endif
