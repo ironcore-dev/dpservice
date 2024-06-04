@@ -5,6 +5,7 @@ dpservice_dump_sources = [
   '../../src/monitoring/dp_pcap.c',
 ]
 
-executable('dpservice-dump', dpservice_dump_sources,
+executable('dpservice-dump',
+  sources: [ dpservice_dump_sources, version_h ],
   include_directories: [includes],
   dependencies: [dpdk_dep, pcap_dep] )

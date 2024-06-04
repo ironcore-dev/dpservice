@@ -72,7 +72,7 @@ if get_option('enable_virtual_services')
 endif
 
 exe = executable('dpservice-bin',
-  sources: [ dp_sources, grpc_generated ],
+  sources: [ dp_sources, grpc_generated, version_h ],
   include_directories: [ includes ],
   dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep, pcap_dep ]
 )
