@@ -138,12 +138,17 @@ static int dp_process_delete_lbtarget(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_lb_target *request = &responder->request.del_lbtrgt;
 	union dp_ipv6 ipv6;
+	int ret;
 
 	if (DP_FAILED(dp_ipv6_from_ipaddr(&ipv6, &request->addr)))
 		return DP_GRPC_ERR_BAD_IPVER;
 
+	ret = dp_del_lb_back_ip(request->lb_id, &ipv6);
+	if (DP_FAILED(ret))
+		return ret;
+
 	dp_remove_lbtarget_flows(&ipv6);
-	return dp_del_lb_back_ip(request->lb_id, &ipv6);
+	return DP_GRPC_OK;
 }
 
 static int dp_process_initialize(__rte_unused struct dp_grpc_responder *responder)

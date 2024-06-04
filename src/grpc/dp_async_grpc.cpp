@@ -680,6 +680,9 @@ void ListNeighborNatsCall::ParseReply(struct dpgrpc_reply* reply)
 
 const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 {
+	uint8_t proto;
+	uint16_t port;
+
 	DPGRPC_LOG_INFO("Creating loadbalancer",
 					DP_LOG_LBID(request_.loadbalancer_id().c_str()),
 					DP_LOG_VNI(request_.vni()),
@@ -698,13 +701,19 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 						DP_LOG_PROTO(request_.loadbalanced_ports(i).protocol()));
 		if (request_.loadbalanced_ports(i).port() > UINT16_MAX)
 			return "Invalid loadbalanced_ports.port";
-		request->add_lb.lbports[i].port = (uint16_t)request_.loadbalanced_ports(i).port();
+		port = (uint16_t)request_.loadbalanced_ports(i).port();
 		if (request_.loadbalanced_ports(i).protocol() == TCP)
-			request->add_lb.lbports[i].protocol = IPPROTO_TCP;
+			proto = IPPROTO_TCP;
 		else if (request_.loadbalanced_ports(i).protocol() == UDP)
-			request->add_lb.lbports[i].protocol = IPPROTO_UDP;
+			proto = IPPROTO_UDP;
 		else
 			return "Invalid loadbalanced_ports.protocol";
+		for (int j = 0; j < i; ++j) {
+			if (request->add_lb.lbports[j].protocol == proto && request->add_lb.lbports[j].port == port)
+				return "Duplicate loadbalanced_ports entry";
+		}
+		request->add_lb.lbports[i].port = port;
+		request->add_lb.lbports[i].protocol = proto;
 	}
 	return NULL;
 }

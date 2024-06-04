@@ -314,9 +314,7 @@ def test_grpc_lb_errors(prepare_ifaces, grpc_client):
 	grpc_client.expect_failure().createlb(lb_name, vni1, lb_ip, "icmp/22")
 	grpc_client.expect_failure().createlb(lb_name, vni1, lb_ip, "udp/65536")
 	# Try to use duplicate port specification
-	grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80,tcp/80")
-	# TODO not failing atm.
-	grpc_client.dellb(lb_name)
+	grpc_client.expect_failure().createlb(lb_name, vni1, lb_ip, "tcp/80,tcp/80")
 	# Try same port with different protocol both at once
 	grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80,udp/80")
 	grpc_client.dellb(lb_name)
@@ -327,8 +325,7 @@ def test_grpc_lbtarget(prepare_ifaces, grpc_client):
 	grpc_client.addlbtarget(lb_name, target_ul)
 	grpc_client.expect_error(202).addlbtarget(lb_name, target_ul)
 	grpc_client.dellbtarget(lb_name, target_ul)
-	# TODO not failing atm.
-	grpc_client.dellbtarget(lb_name, target_ul)
+	grpc_client.expect_error(201).dellbtarget(lb_name, target_ul)
 	grpc_client.addlbtarget(lb_name, target_ul)
 	grpc_client.dellbtarget(lb_name, target_ul)
 	grpc_client.dellb(lb_name)

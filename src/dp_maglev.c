@@ -202,20 +202,26 @@ int dp_add_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 
 int dp_delete_maglev_backend(struct lb_value *lbval, const union dp_ipv6 *back_ip)
 {
-	int i;
+	int match;
 
-	for (i = 0; i < lbval->back_end_cnt; i++) {
-		if (dp_ipv6_match(&lbval->back_end_ips[i], back_ip)) {
-			dp_shift_back_end_ips(lbval->back_end_ips, i, lbval->back_end_cnt - 1, DP_SHIFT_DOWN);
-			dp_copy_ipv6(&lbval->back_end_ips[lbval->back_end_cnt - 1], &dp_empty_ipv6);
-			lbval->back_end_cnt--;
+	for (match = 0; match < lbval->back_end_cnt; ++match) {
+		if (dp_ipv6_match(&lbval->back_end_ips[match], back_ip))
 			break;
-		}
 	}
 
+	if (match >= lbval->back_end_cnt)
+		return DP_GRPC_ERR_NOT_FOUND;
+
+	dp_shift_back_end_ips(lbval->back_end_ips, match, lbval->back_end_cnt - 1, DP_SHIFT_DOWN);
+	dp_copy_ipv6(&lbval->back_end_ips[lbval->back_end_cnt - 1], &dp_empty_ipv6);
+	lbval->back_end_cnt--;
+
 	if (lbval->back_end_cnt == 0)
-		return DP_OK;
-	else
-		return dp_maglev_calc_hash_lookup_table(lbval);
+		return DP_GRPC_OK;
+
+	if (DP_FAILED(dp_maglev_calc_hash_lookup_table(lbval)))
+		return DP_GRPC_ERR_BACKIP_DEL;
+
+	return DP_GRPC_OK;
 }
 
