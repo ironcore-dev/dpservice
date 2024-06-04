@@ -13,6 +13,7 @@
 void dp_init_firewall_rules(struct dp_port *port)
 {
 	TAILQ_INIT(&port->iface.fwall_head);
+	port->iface.fwall_rule_count = 0;
 }
 
 int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *port)
@@ -24,6 +25,7 @@ int dp_add_firewall_rule(const struct dp_fwall_rule *new_rule, struct dp_port *p
 
 	rte_memcpy(rule, new_rule, sizeof(*rule));
 	TAILQ_INSERT_TAIL(&port->iface.fwall_head, rule, next_rule);
+	port->iface.fwall_rule_count++;
 
 	return DP_OK;
 }
@@ -39,6 +41,7 @@ int dp_delete_firewall_rule(const char *rule_id, struct dp_port *port)
 		if (memcmp(rule->rule_id, rule_id, sizeof(rule->rule_id)) == 0) {
 			TAILQ_REMOVE(fwall_head, rule, next_rule);
 			rte_free(rule);
+			port->iface.fwall_rule_count--;
 			return DP_OK;
 		}
 	}
@@ -215,4 +218,5 @@ void dp_del_all_firewall_rules(struct dp_port *port)
 		TAILQ_REMOVE(fwall_head, rule, next_rule);
 		rte_free(rule);
 	}
+	port->iface.fwall_rule_count = 0;
 }

@@ -34,6 +34,7 @@ struct dp_iface_cfg {
 
 struct dp_port_iface {
 	struct dp_fwall_head	fwall_head;
+	uint32_t				fwall_rule_count;
 	struct dp_iface_cfg		cfg;
 	uint32_t				vni;
 	char					id[DP_IFACE_ID_MAX_LEN];
