@@ -5,6 +5,7 @@
 
 #include <rte_telemetry.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "dp_error.h"
