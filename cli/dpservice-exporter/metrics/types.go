@@ -61,6 +61,10 @@ type DpServiceVirtsvcPort struct {
 	Value map[string]int `json:"/dp_service/virtsvc/used_port_count"`
 }
 
+type DpServiceFirewallRuleCount struct {
+	Value map[string]int `json:"/dp_service/firewall/rule_count"`
+}
+
 type NodeData map[string]float64
 
 type GraphCallCount struct {

@@ -81,6 +81,12 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) {
 		InterfaceStat.With(prometheus.Labels{"interface": ifName, "stat_name": "virtsvc_used_port_count"}).Set(float64(portCount))
 	}
 
+	var dpserviceFirewallRuleCount DpServiceFirewallRuleCount
+	queryTelemetry(conn, log, "/dp_service/firewall/rule_count", &dpserviceFirewallRuleCount)
+	for ifName, fwRuleCount := range dpserviceFirewallRuleCount.Value {
+		InterfaceStat.With(prometheus.Labels{"interface": ifName, "stat_name": "firewall_rule_count"}).Set(float64(fwRuleCount))
+	}
+
 	var dpserviceCallCount DpServiceGraphCallCount
 	queryTelemetry(conn, log, "/dp_service/graph/call_count", &dpserviceCallCount)
 
