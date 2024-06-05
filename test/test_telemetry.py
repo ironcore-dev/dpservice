@@ -23,7 +23,7 @@ IFACE_STATS = (
 	'rx_q0_errors', 'rx_q0_bytes', 'tx_q0_bytes', 'rx_q0_packets', 'tx_q0_packets',
 	'rx_good_bytes', 'tx_good_bytes', 'rx_good_packets', 'tx_good_packets',
 	'rx_errors', 'tx_errors', 'rx_missed_errors', 'rx_mbuf_allocation_errors',
-	'nat_used_port_count',
+	'nat_used_port_count', 'firewall_rule_count',
 )
 HASH_TABLES = (
 	'interface_table',
