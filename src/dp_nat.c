@@ -251,13 +251,14 @@ int dp_del_dnat_ip(uint32_t d_ip, uint32_t vni)
 		.ip = d_ip,
 		.vni = vni
 	};
+	hash_sig_t hash = rte_hash_hash(ipv4_dnat_tbl, &nkey);
 
-	if (DP_FAILED(rte_hash_lookup_data(ipv4_dnat_tbl, &nkey, (void **)&data)))
+	if (DP_FAILED(rte_hash_lookup_with_hash_data(ipv4_dnat_tbl, &nkey, hash, (void **)&data)))
 		return DP_GRPC_ERR_DNAT_NO_DATA;
 
 	rte_free(data);
-	if (DP_FAILED(rte_hash_del_key(ipv4_dnat_tbl, &nkey)))
-		DPS_LOG_WARNING("Failed to delete DNAT key");
+	if (DP_FAILED(rte_hash_del_key_with_hash(ipv4_dnat_tbl, &nkey, hash)))
+		DPS_LOG_WARNING("Failed to delete DNAT key", DP_LOG_VNI(vni), DP_LOG_IPV4(d_ip));
 
 	return DP_GRPC_OK;
 }
