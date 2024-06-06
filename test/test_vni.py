@@ -74,3 +74,28 @@ def test_vni_neighnats(prepare_ipv4, grpc_client):
 	VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6)
 
 	grpc_client.dellb(lb_name)
+
+
+def test_vni_dnat_reset(prepare_ifaces, grpc_client):
+	# Need a VM on a separate VNI with a NAT and neighboring entry
+	vni = 999
+	grpc_client.addinterface(VM4.name, VM4.pci, vni, VM4.ip, VM4.ipv6)
+	grpc_client.addnat(VM4.name, nat_vip, 100, 200)
+	grpc_client.addneighnat(nat_vip, vni, 200, 300, neigh_vni1_ul_ipv6)
+
+	# The VM gets removed along with the connected NAT entry
+	# However neighboring NAT entries are removed asynchronously, i.e. arrive later
+	grpc_client.delnat(VM4.name)
+	grpc_client.delinterface(VM4.name)
+	# This resets VM4's VNI, thus purges neighbor NAT entries
+
+	# If asynchronous deletion arrives now, there is no NAT entry (purged)
+	grpc_client.expect_error(201).delneighnat(nat_vip, vni, 200, 300)
+
+	# A VM is re-created with a VIP
+	grpc_client.addinterface(VM4.name, VM4.pci, vni, VM4.ip, VM4.ipv6)
+	# BUG The VNI reset forgot to clean-up DNAT entries
+	grpc_client.addvip(VM4.name, nat_vip)
+	grpc_client.delvip(VM4.name)
+
+	grpc_client.delinterface(VM4.name)
