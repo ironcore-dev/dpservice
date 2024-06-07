@@ -72,15 +72,15 @@ type Client interface {
 }
 
 type client struct {
-	dpdkproto.DPDKironcoreClient
+	dpdkproto.DPDKonmetalClient
 }
 
-func NewClient(protoClient dpdkproto.DPDKironcoreClient) Client {
+func NewClient(protoClient dpdkproto.DPDKonmetalClient) Client {
 	return &client{protoClient}
 }
 
 func (c *client) GetLoadBalancer(ctx context.Context, id string, ignoredErrors ...[]uint32) (*api.LoadBalancer, error) {
-	res, err := c.DPDKironcoreClient.GetLoadBalancer(ctx, &dpdkproto.GetLoadBalancerRequest{
+	res, err := c.DPDKonmetalClient.GetLoadBalancer(ctx, &dpdkproto.GetLoadBalancerRequest{
 		LoadbalancerId: []byte(id),
 	})
 	if err != nil {
@@ -98,7 +98,7 @@ func (c *client) GetLoadBalancer(ctx context.Context, id string, ignoredErrors .
 }
 
 func (c *client) ListLoadBalancers(ctx context.Context, ignoredErrors ...[]uint32) (*api.LoadBalancerList, error) {
-	res, err := c.DPDKironcoreClient.ListLoadBalancers(ctx, &dpdkproto.ListLoadBalancersRequest{})
+	res, err := c.DPDKonmetalClient.ListLoadBalancers(ctx, &dpdkproto.ListLoadBalancersRequest{})
 	if err != nil {
 		return &api.LoadBalancerList{}, err
 	}
@@ -134,7 +134,7 @@ func (c *client) CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, i
 		lbPort := &dpdkproto.LbPort{Port: p.Port, Protocol: dpdkproto.Protocol(p.Protocol)}
 		lbPorts = append(lbPorts, lbPort)
 	}
-	res, err := c.DPDKironcoreClient.CreateLoadBalancer(ctx, &dpdkproto.CreateLoadBalancerRequest{
+	res, err := c.DPDKonmetalClient.CreateLoadBalancer(ctx, &dpdkproto.CreateLoadBalancerRequest{
 		LoadbalancerId:         []byte(lb.LoadBalancerMeta.ID),
 		Vni:                    lb.Spec.VNI,
 		LoadbalancedIp:         api.NetIPAddrToProtoIpAddress(lb.Spec.LbVipIP),
@@ -164,7 +164,7 @@ func (c *client) CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, i
 }
 
 func (c *client) DeleteLoadBalancer(ctx context.Context, id string, ignoredErrors ...[]uint32) (*api.LoadBalancer, error) {
-	res, err := c.DPDKironcoreClient.DeleteLoadBalancer(ctx, &dpdkproto.DeleteLoadBalancerRequest{
+	res, err := c.DPDKonmetalClient.DeleteLoadBalancer(ctx, &dpdkproto.DeleteLoadBalancerRequest{
 		LoadbalancerId: []byte(id),
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func (c *client) DeleteLoadBalancer(ctx context.Context, id string, ignoredError
 }
 
 func (c *client) ListLoadBalancerPrefixes(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.PrefixList, error) {
-	res, err := c.DPDKironcoreClient.ListLoadBalancerPrefixes(ctx, &dpdkproto.ListLoadBalancerPrefixesRequest{
+	res, err := c.DPDKonmetalClient.ListLoadBalancerPrefixes(ctx, &dpdkproto.ListLoadBalancerPrefixesRequest{
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
@@ -218,7 +218,7 @@ func (c *client) CreateLoadBalancerPrefix(ctx context.Context, lbprefix *api.Loa
 		return &api.LoadBalancerPrefix{}, fmt.Errorf("error: input loadbalancer prefix cannot be nil")
 	}
 	lbPrefixAddr := lbprefix.Spec.Prefix.Addr()
-	res, err := c.DPDKironcoreClient.CreateLoadBalancerPrefix(ctx, &dpdkproto.CreateLoadBalancerPrefixRequest{
+	res, err := c.DPDKonmetalClient.CreateLoadBalancerPrefix(ctx, &dpdkproto.CreateLoadBalancerPrefixRequest{
 		InterfaceId: []byte(lbprefix.InterfaceID),
 		Prefix: &dpdkproto.Prefix{
 			Ip:     api.NetIPAddrToProtoIpAddress(&lbPrefixAddr),
@@ -253,7 +253,7 @@ func (c *client) DeleteLoadBalancerPrefix(ctx context.Context, interfaceID strin
 		return &api.LoadBalancerPrefix{}, fmt.Errorf("error: input prefix cannot be nil")
 	}
 	lbPrefixAddr := prefix.Addr()
-	res, err := c.DPDKironcoreClient.DeleteLoadBalancerPrefix(ctx, &dpdkproto.DeleteLoadBalancerPrefixRequest{
+	res, err := c.DPDKonmetalClient.DeleteLoadBalancerPrefix(ctx, &dpdkproto.DeleteLoadBalancerPrefixRequest{
 		InterfaceId: []byte(interfaceID),
 		Prefix: &dpdkproto.Prefix{
 			Ip:     api.NetIPAddrToProtoIpAddress(&lbPrefixAddr),
@@ -276,7 +276,7 @@ func (c *client) DeleteLoadBalancerPrefix(ctx context.Context, interfaceID strin
 }
 
 func (c *client) ListLoadBalancerTargets(ctx context.Context, loadBalancerID string, ignoredErrors ...[]uint32) (*api.LoadBalancerTargetList, error) {
-	res, err := c.DPDKironcoreClient.ListLoadBalancerTargets(ctx, &dpdkproto.ListLoadBalancerTargetsRequest{
+	res, err := c.DPDKonmetalClient.ListLoadBalancerTargets(ctx, &dpdkproto.ListLoadBalancerTargetsRequest{
 		LoadbalancerId: []byte(loadBalancerID),
 	})
 	if err != nil {
@@ -313,7 +313,7 @@ func (c *client) CreateLoadBalancerTarget(ctx context.Context, lbtarget *api.Loa
 	if lbtarget == nil {
 		return &api.LoadBalancerTarget{}, fmt.Errorf("error: input loadbalancer target cannot be nil")
 	}
-	res, err := c.DPDKironcoreClient.CreateLoadBalancerTarget(ctx, &dpdkproto.CreateLoadBalancerTargetRequest{
+	res, err := c.DPDKonmetalClient.CreateLoadBalancerTarget(ctx, &dpdkproto.CreateLoadBalancerTargetRequest{
 		LoadbalancerId: []byte(lbtarget.LoadBalancerTargetMeta.LoadbalancerID),
 		TargetIp:       api.NetIPAddrToProtoIpAddress(lbtarget.Spec.TargetIP),
 	})
@@ -333,7 +333,7 @@ func (c *client) CreateLoadBalancerTarget(ctx context.Context, lbtarget *api.Loa
 }
 
 func (c *client) DeleteLoadBalancerTarget(ctx context.Context, lbid string, targetIP *netip.Addr, ignoredErrors ...[]uint32) (*api.LoadBalancerTarget, error) {
-	res, err := c.DPDKironcoreClient.DeleteLoadBalancerTarget(ctx, &dpdkproto.DeleteLoadBalancerTargetRequest{
+	res, err := c.DPDKonmetalClient.DeleteLoadBalancerTarget(ctx, &dpdkproto.DeleteLoadBalancerTargetRequest{
 		LoadbalancerId: []byte(lbid),
 		TargetIp:       api.NetIPAddrToProtoIpAddress(targetIP),
 	})
@@ -352,7 +352,7 @@ func (c *client) DeleteLoadBalancerTarget(ctx context.Context, lbid string, targ
 }
 
 func (c *client) GetInterface(ctx context.Context, id string, ignoredErrors ...[]uint32) (*api.Interface, error) {
-	res, err := c.DPDKironcoreClient.GetInterface(ctx, &dpdkproto.GetInterfaceRequest{
+	res, err := c.DPDKonmetalClient.GetInterface(ctx, &dpdkproto.GetInterfaceRequest{
 		InterfaceId: []byte(id),
 	})
 	if err != nil {
@@ -368,7 +368,7 @@ func (c *client) GetInterface(ctx context.Context, id string, ignoredErrors ...[
 }
 
 func (c *client) ListInterfaces(ctx context.Context, ignoredErrors ...[]uint32) (*api.InterfaceList, error) {
-	res, err := c.DPDKironcoreClient.ListInterfaces(ctx, &dpdkproto.ListInterfacesRequest{})
+	res, err := c.DPDKonmetalClient.ListInterfaces(ctx, &dpdkproto.ListInterfacesRequest{})
 	if err != nil {
 		return &api.InterfaceList{}, err
 	}
@@ -416,7 +416,7 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 		}
 	}
 
-	res, err := c.DPDKironcoreClient.CreateInterface(ctx, &req)
+	res, err := c.DPDKonmetalClient.CreateInterface(ctx, &req)
 	if err != nil {
 		return &api.Interface{}, err
 	}
@@ -443,7 +443,7 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 }
 
 func (c *client) DeleteInterface(ctx context.Context, id string, ignoredErrors ...[]uint32) (*api.Interface, error) {
-	res, err := c.DPDKironcoreClient.DeleteInterface(ctx, &dpdkproto.DeleteInterfaceRequest{
+	res, err := c.DPDKonmetalClient.DeleteInterface(ctx, &dpdkproto.DeleteInterfaceRequest{
 		InterfaceId: []byte(id),
 	})
 	if err != nil {
@@ -461,7 +461,7 @@ func (c *client) DeleteInterface(ctx context.Context, id string, ignoredErrors .
 }
 
 func (c *client) GetVirtualIP(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.VirtualIP, error) {
-	res, err := c.DPDKironcoreClient.GetVip(ctx, &dpdkproto.GetVipRequest{
+	res, err := c.DPDKonmetalClient.GetVip(ctx, &dpdkproto.GetVipRequest{
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
@@ -480,7 +480,7 @@ func (c *client) CreateVirtualIP(ctx context.Context, virtualIP *api.VirtualIP, 
 	if virtualIP == nil {
 		return &api.VirtualIP{}, fmt.Errorf("error: input virtual ip cannot be nil")
 	}
-	res, err := c.DPDKironcoreClient.CreateVip(ctx, &dpdkproto.CreateVipRequest{
+	res, err := c.DPDKonmetalClient.CreateVip(ctx, &dpdkproto.CreateVipRequest{
 		InterfaceId:            []byte(virtualIP.InterfaceID),
 		VipIp:                  api.NetIPAddrToProtoIpAddress(virtualIP.Spec.IP),
 		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(virtualIP.Spec.UnderlayRoute),
@@ -508,7 +508,7 @@ func (c *client) CreateVirtualIP(ctx context.Context, virtualIP *api.VirtualIP, 
 }
 
 func (c *client) DeleteVirtualIP(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.VirtualIP, error) {
-	res, err := c.DPDKironcoreClient.DeleteVip(ctx, &dpdkproto.DeleteVipRequest{
+	res, err := c.DPDKonmetalClient.DeleteVip(ctx, &dpdkproto.DeleteVipRequest{
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
@@ -526,7 +526,7 @@ func (c *client) DeleteVirtualIP(ctx context.Context, interfaceID string, ignore
 }
 
 func (c *client) ListPrefixes(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.PrefixList, error) {
-	res, err := c.DPDKironcoreClient.ListPrefixes(ctx, &dpdkproto.ListPrefixesRequest{
+	res, err := c.DPDKonmetalClient.ListPrefixes(ctx, &dpdkproto.ListPrefixesRequest{
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
@@ -561,7 +561,7 @@ func (c *client) CreatePrefix(ctx context.Context, prefix *api.Prefix, ignoredEr
 		return &api.Prefix{}, fmt.Errorf("error: input prefix cannot be nil")
 	}
 	prefixAddr := prefix.Spec.Prefix.Addr()
-	res, err := c.DPDKironcoreClient.CreatePrefix(ctx, &dpdkproto.CreatePrefixRequest{
+	res, err := c.DPDKonmetalClient.CreatePrefix(ctx, &dpdkproto.CreatePrefixRequest{
 		InterfaceId: []byte(prefix.InterfaceID),
 		Prefix: &dpdkproto.Prefix{
 			Ip:     api.NetIPAddrToProtoIpAddress(&prefixAddr),
@@ -595,7 +595,7 @@ func (c *client) DeletePrefix(ctx context.Context, interfaceID string, prefix *n
 		return &api.Prefix{}, fmt.Errorf("error: input prefix cannot be nil")
 	}
 	prefixAddr := prefix.Addr()
-	res, err := c.DPDKironcoreClient.DeletePrefix(ctx, &dpdkproto.DeletePrefixRequest{
+	res, err := c.DPDKonmetalClient.DeletePrefix(ctx, &dpdkproto.DeletePrefixRequest{
 		InterfaceId: []byte(interfaceID),
 		Prefix: &dpdkproto.Prefix{
 			Ip:     api.NetIPAddrToProtoIpAddress(&prefixAddr),
@@ -628,7 +628,7 @@ func (c *client) CreateRoute(ctx context.Context, route *api.Route, ignoredError
 		return &api.Route{}, fmt.Errorf("nextHop needs to be specified")
 	}
 	routePrefixAddr := route.Spec.Prefix.Addr()
-	res, err := c.DPDKironcoreClient.CreateRoute(ctx, &dpdkproto.CreateRouteRequest{
+	res, err := c.DPDKonmetalClient.CreateRoute(ctx, &dpdkproto.CreateRouteRequest{
 		Vni: route.VNI,
 		Route: &dpdkproto.Route{
 			Weight: 100,
@@ -663,7 +663,7 @@ func (c *client) DeleteRoute(ctx context.Context, vni uint32, prefix *netip.Pref
 		return &api.Route{}, fmt.Errorf("error: input prefix cannot be nil")
 	}
 	routePrefixAddr := prefix.Addr()
-	res, err := c.DPDKironcoreClient.DeleteRoute(ctx, &dpdkproto.DeleteRouteRequest{
+	res, err := c.DPDKonmetalClient.DeleteRoute(ctx, &dpdkproto.DeleteRouteRequest{
 		Vni: vni,
 		Route: &dpdkproto.Route{
 			Weight: 100,
@@ -692,7 +692,7 @@ func (c *client) DeleteRoute(ctx context.Context, vni uint32, prefix *netip.Pref
 }
 
 func (c *client) ListRoutes(ctx context.Context, vni uint32, ignoredErrors ...[]uint32) (*api.RouteList, error) {
-	res, err := c.DPDKironcoreClient.ListRoutes(ctx, &dpdkproto.ListRoutesRequest{
+	res, err := c.DPDKonmetalClient.ListRoutes(ctx, &dpdkproto.ListRoutesRequest{
 		Vni: vni,
 	})
 	if err != nil {
@@ -723,7 +723,7 @@ func (c *client) ListRoutes(ctx context.Context, vni uint32, ignoredErrors ...[]
 }
 
 func (c *client) GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error) {
-	res, err := c.DPDKironcoreClient.GetNat(ctx, &dpdkproto.GetNatRequest{InterfaceId: []byte(interfaceID)})
+	res, err := c.DPDKonmetalClient.GetNat(ctx, &dpdkproto.GetNatRequest{InterfaceId: []byte(interfaceID)})
 	if err != nil {
 		return &api.Nat{}, err
 	}
@@ -740,7 +740,7 @@ func (c *client) CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[
 	if nat == nil {
 		return &api.Nat{}, fmt.Errorf("error: input nat cannot be nil")
 	}
-	res, err := c.DPDKironcoreClient.CreateNat(ctx, &dpdkproto.CreateNatRequest{
+	res, err := c.DPDKonmetalClient.CreateNat(ctx, &dpdkproto.CreateNatRequest{
 		InterfaceId:            []byte(nat.NatMeta.InterfaceID),
 		NatIp:                  api.NetIPAddrToProtoIpAddress(nat.Spec.NatIP),
 		MinPort:                nat.Spec.MinPort,
@@ -770,7 +770,7 @@ func (c *client) CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[
 }
 
 func (c *client) DeleteNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error) {
-	res, err := c.DPDKironcoreClient.DeleteNat(ctx, &dpdkproto.DeleteNatRequest{
+	res, err := c.DPDKonmetalClient.DeleteNat(ctx, &dpdkproto.DeleteNatRequest{
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
@@ -798,7 +798,7 @@ func (c *client) CreateNeighborNat(ctx context.Context, nNat *api.NeighborNat, i
 	if nNat.Spec.UnderlayRoute == nil {
 		return &api.NeighborNat{}, fmt.Errorf("underlayRoute needs to be specified")
 	}
-	res, err := c.DPDKironcoreClient.CreateNeighborNat(ctx, &dpdkproto.CreateNeighborNatRequest{
+	res, err := c.DPDKonmetalClient.CreateNeighborNat(ctx, &dpdkproto.CreateNeighborNatRequest{
 		NatIp:         api.NetIPAddrToProtoIpAddress(nNat.NatIP),
 		Vni:           nNat.Spec.Vni,
 		MinPort:       nNat.Spec.MinPort,
@@ -840,18 +840,18 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 	var err error
 	switch nType {
 	case 0:
-		res1, err1 := c.DPDKironcoreClient.ListLocalNats(ctx, &dpdkproto.ListLocalNatsRequest{NatIp: req})
+		res1, err1 := c.DPDKonmetalClient.ListLocalNats(ctx, &dpdkproto.ListLocalNatsRequest{NatIp: req})
 		if err1 != nil {
 			return &api.NatList{}, err1
 		}
-		res2, err2 := c.DPDKironcoreClient.ListNeighborNats(ctx, &dpdkproto.ListNeighborNatsRequest{NatIp: req})
+		res2, err2 := c.DPDKonmetalClient.ListNeighborNats(ctx, &dpdkproto.ListNeighborNatsRequest{NatIp: req})
 		if err2 != nil {
 			return &api.NatList{}, err2
 		}
 		natEntries = append(natEntries, res1.NatEntries...)
 		natEntries = append(natEntries, res2.NatEntries...)
 	case 1:
-		res, err := c.DPDKironcoreClient.ListLocalNats(ctx, &dpdkproto.ListLocalNatsRequest{NatIp: req})
+		res, err := c.DPDKonmetalClient.ListLocalNats(ctx, &dpdkproto.ListLocalNatsRequest{NatIp: req})
 		if err != nil {
 			return &api.NatList{}, err
 		}
@@ -863,7 +863,7 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 		natEntries = res.GetNatEntries()
 		status = res.Status
 	case 2:
-		res, err := c.DPDKironcoreClient.ListNeighborNats(ctx, &dpdkproto.ListNeighborNatsRequest{NatIp: req})
+		res, err := c.DPDKonmetalClient.ListNeighborNats(ctx, &dpdkproto.ListNeighborNatsRequest{NatIp: req})
 		if err != nil {
 			return &api.NatList{}, err
 		}
@@ -920,7 +920,7 @@ func (c *client) DeleteNeighborNat(ctx context.Context, neigbhorNat *api.Neighbo
 	if neigbhorNat == nil {
 		return &api.NeighborNat{}, fmt.Errorf("error: input neighbor nat cannot be nil")
 	}
-	res, err := c.DPDKironcoreClient.DeleteNeighborNat(ctx, &dpdkproto.DeleteNeighborNatRequest{
+	res, err := c.DPDKonmetalClient.DeleteNeighborNat(ctx, &dpdkproto.DeleteNeighborNatRequest{
 		NatIp:   api.NetIPAddrToProtoIpAddress(neigbhorNat.NatIP),
 		Vni:     neigbhorNat.Spec.Vni,
 		MinPort: neigbhorNat.Spec.MinPort,
@@ -945,7 +945,7 @@ func (c *client) ListNeighborNats(ctx context.Context, natIP *netip.Addr, ignore
 }
 
 func (c *client) ListFirewallRules(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.FirewallRuleList, error) {
-	res, err := c.DPDKironcoreClient.ListFirewallRules(ctx, &dpdkproto.ListFirewallRulesRequest{
+	res, err := c.DPDKonmetalClient.ListFirewallRules(ctx, &dpdkproto.ListFirewallRulesRequest{
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
@@ -1030,7 +1030,7 @@ func (c *client) CreateFirewallRule(ctx context.Context, fwRule *api.FirewallRul
 		},
 	}
 
-	res, err := c.DPDKironcoreClient.CreateFirewallRule(ctx, &req)
+	res, err := c.DPDKonmetalClient.CreateFirewallRule(ctx, &req)
 	if err != nil {
 		return &api.FirewallRule{}, err
 	}
@@ -1047,7 +1047,7 @@ func (c *client) CreateFirewallRule(ctx context.Context, fwRule *api.FirewallRul
 }
 
 func (c *client) GetFirewallRule(ctx context.Context, interfaceID string, ruleID string, ignoredErrors ...[]uint32) (*api.FirewallRule, error) {
-	res, err := c.DPDKironcoreClient.GetFirewallRule(ctx, &dpdkproto.GetFirewallRuleRequest{
+	res, err := c.DPDKonmetalClient.GetFirewallRule(ctx, &dpdkproto.GetFirewallRuleRequest{
 		InterfaceId: []byte(interfaceID),
 		RuleId:      []byte(ruleID),
 	})
@@ -1067,7 +1067,7 @@ func (c *client) GetFirewallRule(ctx context.Context, interfaceID string, ruleID
 }
 
 func (c *client) DeleteFirewallRule(ctx context.Context, interfaceID string, ruleID string, ignoredErrors ...[]uint32) (*api.FirewallRule, error) {
-	res, err := c.DPDKironcoreClient.DeleteFirewallRule(ctx, &dpdkproto.DeleteFirewallRuleRequest{
+	res, err := c.DPDKonmetalClient.DeleteFirewallRule(ctx, &dpdkproto.DeleteFirewallRuleRequest{
 		InterfaceId: []byte(interfaceID),
 		RuleId:      []byte(ruleID),
 	})
@@ -1087,7 +1087,7 @@ func (c *client) DeleteFirewallRule(ctx context.Context, interfaceID string, rul
 }
 
 func (c *client) CheckInitialized(ctx context.Context, ignoredErrors ...[]uint32) (*api.Initialized, error) {
-	res, err := c.DPDKironcoreClient.CheckInitialized(ctx, &dpdkproto.CheckInitializedRequest{})
+	res, err := c.DPDKonmetalClient.CheckInitialized(ctx, &dpdkproto.CheckInitializedRequest{})
 	if err != nil {
 		return &api.Initialized{}, err
 	}
@@ -1103,7 +1103,7 @@ func (c *client) CheckInitialized(ctx context.Context, ignoredErrors ...[]uint32
 }
 
 func (c *client) Initialize(ctx context.Context, ignoredErrors ...[]uint32) (*api.Initialized, error) {
-	res, err := c.DPDKironcoreClient.Initialize(ctx, &dpdkproto.InitializeRequest{})
+	res, err := c.DPDKonmetalClient.Initialize(ctx, &dpdkproto.InitializeRequest{})
 	if err != nil {
 		return &api.Initialized{}, err
 	}
@@ -1119,7 +1119,7 @@ func (c *client) Initialize(ctx context.Context, ignoredErrors ...[]uint32) (*ap
 }
 
 func (c *client) GetVni(ctx context.Context, vni uint32, vniType uint8, ignoredErrors ...[]uint32) (*api.Vni, error) {
-	res, err := c.DPDKironcoreClient.CheckVniInUse(ctx, &dpdkproto.CheckVniInUseRequest{
+	res, err := c.DPDKonmetalClient.CheckVniInUse(ctx, &dpdkproto.CheckVniInUseRequest{
 		Vni:  vni,
 		Type: dpdkproto.VniType(vniType),
 	})
@@ -1139,7 +1139,7 @@ func (c *client) GetVni(ctx context.Context, vni uint32, vniType uint8, ignoredE
 }
 
 func (c *client) ResetVni(ctx context.Context, vni uint32, vniType uint8, ignoredErrors ...[]uint32) (*api.Vni, error) {
-	res, err := c.DPDKironcoreClient.ResetVni(ctx, &dpdkproto.ResetVniRequest{
+	res, err := c.DPDKonmetalClient.ResetVni(ctx, &dpdkproto.ResetVniRequest{
 		Vni:  vni,
 		Type: dpdkproto.VniType(vniType),
 	})
@@ -1162,7 +1162,7 @@ func (c *client) GetVersion(ctx context.Context, version *api.Version, ignoredEr
 		return &api.Version{}, fmt.Errorf("error: input version cannot be nil")
 	}
 	version.ClientProtocol = strings.TrimSpace(dpdkproto.GeneratedFrom)
-	res, err := c.DPDKironcoreClient.GetVersion(ctx, &dpdkproto.GetVersionRequest{
+	res, err := c.DPDKonmetalClient.GetVersion(ctx, &dpdkproto.GetVersionRequest{
 		ClientProtocol: version.ClientProtocol,
 		ClientName:     version.ClientName,
 		ClientVersion:  version.ClientVersion,
@@ -1205,7 +1205,7 @@ func (c *client) CaptureStart(ctx context.Context, capture *api.CaptureStart, ig
 		interfaces = append(interfaces, protoInterface)
 	}
 
-	res, err := c.DPDKironcoreClient.CaptureStart(ctx, &dpdkproto.CaptureStartRequest{
+	res, err := c.DPDKonmetalClient.CaptureStart(ctx, &dpdkproto.CaptureStartRequest{
 		CaptureConfig: &dpdkproto.CaptureConfig{
 			SinkNodeIp: api.NetIPAddrToProtoIpAddress(capture.CaptureStartMeta.Config.SinkNodeIP),
 			UdpSrcPort: capture.CaptureStartMeta.Config.UdpSrcPort,
@@ -1226,7 +1226,7 @@ func (c *client) CaptureStart(ctx context.Context, capture *api.CaptureStart, ig
 }
 
 func (c *client) CaptureStop(ctx context.Context, ignoredErrors ...[]uint32) (*api.CaptureStop, error) {
-	res, err := c.DPDKironcoreClient.CaptureStop(ctx, &dpdkproto.CaptureStopRequest{})
+	res, err := c.DPDKonmetalClient.CaptureStop(ctx, &dpdkproto.CaptureStopRequest{})
 	if err != nil {
 		return &api.CaptureStop{}, err
 	}
@@ -1245,7 +1245,7 @@ func (c *client) CaptureStop(ctx context.Context, ignoredErrors ...[]uint32) (*a
 }
 
 func (c *client) CaptureStatus(ctx context.Context, ignoredErrors ...[]uint32) (*api.CaptureStatus, error) {
-	res, err := c.DPDKironcoreClient.CaptureStatus(ctx, &dpdkproto.CaptureStatusRequest{})
+	res, err := c.DPDKonmetalClient.CaptureStatus(ctx, &dpdkproto.CaptureStatusRequest{})
 	if err != nil {
 		return &api.CaptureStatus{}, err
 	}

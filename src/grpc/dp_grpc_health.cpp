@@ -16,7 +16,7 @@ void HealthService::SetServingStatus(grpc::health::v1::HealthCheckResponse::Serv
 grpc::Status HealthService::Check(grpc::ServerContext* /*context*/, const grpc::health::v1::HealthCheckRequest* request,
 								  grpc::health::v1::HealthCheckResponse* response)
 {
-	if (!request->service().empty() && request->service() != dpdkironcore::v1::DPDKironcore::service_full_name()) {
+	if (!request->service().empty() && request->service() != dpdkonmetal::v1::DPDKonmetal::service_full_name()) {
 		response->set_status(grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN);
 	} else {
 		std::lock_guard<std::mutex> lock(status_mutex_);
@@ -28,7 +28,7 @@ grpc::Status HealthService::Check(grpc::ServerContext* /*context*/, const grpc::
 grpc::Status HealthService::Watch(grpc::ServerContext* context, const grpc::health::v1::HealthCheckRequest* request,
 								  grpc::ServerWriter<grpc::health::v1::HealthCheckResponse>* writer)
 {
-	if (!request->service().empty() && request->service() != dpdkironcore::v1::DPDKironcore::service_full_name())
+	if (!request->service().empty() && request->service() != dpdkonmetal::v1::DPDKonmetal::service_full_name())
         return grpc::Status(grpc::StatusCode::NOT_FOUND, "Service not found");
 
 	grpc::health::v1::HealthCheckResponse response;
