@@ -47,7 +47,7 @@ func (o *DPDKClientOptions) NewClient(ctx context.Context) (client.Client, func(
 		return nil, nil, fmt.Errorf("error connecting to %s: %w", o.Address, err)
 	}
 
-	protoClient := dpdkproto.NewDPDKironcoreClient(conn)
+	protoClient := dpdkproto.NewDPDKonmetalClient(conn)
 	c := client.NewClient(protoClient)
 
 	cleanup := conn.Close
