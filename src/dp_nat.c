@@ -817,6 +817,28 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 	return DP_GRPC_OK;
 }
 
+static int dp_del_dnat_by_vni(uint32_t vni)
+{
+	struct dnat_data *data;
+	const struct nat_key *key;
+	uint32_t iter = 0;
+	int	ret;
+
+	while ((ret = rte_hash_iterate(ipv4_dnat_tbl, (const void **)&key, (void **)&data, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Iterating dnat table to remove VNI failed", DP_LOG_RET(ret), DP_LOG_VNI(vni));
+			return ret;
+		}
+		if (key->vni == vni) {
+			rte_free(data);
+			ret = rte_hash_del_key(ipv4_dnat_tbl, key);
+			if (DP_FAILED(ret))
+				DPS_LOG_WARNING("Failed to delete DNAT key", DP_LOG_RET(ret), DP_LOG_VNI(vni), DP_LOG_IPV4(key->ip));
+		}
+	}
+	return DP_OK;
+}
+
 void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)
 {
 	struct nat_entry *item, *tmp_item;
@@ -824,10 +846,11 @@ void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)
 	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
 		if ((item->vni == vni) || (vni == DP_NETWORK_NAT_ALL_VNI)) {
-			// can fail on non-presence (fine) or internal error (already logged)
-			dp_del_dnat_ip(item->nat_ip, item->vni);
 			TAILQ_REMOVE(&nat_headp, item, entries);
 			rte_free(item);
 		}
 	}
+
+	if (DP_FAILED(dp_del_dnat_by_vni(vni)))
+		DPS_LOG_WARNING("Not all DNAT entries removed", DP_LOG_VNI(vni));
 }
