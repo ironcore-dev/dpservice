@@ -526,8 +526,8 @@ int dp_add_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, u
 
 	TAILQ_FOREACH(next, &nat_headp, entries) {
 		if (dp_is_network_nat_entry_port_overlap(next, nat_ip, min_port, max_port)) {
-			DPS_LOG_ERR("Cannot add a nat entry that has an overlapping port range with an existing one", DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni),
-						DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
+			DPS_LOG_WARNING("Cannot add a nat entry that has an overlapping port range with an existing one",
+							DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni), DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
 			return DP_GRPC_ERR_ALREADY_EXISTS;
 		}
 	}
