@@ -14,6 +14,7 @@
 #include "dp_internal_stats.h"
 #include "dp_util.h"
 #include "dpdk_layer.h"
+#include "rte_flow/dp_rte_async_flow.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,6 +67,8 @@ struct dp_port {
 	struct dp_port_stats			stats;
 	struct rte_meter_srtcm			port_srtcm;
 	struct rte_meter_srtcm_profile	port_srtcm_profile;
+	struct dp_port_rte_async_templates async_templates;
+	struct rte_flow					*default_async_flow[DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT];
 };
 
 struct dp_ports {
@@ -152,6 +155,12 @@ static __rte_always_inline
 struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 {
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
+}
+
+static __rte_always_inline
+struct dp_port *dp_get_main_eswitch_port(void)
+{
+	return dp_get_port_by_pf_index(0);
 }
 
 #ifdef __cplusplus

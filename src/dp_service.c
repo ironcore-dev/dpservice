@@ -28,6 +28,7 @@
 #endif
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_thread.h"
+#include "rte_flow/dp_rte_async_flow.h"
 
 static char **dp_argv;
 static int dp_argc;
@@ -162,8 +163,10 @@ static int init_interfaces(void)
 #ifdef ENABLE_PYTEST
 	if (dp_conf_is_wcmp_enabled())
 #endif
+	{
 	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(1))))
 		return DP_ERROR;
+	}
 
 	// VFs are started by GRPC later
 
