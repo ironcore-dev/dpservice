@@ -31,7 +31,7 @@ dpservice-cli completion -h
 ```
 
 # Dependency
-This client uses golang bindings from module [/go/dpservice-go](https://github.com/ironcore-dev/dpservice/go/dpservice-go).
+This client uses golang bindings from module [/go/dpservice-go](https://github.com/ironcore-dev/dpservice/tree/main/go/dpservice-go).
 
 Definition go files in [proto](https://github.com/ironcore-dev/dpservice/tree/main/go/dpservice-go/proto) folder are auto-generated from [dpdk.proto](https://github.com/ironcore-dev/dpservice/blob/main/proto/dpdk.proto) file in [dpservice](https://github.com/ironcore-dev/dpservice/) repo.
 

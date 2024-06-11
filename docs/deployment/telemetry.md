@@ -13,3 +13,6 @@ To send telemetry requests, a node name with a parameter (must be zero if not pr
 ```
 
 For the complete list of commands (telemetry nodes), send `/,0`.
+
+## Prometheus exporter
+`dpservice-exporter` is used for monitoring and exposing `dpservice-bin` statistics from DPDK telemetry. It is included in `dpservice` repository and more details can be found [here](https://github.com/ironcore-dev/dpservice/blob/main/cli/dpservice-exporter).

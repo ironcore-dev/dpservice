@@ -8,4 +8,4 @@ For development, direct use of dp-service is covered by the [development section
 ## Command-line tools
 All tool binaries are designed to be prefixed with `dpservice-` to enable the operator to simply type `dps<TAB>` for list of possible tools.
 
-The provided Docker image contains `dpservice-bin` as the main process (already started by being the entrypoint), `dpservice-cli` to gRPC communication with the main process, and `dpservice-dump` to provide a way to see the actual traffic handled by dp-service.
+The provided Docker image contains `dpservice-bin` as the main process (already started by being the entrypoint), `dpservice-cli` to gRPC communication with the main process, and `dpservice-dump` to provide a way to see the actual traffic handled by dp-service. Also included is `dpservice-exporter`, a Prometheus exporter that can export various statistics about dpservice (interface stats, NAT port usage, hash table fullness, ...)

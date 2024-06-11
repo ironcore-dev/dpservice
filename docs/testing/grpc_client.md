@@ -2,7 +2,7 @@
 
 To communicate with the `dpservice-bin` process, you need to use GRPC (running on localhost at default port 1337).
 
-There is a golang command-line client [dpservice-cli](https://github.com/ironcore-dev/dpservice/cli/dpservice-cli/), with full [command-line documentation](https://github.com/ironcore-dev/dpservice/cli/dpservice-cli/tree/osc-main/docs/commands#dpservice-cli-commands).
+There is a golang command-line client [dpservice-cli](https://github.com/ironcore-dev/dpservice/tree/main/cli/dpservice-cli), with full [command-line documentation](https://github.com/ironcore-dev/dpservice/tree/main/cli/dpservice-cli/docs/commands).
 
 
 ## Sample commands for testing
@@ -58,6 +58,12 @@ $ dpservice-cli list lbtargets --lb-id=my_lb
  IpVersion  Address
       IPv6  fc00:1::30:0:7
       IPv6  fc00:1::30:0:8
+```
+List all loadbalancers:
+```bash
+$ dpservice-cli list lb
+ ID  VNI  LbVipIP      Lbports           UnderlayRoute
+ 4   100  10.20.30.40  [TCP/443 UDP/53]  fc00:1::f1:0:95
 ```
 Get info on the loadbalancer setting:
 ```bash

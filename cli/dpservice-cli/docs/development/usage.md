@@ -75,4 +75,4 @@ One file can contain multiple objects of any kind, example file:
 ```
 
 **Note**
-All available commands can be found [here](/docs/commands/README.md).
+All available commands can be found [here](../commands/README.md).

@@ -16,7 +16,7 @@ Dataplane Service in short form dp-service is a L3 virtual router with basic L2 
 - [rte_flow](https://doc.dpdk.org/guides/prog_guide/rte_flow.html) offloading between the Virtual Machines(VMs) on a single hypervisor and ip in ipv6 decap/encap offloading between hypervisors.
 - GRPC support to add virtual network interfaces and routes. There is a C++ based GRPC
   test client (CLI) which can connect to the GRPC server. See the examples under [docs](/docs).
-- There is also a golang based [GRPC client](https://github.com/ironcore-dev/dpservice/cli/dpservice-cli) which is easier to used.
+- There is also a golang based [GRPC client](https://github.com/ironcore-dev/dpservice/tree/main/cli/dpservice-cli) which is easier to used.
 - A kubernetes controller abstraction on top of the provided GRPC interface is availiable as well. It is called [metalnet](https://github.com/ironcore-dev/metalnet).
 - DHCPv4, DHCPv6, Neighbour Discovery, ARP protocols supported (Sub-set implementations.).
 - IPv4 and limited IPv6 overlay support.
@@ -32,7 +32,7 @@ For more details please refer to documentation folder [docs](/docs)
 ## Contributing
 
 We`d love to get a feedback from you.
-Please report bugs, suggestions or post question by opening a [Github issue](https://github.com/ironcore-dev/dpservice/pulls)
+Please report bugs, suggestions or post question by opening a [Github issue](https://github.com/ironcore-dev/dpservice/issues)
 
 ## License
 
