@@ -28,6 +28,7 @@
 #endif
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_thread.h"
+#include "rte_flow/dp_rte_async_flow.h"
 
 static char **dp_argv;
 static int dp_argc;
@@ -89,7 +90,7 @@ static void dp_args_free_mellanox(void)
 static bool dp_is_mellanox_opt_set(void)
 {
 	return dp_conf_get_eal_a_pf0()[0] != '\0'
-		&& dp_conf_get_eal_a_pf1()[0] != '\0';
+ 		|| dp_conf_get_eal_a_pf1()[0] != '\0';
 }
 
 static int dp_eal_init(int *argc_ptr, char ***argv_ptr)
@@ -162,8 +163,10 @@ static int init_interfaces(void)
 #ifdef ENABLE_PYTEST
 	if (dp_conf_is_wcmp_enabled())
 #endif
+	{
 	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(1))))
 		return DP_ERROR;
+	}
 
 	// VFs are started by GRPC later
 
@@ -225,6 +228,11 @@ static int run_service(void)
 	// pre-init sanity checks
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
 		DP_EARLY_ERR("Disabled conntrack requires disabled offloading");
+		return DP_ERROR;
+	}
+
+	if (dp_conf_is_mesw_mode() && dp_conf_is_offload_enabled()) {
+		DP_EARLY_ERR("HW offloading is currently not supported if Nic is configured in the multi-port eswtich mode");
 		return DP_ERROR;
 	}
 
