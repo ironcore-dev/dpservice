@@ -28,7 +28,7 @@ static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_
 	dp_set_redirect_queue_action(&concrete_actions[concrete_action_cnt++], &queue_action, 0);
 	dp_set_end_action(&concrete_actions[concrete_action_cnt++]);
 
-	ret = dp_rte_async_create_concrete_rules(main_eswitch_port->async_templates.template_tables, DP_ASYNC_RULE_TABLE_DEFAULT,
+	ret = dp_rte_async_create_concrete_rules(main_eswitch_port->default_async_rules.async_templates.template_tables, DP_ASYNC_RULE_TABLE_DEFAULT,
 											concrete_patterns, concrete_actions, DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION, &flow);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to create concrete async default rule for pf", DP_LOG_PORTID(port_id));
@@ -36,9 +36,9 @@ static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_
 	}
 
 	if (proto_id == IPPROTO_IPIP)
-		port->default_async_flow[0] = flow;
+		port->default_async_rules.default_async_flow[0] = flow;
 	else
-		port->default_async_flow[1] = flow;
+		port->default_async_rules.default_async_flow[1] = flow;
 
 	return DP_OK;
 }
@@ -72,7 +72,7 @@ int dp_destroy_pf_async_isolation_rules(uint16_t port_id)
 	struct dp_port *main_eswitch_port = dp_get_main_eswitch_port();
 
 	for (uint8_t i = 0; i < DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT; i++) {
-		struct rte_flow *flow_to_destroy = port->default_async_flow[i]; // just to be clear on the difference between port/main_eswitch_port in the next function call
+		struct rte_flow *flow_to_destroy = port->default_async_rules.default_async_flow[i]; // just to be clear on the difference between port/main_eswitch_port in the next function call
 		if (DP_FAILED(dp_rte_async_destroy_rule(main_eswitch_port->port_id, flow_to_destroy)))
 			DPS_LOG_WARNING("Failed to enqueue the operation of destroying pf async isolation rule", DP_LOG_PORTID(port_id));
 	}

@@ -61,14 +61,21 @@ struct dp_port {
 	struct rte_ether_addr			own_mac;
 	struct rte_ether_addr			neigh_mac;
 	struct dp_port_iface			iface;
-	struct rte_flow					*default_jump_flow;
-	struct rte_flow					*default_capture_flow;
 	bool							captured;
 	struct dp_port_stats			stats;
 	struct rte_meter_srtcm			port_srtcm;
 	struct rte_meter_srtcm_profile	port_srtcm_profile;
-	struct dp_port_rte_async_templates async_templates;
-	struct rte_flow					*default_async_flow[DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT];
+	union {
+		struct {
+			struct rte_flow					*default_jump_flow;
+			struct rte_flow					*default_capture_flow;
+		} default_sync_rules;
+
+		struct {
+			struct dp_port_rte_async_templates async_templates;
+			struct rte_flow					*default_async_flow[DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT];
+		} default_async_rules;
+	};
 };
 
 struct dp_ports {

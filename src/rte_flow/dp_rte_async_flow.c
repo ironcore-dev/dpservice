@@ -156,9 +156,9 @@ int dp_rte_async_create_template_tables(uint16_t port_id, uint8_t pattern_action
 	// assuming the attributes of patterns/actions match with table attributes
 	for (int i = 0; i < DP_ASYNC_RULE_TABLE_MAX; i++ ) {
 		ret = dp_rte_async_create_table_template(port->port_id, &table_attr,
-											port->async_templates.pattern_templates, pattern_action_template_counter,
-											port->async_templates.action_templates, pattern_action_template_counter,
-											&(port->async_templates.template_tables[i]));
+											port->default_async_rules.async_templates.pattern_templates, pattern_action_template_counter,
+											port->default_async_rules.async_templates.action_templates, pattern_action_template_counter,
+											&(port->default_async_rules.async_templates.template_tables[i]));
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to create async flow rule table", DP_LOG_VALUE(i));
 			return DP_ERROR;
@@ -212,7 +212,7 @@ static void dp_rte_async_destroy_pattern_template(struct dp_port *port)
 	int ret;
 	
 	for (uint8_t i = 0; i < DP_ASYNC_RULE_TYPE_MAX; i++) {
-		ret = rte_flow_pattern_template_destroy(port->port_id, port->async_templates.pattern_templates[i], &error);
+		ret = rte_flow_pattern_template_destroy(port->port_id, port->default_async_rules.async_templates.pattern_templates[i], &error);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Failed to destroy pattern template", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 	}
@@ -226,7 +226,7 @@ static void dp_rte_async_destroy_action_template(struct dp_port *port)
 	int ret = DP_OK;
 
 	for (uint8_t i = 0; i < DP_ASYNC_RULE_TYPE_MAX; i++) {
-		ret = rte_flow_actions_template_destroy(port->port_id, port->async_templates.action_templates[i], &error);
+		ret = rte_flow_actions_template_destroy(port->port_id, port->default_async_rules.async_templates.action_templates[i], &error);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Failed to destroy action template", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 	}
@@ -239,7 +239,7 @@ static void dp_rte_async_destroy_table_template(struct dp_port *port)
 	int ret = DP_OK;
 	
 	for (uint8_t i = 0; i < DP_ASYNC_RULE_TABLE_MAX; i++) {
-		ret = rte_flow_template_table_destroy(port->port_id, port->async_templates.template_tables[i], &error);
+		ret = rte_flow_template_table_destroy(port->port_id, port->default_async_rules.async_templates.template_tables[i], &error);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Failed to destroy template table", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 	}

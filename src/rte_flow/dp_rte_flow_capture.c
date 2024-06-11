@@ -56,7 +56,7 @@ int dp_install_jump_rule_in_default_group(struct dp_port *port, uint32_t dst_gro
 	if (!flow)
 		return DP_ERROR;
 
-	port->default_jump_flow = flow;
+	port->default_sync_rules.default_jump_flow = flow;
 
 	DPS_LOG_DEBUG("Installed the default jumping flow rule that destinated to group", DP_LOG_PORT(port), DP_LOG_RTE_GROUP(dst_group));
 	return DP_OK;
@@ -137,7 +137,7 @@ static int dp_install_default_rule_in_capture_group(struct dp_port *port, bool c
 		return DP_ERROR;
 	}
 
-	port->default_capture_flow = flow;
+	port->default_sync_rules.default_capture_flow = flow;
 
 	DPS_LOG_DEBUG("Installed the default monitoring flow rule", DP_LOG_PORT(port));
 	return DP_OK;
@@ -149,16 +149,16 @@ int dp_destroy_default_flow(struct dp_port *port)
 	struct rte_flow_error error;
 	int ret;
 
-	if (port->default_jump_flow) {
-		ret = rte_flow_destroy(port->port_id, port->default_jump_flow, &error);
+	if (port->default_sync_rules.default_jump_flow) {
+		ret = rte_flow_destroy(port->port_id, port->default_sync_rules.default_jump_flow, &error);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_WARNING("Failed to destroy default jump flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 	}
 
-	if (port->default_capture_flow) {
-		ret = rte_flow_destroy(port->port_id, port->default_capture_flow, &error);
+	if (port->default_sync_rules.default_capture_flow) {
+		ret = rte_flow_destroy(port->port_id, port->default_sync_rules.default_capture_flow, &error);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_WARNING("Failed to destroy default capture flow", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;

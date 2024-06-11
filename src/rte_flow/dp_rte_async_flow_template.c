@@ -29,7 +29,7 @@ static int dp_create_pf_default_async_rule_templates(uint16_t main_eswitch_port_
 	dp_set_ipv6_flow_item(&pattern[pattern_cnt++], NULL, 0, DP_SET_FLOW_ITEM_WITH_MASK);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
-	ret = dp_rte_async_create_pattern_template(port->port_id, pattern, &pattern_template_attr, &(port->async_templates.pattern_templates[DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION]));
+	ret = dp_rte_async_create_pattern_template(port->port_id, pattern, &pattern_template_attr, &(port->default_async_rules.async_templates.pattern_templates[DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION]));
 	if (DP_FAILED(ret))
 		return DP_ERROR;
 
@@ -40,7 +40,7 @@ static int dp_create_pf_default_async_rule_templates(uint16_t main_eswitch_port_
 	dp_set_redirect_queue_action(&action_mask[action_mask_cnt++], NULL, 0);
 	dp_set_end_action(&action_mask[action_mask_cnt++]);
 
-	ret = dp_rte_async_create_actions_template(0, action, action_mask, &action_template_attr, &(port->async_templates.action_templates[DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION]));
+	ret = dp_rte_async_create_actions_template(0, action, action_mask, &action_template_attr, &(port->default_async_rules.async_templates.action_templates[DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION]));
 	if (DP_FAILED(ret))
 		return DP_ERROR;
 
