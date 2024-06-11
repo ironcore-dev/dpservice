@@ -1,6 +1,6 @@
 # dpservice-cli commands:
 
-You can browse help for all commands starting in the main command [here](/docs/commands/dpservice-cli.md)](/docs/commands/dpservice-cli.md)
+You can browse help for all commands starting in the main command [here](./dpservice-cli.md)
 
 # Available commands:
 

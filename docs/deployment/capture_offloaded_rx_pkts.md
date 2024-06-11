@@ -59,4 +59,4 @@ Offloaded packets are captured by using special rte flow rules, especially the o
 | Outer Ether header | Outer IPv6 header | UDP header | Captured Ether frame |
 ```
 
-[Figure1](docs/sys_design/pkt_capture_flow_rules-VF.drawio.png) and [Figure2](docs/sys_design/pkt_capture_flow_rules-PF.drawio.png) illustrate the organization of flow rules for VF and PF. The differences between handling VF and PF are empirical.
+[Figure1](../sys_design/pkt_capture_flow_rules-VF.drawio.png) and [Figure2](../sys_design/pkt_capture_flow_rules-PF.drawio.png) illustrate the organization of flow rules for VF and PF. The differences between handling VF and PF are empirical.
