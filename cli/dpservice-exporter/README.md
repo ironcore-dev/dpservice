@@ -13,7 +13,7 @@ Also specified port (by default 8080) on which we want to run `dpservice-exporte
 
 ## Support, Feedback, Contributing
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/ironcore/dpservice/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information.
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/ironcore-dev/dpservice/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information.
 
 ## License
 Licensed under the Apache License, Version 2.0 (the "License");
