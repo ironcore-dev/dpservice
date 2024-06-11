@@ -1,4 +1,5 @@
-
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
 
 #include <rte_common.h>
 #include <rte_malloc.h>
@@ -79,8 +80,6 @@ int dp_pull_rte_async_rule_status(uint16_t port_id, uint8_t rule_count) {
 				DPS_LOG_WARNING("Non empty user data when p", DP_LOG_PORTID(port_id));
 			}
 		}
-
-		DPS_LOG_INFO("Polled success async rule", DP_LOG_VALUE(success));
 	}
 	rte_free(res);
 	return DP_OK;

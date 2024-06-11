@@ -231,6 +231,11 @@ static int run_service(void)
 		return DP_ERROR;
 	}
 
+	if (dp_conf_is_mesw_mode() && dp_conf_is_offload_enabled()) {
+		DP_EARLY_ERR("HW offloading is currently not supported if Nic is configured in the multi-port eswtich mode");
+		return DP_ERROR;
+	}
+
 	if (DP_FAILED(dp_log_init()))
 		return DP_ERROR;
 

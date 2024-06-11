@@ -385,18 +385,18 @@ void dp_ports_free(void)
 }
 
 
-// static int dp_port_install_sync_isolated_mode(uint16_t port_id)
-// {
-// 	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
-// 	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPIP))
-// 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
-// 		return DP_ERROR;
-// #ifdef ENABLE_VIRTSVC
-// 	return dp_virtsvc_install_isolation_rules(port_id);
-// #else
-// 	return DP_OK;
-// #endif
-// }
+static int dp_port_install_sync_isolated_mode(uint16_t port_id)
+{
+	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
+	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPIP))
+		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
+		return DP_ERROR;
+#ifdef ENABLE_VIRTSVC
+	return dp_virtsvc_install_isolation_rules(port_id);
+#else
+	return DP_OK;
+#endif
+}
 
 static int dp_port_bind_port_hairpins(const struct dp_port *port)
 {
@@ -425,10 +425,9 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 
 static int dp_install_pf_async_flow_templates(struct dp_port *port)
 {
-	if (port->port_id == dp_get_pf0()->port_id)
+	if (port->port_id == dp_get_main_eswitch_port()->port_id)
 		if (DP_FAILED(dp_create_pf_async_rte_rule_templates(port->port_id)))
 			return DP_ERROR;
-
 	return DP_OK;
 }
 
@@ -445,15 +444,16 @@ static int dp_init_port(struct dp_port *port)
 		return DP_OK;
 
 	if (port->is_pf) {
-		if (DP_FAILED(dp_install_pf_async_flow_templates(port)))
-			return DP_ERROR;
+		if (dp_conf_is_mesw_mode()) {
+			if (DP_FAILED(dp_install_pf_async_flow_templates(port)))
+				return DP_ERROR;
 
-		if (DP_FAILED(dp_port_install_async_isolated_mode(port->port_id)))
-			return DP_ERROR;
-		
-		// TODO: make sync/async optional
-		// if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
-		// 	return DP_ERROR;
+			if (DP_FAILED(dp_port_install_async_isolated_mode(port->port_id)))
+				return DP_ERROR;
+
+		} else
+			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
+				return DP_ERROR;
 	}
 
 	if (dp_conf_is_offload_enabled()) {
