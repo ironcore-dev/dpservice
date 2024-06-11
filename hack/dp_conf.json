@@ -160,6 +160,13 @@
       "max": 300,
       "default": "DP_FLOW_DEFAULT_TIMEOUT",
       "ifdef": "ENABLE_PYTEST"
+    },
+    {
+      "lgopt": "mesw-mode",
+      "help": "enable the support for Nic configured in multi-port eswitch mode ",
+      "var": "mesw_mode",
+      "type": "bool",
+      "default": "false"
     }
   ]
 }

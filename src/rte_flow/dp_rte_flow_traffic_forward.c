@@ -229,12 +229,12 @@ int dp_offload_handle_tunnel_encap_traffic(struct dp_flow *df,
 
 	// Match vf packets (and possibly modified vf packets embedded with vni info)
 	if (cross_pf_port) {
-		dp_set_eth_flow_item(&hairpin_pattern[hairpin_pattern_cnt++], &hairpin_eth_spec, htons(df->l3_type));
+		dp_set_eth_flow_item(&hairpin_pattern[hairpin_pattern_cnt++], &hairpin_eth_spec, htons(df->l3_type), DP_SET_FLOW_ITEM_WITH_MASK);
 		memset(vni_in_mac_addr.addr_bytes, 0, sizeof(vni_in_mac_addr));
 		memcpy(vni_in_mac_addr.addr_bytes, &df->tun_info.dst_vni, 4);
 		dp_set_eth_dst_flow_item(&pattern[pattern_cnt++], &eth_spec, &vni_in_mac_addr, htons(df->l3_type));
 	} else
-		dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
+		dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type), DP_SET_FLOW_ITEM_WITH_MASK);
 
 	// encapsulating, there is only overlay addressing
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6)
@@ -392,7 +392,7 @@ int dp_offload_handle_tunnel_decap_traffic(struct dp_flow *df,
 		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &df->tun_info.ul_src_addr6);
 
 	// create flow match patterns
-	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
+	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type), DP_SET_FLOW_ITEM_WITH_MASK);
 
 	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &df->tun_info.ul_dst_addr6, df->tun_info.proto_id);
 
@@ -526,7 +526,7 @@ int dp_offload_handle_local_traffic(struct dp_flow *df,
 	const struct rte_flow_attr *attr;
 
 	// create local flow match pattern
-	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type));
+	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->l3_type), DP_SET_FLOW_ITEM_WITH_MASK);
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &l3_spec.ipv6, &df->dst.dst_addr6, df->l4_type);
@@ -615,7 +615,7 @@ int dp_offload_handle_in_network_traffic(struct dp_flow *df,
 	const struct dp_port *outgoing_port;
 
 	// create match pattern based on dp_flow
-	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type));
+	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(df->tun_info.l3_type), DP_SET_FLOW_ITEM_WITH_MASK);
 
 	// trick: ul_src_addr6 is actually the original dst ipv6 of bouncing pkt
 	dp_set_ipv6_dst_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &df->tun_info.ul_src_addr6, df->tun_info.proto_id);
