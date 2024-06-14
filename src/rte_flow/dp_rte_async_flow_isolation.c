@@ -8,8 +8,8 @@
 static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_t proto_id)
 {
 
-	struct rte_flow_item_eth eth_pattern = {0};		// #2
-	struct rte_flow_item_ipv6 ipv6_hdr = {0};	   // #3
+	struct rte_flow_item_eth eth_pattern = {0};		// #1
+	struct rte_flow_item_ipv6 ipv6_hdr = {0};	   // #2
 	struct rte_flow_item concrete_patterns[3];  // end
 	int concrete_pattern_cnt = 0;
 

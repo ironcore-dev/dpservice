@@ -168,11 +168,12 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->own_mac)))
 			return DP_ERROR;
 		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
+	}
 
-		if (DP_FAILED(dp_port_rte_async_flow_config(port->port_id))) {
-			DPS_LOG_ERR("Failed to config port to install async flows", DP_LOG_PORT(port));
-			return DP_ERROR;
-		}
+
+	if (DP_FAILED(dp_port_rte_async_flow_config(port->port_id))) {
+		DPS_LOG_ERR("Failed to config port to install async flows", DP_LOG_PORT(port));
+		return DP_ERROR;
 	}
 
 	return DP_OK;
