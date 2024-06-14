@@ -25,20 +25,20 @@ extern "C" {
 #define DP_ASYNC_DEFAULT_OP_QUEUE_ID 0
 
 static const struct rte_flow_pattern_template_attr default_pattern_template_attr = {
-	.transfer = 1
+	.ingress = 1
 };
 
 static const struct rte_flow_actions_template_attr default_action_template_attr = {
-	.transfer = 1
+	.ingress = 1
 };
 
 static const struct rte_flow_template_table_attr pf_default_table_attr = {
 		.flow_attr = {
 			.group = 0,
-			.transfer = 1,
+			.ingress = 1,
 		},
 		.nb_flows = DP_ASYNC_FLOW_PF_DEFAULT_TABLE_MAX_RULES,
-		.specialize = RTE_FLOW_TABLE_SPECIALIZE_TRANSFER_WIRE_ORIG,
+		// .specialize = RTE_FLOW_TABLE_SPECIALIZE_TRANSFER_WIRE_ORIG,
 };
 
 static const struct rte_flow_template_table_attr pf_tunnel_table_attr = {
@@ -87,7 +87,8 @@ int dp_rte_async_create_table_template(uint16_t port_id, struct rte_flow_templat
 
 int dp_rte_async_create_template_tables(uint16_t port_id, uint8_t pattern_action_template_counter);
 
-int dp_rte_async_create_concrete_rules(struct rte_flow_template_table *template_tables[],
+int dp_rte_async_create_concrete_rules(uint16_t port_id,
+									struct rte_flow_template_table *template_tables[],
 									uint8_t used_table_index,
 									struct rte_flow_item *concrete_patterns, struct rte_flow_action *concrete_actions,
 									uint8_t used_pattern_action_index,

@@ -12,7 +12,7 @@ extern "C" {
 #include <stdbool.h>
 #include <rte_flow.h>
 
-int dp_create_pf_async_rte_rule_templates(uint16_t main_eswitch_port_id);
+int dp_create_pf_async_rte_rule_templates(uint16_t port_id);
 
 #ifdef __cplusplus
 }

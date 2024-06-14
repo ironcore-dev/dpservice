@@ -166,7 +166,8 @@ int dp_rte_async_create_template_tables(uint16_t port_id, uint8_t pattern_action
 	return DP_OK;
 }
 
-int dp_rte_async_create_concrete_rules(struct rte_flow_template_table *template_tables[],
+int dp_rte_async_create_concrete_rules(uint16_t port_id,
+									struct rte_flow_template_table *template_tables[],
 									uint8_t used_table_index,
 									struct rte_flow_item *concrete_patterns, struct rte_flow_action *concrete_actions,
 									uint8_t used_pattern_action_index,
@@ -175,15 +176,13 @@ int dp_rte_async_create_concrete_rules(struct rte_flow_template_table *template_
 	struct rte_flow *created_flow;
 	struct rte_flow_error error;
 
-	struct dp_port* main_eswitch_port = dp_get_main_eswitch_port();
-
 	struct rte_flow_template_table *used_table = template_tables[used_table_index];
 	
-	created_flow = rte_flow_async_create(main_eswitch_port->port_id, 0, &op_attr, used_table,
+	created_flow = rte_flow_async_create(port_id, 0, &op_attr, used_table,
 			concrete_patterns, used_pattern_action_index, concrete_actions, used_pattern_action_index, NULL, &error);
 
 	if (!created_flow) {
-		DPS_LOG_ERR("Concrete flow rule cannot be created", DP_LOG_PORTID(main_eswitch_port->port_id), DP_LOG_FLOW_ERROR(error.message));
+		DPS_LOG_ERR("Concrete flow rule cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;
 	}
 
@@ -196,8 +195,10 @@ int dp_rte_async_destroy_rule(uint16_t port_id, struct rte_flow *flow)
 	uint32_t queue_id = DP_ASYNC_DEFAULT_OP_QUEUE_ID;
 	struct rte_flow_error error;
 	int ret;
+	const struct rte_flow_op_attr op_no_delay_attr = {1};
 
-	ret = rte_flow_async_destroy(port_id, queue_id, &op_attr, flow, NULL, &error);
+
+	ret = rte_flow_async_destroy(port_id, queue_id, &op_no_delay_attr, flow, NULL, &error);
 	if (DP_FAILED(ret)){
 		DPS_LOG_ERR("Concrete flow rule cannot be destroyed", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;

@@ -362,8 +362,7 @@ static int dp_stop_eth_port(uint16_t port_id)
 		if (DP_FAILED(dp_destroy_pf_async_isolation_rules(port_id)))
 			DPS_LOG_ERR("Cannot destroy async default rule", DP_LOG_PORTID(port_id));
 
-		if (port_id == dp_get_main_eswitch_port()->port_id)
-			dp_rte_async_destroy_templates(port_id);
+		dp_rte_async_destroy_templates(port_id);
 	}
 
 	ret = rte_eth_dev_stop(port_id);
@@ -425,8 +424,7 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 
 static int dp_install_pf_async_flow_templates(struct dp_port *port)
 {
-	if (port->port_id == dp_get_main_eswitch_port()->port_id)
-		if (DP_FAILED(dp_create_pf_async_rte_rule_templates(port->port_id)))
+	if (DP_FAILED(dp_create_pf_async_rte_rule_templates(port->port_id)))
 			return DP_ERROR;
 	return DP_OK;
 }
