@@ -12,6 +12,7 @@ extern "C" {
 #include <rte_hash.h>
 #include <rte_telemetry.h>
 #include "dp_ipaddr.h"
+#include "dpdk_layer.h"
 
 // limit number of services to one byte due to various implementation reasons
 #define DP_VIRTSVC_MAX 256
@@ -46,6 +47,8 @@ struct dp_virtsvc {
 	uint16_t		last_assigned_port;
 	struct rte_hash	*open_ports;
 	struct dp_virtsvc_conn connections[DP_VIRTSVC_PORTCOUNT];
+	// TODO is this the right way? TODO rename
+	struct rte_flow	*isolation_rules[DP_MAX_PF_PORTS];
 };
 
 struct dp_virtsvc_lookup_entry {
@@ -101,7 +104,9 @@ void dp_virtsvc_free(void);
 
 int dp_virtsvc_get_count(void);
 
-int dp_virtsvc_install_isolation_rules(uint16_t port_id);
+// TODO merge and ask for mesw inside?
+int dp_virtsvc_install_sync_isolation_rules(uint16_t port_id);
+int dp_virtsvc_install_async_isolation_rules(uint16_t port_id);
 
 int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 							 uint16_t vf_port_id,

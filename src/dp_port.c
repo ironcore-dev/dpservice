@@ -170,7 +170,6 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
 	}
 
-
 	if (dp_conf_is_mesw_mode() && DP_FAILED(dp_port_rte_async_flow_config(port->port_id))) {
 		DPS_LOG_ERR("Failed to config port to install async flows", DP_LOG_PORT(port));
 		return DP_ERROR;
@@ -362,7 +361,7 @@ static int dp_stop_eth_port(uint16_t port_id)
 	if (port->is_pf) {
 		if (dp_conf_is_mesw_mode() && DP_FAILED(dp_destroy_pf_async_isolation_rules(port_id)))
 			DPS_LOG_ERR("Cannot destroy async default rule", DP_LOG_PORTID(port_id));
-
+		// TODO this also needs to be behind dp_conf_is_mesw_mode:
 		dp_rte_async_destroy_templates(port_id);
 	}
 
@@ -392,7 +391,7 @@ static int dp_port_install_sync_isolated_mode(uint16_t port_id)
 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
 		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC
-	return dp_virtsvc_install_isolation_rules(port_id);
+	return dp_virtsvc_install_sync_isolation_rules(port_id);
 #else
 	return DP_OK;
 #endif
@@ -425,14 +424,21 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 
 static int dp_install_pf_async_flow_templates(struct dp_port *port)
 {
+	// TODO obsolete wrapper?
 	if (DP_FAILED(dp_create_pf_async_rte_rule_templates(port->port_id)))
-			return DP_ERROR;
+		return DP_ERROR;
 	return DP_OK;
 }
 
 static int dp_port_install_async_isolated_mode(uint16_t port_id)
 {
-	return dp_create_pf_async_isolation_rules(port_id);
+	if (DP_FAILED(dp_create_pf_async_isolation_rules(port_id)))
+		return DP_ERROR;
+#ifdef ENABLE_VIRTSVC
+	return dp_virtsvc_install_async_isolation_rules(port_id);
+#else
+	return DP_OK;
+#endif
 }
 
 static int dp_init_port(struct dp_port *port)
@@ -443,24 +449,28 @@ static int dp_init_port(struct dp_port *port)
 		return DP_OK;
 
 	if (port->is_pf) {
+
 		if (dp_conf_is_mesw_mode()) {
 			if (DP_FAILED(dp_install_pf_async_flow_templates(port)))
 				return DP_ERROR;
-
+			// TODO rollback or merge condition
 			if (DP_FAILED(dp_port_install_async_isolated_mode(port->port_id)))
 				return DP_ERROR;
-
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
 				return DP_ERROR;
+		// TODO actually move virtsvc here? and deal with mesw internally?
+		// TODO do this after Tao merge
 	}
 
 	if (dp_conf_is_offload_enabled()) {
 #ifdef ENABLE_PYTEST
 		if (port->peer_pf_port_id != dp_get_pf1()->port_id)
 #endif
+		{
 		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 			return DP_ERROR;
+		}
 
 		if (!port->is_pf)
 			if (DP_FAILED(dp_install_vf_init_rte_rules(port)))

@@ -57,6 +57,7 @@ static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_
 
 int dp_create_pf_async_isolation_rules(uint16_t port_id)
 {
+	// TODO missing rollback
 	if (DP_FAILED(dp_create_concrete_async_default_rule_for_pf(port_id, IPPROTO_IPIP)) ||
 			DP_FAILED(dp_create_concrete_async_default_rule_for_pf(port_id, IPPROTO_IPV6))) {
 			DPS_LOG_ERR("Failed to install async isolation rules for pf", DP_LOG_PORTID(port_id));
@@ -64,12 +65,12 @@ int dp_create_pf_async_isolation_rules(uint16_t port_id)
 	}
 
 	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
-		DPS_LOG_ERR("Failed to above 2 async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
 	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, 2))) {
-		DPS_LOG_ERR("Failed to pull the status of the above 2 async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to pull the status of the 2 above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
@@ -87,12 +88,12 @@ int dp_destroy_pf_async_isolation_rules(uint16_t port_id)
 	}
 
 	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
-		DPS_LOG_WARNING("Failed to push the operation of destroying above 2 async isolation on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_WARNING("Failed to push the operation of destroying above async isolation on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
 	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, 2))) {
-		DPS_LOG_ERR("Failed to pull the status of the operation of destroying above 2 async isolation rules on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to pull the status of the operation of destroying 2 above async isolation rules on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
