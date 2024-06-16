@@ -52,6 +52,7 @@ static const struct rte_flow_template_table_attr pf_tunnel_table_attr = {
 
 enum dp_rte_async_rule_type_index {
 	DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION,
+	DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION_TEST,
 	DP_ASYNC_RULE_TYPE_MAX,
 };
 
