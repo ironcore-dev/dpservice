@@ -171,7 +171,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	}
 
 
-	if (DP_FAILED(dp_port_rte_async_flow_config(port->port_id))) {
+	if (dp_conf_is_mesw_mode() && DP_FAILED(dp_port_rte_async_flow_config(port->port_id))) {
 		DPS_LOG_ERR("Failed to config port to install async flows", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
@@ -360,7 +360,7 @@ static int dp_stop_eth_port(uint16_t port_id)
 
 	struct dp_port *port = dp_get_port_by_id(port_id);
 	if (port->is_pf) {
-		if (DP_FAILED(dp_destroy_pf_async_isolation_rules(port_id)))
+		if (dp_conf_is_mesw_mode() && DP_FAILED(dp_destroy_pf_async_isolation_rules(port_id)))
 			DPS_LOG_ERR("Cannot destroy async default rule", DP_LOG_PORTID(port_id));
 
 		dp_rte_async_destroy_templates(port_id);
