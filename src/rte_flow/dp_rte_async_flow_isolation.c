@@ -7,9 +7,8 @@
 // proto_id is either IPPROTO_IPIP or IPPROTO_IPV6
 static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_t proto_id)
 {
-
-	struct rte_flow_item_eth eth_pattern = {0};		// #1
-	struct rte_flow_item_ipv6 ipv6_hdr = {0};	   // #2
+	struct rte_flow_item_eth eth_pattern = {0}; // #1
+	struct rte_flow_item_ipv6 ipv6_hdr = {0};   // #2
 	struct rte_flow_item concrete_patterns[3];  // end
 	int concrete_pattern_cnt = 0;
 
@@ -21,7 +20,7 @@ static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_
 	int ret;
 	struct rte_flow *flow;
 
-	dp_set_eth_flow_item(&concrete_patterns[concrete_pattern_cnt++], &eth_pattern, htons(0x86DD), DP_SET_FLOW_ITEM_WITHOUT_MASK);
+	dp_set_eth_flow_item(&concrete_patterns[concrete_pattern_cnt++], &eth_pattern, htons(RTE_ETHER_TYPE_IPV6), DP_SET_FLOW_ITEM_WITHOUT_MASK);
 	dp_set_ipv6_flow_item(&concrete_patterns[concrete_pattern_cnt++], &ipv6_hdr, proto_id, DP_SET_FLOW_ITEM_WITHOUT_MASK);
 	dp_set_end_flow_item(&concrete_patterns[concrete_pattern_cnt++]);
 
@@ -47,6 +46,7 @@ static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_
 
 int dp_create_pf_async_isolation_rules(uint16_t port_id)
 {
+	// TODO missing rollback
 	if (DP_FAILED(dp_create_concrete_async_default_rule_for_pf(port_id, IPPROTO_IPIP)) ||
 			DP_FAILED(dp_create_concrete_async_default_rule_for_pf(port_id, IPPROTO_IPV6))) {
 			DPS_LOG_ERR("Failed to install async isolation rules for pf", DP_LOG_PORTID(port_id));
@@ -54,12 +54,12 @@ int dp_create_pf_async_isolation_rules(uint16_t port_id)
 	}
 
 	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
-		DPS_LOG_ERR("Failed to above 2 async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
 	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, 2))) {
-		DPS_LOG_ERR("Failed to pull the status of the above 2 async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to pull the status of the 2 above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
@@ -77,12 +77,12 @@ int dp_destroy_pf_async_isolation_rules(uint16_t port_id)
 	}
 
 	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
-		DPS_LOG_WARNING("Failed to push the operation of destroying above 2 async isolation on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_WARNING("Failed to push the operation of destroying above async isolation on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
 	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, 2))) {
-		DPS_LOG_ERR("Failed to pull the status of the operation of destroying above 2 async isolation rules on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		DPS_LOG_ERR("Failed to pull the status of the operation of destroying 2 above async isolation rules on main eswitch port to HW", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 

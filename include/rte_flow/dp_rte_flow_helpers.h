@@ -136,7 +136,6 @@ void dp_set_represented_port_item(struct rte_flow_item *item,
 	}
 	if (masked)
 		item->mask = &represented_port_mask;
-
 	item->last = NULL;
 }
 
@@ -211,13 +210,17 @@ static __rte_always_inline
 void dp_set_ipv6_src_flow_item(struct rte_flow_item *item,
 							   struct rte_flow_item_ipv6 *ipv6_spec,
 							   const union dp_ipv6 *src,
-							   uint8_t proto)
+							   uint8_t proto,
+							   bool masked)
 {
-	dp_set_src_ipv6(&ipv6_spec->hdr, src);
-	ipv6_spec->hdr.proto = proto;
+	if (ipv6_spec) {
+		dp_set_src_ipv6(&ipv6_spec->hdr, src);
+		ipv6_spec->hdr.proto = proto;
+	}
 	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
 	item->spec = ipv6_spec;
-	item->mask = &dp_flow_item_ipv6_src_mask;
+	if (masked)
+		item->mask = &dp_flow_item_ipv6_src_mask;
 	item->last = NULL;
 }
 
@@ -268,12 +271,14 @@ void dp_set_ipv4_src_dst_flow_item(struct rte_flow_item *item,
 static __rte_always_inline
 void dp_set_udp_src_flow_item(struct rte_flow_item *item,
 							  struct rte_flow_item_udp *udp_spec,
-							  rte_be16_t src_port)
+							  rte_be16_t src_port,
+							  bool masked)
 {
 	udp_spec->hdr.src_port = src_port;
 	item->type = RTE_FLOW_ITEM_TYPE_UDP;
 	item->spec = udp_spec;
-	item->mask = &dp_flow_item_udp_src_mask;
+	if (masked)
+		item->mask = &dp_flow_item_udp_src_mask;
 	item->last = NULL;
 }
 
@@ -306,12 +311,15 @@ void dp_set_udp_src_dst_flow_item(struct rte_flow_item *item,
 static __rte_always_inline
 void dp_set_tcp_src_flow_item(struct rte_flow_item *item,
 							  struct rte_flow_item_tcp *tcp_spec,
-							  rte_be16_t src_port)
+							  rte_be16_t src_port,
+							  bool masked)
 {
-	tcp_spec->hdr.src_port = src_port;
+	if (tcp_spec)
+		tcp_spec->hdr.src_port = src_port;
 	item->type = RTE_FLOW_ITEM_TYPE_TCP;
 	item->spec = tcp_spec;
-	item->mask = &dp_flow_item_tcp_src_mask;
+	if (masked)
+		item->mask = &dp_flow_item_tcp_src_mask;
 	item->last = NULL;
 }
 

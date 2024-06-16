@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <rte_cycles.h>
+#include <rte_flow.h>
 #include <rte_malloc.h>
 
 #include "dp_conf.h"
@@ -14,6 +15,8 @@
 #include "dp_multi_path.h"
 #include "dp_util.h"
 #include "rte_flow/dp_rte_flow_init.h"
+#include "rte_flow/dp_rte_async_flow.h"
+#include "rte_flow/dp_rte_async_flow_isolation.h"
 
 // WARNING: This module is not designed to be thread-safe (even though it could work)
 // It is assumed that thread-unsafe code will only ever be called from one node
@@ -50,6 +53,14 @@ static uint64_t established_port_timeout = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 #ifdef ENABLE_PYTEST
 static bool fast_timeout = false;
 #endif
+
+// TODO temporary definition I think
+struct dp_port_rte_async_templates {
+	struct rte_flow_pattern_template *pattern_templates[1];
+	struct rte_flow_actions_template *action_templates[1];
+	struct rte_flow_template_table *template_tables[1];
+};
+static struct dp_port_rte_async_templates virtsvc_async_templates[DP_MAX_PF_PORTS];
 
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv4_tree = NULL;
 static struct dp_virtsvc_lookup_entry *dp_virtsvc_ipv6_tree = NULL;
@@ -142,6 +153,166 @@ static int dp_virtsvc_create_trees(void)
 	return DP_OK;
 }
 
+static int dp_virtsvc_create_isolation_template(struct dp_port_rte_async_templates *template, uint16_t pf_idx)
+{
+	struct dp_port *port;
+
+	// TODO hmmm, think of something better than passing pf_idx...
+	port = dp_get_port_by_pf_index(pf_idx);
+	if (!port) {
+		DPS_LOG_ERR("Invalid pf index for virtual service isolation", DP_LOG_VALUE(pf_idx));
+		return DP_ERROR;
+	}
+
+	// TODO comment about this being tcp only
+	// TODO static const!
+	struct rte_flow_item tcp_src_pattern[] = {
+		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
+			.mask = &dp_flow_item_eth_mask,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
+			.mask = &dp_flow_item_ipv6_src_mask,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_TCP,
+			.mask = &dp_flow_item_tcp_src_mask,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_END,
+		},
+	};
+
+	// TODO Static const
+	struct rte_flow_pattern_template_attr pattern_template_attr = {
+		.ingress = 1,
+	};
+
+	struct rte_flow_pattern_template *pattern_template;
+	struct rte_flow_error error;
+
+	pattern_template = rte_flow_pattern_template_create(port->port_id, &pattern_template_attr, tcp_src_pattern, &error);
+	if (!pattern_template){
+		// TODO duplicate to dp_rte_async_flow.c
+		DPS_LOG_ERR("Failed to create async flow pattern template",
+						DP_LOG_PORTID(port->port_id), DP_LOG_RET(rte_errno), DP_LOG_FLOW_ERROR(error.message));
+		// TODO rollback
+		return DP_ERROR;
+	}
+	// TODO wait, needed??
+	template->pattern_templates[0] = pattern_template;
+
+	// TODO static const
+	struct rte_flow_action queue_action[] = {
+		{	.type = RTE_FLOW_ACTION_TYPE_QUEUE, },
+		{	.type = RTE_FLOW_ACTION_TYPE_END, },
+	};
+	// TODO Static const
+	struct rte_flow_actions_template_attr action_template_attr = {
+		.ingress = 1,
+	};
+
+	struct rte_flow_actions_template *actions_template;
+
+	actions_template = rte_flow_actions_template_create(port->port_id, &action_template_attr, queue_action, queue_action, &error);
+	if (!actions_template){
+		// TODO duplicate to dp_rte_async_flow.c
+		DPS_LOG_ERR("Failed to create async flow action template",
+						DP_LOG_PORTID(port->port_id), DP_LOG_RET(rte_errno), DP_LOG_FLOW_ERROR(error.message));
+		// TODO rollback
+		return DP_ERROR;
+	}
+	// TODO wait, needed??
+	template->action_templates[0] = actions_template;
+
+	// TODO this is duplicate of static in dp_rte_async_flow.c!
+	// TODO at least make ti static
+	struct rte_flow_template_table_attr table_attr = {
+		.flow_attr = {
+			.group = 0,
+			.ingress = 1,
+		},
+		.nb_flows = DP_ASYNC_FLOW_PF_DEFAULT_TABLE_MAX_RULES,
+	};
+
+	struct rte_flow_template_table *table;
+
+	table = rte_flow_template_table_create(port->port_id, &table_attr, template->pattern_templates, 1, template->action_templates, 1, &error);
+	if (!table) {
+		// TODO duplicate to dp_rte_async_flow.c
+		DPS_LOG_ERR("Failed to create async flow table template",
+						DP_LOG_PORTID(port->port_id), DP_LOG_RET(rte_errno), DP_LOG_FLOW_ERROR(error.message));
+		// TODO rollback?
+		return DP_ERROR;
+	}
+
+	template->template_tables[0] = table;
+	return DP_OK;
+}
+
+static int dp_virstvc_free_isolation_template(struct dp_port_rte_async_templates *template, uint16_t pf_idx)
+{
+	struct dp_port *port;
+	struct rte_flow_error error;
+	int ret;
+
+	// TODO hmmm, think of something better than passing pf_idx...
+	port = dp_get_port_by_pf_index(pf_idx);
+	if (!port) {
+		DPS_LOG_ERR("Invalid pf index for virtual service isolation", DP_LOG_VALUE(pf_idx));
+		return DP_ERROR;
+	}
+
+	// TODO check for null due to callback calling? test this
+
+	// TODO this seems like it should call somethign of Taos
+	ret = rte_flow_template_table_destroy(port->port_id, template->template_tables[0], &error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to destroy template table", DP_LOG_RET(ret), DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
+		return ret;
+	}
+
+	ret = rte_flow_pattern_template_destroy(port->port_id, template->pattern_templates[0], &error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to destroy virtsvc pattern template", DP_LOG_RET(ret), DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
+		return ret;
+	}
+
+	ret = rte_flow_actions_template_destroy(port->port_id, template->action_templates[0], &error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to destroy virstvc action template", DP_LOG_RET(ret), DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
+		return ret;
+	}
+
+	return DP_OK;
+}
+
+static int dp_virtsvc_init_isolation(void)  // TODO _templates?
+{
+	// TAP devices do not support offloading/isolation
+	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+		return DP_OK;
+
+	// TODO currently only multiport-eswitch mode is done here
+	// TODO(plague): move the normal eswitch mode here too
+	if (!dp_conf_is_mesw_mode())
+		return DP_OK;
+
+	if (DP_FAILED(dp_virtsvc_create_isolation_template(&virtsvc_async_templates[0], 0))
+		|| DP_FAILED(dp_virtsvc_create_isolation_template(&virtsvc_async_templates[1], 1)))  // TODO can alredy use pf_idx I guess inside
+		return DP_ERROR;
+
+	return DP_OK;
+}
+
+// TODO(plague) do rollback tests!
+static int dp_virtsvc_free_isolation(void)  // TODO _templates?
+{
+	int ret1, ret2;
+
+	// TODO check null due to rollback calling convention (and no sync/sync check here)
+	ret1 = dp_virstvc_free_isolation_template(&virtsvc_async_templates[0], 0);  // TODO dp_get_pf_port_by_index inside
+	ret2 = dp_virstvc_free_isolation_template(&virtsvc_async_templates[1], 1);  // TODO dp_get_pf_port_by_index inside
+	return DP_FAILED(ret1) ? ret1 : ret2;
+}
+
 int dp_virtsvc_init(int socket_id)
 {
 	const struct dp_conf_virtual_services *rules = dp_conf_get_virtual_services();
@@ -156,6 +327,12 @@ int dp_virtsvc_init(int socket_id)
 													   RTE_CACHE_LINE_SIZE);
 	if (!dp_virtservices) {
 		DPS_LOG_ERR("Cannot allocate virtual services table");
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_virtsvc_init_isolation())) {
+		DPS_LOG_ERR("Cannot initialize virtual services isolation templates");
+		dp_virtsvc_free();  // TODO test this rollback
 		return DP_ERROR;
 	}
 
@@ -206,12 +383,57 @@ static void dp_virtsvc_free_tree(struct dp_virtsvc_lookup_entry *tree)
 	free(tree);
 }
 
+static void dp_virtsvc_remove_isolation(struct dp_virtsvc *virtsvc, uint16_t pf_idx)
+{
+	struct dp_port *port;
+	int ret;
+
+	port = dp_get_port_by_pf_index(pf_idx);
+	if (!port) {
+		DPS_LOG_ERR("Invalid PF index for virtual service isolation cleanup", DP_LOG_VALUE(pf_idx));
+		return;
+	}
+
+	// TODO connected to the test suite, but needed for rollback anyway
+	if (!virtsvc->isolation_rules[pf_idx]) {
+		DPS_LOG_ERR("No rule for index", DP_LOG_VALUE(pf_idx));
+		return;
+	}
+
+	ret = dp_rte_async_destroy_rule(port->port_id, virtsvc->isolation_rules[pf_idx]);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot destroy async virtual service isolation rule", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
+		return;
+	}
+
+	// TODO do this here for simplicity or in a bulk? because there can be >64 (current max) virstsvcs anyway...
+	// TODO or at least some wrapper
+	// TODO recheck logs
+	if (DP_FAILED(dp_push_rte_async_flow_rules(port->port_id))) {
+		DPS_LOG_WARNING("Failed to push the destruction of async virstvc isolation", DP_LOG_PORTID(port->port_id));  // TODO ret(inside)
+		return;
+	}
+
+	if (DP_FAILED(dp_pull_rte_async_rule_status(port->port_id, 1))) {
+		DPS_LOG_ERR("Failed to pull the status of destruction of async virtsvc isolation", DP_LOG_PORTID(port->port_id));  // TODO ret(inside)
+		// TODO can be omitted
+		return;
+	}
+}
+
 void dp_virtsvc_free(void)
 {
 	dp_virtsvc_free_tree(dp_virtsvc_ipv4_tree);
 	dp_virtsvc_free_tree(dp_virtsvc_ipv6_tree);
-	DP_FOREACH_VIRTSVC(&dp_virtservices, service)
+	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
+		// TODO free isolation rules here
+		// TODO ifs?
+		// TODO Maybe do both at once inside and then push+pull
+		dp_virtsvc_remove_isolation(service, 0);
+		dp_virtsvc_remove_isolation(service, 1);
 		dp_free_jhash_table(service->open_ports);
+	}
+	dp_virtsvc_free_isolation();
 	rte_free(dp_virtservices);
 }
 
@@ -222,7 +444,8 @@ int dp_virtsvc_get_count(void)
 }
 
 
-int dp_virtsvc_install_isolation_rules(uint16_t port_id)
+// TODO if seperated here, then do a DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels"); message
+int dp_virtsvc_install_sync_isolation_rules(uint16_t port_id)
 {
 	int ret;
 
@@ -235,6 +458,100 @@ int dp_virtsvc_install_isolation_rules(uint16_t port_id)
 			DPS_LOG_ERR("Cannot create isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
+	}
+	return DP_OK;
+}
+
+static int dp_virtsvc_install_async_isolation(uint16_t port_id, uint8_t proto_id, const union dp_ipv6 *svc_ipv6, rte_be16_t svc_port, struct rte_flow **p_flow, struct rte_flow_template_table *template_tables[])
+{
+	// TODO without mask we need to zero these, which is against the intent of the whole header, look into it
+	struct rte_flow_item_eth eth_spec = {0};    // #1
+	struct rte_flow_item_ipv6 ipv6_spec = {0};  // #2
+	struct rte_flow_item_tcp tcp_spec = {0};    // #3 (choose one)
+// 	struct rte_flow_item_udp udp_spec = {0};    // #3 (choose one)
+	struct rte_flow_item concrete_patterns[4];  // + end
+	int concrete_pattern_cnt = 0;
+	struct rte_flow_action_queue queue_action = {0};  // #1
+	struct rte_flow_action concrete_actions[2]; // + end
+	int concrete_action_cnt = 0;
+
+	// create match pattern: IPv6 packets from selected addresses
+	dp_set_eth_flow_item(&concrete_patterns[concrete_pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6), DP_SET_FLOW_ITEM_WITHOUT_MASK);
+	dp_set_ipv6_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &ipv6_spec, svc_ipv6, proto_id, DP_SET_FLOW_ITEM_WITHOUT_MASK);
+	if (proto_id == IPPROTO_TCP) {
+		dp_set_tcp_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &tcp_spec, svc_port, DP_SET_FLOW_ITEM_WITHOUT_MASK);
+// TODO not implemented yet!
+// 	} else if (proto_id == IPPROTO_UDP) {
+// 		dp_set_udp_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &udp_spec, svc_port, DP_SET_FLOW_ITEM_WITHOUT_MASK);
+	} else {
+		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));
+		return DP_ERROR;
+	}
+	dp_set_end_flow_item(&concrete_patterns[concrete_pattern_cnt++]);
+
+	// create flow action: allow packets to enter dp-service packet queue
+	dp_set_redirect_queue_action(&concrete_actions[concrete_action_cnt++], &queue_action, 0);
+	dp_set_end_action(&concrete_actions[concrete_action_cnt++]);
+
+	// TODO needed or simply write into?
+	struct rte_flow *created_flow;
+	struct rte_flow_error error;
+	// TODO static const?
+	struct rte_flow_op_attr op_attr = { .postpone = 1 };  // TODO do we actually want to postpone??; TODO rename
+
+	created_flow = rte_flow_async_create(port_id, 0, &op_attr, template_tables[0],  // TODO better argument instead of the tables?
+			concrete_patterns, 0, concrete_actions, 0, NULL, &error);
+	if (!created_flow) {
+		DPS_LOG_ERR("Failed to create concrete async virstvc rule", DP_LOG_RET(rte_errno), DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
+		return DP_ERROR;
+	}
+
+	*p_flow = created_flow;  // TODO get rid of this p_flow
+	return DP_OK;
+}
+
+int dp_virtsvc_install_async_isolation_rules(uint16_t port_id)
+{
+	uint8_t rule_count = 0;  // TODO type?
+	uint16_t pf_idx;
+	int ret;
+
+	// TODO rollback missing everywhere
+
+	// TODO this needs making better!
+	if (port_id == dp_get_pf0()->port_id)
+		pf_idx = 0;
+	else if (port_id == dp_get_pf1()->port_id)
+		pf_idx = 1;
+	else {
+		DPS_LOG_ERR("Invalid port for virtual service isolation", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
+	}
+
+	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
+		// TODO pass service itself (and maybe pf idx), but that can only happen *after* we remove the p_flow argument
+		ret = dp_virtsvc_install_async_isolation(port_id,
+													 service->proto,
+													 &service->service_addr,
+													 service->service_port,
+													 &service->isolation_rules[pf_idx],
+													 virtsvc_async_templates[pf_idx].template_tables);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot create async isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));
+			return DP_ERROR;
+		}
+		rule_count++;
+	}
+
+	// TODO code duplication, there needs to be some "blocking push" or something as a single call
+	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
+		DPS_LOG_ERR("TODO Failed to above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, rule_count))) {
+		DPS_LOG_ERR("TODO Failed to pull the status of the above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
 	}
 	return DP_OK;
 }

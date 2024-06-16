@@ -59,11 +59,11 @@ int dp_install_isolated_mode_virtsvc(uint16_t port_id, uint8_t proto_id, const u
 
 	// create match pattern: IPv6 packets from selected addresses
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6), DP_SET_FLOW_ITEM_WITH_MASK);
-	dp_set_ipv6_src_flow_item(&pattern[pattern_cnt++], &ipv6_spec, svc_ipv6, proto_id);
+	dp_set_ipv6_src_flow_item(&pattern[pattern_cnt++], &ipv6_spec, svc_ipv6, proto_id, DP_SET_FLOW_ITEM_WITH_MASK);
 	if (proto_id == IPPROTO_TCP) {
-		dp_set_tcp_src_flow_item(&pattern[pattern_cnt++], &tcp_spec, svc_port);
+		dp_set_tcp_src_flow_item(&pattern[pattern_cnt++], &tcp_spec, svc_port, DP_SET_FLOW_ITEM_WITH_MASK);
 	} else if (proto_id == IPPROTO_UDP) {
-		dp_set_udp_src_flow_item(&pattern[pattern_cnt++], &udp_spec, svc_port);
+		dp_set_udp_src_flow_item(&pattern[pattern_cnt++], &udp_spec, svc_port, DP_SET_FLOW_ITEM_WITH_MASK);
 	} else {
 		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));
 		return DP_ERROR;
