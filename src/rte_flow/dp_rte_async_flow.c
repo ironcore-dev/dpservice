@@ -74,12 +74,15 @@ int dp_pull_rte_async_rule_status(uint16_t port_id, uint8_t rule_count)
 		}
 
 		for (int i = 0; i < ret; i++) {
-			if (res[i].status == RTE_FLOW_OP_SUCCESS) {
-				success++;
-			}
-
 			if (res[i].user_data) {
 				DPS_LOG_WARNING("Non empty user data when p", DP_LOG_PORTID(port_id));
+			}
+			if (res[i].status == RTE_FLOW_OP_SUCCESS) {
+				success++;
+			} else {
+				DPS_LOG_ERR("Error processing rule", DP_LOG_PORTID(port_id), DP_LOG_VALUE(i));
+				rte_free(res);
+				return DP_ERROR;
 			}
 		}
 	}
@@ -100,7 +103,7 @@ int dp_rte_async_create_pattern_template(uint16_t port_id,
 
 	if (!pattern_template){
 		DPS_LOG_ERR("Failed to create async flow pattern template",
-						DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
+						DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno), DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;
 	}
 	port->default_async_rules.async_templates[table_id].pattern_templates[pattern_id] = pattern_template;
@@ -149,7 +152,7 @@ int dp_rte_async_create_table_template(uint16_t port_id, const struct rte_flow_t
 	
 	if (!table){
 		DPS_LOG_ERR("Failed to create async flow table template",
-						DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
+						DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno), DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;
 	}
 	
