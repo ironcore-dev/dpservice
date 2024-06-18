@@ -2,6 +2,7 @@ import sys
 import os
 import subprocess
 import json
+import psutil
 
 from remote_machine_management import (
 	hypervisor_machines,
@@ -247,6 +248,11 @@ def tear_down_test_environment():
 			time.sleep(1)
 
 		cleanup_remote_machine()
+
+		pid = os.getpid()  # Get the current process ID
+		process = psutil.Process(pid)
+		process.terminate()  # Terminate the process
+		sys.exit(0)  # Exit with a status code
 	except Exception as e:
 		print(f"Failed to stop a connection due to {e} ")
 		raise e
