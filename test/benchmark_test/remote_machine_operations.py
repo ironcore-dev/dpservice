@@ -354,6 +354,10 @@ def remote_machine_op_reboot(machine_name):
 		]
 		machine.exec_task(reboot_task)
 
+		ssh_stop_socket_command = [
+			{"command": "systemctl", "parameters": "stop ssh.socket", "sudo": True}
+		]
+		machine.exec_task(ssh_stop_socket_command)
 		ssh_stop_command = [
 			{"command": "systemctl", "parameters": "stop ssh", "sudo": True}
 		]

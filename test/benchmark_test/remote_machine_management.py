@@ -1,6 +1,7 @@
 import paramiko
 import time
 from helper import remove_last_empty_line
+import threading
 
 hypervisor_machines = []
 vm_machines = []
@@ -16,8 +17,9 @@ class SSHManager:
 		self.client = None
 		self.max_retries = max_retries
 		self.pid_file = "/tmp/pids.txt"  # a file to store all PIDs
+		self.stop_event = threading.Event()
 
-	def connect_one_shot(self, timeout=None):
+	def connect_one_shot(self, timeout=1):
 		try:
 			if self.proxy:
 				proxy_sock = self.proxy.client.get_transport().open_channel(
@@ -54,7 +56,7 @@ class SSHManager:
 					time_to_sleep = initial_delay * \
 						(2 ** (attempt - 1))  # Exponential backoff
 					print(f"Retrying in {time_to_sleep} seconds...")
-					time.sleep(time_to_sleep)
+					self.stop_event.wait(time_to_sleep)
 				else:
 					raise ConnectionError(
 						"Failed to establish SSH connection after multiple attempts.")
@@ -96,8 +98,15 @@ class SSHManager:
 
 	def disconnect(self):
 		"""Close the SSH connection."""
-		if self.client:
-			self.client.close()
+		print(f"try to disconnect {self.host_address}")
+		self.stop_event.set()
+		self.client.close()
+
+	def is_alive(self):
+		is_alive = False
+		if self.client.get_transport() is not None:
+			is_alive = self.client.get_transport().is_alive()
+		return is_alive
 
 	def upload(self, proto, local_path, remote_path):
 		"""Upload a file to a remote location"""
@@ -282,9 +291,10 @@ class RemoteMachine:
 			raise ConnectionError("")
 
 	def stop(self):
-		self.ssh_manager.terminate_all_processes()
-		if not self.parent_machine:
-			self.ssh_manager.terminate_all_containers()
+		if self.ssh_manager.is_alive():
+			self.ssh_manager.terminate_all_processes()
+			if not self.parent_machine:
+				self.ssh_manager.terminate_all_containers()
 		self.ssh_manager.disconnect()
 
 	def get_machine_name(self):

@@ -3,8 +3,9 @@ import sys
 import os
 import signal
 import json
+import psutil
 
-from benchmark_test_config import prepare_test_environment, tear_down_test_environment, init_lb
+from benchmark_test_config import prepare_test_environment, tear_down_test_environment, init_lb, tear_down_test_environment
 
 
 def pytest_addoption(parser):
@@ -36,9 +37,6 @@ def pytest_addoption(parser):
 def signal_handler(sig, frame):
 	print("Ctrl-C pressed. Cleaning up...")
 	tear_down_test_environment()
-	sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
 
 @pytest.fixture(scope="package")
 def test_config(request):
@@ -109,6 +107,8 @@ def benchmark_test_setup(request, test_config, test_mode):
 	build_path = config.getoption("--dpservice-build-path")
 	reboot_vm = config.getoption("--reboot")
 
+	signal.signal(signal.SIGINT, signal_handler)
+
 	try:
 		prepare_test_environment(
 			test_mode, stage, docker_iamge_url, reboot_vm, test_config, build_path)
@@ -117,4 +117,3 @@ def benchmark_test_setup(request, test_config, test_mode):
 
 	request.addfinalizer(tear_down_test_environment)
 
-	yield
