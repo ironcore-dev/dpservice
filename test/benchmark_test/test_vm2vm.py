@@ -1,4 +1,5 @@
 from remote_machine_management import get_vm_config_detail
+from benchmark_test_config import test_logger
 from remote_machine_operations import *
 from helper import *
 
@@ -18,20 +19,17 @@ def test_cross_hypervisor_ipv4(test_flow_count, test_mode, test_min_throughput_s
 		"vm1", True, vm1_config.get_ip(), test_flow_count)
 	client_output = remote_machine_op_flow_test(
 		"vm3", False, vm1_config.get_ip(), test_flow_count)
-	print(client_output)
 
 	if result_checking_ping_failed(client_output, "Server is not reachable"):
 		raise AssertionError(
 			"Failed to pass cross hypervisor ipv4 test, ping failed")
-	else:
-		print("Passed ping test")
 
 	min_throughput = test_min_throughput_hw_remote if test_mode else test_min_throughput_sw_remote
 	if not result_checking_throughput_higher_than(client_output, min_throughput):
 		raise AssertionError(
 			"Failed to pass cross hypervisor ipv4 test, throughput test failed")
 	else:
-		print("Passed throughput test")
+		test_logger.info("test_cross_hypervisor_ipv4 succeeds")
 
 	remote_machine_op_terminate_processes("vm1")
 	remote_machine_op_dpservice_delete_route(
@@ -51,20 +49,16 @@ def test_same_hypervisor_ipv4(test_flow_count, test_mode, test_min_throughput_sw
 	client_output = remote_machine_op_flow_test(
 		"vm2", False, vm1_config.get_ip(), test_flow_count)
 
-	print(client_output)
-
 	if result_checking_ping_failed(client_output, "Server is not reachable"):
 		raise AssertionError(
 			"Failed to pass same hypervisor ipv4 test, ping failed")
-	else:
-		print("Passed ping test")
 
 	min_throughput = test_min_throughput_hw_local if test_mode else test_min_throughput_sw_local
 	if not result_checking_throughput_higher_than(client_output, min_throughput):
 		raise AssertionError(
 			"Failed to pass same hypervisor ipv4 test, throughput test failed")
 	else:
-		print("Passed throughput test")
+		test_logger.info("test_same_hypervisor_ipv4 succeeds")
 
 	remote_machine_op_terminate_processes("vm1")
 
@@ -84,20 +78,17 @@ def test_cross_hypervisor_ipv6(test_flow_count, test_mode, test_min_throughput_s
 		"vm1", True, vm1_config.get_ipv6(), test_flow_count)
 	client_output = remote_machine_op_flow_test(
 		"vm3", False, vm1_config.get_ipv6(), test_flow_count)
-	print(client_output)
 
 	if result_checking_ping_failed(client_output, "Server is not reachable"):
 		raise AssertionError(
 			"Failed to pass cross hypervisor ipv6 test, ping failed")
-	else:
-		print("Passed ping test")
 
 	min_throughput = test_min_throughput_hw_remote if test_mode else test_min_throughput_sw_remote
 	if not result_checking_throughput_higher_than(client_output, min_throughput):
 		raise AssertionError(
 			"Failed to pass cross hypervisor ipv6 test, throughput test failed")
 	else:
-		print("Passed throughput test")
+		test_logger.info("test_cross_hypervisor_ipv6 succeeds")
 
 	remote_machine_op_terminate_processes("vm1")
 	remote_machine_op_dpservice_delete_route(
@@ -117,19 +108,15 @@ def test_same_hypervisor_ipv6(test_flow_count, test_mode, test_min_throughput_sw
 	client_output = remote_machine_op_flow_test(
 		"vm2", False, vm1_config.get_ipv6(), test_flow_count)
 
-	print(client_output)
-
 	if result_checking_ping_failed(client_output, "Server is not reachable"):
 		raise AssertionError(
 			"Failed to pass same hypervisor ipv6 test, ping failed")
-	else:
-		print("Passed ping test")
 
 	min_throughput = test_min_throughput_hw_local if test_mode else test_min_throughput_sw_local
 	if not result_checking_throughput_higher_than(client_output, min_throughput):
 		raise AssertionError(
 			"Failed to pass same hypervisor ipv6 test, throughput test failed")
 	else:
-		print("Passed throughput test")
+		test_logger.info("test_same_hypervisor_ipv6 succeeds")
 
 	remote_machine_op_terminate_processes("vm1")

@@ -13,9 +13,11 @@ from remote_machine_management import (
 	cleanup_remote_machine,
 )
 from remote_machine_operations import *
+from helper import MachineLogger
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
+test_logger = MachineLogger("Benchmark-test")
 
 def init_machines(env_config, ssh_key_file):
 	try:
@@ -27,14 +29,14 @@ def init_machines(env_config, ssh_key_file):
 					vm_info, ssh_key_file, hypervisor_machine)
 				add_remote_machine(vm_machine, True)
 	except Exception as e:
-		print(f"Failed to setup remote control machine due to {e} ")
+		test_logger.error(f"Failed to setup remote control machine: {e} ")
 		raise e
 
 	try:
 		for machine in hypervisor_machines + vm_machines:
 			machine.start()
 	except Exception as e:
-		print(f"Failed to start machine due to {e}")
+		test_logger.error(f"Failed to start machine: {e}")
 		raise e
 
 
@@ -61,10 +63,11 @@ def init_dpservice(
 				docker_image_url=docker_image,
 			)
 			machine_name = hypervisor_info["machine_name"]
-			print(f"init on machine {machine_name}")
+			test_logger.info(f"Initialising dpservice on {machine_name}...")
 			remote_machine_op_dpservice_init(hypervisor_info["machine_name"])
+			test_logger.info(f"Initialised dpservice on {machine_name}")
 	except Exception as e:
-		print(f"Failed to start dpservice due to {e} ")
+		test_logger.error(f"Failed to start dpservice:{e} ")
 		raise e
 
 
@@ -91,7 +94,7 @@ def init_vms(env_config, reboot_vm):
 					vm_info["machine_name"], script_path_to_land
 				)
 	except Exception as e:
-		print(f"Failed to init vms due to {e} ")
+		test_logger.error(f"Failed to init vms: {e} ")
 		raise e
 
 
@@ -156,12 +159,13 @@ def check_dpservice_cli(machine_name, build_dir):
 	target_cli_path = "/tmp/dpservice-cli"
 	try:
 		if not remote_machine_op_file_exists(machine_name, target_cli_path):
-			print("need to upload dpservice-cli")
+			test_logger.info(f"Uploading dpservice-cli to {machine_name}")
 			remote_machine_op_upload(
 				machine_name, downloaded_cli_path, target_cli_path)
 			remote_machine_op_make_runnable(machine_name, target_cli_path)
+			test_logger.info(f"Uploaded dpservice-cli to {machine_name}")
 	except Exception as e:
-		print(f"Failed to prepare dpservice cli on hypervisors due to {e}")
+		test_logger.error(f"Failed to prepare dpservice cli on hypervisors due to {e}")
 
 
 def prepare_test_environment(
@@ -192,7 +196,7 @@ def prepare_test_environment(
 						   build_path, is_offload)
 		init_vms(config, reboot_vm)
 	except Exception as e:
-		tear_down_test_environment()
+		tear_down_test_environment(forced=True)
 		raise RuntimeError(f"failed to prepare test environment due to: {e}")
 
 
@@ -219,7 +223,7 @@ def prepare_local_docker_image(image_name, output_file, build_dir):
 						   "a+r", f"{build_dir}/{output_file}"]
 	subprocess.run(mode_change_command, check=True)
 
-	print(f"Image {image_name} built and exported to {output_file}")
+	test_logger.info(f"Image {image_name} built and exported to {output_file}")
 	os.chdir(script_dir)
 
 
@@ -232,16 +236,18 @@ def upload_and_import_docker_image(machine_name, image_name, build_dir, output_f
 			machine_name, generated_image_file, target_image_file)
 		remote_machine_op_docker_load_image(machine_name, target_image_file)
 	except Exception as e:
-		print(f"Failed to prepare dpservice cli on hypervisors due to {e}")
+		test_logger.error(f"Failed to prepare dpservice cli on hypervisors {machine_name}: {e}")
 
 
-def tear_down_test_environment():
+def tear_down_test_environment(forced=False):
 	try:
-		for machine in hypervisor_machines:
-			machine.stop_containers()
-			remote_machine_op_fetch_dpservice_container_log(machine.get_machine_name())
-			dpservice_log = machine.fetch_log("dpservice")
-			print(dpservice_log)
+		if not forced:
+			for machine in hypervisor_machines:
+				machine.stop_containers()
+				remote_machine_op_fetch_dpservice_container_log(machine.get_machine_name())
+				dpservice_log = machine.fetch_log("dpservice")
+				test_logger.info(f"Fetched dpservice log from {machine.get_machine_name()}:")
+				test_logger.info(dpservice_log)
 
 		for machine in vm_machines + hypervisor_machines:
 			machine.stop()
@@ -249,10 +255,11 @@ def tear_down_test_environment():
 
 		cleanup_remote_machine()
 
-		pid = os.getpid()  # Get the current process ID
-		process = psutil.Process(pid)
-		process.terminate()  # Terminate the process
-		sys.exit(0)  # Exit with a status code
+		if forced:
+			pid = os.getpid()  # Get the current process ID
+			process = psutil.Process(pid)
+			process.terminate()  # Terminate the process
+			sys.exit(0)  # Exit with a status code
 	except Exception as e:
-		print(f"Failed to stop a connection due to {e} ")
+		test_logger.error(f"Failed to stop a connection: {e} ")
 		raise e

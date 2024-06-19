@@ -1,8 +1,30 @@
 import re
+import logging
+import os
+import sys
+from termcolor import colored
+
+class MachineLogger:
+	def __init__(self, machine_name):
+		self.machine_name = machine_name
+		self.logger = logging.getLogger(machine_name)
+		self.logger.setLevel(logging.INFO)
+
+		handler = logging.StreamHandler(sys.stdout)
+		formatter = logging.Formatter('%(message)s')
+		handler.setFormatter(formatter)
+		self.logger.addHandler(handler)
+
+	def info(self, message):
+		colored_message = colored(f"[INFO] [{self.machine_name}] {message}", 'green')
+		self.logger.info(colored_message)
+
+	def error(self, message):
+		colored_message = colored(f"[ERROR] [{self.machine_name}] {message}", 'red')
+		self.logger.error(colored_message)
+
 
 # string processing functions
-
-
 def remove_last_empty_line(output):
 	lines = output.splitlines()
 	if lines and lines[-1] == '':
@@ -10,8 +32,6 @@ def remove_last_empty_line(output):
 	return '\n'.join(lines)
 
 # result checking functions
-
-
 def result_checking_ping_failed(result, query):
 	return query in result
 
@@ -30,5 +50,4 @@ def result_checking_throughput_higher_than(result, minimum_throughput):
 			return False
 	else:
 		# If no matching throughput is found, handle it accordingly
-		print("No average throughput found in the result.")
 		return False

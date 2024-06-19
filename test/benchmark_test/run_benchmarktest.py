@@ -30,7 +30,6 @@ def execute_benchmark_pytest(args):
 		pytest_args_collection.append(["--mode", mode] + args_template)
 
 	for pytest_args in pytest_args_collection:
-		print(pytest_args)
 		pytest.main(args=pytest_args)
 		time.sleep(1)
 
