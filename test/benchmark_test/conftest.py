@@ -5,7 +5,7 @@ import signal
 import json
 import psutil
 
-from benchmark_test_config import prepare_test_environment, tear_down_test_environment, init_lb, tear_down_test_environment
+from benchmark_test_config import prepare_test_environment, tear_down_test_environment, init_lb, tear_down_test_environment, test_logger
 
 
 def pytest_addoption(parser):
@@ -35,8 +35,8 @@ def pytest_addoption(parser):
 
 
 def signal_handler(sig, frame):
-	print("Ctrl-C pressed. Cleaning up...")
-	tear_down_test_environment()
+	test_logger.info("Ctrl-C pressed. Cleaning up...")
+	tear_down_test_environment(forced=True)
 
 @pytest.fixture(scope="package")
 def test_config(request):
@@ -113,7 +113,7 @@ def benchmark_test_setup(request, test_config, test_mode):
 		prepare_test_environment(
 			test_mode, stage, docker_iamge_url, reboot_vm, test_config, build_path)
 	except Exception as e:
-		print(f"Failed to prepare test environment due to: {e}")
+		test_logger.error(f"Failed to prepare test environment: {e}")
 
 	request.addfinalizer(tear_down_test_environment)
 

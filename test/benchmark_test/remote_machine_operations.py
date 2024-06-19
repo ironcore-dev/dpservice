@@ -7,17 +7,19 @@ from remote_machine_management import get_remote_machine, add_vm_config_info, ad
 
 
 def remote_machine_op_upload(machine_name, local_path, remote_path):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		machine.upload("sftp", local_path, remote_path)
 		if not remote_machine_op_file_exists(machine_name, remote_path):
 			machine.upload("scp", local_path, remote_path)
 	except Exception as e:
-		print(
-			f"Failed to copy {local_path} to {remote_path} on machine {machine_name}")
+		if machine:
+			machine.logger.error(f"Failed to copy {local_path} to {remote_path}: {e}")
 
 
 def remote_machine_op_make_runnable(machine_name, path):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		task = [
@@ -25,11 +27,12 @@ def remote_machine_op_make_runnable(machine_name, path):
 		]
 		machine.exec_task(task)
 	except Exception as e:
-		print(
-			f"Failed to make this file {path} on machine {machine_name} runnable due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to make this file {path} runnable: {e}")
 
 
 def remote_machine_op_file_exists(machine_name, path):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		task = [
@@ -38,10 +41,12 @@ def remote_machine_op_file_exists(machine_name, path):
 		result = machine.exec_task(task)
 		return result == "exists"
 	except Exception as e:
-		print(f"Failed to test {path} on machine {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to test {path}: {e}")
 
 
 def remote_machine_op_docker_rm_image(machine_name, image_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		task = [
@@ -50,11 +55,12 @@ def remote_machine_op_docker_rm_image(machine_name, image_name):
 		]
 		machine.exec_task(task)
 	except Exception as e:
-		print(
-			f"Failed to remove docker image {image_name} from machine {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to remove docker image {image_name}: {e}")
 
 
 def remote_machine_op_docker_load_image(machine_name, image_file):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		task = [
@@ -62,8 +68,8 @@ def remote_machine_op_docker_load_image(machine_name, image_file):
 		]
 		machine.exec_task(task)
 	except Exception as e:
-		print(
-			f"Failed to load docker image {image_file} on machine {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to load docker image {image_file}: {e}")
 
 
 def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_image_url='', path_to_bin="/tmp/dpservice-bin"):
@@ -71,10 +77,10 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 	if is_docker and docker_image_url == '':
 		raise ValueError(
 			f"docker image url is required if dpservice is running in docker env")
-
+	machine = None
 	try:
-		docker_container_name = f"dpservice_{machine_name}"
 		machine = get_remote_machine(machine_name)
+		docker_container_name = f"dpservice_{machine_name}"
 		if machine.parent_machine:
 			raise NotImplementedError(
 				f"Cannot start dpservice on a vm machine {machine_name}")
@@ -102,7 +108,7 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 				kill_command = f"kill {running_pid.strip()}"
 				machine.ssh_manager.run_command(kill_command, sudo=True)
 				time.sleep(1)
-				print(
+				machine.logger.info(
 					f"Existing dpservice process killed: PID {running_pid.strip()}")
 
 			dpservice_task = [
@@ -111,10 +117,11 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 			]
 			machine.exec_task(dpservice_task)
 	except Exception as e:
-		print(
-			f"Failed to start dpservice on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to start dpservice on hypervisor: {e}")
 
 def remote_machine_op_fetch_dpservice_container_log(machine_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -131,10 +138,11 @@ def remote_machine_op_fetch_dpservice_container_log(machine_name):
 		]
 		machine.exec_task(docker_run_task)
 	except Exception as e:
-		print(
-			f"Failed to get dpservice container log from {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to get dpservice container log: {e}")
 
 def remote_machine_op_dpservice_init(machine_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -146,11 +154,12 @@ def remote_machine_op_dpservice_init(machine_name):
 		machine.exec_task(cli_task)
 		time.sleep(1)
 	except Exception as e:
-		print(
-			f"Failed to init dpservice on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to init dpservice on hypervisor: {e}")
 
 
 def remote_machine_op_dpservice_create_interface(machine_name, if_id, vni, ipv4, ipv6, pci_dev):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -162,11 +171,12 @@ def remote_machine_op_dpservice_create_interface(machine_name, if_id, vni, ipv4,
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to create interface on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to create interface: {e}")
 
 
 def remote_machine_op_dpservice_create_nat(machine_name, if_id, ip, ports):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -178,10 +188,12 @@ def remote_machine_op_dpservice_create_nat(machine_name, if_id, ip, ports):
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(f"Failed to create nat on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to create nat on hypervisor: {e}")
 
 
 def remote_machine_op_dpservice_delete_nat(machine_name, if_id):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -193,10 +205,12 @@ def remote_machine_op_dpservice_delete_nat(machine_name, if_id):
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(f"Failed to delete nat on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to delete nat: {e}")
 
 
 def remote_machine_op_dpservice_create_lb(machine_name, lb_name, lb_vni, lb_ip, lb_ports):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -208,10 +222,12 @@ def remote_machine_op_dpservice_create_lb(machine_name, lb_name, lb_vni, lb_ip, 
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(f"Failed to create lb on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to create lb: {e}")
 
 
 def remote_machine_op_dpservice_delete_lb(machine_name, lb_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -223,10 +239,12 @@ def remote_machine_op_dpservice_delete_lb(machine_name, lb_name):
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(f"Failed to delete lb on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to delete lb: {e}")
 
 
 def remote_machine_op_dpservice_create_lbpfx(machine_name, prefix, if_id):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -238,11 +256,12 @@ def remote_machine_op_dpservice_create_lbpfx(machine_name, prefix, if_id):
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to create lbpfx on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to create lbpfx: {e}")
 
 
 def remote_machine_op_dpservice_delete_lbpfx(machine_name, prefix, if_id):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -254,11 +273,12 @@ def remote_machine_op_dpservice_delete_lbpfx(machine_name, prefix, if_id):
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to delete lbpfx on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to delete lbpfx: {e}")
 
 
 def remote_machine_op_dpservice_create_lbtarget(machine_name, target_ip, lb_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -270,11 +290,12 @@ def remote_machine_op_dpservice_create_lbtarget(machine_name, target_ip, lb_name
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to delete lbpfx on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to create lbtarget: {e}")
 
 
 def remote_machine_op_dpservice_delete_lbtarget(machine_name, target_ip, lb_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -286,8 +307,8 @@ def remote_machine_op_dpservice_delete_lbtarget(machine_name, target_ip, lb_name
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to delete lbpfx on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to delete lbtarget: {e}")
 
 
 def remote_machine_op_dpservice_add_vms(env_config):
@@ -306,11 +327,11 @@ def remote_machine_op_dpservice_add_vms(env_config):
 						vm_info["machine_name"], vm_info["nat"]["ip"], vm_info["nat"]["ports"])
 
 	except Exception as e:
-		print(f"Failed to add vm interfaces via dpservice cli due to {e} ")
-		sys.exit(1)
+		raise e
 
 
 def remote_machine_op_dpservice_create_route(machine_name, prefix, nxt_hop_vni, nxt_hop_underly_ip, vni):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -322,11 +343,12 @@ def remote_machine_op_dpservice_create_route(machine_name, prefix, nxt_hop_vni, 
 		]
 		machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to create route on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to create route: {e}")
 
 
 def remote_machine_op_dpservice_delete_route(machine_name, prefix, vni):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if machine.parent_machine:
@@ -338,11 +360,12 @@ def remote_machine_op_dpservice_delete_route(machine_name, prefix, vni):
 		]
 		machine.exec_task(cli_task)
 	except Exception as e:
-		print(
-			f"Failed to delete route on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to delete route: {e}")
 
 
 def remote_machine_op_reboot(machine_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
@@ -364,28 +387,32 @@ def remote_machine_op_reboot(machine_name):
 		machine.exec_task(ssh_stop_command)
 		machine.stop()
 
-		print(f"Waiting for {machine_name} to reboot...")
+		machine.logger.info(f"Waiting for {machine_name} to reboot...")
 		machine.start()
 	except Exception as e:
-		print(f"Failed to reboot vm {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to reboot vm: {e}")
 
 
 def remote_machine_op_terminate_processes(machine_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		machine.terminate_processes()
 		time.sleep(1)
 	except Exception as e:
-		print(f"Failed to terminate processes on {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to terminate processes: {e}")
 
 
 def remote_machine_op_terminate_containers(machine_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		machine.terminate_containers()
 	except Exception as e:
-		print(
-			f"Failed to terminate containers on hypervisor {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to terminate containers: {e}")
 
 def remote_machine_op_vm_config_rm_default_route(machine_name, default_gw="192.168.122.1"):
 	try:
@@ -398,11 +425,12 @@ def remote_machine_op_vm_config_rm_default_route(machine_name, default_gw="192.1
 		]
 		machine.exec_task(vm_task)
 	except Exception as e:
-		print(
-			f"Failed to remove the default route from vm {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to remove the default route: {e}")
 
 
 def remote_machine_op_vm_config_tmp_dir(machine_name):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
@@ -413,10 +441,11 @@ def remote_machine_op_vm_config_tmp_dir(machine_name):
 		]
 		machine.exec_task(vm_task)
 	except Exception as e:
-		print(
-			f"Failed to change ownership of tmp dir from vm {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to change ownership of tmp dir: {e}")
 
 def remote_machine_op_flow_test(machine_name, is_server, server_ip, flow_count, run_time=5, round_count=3, payload_length=1000, output_file_name="test", test_script='/tmp/flow_test.py'):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
@@ -434,10 +463,12 @@ def remote_machine_op_flow_test(machine_name, is_server, server_ip, flow_count, 
 		]
 		return machine.exec_task(test_task)
 	except Exception as e:
-		print(f"Failed to invoke flow test on vm {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to invoke flow test: {e}")
 
 
 def remote_machine_op_add_ip_addr(machine_name, ip, dev, is_v6):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
@@ -454,10 +485,12 @@ def remote_machine_op_add_ip_addr(machine_name, ip, dev, is_v6):
 		]
 		return machine.exec_task(test_task)
 	except Exception as e:
-		print(f"Failed to add ip address to vm {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to add ip address to vm: {e}")
 
 
 def remote_machine_op_delete_ip_addr(machine_name, ip, dev, is_v6):
+	machine = None
 	try:
 		machine = get_remote_machine(machine_name)
 		if not machine.parent_machine:
@@ -474,7 +507,8 @@ def remote_machine_op_delete_ip_addr(machine_name, ip, dev, is_v6):
 		]
 		return machine.exec_task(test_task)
 	except Exception as e:
-		print(f"Failed to delete ip address to vm {machine_name} due to {e}")
+		if machine:
+			machine.logger.error(f"Failed to delete ip address: {e}")
 
 
 def get_underly_ip(output_string):

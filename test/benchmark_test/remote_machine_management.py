@@ -1,14 +1,17 @@
 import paramiko
 import time
-from helper import remove_last_empty_line
 import threading
+from helper import remove_last_empty_line, MachineLogger
+
 
 hypervisor_machines = []
 vm_machines = []
 
 
 class SSHManager:
-	def __init__(self, host_address, port, user_name, key_file, proxy=None, max_retries=10):
+	def __init__(self, host_name, host_address, port, user_name, key_file, proxy=None, max_retries=10):
+		self.host_name = host_name
+		self.logger = MachineLogger(self.host_name)
 		self.host_address = host_address
 		self.port = port
 		self.username = user_name
@@ -47,15 +50,15 @@ class SSHManager:
 							raise Exception("Unable to connect through proxy")
 
 				self.connect_one_shot()
-				print(
-					f"Connection established successfully on attempt {attempt} to IP {self.host_address}")
+				self.logger.info(
+					f"Connection established successfully on attempt {attempt}.")
 				break
 			except Exception as e:
-				print(f"Attempt {attempt} failed: {e}")
+				self.logger.error(f"Attempt {attempt} failed: {e}")
 				if attempt < self.max_retries:
 					time_to_sleep = initial_delay * \
 						(2 ** (attempt - 1))  # Exponential backoff
-					print(f"Retrying in {time_to_sleep} seconds...")
+					self.logger.info(f"Retrying in {time_to_sleep} seconds...")
 					self.stop_event.wait(time_to_sleep)
 				else:
 					raise ConnectionError(
@@ -82,7 +85,7 @@ class SSHManager:
 					command = f"bash -c '{command}'"
 				else:
 					command = f"bash -c 'nohup {command} > /tmp/{command_output_name}.log 2>&1 & echo $! >> {self.pid_file}'"
-			print(command)
+			self.logger.info(f"Execute command: {command}")
 			stdin, stdout, stderr = self.client.exec_command(command)
 			if not background:
 				return stdout.read().decode('utf-8') + stderr.read().decode('utf-8')
@@ -98,9 +101,10 @@ class SSHManager:
 
 	def disconnect(self):
 		"""Close the SSH connection."""
-		print(f"try to disconnect {self.host_address}")
+		self.logger.info("Disconnecting...")
 		self.stop_event.set()
 		self.client.close()
+		self.logger.info("Disconnected.")
 
 	def is_alive(self):
 		is_alive = False
@@ -139,10 +143,10 @@ class SSHManager:
 			# Command to stop all running Docker containers
 			stop_command = "sudo docker stop $(sudo docker ps -q)"
 			stop_output = self.run_command(stop_command)
-			print(
-				f"All containers stopped on {self.host_address}: {stop_output}")
+			self.logger.info(
+				f"All containers stopped with the status: {stop_output}")
 		else:
-			print("No running containers to stop.")
+			self.logger.info("No running containers to stop.")
 
 	def remove_all_containers(self):
 		"""remove all possible running docker containers"""
@@ -154,10 +158,10 @@ class SSHManager:
 			# Command to remove all stopped containers
 			remove_command = "sudo docker rm $(sudo docker ps -a -q)"
 			remove_output = self.run_command(remove_command)
-			print(
-				f"All containers removed on {self.host_address}: {remove_output}")
+			self.logger.info(
+				f"All containers removed on with the status: {remove_output}")
 		else:
-			print("No containers to remove.")
+			self.logger.info("No containers to remove.")
 
 	def terminate_all_containers(self):
 		"""Terminate all possible running docker containers"""
@@ -217,9 +221,6 @@ class VMConfig:
 	def get_nat_ports(self):
 		return self.nat_ports
 
-	# def get_nat_underly_ip(self):
-	# 	return self.nat_underly_ip
-
 	def get_nat(self):
 		return self.nat
 
@@ -274,15 +275,17 @@ class RemoteMachine:
 	def __init__(self, config, key_file, parent_machine=None):
 		self.machine_name = config["machine_name"]
 		self.parent_machine = parent_machine
-		self.ssh_manager = SSHManager(config["host_address"], config["port"], config["user_name"],
+		self.ssh_manager = SSHManager(self.machine_name, config["host_address"], config["port"], config["user_name"],
 									  key_file=key_file, proxy=None if not parent_machine else self.parent_machine.get_connection())
+		self.logger = self.ssh_manager.logger
 
 	def start(self):
-		print(f"Connecting to {self.machine_name}...")
+		self.logger.info(f"Connecting via ssh...")
 		try:
 			self.ssh_manager.connect()
+
 		except Exception as e:
-			print(f"Failed to connect to {self.machine_name}: {e}")
+			self.logger.error(f"Failed to connect due to: {e}")
 
 	def probe_connect(self):
 		try:
@@ -330,7 +333,7 @@ class RemoteMachine:
 		output = self.ssh_manager.run_command(task['command'], parameters=task.get('parameters', ''), background=task.get(
 			'background', False), sudo=task.get('sudo', False), delay=task.get('delay', 0), command_output_name=task.get('cmd_output_name', ''))
 		output = remove_last_empty_line(output)
-		print(output)
+		self.logger.info(f"Execution result: {output}")
 		return output
 
 	def set_vm_config(self, ipv4, ipv6, pci, underly_ip, vni):
@@ -366,20 +369,20 @@ def cleanup_remote_machine():
 
 
 def add_vm_config_info(machine_name, ipv4, ipv6, pci, underly_ip, vni):
+	machine = get_remote_machine(machine_name)
 	try:
-		machine = get_remote_machine(machine_name)
 		machine.set_vm_config(ipv4, ipv6, pci, underly_ip, vni)
 	except Exception as e:
-		print(f"Failed to store vm config for {machine_name} due to {e} ")
+		machine.logger.error(f"Failed to store vm config due to: {e} ")
 
 
 def add_vm_nat_config(machine_name, ip, ports):
+	machine = get_remote_machine(machine_name)
 	try:
-		machine = get_remote_machine(machine_name)
 		machine.get_vm_config().set_nat(ip, ports)
 	except Exception as e:
-		print(
-			f"Failed to store {machine_name} vm's nat configuration due to {e}")
+		machine.logger.error(
+			f"Failed to store vm's nat configuration due to: {e}")
 
 
 def get_vm_config_detail(machine_name):
@@ -387,4 +390,4 @@ def get_vm_config_detail(machine_name):
 		machine = get_remote_machine(machine_name)
 		return machine.get_vm_config()
 	except Exception as e:
-		print(f"Failed to get stored vm {machine_name} config due to {e} ")
+		machine.logger.error(f"Failed to get stored vm config due to {e} ")
