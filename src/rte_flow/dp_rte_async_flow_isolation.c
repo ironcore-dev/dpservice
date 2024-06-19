@@ -28,8 +28,10 @@ static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_
 	dp_set_redirect_queue_action(&concrete_actions[concrete_action_cnt++], &queue_action, 0);
 	dp_set_end_action(&concrete_actions[concrete_action_cnt++]);
 
-	ret = dp_rte_async_create_concrete_rules(port_id, port->default_async_rules.async_templates.template_tables, DP_ASYNC_RULE_TABLE_DEFAULT,
-											concrete_patterns, concrete_actions, DP_ASYNC_RULE_TYPE_DEFAULT_ISOLATION, &flow);
+	ret = dp_rte_async_create_concrete_rules(port_id, port->default_async_rules.async_templates[DP_ASYNC_TEMPLATE_TABLE_PF_ISOLATION].template_table,
+											concrete_patterns, concrete_actions,
+											DP_ASYNC_TEMPLATE_PATTERN_PF_IPV6_PROTO, DP_ASYNC_TEMPLATE_ACTION_PF_QUEUE,
+											&flow);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to create concrete async default rule for pf", DP_LOG_PORTID(port_id));
 		return DP_ERROR;

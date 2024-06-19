@@ -38,7 +38,8 @@ int dp_port_rte_async_flow_config(uint16_t port_id)
 	return DP_OK;
 }
 
-int dp_push_rte_async_flow_rules(uint16_t port_id) {
+int dp_push_rte_async_flow_rules(uint16_t port_id)
+{
 
 	struct rte_flow_error error;
 
@@ -51,7 +52,8 @@ int dp_push_rte_async_flow_rules(uint16_t port_id) {
 	return DP_OK;
 }
 
-int dp_pull_rte_async_rule_status(uint16_t port_id, uint8_t rule_count) {
+int dp_pull_rte_async_rule_status(uint16_t port_id, uint8_t rule_count)
+{
 	struct rte_flow_op_result *res;
 	int success = 0;
 	struct rte_flow_error error;
@@ -88,9 +90,11 @@ int dp_pull_rte_async_rule_status(uint16_t port_id, uint8_t rule_count) {
 int dp_rte_async_create_pattern_template(uint16_t port_id,
 										const struct rte_flow_item pattern[],
 										const struct rte_flow_pattern_template_attr *pattern_template_attr,
-										struct rte_flow_pattern_template** pattern_template_ptr) {
+										uint8_t table_id, uint8_t pattern_id)
+{
 	struct rte_flow_pattern_template *pattern_template;
 	struct rte_flow_error error;
+	struct dp_port *port = dp_get_port_by_id(port_id);
 
 	pattern_template = rte_flow_pattern_template_create(port_id, pattern_template_attr, pattern, &error);
 
@@ -99,17 +103,19 @@ int dp_rte_async_create_pattern_template(uint16_t port_id,
 						DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
 		return DP_ERROR;
 	}
-	
-	*pattern_template_ptr = pattern_template;
+	port->default_async_rules.async_templates[table_id].pattern_templates[pattern_id] = pattern_template;
+	port->default_async_rules.async_templates[table_id].nr_patterns++;
 	return DP_OK;
 }
 
 int dp_rte_async_create_actions_template(uint16_t port_id,
 										const struct rte_flow_action act[], const struct rte_flow_action msk[],
 										const struct rte_flow_actions_template_attr *action_template_attr,
-										struct rte_flow_actions_template** actions_template_ptr) {
+										uint8_t table_id, uint8_t action_id)
+{
 	struct rte_flow_actions_template *actions_template;
 	struct rte_flow_error error;
+	struct dp_port *port = dp_get_port_by_id(port_id);
 
 	actions_template =
 			rte_flow_actions_template_create(port_id, action_template_attr, act, msk, &error);
@@ -119,14 +125,23 @@ int dp_rte_async_create_actions_template(uint16_t port_id,
 		return DP_ERROR;
 	}
 
-	*actions_template_ptr = actions_template;
+	port->default_async_rules.async_templates[table_id].action_templates[action_id] = actions_template;
+	port->default_async_rules.async_templates[table_id].nr_actions++;
 	return DP_OK;
 }
 
-int dp_rte_async_create_table_template(uint16_t port_id, struct rte_flow_template_table_attr *table_attr,
+void dp_rte_async_create_table_attribute(uint16_t port_id, uint8_t table_id, const struct rte_flow_template_table_attr *attr)
+{
+	struct dp_port *port = dp_get_port_by_id(port_id);
+	port->default_async_rules.async_templates[table_id].table_attr = attr;
+	port->default_async_rules.async_templates[table_id].filled = true;
+}
+
+int dp_rte_async_create_table_template(uint16_t port_id, const struct rte_flow_template_table_attr *table_attr,
 													struct rte_flow_pattern_template* pattern_templates[], uint8_t nb_pattern_templ,
 													struct rte_flow_actions_template* actions_templates[], uint8_t nb_actions_templ,
-													struct rte_flow_template_table** template_table) {
+													struct rte_flow_template_table** template_table)
+{
     struct rte_flow_error error;
 	struct rte_flow_template_table *table;
 	
@@ -143,21 +158,25 @@ int dp_rte_async_create_table_template(uint16_t port_id, struct rte_flow_templat
 }
 
 
-int dp_rte_async_create_template_tables(uint16_t port_id, uint8_t pattern_action_template_counter)
+int dp_rte_async_create_template_tables(uint16_t port_id)
 {
 
 	int ret;
-	struct rte_flow_template_table_attr table_attr = pf_default_table_attr;
 	struct dp_port* port = dp_get_port_by_id(port_id);
+	struct dp_port_rte_async_template *template;
 
 	// the current approach is that each template table is initialized with all patterns/actions for pf/vf
 	// choose the correct pattern/action by using dp_rte_async_rule_type_index when concretizing flow rules
 	// assuming the attributes of patterns/actions match with table attributes
-	for (int i = 0; i < DP_ASYNC_RULE_TABLE_MAX; i++ ) {
-		ret = dp_rte_async_create_table_template(port->port_id, &table_attr,
-											port->default_async_rules.async_templates.pattern_templates, pattern_action_template_counter,
-											port->default_async_rules.async_templates.action_templates, pattern_action_template_counter,
-											&(port->default_async_rules.async_templates.template_tables[i]));
+	for (int i = 0; i < DP_ASYNC_TEMPLATE_MAX_TABLE; i++ ) {
+		 template = &port->default_async_rules.async_templates[i];
+		if (!template->filled)
+			continue; // or break assuming there is no skipped template
+		
+		ret = dp_rte_async_create_table_template(port->port_id, template->table_attr,
+											template->pattern_templates, template->nr_patterns,
+											template->action_templates, template->nr_actions,
+											&(template->template_table));
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to create async flow rule table", DP_LOG_VALUE(i));
 			return DP_ERROR;
@@ -167,19 +186,16 @@ int dp_rte_async_create_template_tables(uint16_t port_id, uint8_t pattern_action
 }
 
 int dp_rte_async_create_concrete_rules(uint16_t port_id,
-									struct rte_flow_template_table *template_tables[],
-									uint8_t used_table_index,
+									struct rte_flow_template_table *template_table,
 									struct rte_flow_item *concrete_patterns, struct rte_flow_action *concrete_actions,
-									uint8_t used_pattern_action_index,
+									uint8_t used_pattern_index, uint8_t used_action_index,
 									struct rte_flow **flow)
 {
 	struct rte_flow *created_flow;
 	struct rte_flow_error error;
-
-	struct rte_flow_template_table *used_table = template_tables[used_table_index];
 	
-	created_flow = rte_flow_async_create(port_id, 0, &op_attr, used_table,
-			concrete_patterns, used_pattern_action_index, concrete_actions, used_pattern_action_index, NULL, &error);
+	created_flow = rte_flow_async_create(port_id, 0, &op_attr, template_table,
+			concrete_patterns, used_pattern_index, concrete_actions, used_action_index, NULL, &error);
 
 	if (!created_flow) {
 		DPS_LOG_ERR("Concrete flow rule cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
@@ -206,13 +222,13 @@ int dp_rte_async_destroy_rule(uint16_t port_id, struct rte_flow *flow)
 	return DP_OK;
 }
 
-static void dp_rte_async_destroy_pattern_template(struct dp_port *port)
+static void dp_rte_async_destroy_pattern_template(struct dp_port *port, uint8_t table_id)
 {
 	struct rte_flow_error error;
 	int ret;
 	
-	for (uint8_t i = 0; i < DP_ASYNC_RULE_TYPE_MAX; i++) {
-		ret = rte_flow_pattern_template_destroy(port->port_id, port->default_async_rules.async_templates.pattern_templates[i], &error);
+	for (uint8_t i = 0; i < port->default_async_rules.async_templates[table_id].nr_patterns; i++) {
+		ret = rte_flow_pattern_template_destroy(port->port_id, port->default_async_rules.async_templates[table_id].pattern_templates[i], &error);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Failed to destroy pattern template", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 	}
@@ -220,37 +236,37 @@ static void dp_rte_async_destroy_pattern_template(struct dp_port *port)
 }
 
 
-static void dp_rte_async_destroy_action_template(struct dp_port *port)
+static void dp_rte_async_destroy_action_template(struct dp_port *port, uint8_t table_id)
 {
 	struct rte_flow_error error;
 	int ret = DP_OK;
 
-	for (uint8_t i = 0; i < DP_ASYNC_RULE_TYPE_MAX; i++) {
-		ret = rte_flow_actions_template_destroy(port->port_id, port->default_async_rules.async_templates.action_templates[i], &error);
+	for (uint8_t i = 0; i < port->default_async_rules.async_templates[table_id].nr_actions; i++) {
+		ret = rte_flow_actions_template_destroy(port->port_id, port->default_async_rules.async_templates[table_id].action_templates[i], &error);
 		if (DP_FAILED(ret))
 			DPS_LOG_WARNING("Failed to destroy action template", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 	}
 }
 
 
-static void dp_rte_async_destroy_table_template(struct dp_port *port)
+static void dp_rte_async_destroy_table_template(struct dp_port *port, uint8_t table_id)
 {
 	struct rte_flow_error error;
-	int ret = DP_OK;
+	int ret;
 	
-	for (uint8_t i = 0; i < DP_ASYNC_RULE_TABLE_MAX; i++) {
-		ret = rte_flow_template_table_destroy(port->port_id, port->default_async_rules.async_templates.template_tables[i], &error);
-		if (DP_FAILED(ret))
-			DPS_LOG_WARNING("Failed to destroy template table", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
-	}
+	ret = rte_flow_template_table_destroy(port->port_id, port->default_async_rules.async_templates[table_id].template_table, &error);
+	if (DP_FAILED(ret))
+		DPS_LOG_WARNING("Failed to destroy template table", DP_LOG_PORTID(port->port_id), DP_LOG_FLOW_ERROR(error.message));
 }
 
 
 void dp_rte_async_destroy_templates(uint16_t port_id)
 {
 	struct dp_port *port = dp_get_port_by_id(port_id);
-
-	dp_rte_async_destroy_table_template(port); // destroy table template first, then destroy pattern and action template
-	dp_rte_async_destroy_pattern_template(port);
-	dp_rte_async_destroy_action_template(port);
+	
+	for (uint8_t i = 0; i < DP_ASYNC_TEMPLATE_MAX_TABLE; i++) {
+		dp_rte_async_destroy_table_template(port, i); // destroy table template first, then destroy pattern and action template
+		dp_rte_async_destroy_pattern_template(port, i);
+		dp_rte_async_destroy_action_template(port, i);
+	}	
 }

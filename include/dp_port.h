@@ -72,7 +72,7 @@ struct dp_port {
 		} default_sync_rules;
 
 		struct {
-			struct dp_port_rte_async_templates async_templates;
+			struct dp_port_rte_async_template async_templates[DP_ASYNC_TEMPLATE_MAX_TABLE];
 			struct rte_flow					*default_async_flow[DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT];
 		} default_async_rules;
 	};
