@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
+
 from remote_machine_management import get_vm_config_detail
 from remote_machine_operations import *
 from benchmark_test_config import init_lb, tear_down_lb, test_logger
