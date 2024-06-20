@@ -60,13 +60,13 @@ static int get_num_of_vfs_sriov(void)
 
 	fp = fopen(filename, "r");
 	if (!fp) {
-		DPS_LOG_ERR("Cannot open SR-IOV sysfs path", DP_LOG_RET(errno));
+		DPS_LOG_ERR("Cannot open SR-IOV sysfs path", DP_LOG_RET(errno), DP_LOG_PATH(filename));
 		return DP_ERROR;
 	}
 
 	vfs = DP_ERROR;
 	if (fscanf(fp, "%d", &vfs) != 1)
-		DPS_LOG_ERR("Cannot parse SR-IOV sysfs VF number", DP_LOG_RET(errno));
+		DPS_LOG_ERR("Cannot parse SR-IOV sysfs VF number", DP_LOG_RET(errno), DP_LOG_PATH(filename));
 	fclose(fp);
 	return vfs;
 }

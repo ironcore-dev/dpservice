@@ -2,7 +2,7 @@
 
 Dataplane service comes with a set of tests to verify basic functionality. Running these tests requires root privileges and uses TAP interfaces instead of a real NIC. SmartNIC is therefore not needed to run them.
 
-The test infrastructure uses [pytest](https://docs.pytest.org/) and [scapy](https://scapy.net/), meson build system will check for them being installed during configuration phase if the option is set, use `meson setup -Denable_tests=true build` or `meson setup --reconfigure -Denable_tests=true build` on an existing build directory.
+The test infrastructure uses [pytest](https://docs.pytest.org/), [scapy](https://scapy.net/) and golang, meson build system will check for them being installed during configuration phase if the option is set, use `meson setup -Denable_tests=true build` or `meson setup --reconfigure -Denable_tests=true build` on an existing build directory.
 
 Enabling tests via meson also adds some compiled-in testing code, which is beyond the scope of this document. Automated tests already utilize this feature.
 
@@ -37,8 +37,8 @@ There is a tester image provided by this repo, simply build it using this repo's
 To run the image, you need to provide more arguments for privileged access: `sudo docker run -it --rm --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages <image>`.
 
 
-## GRPC test client
-If you want to do some manual testing, you need to use GRPC to communicate with the `dpservice-bin` process. A simple client is provided by this repository. For more information about the client, see [this section](grpc_client.md).
+## GRPC client
+If you want to do some manual testing, you need to use GRPC to communicate with the `dpservice-bin` process. A full-featured command-line client is provided by this repository. For more information about the client, see [this section](grpc_client.md).
 
 
 ## Mellanox test setup

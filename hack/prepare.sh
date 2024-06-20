@@ -165,9 +165,9 @@ function get_ipv6() {
 	# TODO: this needs to be done in a better way
 	while read -r l1; do
 		if [ "$l1" != "::1/128" ]; then
-        		echo ${l1%/*}
+			echo ${l1%/*}
 			break
-    		fi
+		fi
 	done < <(ip -6 -o addr show lo | awk '{print $4}')
 }
 

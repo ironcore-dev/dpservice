@@ -20,7 +20,7 @@ sudo update-grub
 ```
 > The `hugepages=4` can also be done later via `sysctl vm.nr_hugepages=4` or `echo 4 > /sys/devices/system/node/node0/hugepages/hugepages-1048576kB/nr_hugepages`.
 
-Second, you need to mount the hugepage filesystem, either manually or via `/etc/fstab`:
+Unless done automatically by the kernel (see above), you need to mount the hugepage filesystem, either manually or via `/etc/fstab`:
 ```bash
 hugetlbfs    /dev/hugepages    hugetlbfs    x-mount.mkdir=0770,mode=0770,gid=1000,pagesize=1G,size=4G
 ```

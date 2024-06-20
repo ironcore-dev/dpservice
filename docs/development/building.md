@@ -18,8 +18,9 @@ sudo apt install git pkgconf cmake protobuf-compiler-grpc libgrpc++-dev uuid-dev
 ```
 For [automated testing](../testing/) (enabled via meson option `-Denable_tests=true`) also install:
 ```bash
-sudo apt install python3-pytest python3-scapy
+sudo apt install python3-pytest python3-scapy golang
 ```
+> Golang needs to be at least version 1.21
 
 #### Cross-compilation
 Dp-service currently only supports x86 architecture (amd64 instruction set actually). For cross-compilation, add `--cross-file config/arm/arm64_armv8_linux_gcc` to `meson setup` (see below).

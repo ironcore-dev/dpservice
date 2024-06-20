@@ -42,6 +42,7 @@ extern "C" {
 #define DP_LOG_VALUE(VALUE) _DP_LOG_INT("value", VALUE)
 #define DP_LOG_MIN(VALUE) _DP_LOG_INT("min", VALUE)
 #define DP_LOG_MAX(VALUE) _DP_LOG_INT("max", VALUE)
+#define DP_LOG_PATH(VALUE) _DP_LOG_STR("path", VALUE)
 // used for tagged calls (like allocation pools, etc.)
 #define DP_LOG_NAME(VALUE) _DP_LOG_STR("name", VALUE)
 // RTE and NIC related

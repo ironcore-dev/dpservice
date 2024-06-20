@@ -59,7 +59,7 @@ Running dp-service on ConnectX-4 Lx requires `UCTX_EN` to be `False`, otherwise 
 
 Running dp-service on ConnectX-6 Lx with offloading requires `UCTX_EN` to be `True`, otherwise hairpins to PF1 will fail to initialize.
 
-Running dp-service on ConnectX-6 Lx in user-mode (non-root) requires `UCTX_EN` to be `False`, otherwise PF to VF traffic is not working at all. Offloading is not possible then.
+Running dp-service on ConnectX-6 Lx in user-mode (non-root) may require `UCTX_EN` to be `False` (it has been obseved that PF to VF traffic is not working at all in some cases). Offloading is not possible then.
 
 
 ## Building DPDK
