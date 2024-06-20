@@ -84,7 +84,7 @@ COPY proto/ proto/
 COPY go/ go/
 COPY cli/ cli/
 COPY tools/ tools/
-COPY test/ test/
+COPY test/local/ test/
 COPY src/ src/
 COPY include/ include/
 # Needed for version extraction by meson

@@ -152,7 +152,7 @@ def silent_sigint(sig, frame):
 if __name__ == '__main__':
 	script_path = os.path.dirname(os.path.abspath(__file__))
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--build-path", action="store", default=f"{script_path}/../build", help="Path to the root build directory")
+	parser.add_argument("--build-path", action="store", default=f"{script_path}/../../build", help="Path to the root build directory")
 	parser.add_argument("--port-redundancy", action="store_true", help="Set up two physical ports")
 	parser.add_argument("--fast-flow-timeout", action="store_true", help="Test with fast flow timeout value")
 	parser.add_argument("--virtsvc", action="store_true", help="Enable virtual service tests")

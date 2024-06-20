@@ -15,5 +15,4 @@ __*
 scapy-script/*
 code_check/_checkpatch.pl
 .out
-s/*
 test/benchmark_test/access_details.json

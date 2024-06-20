@@ -15,7 +15,7 @@ from helpers import request_ip, wait_for_port, is_port_open
 def pytest_addoption(parser):
 	script_dir = os.path.dirname(os.path.abspath(__file__))
 	parser.addoption(
-		"--build-path", action="store", default=f"{script_dir}/../build", help="Path to the root build directory"
+		"--build-path", action="store", default=f"{script_dir}/../../build", help="Path to the root build directory"
 	)
 	parser.addoption(
 		"--port-redundancy", action="store_true", help="Test with port redundancy"
