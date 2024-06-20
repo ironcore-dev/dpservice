@@ -1,38 +1,19 @@
 # When to perform automated benchmarking tests
-Automated benchmarking tests are additional functional and performance tests to the existing TAP device-based ones. This test suit relies on a configured environment including hypervisors and started VMs, as well as configured SSH authorized key of the execution machine starting the benchmarking tests.
-This benchmarking testing suite is built upon and utilises 1) dpservice-cli to configure running dpservice instances or containers on hypervisors; 2) connectivity and performance testing script under the repository `hack/connectiviy_test`. In the end, running these benchmarking tests is useful for verifying if dpservice works correctly together with actual running VMs for both offloading and non-offloading modes. It also verifies if networking performance meets specified values during dpservice development.
-
-# Examplary command to invoke tests
-```
-./run_benchmarktest.py --mode offload --stage cicd --docker-image ghcr.io/ironcore-dev/dpservice:sha-e9b4272 -v
-
-./run_benchmarktest.py --mode both --stage dev -v
-```
+Automated benchmarking tests are additional functional and performance tests to the existing TAP device-based ones. This test suit relies on a configured environment including hypervisors and started VMs, as well as configured SSH authorized key of the execution machine starting the benchmarking tests. In the end, running these benchmarking tests is useful for verifying if dpservice works correctly together with actual running VMs for both offloading and non-offloading modes. It also verifies if networking performance meets specified values during dpservice development.
 
 # Required hypervisor and VM setup
 To successfully run these automated benchmarking tests, currently, 2 hypervisors and 3 VMs need to be prepared beforehand, especially putting the ssh key of the machine executing the benchmarking tests into the above mentioned hypervisors and VMs.
 
-## Interface configuration in VMs
-To ssh into VMs, QEMU's default networking needs to be activated, and VMs need to be configured to have two interfaces, one using NIC's VF and one connecting to qemu's network bridge. Here is an example of the libvirt default networking configuration file.
+## Prerequisite
 
+1. Ensure the script execution machine can compile dpservice, especiall dpservice-cli within the directory.
+2. Install the following python libraries on your executing machine by executing
 ```
-<network connections='1'>
-  <name>default</name>
-  <uuid>28910926-4a1c-4f79-8d4c-2f17277727cc</uuid>
-  <forward mode='nat'>
-    <nat>
-      <port start='1024' end='65535'/>
-    </nat>
-  </forward>
-  <bridge name='virbr0' stp='on' delay='0'/>
-  <mac address='52:54:00:8c:3c:6f'/>
-  <ip address='192.168.122.1' netmask='255.255.255.0'>
-    <dhcp>
-      <range start='192.168.122.2' end='192.168.122.254'/>
-    </dhcp>
-  </ip>
-</network>
+apt install python3-termcolor
+apt install python3-psutil
+apt install python3-paramiko
 ```
+
 ## Extra configuration on hypervisors running Gardenlinux
 On hypervisors running gardenlinux, it is also necessary to open ports to allow the DHCP service to provide IP addresses to VMs to be able for access. For example, the most convenient way is to  change the default input filter policy to 'accept' by importing the following nft table rules.
 
@@ -64,6 +45,31 @@ filter_table.nft:
 	}
 ```
 
+Additionally, if the used hypervisors are running Gardenlinux, it is needed to remount `/tmp` to allow execute binary files being uploaded to it, due to the strict security policy. Simply execute `sudo mount -o remount,exec /tmp`.
+
+
+## Interface configuration in VMs
+To ssh into VMs, QEMU's default networking needs to be activated, and VMs need to be configured to have two interfaces, one using NIC's VF and one connecting to qemu's network bridge. Here is an example of the libvirt default networking configuration file.
+
+```
+<network connections='1'>
+  <name>default</name>
+  <uuid>28910926-4a1c-4f79-8d4c-2f17277727cc</uuid>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='virbr0' stp='on' delay='0'/>
+  <mac address='52:54:00:8c:3c:6f'/>
+  <ip address='192.168.122.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.122.2' end='192.168.122.254'/>
+    </dhcp>
+  </ip>
+</network>
+```
+
 In order to add one extra interface dedicated for ssh connection, please modify the VM's libvirt configuration file in the format of XML and add the following section to setup an interface.
 
 ```
@@ -74,8 +80,6 @@ In order to add one extra interface dedicated for ssh connection, please modify 
 </interface>
 ```
 
-Additionally, if the used hypervisors are running Gardenlinux, it is needed to remount `/tmp` to allow execute binary files being uploaded to it, due to the strict security policy. Simply execute `sudo mount -o remount,exec /tmp`.
-
 # Configuration file for test environment
 The configuration file, `/test/benchmark_test/test_configurations.json` for the test environment provides machine access information and the most of test configurations to the execution script. The following fields need to be double-checked and therefore changed according to the actual environment setup.
 
@@ -84,6 +88,8 @@ The configuration file, `/test/benchmark_test/test_configurations.json` for the 
 2. "expected_throughput" values need to adapted to the actual environment, as depending on the hardware capability, e.g., CPU speed and cabling specification, the maximum achievable throughput can be different. If these values are too high, tests will always fail.
 
 3. "pci_addr" in "vm" sections needs to match the VF and VM configuration on hypervisors.
+
+4. "machine_name" field is NOT expected to be changed.
 
 
 # Execution of test script
@@ -108,3 +114,10 @@ Alternatively, if this option is set as 'cicd', the above described docker image
 5. `--env-config-file` and `--env-config-name`. They provide information of the above described `test_configurations.json`. It is possible this file is renamed or located somewhere else. And it is also possible to create several configurations within this file and specify one of them for the tests.
 
 6. `--verbose`. Specify if pytest runs in the verbose mode to see all steps and results during test execution.
+
+# Examplary command to invoke tests
+```
+./run_benchmarktest.py --mode offload --stage cicd --docker-image ghcr.io/ironcore-dev/dpservice:sha-e9b4272 -v
+
+./run_benchmarktest.py --mode both --stage dev -v
+```
