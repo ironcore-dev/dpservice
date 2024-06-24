@@ -137,7 +137,7 @@ bool dp_are_flows_identical(const struct flow_key *key1, const struct flow_key *
 
 int dp_get_flow(const struct flow_key *key, struct flow_value **p_flow_val);
 int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val);
-void dp_delete_flow(const struct flow_key *key);
+void dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val);
 int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in */);
 void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
 int dp_flow_init(int socket_id);

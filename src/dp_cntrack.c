@@ -192,11 +192,12 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_REPLY], &inverted_key, sizeof(inverted_key));
 	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
 		goto error_add_inv;
+	dp_ref_inc(&flow_val->ref_count);
 
 	return flow_val;
 
 error_add_inv:
-	dp_delete_flow(key);
+	dp_delete_flow(key, flow_val);
 error_add:
 	rte_free(flow_val);
 error_alloc:
