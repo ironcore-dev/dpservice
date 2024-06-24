@@ -14,33 +14,43 @@ extern "C" {
 struct dp_ref {
 	rte_atomic32_t refcount;
 	void (*release)(struct dp_ref *dpref);
+#ifdef ENABLE_PYTEST
 	bool valid;
+#endif
 };
 
 static inline void dp_ref_init(struct dp_ref *ref, void (*release)(struct dp_ref *dpref))
 {
 	rte_atomic32_set(&ref->refcount, 1);
 	ref->release = release;
+#ifdef ENABLE_PYTEST
 	ref->valid = true;
+#endif
 }
 
 static inline void dp_ref_inc(struct dp_ref *ref)
 {
+#ifdef ENABLE_PYTEST
 	RTE_VERIFY(ref->valid);
+#endif
 	RTE_VERIFY(rte_atomic32_read(&ref->refcount));
 	rte_atomic32_add(&ref->refcount, 1);
 }
 
 static inline void dp_ref_dec(struct dp_ref *ref)
 {
+#ifdef ENABLE_PYTEST
 	RTE_VERIFY(ref->valid);
+#endif
 	if (rte_atomic32_dec_and_test(&ref->refcount))
 		ref->release(ref);
 }
 
 static inline bool dp_ref_dec_and_chk_freed(struct dp_ref *ref)
 {
+#ifdef ENABLE_PYTEST
 	RTE_VERIFY(ref->valid);
+#endif
 	if (rte_atomic32_dec_and_test(&ref->refcount)) {
 		ref->release(ref);
 		return true;
