@@ -64,13 +64,14 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
-	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, ntohl(ipv4_hdr->src_addr));
 	if (snat_data->nat_ip != 0)
 		cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 
 	if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 		return DP_ERROR;
+	dp_ref_inc(&cntrack->ref_count);
 
 	return DP_OK;
 }
@@ -126,7 +127,7 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT64;
-	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(dest_ip4));
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, snat64_data.nat_ip);
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
@@ -134,6 +135,7 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 
 	if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 		return DP_ERROR;
+	dp_ref_inc(&cntrack->ref_count);
 
 	return DP_OK;
 }

@@ -79,7 +79,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 		if (df->nat_type != DP_LB_RECIRC) {
 			cntrack->nf_info.nat_type = DP_FLOW_LB_TYPE_FORWARD;
-			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
+			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack); // no reverse traffic for relaying pkts
 		} else
 			cntrack->nf_info.nat_type = DP_FLOW_LB_TYPE_RECIRC;
 

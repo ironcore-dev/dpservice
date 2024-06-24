@@ -58,7 +58,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					cntrack->nf_info.l4_type = df->l4_type;
 					dp_copy_ipv6(&cntrack->nf_info.underlay_dst, underlay_dst);
 
-					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]); // no reverse traffic for relaying pkts
+					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack); // no reverse traffic for relaying pkts
 					return DNAT_NEXT_PACKET_RELAY;
 				}
 
@@ -79,10 +79,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
-			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
+			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 			dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
 				return DNAT_NEXT_DROP;
+			dp_ref_inc(&cntrack->ref_count);
 		}
 		return DNAT_NEXT_IPV4_LOOKUP;
 	}

@@ -214,7 +214,7 @@ void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *in
 	}
 }
 
-static void dp_delete_flow_no_flush(const struct flow_key *key)
+void dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val)
 {
 	int ret;
 
@@ -229,11 +229,7 @@ static void dp_delete_flow_no_flush(const struct flow_key *key)
 #ifdef ENABLE_PYTEST
 	dp_flow_log_key(key, "Successfully deleted an existing hash key");
 #endif
-}
-
-void dp_delete_flow(const struct flow_key *key)
-{
-	dp_delete_flow_no_flush(key);
+	dp_ref_dec(&flow_val->ref_count);
 	// removed a flow, purge the cache to be safe
 	// (could only remove this key from cache, but that would need matching, which takes time)
 	dp_cntrack_flush_cache();
@@ -268,8 +264,6 @@ void dp_free_flow(struct dp_ref *ref)
 	struct flow_value *cntrack = container_of(ref, struct flow_value, ref_count);
 
 	dp_free_network_nat_port(cntrack);
-	dp_delete_flow_no_flush(&cntrack->flow_key[DP_FLOW_DIR_ORG]);
-	dp_delete_flow_no_flush(&cntrack->flow_key[DP_FLOW_DIR_REPLY]);
 	dp_cntrack_flush_cache();
 
 	rte_free(cntrack);
@@ -402,12 +396,6 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_value *f
 
 }
 
-static __rte_always_inline void dp_age_out_flow(struct flow_value *flow_val)
-{
-	flow_val->aged = 1;
-	dp_ref_dec(&flow_val->ref_count);
-}
-
 void dp_process_aged_flows_non_offload(void)
 {
 	struct flow_value *flow_val = NULL;
@@ -430,16 +418,16 @@ void dp_process_aged_flows_non_offload(void)
 				DPS_LOG_ERR("Failed to query and remove rte flows", DP_LOG_RET(ret));
 		}
 
-		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value) && (!flow_val->aged))
-			dp_age_out_flow(flow_val);
+		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value))
+			dp_delete_flow(next_key, flow_val);
 	}
 }
 
-static __rte_always_inline void dp_remove_flow(struct flow_value *flow_val)
+static __rte_always_inline void dp_remove_flow(struct flow_value *flow_val, const void *key)
 {
 	if (offload_mode_enabled)
 		dp_rte_flow_remove(flow_val);
-	dp_age_out_flow(flow_val);
+	dp_delete_flow(key, flow_val);
 }
 
 void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type)
@@ -456,7 +444,7 @@ void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type)
 		}
 		// NAT/VIP are in 1:1 relation to a VM (port_id), no need to check IP:port
 		if (flow_val->created_port_id == port_id && flow_val->nf_info.nat_type == nat_type)
-			dp_remove_flow(flow_val);
+			dp_remove_flow(flow_val, next_key);
 	}
 }
 
@@ -475,7 +463,7 @@ void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, ui
 		if (next_key->vni == vni && !next_key->l3_dst.is_v6 && next_key->l3_dst.ipv4 == ipv4
 			&& next_key->port_dst >= min_port && next_key->port_dst < max_port
 		) {
-			dp_remove_flow(flow_val);
+			dp_remove_flow(flow_val, next_key);
 		}
 	}
 }
@@ -495,7 +483,7 @@ void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni)
 		if (flow_val->created_port_id == port_id
 			|| (next_key->vni == vni && !flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.is_v6 && flow_val->flow_key[DP_FLOW_DIR_ORG].l3_dst.ipv4 == ipv4)
 		) {
-			dp_remove_flow(flow_val);
+			dp_remove_flow(flow_val, next_key);
 		}
 	}
 }
@@ -513,7 +501,7 @@ void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr)
 			return;
 		}
 		if (dp_ipv6_match(&flow_val->nf_info.underlay_dst, ul_addr))
-			dp_remove_flow(flow_val);
+			dp_remove_flow(flow_val, next_key);
 	}
 }
 
