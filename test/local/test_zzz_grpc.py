@@ -9,7 +9,9 @@ def test_grpc_init(prepare_ifaces, grpc_client):
 	# Already initialized
 	grpc_client.expect_failure().init()
 
-def test_grpc_getinit(prepare_ifaces, grpc_client):
+def test_grpc_getinit(prepare_ifaces, grpc_client, request):
+	if request.config.getoption("--attach"):
+		pytest.skip("gRPC GetInit not available when attaching to an already running service")
 	spec = grpc_client.getinit()
 	assert spec['uuid'] == grpc_client.uuid, \
 		f"UUID mismatch: {spec['uuid']} (get init) vs. {grpc_client.uuid} (init)"
