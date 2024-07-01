@@ -136,6 +136,8 @@ void dp_set_represented_port_item(struct rte_flow_item *item,
 	}
 	if (masked)
 		item->mask = &represented_port_mask;
+	else
+		item->mask = NULL;
 	item->last = NULL;
 }
 
@@ -155,6 +157,8 @@ void dp_set_eth_flow_item(struct rte_flow_item *item,
 	}
 	if (masked)
 		item->mask = &dp_flow_item_eth_mask;
+	else
+		item->mask = NULL;
 	item->last = NULL;
 }
 
@@ -201,8 +205,10 @@ void dp_set_ipv6_flow_item(struct rte_flow_item *item,
 	} else {
 		item->spec = NULL;
 	}
-	if(masked)
+	if (masked)
 		item->mask = &dp_flow_item_ipv6_mask;
+	else
+		item->mask = NULL;
 	item->last = NULL;
 }
 
@@ -221,6 +227,8 @@ void dp_set_ipv6_src_flow_item(struct rte_flow_item *item,
 	item->spec = ipv6_spec;
 	if (masked)
 		item->mask = &dp_flow_item_ipv6_src_mask;
+	else
+		item->mask = NULL;
 	item->last = NULL;
 }
 
@@ -279,6 +287,8 @@ void dp_set_udp_src_flow_item(struct rte_flow_item *item,
 	item->spec = udp_spec;
 	if (masked)
 		item->mask = &dp_flow_item_udp_src_mask;
+	else
+		item->mask = NULL;
 	item->last = NULL;
 }
 
@@ -320,6 +330,8 @@ void dp_set_tcp_src_flow_item(struct rte_flow_item *item,
 	item->spec = tcp_spec;
 	if (masked)
 		item->mask = &dp_flow_item_tcp_src_mask;
+	else
+		item->mask = NULL;
 	item->last = NULL;
 }
 
