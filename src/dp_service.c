@@ -189,6 +189,7 @@ static void free_interfaces(void)
 	dp_nat_free();
 	dp_ifaces_free();
 	dp_flow_free();
+	dp_ports_stop();
 	dp_telemetry_free();
 	dp_graph_free();
 #ifdef ENABLE_VIRTSVC
@@ -231,8 +232,8 @@ static int run_service(void)
 		return DP_ERROR;
 	}
 
-	if (dp_conf_is_mesw_mode() && dp_conf_is_offload_enabled()) {
-		DP_EARLY_ERR("HW offloading is currently not supported if Nic is configured in the multi-port eswtich mode");
+	if (dp_conf_is_multiport_eswitch() && dp_conf_is_offload_enabled()) {
+		DP_EARLY_ERR("HW offloading is currently not supported for multi-port eswitch mode");
 		return DP_ERROR;
 	}
 
