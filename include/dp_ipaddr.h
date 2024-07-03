@@ -19,6 +19,12 @@ extern "C" {
 #define DP_IPV6_ADDR_SIZE 16
 static_assert(sizeof(rte_be64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
 
+#define DP_INIT_FROM_IPV6(IPV6) { \
+	(IPV6)->bytes[0], (IPV6)->bytes[1], (IPV6)->bytes[2], (IPV6)->bytes[3], \
+	(IPV6)->bytes[4], (IPV6)->bytes[5], (IPV6)->bytes[6], (IPV6)->bytes[7], \
+	(IPV6)->bytes[8], (IPV6)->bytes[9], (IPV6)->bytes[10], (IPV6)->bytes[11], \
+	(IPV6)->bytes[12], (IPV6)->bytes[13], (IPV6)->bytes[14], (IPV6)->bytes[15] }
+
 // structure for holding IPv6 addresses
 // this way sizeof(dp_ipv6 *) is a meaningful value and passing the pointer only is safe
 union dp_ipv6 {
