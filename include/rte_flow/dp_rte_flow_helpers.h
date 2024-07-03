@@ -26,9 +26,6 @@ extern "C"
 										  + sizeof(struct rte_ipv6_hdr) \
 										  + sizeof(struct rte_udp_hdr))
 
-#define DP_SET_FLOW_ITEM_WITH_MASK (true)
-#define DP_SET_FLOW_ITEM_WITHOUT_MASK (!DP_SET_FLOW_ITEM_WITH_MASK)
-
 union dp_flow_item_l3 {
 	struct rte_flow_item_ipv6 ipv6;
 	struct rte_flow_item_ipv4 ipv4;
@@ -108,10 +105,6 @@ static const struct rte_flow_item_icmp6 dp_flow_item_icmp6_mask = {
 	.type = 0xff,
 };
 
-static const struct rte_flow_item_ethdev represented_port_mask = {
-	.port_id = 0xffff
-};
-
 static __rte_always_inline
 void dp_set_eth_match_all_item(struct rte_flow_item *item)
 {
@@ -122,40 +115,14 @@ void dp_set_eth_match_all_item(struct rte_flow_item *item)
 }
 
 static __rte_always_inline
-void dp_set_represented_port_item(struct rte_flow_item *item,
-								  struct rte_flow_item_ethdev *represented_port,
-								  uint16_t represented_port_id,
-								  bool masked)
-{
-	item->type = RTE_FLOW_ITEM_TYPE_REPRESENTED_PORT;
-	if (represented_port) {
-		represented_port->port_id = represented_port_id;
-		item->spec = represented_port;
-	} else {
-		item->spec = NULL;
-	}
-	if (masked)
-		item->mask = &represented_port_mask;
-
-	item->last = NULL;
-}
-
-
-static __rte_always_inline
 void dp_set_eth_flow_item(struct rte_flow_item *item,
 						  struct rte_flow_item_eth *eth_spec,
-						  rte_be16_t type,
-						  bool masked)
+						  rte_be16_t type)
 {
+	eth_spec->hdr.ether_type = type;
 	item->type = RTE_FLOW_ITEM_TYPE_ETH;
-	if (eth_spec) {
-		eth_spec->hdr.ether_type = type;
-		item->spec = eth_spec;
-	} else {
-		item->spec = NULL;
-	}
-	if (masked)
-		item->mask = &dp_flow_item_eth_mask;
+	item->spec = eth_spec;
+	item->mask = &dp_flow_item_eth_mask;
 	item->last = NULL;
 }
 
@@ -192,18 +159,12 @@ void dp_set_eth_src_dst_flow_item(struct rte_flow_item *item,
 static __rte_always_inline
 void dp_set_ipv6_flow_item(struct rte_flow_item *item,
 						   struct rte_flow_item_ipv6 *ipv6_spec,
-						   uint8_t proto,
-						   bool masked)
+						   uint8_t proto)
 {
+	ipv6_spec->hdr.proto = proto;
 	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
-	if (ipv6_spec) {
-		ipv6_spec->hdr.proto = proto;
-		item->spec = ipv6_spec;
-	} else {
-		item->spec = NULL;
-	}
-	if(masked)
-		item->mask = &dp_flow_item_ipv6_mask;
+	item->spec = ipv6_spec;
+	item->mask = &dp_flow_item_ipv6_mask;
 	item->last = NULL;
 }
 
@@ -571,13 +532,9 @@ void dp_set_redirect_queue_action(struct rte_flow_action *action,
 								  struct rte_flow_action_queue *queue_action,
 								  uint16_t queue_index)
 {
-	if (queue_action) {
-		queue_action->index = queue_index;
-		action->conf = queue_action;
-	} else {
-		action->conf = NULL;
-	}
+	queue_action->index = queue_index;
 	action->type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	action->conf = queue_action;
 }
 
 static __rte_always_inline
@@ -629,22 +586,9 @@ void dp_set_jump_group_action(struct rte_flow_action *action,
 							  struct rte_flow_action_jump *jump_action,
 							  uint32_t group_id)
 {
-	if (jump_action) {
-		jump_action->group = group_id;
-		action->conf = jump_action;
-	}
+	jump_action->group = group_id;
 	action->type = RTE_FLOW_ACTION_TYPE_JUMP;
-}
-
-static __rte_always_inline
-void dp_set_port_representor_action(struct rte_flow_action *action,
-							  struct rte_flow_action_ethdev *port_representor_action)
-{
-	if (port_representor_action) {
-		port_representor_action->port_id = 0xffff;
-		action->conf = port_representor_action;
-	}
-	action->type = RTE_FLOW_ACTION_TYPE_PORT_REPRESENTOR;
+	action->conf = jump_action;
 }
 
 static __rte_always_inline

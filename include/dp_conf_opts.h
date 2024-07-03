@@ -44,7 +44,7 @@ int dp_conf_get_grpc_port(void);
 #ifdef ENABLE_PYTEST
 int dp_conf_get_flow_timeout(void);
 #endif
-bool dp_conf_is_mesw_mode(void);
+bool dp_conf_is_multiport_eswitch(void);
 
 enum dp_conf_runmode {
 	DP_CONF_RUNMODE_NORMAL, /**< Start normally */

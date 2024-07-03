@@ -46,7 +46,7 @@ _OPT_SHOPT_MAX = 255,
 #ifdef ENABLE_PYTEST
 	OPT_FLOW_TIMEOUT,
 #endif
-	OPT_MESW_MODE,
+	OPT_MULTIPORT_ESWITCH,
 };
 
 #define OPTSTRING ":hv" \
@@ -82,7 +82,7 @@ static const struct option dp_conf_longopts[] = {
 #ifdef ENABLE_PYTEST
 	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
 #endif
-	{ "mesw-mode", 0, 0, OPT_MESW_MODE },
+	{ "multiport-eswitch", 0, 0, OPT_MULTIPORT_ESWITCH },
 	{ NULL, 0, 0, 0 }
 };
 
@@ -122,7 +122,7 @@ static int grpc_port = 1337;
 #ifdef ENABLE_PYTEST
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 #endif
-static bool mesw_mode = false;
+static bool multiport_eswitch = false;
 
 const char *dp_conf_get_pf0_name(void)
 {
@@ -203,9 +203,9 @@ int dp_conf_get_flow_timeout(void)
 }
 
 #endif
-bool dp_conf_is_mesw_mode(void)
+bool dp_conf_is_multiport_eswitch(void)
 {
-	return mesw_mode;
+	return multiport_eswitch;
 }
 
 
@@ -256,7 +256,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 #ifdef ENABLE_PYTEST
 		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
 #endif
-		"     --mesw-mode                        enable the support for Nic configured in multi-port eswitch mode \n"
+		"     --multiport-eswitch                run on NIC configured in multiport e-switch mode\n"
 	, progname);
 }
 
@@ -312,8 +312,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 	case OPT_FLOW_TIMEOUT:
 		return dp_argparse_int(arg, &flow_timeout, 1, 300);
 #endif
-	case OPT_MESW_MODE:
-		return dp_argparse_store_true(&mesw_mode);
+	case OPT_MULTIPORT_ESWITCH:
+		return dp_argparse_store_true(&multiport_eswitch);
 	default:
 		fprintf(stderr, "Unimplemented option %d\n", opt);
 		return DP_ERROR;

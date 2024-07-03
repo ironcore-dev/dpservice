@@ -14,7 +14,6 @@
 #include "dp_internal_stats.h"
 #include "dp_util.h"
 #include "dpdk_layer.h"
-#include "rte_flow/dp_rte_async_flow.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +46,26 @@ struct dp_port_iface {
 	uint64_t				public_flow_rate_cap;
 };
 
+struct dp_port_async_template {
+	struct rte_flow_pattern_template **pattern_templates;
+	struct rte_flow_actions_template **actions_templates;
+	struct rte_flow_template_table *template_table;
+	const struct rte_flow_template_table_attr *table_attr;
+	uint8_t pattern_count;
+	uint8_t actions_count;
+};
+
+enum dp_port_async_template_type {
+	DP_PORT_ASYNC_TEMPLATE_PF_ISOLATION,
+	DP_PORT_ASYNC_TEMPLATE_COUNT,
+};
+
+enum dp_port_async_flow_type {
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPIP,
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPV6,
+	DP_PORT_ASYNC_FLOW_COUNT,
+};
+
 struct dp_port {
 	bool							is_pf;
 	uint16_t						port_id;
@@ -70,10 +89,9 @@ struct dp_port {
 			struct rte_flow					*default_jump_flow;
 			struct rte_flow					*default_capture_flow;
 		} default_sync_rules;
-
 		struct {
-			struct dp_port_rte_async_template async_templates[DP_ASYNC_TEMPLATE_MAX_TABLE];
-			struct rte_flow					*default_async_flow[DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT];
+			struct dp_port_async_template	*default_templates[DP_PORT_ASYNC_TEMPLATE_COUNT];
+			struct rte_flow					*default_flows[DP_PORT_ASYNC_FLOW_COUNT];
 		} default_async_rules;
 	};
 };
@@ -92,6 +110,7 @@ extern struct dp_ports _dp_ports;
 struct dp_port *dp_get_port_by_name(const char *pci_name);
 
 int dp_ports_init(void);
+void dp_ports_stop(void);
 void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
@@ -162,12 +181,6 @@ static __rte_always_inline
 struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 {
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
-}
-
-static __rte_always_inline
-struct dp_port *dp_get_main_eswitch_port(void)
-{
-	return dp_get_port_by_pf_index(0);
 }
 
 #ifdef __cplusplus

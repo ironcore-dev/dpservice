@@ -13,13 +13,14 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "monitoring/dp_event.h"
+#include "monitoring/dp_graphtrace.h"
 #include "nodes/rx_node.h"
-#include "rte_flow/dp_rte_flow_init.h"
+#include "rte_flow/dp_rte_async_flow.h"
+#include "rte_flow/dp_rte_async_flow_isolation.h"
+#include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_capture.h"
-#include "rte_flow/dp_rte_async_flow_template.h"
-#include "rte_flow/dp_rte_async_flow_isolation.h"
-#include "monitoring/dp_graphtrace.h"
+#include "rte_flow/dp_rte_flow_init.h"
 
 #define DP_PORT_INIT_PF true
 #define DP_PORT_INIT_VF false
@@ -170,11 +171,8 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
 	}
 
-
-	if (DP_FAILED(dp_port_rte_async_flow_config(port->port_id))) {
-		DPS_LOG_ERR("Failed to config port to install async flows", DP_LOG_PORT(port));
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return DP_ERROR;
-	}
 
 	return DP_OK;
 }
@@ -354,40 +352,53 @@ int dp_ports_init(void)
 	return DP_OK;
 }
 
-static int dp_stop_eth_port(uint16_t port_id)
+static void dp_destroy_default_async_templates(struct dp_port *port)
 {
-	int ret = 0;
+	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.default_templates); ++i)
+		dp_destroy_async_template(port->port_id, port->default_async_rules.default_templates[i]);
+}
 
-	struct dp_port *port = dp_get_port_by_id(port_id);
-	if (port->is_pf) {
-		if (DP_FAILED(dp_destroy_pf_async_isolation_rules(port_id)))
-			DPS_LOG_ERR("Cannot destroy async default rule", DP_LOG_PORTID(port_id));
+static int dp_stop_eth_port(struct dp_port *port)
+{
+	int ret;
 
-		dp_rte_async_destroy_templates(port_id);
+	if (dp_conf_is_multiport_eswitch()) {
+		dp_destroy_async_rules(port->port_id,
+							   port->default_async_rules.default_flows,
+							   RTE_DIM(port->default_async_rules.default_flows));
+		dp_destroy_default_async_templates(port);
 	}
 
-	ret = rte_eth_dev_stop(port_id);
+	ret = rte_eth_dev_stop(port->port_id);
 	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 
 	return ret;
 }
 
-void dp_ports_free(void)
+void dp_ports_stop(void)
 {
+	// in multiport-mode, PF0 needs to be stopped last
+	struct dp_port *pf0 = dp_get_port_by_pf_index(0);
+
 	// without stopping started ports, DPDK complains
 	DP_FOREACH_PORT(&_dp_ports, port) {
-		if (port->allocated && port->port_id != dp_get_main_eswitch_port()->port_id)
-			 dp_stop_eth_port(port->port_id);
+		if (port->allocated && port != pf0)
+			dp_stop_eth_port(port);
 	}
-	dp_stop_eth_port(dp_get_main_eswitch_port()->port_id);
+	if (pf0->allocated)
+		dp_stop_eth_port(pf0);
+}
+
+void dp_ports_free(void)
+{
 	free(_dp_ports.ports);
 }
 
 
 static int dp_port_install_sync_isolated_mode(uint16_t port_id)
 {
-	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
+	DPS_LOG_INFO("Init isolation flow rules");
 	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPIP))
 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
 		return DP_ERROR;
@@ -423,33 +434,35 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 	return DP_OK;
 }
 
-static int dp_install_pf_async_flow_templates(struct dp_port *port)
+static int dp_port_install_async_isolated_mode(struct dp_port *port)
 {
-	if (DP_FAILED(dp_create_pf_async_rte_rule_templates(port->port_id)))
-			return DP_ERROR;
+	DPS_LOG_INFO("Init async isolation flow rules");
+	if (DP_FAILED(dp_create_pf_async_isolation_rules(port)))
+		return DP_ERROR;
 	return DP_OK;
 }
 
-static int dp_port_install_async_isolated_mode(uint16_t port_id)
+static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 {
-	return dp_create_pf_async_isolation_rules(port_id);
+	DPS_LOG_INFO("Installing PF async templates", DP_LOG_PORTID(port->port_id));
+	if (DP_FAILED(dp_create_pf_async_isolation_templates(port))) {
+		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
+	return DP_OK;
 }
 
 static int dp_init_port(struct dp_port *port)
 {
-
 	// TAP devices do not support offloading/isolation
 	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
 		return DP_OK;
 
 	if (port->is_pf) {
-		if (dp_conf_is_mesw_mode()) {
-			if (DP_FAILED(dp_install_pf_async_flow_templates(port)))
+		if (dp_conf_is_multiport_eswitch()) {
+			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
+				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
 				return DP_ERROR;
-
-			if (DP_FAILED(dp_port_install_async_isolated_mode(port->port_id)))
-				return DP_ERROR;
-
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
 				return DP_ERROR;
@@ -459,8 +472,10 @@ static int dp_init_port(struct dp_port *port)
 #ifdef ENABLE_PYTEST
 		if (port->peer_pf_port_id != dp_get_pf1()->port_id)
 #endif
+		{
 		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 			return DP_ERROR;
+		}
 
 		if (!port->is_pf)
 			if (DP_FAILED(dp_install_vf_init_rte_rules(port)))
@@ -482,7 +497,7 @@ int dp_start_port(struct dp_port *port)
 
 	ret = dp_init_port(port);
 	if (DP_FAILED(ret)) {
-		dp_stop_eth_port(port->port_id);
+		dp_stop_eth_port(port);
 		return ret;
 	}
 
@@ -496,7 +511,7 @@ int dp_stop_port(struct dp_port *port)
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_stop_eth_port(port->port_id)))
+	if (DP_FAILED(dp_stop_eth_port(port)))
 		return DP_ERROR;
 
 	port->allocated = false;
