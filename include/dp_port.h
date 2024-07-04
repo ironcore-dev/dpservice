@@ -47,6 +47,43 @@ struct dp_port_iface {
 	uint64_t				public_flow_rate_cap;
 };
 
+// TODO these are "instances" so this needs more thought
+enum dp_rte_async_pattern_pf_isolation_index {
+	DP_ASYNC_TEMPLATE_PATTERN_PF_IPV6_PROTO,
+	DP_ASYNC_TEMPLATE_PATTERN_PF_ISOLATION_MAX,
+};
+
+enum dp_rte_async_action_pf_isolation_index {
+	DP_ASYNC_TEMPLATE_ACTION_PF_QUEUE,
+	DP_ASYNC_TEMPLATE_ACTION_PF_ISOLATION_MAX,
+};
+// TODO this alwas needs to be "MAX" of those above..
+// TODO I think this should be done via multi-enum members (using equal sign), but then how to guarantee max?
+
+#define DP_ASYNC_TEMPLATE_MAX_PATTERNS 1
+#define DP_ASYNC_TEMPLATE_MAX_ACTIONS 1
+
+struct dp_port_async_template {
+	bool filled;
+	uint8_t nr_patterns;
+	uint8_t nr_actions;
+	struct rte_flow_pattern_template *pattern_templates[DP_ASYNC_TEMPLATE_MAX_PATTERNS];
+	struct rte_flow_actions_template *action_templates[DP_ASYNC_TEMPLATE_MAX_ACTIONS];
+	struct rte_flow_template_table *template_table;
+	const struct rte_flow_template_table_attr *table_attr;
+};
+
+enum dp_port_async_template_type {
+	DP_PORT_ASYNC_TEMPLATE_ISOLATION,
+	DP_PORT_ASYNC_TEMPLATE_COUNT,
+};
+
+enum dp_port_async_flow_type {
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPIP,
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPV6,
+	DP_PORT_ASYNC_FLOW_COUNT,
+};
+
 struct dp_port {
 	bool							is_pf;
 	uint16_t						port_id;
@@ -70,10 +107,9 @@ struct dp_port {
 			struct rte_flow					*default_jump_flow;
 			struct rte_flow					*default_capture_flow;
 		} default_sync_rules;
-
 		struct {
-			struct dp_port_rte_async_template async_templates[DP_ASYNC_TEMPLATE_MAX_TABLE];
-			struct rte_flow					*default_async_flow[DP_ASYNC_DEFAULT_FLOW_ON_PF_CNT];
+			struct dp_port_async_template	async_templates[DP_PORT_ASYNC_TEMPLATE_COUNT];  // TODO revisit this as this field can be quite big (currently 40B)
+			struct rte_flow					*async_flows[DP_PORT_ASYNC_FLOW_COUNT];
 		} default_async_rules;
 	};
 };

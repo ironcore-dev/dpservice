@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include "rte_flow/dp_rte_async_flow.h"
+
 #include <rte_common.h>
 #include <rte_malloc.h>
 
-#include "rte_flow/dp_rte_async_flow.h"
 #include "dpdk_layer.h"
 #include "dp_port.h"
 
@@ -12,7 +13,9 @@ static struct rte_flow_queue_attr queue_attr = {
 												.size = DP_AYNC_FLOW_MAX_FLOW_RULES,
 											};
 
-static const struct rte_flow_op_attr op_attr = {1};  // TODO explain by using the right member designator
+static const struct rte_flow_op_attr postponed_op_attr = {
+	.postpone = 1
+};
 
 int dp_port_rte_async_flow_config(uint16_t port_id)
 {
@@ -162,18 +165,16 @@ int dp_rte_async_create_table_template(uint16_t port_id, const struct rte_flow_t
 }
 
 
-int dp_rte_async_create_template_tables(uint16_t port_id)
+int dp_rte_async_create_template_tables(struct dp_port *port)
 {
-
+	struct dp_port_async_template *template;
 	int ret;
-	struct dp_port* port = dp_get_port_by_id(port_id);
-	struct dp_port_rte_async_template *template;
 
 	// the current approach is that each template table is initialized with all patterns/actions for pf/vf
 	// choose the correct pattern/action by using dp_rte_async_rule_type_index when concretizing flow rules
 	// assuming the attributes of patterns/actions match with table attributes
-	for (int i = 0; i < DP_ASYNC_TEMPLATE_MAX_TABLE; i++ ) {
-		 template = &port->default_async_rules.async_templates[i];
+	for (size_t i = 0; i < RTE_DIM(port->default_async_rules.async_templates); ++i) {
+		template = &port->default_async_rules.async_templates[i];
 		if (!template->filled)
 			continue; // or break assuming there is no skipped template
 		
@@ -189,24 +190,21 @@ int dp_rte_async_create_template_tables(uint16_t port_id)
 	return DP_OK;
 }
 
-int dp_rte_async_create_concrete_rules(uint16_t port_id,
-									struct rte_flow_template_table *template_table,
-									const struct rte_flow_item *concrete_pattern, const struct rte_flow_action *concrete_actions,
-									uint8_t used_pattern_index, uint8_t used_action_index,  // TODO order them in pairs like rte_
-									struct rte_flow **flow)
+struct rte_flow *dp_rte_flow_async_create(uint16_t port_id,
+										  struct rte_flow_template_table *template_table,
+										  const struct rte_flow_item *concrete_pattern, uint8_t pattern_template_index,
+										  const struct rte_flow_action *concrete_actions, uint8_t action_template_index)
 {
 	struct rte_flow *created_flow;
 	struct rte_flow_error error;
 
-	created_flow = rte_flow_async_create(port_id, 0, &op_attr, template_table,
-			concrete_pattern, used_pattern_index, concrete_actions, used_action_index, NULL, &error);
-	if (!created_flow) {
+	created_flow = rte_flow_async_create(port_id, 0, &postponed_op_attr, template_table,
+										 concrete_pattern, pattern_template_index, concrete_actions, action_template_index,
+										 NULL, &error);
+	if (!created_flow)
 		DPS_LOG_ERR("Concrete flow rule cannot be created", DP_LOG_RET(rte_errno), DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
-		return DP_ERROR;
-	}
 
-	*flow = created_flow;
-	return DP_OK;
+	return created_flow;
 }
 
 int dp_rte_async_destroy_rule(uint16_t port_id, struct rte_flow *flow)
@@ -214,7 +212,7 @@ int dp_rte_async_destroy_rule(uint16_t port_id, struct rte_flow *flow)
 	uint32_t queue_id = DP_ASYNC_DEFAULT_OP_QUEUE_ID;
 	struct rte_flow_error error;
 	int ret;
-	const struct rte_flow_op_attr op_no_delay_attr = {1};
+	const struct rte_flow_op_attr op_no_delay_attr = {1};  // TODO but this is postponed=TRUE so it will have delay and needs pushing
 
 
 	ret = rte_flow_async_destroy(port_id, queue_id, &op_no_delay_attr, flow, NULL, &error);
@@ -267,7 +265,8 @@ void dp_rte_async_destroy_templates(uint16_t port_id)
 {
 	struct dp_port *port = dp_get_port_by_id(port_id);
 	
-	for (uint8_t i = 0; i < DP_ASYNC_TEMPLATE_MAX_TABLE; i++) {
+	// TODO pass pointers?
+	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.async_templates); ++i) {
 		dp_rte_async_destroy_table_template(port, i); // destroy table template first, then destroy pattern and action template
 		dp_rte_async_destroy_pattern_template(port, i);
 		dp_rte_async_destroy_action_template(port, i);

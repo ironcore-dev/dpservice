@@ -14,8 +14,8 @@ extern "C" {
 #include "dp_port.h"
 #include "dp_rte_flow_helpers.h"
 
-int dp_create_pf_async_isolation_rules(uint16_t port_id);
-int dp_destroy_pf_async_isolation_rules(uint16_t port_id);
+int dp_create_pf_async_isolation_rules(struct dp_port *port);
+int dp_destroy_default_async_rules(uint16_t port_id);
 
 #ifdef __cplusplus
 }

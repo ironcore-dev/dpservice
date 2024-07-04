@@ -57,34 +57,34 @@ static int dp_create_pf_default_async_rule_templates(uint16_t port_id) {
 	// TODO change the aPI to pass port + template pointer
 	// TODO change call to || variant with freeup at the end
 	ret = dp_rte_async_create_pattern_template(port_id, pf_isolation_pattern, &default_pattern_template_attr,
-										DP_ASYNC_TEMPLATE_TABLE_PF_ISOLATION, DP_ASYNC_TEMPLATE_PATTERN_PF_IPV6_PROTO);
+										DP_PORT_ASYNC_TEMPLATE_ISOLATION, DP_ASYNC_TEMPLATE_PATTERN_PF_IPV6_PROTO);
 	if (DP_FAILED(ret))
 		return DP_ERROR;
 
 	ret = dp_rte_async_create_actions_template(port_id, pf_isolation_action, pf_isolation_action, &default_actions_template_attr,
-										DP_ASYNC_TEMPLATE_TABLE_PF_ISOLATION, DP_ASYNC_TEMPLATE_ACTION_PF_QUEUE);
+										DP_PORT_ASYNC_TEMPLATE_ISOLATION, DP_ASYNC_TEMPLATE_ACTION_PF_QUEUE);
 	if (DP_FAILED(ret))
 		return DP_ERROR;
 
 	// TODO _set_ not _create_?
-	dp_rte_async_create_table_attribute(port_id, DP_ASYNC_TEMPLATE_TABLE_PF_ISOLATION, &pf_default_template_table_attr);
+	dp_rte_async_create_table_attribute(port_id, DP_PORT_ASYNC_TEMPLATE_ISOLATION, &pf_default_template_table_attr);
 
 	return DP_OK;
 }
 
-int dp_create_pf_async_rte_rule_templates(uint16_t port_id) {
+int dp_create_pf_async_rte_rule_templates(struct dp_port *port) {
 
-	DPS_LOG_INFO("Installing async rule templates", DP_LOG_PORTID(port_id));
+	DPS_LOG_INFO("Installing async rule templates", DP_LOG_PORTID(port->port_id));
 
-	if (DP_FAILED(dp_create_pf_default_async_rule_templates(port_id))) {
-		DPS_LOG_ERR("Failed to create pf async rte rule templates", DP_LOG_PORTID(port_id));
+	if (DP_FAILED(dp_create_pf_default_async_rule_templates(port->port_id))) {
+		DPS_LOG_ERR("Failed to create pf async rte rule templates", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
 
 	// add more template pattern/action combinations in the future
 
-	if (DP_FAILED(dp_rte_async_create_template_tables(port_id))) {
-		DPS_LOG_ERR("Failed to create pf async rte rule template table", DP_LOG_PORTID(port_id));
+	if (DP_FAILED(dp_rte_async_create_template_tables(port))) {
+		DPS_LOG_ERR("Failed to create pf async rte rule template table", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
 

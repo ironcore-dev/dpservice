@@ -11,8 +11,9 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include <rte_flow.h>
+#include "dp_port.h"
 
-int dp_create_pf_async_rte_rule_templates(uint16_t port_id);
+int dp_create_pf_async_rte_rule_templates(struct dp_port *port);
 
 #ifdef __cplusplus
 }
