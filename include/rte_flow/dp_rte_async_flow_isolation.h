@@ -12,10 +12,10 @@ extern "C" {
 #include <stdbool.h>
 #include <rte_flow.h>
 #include "dp_port.h"
-#include "dp_rte_flow_helpers.h"
+
+int dp_create_pf_async_isolation_templates(struct dp_port *port);
 
 int dp_create_pf_async_isolation_rules(struct dp_port *port);
-int dp_destroy_default_async_rules(uint16_t port_id);
 
 #ifdef __cplusplus
 }

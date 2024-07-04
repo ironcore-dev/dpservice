@@ -3,32 +3,68 @@
 
 #include "rte_flow/dp_rte_async_flow_isolation.h"
 #include "dp_error.h"
+#include "rte_flow/dp_rte_async_flow.h"
+#include "rte_flow/dp_rte_async_flow_template.h"
+#include "rte_flow/dp_rte_flow_helpers.h"
 
-static const struct rte_flow_action_queue isolation_queue_action = {
-	.index = 0,
+// TODO names?
+// TODO let's see if virtsvuc reuses this
+static const struct rte_flow_pattern_template_attr default_pattern_template_attr = {
+	.ingress = 1
 };
 
-static const struct rte_flow_action isolation_actions[] = {
-	{	.type = RTE_FLOW_ACTION_TYPE_QUEUE,
-		.conf = &isolation_queue_action,
+static const struct rte_flow_actions_template_attr default_actions_template_attr = {
+	.ingress = 1
+};
+
+static const struct rte_flow_template_table_attr pf_default_template_table_attr = {
+	.flow_attr = {
+		.group = 0,
+		.ingress = 1,
 	},
-	{	.type = RTE_FLOW_ACTION_TYPE_END },
+	.nb_flows = DP_ASYNC_FLOW_PF_DEFAULT_TABLE_MAX_RULES,
+	// TODO? .specialize = RTE_FLOW_TABLE_SPECIALIZE_TRANSFER_WIRE_ORIG,
 };
 
-enum isolation_type {
-	ISOLATE_IPIP,
-	ISOLATE_IPV6,
-};
+int dp_create_pf_async_isolation_templates(struct dp_port *port) {
 
-static int dp_create_pf_async_isolation_rule(struct dp_port *port, enum isolation_type type)
+	struct dp_port_async_template *template = &port->default_async_rules.async_templates[DP_PORT_ASYNC_TEMPLATE_ISOLATION];
+
+	// no need to check returned values here, dp_create_async_template() takes care of everything
+
+	static const struct rte_flow_item pattern[] = {
+		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
+			.mask = &dp_flow_item_eth_mask,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
+			.mask = &dp_flow_item_ipv6_mask,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_END,
+		},
+	};
+	template->pattern_templates[DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO]
+		= dp_create_async_pattern_template(port->port_id, &default_pattern_template_attr, pattern);
+
+	static const struct rte_flow_action actions[] = {
+		{	.type = RTE_FLOW_ACTION_TYPE_QUEUE, },
+		{	.type = RTE_FLOW_ACTION_TYPE_END, },
+	};
+	template->actions_templates[DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE]
+		= dp_create_async_actions_template(port->port_id, &default_actions_template_attr, actions, actions);
+
+	template->table_attr = &pf_default_template_table_attr;
+
+	return dp_create_async_template(port->port_id, template, DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_COUNT, DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_COUNT);
+}
+
+
+static struct rte_flow *dp_create_pf_async_isolation_rule(uint16_t port_id, uint8_t proto, struct rte_flow_template_table *template_table)
 {
-	struct rte_flow *flow;
-
 	struct rte_flow_item_eth eth_spec = {
 		.hdr.ether_type = htons(RTE_ETHER_TYPE_IPV6),
 	};
 	struct rte_flow_item_ipv6 ipv6_spec = {
-		.hdr.proto = type == ISOLATE_IPIP ? IPPROTO_IPIP : IPPROTO_IPV6,
+		.hdr.proto = proto,
 	};
 	struct rte_flow_item pattern[] = {
 		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
@@ -40,65 +76,53 @@ static int dp_create_pf_async_isolation_rule(struct dp_port *port, enum isolatio
 		{	.type = RTE_FLOW_ITEM_TYPE_END },
 	};
 
-	flow = dp_rte_flow_async_create(port->port_id, port->default_async_rules.async_templates[DP_PORT_ASYNC_TEMPLATE_ISOLATION].template_table,
-									pattern, DP_ASYNC_TEMPLATE_PATTERN_PF_IPV6_PROTO, isolation_actions, DP_ASYNC_TEMPLATE_ACTION_PF_QUEUE);
-	if (!flow)
-		return DP_ERROR;
+	static const struct rte_flow_action_queue queue_action = {
+		.index = 0,
+	};
+	static const struct rte_flow_action actions[] = {
+		{	.type = RTE_FLOW_ACTION_TYPE_QUEUE,
+			.conf = &queue_action,
+		},
+		{	.type = RTE_FLOW_ACTION_TYPE_END },
+	};
 
-	switch (type) {
-		case ISOLATE_IPIP:
-			port->default_async_rules.async_flows[DP_PORT_ASYNC_FLOW_ISOLATE_IPIP] = flow;
-			break;
-		case ISOLATE_IPV6:
-			port->default_async_rules.async_flows[DP_PORT_ASYNC_FLOW_ISOLATE_IPV6] = flow;
-			break;
-	}
-
-	return DP_OK;
+	return dp_rte_flow_async_create(port_id, template_table,
+									pattern, DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
+									actions, DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE);
 }
 
 int dp_create_pf_async_isolation_rules(struct dp_port *port)
 {
-	// TODO missing rollback
-	if (DP_FAILED(dp_create_pf_async_isolation_rule(port, ISOLATE_IPIP))
-		|| DP_FAILED(dp_create_pf_async_isolation_rule(port, ISOLATE_IPV6))
-	) {
-		DPS_LOG_ERR("Failed to install async isolation rules for pf", DP_LOG_PORTID(port->port_id));
+	struct rte_flow *flow;
+	uint16_t rule_count = 0;
+
+	flow = dp_create_pf_async_isolation_rule(port->port_id, IPPROTO_IPIP,
+											 port->default_async_rules.async_templates[DP_PORT_ASYNC_TEMPLATE_ISOLATION].template_table);
+	if (!flow) {
+		DPS_LOG_ERR("Failed to install PF async IPIP isolation rule", DP_LOG_PORTID(port->port_id));
+	} else {
+		port->default_async_rules.default_async_flows[DP_PORT_DEFAULT_ASYNC_FLOW_ISOLATE_IPIP] = flow;
+		rule_count++;
+	}
+
+	flow = dp_create_pf_async_isolation_rule(port->port_id, IPPROTO_IPV6,
+											 port->default_async_rules.async_templates[DP_PORT_ASYNC_TEMPLATE_ISOLATION].template_table);
+	if (!flow) {
+		DPS_LOG_ERR("Failed to install PF async IPV6 isolation rule", DP_LOG_PORTID(port->port_id));
+	} else {
+		port->default_async_rules.default_async_flows[DP_PORT_DEFAULT_ASYNC_FLOW_ISOLATE_IPV6] = flow;
+		rule_count++;
+	}
+
+	// need to commit even partial success so the already created flows can be freed later
+	if (dp_commit_rte_async_flow_rules(port->port_id, rule_count)) {
+		DPS_LOG_ERR("Failed to commit PF async isolation rules", DP_LOG_PORTID(port->port_id));
+		// if this fails, rollback is impossible, as it would also require a commit
 		return DP_ERROR;
 	}
 
-	// TODO wrapper
-	if (DP_FAILED(dp_push_rte_async_flow_rules(port->port_id))) {
-		DPS_LOG_ERR("Failed to above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port->port_id));
-		return DP_ERROR;
-	}
-
-	if (DP_FAILED(dp_pull_rte_async_rule_status(port->port_id, 2))) {
-		DPS_LOG_ERR("Failed to pull the status of the 2 above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port->port_id));
-		return DP_ERROR;
-	}
-
-	return DP_OK;
-}
-
-int dp_destroy_default_async_rules(uint16_t port_id)
-{
-	struct dp_port *port = dp_get_port_by_id(port_id);
-
-	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.async_flows); ++i) {
-		struct rte_flow *flow_to_destroy = port->default_async_rules.async_flows[i];  // TODO checkpatch
-		if (DP_FAILED(dp_rte_async_destroy_rule(port_id, flow_to_destroy)))
-			DPS_LOG_WARNING("Failed to enqueue the operation of destroying pf async isolation rule", DP_LOG_PORTID(port_id));
-	}
-
-	// TODO wrapper
-	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
-		DPS_LOG_WARNING("Failed to push the operation of destroying above async isolation on main eswitch port to HW", DP_LOG_PORTID(port_id));
-		return DP_ERROR;
-	}
-
-	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, 2))) {
-		DPS_LOG_ERR("Failed to pull the status of the operation of destroying 2 above async isolation rules on main eswitch port to HW", DP_LOG_PORTID(port_id));
+	if (rule_count != 2) {
+		DPS_LOG_ERR("Not all PF async isolation rules were installed", DP_LOG_VALUE(rule_count), DP_LOG_MAX(2), DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
 

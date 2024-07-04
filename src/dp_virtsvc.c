@@ -17,6 +17,7 @@
 #include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_async_flow.h"
 #include "rte_flow/dp_rte_async_flow_isolation.h"
+#include "rte_flow/dp_rte_flow_helpers.h"
 
 // WARNING: This module is not designed to be thread-safe (even though it could work)
 // It is assumed that thread-unsafe code will only ever be called from one node
@@ -395,30 +396,23 @@ static void dp_virtsvc_remove_isolation(struct dp_virtsvc *virtsvc, uint16_t pf_
 	}
 
 	// TODO connected to the test suite, but needed for rollback anyway
+	// TODO this fails if PF0 init fails, but this should be solved automatically by proper virtsvc islation implementation
 	if (!virtsvc->isolation_rules[pf_idx]) {
 		DPS_LOG_ERR("No rule for index", DP_LOG_VALUE(pf_idx));
 		return;
 	}
 
-	ret = dp_rte_async_destroy_rule(port->port_id, virtsvc->isolation_rules[pf_idx]);
+	ret = dp_destroy_async_rules(port->port_id, &virtsvc->isolation_rules[pf_idx], 1);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot destroy async virtual service isolation rule", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
 		return;
 	}
 
 	// TODO do this here for simplicity or in a bulk? because there can be >64 (current max) virstsvcs anyway...
-	// TODO or at least some wrapper
 	// TODO recheck logs
-	if (DP_FAILED(dp_push_rte_async_flow_rules(port->port_id))) {
-		DPS_LOG_WARNING("Failed to push the destruction of async virstvc isolation", DP_LOG_PORTID(port->port_id));  // TODO ret(inside)
-		return;
-	}
-
-	if (DP_FAILED(dp_pull_rte_async_rule_status(port->port_id, 1))) {
-		DPS_LOG_ERR("Failed to pull the status of destruction of async virtsvc isolation", DP_LOG_PORTID(port->port_id));  // TODO ret(inside)
-		// TODO can be omitted
-		return;
-	}
+	// TODO obsolete due to the above call, rewrite!
+// 	if (DP_FAILED(dp_commit_rte_async_flow_rules(port->port_id, 1)))
+// 		DPS_LOG_ERR("Failed to commit the destruction of async virtsvc isolation", DP_LOG_PORTID(port->port_id));  // TODO ret(inside)
 }
 
 void dp_virtsvc_free(void)
@@ -576,22 +570,18 @@ int dp_virtsvc_install_async_isolation_rules(uint16_t port_id)
 													 &service->isolation_rules[pf_idx],
 													 virtsvc_async_templates[pf_idx].template_tables);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot create async isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));
+			DPS_LOG_ERR("Cannot create async virtsvc isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 		rule_count++;
 	}
 
 	// TODO code duplication, there needs to be some "blocking push" or something as a single call
-	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id))) {
-		DPS_LOG_ERR("TODO Failed to above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
+	if (DP_FAILED(dp_commit_rte_async_flow_rules(port_id, rule_count))) {
+		DPS_LOG_ERR("TODO Failed to commit async virtsvc isolation rules ", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}
 
-	if (DP_FAILED(dp_pull_rte_async_rule_status(port_id, rule_count))) {
-		DPS_LOG_ERR("TODO Failed to pull the status of the above async isolation rules installed on main eswitch port to HW", DP_LOG_PORTID(port_id));
-		return DP_ERROR;
-	}
 	return DP_OK;
 }
 

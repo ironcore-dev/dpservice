@@ -13,13 +13,16 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "monitoring/dp_event.h"
+#include "monitoring/dp_graphtrace.h"
 #include "nodes/rx_node.h"
-#include "rte_flow/dp_rte_flow_init.h"
+// TODO check these
+#include "rte_flow/dp_rte_async_flow.h"
+#include "rte_flow/dp_rte_async_flow_init.h"
+#include "rte_flow/dp_rte_async_flow_isolation.h"
+#include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_capture.h"
-#include "rte_flow/dp_rte_async_flow_template.h"
-#include "rte_flow/dp_rte_async_flow_isolation.h"
-#include "monitoring/dp_graphtrace.h"
+#include "rte_flow/dp_rte_flow_init.h"
 
 #define DP_PORT_INIT_PF true
 #define DP_PORT_INIT_VF false
@@ -353,16 +356,25 @@ int dp_ports_init(void)
 	return DP_OK;
 }
 
+static void dp_destroy_default_async_templates(struct dp_port *port)
+{
+	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.async_templates); ++i)
+		dp_destroy_async_template(port->port_id, &port->default_async_rules.async_templates[i]);
+}
+
 static int dp_stop_eth_port(uint16_t port_id)
 {
 	int ret = 0;
 
 	struct dp_port *port = dp_get_port_by_id(port_id);
+	// TODO just do it everywhere? (i.e. should be empty for VFs
 	if (port->is_pf) {
-		if (dp_conf_is_mesw_mode() && DP_FAILED(dp_destroy_default_async_rules(port_id)))
-			DPS_LOG_ERR("Cannot destroy async default rule", DP_LOG_PORTID(port_id));
-		// TODO this also needs to be behind dp_conf_is_mesw_mode:
-		dp_rte_async_destroy_templates(port_id);
+		if (dp_conf_is_mesw_mode()) {
+			dp_destroy_async_rules(port->port_id,
+								   port->default_async_rules.default_async_flows,
+								   RTE_DIM(port->default_async_rules.default_async_flows));
+			dp_destroy_default_async_templates(port);
+		}
 	}
 
 	ret = rte_eth_dev_stop(port_id);
@@ -379,7 +391,10 @@ void dp_ports_free(void)
 		if (port->allocated && port->port_id != dp_get_main_eswitch_port()->port_id)
 			 dp_stop_eth_port(port->port_id);
 	}
-	dp_stop_eth_port(dp_get_main_eswitch_port()->port_id);
+	// TODO comment about this, that PF0 needs to go last, but maybe change the loop to go VFs first and then PFs
+	// TODO quick hack, fix later as not to mix with everything
+	if (dp_get_main_eswitch_port()->allocated)  // fix for failure during PF0 init
+		dp_stop_eth_port(dp_get_main_eswitch_port()->port_id);
 	free(_dp_ports.ports);
 }
 
@@ -442,10 +457,14 @@ static int dp_init_port(struct dp_port *port)
 
 	if (port->is_pf) {
 		if (dp_conf_is_mesw_mode()) {
-			// TODO rollback by calling free
-			if (DP_FAILED(dp_create_pf_async_rte_rule_templates(port))
-				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
+			if (DP_FAILED(dp_create_pf_async_templates(port)))
 				return DP_ERROR;
+			if (DP_FAILED(dp_port_install_async_isolated_mode(port)))
+				return DP_ERROR;
+			// TODO rollback by calling free
+// 			if (DP_FAILED(dp_create_pf_async_templates(port))
+// 				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
+// 				return DP_ERROR;
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port)))
 				return DP_ERROR;
