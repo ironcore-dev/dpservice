@@ -4,32 +4,42 @@
 #include "rte_flow/dp_rte_async_flow_isolation.h"
 #include "dp_error.h"
 
+static const struct rte_flow_action_queue isolation_queue_action = {
+	.index = 0,
+};
+
+static const struct rte_flow_action isolation_actions[] = {
+	{	.type = RTE_FLOW_ACTION_TYPE_QUEUE,
+		.conf = &isolation_queue_action,
+	},
+	{	.type = RTE_FLOW_ACTION_TYPE_END },
+};
+
 // proto_id is either IPPROTO_IPIP or IPPROTO_IPV6
 static int dp_create_concrete_async_default_rule_for_pf(uint16_t port_id, uint8_t proto_id)
 {
-
-	struct rte_flow_item_eth eth_pattern = {0};		// #1
-	struct rte_flow_item_ipv6 ipv6_hdr = {0};	   // #2
-	struct rte_flow_item concrete_patterns[3];  // end
-	int concrete_pattern_cnt = 0;
-
-	struct rte_flow_action_queue queue_action;  // #1
-	struct rte_flow_action concrete_actions[2]; // end
-	int concrete_action_cnt = 0;
-
 	struct dp_port *port = dp_get_port_by_id(port_id);
 	int ret;
 	struct rte_flow *flow;
 
-	dp_set_eth_flow_item(&concrete_patterns[concrete_pattern_cnt++], &eth_pattern, htons(0x86DD), DP_SET_FLOW_ITEM_WITHOUT_MASK);
-	dp_set_ipv6_flow_item(&concrete_patterns[concrete_pattern_cnt++], &ipv6_hdr, proto_id, DP_SET_FLOW_ITEM_WITHOUT_MASK);
-	dp_set_end_flow_item(&concrete_patterns[concrete_pattern_cnt++]);
-
-	dp_set_redirect_queue_action(&concrete_actions[concrete_action_cnt++], &queue_action, 0);
-	dp_set_end_action(&concrete_actions[concrete_action_cnt++]);
+	struct rte_flow_item_eth eth_spec = {
+		.hdr.ether_type = htons(RTE_ETHER_TYPE_IPV6),
+	};
+	struct rte_flow_item_ipv6 ipv6_spec = {
+		.hdr.proto = proto_id,
+	};
+	struct rte_flow_item pattern[] = {
+		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
+			.spec = &eth_spec,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
+			.spec = &ipv6_spec,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_END },
+	};
 
 	ret = dp_rte_async_create_concrete_rules(port_id, port->default_async_rules.async_templates[DP_ASYNC_TEMPLATE_TABLE_PF_ISOLATION].template_table,
-											concrete_patterns, concrete_actions,
+											pattern, isolation_actions,
 											DP_ASYNC_TEMPLATE_PATTERN_PF_IPV6_PROTO, DP_ASYNC_TEMPLATE_ACTION_PF_QUEUE,
 											&flow);
 	if (DP_FAILED(ret)) {

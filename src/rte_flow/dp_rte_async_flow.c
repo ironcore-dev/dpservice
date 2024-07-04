@@ -187,7 +187,7 @@ int dp_rte_async_create_template_tables(uint16_t port_id)
 
 int dp_rte_async_create_concrete_rules(uint16_t port_id,
 									struct rte_flow_template_table *template_table,
-									struct rte_flow_item *concrete_patterns, struct rte_flow_action *concrete_actions,
+									const struct rte_flow_item *concrete_pattern, const struct rte_flow_action *concrete_actions,
 									uint8_t used_pattern_index, uint8_t used_action_index,
 									struct rte_flow **flow)
 {
@@ -195,7 +195,7 @@ int dp_rte_async_create_concrete_rules(uint16_t port_id,
 	struct rte_flow_error error;
 	
 	created_flow = rte_flow_async_create(port_id, 0, &op_attr, template_table,
-			concrete_patterns, used_pattern_index, concrete_actions, used_action_index, NULL, &error);
+			concrete_pattern, used_pattern_index, concrete_actions, used_action_index, NULL, &error);
 
 	if (!created_flow) {
 		DPS_LOG_ERR("Concrete flow rule cannot be created", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));

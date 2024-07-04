@@ -78,7 +78,7 @@ int dp_rte_async_create_template_tables(uint16_t port_id);
 
 int dp_rte_async_create_concrete_rules(uint16_t port_id,
 									struct rte_flow_template_table *template_table,
-									struct rte_flow_item *concrete_patterns, struct rte_flow_action *concrete_actions,
+									const struct rte_flow_item *concrete_pattern, const struct rte_flow_action *concrete_actions,
 									uint8_t used_pattern_index, uint8_t used_action_index,
 									struct rte_flow **flow);
 
