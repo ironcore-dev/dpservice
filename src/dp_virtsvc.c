@@ -464,40 +464,79 @@ int dp_virtsvc_install_sync_isolation_rules(uint16_t port_id)
 
 static int dp_virtsvc_install_async_isolation(uint16_t port_id, uint8_t proto_id, const union dp_ipv6 *svc_ipv6, rte_be16_t svc_port, struct rte_flow **p_flow, struct rte_flow_template_table *template_tables[])
 {
+	// TODO rename concrete_patterns to pattern singular as per RTE
 	// TODO without mask we need to zero these, which is against the intent of the whole header, look into it
-	struct rte_flow_item_eth eth_spec = {0};    // #1
-	struct rte_flow_item_ipv6 ipv6_spec = {0};  // #2
-	struct rte_flow_item_tcp tcp_spec = {0};    // #3 (choose one)
+// 	struct rte_flow_item_eth eth_spec = {0};    // #1
+// 	struct rte_flow_item_ipv6 ipv6_spec = {0};  // #2
+// 	struct rte_flow_item_tcp tcp_spec = {0};    // #3 (choose one)
 // 	struct rte_flow_item_udp udp_spec = {0};    // #3 (choose one)
-	struct rte_flow_item concrete_patterns[4];  // + end
-	int concrete_pattern_cnt = 0;
-	struct rte_flow_action_queue queue_action = {0};  // #1
-	struct rte_flow_action concrete_actions[2]; // + end
-	int concrete_action_cnt = 0;
+// 	struct rte_flow_item concrete_patterns[4];  // + end
+// 	int concrete_pattern_cnt = 0;
+// 	struct rte_flow_action_queue queue_action = {0};  // #1
+// 	struct rte_flow_action concrete_actions[2]; // + end
+// 	int concrete_action_cnt = 0;
+
+	// TODO I dont think this can be shared with islocation rules
+	struct rte_flow_item_eth eth_spec = {
+		.hdr.ether_type = htons(RTE_ETHER_TYPE_IPV6),
+	};
+	struct rte_flow_item_ipv6 ipv6_spec = {
+		.hdr.proto = proto_id,
+		// cannot set IPv6 here as it's an array // TODO? .hdr.src_addr = { svc_ipv6->bytes[0], ... },
+	};
+	dp_set_src_ipv6(&ipv6_spec.hdr, svc_ipv6);  // TODO this can be done via a macro in the init itself...
+	struct rte_flow_item_tcp tcp_spec = {
+		.hdr.src_port = svc_port,
+	};
+	// TODO udp, either separate func or just fill in both and then ternary in the table
+	// TODO validate proto_id to be only UDP/TCP!
+	struct rte_flow_item concrete_patterns[] = {
+		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
+			.spec = &eth_spec,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
+			.spec = &ipv6_spec,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_TCP,
+			.spec = &tcp_spec,
+		},
+		{	.type = RTE_FLOW_ITEM_TYPE_END },
+	};
 
 	// create match pattern: IPv6 packets from selected addresses
-	dp_set_eth_flow_item(&concrete_patterns[concrete_pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6), DP_SET_FLOW_ITEM_WITHOUT_MASK);
-	dp_set_ipv6_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &ipv6_spec, svc_ipv6, proto_id, DP_SET_FLOW_ITEM_WITHOUT_MASK);
-	if (proto_id == IPPROTO_TCP) {
-		dp_set_tcp_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &tcp_spec, svc_port, DP_SET_FLOW_ITEM_WITHOUT_MASK);
+// 	dp_set_eth_flow_item(&concrete_patterns[concrete_pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6), DP_SET_FLOW_ITEM_WITHOUT_MASK);
+// 	dp_set_ipv6_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &ipv6_spec, svc_ipv6, proto_id, DP_SET_FLOW_ITEM_WITHOUT_MASK);
+// 	if (proto_id == IPPROTO_TCP) {
+// 		dp_set_tcp_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &tcp_spec, svc_port, DP_SET_FLOW_ITEM_WITHOUT_MASK);
 // TODO not implemented yet!
 // 	} else if (proto_id == IPPROTO_UDP) {
 // 		dp_set_udp_src_flow_item(&concrete_patterns[concrete_pattern_cnt++], &udp_spec, svc_port, DP_SET_FLOW_ITEM_WITHOUT_MASK);
-	} else {
-		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));
-		return DP_ERROR;
-	}
-	dp_set_end_flow_item(&concrete_patterns[concrete_pattern_cnt++]);
+// 	} else {
+// 		DPS_LOG_ERR("Invalid virtsvc protocol for isolation", DP_LOG_PROTO(proto_id));
+// 		return DP_ERROR;
+// 	}
+// 	dp_set_end_flow_item(&concrete_patterns[concrete_pattern_cnt++]);
+
+	// TODO shared with isolation rules, move this function
+	struct rte_flow_action_queue queue_action = {
+		.index = 0,
+	};
+	struct rte_flow_action concrete_actions[] = {
+		{	.type = RTE_FLOW_ACTION_TYPE_QUEUE,
+			.conf = &queue_action,
+		},
+		{	.type = RTE_FLOW_ACTION_TYPE_END },
+	};
 
 	// create flow action: allow packets to enter dp-service packet queue
-	dp_set_redirect_queue_action(&concrete_actions[concrete_action_cnt++], &queue_action, 0);
-	dp_set_end_action(&concrete_actions[concrete_action_cnt++]);
+// 	dp_set_redirect_queue_action(&concrete_actions[concrete_action_cnt++], &queue_action, 0);
+// 	dp_set_end_action(&concrete_actions[concrete_action_cnt++]);
 
 	// TODO needed or simply write into?
 	struct rte_flow *created_flow;
 	struct rte_flow_error error;
 	// TODO static const?
-	struct rte_flow_op_attr op_attr = { .postpone = 1 };  // TODO do we actually want to postpone??; TODO rename
+	struct rte_flow_op_attr op_attr = { .postpone = 1 };  // TODO do we actually want to postpone? -> yes it prevent push, but not the pull unfortunately
 
 	created_flow = rte_flow_async_create(port_id, 0, &op_attr, template_tables[0],  // TODO better argument instead of the tables?
 			concrete_patterns, 0, concrete_actions, 0, NULL, &error);
