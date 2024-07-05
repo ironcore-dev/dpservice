@@ -5,6 +5,7 @@
 #define __DP_GRPC_API_H__
 
 #include <stdint.h>
+#include <rte_common.h>
 #include "dp_firewall.h"
 #include "dp_iface.h"
 #include "dp_util.h"
@@ -76,7 +77,7 @@ enum dpgrpc_capture_iface_type {
 };
 
 struct dpgrpc_iface {
-	char					iface_id[DP_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	uint32_t				ip4_addr;
 	union dp_ipv6			ip6_addr;
 	uint32_t				vni;
@@ -89,11 +90,11 @@ struct dpgrpc_iface {
 };
 
 struct dpgrpc_iface_id {
-	char 					iface_id[DP_IFACE_ID_MAX_LEN];
+	char 					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 };
 
 struct dpgrpc_prefix {
-	char					iface_id[DP_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	struct dp_ip_address	addr;
 	uint8_t					length;
 };
@@ -107,13 +108,13 @@ struct dpgrpc_route {
 };
 
 struct dpgrpc_vip {
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	struct dp_ip_address	addr;
-	char					iface_id[DP_IFACE_ID_MAX_LEN];
 	union dp_ipv6			ul_addr6;						// reply only
 };
 
 struct dpgrpc_nat {
-	char					iface_id[DP_IFACE_ID_MAX_LEN];	// local only
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);	// local only
 	struct dp_ip_address	addr;
 	uint16_t				min_port;
 	uint16_t				max_port;
@@ -145,12 +146,12 @@ struct dpgrpc_lb_target {
 };
 
 struct dpgrpc_fwrule {
-	char					iface_id[DP_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	struct dp_fwall_rule	rule;
 };
 
 struct dpgrpc_fwrule_id {
-	char					iface_id[DP_IFACE_ID_MAX_LEN];
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	char					rule_id[DP_FIREWALL_ID_MAX_LEN];
 };
 
@@ -166,11 +167,11 @@ struct dpgrpc_versions {
 };
 
 struct dpgrpc_capture_interface {
-	enum dpgrpc_capture_iface_type	type;
 	union {
-		char		iface_id[DP_IFACE_ID_MAX_LEN];
+		char		iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 		uint8_t		pf_index;
 	} spec;
+	enum dpgrpc_capture_iface_type	type;
 };
 
 struct dpgrpc_capture {
