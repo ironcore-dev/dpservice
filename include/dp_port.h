@@ -110,6 +110,10 @@ extern struct dp_port *_dp_port_table[DP_MAX_PORTS];
 extern struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 extern struct dp_ports _dp_ports;
 
+#ifdef ENABLE_PF1_PROXY
+extern struct dp_port *_dp_pf_proxy_tap_port;
+#endif
+
 
 struct dp_port *dp_get_port_by_name(const char *pci_name);
 
@@ -151,6 +155,11 @@ struct dp_port *dp_get_out_port(struct dp_flow *df)
 static __rte_always_inline
 struct dp_port *dp_get_port_by_id(uint16_t port_id)
 {
+#ifdef ENABLE_PF1_PROXY
+	if (port_id == _dp_pf_proxy_tap_port->port_id)
+		return _dp_pf_proxy_tap_port;
+#endif
+	
 	if (unlikely(port_id >= RTE_DIM(_dp_port_table))) {
 		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
 		return NULL;
@@ -186,6 +195,14 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 {
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }
+
+#ifdef ENABLE_PF1_PROXY
+static __rte_always_inline
+struct dp_port *dp_get_pf_proxy_tap_port(void)
+{
+	return _dp_pf_proxy_tap_port;
+}
+#endif
 
 #ifdef __cplusplus
 }
