@@ -10,4 +10,6 @@ option('compiler_suggestions', type: 'boolean', value: false, description:
        'Show various compiler suggestions (warnings)')
 option('build_dpservice_cli', type: 'boolean', value: false, description:
        'Enable building of dpservice-cli golang gRPC client')
+option('enable_pf1_proxy', type: 'boolean', value: false, description:
+       'Enable the workaround solution to allow PF1 to communicate with the outside world')
 

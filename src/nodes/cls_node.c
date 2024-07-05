@@ -23,11 +23,18 @@
 #	define VIRTSVC_NEXT(NEXT)
 #endif
 
+#ifdef ENABLE_PF1_PROXY
+#define PF_TAP_FORWARD_NEXT(NEXT) NEXT(CLS_NEXT_PF_TAP_FORWARD, "pf_tap_forward")
+#else
+#define PF_TAP_FORWARD_NEXT(NEXT)
+#endif
+
 #define NEXT_NODES(NEXT) \
 	NEXT(CLS_NEXT_ARP, "arp") \
 	NEXT(CLS_NEXT_IPV6_ND, "ipv6_nd") \
 	NEXT(CLS_NEXT_CONNTRACK, "conntrack") \
 	NEXT(CLS_NEXT_IPIP_DECAP, "ipip_decap") \
+	PF_TAP_FORWARD_NEXT(NEXT) \
 	VIRTSVC_NEXT(NEXT)
 
 #ifdef ENABLE_VIRTSVC
@@ -119,6 +126,36 @@ static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(const struct 
 }
 #endif
 
+#ifdef ENABLE_PF1_PROXY
+static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
+{
+	const struct rte_ether_hdr *ether_hdr;
+	const struct rte_ipv6_hdr *ipv6_hdr;
+	uint32_t l3_type;
+	
+	if (m->port != dp_get_pf1()->port_id && m->port != dp_get_pf_proxy_tap_port()->port_id)
+		return false;
+
+	if (m->port == dp_get_pf_proxy_tap_port()->port_id)
+		return true;
+
+	if (m->port == dp_get_pf1()->port_id) {
+		ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+		l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
+
+		if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
+			ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
+			if (ipv6_hdr->proto == IPPROTO_IPIP || ipv6_hdr->proto == IPPROTO_IPV6)
+				return false;
+		} 
+
+		return true;
+	}
+
+	return false;
+}
+#endif
+
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	const struct rte_ether_hdr *ether_hdr;
@@ -128,6 +165,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_port *port;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
+#endif
+
+#ifdef ENABLE_PF1_PROXY
+	if (pf1_tap_proxy_forward(m))
+		return CLS_NEXT_PF_TAP_FORWARD;
 #endif
 
 	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
