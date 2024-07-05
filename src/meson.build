@@ -31,6 +31,7 @@ dp_sources = [
   'nodes/rx_periodic_node.c',
   'nodes/snat_node.c',
   'nodes/tx_node.c',
+  'nodes/pf_tap_forward_node.c',
   'rte_flow/dp_rte_flow.c',
   'rte_flow/dp_rte_flow_capture.c',
   'rte_flow/dp_rte_flow_init.c',

@@ -61,6 +61,8 @@ struct dp_port *_dp_port_table[DP_MAX_PORTS];
 struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 struct dp_ports _dp_ports;
 
+struct dp_port *_dp_pf_proxy_tap_port;
+
 static int dp_port_register_pf(struct dp_port *port)
 {
 	// sub-optimal, but the number of PF ports is extremely low
@@ -103,7 +105,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	/* Default config */
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
-	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP || dp_conf_is_multiport_eswitch())
 		nr_hairpin_queues = 0;
 	else
 		nr_hairpin_queues = port->is_pf
@@ -171,9 +173,6 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
 	}
 
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return DP_ERROR;
-
 	return DP_OK;
 }
 
@@ -233,6 +232,9 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
 
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+		return NULL;
+
 	if (is_pf) {
 		if (DP_FAILED(dp_port_register_pf(port)))
 			return NULL;
@@ -252,6 +254,94 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 			}
 		}
 		// No link status callback, VFs are not critical for cross-hypervisor communication
+	}
+
+	return port;
+}
+
+static struct dp_port *dp_port_init_proxyed_pf_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+{
+	struct dp_port *port;
+	int socket_id;
+	int ret;
+
+	if (port_id >= RTE_DIM(_dp_port_table)) {
+		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+		return NULL;
+	}
+
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return NULL;
+		}
+	}
+
+	// oveflow check done by liming the number of calls to this function
+	port = _dp_ports.end++;
+	port->is_pf = true;
+	port->port_id = port_id;
+	port->socket_id = socket_id;
+	_dp_port_table[port_id] = port;
+
+	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
+		return NULL;
+	
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+		return NULL;
+	
+	DPS_LOG_INFO("INIT setting proxyed pf port to promiscuous mode", DP_LOG_PORT(port));
+	ret = rte_eth_promiscuous_enable(port->port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return NULL;
+	}
+
+	if (DP_FAILED(dp_port_register_pf(port)))
+		return NULL;
+	ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
+		return NULL;
+	}
+
+	return port;
+}
+
+static struct dp_port *dp_port_init_proxy_tap(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+{
+	// struct dp_port *port;
+	struct dp_port *port = dp_get_pf_proxy_tap_port();
+	int socket_id;
+	int ret;
+
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return NULL;
+		}
+	}
+
+	// oveflow check done by liming the number of calls to this function
+	// port = _dp_ports.end++;
+	port->is_pf = false;
+	port->port_id = port_id;
+	port->socket_id = socket_id;
+
+	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
+		return NULL;
+
+	DPS_LOG_INFO("INIT setting proxy tap to promiscuous mode", DP_LOG_PORT(port));
+	ret = rte_eth_promiscuous_enable(port->port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return NULL;
 	}
 
 	return port;
@@ -285,7 +375,10 @@ static int dp_port_init_pf(const char *pf_name)
 			return DP_ERROR;
 		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
 			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+			if (strncmp(pf_name, dp_conf_get_pf1_name(), sizeof(ifname)))
+				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+			else
+				port = dp_port_init_proxyed_pf_interface(port_id, &dev_info);
 			if (!port)
 				return DP_ERROR;
 			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
@@ -293,6 +386,30 @@ static int dp_port_init_pf(const char *pf_name)
 		}
 	}
 	DPS_LOG_ERR("No such PF", DP_LOG_NAME(pf_name));
+	return DP_ERROR;
+}
+
+
+static int dp_port_init_tap_proxy(const char *pf_tap_proxy_name)
+{
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	char ifname[IF_NAMESIZE] = {0};
+	struct dp_port *port;
+
+	RTE_ETH_FOREACH_DEV(port_id) {
+		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
+			return DP_ERROR;
+		if (!strncmp(pf_tap_proxy_name, ifname, sizeof(ifname))) {
+			DPS_LOG_INFO("INIT initializing PF proxy tap port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
+			port = dp_port_init_proxy_tap(port_id, &dev_info);
+			if (!port)
+				return DP_ERROR;
+			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_tap_proxy_name);
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("No such PF proxy tap port", DP_LOG_NAME(pf_tap_proxy_name));
 	return DP_ERROR;
 }
 
@@ -338,10 +455,18 @@ int dp_ports_init(void)
 	}
 	_dp_ports.end = _dp_ports.ports;
 
+	_dp_pf_proxy_tap_port = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
+	if (!_dp_pf_proxy_tap_port) {
+		DPS_LOG_ERR("Cannot allocate pf proxy tap port");
+		return DP_ERROR;
+	}
+
 	// these need to be done in order
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
+		// || DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
-		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
+		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs))
+		|| DP_FAILED(dp_port_init_tap_proxy(dp_conf_get_pf1_tap_name())))
 		return DP_ERROR;
 
 	if (dp_conf_is_offload_enabled()) {
