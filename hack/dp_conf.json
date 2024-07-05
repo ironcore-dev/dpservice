@@ -167,6 +167,14 @@
       "var": "mesw_mode",
       "type": "bool",
       "default": "false"
+    },
+    {
+      "lgopt": "pf1-tap",
+      "arg": "PATTERN",
+      "help": "proxy tap device's name for PF1",
+      "var": "pf1_tap_name",
+      "type": "char",
+      "array_size": "IF_NAMESIZE"
     }
   ]
 }

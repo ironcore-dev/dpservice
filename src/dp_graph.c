@@ -120,6 +120,18 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 	return graph_id;
 }
 
+static int dp_graph_init_proxy_tap(void)
+{
+	const struct dp_port *port = dp_get_pf_proxy_tap_port();
+	uint16_t port_id = port->port_id;
+
+	if (DP_FAILED(rx_node_create(port_id, 0))
+			|| DP_FAILED(tx_node_create(port_id)))
+		return DP_ERROR;
+
+	return DP_OK;
+}
+
 static int dp_graph_init_nodes(void)
 {
 	char name[RTE_NODE_NAMESIZE];
@@ -169,6 +181,9 @@ int dp_graph_init(void)
 		return DP_ERROR;
 
 	if (DP_FAILED(dp_graph_init_nodes()))
+		return DP_ERROR;
+
+	if (DP_FAILED(dp_graph_init_proxy_tap()))
 		return DP_ERROR;
 
 	// find the right core(s) to run on

@@ -168,6 +168,10 @@ static int init_interfaces(void)
 		return DP_ERROR;
 	}
 
+	if (DP_FAILED(dp_start_port(dp_get_pf_proxy_tap_port())))
+		return DP_ERROR;
+
+
 	// VFs are started by GRPC later
 
 	if (DP_FAILED(dp_flow_init(pf0_socket_id))
