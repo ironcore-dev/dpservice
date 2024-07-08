@@ -35,8 +35,12 @@ void dp_multipath_init(void)
 
 const struct dp_port *dp_multipath_get_pf(uint32_t hash)
 {
-	if (!dp_conf_is_wcmp_enabled())
-		return dp_get_pf0();
+	if (!dp_conf_is_wcmp_enabled()) {
+		if (dp_get_pf0()->link_status == RTE_ETH_LINK_DOWN)
+			return dp_get_pf1();
+		else
+			return dp_get_pf0();
+	}
 
 	enum egress_pf_port selected_port = pf0_egress_select_table[hash % PORT_SELECT_TABLE_SIZE];
 	const struct dp_port *owner_port = dp_get_pf0();
