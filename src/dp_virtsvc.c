@@ -5,7 +5,6 @@
 
 #include <stdlib.h>
 #include <rte_cycles.h>
-#include <rte_flow.h>
 #include <rte_malloc.h>
 
 #include "dp_conf.h"
@@ -17,7 +16,6 @@
 #include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_async_flow.h"
 #include "rte_flow/dp_rte_async_flow_isolation.h"
-#include "rte_flow/dp_rte_flow_helpers.h"
 
 // WARNING: This module is not designed to be thread-safe (even though it could work)
 // It is assumed that thread-unsafe code will only ever be called from one node
@@ -215,7 +213,6 @@ static void dp_virtsvc_remove_isolation(struct dp_virtsvc *virtsvc, uint16_t pf_
 	struct dp_port *port;
 	int ret;
 
-	// TODO can this be done better?
 	port = dp_get_port_by_pf_index(pf_idx);
 	if (!port) {
 		DPS_LOG_ERR("Invalid PF index for virtual service isolation cleanup", DP_LOG_VALUE(pf_idx));
@@ -234,12 +231,8 @@ void dp_virtsvc_free(void)
 	dp_virtsvc_free_tree(dp_virtsvc_ipv4_tree);
 	dp_virtsvc_free_tree(dp_virtsvc_ipv6_tree);
 	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
-		// TODO free isolation rules here
-		// TODO ifs?
-		// TODO Maybe do both at once inside and then push+pull
-		// TODO need something for PF index, some define
-		dp_virtsvc_remove_isolation(service, 0);  // TODO rename
-		dp_virtsvc_remove_isolation(service, 1);
+		for (uint16_t pf_idx = 0; pf_idx < DP_MAX_PF_PORTS; ++pf_idx)
+			dp_virtsvc_remove_isolation(service, pf_idx);
 		dp_free_jhash_table(service->open_ports);
 	}
 	rte_free(dp_virtservices);
@@ -275,7 +268,6 @@ uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id, struct rte_fl
 	uint16_t rule_count = 0;
 	uint16_t pf_idx;
 
-	// TODO this needs making better!
 	if (port_id == dp_get_pf0()->port_id)
 		pf_idx = 0;
 	else if (port_id == dp_get_pf1()->port_id)

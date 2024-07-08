@@ -360,51 +360,49 @@ static void dp_destroy_default_async_templates(struct dp_port *port)
 		dp_destroy_async_template(port->port_id, &port->default_async_rules.async_templates[i]);
 }
 
-static int dp_stop_eth_port(uint16_t port_id)
+static int dp_stop_eth_port(struct dp_port *port)
 {
-	int ret = 0;
+	int ret;
 
-	struct dp_port *port = dp_get_port_by_id(port_id);
-	// TODO just do it everywhere? (i.e. should be empty for VFs
-	if (port->is_pf) {
-		if (dp_conf_is_mesw_mode()) {
-			dp_destroy_async_rules(port->port_id,
-								   port->default_async_rules.default_async_flows,
-								   RTE_DIM(port->default_async_rules.default_async_flows));
-			dp_destroy_default_async_templates(port);
-		}
+	if (dp_conf_is_mesw_mode()) {
+		dp_destroy_async_rules(port->port_id,
+							   port->default_async_rules.default_async_flows,
+							   RTE_DIM(port->default_async_rules.default_async_flows));
+		dp_destroy_default_async_templates(port);
 	}
 
-	ret = rte_eth_dev_stop(port_id);
+	ret = rte_eth_dev_stop(port->port_id);
 	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 
 	return ret;
 }
 
 void dp_ports_free(void)
 {
+	// in multiport-mode, PF0 needs to be stopped last
+	struct dp_port *pf0 = dp_get_port_by_pf_index(0);
+
 	// without stopping started ports, DPDK complains
 	DP_FOREACH_PORT(&_dp_ports, port) {
-		if (port->allocated && port->port_id != dp_get_main_eswitch_port()->port_id)
-			 dp_stop_eth_port(port->port_id);
+		if (port->allocated && port != pf0)
+			dp_stop_eth_port(port);
 	}
-	// TODO comment about this, that PF0 needs to go last, but maybe change the loop to go VFs first and then PFs
-	// TODO quick hack, fix later as not to mix with everything
-	if (dp_get_main_eswitch_port()->allocated)  // fix for failure during PF0 init
-		dp_stop_eth_port(dp_get_main_eswitch_port()->port_id);
+	if (pf0->allocated)
+		dp_stop_eth_port(pf0);
+
 	free(_dp_ports.ports);
 }
 
 
-static int dp_port_install_sync_isolated_mode(struct dp_port *port)
+static int dp_port_install_sync_isolated_mode(uint16_t port_id)
 {
 	DPS_LOG_INFO("Init isolation flow rules");
-	if (DP_FAILED(dp_install_isolated_mode_ipip(port->port_id, IPPROTO_IPIP))
-		|| DP_FAILED(dp_install_isolated_mode_ipip(port->port_id, IPPROTO_IPV6)))
+	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPIP))
+		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
 		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC
-	return dp_virtsvc_install_sync_isolation_rules(port->port_id);
+	return dp_virtsvc_install_sync_isolation_rules(port_id);
 #else
 	return DP_OK;
 #endif
@@ -471,7 +469,7 @@ static int dp_init_port(struct dp_port *port)
 				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
 				return DP_ERROR;
 		} else
-			if (DP_FAILED(dp_port_install_sync_isolated_mode(port)))
+			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
 				return DP_ERROR;
 	}
 
@@ -504,7 +502,7 @@ int dp_start_port(struct dp_port *port)
 
 	ret = dp_init_port(port);
 	if (DP_FAILED(ret)) {
-		dp_stop_eth_port(port->port_id);
+		dp_stop_eth_port(port);
 		return ret;
 	}
 
@@ -518,7 +516,7 @@ int dp_stop_port(struct dp_port *port)
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_stop_eth_port(port->port_id)))
+	if (DP_FAILED(dp_stop_eth_port(port)))
 		return DP_ERROR;
 
 	port->allocated = false;

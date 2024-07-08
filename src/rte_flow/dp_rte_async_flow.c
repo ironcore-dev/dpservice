@@ -98,6 +98,9 @@ static int dp_pull_rte_async_rule_status(uint16_t port_id, uint16_t rule_count)
 // TODO rename to indicate the fact that this is BLOCKING INDEFINITELY!
 int dp_commit_rte_async_flow_rules(uint16_t port_id, uint16_t rule_count)
 {
+	if (rule_count == 0)
+		return DP_OK;
+
 	if (DP_FAILED(dp_push_rte_async_flow_rules(port_id)))
 		return DP_ERROR;
 

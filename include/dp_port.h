@@ -201,12 +201,6 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }
 
-static __rte_always_inline
-struct dp_port *dp_get_main_eswitch_port(void)
-{
-	return dp_get_port_by_pf_index(0);
-}
-
 #ifdef __cplusplus
 }
 #endif
