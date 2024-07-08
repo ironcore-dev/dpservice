@@ -456,7 +456,9 @@ static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 		return DP_ERROR;
 	}
 #ifdef ENABLE_VIRTSVC
-	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port))) {
+	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_TCP))
+		|| DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_UDP))
+	) {
 		DPS_LOG_ERR("Failed to create virtsvc async isolation templates", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}

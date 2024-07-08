@@ -241,7 +241,9 @@ int dp_virtsvc_install_sync_isolation_rules(uint16_t port_id)
 	return DP_OK;
 }
 
-uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id, struct rte_flow_template_table *template_table)
+uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
+												 struct rte_flow_template_table *tcp_template_table,
+												 struct rte_flow_template_table *udp_template_table)
 {
 	struct rte_flow *flow;
 	uint16_t rule_count = 0;
@@ -261,7 +263,9 @@ uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id, struct rte_fl
 													  service->proto,
 													  &service->service_addr,
 													  service->service_port,
-													  template_table);
+													  service->proto == IPPROTO_TCP
+														? tcp_template_table
+														: udp_template_table);
 		if (!flow) {
 			DPS_LOG_ERR("Cannot create async virtsvc isolation rule", DP_LOG_VIRTSVC(service));
 			break;

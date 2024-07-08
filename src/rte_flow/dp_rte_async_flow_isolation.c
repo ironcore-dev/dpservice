@@ -61,19 +61,23 @@ int dp_create_pf_async_isolation_templates(struct dp_port *port) {
 }
 
 #ifdef ENABLE_VIRTSVC
-int dp_create_virtsvc_async_isolation_templates(struct dp_port *port)  // TODO TCP/UDP
+int dp_create_virtsvc_async_isolation_templates(struct dp_port *port, uint8_t proto_id)
 {
-	struct dp_port_async_template *template = &port->default_async_rules.async_templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_ISOLATION];  // TODO :)
+	enum dp_port_async_template_type type =
+		proto_id == IPPROTO_TCP
+			? DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION
+			: DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION;
+	struct dp_port_async_template *template = &port->default_async_rules.async_templates[type];
 
-	static const struct rte_flow_item tcp_src_pattern[] = {
+	const struct rte_flow_item tcp_src_pattern[] = {
 		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
 			.mask = &dp_flow_item_eth_mask,
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
 			.mask = &dp_flow_item_ipv6_src_mask,
 		},
-		{	.type = RTE_FLOW_ITEM_TYPE_TCP,
-			.mask = &dp_flow_item_tcp_src_mask,
+		{	.type = proto_id == IPPROTO_TCP ? RTE_FLOW_ITEM_TYPE_TCP : RTE_FLOW_ITEM_TYPE_UDP,
+			.mask = proto_id == IPPROTO_TCP ? (const void *)&dp_flow_item_tcp_src_mask : (const void *)&dp_flow_item_udp_src_mask,
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_END,
 		},
@@ -144,6 +148,9 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 	const struct rte_flow_item_tcp tcp_spec = {
 		.hdr.src_port = svc_port,
 	};
+	const struct rte_flow_item_udp udp_spec = {
+		.hdr.src_port = svc_port,
+	};
 	// TODO udp, either separate func or just fill in both and then ternary in the table
 	// TODO validate proto_id to be only UDP/TCP!
 	const struct rte_flow_item pattern[] = {
@@ -153,8 +160,8 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
 			.spec = &ipv6_spec,
 		},
-		{	.type = RTE_FLOW_ITEM_TYPE_TCP,
-			.spec = &tcp_spec,
+		{	.type = proto_id == IPPROTO_TCP ? RTE_FLOW_ITEM_TYPE_TCP : RTE_FLOW_ITEM_TYPE_UDP,
+			.spec = proto_id == IPPROTO_TCP ? (const void *)&tcp_spec : (const void *)&udp_spec,
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_END },
 	};
@@ -203,13 +210,15 @@ int dp_create_pf_async_isolation_rules(struct dp_port *port)
 	}
 
 	rule_count += dp_create_virtsvc_async_isolation_rules(port->port_id,
-														  templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_ISOLATION].template_table);
+														  templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION].template_table,
+														  templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION].template_table);
 	// cannot end on error, need to commit partial success
 
 	if (dp_commit_rte_async_flow_rules(port->port_id, rule_count)) {
 		DPS_LOG_ERR("Failed to commit PF async isolation rules", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
+
 
 #ifdef ENABLE_VIRTSVC
 	rules_required += dp_virtsvc_get_count();
