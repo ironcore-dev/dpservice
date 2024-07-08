@@ -12,7 +12,8 @@ extern "C" {
 #include <rte_flow.h>
 #include "dp_port.h"
 
-int dp_create_async_template(uint16_t port_id, struct dp_port_async_template *template, uint8_t pattern_count, uint8_t actions_count);
+struct dp_port_async_template *dp_alloc_async_template(uint8_t pattern_count, uint8_t actions_count);
+int dp_init_async_template(uint16_t port_id, struct dp_port_async_template *template);
 void dp_destroy_async_template(uint16_t port_id, struct dp_port_async_template *template);
 
 struct rte_flow_pattern_template *dp_create_async_pattern_template(uint16_t port_id,

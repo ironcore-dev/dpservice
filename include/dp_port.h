@@ -46,6 +46,15 @@ struct dp_port_iface {
 	uint64_t				public_flow_rate_cap;
 };
 
+struct dp_port_async_template {
+	struct rte_flow_pattern_template **pattern_templates;
+	struct rte_flow_actions_template **actions_templates;
+	struct rte_flow_template_table *template_table;
+	const struct rte_flow_template_table_attr *table_attr;
+	uint8_t pattern_count;
+	uint8_t actions_count;
+};
+
 enum dp_port_async_template_type {
 	DP_PORT_ASYNC_TEMPLATE_PF_ISOLATION,
 #ifdef ENABLE_VIRTSVC
@@ -55,37 +64,10 @@ enum dp_port_async_template_type {
 	DP_PORT_ASYNC_TEMPLATE_COUNT,
 };
 
-// TODO these are "instances" so this needs more thought
-// TODO maybe do away with enum, and really just store it one-by-one...
-// shared among PF and VIRTSVC isolation templates
-enum dp_async_pattern_template_isolation_type {
-	DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
-	DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_COUNT,
-};
-
-// shared among PF and VIRTSVC isolation templates
-enum dp_async_actions_template_isolation_type {
-	DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE,
-	DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_COUNT,
-};
-// TODO this alwas needs to be "MAX" of those above..
-// TODO I think this should be done via multi-enum members (using equal sign), but then how to guarantee max?
-// TODO or just move to synamic allocation (has other positives)
-
-#define DP_ASYNC_TEMPLATE_MAX_PATTERNS 1
-#define DP_ASYNC_TEMPLATE_MAX_ACTIONS 1
-
-struct dp_port_async_template {
-	struct rte_flow_pattern_template *pattern_templates[DP_ASYNC_TEMPLATE_MAX_PATTERNS];
-	struct rte_flow_actions_template *actions_templates[DP_ASYNC_TEMPLATE_MAX_ACTIONS];
-	struct rte_flow_template_table *template_table;
-	const struct rte_flow_template_table_attr *table_attr;
-};
-
-enum dp_port_default_async_flow_type {
-	DP_PORT_DEFAULT_ASYNC_FLOW_ISOLATE_IPIP,
-	DP_PORT_DEFAULT_ASYNC_FLOW_ISOLATE_IPV6,
-	DP_PORT_DEFAULT_ASYNC_FLOW_COUNT,
+enum dp_port_async_flow_type {
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPIP,
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPV6,
+	DP_PORT_ASYNC_FLOW_COUNT,
 };
 
 struct dp_port {
@@ -112,8 +94,8 @@ struct dp_port {
 			struct rte_flow					*default_capture_flow;
 		} default_sync_rules;
 		struct {
-			struct dp_port_async_template	async_templates[DP_PORT_ASYNC_TEMPLATE_COUNT];  // TODO revisit this as this field can be quite big (currently 40B)
-			struct rte_flow					*default_async_flows[DP_PORT_DEFAULT_ASYNC_FLOW_COUNT];
+			struct dp_port_async_template	*default_templates[DP_PORT_ASYNC_TEMPLATE_COUNT];
+			struct rte_flow					*default_flows[DP_PORT_ASYNC_FLOW_COUNT];
 		} default_async_rules;
 	};
 };

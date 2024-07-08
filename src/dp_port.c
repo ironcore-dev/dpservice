@@ -354,8 +354,8 @@ int dp_ports_init(void)
 
 static void dp_destroy_default_async_templates(struct dp_port *port)
 {
-	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.async_templates); ++i)
-		dp_destroy_async_template(port->port_id, &port->default_async_rules.async_templates[i]);
+	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.default_templates); ++i)
+		dp_destroy_async_template(port->port_id, port->default_async_rules.default_templates[i]);
 }
 
 static int dp_stop_eth_port(struct dp_port *port)
@@ -368,8 +368,8 @@ static int dp_stop_eth_port(struct dp_port *port)
 			dp_destroy_virtsvc_async_isolation_rules(port->port_id);
 #endif
 		dp_destroy_async_rules(port->port_id,
-							   port->default_async_rules.default_async_flows,
-							   RTE_DIM(port->default_async_rules.default_async_flows));
+							   port->default_async_rules.default_flows,
+							   RTE_DIM(port->default_async_rules.default_flows));
 		dp_destroy_default_async_templates(port);
 	}
 
