@@ -10,8 +10,6 @@
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow_helpers.h"
 
-// TODO names?
-// TODO let's see if virtsvuc reuses this
 static const struct rte_flow_pattern_template_attr default_pattern_template_attr = {
 	.ingress = 1
 };
@@ -142,17 +140,14 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 	};
 	struct rte_flow_item_ipv6 ipv6_spec = {
 		.hdr.proto = proto_id,
-		// cannot set IPv6 here as it's an array // TODO? .hdr.src_addr = { svc_ipv6->bytes[0], ... }, + set const to the struct
+		.hdr.src_addr = DP_INIT_FROM_IPV6(svc_ipv6),
 	};
-	dp_set_src_ipv6(&ipv6_spec.hdr, svc_ipv6);  // TODO this can be done via a macro in the init itself...
 	const struct rte_flow_item_tcp tcp_spec = {
 		.hdr.src_port = svc_port,
 	};
 	const struct rte_flow_item_udp udp_spec = {
 		.hdr.src_port = svc_port,
 	};
-	// TODO udp, either separate func or just fill in both and then ternary in the table
-	// TODO validate proto_id to be only UDP/TCP!
 	const struct rte_flow_item pattern[] = {
 		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
 			.spec = &eth_spec,

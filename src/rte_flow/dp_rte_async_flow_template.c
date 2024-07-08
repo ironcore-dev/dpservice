@@ -14,18 +14,18 @@ int dp_create_async_template(uint16_t port_id, struct dp_port_async_template *te
 
 	if (pattern_count > RTE_DIM(template->pattern_templates) || actions_count > RTE_DIM(template->actions_templates)) {
 		DPS_LOG_ERR("Invalid async template pattern/actions count");
-		goto rollback;
+		return DP_ERROR;
 	}
 	for (uint8_t i = 0; i < pattern_count; ++i) {
 		if (!template->pattern_templates[i]) {
 			DPS_LOG_ERR("Incomplete async template patterns");
-			goto rollback;
+			return DP_ERROR;
 		}
 	}
 	for (uint8_t i = 0; i < actions_count; ++i) {
 		if (!template->actions_templates[i]) {
 			DPS_LOG_ERR("Incomplete async template actions");
-			goto rollback;
+			return DP_ERROR;
 		}
 	}
 
@@ -36,14 +36,10 @@ int dp_create_async_template(uint16_t port_id, struct dp_port_async_template *te
 	if (!template->template_table) {
 		DPS_LOG_ERR("Failed to create async flow template table",
 					DP_LOG_RET(rte_errno), DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message));
-		goto rollback;
+		return DP_ERROR;
 	}
 
 	return DP_OK;
-
-rollback:
-	dp_destroy_async_template(port_id, template);
-	return DP_ERROR;
 }
 
 void dp_destroy_async_template(uint16_t port_id, struct dp_port_async_template *template)
