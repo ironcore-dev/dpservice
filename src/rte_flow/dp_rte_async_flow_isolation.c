@@ -125,9 +125,9 @@ static struct rte_flow *dp_create_pf_async_isolation_rule(uint16_t port_id, uint
 		{	.type = RTE_FLOW_ACTION_TYPE_END },
 	};
 
-	return dp_rte_flow_async_create(port_id, template_table,
-									pattern, DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
-									actions, DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE);
+	return dp_create_async_rule(port_id, template_table,
+								pattern, DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
+								actions, DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE);
 }
 
 #ifdef ENABLE_VIRTSVC
@@ -171,9 +171,9 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 		{	.type = RTE_FLOW_ACTION_TYPE_END },
 	};
 
-	return dp_rte_flow_async_create(port_id, template_table,
-									pattern, DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
-									actions, DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE);
+	return dp_create_async_rule(port_id, template_table,
+								pattern, DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
+								actions, DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE);
 }
 #endif
 
@@ -209,7 +209,7 @@ int dp_create_pf_async_isolation_rules(struct dp_port *port)
 														  templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION].template_table);
 	// cannot end on error, need to commit partial success
 
-	if (dp_commit_rte_async_flow_rules(port->port_id, rule_count)) {
+	if (dp_blocking_commit_async_rules(port->port_id, rule_count)) {
 		DPS_LOG_ERR("Failed to commit PF async isolation rules", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
