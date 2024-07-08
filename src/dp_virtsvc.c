@@ -208,33 +208,12 @@ static void dp_virtsvc_free_tree(struct dp_virtsvc_lookup_entry *tree)
 	free(tree);
 }
 
-static void dp_virtsvc_remove_isolation(struct dp_virtsvc *virtsvc, uint16_t pf_idx)
-{
-	struct dp_port *port;
-	int ret;
-
-	port = dp_get_port_by_pf_index(pf_idx);
-	if (!port) {
-		DPS_LOG_ERR("Invalid PF index for virtual service isolation cleanup", DP_LOG_VALUE(pf_idx));
-		return;
-	}
-
-	ret = dp_destroy_async_rules(port->port_id, &virtsvc->isolation_rules[pf_idx], 1);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot destroy async virtual service isolation rule", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
-		return;
-	}
-}
-
 void dp_virtsvc_free(void)
 {
 	dp_virtsvc_free_tree(dp_virtsvc_ipv4_tree);
 	dp_virtsvc_free_tree(dp_virtsvc_ipv6_tree);
-	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
-		for (uint16_t pf_idx = 0; pf_idx < DP_MAX_PF_PORTS; ++pf_idx)
-			dp_virtsvc_remove_isolation(service, pf_idx);
+	DP_FOREACH_VIRTSVC(&dp_virtservices, service)
 		dp_free_jhash_table(service->open_ports);
-	}
 	rte_free(dp_virtservices);
 }
 
@@ -292,6 +271,25 @@ uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id, struct rte_fl
 	}
 
 	return rule_count;
+}
+
+void dp_destroy_virtsvc_async_isolation_rules(uint16_t port_id)
+{
+	uint16_t pf_idx;
+
+	if (port_id == dp_get_pf0()->port_id)
+		pf_idx = 0;
+	else if (port_id == dp_get_pf1()->port_id)
+		pf_idx = 1;
+	else {
+		DPS_LOG_ERR("Invalid port for virtual service isolation", DP_LOG_PORTID(port_id));
+		return;
+	}
+
+	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
+		if (DP_FAILED(dp_destroy_async_rules(port_id, &service->isolation_rules[pf_idx], 1)))
+			DPS_LOG_ERR("Cannot destroy async virtual service isolation rule", DP_LOG_VIRTSVC(service));
+	}
 }
 
 

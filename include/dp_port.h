@@ -129,6 +129,7 @@ extern struct dp_ports _dp_ports;
 struct dp_port *dp_get_port_by_name(const char *pci_name);
 
 int dp_ports_init(void);
+void dp_ports_stop(void);
 void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);

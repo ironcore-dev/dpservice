@@ -189,6 +189,7 @@ static void free_interfaces(void)
 	dp_nat_free();
 	dp_ifaces_free();
 	dp_flow_free();
+	dp_ports_stop();
 	dp_telemetry_free();
 	dp_graph_free();
 #ifdef ENABLE_VIRTSVC

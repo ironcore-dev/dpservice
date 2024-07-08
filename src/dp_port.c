@@ -365,6 +365,10 @@ static int dp_stop_eth_port(struct dp_port *port)
 	int ret;
 
 	if (dp_conf_is_mesw_mode()) {
+#ifdef ENABLE_VIRTSVC
+		if (port->is_pf)
+			dp_destroy_virtsvc_async_isolation_rules(port->port_id);
+#endif
 		dp_destroy_async_rules(port->port_id,
 							   port->default_async_rules.default_async_flows,
 							   RTE_DIM(port->default_async_rules.default_async_flows));
@@ -378,7 +382,7 @@ static int dp_stop_eth_port(struct dp_port *port)
 	return ret;
 }
 
-void dp_ports_free(void)
+void dp_ports_stop(void)
 {
 	// in multiport-mode, PF0 needs to be stopped last
 	struct dp_port *pf0 = dp_get_port_by_pf_index(0);
@@ -390,7 +394,10 @@ void dp_ports_free(void)
 	}
 	if (pf0->allocated)
 		dp_stop_eth_port(pf0);
+}
 
+void dp_ports_free(void)
+{
 	free(_dp_ports.ports);
 }
 
