@@ -46,12 +46,21 @@ struct dp_port_iface {
 	uint64_t				public_flow_rate_cap;
 };
 
+enum dp_port_async_template_type {
+	DP_PORT_ASYNC_TEMPLATE_PF_ISOLATION,
+	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_ISOLATION,
+	DP_PORT_ASYNC_TEMPLATE_COUNT,
+};
+
 // TODO these are "instances" so this needs more thought
+// TODO maybe do away with enum, and really just store it one-by-one...
+// shared among PF and VIRTSVC isolation templates
 enum dp_async_pattern_template_isolation_type {
 	DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_IPV6_PROTO,
 	DP_ASYNC_PATTERN_TEMPLATE_ISOLATION_COUNT,
 };
 
+// shared among PF and VIRTSVC isolation templates
 enum dp_async_actions_template_isolation_type {
 	DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_QUEUE,
 	DP_ASYNC_ACTIONS_TEMPLATE_ISOLATION_COUNT,
@@ -68,11 +77,6 @@ struct dp_port_async_template {
 	struct rte_flow_actions_template *actions_templates[DP_ASYNC_TEMPLATE_MAX_ACTIONS];
 	struct rte_flow_template_table *template_table;
 	const struct rte_flow_template_table_attr *table_attr;
-};
-
-enum dp_port_async_template_type {
-	DP_PORT_ASYNC_TEMPLATE_ISOLATION,
-	DP_PORT_ASYNC_TEMPLATE_COUNT,
 };
 
 enum dp_port_default_async_flow_type {

@@ -15,9 +15,7 @@
 #include "monitoring/dp_event.h"
 #include "monitoring/dp_graphtrace.h"
 #include "nodes/rx_node.h"
-// TODO check these
 #include "rte_flow/dp_rte_async_flow.h"
-#include "rte_flow/dp_rte_async_flow_init.h"
 #include "rte_flow/dp_rte_async_flow_isolation.h"
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -442,11 +440,23 @@ static int dp_port_install_async_isolated_mode(struct dp_port *port)
 	DPS_LOG_INFO("Init async isolation flow rules");
 	if (DP_FAILED(dp_create_pf_async_isolation_rules(port)))
 		return DP_ERROR;
-#ifdef ENABLE_VIRTSVC
-	return dp_virtsvc_install_async_isolation_rules(port->port_id);
-#else
 	return DP_OK;
+}
+
+static int dp_port_create_default_pf_async_templates(struct dp_port *port)
+{
+	DPS_LOG_INFO("Installing PF async templates", DP_LOG_PORTID(port->port_id));
+	if (DP_FAILED(dp_create_pf_async_isolation_templates(port))) {
+		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
+#ifdef ENABLE_VIRTSVC
+	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port))) {
+		DPS_LOG_ERR("Failed to create virtsvc async isolation templates", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
 #endif
+	return DP_OK;
 }
 
 static int dp_init_port(struct dp_port *port)
@@ -457,19 +467,12 @@ static int dp_init_port(struct dp_port *port)
 
 	if (port->is_pf) {
 		if (dp_conf_is_mesw_mode()) {
-			if (DP_FAILED(dp_create_pf_async_templates(port)))
+			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
+				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
 				return DP_ERROR;
-			if (DP_FAILED(dp_port_install_async_isolated_mode(port)))
-				return DP_ERROR;
-			// TODO rollback by calling free
-// 			if (DP_FAILED(dp_create_pf_async_templates(port))
-// 				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
-// 				return DP_ERROR;
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port)))
 				return DP_ERROR;
-		// TODO actually move virtsvc here? and deal with mesw internally?
-		// TODO do this after Tao merge
 	}
 
 	if (dp_conf_is_offload_enabled()) {

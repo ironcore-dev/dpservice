@@ -36,7 +36,6 @@ dp_sources = [
   'rte_flow/dp_rte_flow_init.c',
   'rte_flow/dp_rte_flow_traffic_forward.c',
   'rte_flow/dp_rte_async_flow.c',
-  'rte_flow/dp_rte_async_flow_init.c',
   'rte_flow/dp_rte_async_flow_isolation.c',
   'rte_flow/dp_rte_async_flow_template.c',
   'dp_argparse.c',

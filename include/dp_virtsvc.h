@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 #include <rte_byteorder.h>
+#include <rte_flow.h>
 #include <rte_hash.h>
 #include <rte_telemetry.h>
 #include "dp_ipaddr.h"
@@ -47,7 +48,6 @@ struct dp_virtsvc {
 	uint16_t		last_assigned_port;
 	struct rte_hash	*open_ports;
 	struct dp_virtsvc_conn connections[DP_VIRTSVC_PORTCOUNT];
-	// TODO is this the right way? TODO rename
 	struct rte_flow	*isolation_rules[DP_MAX_PF_PORTS];
 };
 
@@ -102,11 +102,10 @@ int dp_virtsvc_ipv6_cmp(uint8_t proto1, const union dp_ipv6 *addr1, rte_be16_t p
 int dp_virtsvc_init(int socket_id);
 void dp_virtsvc_free(void);
 
-int dp_virtsvc_get_count(void);
+size_t dp_virtsvc_get_count(void);
 
-// TODO merge and ask for mesw inside?
 int dp_virtsvc_install_sync_isolation_rules(uint16_t port_id);
-int dp_virtsvc_install_async_isolation_rules(uint16_t port_id);
+uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id, struct rte_flow_template_table *template_table);
 
 int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 							 uint16_t vf_port_id,
