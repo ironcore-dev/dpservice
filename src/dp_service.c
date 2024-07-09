@@ -89,6 +89,7 @@ static void dp_args_free_mellanox(void)
 
 static bool dp_is_mellanox_opt_set(void)
 {
+	// if only one of them is set, EAL will simply receive `-a ''` which is actually OK
 	return dp_conf_get_eal_a_pf0()[0] != '\0'
  		|| dp_conf_get_eal_a_pf1()[0] != '\0';
 }

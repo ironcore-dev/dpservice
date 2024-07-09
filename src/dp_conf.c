@@ -21,7 +21,7 @@
 #define DP_CONF_DEFAULT_CONF_FILE "/tmp/dp_service.conf"
 
 // magic number, hopefully large enough to hold the full '-a' EAL argument
-#define DP_EAL_A_MAXLEN 128
+#define DP_EAL_A_MAXLEN 256
 
 // generated definitions for getopt(),
 // generated storage variables and
