@@ -9,10 +9,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include <stdbool.h>
 #include <rte_flow.h>
-
-#define DP_ASYNC_FLOW_PF_DEFAULT_TABLE_MAX_RULES 8
 
 int dp_configure_async_flows(uint16_t port_id);
 

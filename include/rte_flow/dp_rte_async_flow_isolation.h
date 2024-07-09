@@ -9,8 +9,8 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include <stdbool.h>
 #include <rte_flow.h>
+#include "dp_ipaddr.h"
 #include "dp_port.h"
 
 int dp_create_pf_async_isolation_templates(struct dp_port *port);

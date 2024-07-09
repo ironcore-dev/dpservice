@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "rte_flow/dp_rte_async_flow_isolation.h"
+
 #include "dp_error.h"
 #ifdef ENABLE_VIRTSVC
 #include "dp_virtsvc.h"
@@ -9,6 +10,8 @@
 #include "rte_flow/dp_rte_async_flow.h"
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow_helpers.h"
+
+#define DP_ISOLATION_DEFAULT_TABLE_MAX_RULES 8
 
 enum dp_isolation_pattern_type {
 	DP_ISOLATION_PATTERN_IPV6_PROTO,
@@ -33,7 +36,7 @@ static const struct rte_flow_template_table_attr pf_default_template_table_attr 
 		.group = 0,
 		.ingress = 1,
 	},
-	.nb_flows = DP_ASYNC_FLOW_PF_DEFAULT_TABLE_MAX_RULES,
+	.nb_flows = DP_ISOLATION_DEFAULT_TABLE_MAX_RULES,
 	// TODO? .specialize = RTE_FLOW_TABLE_SPECIALIZE_TRANSFER_WIRE_ORIG,
 };
 

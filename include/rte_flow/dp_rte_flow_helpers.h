@@ -119,8 +119,8 @@ void dp_set_eth_flow_item(struct rte_flow_item *item,
 						  struct rte_flow_item_eth *eth_spec,
 						  rte_be16_t type)
 {
-	item->type = RTE_FLOW_ITEM_TYPE_ETH;
 	eth_spec->hdr.ether_type = type;
+	item->type = RTE_FLOW_ITEM_TYPE_ETH;
 	item->spec = eth_spec;
 	item->mask = &dp_flow_item_eth_mask;
 	item->last = NULL;
@@ -161,8 +161,8 @@ void dp_set_ipv6_flow_item(struct rte_flow_item *item,
 						   struct rte_flow_item_ipv6 *ipv6_spec,
 						   uint8_t proto)
 {
-	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
 	ipv6_spec->hdr.proto = proto;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
 	item->spec = ipv6_spec;
 	item->mask = &dp_flow_item_ipv6_mask;
 	item->last = NULL;
@@ -533,8 +533,8 @@ void dp_set_redirect_queue_action(struct rte_flow_action *action,
 								  uint16_t queue_index)
 {
 	queue_action->index = queue_index;
-	action->conf = queue_action;
 	action->type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	action->conf = queue_action;
 }
 
 static __rte_always_inline
@@ -587,8 +587,8 @@ void dp_set_jump_group_action(struct rte_flow_action *action,
 							  uint32_t group_id)
 {
 	jump_action->group = group_id;
-	action->conf = jump_action;
 	action->type = RTE_FLOW_ACTION_TYPE_JUMP;
+	action->conf = jump_action;
 }
 
 static __rte_always_inline

@@ -407,7 +407,7 @@ static int dp_port_install_sync_isolated_mode(uint16_t port_id)
 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
 		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC
-	return dp_virtsvc_install_sync_isolation_rules(port_id);
+	return dp_install_virtsvc_sync_isolation_rules(port_id);
 #else
 	return DP_OK;
 #endif

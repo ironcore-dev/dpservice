@@ -6,6 +6,8 @@
 #include <rte_common.h>
 #include <rte_malloc.h>
 
+#include "dp_error.h"
+#include "dp_log.h"
 #include "dpdk_layer.h"
 #include "rte_flow/dp_rte_async_flow_template.h"
 

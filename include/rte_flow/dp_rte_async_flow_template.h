@@ -10,7 +10,6 @@ extern "C" {
 
 #include <stdint.h>
 #include <rte_flow.h>
-#include "dp_port.h"
 
 struct dp_port_async_template *dp_alloc_async_template(uint8_t pattern_count, uint8_t actions_count);
 int dp_init_async_template(uint16_t port_id, struct dp_port_async_template *template);

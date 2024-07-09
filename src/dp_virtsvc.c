@@ -219,12 +219,11 @@ void dp_virtsvc_free(void)
 
 size_t dp_virtsvc_get_count(void)
 {
-	// conversion is fine, will never get that far
 	return dp_virtservices_end - dp_virtservices;
 }
 
 
-int dp_virtsvc_install_sync_isolation_rules(uint16_t port_id)
+int dp_install_virtsvc_sync_isolation_rules(uint16_t port_id)
 {
 	int ret;
 
