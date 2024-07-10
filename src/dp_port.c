@@ -363,6 +363,10 @@ static int dp_stop_eth_port(struct dp_port *port)
 	int ret;
 
 	if (dp_conf_is_multiport_eswitch()) {
+#ifdef ENABLE_VIRTSVC
+		if (port->is_pf)
+			dp_destroy_virtsvc_async_isolation_rules(port->port_id);
+#endif
 		dp_destroy_async_rules(port->port_id,
 							   port->default_async_rules.default_flows,
 							   RTE_DIM(port->default_async_rules.default_flows));
@@ -403,7 +407,7 @@ static int dp_port_install_sync_isolated_mode(uint16_t port_id)
 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
 		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC
-	return dp_virtsvc_install_isolation_rules(port_id);
+	return dp_install_virtsvc_sync_isolation_rules(port_id);
 #else
 	return DP_OK;
 #endif
@@ -449,6 +453,14 @@ static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORTID(port->port_id));
 		return DP_ERROR;
 	}
+#ifdef ENABLE_VIRTSVC
+	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_TCP))
+		|| DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_UDP))
+	) {
+		DPS_LOG_ERR("Failed to create virtsvc async isolation templates", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
+#endif
 	return DP_OK;
 }
 
