@@ -24,9 +24,9 @@
 #endif
 
 #ifdef ENABLE_PF1_PROXY
-#define PF_TAP_FORWARD_NEXT(NEXT) NEXT(CLS_NEXT_PF_TAP_FORWARD, "pf_tap_forward")
+#define PF1_PROXY_NEXT(NEXT) NEXT(CLS_NEXT_PF1_PROXY, "pf1_proxy")
 #else
-#define PF_TAP_FORWARD_NEXT(NEXT)
+#define PF1_PROXY_NEXT(NEXT)
 #endif
 
 #define NEXT_NODES(NEXT) \
@@ -34,7 +34,7 @@
 	NEXT(CLS_NEXT_IPV6_ND, "ipv6_nd") \
 	NEXT(CLS_NEXT_CONNTRACK, "conntrack") \
 	NEXT(CLS_NEXT_IPIP_DECAP, "ipip_decap") \
-	PF_TAP_FORWARD_NEXT(NEXT) \
+	PF1_PROXY_NEXT(NEXT) \
 	VIRTSVC_NEXT(NEXT)
 
 #ifdef ENABLE_VIRTSVC
@@ -169,7 +169,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 #ifdef ENABLE_PF1_PROXY
 	if (pf1_tap_proxy_forward(m))
-		return CLS_NEXT_PF_TAP_FORWARD;
+		return CLS_NEXT_PF1_PROXY;
 #endif
 
 	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))

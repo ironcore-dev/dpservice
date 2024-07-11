@@ -262,7 +262,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 }
 
 #ifdef ENABLE_PF1_PROXY
-static struct dp_port *dp_port_init_proxyed_pf_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+static struct dp_port *dp_port_init_proxied_pf_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_port *port;
 	int socket_id;
@@ -296,7 +296,7 @@ static struct dp_port *dp_port_init_proxyed_pf_interface(uint16_t port_id, struc
 	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return NULL;
 	
-	DPS_LOG_INFO("INIT setting proxyed pf port to promiscuous mode", DP_LOG_PORT(port));
+	DPS_LOG_INFO("INIT setting proxied pf port to promiscuous mode", DP_LOG_PORT(port));
 	ret = rte_eth_promiscuous_enable(port->port_id);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
@@ -383,7 +383,7 @@ static int dp_port_init_pf(const char *pf_name)
 			if (strncmp(pf_name, dp_conf_get_pf1_name(), sizeof(ifname)))
 				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
 			else
-				port = dp_port_init_proxyed_pf_interface(port_id, &dev_info);
+				port = dp_port_init_proxied_pf_interface(port_id, &dev_info);
 #else
 				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
 #endif
