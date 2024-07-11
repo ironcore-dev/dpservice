@@ -23,7 +23,11 @@
 #	define VIRTSVC_NEXT(NEXT)
 #endif
 
+#ifdef ENABLE_PF1_PROXY
 #define PF_TAP_FORWARD_NEXT(NEXT) NEXT(CLS_NEXT_PF_TAP_FORWARD, "pf_tap_forward")
+#else
+#define PF_TAP_FORWARD_NEXT(NEXT)
+#endif
 
 #define NEXT_NODES(NEXT) \
 	NEXT(CLS_NEXT_ARP, "arp") \
@@ -122,6 +126,7 @@ static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(const struct 
 }
 #endif
 
+#ifdef ENABLE_PF1_PROXY
 static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 {
 	const struct rte_ether_hdr *ether_hdr;
@@ -149,6 +154,7 @@ static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 
 	return false;
 }
+#endif
 
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
@@ -161,8 +167,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_virtsvc *virtsvc;
 #endif
 
+#ifdef ENABLE_PF1_PROXY
 	if (pf1_tap_proxy_forward(m))
 		return CLS_NEXT_PF_TAP_FORWARD;
+#endif
 
 	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
 		return CLS_NEXT_DROP;

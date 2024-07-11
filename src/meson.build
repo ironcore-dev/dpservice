@@ -31,7 +31,6 @@ dp_sources = [
   'nodes/rx_periodic_node.c',
   'nodes/snat_node.c',
   'nodes/tx_node.c',
-  'nodes/pf_tap_forward_node.c',
   'rte_flow/dp_rte_flow.c',
   'rte_flow/dp_rte_flow_capture.c',
   'rte_flow/dp_rte_flow_init.c',
@@ -72,6 +71,11 @@ if get_option('enable_virtual_services')
   dp_sources += [
     'nodes/virtsvc_node.c',
     'dp_virtsvc.c',
+  ]
+endif
+if get_option('enable_pf1_proxy')
+  dp_sources += [
+    'nodes/pf_tap_forward_node.c',
   ]
 endif
 

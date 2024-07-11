@@ -120,6 +120,7 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 	return graph_id;
 }
 
+#ifdef ENABLE_PF1_PROXY
 static int dp_graph_init_proxy_tap(void)
 {
 	const struct dp_port *port = dp_get_pf_proxy_tap_port();
@@ -131,6 +132,7 @@ static int dp_graph_init_proxy_tap(void)
 
 	return DP_OK;
 }
+#endif
 
 static int dp_graph_init_nodes(void)
 {
@@ -183,8 +185,10 @@ int dp_graph_init(void)
 	if (DP_FAILED(dp_graph_init_nodes()))
 		return DP_ERROR;
 
+#ifdef ENABLE_PF1_PROXY
 	if (DP_FAILED(dp_graph_init_proxy_tap()))
 		return DP_ERROR;
+#endif
 
 	// find the right core(s) to run on
 	// start from second core, first core is for main loop, not graph

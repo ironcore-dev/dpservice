@@ -16,9 +16,6 @@ extern "C" {
 #define DP_MAX_VF_PORTS 126
 #define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS)
 
-// #define DP_PF_TAP_PROXY 1
-// #define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS + DP_PF_TAP_PROXY)
-
 #define DP_NR_STD_RX_QUEUES		1
 #define DP_NR_STD_TX_QUEUES		1
 #define DP_NR_PF_HAIRPIN_RX_TX_QUEUES	1

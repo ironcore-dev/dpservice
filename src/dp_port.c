@@ -61,7 +61,9 @@ struct dp_port *_dp_port_table[DP_MAX_PORTS];
 struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 struct dp_ports _dp_ports;
 
+#ifdef ENABLE_PF1_PROXY
 struct dp_port *_dp_pf_proxy_tap_port;
+#endif
 
 static int dp_port_register_pf(struct dp_port *port)
 {
@@ -259,6 +261,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	return port;
 }
 
+#ifdef ENABLE_PF1_PROXY
 static struct dp_port *dp_port_init_proxyed_pf_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_port *port;
@@ -346,6 +349,7 @@ static struct dp_port *dp_port_init_proxy_tap(uint16_t port_id, struct rte_eth_d
 
 	return port;
 }
+#endif
 
 static int dp_port_set_up_hairpins(void)
 {
@@ -375,10 +379,15 @@ static int dp_port_init_pf(const char *pf_name)
 			return DP_ERROR;
 		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
 			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
+#ifdef ENABLE_PF1_PROXY
 			if (strncmp(pf_name, dp_conf_get_pf1_name(), sizeof(ifname)))
 				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
 			else
 				port = dp_port_init_proxyed_pf_interface(port_id, &dev_info);
+#else
+				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+#endif
+
 			if (!port)
 				return DP_ERROR;
 			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
@@ -389,7 +398,7 @@ static int dp_port_init_pf(const char *pf_name)
 	return DP_ERROR;
 }
 
-
+#ifdef ENABLE_PF1_PROXY
 static int dp_port_init_tap_proxy(const char *pf_tap_proxy_name)
 {
 	uint16_t port_id;
@@ -412,6 +421,7 @@ static int dp_port_init_tap_proxy(const char *pf_tap_proxy_name)
 	DPS_LOG_ERR("No such PF proxy tap port", DP_LOG_NAME(pf_tap_proxy_name));
 	return DP_ERROR;
 }
+#endif
 
 static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 {
@@ -455,18 +465,21 @@ int dp_ports_init(void)
 	}
 	_dp_ports.end = _dp_ports.ports;
 
+#ifdef ENABLE_PF1_PROXY
 	_dp_pf_proxy_tap_port = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
 	if (!_dp_pf_proxy_tap_port) {
 		DPS_LOG_ERR("Cannot allocate pf proxy tap port");
 		return DP_ERROR;
 	}
+#endif
 
 	// these need to be done in order
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
-		// || DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
-		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs))
-		|| DP_FAILED(dp_port_init_tap_proxy(dp_conf_get_pf1_tap_name())))
+#ifdef ENABLE_PF1_PROXY
+		|| DP_FAILED(dp_port_init_tap_proxy(dp_conf_get_pf1_tap_name()))
+#endif
+		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
 		return DP_ERROR;
 
 	if (dp_conf_is_offload_enabled()) {

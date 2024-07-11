@@ -168,8 +168,10 @@ static int init_interfaces(void)
 		return DP_ERROR;
 	}
 
+#ifdef ENABLE_PF1_PROXY
 	if (DP_FAILED(dp_start_port(dp_get_pf_proxy_tap_port())))
 		return DP_ERROR;
+#endif
 
 
 	// VFs are started by GRPC later
