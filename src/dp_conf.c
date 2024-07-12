@@ -41,7 +41,7 @@ static struct dp_conf_virtual_services virtual_services = {0};
 #ifdef ENABLE_PF1_PROXY
 #define DP_EAL_PF1_MAC_ADDR_SIZE 18
 static char eal_pf1_proxy_mac_addr_str[DP_EAL_PF1_MAC_ADDR_SIZE] = {0};
-const static char *eal_pf1_proxy_dev_name = "pf1-tap";
+static const char *eal_pf1_proxy_dev_name = "pf1-tap";
 static char eal_pf1_proxy_params[DP_EAL_A_MAXLEN] = {0};
 
 const char *dp_get_eal_pf1_proxy_mac_addr(void)
@@ -297,7 +297,7 @@ static int parse_line(char *line, int lineno)
 		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1)); 
 #ifdef ENABLE_PF1_PROXY
 	else {
-		if (!strcmp(key, "pf1-tap"))
+		if (!strcmp(key, "pf1-proxy"))
 			return dp_argparse_string(value, eal_pf1_proxy_mac_addr_str, sizeof(eal_pf1_proxy_mac_addr_str));
 	}
 #endif
