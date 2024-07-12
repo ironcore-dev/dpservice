@@ -159,7 +159,7 @@ struct dp_port *dp_get_port_by_id(uint16_t port_id)
 	if (port_id == _dp_pf_proxy_tap_port->port_id)
 		return _dp_pf_proxy_tap_port;
 #endif
-	
+
 	if (unlikely(port_id >= RTE_DIM(_dp_port_table))) {
 		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
 		return NULL;

@@ -37,11 +37,10 @@ static const struct rte_flow_template_table_attr pf_default_template_table_attr 
 		.ingress = 1,
 	},
 	.nb_flows = DP_ISOLATION_DEFAULT_TABLE_MAX_RULES,
-	// TODO? .specialize = RTE_FLOW_TABLE_SPECIALIZE_TRANSFER_WIRE_ORIG,
 };
 
-int dp_create_pf_async_isolation_templates(struct dp_port *port) {
-
+int dp_create_pf_async_isolation_templates(struct dp_port *port)
+{
 	struct dp_port_async_template *tmpl;
 
 	tmpl = dp_alloc_async_template(DP_ISOLATION_PATTERN_COUNT, DP_ISOLATION_ACTIONS_COUNT);
@@ -230,8 +229,8 @@ int dp_create_pf_async_isolation_rules(struct dp_port *port)
 
 #ifdef ENABLE_VIRTSVC
 	rule_count += dp_create_virtsvc_async_isolation_rules(port->port_id,
-														  templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION]->template_table,
-														  templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION]->template_table);
+											templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION]->template_table,
+											templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION]->template_table);
 	// cannot end on error, need to commit partial success
 #endif
 

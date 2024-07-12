@@ -292,10 +292,10 @@ static struct dp_port *dp_port_init_proxied_pf_interface(uint16_t port_id, struc
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
-	
+
 	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return NULL;
-	
+
 	DPS_LOG_INFO("INIT setting proxied pf port to promiscuous mode", DP_LOG_PORT(port));
 	ret = rte_eth_promiscuous_enable(port->port_id);
 	if (DP_FAILED(ret)) {
@@ -477,7 +477,7 @@ int dp_ports_init(void)
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
 #ifdef ENABLE_PF1_PROXY
-		|| DP_FAILED(dp_port_init_tap_proxy(dp_conf_get_pf1_tap_name()))
+		|| DP_FAILED(dp_port_init_tap_proxy(dp_get_eal_pf1_proxy_dev_name()))
 #endif
 		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
 		return DP_ERROR;

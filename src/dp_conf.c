@@ -38,6 +38,30 @@ static struct dp_conf_dhcp_dns dhcpv6_dns = {0};
 static struct dp_conf_virtual_services virtual_services = {0};
 #endif
 
+#ifdef ENABLE_PF1_PROXY
+#define DP_EAL_PF1_MAC_ADDR_SIZE 18
+static char eal_pf1_proxy_mac_addr_str[DP_EAL_PF1_MAC_ADDR_SIZE] = {0};
+const static char *eal_pf1_proxy_dev_name = "pf1-tap";
+static char eal_pf1_proxy_params[DP_EAL_A_MAXLEN] = {0};
+
+const char *dp_get_eal_pf1_proxy_mac_addr(void)
+{
+	return eal_pf1_proxy_mac_addr_str;
+}
+
+const char *dp_get_eal_pf1_proxy_dev_name(void)
+{
+	return eal_pf1_proxy_dev_name;
+}
+
+const char *dp_generate_eal_pf1_proxy_params(void)
+{
+	snprintf(eal_pf1_proxy_params, sizeof(eal_pf1_proxy_params), "net_tap0,iface=%s,mac=%s",
+				dp_get_eal_pf1_proxy_dev_name(), dp_get_eal_pf1_proxy_mac_addr());
+	return eal_pf1_proxy_params;
+}
+#endif
+
 int dp_conf_is_wcmp_enabled(void)
 {
 	return wcmp_perc < 100;
@@ -268,8 +292,15 @@ static int parse_line(char *line, int lineno)
 	// Config-file-specific keys
 	if (!strcmp(key, "a-pf0"))
 		return dp_argparse_string(value, eal_a_pf0, sizeof(eal_a_pf0));
-	if (!strcmp(key, "a-pf1"))
-		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1));
+
+	if (!strcmp(key, "a-pf1")) // TODO: throw an error when pf0 and pf1 are present and nic is in the mpesw mode
+		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1)); 
+#ifdef ENABLE_PF1_PROXY
+	else {
+		if (!strcmp(key, "pf1-tap"))
+			return dp_argparse_string(value, eal_pf1_proxy_mac_addr_str, sizeof(eal_pf1_proxy_mac_addr_str));
+	}
+#endif
 
 	// Otherwise support all long options
 	if (!longopt) {

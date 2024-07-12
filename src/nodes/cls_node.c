@@ -132,7 +132,7 @@ static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 	const struct rte_ether_hdr *ether_hdr;
 	const struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t l3_type;
-	
+
 	if (m->port != dp_get_pf1()->port_id && m->port != dp_get_pf_proxy_tap_port()->port_id)
 		return false;
 
@@ -147,7 +147,7 @@ static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 			ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
 			if (ipv6_hdr->proto == IPPROTO_IPIP || ipv6_hdr->proto == IPPROTO_IPV6)
 				return false;
-		} 
+		}
 
 		return true;
 	}
