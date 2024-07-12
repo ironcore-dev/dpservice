@@ -38,7 +38,7 @@ int dp_configure_async_flows(uint16_t port_id)
 
 	for (uint16_t std_queue = 0; std_queue < DP_NR_STD_RX_QUEUES; std_queue++)
 		attr_list[std_queue] = &queue_attr;
-	
+
 	ret = rte_flow_configure(port_id, &port_attr, DP_NR_STD_RX_QUEUES, attr_list, &error);
 	if (DP_FAILED(ret))
 		DPS_LOG_ERR("Failed to configure port's queue attr for async flow operations",

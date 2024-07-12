@@ -103,8 +103,10 @@ void dp_destroy_async_template(uint16_t port_id, struct dp_port_async_template *
 }
 
 
-struct rte_flow_pattern_template *dp_create_async_pattern_template(uint16_t port_id,
-																   const struct rte_flow_pattern_template_attr *pattern_template_attr,									const struct rte_flow_item pattern[])
+struct rte_flow_pattern_template
+*dp_create_async_pattern_template(uint16_t port_id,
+								const struct rte_flow_pattern_template_attr *pattern_template_attr,
+								const struct rte_flow_item pattern[])
 {
 	struct rte_flow_pattern_template *pattern_template;
 	struct rte_flow_error error;
@@ -117,10 +119,11 @@ struct rte_flow_pattern_template *dp_create_async_pattern_template(uint16_t port
 	return pattern_template;
 }
 
-struct rte_flow_actions_template *dp_create_async_actions_template(uint16_t port_id,
-																   const struct rte_flow_actions_template_attr *actions_template_attr,
-																   const struct rte_flow_action actions[],
-																   const struct rte_flow_action masks[])
+struct rte_flow_actions_template
+*dp_create_async_actions_template(uint16_t port_id,
+								const struct rte_flow_actions_template_attr *actions_template_attr,
+								const struct rte_flow_action actions[],
+								const struct rte_flow_action masks[])
 {
 	struct rte_flow_actions_template *actions_template;
 	struct rte_flow_error error;

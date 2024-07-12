@@ -58,6 +58,6 @@ static uint16_t pf1_proxy_node_process(struct rte_graph *graph,
 			rte_node_enqueue(graph, node, PF1_PROXY_NEXT_DROP, &objs[i], 1);
 		}
 	}
- 
+
 	return nb_objs;
 }
