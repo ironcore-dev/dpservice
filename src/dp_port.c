@@ -477,7 +477,7 @@ int dp_ports_init(void)
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
 #ifdef ENABLE_PF1_PROXY
-		|| DP_FAILED(dp_port_init_tap_proxy(dp_conf_get_pf1_tap_name()))
+		|| DP_FAILED(dp_port_init_tap_proxy(dp_get_eal_pf1_proxy_dev_name()))
 #endif
 		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
 		return DP_ERROR;

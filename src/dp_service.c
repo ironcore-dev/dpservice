@@ -60,8 +60,20 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	// add mellanox args (remember that they can be written to, so strdup())
 	dp_mlx_args[0] = dp_argv[curarg++] = strdup("-a");
 	dp_mlx_args[1] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf0());
-	dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
-	dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
+
+	if (!dp_conf_is_multiport_eswitch()) {
+		#ifdef ENABLE_PF1_PROXY
+			dp_mlx_args[2] = dp_argv[curarg++] = strdup("--vdev");
+			dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_generate_eal_pf1_proxy_params());
+		#else
+			dp_mlx_args[2] = dp_argv[curarg++] = strdup(" ");
+			dp_mlx_args[3] = dp_argv[curarg++] = strdup(" ");
+		#endif
+	} else {
+		dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
+		dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
+	}
+	
 	if (!dp_mlx_args[0] || !dp_mlx_args[1] || !dp_mlx_args[2] || !dp_mlx_args[3]) {
 		DP_EARLY_ERR("Cannot allocate Mellanox arguments");
 		return DP_ERROR;

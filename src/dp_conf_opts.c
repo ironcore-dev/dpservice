@@ -47,7 +47,6 @@ _OPT_SHOPT_MAX = 255,
 	OPT_FLOW_TIMEOUT,
 #endif
 	OPT_MULTIPORT_ESWITCH,
-	OPT_PF1_TAP,
 };
 
 #define OPTSTRING ":hv" \
@@ -84,7 +83,6 @@ static const struct option dp_conf_longopts[] = {
 	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
 #endif
 	{ "multiport-eswitch", 0, 0, OPT_MULTIPORT_ESWITCH },
-	{ "pf1-tap", 1, 0, OPT_PF1_TAP },
 	{ NULL, 0, 0, 0 }
 };
 
@@ -125,7 +123,6 @@ static int grpc_port = 1337;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 #endif
 static bool multiport_eswitch = false;
-static char pf1_tap_name[IF_NAMESIZE];
 
 const char *dp_conf_get_pf0_name(void)
 {
@@ -211,11 +208,6 @@ bool dp_conf_is_multiport_eswitch(void)
 	return multiport_eswitch;
 }
 
-const char *dp_conf_get_pf1_tap_name(void)
-{
-	return pf1_tap_name;
-}
-
 
 
 /* These functions need to be implemented by the user of this generated code */
@@ -265,7 +257,6 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
 #endif
 		"     --multiport-eswitch                run on NIC configured in multiport e-switch mode\n"
-		"     --pf1-tap=PATTERN                  proxy tap device's name for PF1\n"
 	, progname);
 }
 
@@ -323,8 +314,6 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 #endif
 	case OPT_MULTIPORT_ESWITCH:
 		return dp_argparse_store_true(&multiport_eswitch);
-	case OPT_PF1_TAP:
-		return dp_argparse_string(arg, pf1_tap_name, ARRAY_SIZE(pf1_tap_name));
 	default:
 		fprintf(stderr, "Unimplemented option %d\n", opt);
 		return DP_ERROR;

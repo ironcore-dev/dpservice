@@ -47,6 +47,13 @@ const char *dp_conf_get_eal_a_pf1(void);
 const union dp_ipv6 *dp_conf_get_underlay_ip(void);
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void);
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcpv6_dns(void);
+
+#ifdef ENABLE_PF1_PROXY
+const char* dp_get_eal_pf1_proxy_mac_addr(void);
+const char* dp_get_eal_pf1_proxy_dev_name(void);
+const char* dp_generate_eal_pf1_proxy_params(void);
+#endif
+
 #ifdef ENABLE_VIRTSVC
 const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void);
 #endif

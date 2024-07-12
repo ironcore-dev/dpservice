@@ -245,7 +245,7 @@ function make_config() {
 			echo "a-pf1 ${devs[1]},class=rxq_cqe_comp_en=0,rx_vec_en=1"
 		else
 			echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=1,representor=pf[0-1]vf[0-$[$actualvfs-1]]";
-			echo "pf1_tap $(get_pf_mac_address 1)"
+			echo "pf1_proxy $(get_pf_mac_address 1)"
 	fi; } >> "$CONFIG"
 
 }
