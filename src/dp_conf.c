@@ -294,7 +294,7 @@ static int parse_line(char *line, int lineno)
 		return dp_argparse_string(value, eal_a_pf0, sizeof(eal_a_pf0));
 
 	if (!strcmp(key, "a-pf1")) // TODO: throw an error when pf0 and pf1 are present and nic is in the mpesw mode
-		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1)); 
+		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1));
 #ifdef ENABLE_PF1_PROXY
 	else {
 		if (!strcmp(key, "pf1-proxy"))
