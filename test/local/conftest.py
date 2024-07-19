@@ -41,6 +41,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--graphtrace", action="store_true", help="Log graph tracing messages"
 	)
+	parser.addoption(
+		"--pf1-proxy", action="store_true", help="Test an extra tap device serving as PF1's proxy"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -69,7 +72,8 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
 						   offloading = request.config.getoption("--offloading"),
-						   graphtrace = request.config.getoption("--graphtrace"))
+						   graphtrace = request.config.getoption("--graphtrace"),
+						   pf1_proxy = request.config.getoption("--pf1-proxy"))
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
