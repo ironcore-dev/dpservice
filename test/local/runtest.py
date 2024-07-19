@@ -27,6 +27,27 @@ def queryDpService(dpservice, arg):
 	return subprocess.check_output([dpservice, '--no-pci', '--no-huge', '--', arg],
 								   stderr=subprocess.DEVNULL).decode('utf8').strip()
 
+def generateTestSuits(test_args, build_path, dpservice_help):
+	suites = []
+	if 'pf_proxy' in build_path:
+		suites.append(TestSuite("pf-proxy-base", "Basic set of tests with common dpservice setup",
+		test_args + ['--pf1-proxy']))
+		suites.append(TestSuite("pf-proxy-xtra", "Test the impact of using the pf proxy solution",
+			test_args + ['--pf1-proxy'] +  ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py', 'xtratest_pf_proxy.py']))
+		return suites
+
+	suites.append(TestSuite("base", "Basic set of tests with common dpservice setup",
+		test_args))
+	suites.append(TestSuite("wcmp", "Port-redundancy tests with WCMP enabled",
+		test_args + ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py']))
+
+	if '--flow-timeout' in dpservice_help:
+		suites.append(TestSuite("flow", "Flow timeout tests with extremely fast flow timeout",
+			test_args + ['--fast-flow-timeout'], ['xtratest_flow_timeout.py']))
+
+	return suites
+
+
 def testDpService(build_path, print_header):
 	global args
 
@@ -50,15 +71,7 @@ def testDpService(build_path, print_header):
 		test_args.append('--virtsvc')
 
 	# Generate test suites supported by this binary
-	suites = [
-		TestSuite("base", "Basic set of tests with common dpservice setup",
-			test_args),
-		TestSuite("wcmp", "Port-redundancy tests with WCMP enabled",
-			test_args + ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py']),
-	]
-	if '--flow-timeout' in dpservice_help:
-		suites.append(TestSuite("flow", "Flow timeout tests with extremely fast flow timeout",
-			test_args + ['--fast-flow-timeout'], ['xtratest_flow_timeout.py']))
+	suites = generateTestSuits(test_args, build_path, dpservice_help)
 
 	# --list-suites prints and terminates
 	if args.list_suites:
