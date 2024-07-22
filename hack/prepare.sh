@@ -270,7 +270,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$CONFIG_EXISTS" == "true" ]]; then
-	err "File $CONFIG already exists"
+	log "File $CONFIG already exists, no changes made"
+	exit 0
 fi
 
 validate
