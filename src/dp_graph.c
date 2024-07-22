@@ -123,6 +123,9 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 #ifdef ENABLE_PF1_PROXY
 static int dp_graph_init_proxy_tap(void)
 {
+	if (!dp_conf_is_pf1_proxy_enabled())
+		return DP_OK;
+
 	const struct dp_port *port = dp_get_pf_proxy_tap_port();
 	uint16_t port_id = port->port_id;
 

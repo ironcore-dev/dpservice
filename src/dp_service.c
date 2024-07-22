@@ -63,12 +63,15 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 
 	if (dp_conf_get_eal_a_pf1()[0] == '\0') {
 #ifdef ENABLE_PF1_PROXY
-		dp_mlx_args[2] = dp_argv[curarg++] = strdup("--vdev");
-		dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_generate_eal_pf1_proxy_params());
-#else
-		dp_mlx_args[2] = dp_argv[curarg++] = strdup("");
-		dp_mlx_args[3] = dp_argv[curarg++] = strdup("");
+		if (dp_conf_is_pf1_proxy_enabled()) {
+			dp_mlx_args[2] = dp_argv[curarg++] = strdup("--vdev");
+			dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_generate_eal_pf1_proxy_params());
+		} else
 #endif
+		{
+			dp_mlx_args[2] = dp_argv[curarg++] = strdup("");
+			dp_mlx_args[3] = dp_argv[curarg++] = strdup("");
+		}
 	} else {
 		dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
 		dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
@@ -183,10 +186,9 @@ static int init_interfaces(void)
 	}
 
 #ifdef ENABLE_PF1_PROXY
-	if (DP_FAILED(dp_start_port(dp_get_pf_proxy_tap_port())))
+	if (DP_FAILED(dp_start_pf_proxy_tap_port()))
 		return DP_ERROR;
 #endif
-
 
 	// VFs are started by GRPC later
 
