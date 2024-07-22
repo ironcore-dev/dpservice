@@ -20,7 +20,7 @@ TAG="$MTR_GITLAB_HOST/osc/onmetal/dp-service:$COMMITDATE-$COMMITID"
 
 echo "$MTR_GITLAB_PASSWORD" | $DOCKER_CRE login --username "$MTR_GITLAB_LOGIN" --password-stdin "$MTR_GITLAB_HOST"
 
-$DOCKER_CRE build --platform=linux/amd64 --build-arg="DPSERVICE_FEATURES=-Denable_virtual_services=true" -t "$TAG" .
+$DOCKER_CRE build --platform=linux/amd64 --build-arg=DPSERVICE_FEATURES="-Denable_virtual_services=true -Denable_pf1_proxy=true" -t "$TAG" .
 
 $DOCKER_CRE push "$TAG"
 $DOCKER_CRE logout "$MTR_GITLAB_HOST"
