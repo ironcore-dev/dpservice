@@ -236,7 +236,14 @@ function make_config() {
 		echo "a-pf1 ${devs[1]},class=rxq_cqe_comp_en=0,rx_vec_en=1"
 	fi; } > "$CONFIG"
 
-	echo "multiport-eswitch is enabled and a tap device with mac $(get_pf_mac 1) is used as pf1's proxy"
+	if [[ "$OPT_MULTIPORT" == "true" ]]; then
+		log "dpservice configured in multiport-eswitch mode"
+		if [[ "$OPT_PF1_PROXY" == "true" ]]; then
+			log "dpservice will create a TAP device to proxy PF1"
+		fi
+	else
+		log "dpservice configured in normal mode"
+	fi
 }
 
 # main
