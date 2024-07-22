@@ -173,7 +173,9 @@ static int init_interfaces(void)
 	// PF1 is always started (can receive from outside) even when not used for Tx
 	// but test suite can use it for monitoring in some setups, so do not bind it then
 #ifdef ENABLE_PYTEST
+#ifndef ENABLE_PF1_PROXY
 	if (dp_conf_is_wcmp_enabled())
+#endif
 #endif
 	{
 	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(1))))
