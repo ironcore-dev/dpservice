@@ -168,7 +168,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 #endif
 
 #ifdef ENABLE_PF1_PROXY
-	if (pf1_tap_proxy_forward(m))
+	if (unlikely(pf1_tap_proxy_forward(m)))
 		return CLS_NEXT_PF1_PROXY;
 #endif
 
