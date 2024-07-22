@@ -240,24 +240,31 @@ function make_config() {
 }
 
 # main
+CONFIG_EXISTS=false
 if [[ -e $CONFIG ]]; then
-	err "File $CONFIG already exists"
+	CONFIG_EXISTS=true
 fi
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
 		--multiport-eswitch)
 			OPT_MULTIPORT=true
-			shift
 			;;
 		--pf1-proxy)
 			OPT_PF1_PROXY=true
-			shift
+			;;
+		--force)
+			CONFIG_EXISTS=false
 			;;
 		*)
 			err "Invalid argument $1"
 	esac
+	shift
 done
+
+if [[ "$CONFIG_EXISTS" == "true" ]]; then
+	err "File $CONFIG already exists"
+fi
 
 validate
 get_pfs
