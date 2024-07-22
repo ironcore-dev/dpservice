@@ -235,6 +235,8 @@ function make_config() {
 		echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,representor=pf[0]vf[0-$[$actualvfs-1]]"
 		echo "a-pf1 ${devs[1]},class=rxq_cqe_comp_en=0,rx_vec_en=1"
 	fi; } > "$CONFIG"
+
+	echo "multiport-eswitch is enabled and a tap device with mac $(get_pf_mac 1) is used as pf1's proxy"
 }
 
 # main
