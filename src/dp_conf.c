@@ -43,6 +43,7 @@ static struct dp_conf_virtual_services virtual_services = {0};
 static char eal_pf1_proxy_mac_addr_str[DP_EAL_PF1_MAC_ADDR_SIZE] = {0};
 static const char *eal_pf1_proxy_dev_name = "pf1-tap";
 static char eal_pf1_proxy_params[DP_EAL_A_MAXLEN] = {0};
+static bool dp_conf_pf1_proxy_enabled = false;
 
 const char *dp_get_eal_pf1_proxy_mac_addr(void)
 {
@@ -59,6 +60,11 @@ const char *dp_generate_eal_pf1_proxy_params(void)
 	snprintf(eal_pf1_proxy_params, sizeof(eal_pf1_proxy_params), "net_tap0,iface=%s,mac=%s",
 				dp_get_eal_pf1_proxy_dev_name(), dp_get_eal_pf1_proxy_mac_addr());
 	return eal_pf1_proxy_params;
+}
+
+bool dp_conf_is_pf1_proxy_enabled(void)
+{
+	return dp_conf_pf1_proxy_enabled;
 }
 #endif
 
@@ -297,8 +303,10 @@ static int parse_line(char *line, int lineno)
 		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1));
 #ifdef ENABLE_PF1_PROXY
 	else {
-		if (!strcmp(key, "pf1-proxy"))
+		if (!strcmp(key, "pf1-proxy")) {
+			dp_conf_pf1_proxy_enabled = true;
 			return dp_argparse_string(value, eal_pf1_proxy_mac_addr_str, sizeof(eal_pf1_proxy_mac_addr_str));
+		}
 	}
 #endif
 

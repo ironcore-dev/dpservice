@@ -113,7 +113,11 @@ def test_telemetry_exporter(prepare_ifaces, start_exporter):
 		else:
 			assert metric.startswith("#"), \
 				f"Unknown exported metric '{metric.split('{')[0]}' found"
-	assert graph_stats == set(GRAPH_NODES) or graph_stats == set(GRAPH_NODES + ('virtsvc',)), \
+	# meson options (e.g. enable_pf1_proxy) are hard to do in these screipts, so just check manually
+	graph_nodes = GRAPH_NODES
+	if 'pf1_proxy' in graph_stats:
+		graph_nodes += ('pf1_proxy',)
+	assert graph_stats == set(graph_nodes) or graph_stats == set(graph_nodes + ('virtsvc',)), \
 		"Unexpected graph telemetry in exporter output"
 	assert heap_info == set(HEAP_INFO), \
 		"Unexpected heap info in exporter output"

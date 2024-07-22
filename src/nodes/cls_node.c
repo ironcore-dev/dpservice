@@ -129,6 +129,9 @@ static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(const struct 
 #ifdef ENABLE_PF1_PROXY
 static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 {
+	if (!dp_conf_is_pf1_proxy_enabled())
+		return false;
+
 	const struct rte_ether_hdr *ether_hdr;
 	const struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t l3_type;

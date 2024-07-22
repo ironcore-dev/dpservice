@@ -111,7 +111,7 @@ extern struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 extern struct dp_ports _dp_ports;
 
 #ifdef ENABLE_PF1_PROXY
-extern struct dp_port *_dp_pf_proxy_tap_port;
+extern struct dp_port _dp_pf_proxy_tap_port;
 #endif
 
 
@@ -122,6 +122,9 @@ void dp_ports_stop(void);
 void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
+#ifdef ENABLE_PF1_PROXY
+int dp_start_pf_proxy_tap_port(void);
+#endif
 int dp_stop_port(struct dp_port *port);
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap);
@@ -156,8 +159,8 @@ static __rte_always_inline
 struct dp_port *dp_get_port_by_id(uint16_t port_id)
 {
 #ifdef ENABLE_PF1_PROXY
-	if (port_id == _dp_pf_proxy_tap_port->port_id)
-		return _dp_pf_proxy_tap_port;
+	if (unlikely(dp_conf_is_pf1_proxy_enabled() && port_id == _dp_pf_proxy_tap_port.port_id))
+		return &_dp_pf_proxy_tap_port;
 #endif
 
 	if (unlikely(port_id >= RTE_DIM(_dp_port_table))) {
@@ -198,9 +201,9 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 
 #ifdef ENABLE_PF1_PROXY
 static __rte_always_inline
-struct dp_port *dp_get_pf_proxy_tap_port(void)
+const struct dp_port *dp_get_pf_proxy_tap_port(void)
 {
-	return _dp_pf_proxy_tap_port;
+	return &_dp_pf_proxy_tap_port;
 }
 #endif
 
