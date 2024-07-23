@@ -35,16 +35,16 @@ def generateTestSuits(test_args, build_path, dpservice_help):
 		suites.append(TestSuite("pf-proxy-xtra", "Test the impact of using the pf proxy solution",
 			test_args + ['--pf1-proxy'] +  ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py', 'xtratest_pf_proxy.py']))
 		return suites
-	
+
 	suites.append(TestSuite("base", "Basic set of tests with common dpservice setup",
 		test_args))
 	suites.append(TestSuite("wcmp", "Port-redundancy tests with WCMP enabled",
 		test_args + ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py']))
-	
+
 	if '--flow-timeout' in dpservice_help:
 		suites.append(TestSuite("flow", "Flow timeout tests with extremely fast flow timeout",
 			test_args + ['--fast-flow-timeout'], ['xtratest_flow_timeout.py']))
-		
+
 	return suites
 
 
