@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
+          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
           fetch-depth: 0
       - name: Determine SHA for Docker Image
         id: get_sha
