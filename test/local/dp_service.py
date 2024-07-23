@@ -22,6 +22,7 @@ class DpService:
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
+		self.pf1_proxy = pf1_proxy
 
 		if self.hardware:
 			if self.port_redundancy:
@@ -45,8 +46,8 @@ class DpService:
 						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
 						 f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
 						 f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"')
-		if pf1_proxy:
-			self.cmd +=  f' --vdev={PF1_PROXY.pci},iface={PF1_PROXY.tap},mac="{PF1_PROXY.mac}"'
+			if pf1_proxy:
+				self.cmd +=  f' --vdev={PF1_PROXY.pci},iface={PF1_PROXY.tap},mac="{PF1_PROXY.mac}"'
 
 		self.cmd += ' --'
 		if not self.hardware:
@@ -90,6 +91,8 @@ class DpService:
 		interface_init(PF0.tap)
 		if not self.hardware:  # see above
 			interface_init(PF1.tap, self.port_redundancy)
+		if self.pf1_proxy:
+			interface_init(PF1_PROXY.tap)
 		grpc_client.init()
 		VM1.ul_ipv6 = grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name)
 		VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name)

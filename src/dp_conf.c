@@ -66,6 +66,10 @@ bool dp_conf_is_pf1_proxy_enabled(void)
 {
 	return dp_conf_pf1_proxy_enabled;
 }
+void dp_conf_set_pf1_proxy_enabled(void)
+{
+	dp_conf_pf1_proxy_enabled = true;
+}
 #endif
 
 int dp_conf_is_wcmp_enabled(void)

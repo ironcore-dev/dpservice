@@ -119,7 +119,7 @@ def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 	# meson options (e.g. enable_pf1_proxy) are hard to do in these screipts, so just check manually
 	graph_nodes = GRAPH_NODES
 	if request.config.getoption("--pf1-proxy"):
-		graph_nodes += ('pf1_proxy',)
+		graph_nodes += ('pf1_proxy','rx-6-0')
 	assert graph_stats == set(graph_nodes) or graph_stats == set(graph_nodes + ('virtsvc',)), \
 		"Unexpected graph telemetry in exporter output"
 	assert heap_info == set(HEAP_INFO), \

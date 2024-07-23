@@ -53,6 +53,7 @@ const char *dp_get_eal_pf1_proxy_mac_addr(void);
 const char *dp_get_eal_pf1_proxy_dev_name(void);
 const char *dp_generate_eal_pf1_proxy_params(void);
 bool dp_conf_is_pf1_proxy_enabled(void);
+void dp_conf_set_pf1_proxy_enabled(void);
 #endif
 
 #ifdef ENABLE_VIRTSVC

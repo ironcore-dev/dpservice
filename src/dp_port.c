@@ -467,6 +467,11 @@ int dp_ports_init(void)
 	}
 	_dp_ports.end = _dp_ports.ports;
 
+#ifdef ENABLE_PF1_PROXY
+	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+		dp_conf_set_pf1_proxy_enabled();
+#endif
+
 	// these need to be done in order
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
