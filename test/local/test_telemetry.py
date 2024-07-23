@@ -42,8 +42,11 @@ def get_telemetry(request):
 		client.close()
 	return response
 
-def check_tel_graph(key):
-	expected_tel_rx_node_count = 6
+def check_tel_graph(request, key):
+	if not request.config.getoption("--pf1-proxy"):
+		expected_tel_rx_node_count = 6
+	else:
+		expected_tel_rx_node_count = 7
 	tel = get_telemetry(f"/dp_service/graph/{key}")
 	assert tel is not None, \
 		"Missing graph telemetry"
@@ -56,11 +59,11 @@ def check_tel_graph(key):
 		f"Expected {expected_tel_rx_node_count} 'rx-X-0' nodes, found {len(rx_nodes)} in {key} graph telemetry"
 
 
-def test_telemetry_graph(prepare_ifaces):
-	check_tel_graph("obj_count")
-	check_tel_graph("call_count")
-	check_tel_graph("cycle_count")
-	check_tel_graph("realloc_count")
+def test_telemetry_graph(request, prepare_ifaces):
+	check_tel_graph(request, "obj_count")
+	check_tel_graph(request, "call_count")
+	check_tel_graph(request, "cycle_count")
+	check_tel_graph(request,"realloc_count")
 
 def test_telemetry_nat(prepare_ifaces):
 	tel = get_telemetry("/dp_service/nat/used_port_count")
@@ -113,7 +116,7 @@ def test_telemetry_exporter(prepare_ifaces, start_exporter):
 		else:
 			assert metric.startswith("#"), \
 				f"Unknown exported metric '{metric.split('{')[0]}' found"
-	assert graph_stats == set(GRAPH_NODES) or graph_stats == set(GRAPH_NODES + ('virtsvc',)), \
+	assert graph_stats == set(GRAPH_NODES) or graph_stats == set(GRAPH_NODES + ('virtsvc',)) or graph_stats == set(GRAPH_NODES + ('pf1_proxy','rx-6-0',)), \
 		"Unexpected graph telemetry in exporter output"
 	assert heap_info == set(HEAP_INFO), \
 		"Unexpected heap info in exporter output"

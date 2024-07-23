@@ -100,6 +100,7 @@ ARG DPSERVICE_FEATURES=""
 RUN meson setup release_build $DPSERVICE_FEATURES --buildtype=release && ninja -C release_build
 RUN CC=clang CXX=clang++ meson setup clang_build $DPSERVICE_FEATURES && ninja -C clang_build
 RUN meson setup xtratest_build $DPSERVICE_FEATURES -Denable_tests=true && ninja -C xtratest_build
+RUN meson setup pf_proxy_build $DPSERVICE_FEATURES -Denable_pf1_proxy=true -Denable_tests=true && ninja -C pf_proxy_build
 
 
 # Test-image to run pytest
@@ -135,12 +136,15 @@ COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-export
 COPY --from=testbuilder /workspace/xtratest_build/src/dpservice-bin ./xtratest_build/src/dpservice-bin
 COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./xtratest_build/cli/dpservice-cli/dpservice-cli
 COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-exporter ./xtratest_build/cli/dpservice-exporter/dpservice-exporter
+COPY --from=testbuilder /workspace/pf_proxy_build/src/dpservice-bin ./pf_proxy_build/src/dpservice-bin
+COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./pf_proxy_build/cli/dpservice-cli/dpservice-cli
+COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-exporter ./pf_proxy_build/cli/dpservice-exporter/dpservice-exporter
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
 
 WORKDIR /test
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["./runtest.py", "../build", "../xtratest_build"]
+ENTRYPOINT ["./runtest.py", "../build", "../xtratest_build", "../pf_proxy_build"]
 
 
 # Deployed pod image itself

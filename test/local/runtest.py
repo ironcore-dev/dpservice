@@ -30,7 +30,9 @@ def queryDpService(dpservice, arg):
 def generateTestSuits(test_args, build_path, dpservice_help):
 	suites = []
 	if 'pf_proxy' in build_path:
-		suites.append(TestSuite("pf-proxy", "Test the impact of using the pf proxy solution",
+		suites.append(TestSuite("pf-proxy-base", "Basic set of tests with common dpservice setup",
+		test_args + ['--pf1-proxy']))
+		suites.append(TestSuite("pf-proxy-xtra", "Test the impact of using the pf proxy solution",
 			test_args + ['--pf1-proxy'] +  ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py', 'xtratest_pf_proxy.py']))
 		return suites
 	
