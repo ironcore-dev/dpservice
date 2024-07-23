@@ -180,3 +180,37 @@ RUN ldconfig
 RUN echo 'PATH=${PATH}:/\nsource /etc/bash_completion\nsource <(dpservice-cli completion bash)' >> /root/.bashrc
 
 ENTRYPOINT ["dpservice-bin"]
+
+# another image that supports multiport eswitch mode
+FROM debian:12-slim AS production-mpesw
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ON \
+libibverbs-dev \
+numactl \
+libnuma1 \
+pciutils \
+procps \
+libuuid1 \
+libgrpc++1.51 \
+libpcap0.8-dev \
+iproute2 \
+udev \
+gawk \
+bash-completion \
+&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /
+COPY --from=builder \
+/workspace/pf_proxy_build/src/dpservice-bin \
+/workspace/pf_proxy_build/tools/dump/dpservice-dump \
+/workspace/pf_proxy_build/cli/dpservice-cli/dpservice-cli \
+/workspace/pf_proxy_build/cli/dpservice-exporter/dpservice-exporter \
+/workspace/hack/prepare.sh \
+/usr/local/bin/
+COPY --from=builder /usr/local/lib /usr/local/lib
+RUN ldconfig
+
+# Ensure bash-completion is working in operations
+RUN echo 'PATH=${PATH}:/\nsource /etc/bash_completion\nsource <(dpservice-cli completion bash)' >> /root/.bashrc
+
+ENTRYPOINT ["dpservice-bin"]
