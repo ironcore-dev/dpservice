@@ -46,6 +46,30 @@ struct dp_port_iface {
 	uint64_t				public_flow_rate_cap;
 };
 
+struct dp_port_async_template {
+	struct rte_flow_pattern_template **pattern_templates;
+	struct rte_flow_actions_template **actions_templates;
+	struct rte_flow_template_table *template_table;
+	const struct rte_flow_template_table_attr *table_attr;
+	uint8_t pattern_count;
+	uint8_t actions_count;
+};
+
+enum dp_port_async_template_type {
+	DP_PORT_ASYNC_TEMPLATE_PF_ISOLATION,
+#ifdef ENABLE_VIRTSVC
+	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION,
+	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION,
+#endif
+	DP_PORT_ASYNC_TEMPLATE_COUNT,
+};
+
+enum dp_port_async_flow_type {
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPIP,
+	DP_PORT_ASYNC_FLOW_ISOLATE_IPV6,
+	DP_PORT_ASYNC_FLOW_COUNT,
+};
+
 struct dp_port {
 	bool							is_pf;
 	uint16_t						port_id;
@@ -60,12 +84,20 @@ struct dp_port {
 	struct rte_ether_addr			own_mac;
 	struct rte_ether_addr			neigh_mac;
 	struct dp_port_iface			iface;
-	struct rte_flow					*default_jump_flow;
-	struct rte_flow					*default_capture_flow;
 	bool							captured;
 	struct dp_port_stats			stats;
 	struct rte_meter_srtcm			port_srtcm;
 	struct rte_meter_srtcm_profile	port_srtcm_profile;
+	union {
+		struct {
+			struct rte_flow					*default_jump_flow;
+			struct rte_flow					*default_capture_flow;
+		} default_sync_rules;
+		struct {
+			struct dp_port_async_template	*default_templates[DP_PORT_ASYNC_TEMPLATE_COUNT];
+			struct rte_flow					*default_flows[DP_PORT_ASYNC_FLOW_COUNT];
+		} default_async_rules;
+	};
 };
 
 struct dp_ports {
@@ -78,10 +110,15 @@ extern struct dp_port *_dp_port_table[DP_MAX_PORTS];
 extern struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 extern struct dp_ports _dp_ports;
 
+#ifdef ENABLE_PF1_PROXY
+extern struct dp_port *_dp_pf_proxy_tap_port;
+#endif
+
 
 struct dp_port *dp_get_port_by_name(const char *pci_name);
 
 int dp_ports_init(void);
+void dp_ports_stop(void);
 void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
@@ -118,6 +155,11 @@ struct dp_port *dp_get_out_port(struct dp_flow *df)
 static __rte_always_inline
 struct dp_port *dp_get_port_by_id(uint16_t port_id)
 {
+#ifdef ENABLE_PF1_PROXY
+	if (port_id == _dp_pf_proxy_tap_port->port_id)
+		return _dp_pf_proxy_tap_port;
+#endif
+
 	if (unlikely(port_id >= RTE_DIM(_dp_port_table))) {
 		DPS_LOG_ERR("Port not registered in dpservice", DP_LOG_PORTID(port_id));
 		return NULL;
@@ -153,6 +195,14 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 {
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }
+
+#ifdef ENABLE_PF1_PROXY
+static __rte_always_inline
+struct dp_port *dp_get_pf_proxy_tap_port(void)
+{
+	return _dp_pf_proxy_tap_port;
+}
+#endif
 
 #ifdef __cplusplus
 }

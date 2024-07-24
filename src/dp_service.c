@@ -28,6 +28,7 @@
 #endif
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_thread.h"
+#include "rte_flow/dp_rte_async_flow.h"
 
 static char **dp_argv;
 static int dp_argc;
@@ -59,8 +60,20 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	// add mellanox args (remember that they can be written to, so strdup())
 	dp_mlx_args[0] = dp_argv[curarg++] = strdup("-a");
 	dp_mlx_args[1] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf0());
-	dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
-	dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
+
+	if (dp_conf_get_eal_a_pf1()[0] == '\0') {
+#ifdef ENABLE_PF1_PROXY
+		dp_mlx_args[2] = dp_argv[curarg++] = strdup("--vdev");
+		dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_generate_eal_pf1_proxy_params());
+#else
+		dp_mlx_args[2] = dp_argv[curarg++] = strdup("");
+		dp_mlx_args[3] = dp_argv[curarg++] = strdup("");
+#endif
+	} else {
+		dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
+		dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
+	}
+
 	if (!dp_mlx_args[0] || !dp_mlx_args[1] || !dp_mlx_args[2] || !dp_mlx_args[3]) {
 		DP_EARLY_ERR("Cannot allocate Mellanox arguments");
 		return DP_ERROR;
@@ -89,7 +102,7 @@ static void dp_args_free_mellanox(void)
 static bool dp_is_mellanox_opt_set(void)
 {
 	return dp_conf_get_eal_a_pf0()[0] != '\0'
-		&& dp_conf_get_eal_a_pf1()[0] != '\0';
+		|| dp_conf_get_eal_a_pf1()[0] != '\0';
 }
 
 static int dp_eal_init(int *argc_ptr, char ***argv_ptr)
@@ -162,8 +175,16 @@ static int init_interfaces(void)
 #ifdef ENABLE_PYTEST
 	if (dp_conf_is_wcmp_enabled())
 #endif
+	{
 	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(1))))
 		return DP_ERROR;
+	}
+
+#ifdef ENABLE_PF1_PROXY
+	if (DP_FAILED(dp_start_port(dp_get_pf_proxy_tap_port())))
+		return DP_ERROR;
+#endif
+
 
 	// VFs are started by GRPC later
 
@@ -186,6 +207,7 @@ static void free_interfaces(void)
 	dp_nat_free();
 	dp_ifaces_free();
 	dp_flow_free();
+	dp_ports_stop();
 	dp_telemetry_free();
 	dp_graph_free();
 #ifdef ENABLE_VIRTSVC
@@ -225,6 +247,11 @@ static int run_service(void)
 	// pre-init sanity checks
 	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
 		DP_EARLY_ERR("Disabled conntrack requires disabled offloading");
+		return DP_ERROR;
+	}
+
+	if (dp_conf_is_multiport_eswitch() && dp_conf_is_offload_enabled()) {
+		DP_EARLY_ERR("HW offloading is currently not supported for multi-port eswitch mode");
 		return DP_ERROR;
 	}
 

@@ -160,6 +160,13 @@
       "max": 300,
       "default": "DP_FLOW_DEFAULT_TIMEOUT",
       "ifdef": "ENABLE_PYTEST"
+    },
+    {
+      "lgopt": "multiport-eswitch",
+      "help": "run on NIC configured in multiport e-switch mode",
+      "var": "multiport_eswitch",
+      "type": "bool",
+      "default": "false"
     }
   ]
 }

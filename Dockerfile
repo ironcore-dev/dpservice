@@ -100,6 +100,7 @@ ARG DPSERVICE_FEATURES=""
 RUN meson setup release_build $DPSERVICE_FEATURES --buildtype=release && ninja -C release_build
 RUN CC=clang CXX=clang++ meson setup clang_build $DPSERVICE_FEATURES && ninja -C clang_build
 RUN meson setup xtratest_build $DPSERVICE_FEATURES -Denable_tests=true && ninja -C xtratest_build
+RUN meson setup pf_proxy_build $DPSERVICE_FEATURES -Denable_pf1_proxy=true -Denable_tests=true && ninja -C pf_proxy_build
 
 
 # Test-image to run pytest
@@ -135,12 +136,15 @@ COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-export
 COPY --from=testbuilder /workspace/xtratest_build/src/dpservice-bin ./xtratest_build/src/dpservice-bin
 COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./xtratest_build/cli/dpservice-cli/dpservice-cli
 COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-exporter ./xtratest_build/cli/dpservice-exporter/dpservice-exporter
+COPY --from=testbuilder /workspace/pf_proxy_build/src/dpservice-bin ./pf_proxy_build/src/dpservice-bin
+COPY --from=testbuilder /workspace/build/cli/dpservice-cli/dpservice-cli ./pf_proxy_build/cli/dpservice-cli/dpservice-cli
+COPY --from=testbuilder /workspace/build/cli/dpservice-exporter/dpservice-exporter ./pf_proxy_build/cli/dpservice-exporter/dpservice-exporter
 COPY --from=testbuilder /usr/local/lib /usr/local/lib
 RUN ldconfig
 
 WORKDIR /test
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["./runtest.py", "../build", "../xtratest_build"]
+ENTRYPOINT ["./runtest.py", "../build", "../xtratest_build", "../pf_proxy_build"]
 
 
 # Deployed pod image itself
@@ -167,6 +171,40 @@ COPY --from=builder \
 /workspace/build/tools/dump/dpservice-dump \
 /workspace/build/cli/dpservice-cli/dpservice-cli \
 /workspace/build/cli/dpservice-exporter/dpservice-exporter \
+/workspace/hack/prepare.sh \
+/usr/local/bin/
+COPY --from=builder /usr/local/lib /usr/local/lib
+RUN ldconfig
+
+# Ensure bash-completion is working in operations
+RUN echo 'PATH=${PATH}:/\nsource /etc/bash_completion\nsource <(dpservice-cli completion bash)' >> /root/.bashrc
+
+ENTRYPOINT ["dpservice-bin"]
+
+# another image that supports multiport eswitch mode
+FROM debian:12-slim AS production-mpesw
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ON \
+libibverbs-dev \
+numactl \
+libnuma1 \
+pciutils \
+procps \
+libuuid1 \
+libgrpc++1.51 \
+libpcap0.8-dev \
+iproute2 \
+udev \
+gawk \
+bash-completion \
+&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /
+COPY --from=builder \
+/workspace/pf_proxy_build/src/dpservice-bin \
+/workspace/pf_proxy_build/tools/dump/dpservice-dump \
+/workspace/pf_proxy_build/cli/dpservice-cli/dpservice-cli \
+/workspace/pf_proxy_build/cli/dpservice-exporter/dpservice-exporter \
 /workspace/hack/prepare.sh \
 /usr/local/bin/
 COPY --from=builder /usr/local/lib /usr/local/lib

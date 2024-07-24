@@ -18,6 +18,10 @@ on:
         description: 'Manual build trigger for arm64 architecture'
         required: false
         default: 'linux/arm64'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 jobs:
   buildAndPush:
@@ -25,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref }}
+          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -75,5 +79,17 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: production
+          secrets: |
+            "github_token=${{ secrets.BOT_PAT }}"
+      - name: Build and push (multiport)
+        timeout-minutes: 60
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{env.platforms}}
+          push: ${{ github.event_name != 'workflow_dispatch' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          target: production-mpesw
           secrets: |
             "github_token=${{ secrets.BOT_PAT }}"

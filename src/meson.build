@@ -32,9 +32,12 @@ dp_sources = [
   'nodes/snat_node.c',
   'nodes/tx_node.c',
   'rte_flow/dp_rte_flow.c',
+  'rte_flow/dp_rte_flow_capture.c',
   'rte_flow/dp_rte_flow_init.c',
   'rte_flow/dp_rte_flow_traffic_forward.c',
-  'rte_flow/dp_rte_flow_capture.c',
+  'rte_flow/dp_rte_async_flow.c',
+  'rte_flow/dp_rte_async_flow_isolation.c',
+  'rte_flow/dp_rte_async_flow_template.c',
   'dp_argparse.c',
   'dp_cntrack.c',
   'dp_conf.c',
@@ -68,6 +71,11 @@ if get_option('enable_virtual_services')
   dp_sources += [
     'nodes/virtsvc_node.c',
     'dp_virtsvc.c',
+  ]
+endif
+if get_option('enable_pf1_proxy')
+  dp_sources += [
+    'nodes/pf1_proxy_node.c',
   ]
 endif
 

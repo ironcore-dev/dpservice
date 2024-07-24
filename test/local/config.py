@@ -137,6 +137,10 @@ class VMSpec:
 
 PF0 = PFSpec.create()
 PF1 = PFSpec.create()
+#PF1_PROXY is used when ENABLE_PF1_PROXY is set
+PF1_PROXY = PFSpec.create()
+PF1_PROXY.tap = "pf1-tap"
+
 # VM1 and VM2 are on the same VNI
 VM1 = VMSpec.create(vni1)
 VM2 = VMSpec.create(vni1)
@@ -146,3 +150,4 @@ VM3 = VMSpec.create(vni2)
 # it is not added anywhere, the interface is not up
 # add it and delete manually, note that it is configured for VNI1
 VM4 = VMSpec.create(vni1)
+

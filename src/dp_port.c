@@ -13,11 +13,14 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "monitoring/dp_event.h"
+#include "monitoring/dp_graphtrace.h"
 #include "nodes/rx_node.h"
-#include "rte_flow/dp_rte_flow_init.h"
+#include "rte_flow/dp_rte_async_flow.h"
+#include "rte_flow/dp_rte_async_flow_isolation.h"
+#include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_capture.h"
-#include "monitoring/dp_graphtrace.h"
+#include "rte_flow/dp_rte_flow_init.h"
 
 #define DP_PORT_INIT_PF true
 #define DP_PORT_INIT_VF false
@@ -57,6 +60,10 @@ static const struct rte_meter_srtcm_params dp_srtcm_params_base = {
 struct dp_port *_dp_port_table[DP_MAX_PORTS];
 struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 struct dp_ports _dp_ports;
+
+#ifdef ENABLE_PF1_PROXY
+struct dp_port *_dp_pf_proxy_tap_port;
+#endif
 
 static int dp_port_register_pf(struct dp_port *port)
 {
@@ -100,7 +107,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	/* Default config */
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
 
-	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
+	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP || dp_conf_is_multiport_eswitch())
 		nr_hairpin_queues = 0;
 	else
 		nr_hairpin_queues = port->is_pf
@@ -227,6 +234,9 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
 
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+		return NULL;
+
 	if (is_pf) {
 		if (DP_FAILED(dp_port_register_pf(port)))
 			return NULL;
@@ -250,6 +260,96 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 
 	return port;
 }
+
+#ifdef ENABLE_PF1_PROXY
+static struct dp_port *dp_port_init_proxied_pf_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+{
+	struct dp_port *port;
+	int socket_id;
+	int ret;
+
+	if (port_id >= RTE_DIM(_dp_port_table)) {
+		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+		return NULL;
+	}
+
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return NULL;
+		}
+	}
+
+	// oveflow check done by liming the number of calls to this function
+	port = _dp_ports.end++;
+	port->is_pf = true;
+	port->port_id = port_id;
+	port->socket_id = socket_id;
+	_dp_port_table[port_id] = port;
+
+	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
+		return NULL;
+
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+		return NULL;
+
+	DPS_LOG_INFO("INIT setting proxied pf port to promiscuous mode", DP_LOG_PORT(port));
+	ret = rte_eth_promiscuous_enable(port->port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return NULL;
+	}
+
+	if (DP_FAILED(dp_port_register_pf(port)))
+		return NULL;
+	ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
+		return NULL;
+	}
+
+	return port;
+}
+
+static struct dp_port *dp_port_init_proxy_tap(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+{
+	// struct dp_port *port;
+	struct dp_port *port = dp_get_pf_proxy_tap_port();
+	int socket_id;
+	int ret;
+
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return NULL;
+		}
+	}
+
+	// oveflow check done by liming the number of calls to this function
+	// port = _dp_ports.end++;
+	port->is_pf = false;
+	port->port_id = port_id;
+	port->socket_id = socket_id;
+
+	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
+		return NULL;
+
+	DPS_LOG_INFO("INIT setting proxy tap to promiscuous mode", DP_LOG_PORT(port));
+	ret = rte_eth_promiscuous_enable(port->port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return NULL;
+	}
+
+	return port;
+}
+#endif
 
 static int dp_port_set_up_hairpins(void)
 {
@@ -279,7 +379,15 @@ static int dp_port_init_pf(const char *pf_name)
 			return DP_ERROR;
 		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
 			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+#ifdef ENABLE_PF1_PROXY
+			if (strncmp(pf_name, dp_conf_get_pf1_name(), sizeof(ifname)))
+				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+			else
+				port = dp_port_init_proxied_pf_interface(port_id, &dev_info);
+#else
+				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+#endif
+
 			if (!port)
 				return DP_ERROR;
 			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
@@ -289,6 +397,31 @@ static int dp_port_init_pf(const char *pf_name)
 	DPS_LOG_ERR("No such PF", DP_LOG_NAME(pf_name));
 	return DP_ERROR;
 }
+
+#ifdef ENABLE_PF1_PROXY
+static int dp_port_init_tap_proxy(const char *pf_tap_proxy_name)
+{
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	char ifname[IF_NAMESIZE] = {0};
+	struct dp_port *port;
+
+	RTE_ETH_FOREACH_DEV(port_id) {
+		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
+			return DP_ERROR;
+		if (!strncmp(pf_tap_proxy_name, ifname, sizeof(ifname))) {
+			DPS_LOG_INFO("INIT initializing PF proxy tap port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
+			port = dp_port_init_proxy_tap(port_id, &dev_info);
+			if (!port)
+				return DP_ERROR;
+			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_tap_proxy_name);
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("No such PF proxy tap port", DP_LOG_NAME(pf_tap_proxy_name));
+	return DP_ERROR;
+}
+#endif
 
 static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 {
@@ -332,9 +465,20 @@ int dp_ports_init(void)
 	}
 	_dp_ports.end = _dp_ports.ports;
 
+#ifdef ENABLE_PF1_PROXY
+	_dp_pf_proxy_tap_port = (struct dp_port *)calloc(num_of_ports, sizeof(struct dp_port));
+	if (!_dp_pf_proxy_tap_port) {
+		DPS_LOG_ERR("Cannot allocate pf proxy tap port");
+		return DP_ERROR;
+	}
+#endif
+
 	// these need to be done in order
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
+#ifdef ENABLE_PF1_PROXY
+		|| DP_FAILED(dp_port_init_tap_proxy(dp_get_eal_pf1_proxy_dev_name()))
+#endif
 		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
 		return DP_ERROR;
 
@@ -346,37 +490,62 @@ int dp_ports_init(void)
 	return DP_OK;
 }
 
-static int dp_stop_eth_port(uint16_t port_id)
+static void dp_destroy_default_async_templates(struct dp_port *port)
+{
+	for (uint8_t i = 0; i < RTE_DIM(port->default_async_rules.default_templates); ++i)
+		dp_destroy_async_template(port->port_id, port->default_async_rules.default_templates[i]);
+}
+
+static int dp_stop_eth_port(struct dp_port *port)
 {
 	int ret;
 
+	if (dp_conf_is_multiport_eswitch()) {
+#ifdef ENABLE_VIRTSVC
+		if (port->is_pf)
+			dp_destroy_virtsvc_async_isolation_rules(port->port_id);
+#endif
+		dp_destroy_async_rules(port->port_id,
+							   port->default_async_rules.default_flows,
+							   RTE_DIM(port->default_async_rules.default_flows));
+		dp_destroy_default_async_templates(port);
+	}
 
-	ret = rte_eth_dev_stop(port_id);
+	ret = rte_eth_dev_stop(port->port_id);
 	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
 
 	return ret;
 }
 
-void dp_ports_free(void)
+void dp_ports_stop(void)
 {
+	// in multiport-mode, PF0 needs to be stopped last
+	struct dp_port *pf0 = dp_get_port_by_pf_index(0);
+
 	// without stopping started ports, DPDK complains
 	DP_FOREACH_PORT(&_dp_ports, port) {
-		if (port->allocated)
-			 dp_stop_eth_port(port->port_id);
+		if (port->allocated && port != pf0)
+			dp_stop_eth_port(port);
 	}
+	if (pf0->allocated)
+		dp_stop_eth_port(pf0);
+}
+
+void dp_ports_free(void)
+{
 	free(_dp_ports.ports);
 }
 
 
-static int dp_port_install_isolated_mode(uint16_t port_id)
+static int dp_port_install_sync_isolated_mode(uint16_t port_id)
 {
-	DPS_LOG_INFO("Init isolation flow rule for IPinIP tunnels");
+	DPS_LOG_INFO("Init isolation flow rules");
 	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPIP))
 		|| DP_FAILED(dp_install_isolated_mode_ipip(port_id, IPPROTO_IPV6)))
 		return DP_ERROR;
 #ifdef ENABLE_VIRTSVC
-	return dp_virtsvc_install_isolation_rules(port_id);
+	return dp_install_virtsvc_sync_isolation_rules(port_id);
 #else
 	return DP_OK;
 #endif
@@ -407,23 +576,56 @@ static int dp_install_vf_init_rte_rules(struct dp_port *port)
 	return DP_OK;
 }
 
+static int dp_port_install_async_isolated_mode(struct dp_port *port)
+{
+	DPS_LOG_INFO("Init async isolation flow rules");
+	if (DP_FAILED(dp_create_pf_async_isolation_rules(port)))
+		return DP_ERROR;
+	return DP_OK;
+}
+
+static int dp_port_create_default_pf_async_templates(struct dp_port *port)
+{
+	DPS_LOG_INFO("Installing PF async templates", DP_LOG_PORTID(port->port_id));
+	if (DP_FAILED(dp_create_pf_async_isolation_templates(port))) {
+		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
+#ifdef ENABLE_VIRTSVC
+	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_TCP))
+		|| DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_UDP))
+	) {
+		DPS_LOG_ERR("Failed to create virtsvc async isolation templates", DP_LOG_PORTID(port->port_id));
+		return DP_ERROR;
+	}
+#endif
+	return DP_OK;
+}
+
 static int dp_init_port(struct dp_port *port)
 {
-
 	// TAP devices do not support offloading/isolation
 	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP)
 		return DP_OK;
 
-	if (port->is_pf)
-		if (DP_FAILED(dp_port_install_isolated_mode(port->port_id)))
-			return DP_ERROR;
+	if (port->is_pf) {
+		if (dp_conf_is_multiport_eswitch()) {
+			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
+				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
+				return DP_ERROR;
+		} else
+			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
+				return DP_ERROR;
+	}
 
 	if (dp_conf_is_offload_enabled()) {
 #ifdef ENABLE_PYTEST
 		if (port->peer_pf_port_id != dp_get_pf1()->port_id)
 #endif
+		{
 		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 			return DP_ERROR;
+		}
 
 		if (!port->is_pf)
 			if (DP_FAILED(dp_install_vf_init_rte_rules(port)))
@@ -445,7 +647,7 @@ int dp_start_port(struct dp_port *port)
 
 	ret = dp_init_port(port);
 	if (DP_FAILED(ret)) {
-		dp_stop_eth_port(port->port_id);
+		dp_stop_eth_port(port);
 		return ret;
 	}
 
@@ -459,7 +661,7 @@ int dp_stop_port(struct dp_port *port)
 	if (DP_FAILED(dp_destroy_default_flow(port)))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_stop_eth_port(port->port_id)))
+	if (DP_FAILED(dp_stop_eth_port(port)))
 		return DP_ERROR;
 
 	port->allocated = false;

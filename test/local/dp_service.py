@@ -18,7 +18,7 @@ class DpService:
 	DP_SERVICE_CONF = "/tmp/dp_service.conf"
 
 	def __init__(self, build_path, port_redundancy, fast_flow_timeout,
-				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
+				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False, pf1_proxy=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
@@ -45,6 +45,9 @@ class DpService:
 						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
 						 f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
 						 f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"')
+		if pf1_proxy:
+			self.cmd +=  f' --vdev={PF1_PROXY.pci},iface={PF1_PROXY.tap},mac="{PF1_PROXY.mac}"'
+
 		self.cmd += ' --'
 		if not self.hardware:
 			self.cmd +=  f' --pf0={PF0.tap} --pf1={PF1.tap} --vf-pattern={vf_tap_pattern} --nic-type=tap'
@@ -160,6 +163,7 @@ if __name__ == '__main__':
 	parser.add_argument("--init-only", action="store_true", help="Only init interfaces of a running service")
 	parser.add_argument("--gdb", action="store_true", help="Run service under gdb")
 	parser.add_argument("--hw", action="store_true", help="Run on actual hardware NIC instead of virtual TAP devices")
+	parser.add_argument("--pf1-proxy", action="store_true", help="Test an extra tap device serving as PF1's proxy")
 	args = parser.parse_args()
 
 	dp_service = DpService(args.build_path,
@@ -167,7 +171,8 @@ if __name__ == '__main__':
 						   args.fast_flow_timeout,
 						   gdb=args.gdb,
 						   test_virtsvc=args.virtsvc,
-						   hardware=args.hw)
+						   hardware=args.hw,
+						   pf1_proxy=args.pf1_proxy)
 
 	if args.init_only:
 		dp_service.init_ifaces(GrpcClient(args.build_path))
