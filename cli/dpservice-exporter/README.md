@@ -11,11 +11,16 @@ Export Dpservice statistics to Prometheus readable format.
 `dpservice-bin` needs to be running on the same host to run `dpservice-exporter` and to export the statistics `dpservice-exporter` needs to have access to the socket with the path specified in variable `metrics.SocketPath` *(/var/run/dpdk/rte/dpdk_telemetry.v2)*.
 Also specified port (by default 8080) on which we want to run `dpservice-exporter` needs to be available.
 
+## Grafana dashboard
+
+The Grafana dashboard template is located in the folder [dashboard](./dashboard/). It's a JSON file, that can be directly imported into Grafana, just `datasource` and `uid` need to be adjusted based on the environment (marked as `<replace>`).
+
 ## Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/ironcore-dev/dpservice/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information.
 
 ## License
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
