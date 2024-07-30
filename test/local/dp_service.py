@@ -24,6 +24,7 @@ class DpService:
 		self.hardware = hardware
 
 		if self.hardware:
+			raise ValueError("Hardware tests are currently not supported")
 			if self.port_redundancy:
 				raise ValueError("Port redundancy is not supported when testing on actual hardware")
 			self.reconfigure_tests(DpService.DP_SERVICE_CONF)
