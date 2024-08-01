@@ -6,16 +6,10 @@ import threading
 
 from helpers import *
 
+
 def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	icmp_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-			    IPv6(dst=nat_ul_ipv6, src=router_ul_ipv6, nh=4) /
-			    IP(dst=nat_vip, src=public_ip) /
-			    ICMP(type=8, id=0x0040))
-	answer = srp1(icmp_pkt, iface=PF0.tap, timeout=sniff_timeout)
-	validate_checksums(answer)
-	assert answer and is_icmp_pkt(answer), \
-		"No ECHO reply"
+	external_ping(nat_vip, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)
 
 def send_bounce_pkt_to_pf(ipv6_nat):

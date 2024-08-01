@@ -24,11 +24,12 @@ class DpService:
 		self.hardware = hardware
 
 		if self.hardware:
-			raise ValueError("Hardware tests are currently not supported")
-			if self.port_redundancy:
-				raise ValueError("Port redundancy is not supported when testing on actual hardware")
+			# TODO test without pf1-tap
+			# if self.port_redundancy:
+				# raise ValueError("Port redundancy is not supported when testing on actual hardware")
 			self.reconfigure_tests(DpService.DP_SERVICE_CONF)
 		else:
+			# TODO needs testing
 			if offloading:
 				raise ValueError("Offloading is only possible when testing on actual hardware")
 
@@ -113,6 +114,7 @@ class DpService:
 		return iface
 
 	def reconfigure_tests(self, cfgfile):
+		pfrepr = "c0pf0"
 		# Rewrite config values to actual hardware values
 		if not os.access(cfgfile, os.R_OK):
 			raise OSError(f"Cannot read {cfgfile} to bind to hardware NIC")
@@ -123,9 +125,12 @@ class DpService:
 					continue
 				key = options[0]
 				value = options[1]
-				if key == "pf1":
-					# in hardware, PF0 is actually PF1 as it is used as the monitoring interface connected to the real PF0
+				if key == "pf0":
 					PF0.tap = value
+				elif key == "pf1":
+					PF1.tap = value
+				elif key == "pf1-proxy":
+					PF1.tap = "pf1-tap"
 				elif key == "vf-pattern":
 					# MACs cannot be changed for VFs, use actual values
 					VM1.mac = get_if_hwaddr(f"{value}0")
@@ -134,13 +139,16 @@ class DpService:
 				elif key == "a-pf0":
 					# PCI addresses for VFs are defined by DPDK in this pattern
 					pci = value.split(',')[0]
-					VM1.pci = f"{pci}_representor_vf0"
-					VM2.pci = f"{pci}_representor_vf1"
-					VM3.pci = f"{pci}_representor_vf2"
-					VM4.pci = f"{pci}_representor_vf3"
+				elif key == "a-pf1":
+					# There is a different representor in multiport-eswitch mode and normal mode
+					pfrepr = ""
 		VM1.tap = self.get_vm_tap(0)
 		VM2.tap = self.get_vm_tap(1)
 		VM3.tap = self.get_vm_tap(2)
+		VM1.pci = f"{pci}_representor_{pfrepr}vf0"
+		VM2.pci = f"{pci}_representor_{pfrepr}vf1"
+		VM3.pci = f"{pci}_representor_{pfrepr}vf2"
+		VM4.pci = f"{pci}_representor_{pfrepr}vf3"
 
 # If run manually:
 import argparse

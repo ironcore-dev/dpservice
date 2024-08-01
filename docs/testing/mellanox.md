@@ -70,7 +70,9 @@ ip -n nic4 link set dev enp4s0 up
 
 To run commands using `enp3s0` card, use `ip netns exec nic3 <command>`. It is practical to simply call `ip netns exec system1 su <username>` in a separate terminal. Then it is trivial to listen on this interface to monitor outbound communication for example.
 
-### Single NIC with two ports
-This is actually the setup `pytest` suite uses to test on Mellanox. You need to connect the two ports of your NIC. Then the first (the SR-IOV capable) port will be used normally and the second one can be bound to to communicate with dp-service from the outside (host-host communication).
+### Two-machine setup
+This is actually the setup `pytest` suite uses to test on Mellanox using `--hw` command-line option. You need two *directly connected* machines (without a switch in between).
 
-This requires dp-service running in a mode without a second physical interface. For that to happen you need to compile it with `-Denable_pytest=true` meson flag and not use `--wcmp-frac` command-line option (or any test using port redundancy).
+If both Mellanox ports are connected directly to a remote machine, you only need to run `reflector.py` on the remote machine and then start `pytest --hw` on the dpservice-enabled machine. See `reflector.py --help` for command-line options you need to provide (interface names, MACs, optionally virtual service addresses).
+
+What `reflector.py` does is it takes the underlay traffic and sends it back over the same interface. This way `pytest` can finally listen on PFs and reach the packets sent out from dpservice. To prevent isolation rules from "grabbing" the packet, some packets (i.e. those with a specified MAC) are mangled (the EtherType is changed to `1337`) and then `pytest` changes the type back to IPv6 before processing it further. Thus the packet reflection is transparent to the test suite itself.
