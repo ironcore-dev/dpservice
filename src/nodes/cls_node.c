@@ -136,13 +136,15 @@ static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 	const struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t l3_type;
 
-	if (m->port != dp_get_pf1()->port_id && m->port != dp_get_pf_proxy_tap_port()->port_id)
-		return false;
-
 	if (m->port == dp_get_pf_proxy_tap_port()->port_id)
 		return true;
 
+	// this duplicates code from the main classifier, to pass underlay/virtsvc packets
+	// TODO needs reworking if proxy is kept as a long-term solution
 	if (m->port == dp_get_pf1()->port_id) {
+		if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
+			return true;
+
 		ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 		l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
 
@@ -150,6 +152,12 @@ static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 			ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
 			if (ipv6_hdr->proto == IPPROTO_IPIP || ipv6_hdr->proto == IPPROTO_IPV6)
 				return false;
+#ifdef ENABLE_VIRTSVC
+			if (virtsvc_present) {
+				if (get_incoming_virtsvc(ipv6_hdr))
+					return false;
+			}
+#endif
 		}
 
 		return true;
@@ -171,6 +179,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 #endif
 
 #ifdef ENABLE_PF1_PROXY
+	// TODO this is not the best way as this function duplicates work, needs reworking if pf1-proxy is kept in the future
 	if (unlikely(pf1_tap_proxy_forward(m)))
 		return CLS_NEXT_PF1_PROXY;
 #endif
