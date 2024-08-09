@@ -142,11 +142,20 @@ def validate_checksums(packet):
 
 def sniff_packet(iface, lfilter, skip=0):
 	count = skip+1
-	pkt_list = sniff(count=count, lfilter=lfilter, iface=iface, timeout=count*sniff_timeout)
+	# Need to accept 1337 EtherType which is reflected packet used for --hw tests
+	pkt_list = sniff(count=count, iface=iface, timeout=count*sniff_timeout,
+					 lfilter=lambda pkt: pkt[Ether].type == 0x1337 or lfilter(pkt))
 	assert len(pkt_list) == count, \
 		f"No reply on {iface}"
 	pkt = pkt_list[skip]
 	validate_checksums(pkt)
+	# Reconstruct the original packet for --hw tests
+	# NOTE: only supports underlay/IPv6 traffic
+	if pkt[Ether].type == 0x1337:
+		pkt[Ether].type = 0x86DD
+		pkt = Ether(pkt.build())
+		assert lfilter(pkt), \
+			"Reflected packet not of right type"
 	return pkt
 
 
@@ -191,3 +200,31 @@ def stop_process(process):
 	except subprocess.TimeoutExpired:
 		process.kill()
 		process.wait()
+
+
+def _send_external_icmp_echo(dst_ipv4, ul_ipv6):
+	icmp_pkt = (Ether(dst=PF0.mac, src=ipv6_multicast_mac, type=0x86DD) /
+			    IPv6(dst=ul_ipv6, src=router_ul_ipv6, nh=4) /
+			    IP(dst=dst_ipv4, src=public_ip) /
+			    ICMP(type=8, id=0x0040))
+	delayed_sendp(icmp_pkt, PF0.tap)
+
+def external_ping(dst_ipv4, ul_ipv6):
+	threading.Thread(target=_send_external_icmp_echo, args=(dst_ipv4, ul_ipv6)).start()
+	answer = sniff_packet(PF0.tap, is_icmp_pkt, skip=1)
+	assert answer[ICMP].code == 0, \
+		"Invalid ICMP echo response"
+
+
+def _send_external_icmp_echo6(dst_ipv6, ul_ipv6):
+	icmp_pkt = (Ether(dst=PF0.mac, src=ipv6_multicast_mac, type=0x86DD) /
+				IPv6(dst=ul_ipv6, src=router_ul_ipv6, nh=0x29) /
+				IPv6(dst=dst_ipv6, src=public_ipv6, nh=58) /
+				ICMPv6EchoRequest())
+	delayed_sendp(icmp_pkt, PF0.tap)
+
+def external_ping6(dst_ipv6, ul_ipv6):
+	threading.Thread(target=_send_external_icmp_echo6, args=(dst_ipv6, ul_ipv6)).start()
+	answer = sniff_packet(PF0.tap, is_icmpv6echo_reply_pkt)
+	assert answer[ICMPv6EchoReply].type == 129, \
+		"Invalid ICMPv6 echo response"

@@ -31,6 +31,9 @@ When running `pytest` directly in the `test/` directory, only a specific set of 
 
 If one should want to instead run your own `dpservice-bin` instance (e.g. for running under a debugger), the `--attach` argument connects to an already running service instead of starting its own (which in turn can be started via a helper `dp_service.py` script). This comes with the caveat of ensuring the right arguments are passed to the service at startup.
 
+#### Pytest on Mellanox
+By default, `pytest` runs using virtual intefaces (TAPs). By providing `--hw` command-line option, it can instead use real NIC based on the contents of `/tmp/dp_service.conf`. For more information [see Mellanox testing guide](mellanox.md#two-machine-setup).
+
 ## Docker
 There is a tester image provided by this repo, simply build it using this repo's `Dockerfile` and use `--target tester`. For fully working images a GitHub PAT is needed: `docker build --secret=id=github_token,src=<path/to/github_token> --target tester .`
 

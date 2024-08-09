@@ -25,6 +25,32 @@ IFACE_STATS = (
 	'rx_errors', 'tx_errors', 'rx_missed_errors', 'rx_mbuf_allocation_errors',
 	'nat_used_port_count', 'firewall_rule_count',
 )
+HW_IFACE_STATS = (
+	'rx_broadcast_bytes', 'rx_broadcast_packets', 'tx_broadcast_bytes', 'tx_broadcast_packets',
+	'rx_multicast_bytes', 'rx_multicast_packets', 'tx_multicast_bytes', 'tx_multicast_packets',
+	'rx_out_of_buffer',
+	'rx_phy_bytes', 'rx_phy_crc_errors', 'rx_phy_discard_packets', 'rx_phy_in_range_len_errors', 'rx_phy_packets', 'rx_phy_symbol_errors',
+	'tx_phy_bytes', 'tx_phy_discard_packets', 'tx_phy_errors', 'tx_phy_packets',
+	'rx_prio0_buf_discard_packets', 'rx_prio0_cong_discard_packets',
+	'rx_prio1_buf_discard_packets', 'rx_prio1_cong_discard_packets',
+	'rx_prio2_buf_discard_packets', 'rx_prio2_cong_discard_packets',
+	'rx_prio3_buf_discard_packets', 'rx_prio3_cong_discard_packets',
+	'rx_prio4_buf_discard_packets', 'rx_prio4_cong_discard_packets',
+	'rx_prio5_buf_discard_packets', 'rx_prio5_cong_discard_packets',
+	'rx_prio6_buf_discard_packets', 'rx_prio6_cong_discard_packets',
+	'rx_prio7_buf_discard_packets', 'rx_prio7_cong_discard_packets',
+	'rx_unicast_bytes', 'rx_unicast_packets', 'tx_unicast_bytes', 'tx_unicast_packets',
+	'rx_vport_bytes', 'rx_vport_packets', 'tx_vport_bytes', 'tx_vport_packets',
+	'rx_wqe_errors',
+	'tx_pp_clock_queue_errors', 'tx_pp_jitter', 'tx_pp_missed_interrupt_errors', 'tx_pp_rearm_queue_errors', 'tx_pp_sync_lost', 'tx_pp_timestamp_future_errors', 'tx_pp_timestamp_order_errors', 'tx_pp_timestamp_past_errors', 'tx_pp_wander',
+)
+HW_PF1_IFACE_STATS = (
+	'rx_q1_bytes', 'rx_q1_errors', 'rx_q1_packets', 'tx_q1_bytes', 'tx_q1_packets',
+	'rx_q2_bytes', 'rx_q2_errors', 'rx_q2_packets', 'tx_q2_bytes', 'tx_q2_packets',
+	'rx_q3_bytes', 'rx_q3_errors', 'rx_q3_packets', 'tx_q3_bytes', 'tx_q3_packets',
+	'rx_q4_bytes', 'rx_q4_errors', 'rx_q4_packets', 'tx_q4_bytes', 'tx_q4_packets',
+	'rx_q5_bytes', 'rx_q5_errors', 'rx_q5_packets', 'tx_q5_bytes', 'tx_q5_packets',
+)
 HASH_TABLES = (
 	'interface_table',
 	'conntrack_table', 'dnat_table', 'snat_table',
@@ -43,7 +69,7 @@ def get_telemetry(request):
 	return response
 
 def check_tel_graph(key):
-	expected_tel_rx_node_count = 6
+	expected_tel_rx_node_count = 7 if PF1.tap == "pf1-tap" else 6
 	tel = get_telemetry(f"/dp_service/graph/{key}")
 	assert tel is not None, \
 		"Missing graph telemetry"
@@ -56,7 +82,7 @@ def check_tel_graph(key):
 		f"Expected {expected_tel_rx_node_count} 'rx-X-0' nodes, found {len(rx_nodes)} in {key} graph telemetry"
 
 
-def test_telemetry_graph(prepare_ifaces):
+def test_telemetry_graph(request, prepare_ifaces):
 	check_tel_graph("obj_count")
 	check_tel_graph("call_count")
 	check_tel_graph("cycle_count")
@@ -98,7 +124,7 @@ def test_telemetry_fwall(prepare_ifaces, grpc_client):
 	assert tel == { VM1.name: 0, VM2.name: 0, VM3.name: 0 }, \
 		"Unexpected firewall rule count"
 
-def test_telemetry_exporter(prepare_ifaces, start_exporter):
+def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
 	graph_stats, heap_info, interface_stats, htable_saturation = set(), set(), set(), set()
 	for metric in metrics.splitlines():
@@ -113,15 +139,24 @@ def test_telemetry_exporter(prepare_ifaces, start_exporter):
 		else:
 			assert metric.startswith("#"), \
 				f"Unknown exported metric '{metric.split('{')[0]}' found"
-	# meson options (e.g. enable_pf1_proxy) are hard to do in these screipts, so just check manually
+	# meson options (e.g. enable_pf1_proxy) are hard to do in these scripts, so just check manually
 	graph_nodes = GRAPH_NODES
+	iface_stats = IFACE_STATS
 	if 'pf1_proxy' in graph_stats:
 		graph_nodes += ('pf1_proxy',)
-	assert graph_stats == set(graph_nodes) or graph_stats == set(graph_nodes + ('virtsvc',)), \
+	if 'virtsvc' in graph_stats:
+		graph_nodes += ('virtsvc',)
+	if request.config.getoption("--hw"):
+		iface_stats += HW_IFACE_STATS
+		if PF1.tap == "pf1-tap":
+			graph_nodes += ('rx-6-0',)
+	if 'rx_q1_bytes' in interface_stats:
+		iface_stats += HW_PF1_IFACE_STATS
+	assert graph_stats == set(graph_nodes), \
 		"Unexpected graph telemetry in exporter output"
 	assert heap_info == set(HEAP_INFO), \
 		"Unexpected heap info in exporter output"
-	assert interface_stats == set(IFACE_STATS) or interface_stats == set(IFACE_STATS + ('virtsvc_used_port_count',)), \
+	assert interface_stats == set(iface_stats) or interface_stats == set(iface_stats + ('virtsvc_used_port_count',)), \
 		"Unexpected interface statistics in exporter output"
 	assert htable_saturation == set(HASH_TABLES) or htable_saturation == set(HASH_TABLES + ('virtsvc_table_0', 'virtsvc_table_1')), \
 		"Unexpected hash table info in exporter output"

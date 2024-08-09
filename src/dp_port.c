@@ -613,13 +613,8 @@ static int dp_init_port(struct dp_port *port)
 	}
 
 	if (dp_conf_is_offload_enabled()) {
-#ifdef ENABLE_PYTEST
-		if (port->peer_pf_port_id != dp_get_pf1()->port_id)
-#endif
-		{
 		if (DP_FAILED(dp_port_bind_port_hairpins(port)))
 			return DP_ERROR;
-		}
 
 		if (!port->is_pf)
 			if (DP_FAILED(dp_install_vf_init_rte_rules(port)))
