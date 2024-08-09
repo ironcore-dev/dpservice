@@ -27,7 +27,7 @@ If you set two VMs like this, they should be able to connect to each other (ping
 ### Pytest suite
 As `scapy` cannot directly communicate with VFs, running VMs with two anonymous bridged interfaces are needed. One interface is connected to Mellanox VF using VFIO and the other is a simple TAP device created by KVM. Then dp-service communicates using the VF and test suite uses the TAP device, e.g.
 ```
--net none -device vfio-pci,host=03:00.02 -device e1000,netdev=tap0 -netdev tap,id=tap0,script=no,downscript=no
+qemu-system-x86_64 -enable-kvm -drive media=disk,if=virtio,index=0,file=./kvm/onmetal_tap.qcow2 -m 2G -cpu host -smp 2 -nographic -net none -device vfio-pci,host=03:00.2 -device e1000,netdev=tap2 -netdev tap,id=tap2,script=no,downscript=no
 ```
 
 Tests have been done using basic Debian 11 installation, but any fresh distro should work, just configure interface like this:
