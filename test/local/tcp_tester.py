@@ -66,13 +66,17 @@ class _TCPTester:
 			self.tcp_receiver_seq += 1
 
 		# Application-level reply
-		if pkt[TCP].payload != None and len(pkt[TCP].payload) > 0:
-			if pkt[TCP].payload == Raw(_TCPTester.TCP_RESET_REQUEST):
+		payload = pkt[TCP].payload
+		if payload != None and len(payload) > 0:
+			if Padding in payload:
+				length = len(payload) - len(payload[Padding])
+				payload = payload.__class__(raw(payload)[0:length])
+			if payload == Raw(_TCPTester.TCP_RESET_REQUEST):
 				reply_pkt = (self.get_server_l3_reply(pkt) /
 							 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=self.tcp_receiver_seq, flags="R"))
 				delayed_sendp(reply_pkt, self.server_tap)
 				return
-			elif pkt[TCP].payload == Raw(_TCPTester.TCP_NORMAL_REQUEST):
+			elif payload == Raw(_TCPTester.TCP_NORMAL_REQUEST):
 				reply_pkt = (self.get_server_l3_reply(pkt) /
 							 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=self.tcp_receiver_seq, flags="") /
 							 Raw(_TCPTester.TCP_NORMAL_RESPONSE))

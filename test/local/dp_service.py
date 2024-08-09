@@ -24,12 +24,8 @@ class DpService:
 		self.hardware = hardware
 
 		if self.hardware:
-			# TODO test without pf1-tap
-			# if self.port_redundancy:
-				# raise ValueError("Port redundancy is not supported when testing on actual hardware")
 			self.reconfigure_tests(DpService.DP_SERVICE_CONF)
 		else:
-			# TODO needs testing
 			if offloading:
 				raise ValueError("Offloading is only possible when testing on actual hardware")
 
