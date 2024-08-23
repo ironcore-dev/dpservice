@@ -51,10 +51,8 @@ def add_arg_parser():
 						default=f"{script_path}/../../build", help="Path to dpservice-bin build directory")
 	parser.add_argument("--reboot", action="store_true", default=False,
 						help="Reboot VMs to obtain new configurations such as IPs")
-	parser.add_argument("--env-config-file", action="store", default="./test_configurations.json",
+	parser.add_argument("--env-config-file", action="store", default="./provision_tmpls/output/test_configurations.json",
 						help="Specify the file containing setup information")
-	parser.add_argument("--env-config-name", action="store", default="regular_setup",
-						help="Specify the name of environment configuration that fits to hardware and VM setup. ")
 	parser.add_argument("-v", "--verbose", action="store_true", default=False,
 						help="Allow to output debug information during pytest execution")
 	parser.set_defaults(func=execute_benchmark_pytest)
