@@ -27,10 +27,7 @@ def pytest_addoption(parser):
 		"--reboot", action="store_true", help="Reboot VMs to obtain new configurations such as IPs"
 	)
 	parser.addoption(
-		"--env-config-file", action="store", default="./test_configurations.json", help="Specify the file containing setup information"
-	)
-	parser.addoption(
-		"--env-config-name", action="store", default="regular_setup", help="Specify the name of environment configuration that fits to hardware and VM setup. "
+		"--env-config-file", action="store", default="./provision_tmpls/output/test_configurations.json", help="Specify the file containing setup information"
 	)
 	parser.addoption(
 		"--dpservice-build-path", action="store", default=f"{script_dir}/../../build", help="Path to the root build directory"
@@ -45,18 +42,11 @@ def signal_handler(sig, frame):
 def test_config(request):
 	config = request.config
 	test_config_file = config.getoption("--env-config-file")
-	test_config_name = config.getoption("--env-config-name")
 
 	with open(test_config_file, 'r') as file:
 		config = json.load(file)
 
-	env_config = next(
-		(env for env in config['environments'] if env['name'] == test_config_name), None)
-	if not env_config:
-		raise RuntimeError(
-			f"Failed to get config info for environment with name {test_config_name}")
-
-	return env_config
+	return config
 
 
 @pytest.fixture(scope="package", autouse=True)

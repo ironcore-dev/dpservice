@@ -105,7 +105,6 @@ class SSHManager:
 	def disconnect(self):
 		"""Close the SSH connection."""
 		self.logger.info("Disconnecting...")
-		self.stop_event.set()
 		self.client.close()
 		self.logger.info("Disconnected.")
 
@@ -278,8 +277,9 @@ class RemoteMachine:
 	def __init__(self, config, key_file, parent_machine=None):
 		self.machine_name = config["machine_name"]
 		self.parent_machine = parent_machine
-		self.ssh_manager = SSHManager(self.machine_name, config["host_address"], config["port"], config["user_name"],
-									  key_file=key_file, proxy=None if not parent_machine else self.parent_machine.get_connection())
+		port, user_name, proxy = (config["port"], config["user_name"], None) if not parent_machine else (22, "root", self.parent_machine.get_connection())
+		self.ssh_manager = SSHManager(self.machine_name, config["host_address"], port, user_name,
+									  key_file=key_file, proxy=proxy)
 		self.logger = self.ssh_manager.logger
 
 	def start(self):
@@ -301,6 +301,9 @@ class RemoteMachine:
 			self.ssh_manager.terminate_all_processes()
 			if not self.parent_machine:
 				self.ssh_manager.terminate_all_containers()
+		self.ssh_manager.disconnect()
+	
+	def disconnect(self):
 		self.ssh_manager.disconnect()
 
 	def get_machine_name(self):
