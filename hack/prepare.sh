@@ -121,8 +121,7 @@ process_switchdev_mode() {
 
 	log "enabling switchdev for $pf"
 	if ! devlink dev eswitch set pci/$pf mode switchdev; then
-		log "can't set eswitch mode, setting VFs to 0"
-		echo 0 > /sys/bus/pci/devices/$pf/sriov_numvfs
+		err "can't set eswitch mode"
 	fi
 	log "now waiting for everything to settle"
 	udevadm settle
@@ -133,8 +132,7 @@ process_multiport_eswitch_mode() {
 
 	log "enabling multiport eswitch mode for $pf"
 	if ! devlink dev param set pci/$pf name esw_multiport value true cmode runtime; then
-		log "can't enable multiport eswitch mode, setting VFs to 0"
-		echo 0 > /sys/bus/pci/devices/$pf/sriov_numvfs
+		err "can't enable multiport eswitch mode"
 	fi
 	log "now waiting for everything to settle"
 	udevadm settle
