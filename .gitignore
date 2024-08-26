@@ -15,5 +15,4 @@ __*
 scapy-script/*
 code_check/_checkpatch.pl
 .out
-test/benchmark_test/access_details.json
 test/benchmark_test/provision_tmpls

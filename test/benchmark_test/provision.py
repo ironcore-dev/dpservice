@@ -30,7 +30,7 @@ def underscore_convert(text):
 def get_test_config(args, init):
 	if init:
 		os.system(f"cp ./config_templates/test_configurations.json {working_test_config_file}")
-	
+
 	with open(working_test_config_file, 'r') as file:
 		config = json.load(file)
 
@@ -46,7 +46,7 @@ def prepare_ignition_file(env_config, template_path, ignition_template_name):
 	pub_rsa_key_path = os.path.expanduser(env_config["public_key_file"])
 	with open(pub_rsa_key_path, 'r') as key_file:
 		pub_rsa_key = key_file.read().strip()
-	
+
 	# Load the Jinja2 template for the ignition file
 	env = Environment(loader=FileSystemLoader(os.path.expanduser(template_path)))
 	template = env.get_template(ignition_template_name)
@@ -102,7 +102,7 @@ def remove_local_provision_tmpls_path():
 def create_tmpls_output_path():
 	# Append '/output' to the provided path
 	output_path = os.path.join(local_provision_tmpls_path, 'output')
-	
+
 	# Expand user (~) and create the full path if it doesn't exist
 	expanded_output_path = os.path.expanduser(output_path)
 	create_path_on_local(expanded_output_path)
@@ -111,12 +111,12 @@ def create_tmpls_output_path():
 
 def generate_vm_iface_mac_addr():
 	mac_addr = [0x02, 0x00, 0x00]
-	
+
 	for _ in range(3):
 		mac_addr.append(random.randint(0x00, 0xFF))
-	
+
 	mac_addr_str = ":".join(map(lambda x: f"{x:02x}", mac_addr))
-	
+
 	return mac_addr_str
 
 
@@ -129,7 +129,7 @@ def update_vm_mac_addresses(config):
 			# Add the MAC address to the VM's if_config
 			vm['mac_address'] = mac_address
 			print(f"Generated MAC address for {vm['machine_name']}: {mac_address}")
-	
+
 	# Write updated configuration back to the JSON file
 	with open(working_test_config_file, 'w') as file:
 		json.dump(config, file, indent=4)
@@ -139,14 +139,14 @@ def update_vm_mac_addresses(config):
 def convert_pci_address(pci_addr):
 	# Extract the domain, bus, slot, function, and vf using regex
 	match = re.match(r"(?:(?P<domain>[0-9a-fA-F]{4}):)?(?P<bus>[0-9a-fA-F]{2}):(?P<slot>[0-9a-fA-F]{2})\.(?P<function>[0-9a-fA-F])_representor_vf(?P<vf>\d+)", pci_addr)
-	
+
 	if match:
 		# If domain is missing, default it to '0000'
 		domain = match.group('domain') if match.group('domain') else '0000'
 		bus = match.group('bus')
 		slot = match.group('slot')
 		vf = match.group('vf')
-		
+
 		# Compute the function value as the VF value plus 2
 		function = hex(int(vf) + 2)[2:]
 
@@ -164,7 +164,7 @@ def generate_vm_domain_xml(config):
 		hypervisor_name = hypervisor['machine_name']
 		xml_repo_per_hypervisor = tmpls_output_path + '/' + hypervisor_name
 		create_path_on_local(xml_repo_per_hypervisor)
-		
+
 		for vm in hypervisor['vms']:
 			vm_name = vm['machine_name']
 			vm_xml_name = xml_repo_per_hypervisor + '/' + f'{vm_name}.xml'
@@ -226,7 +226,7 @@ def upload_and_decompress_provision_tmpls(machine):
 			{"command": "mkdir -p", "parameters": f"{target_provision_tmpls_output_path}"}
 		]
 		machine.exec_task(task)
-	
+
 		task = [
 			{"command": "tar -xzf", "parameters": f"{provision_tmpls_dst} -C {target_provision_tmpls_output_path}"}
 		]
@@ -298,7 +298,7 @@ def stop_and_remove_vm_on_hypervisor(machine, hypervisor_info):
 	except Exception as e:
 		print(f"Failed to stop and remove VM {vm_name}: {e}")
 		raise e
-	
+
 
 def provision_vms_on_hypervisor(config, args):
 	try:
@@ -342,11 +342,11 @@ def update_vm_ip_addresses(config, args):
 					{"command": "virsh net-dhcp-leases", "parameters": 'default', "sudo": True}
 				]
 				result = hypervisor_machine.exec_task(task)
-				
+
 				for vm in hypervisor_info['vms']:
 					mac_address = vm['mac_address']
 					vm_ip = None
-					
+
 					# Parse each line in the virsh net-dhcp-leases result
 					for line in result.splitlines():
 						if mac_address in line:
@@ -354,7 +354,7 @@ def update_vm_ip_addresses(config, args):
 							if match:
 								vm_ip = match.group(0)
 								break
-					
+
 					if vm_ip:
 						print(f"Found IP address {vm_ip} for VM {vm['machine_name']} with MAC {mac_address}")
 						vm['host_address'] = vm_ip
@@ -365,11 +365,11 @@ def update_vm_ip_addresses(config, args):
 				all_vms_have_ips = all('host_address' in vm for vm in hypervisor_info['vms'])
 				if all_vms_have_ips:
 					break
-				
+
 				# Wait for 3 seconds before trying again
 				time.sleep(3)
 
-					
+
 		# Write the updated configuration with IP addresses back to the JSON file
 		with open(working_test_config_file, 'w') as file:
 			json.dump(config, file, indent=4)
@@ -388,6 +388,8 @@ def connect_with_hypervisors(config):
 			hypervisor_machine.start()
 	except Exception as e:
 		print("Cannot connect with hypervisor")
+		remove_local_provision_tmpls_path()
+		exit(1)
 
 def disconnect_from_hypervisors():
 	for machine in hypervisor_machines:
@@ -398,7 +400,7 @@ def disconnect_from_hypervisors():
 def provision_benchmark_environment(args):
 	global tmpls_output_path
 	global working_test_config_file
-	
+
 	args = vars(args)
 
 	create_local_provision_tmpls_path()
