@@ -302,7 +302,7 @@ class RemoteMachine:
 			if not self.parent_machine:
 				self.ssh_manager.terminate_all_containers()
 		self.ssh_manager.disconnect()
-	
+
 	def disconnect(self):
 		self.ssh_manager.disconnect()
 
