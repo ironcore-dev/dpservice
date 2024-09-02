@@ -30,98 +30,8 @@
 #include "grpc/dp_grpc_thread.h"
 #include "rte_flow/dp_rte_async_flow.h"
 
-static char **dp_argv;
-static int dp_argc;
-static char *dp_mlx_args[4];
+static char *generated_argv[6];
 
-static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
-{
-	int curarg;
-	int argend = -1;
-	int argc = *orig_argc;
-	char **argv = *orig_argv;
-
-	// will be adding two devices (4 args) + terminator
-	dp_argv = (char **)calloc(argc + 5, sizeof(*dp_argv));
-	if (!dp_argv) {
-		DP_EARLY_ERR("Cannot allocate argument array");
-		return DP_ERROR;
-	}
-
-	// copy EAL args
-	for (curarg = 0; curarg < argc; curarg++) {
-		if (strcmp(argv[curarg], "--") == 0) {
-			argend = curarg;
-			break;
-		} else {
-			dp_argv[curarg] = argv[curarg];
-		}
-	}
-	// add mellanox args (remember that they can be written to, so strdup())
-	dp_mlx_args[0] = dp_argv[curarg++] = strdup("-a");
-	dp_mlx_args[1] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf0());
-
-	if (dp_conf_get_eal_a_pf1()[0] == '\0') {
-#ifdef ENABLE_PF1_PROXY
-		if (dp_conf_is_pf1_proxy_enabled()) {
-			dp_mlx_args[2] = dp_argv[curarg++] = strdup("--vdev");
-			dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_generate_eal_pf1_proxy_params());
-		} else
-#endif
-		{
-			dp_mlx_args[2] = dp_argv[curarg++] = strdup("");
-			dp_mlx_args[3] = dp_argv[curarg++] = strdup("");
-		}
-	} else {
-		dp_mlx_args[2] = dp_argv[curarg++] = strdup("-a");
-		dp_mlx_args[3] = dp_argv[curarg++] = strdup(dp_conf_get_eal_a_pf1());
-	}
-
-	if (!dp_mlx_args[0] || !dp_mlx_args[1] || !dp_mlx_args[2] || !dp_mlx_args[3]) {
-		DP_EARLY_ERR("Cannot allocate Mellanox arguments");
-		return DP_ERROR;
-	}
-
-	// add original dpservice args
-	if (argend >= 0) {
-		for (int j = argend; j < argc; ++j)
-			dp_argv[curarg++] = argv[j];
-	}
-	dp_argv[curarg] = NULL;
-	dp_argc = curarg;
-
-	*orig_argc = dp_argc;
-	*orig_argv = dp_argv;
-	return DP_OK;
-}
-
-static void dp_args_free_mellanox(void)
-{
-	for (int i = 0; i < 4; ++i)
-		free(dp_mlx_args[i]);
-	free(dp_argv);
-}
-
-static bool dp_is_mellanox_opt_set(void)
-{
-	return dp_conf_get_eal_a_pf0()[0] != '\0'
-		|| dp_conf_get_eal_a_pf1()[0] != '\0';
-}
-
-static int dp_eal_init(int *argc_ptr, char ***argv_ptr)
-{
-	if (dp_is_mellanox_opt_set())
-		if (DP_FAILED(dp_args_add_mellanox(argc_ptr, argv_ptr)))
-			return DP_ERROR;
-	return rte_eal_init(*argc_ptr, *argv_ptr);
-}
-
-static void dp_eal_cleanup(void)
-{
-	rte_eal_cleanup();
-	if (dp_is_mellanox_opt_set())
-		dp_args_free_mellanox();
-}
 
 static void signal_handler(int signum)
 {
@@ -268,23 +178,192 @@ static int run_service(void)
 	return result;
 }
 
+static void free_eal_args(char **eal_argv)
+{
+	for (size_t i = 0; i < RTE_DIM(generated_argv); ++i)
+		free(generated_argv[i]);
+	free(eal_argv);
+}
+
+static int create_eal_args(int argc, char **argv, int eal_args_index, int *eal_argc_ptr, char ***eal_argv_ptr)
+{
+	int eal_argc;
+	char **eal_argv;
+	int generated_argc;
+	int genarg;
+	int curarg = 0;
+
+	// program name
+	eal_argc = 1;
+
+	// generated EAL arguments
+	generated_argc = 0;
+	if (*dp_conf_get_eal_a_pf0())
+		generated_argc += 2;
+	if (*dp_conf_get_eal_a_pf1())
+		generated_argc += 2;
+	if (dp_conf_is_pf1_proxy_enabled())
+		generated_argc += 2;
+	eal_argc += generated_argc;
+
+	// user-provided EAL arguments
+	if (eal_args_index >= 0 && eal_args_index < argc)
+		eal_argc += argc - eal_args_index;
+
+	eal_argv = (char **)calloc(eal_argc, sizeof(*eal_argv));
+	if (!eal_argv) {
+		DP_EARLY_ERR("Cannot allocate EAL argument array");
+		return DP_ERROR;
+	}
+
+	// program name
+	eal_argv[curarg++] = argv[0];
+
+	// generated EAL arguments
+	// (EAL can change argv, need to store the original pointers for freeing)
+	genarg = 0;
+	if (*dp_conf_get_eal_a_pf0()) {
+		generated_argv[genarg++] = strdup("-a");
+		generated_argv[genarg++] = strdup(dp_conf_get_eal_a_pf0());
+	}
+	if (*dp_conf_get_eal_a_pf1()) {
+		generated_argv[genarg++] = strdup("-a");
+		generated_argv[genarg++] = strdup(dp_conf_get_eal_a_pf1());
+	}
+	if (dp_conf_is_pf1_proxy_enabled()) {
+		generated_argv[genarg++] = strdup("--vdev");
+		generated_argv[genarg++] = strdup(dp_generate_eal_pf1_proxy_params());
+	}
+	for (int i = 0; i < generated_argc; ++i) {
+		if (!generated_argv[i]) {
+			DP_EARLY_ERR("Cannot allocate generated EAL arguments");
+			free_eal_args(eal_argv);
+			return DP_ERROR;
+		}
+		eal_argv[curarg++] = generated_argv[i];
+	}
+
+	// user-provided EAL arguments
+	if (eal_args_index >= 0)
+		for (int i = eal_args_index; i < argc; ++i)
+			eal_argv[curarg++] = argv[i];
+
+	*eal_argc_ptr = eal_argc;
+	*eal_argv_ptr = eal_argv;
+	return DP_OK;
+}
+
+static int run_eal_service(int argc, char **argv, int eal_args_index)
+{
+	int ret;
+
+	// TODO this needs to be done differently:
+	//  - create EAL argv
+	//  - if positional_index valid, add more EAL args from command-line
+	//  - watch out for nic_type!
+	// --> actually just copy everytime, but add to it for mellanox?
+
+	int eal_argc;
+	char **eal_argv;
+
+	// TODO yeah, just rewrite dp_eal_init I think...
+	if (DP_FAILED(create_eal_args(argc, argv, eal_args_index, &eal_argc, &eal_argv)))
+		return DP_ERROR;
+
+	for (int i = 0; i < eal_argc; ++i)
+		printf("\t%s\n", eal_argv[i]);
+
+// 	free_eal_args(eal_argv);
+// 	return DP_ERROR;
+
+	int eal_argc2 = eal_argc;
+	char **eal_argv2 = eal_argv;
+	printf("%d %p\n", eal_argc2, eal_argv2);
+	for (int i = 0; i < eal_argc2; ++i)
+		printf("  %s\n", (eal_argv2)[i]);
+	ret = rte_eal_init(eal_argc2, eal_argv2);
+	if (DP_FAILED(ret)) {
+		DP_EARLY_ERR("Failed to initialize EAL");
+		// TODO better (maybe goto?) but if we're jumping, then unroll a few layers??
+		free_eal_args(eal_argv);
+		return ret;
+	}
+
+	ret = run_service();
+
+	rte_eal_cleanup();
+	free_eal_args(eal_argv);
+	return ret;
+
+
+/*
+	if (eal_args_index >= 0 && eal_args_index < argc)
+		eal_argc += argc - eal_args_index;
+
+
+	// TODO add mellanox args
+	printf("NEED %d\n", eal_argc);
+
+	eal_argv = (char **)calloc(eal_argc, sizeof(*eal_argv));
+	if (!eal_argv) {
+		DP_EARLY_ERR("Cannot allocate EAL argument array");
+		return DP_ERROR;
+	}
+	// TODO better uninit/checks
+	eal_argv[0] = strdup(argv[0]);  // TODO dup not needed
+	// TODO add mellanox args
+	for (int i = 0; i < eal_argc-1; ++i)  // TODO hmm unclear -1
+		eal_argv[1+i] = strdup(argv[eal_args_index+i]);  // TODO yes, checks
+
+	for (int i = 0; i < eal_argc; ++i)
+		printf("\t%s\n", eal_argv[i]);
+
+	ret = rte_eal_init(eal_argc, eal_argv);  // TODO may modify!!!! (see the original code and comment then)
+	if (DP_FAILED(ret)) {
+		DP_EARLY_ERR("Failed to initialize EAL");
+		// TODO free argv
+		return ret;
+	}
+
+	ret = run_service();
+
+	rte_eal_cleanup();
+	free(eal_argv);
+	return ret;
+	// binary
+	// (optional) -l <cores>
+	// (optional) -a <from pf0>
+	// (optional) -a <from pf1>
+	// (optional) --vdev <pf1-tap>
+	// (optional) <eal_argv>
+
+	// TODO temporary, unsafe for -1!
+	int eal_argc = argc - eal_args_index + 1;
+	char **eal_argv = argv + eal_args_index -1;
+
+	ret = dp_eal_init(&eal_argc, &eal_argv);
+	if (DP_FAILED(ret)) {
+		DP_EARLY_ERR("Failed to initialize EAL");
+		return ret;
+	}
+
+	ret = run_service();
+
+	dp_eal_cleanup();
+
+	return ret;*/
+}
+
 int main(int argc, char **argv)
 {
 	int retval = EXIT_SUCCESS;
-	int eal_argcount;
+	int eal_args_index = -1;
 
-	// Read the config file first because it can contain EAL arguments
-	// (those need to be injected *before* rte_eal_init())
+	// Read the config file first so command-line arguments take precedence
 	if (DP_FAILED(dp_conf_parse_file(getenv("DP_CONF"))))
 		return EXIT_FAILURE;
 
-	eal_argcount = dp_eal_init(&argc, &argv);
-	if (DP_FAILED(eal_argcount)) {
-		DP_EARLY_ERR("Failed to initialize EAL");
-		return EXIT_FAILURE;
-	}
-
-	switch (dp_conf_parse_args(argc - eal_argcount, argv + eal_argcount)) {
+	switch (dp_conf_parse_args(argc, argv, &eal_args_index)) {
 	case DP_CONF_RUNMODE_ERROR:
 		retval = EXIT_FAILURE;
 		break;
@@ -292,11 +371,10 @@ int main(int argc, char **argv)
 		retval = EXIT_SUCCESS;
 		break;
 	case DP_CONF_RUNMODE_NORMAL:
-		retval = DP_FAILED(run_service()) ? EXIT_FAILURE : EXIT_SUCCESS;
+		retval = DP_FAILED(run_eal_service(argc, argv, eal_args_index)) ? EXIT_FAILURE : EXIT_SUCCESS;
 		break;
 	}
 
-	dp_eal_cleanup();
 	dp_conf_free();
 
 	return retval;

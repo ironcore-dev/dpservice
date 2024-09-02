@@ -411,7 +411,7 @@ int main(int argc, char **argv)
 {
 	int ret;
 
-	switch (dp_conf_parse_args(argc, argv)) {
+	switch (dp_conf_parse_args(argc, argv, NULL)) {
 	case DP_CONF_RUNMODE_ERROR:
 		return EXIT_FAILURE;
 	case DP_CONF_RUNMODE_EXIT:

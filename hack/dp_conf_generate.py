@@ -242,7 +242,7 @@ def generate_c(options):
 	print("\t}")
 	print("}\n")
 	# Generate the parser entrypoint
-	print("enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)")
+	print("enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv, int *positional_index)")
 	print("{")
 	print("\tconst char *progname = argv[0];")
 	print("\tint option_index = -1;")
@@ -276,6 +276,10 @@ def generate_c(options):
 	print("\t\t}")
 	print("\t\toption_index = -1;")
 	print("\t}")
+	print("")
+	print("\tif (positional_index)")
+	print("\t\t*positional_index = optind;")
+	print("")
 	print("\treturn DP_CONF_RUNMODE_NORMAL;")
 	print("}\n")
 
@@ -309,7 +313,8 @@ def generate_h(options):
 	print("\tDP_CONF_RUNMODE_ERROR,  /**< Error parsing arguments */")
 	print("};")
 	print("")
-	print("enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv);")
+	print("/** Pass program's arguments and optionally a place to store the index to first positional argument. */")
+	print("enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv, int *positional_index);")
 
 def generate_md(options):
 	print("# Command-line Options")

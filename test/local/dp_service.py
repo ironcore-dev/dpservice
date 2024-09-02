@@ -34,16 +34,8 @@ class DpService:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8 --huge-unlink '
-		if not self.hardware:
-			self.cmd += (f' --no-pci'
-						 f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
-						 f' --vdev={PF1.pci},iface={PF1.tap},mac="{PF1.mac}"'
-						 f' --vdev={VM1.pci},iface={VM1.tap},mac="{VM1.mac}"'
-						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
-						 f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
-						 f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"')
-		self.cmd += ' --'
+		self.cmd += f'{self.build_path}/src/dpservice-bin'
+
 		if not self.hardware:
 			self.cmd +=  f' --pf0={PF0.tap} --pf1={PF1.tap} --vf-pattern={vf_tap_pattern} --nic-type=tap'
 		self.cmd +=	(f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
@@ -65,6 +57,17 @@ class DpService:
 		if test_virtsvc:
 			self.cmd += (f' --udp-virtsvc="{virtsvc_udp_virtual_ip},{virtsvc_udp_virtual_port},{virtsvc_udp_svc_ipv6},{virtsvc_udp_svc_port}"'
 						 f' --tcp-virtsvc="{virtsvc_tcp_virtual_ip},{virtsvc_tcp_virtual_port},{virtsvc_tcp_svc_ipv6},{virtsvc_tcp_svc_port}"')
+
+		self.cmd += ' --'
+		self.cmd += ' -l 0,1 --log-level=user*:8 --huge-unlink '
+		if not self.hardware:
+			self.cmd += (f' --no-pci'
+						 f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
+						 f' --vdev={PF1.pci},iface={PF1.tap},mac="{PF1.mac}"'
+						 f' --vdev={VM1.pci},iface={VM1.tap},mac="{VM1.mac}"'
+						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
+						 f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
+						 f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"')
 
 	def get_cmd(self):
 		return self.cmd

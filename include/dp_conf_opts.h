@@ -52,4 +52,5 @@ enum dp_conf_runmode {
 	DP_CONF_RUNMODE_ERROR,  /**< Error parsing arguments */
 };
 
-enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv);
+/** Pass program's arguments and optionally a place to store the index to first positional argument. */
+enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv, int *positional_index);

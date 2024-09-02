@@ -201,12 +201,14 @@ int dp_conf_get_flow_timeout(void)
 {
 	return flow_timeout;
 }
-#endif
 
+#endif
 bool dp_conf_is_multiport_eswitch(void)
 {
 	return multiport_eswitch;
 }
+
+
 
 /* These functions need to be implemented by the user of this generated code */
 static void dp_argparse_version(void);
@@ -318,7 +320,7 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 	}
 }
 
-enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
+enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv, int *positional_index)
 {
 	const char *progname = argv[0];
 	int option_index = -1;
@@ -352,6 +354,10 @@ enum dp_conf_runmode dp_conf_parse_args(int argc, char **argv)
 		}
 		option_index = -1;
 	}
+
+	if (positional_index)
+		*positional_index = optind;
+
 	return DP_CONF_RUNMODE_NORMAL;
 }
 
