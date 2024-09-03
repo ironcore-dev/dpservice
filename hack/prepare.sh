@@ -18,6 +18,7 @@ CONFIG="/tmp/dp_service.conf"
 IS_X86_WITH_BLUEFIELD=false
 IS_ARM_WITH_BLUEFIELD=false
 IS_X86_WITH_MLX=false
+CONFIG_ONLY=false
 
 function log() {
 	echo "$(date +"%Y-%m-%d_%H-%M-%S-%3N") $1"
@@ -149,6 +150,12 @@ function create_vf() {
 		return
 	fi
 
+	if [[ "$CONFIG_ONLY" == "true" ]]; then
+		actualvfs=$(cat /sys/bus/pci/devices/$pf/sriov_numvfs)
+		log "Skipping VF creation as requested"
+		return
+	fi
+
 	# we disable automatic binding so that VFs don't get created, saves a lot of time
 	# plus we don't need to unbind them before enabling switchdev mode
 	log "disabling automatic binding of VFs on pf: $pf"
@@ -260,6 +267,9 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--force)
 			CONFIG_EXISTS=false
+			;;
+		--config-only)
+			CONFIG_ONLY=true
 			;;
 		*)
 			err "Invalid argument $1"
