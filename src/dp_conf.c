@@ -39,32 +39,16 @@ static struct dp_conf_virtual_services virtual_services = {0};
 #endif
 
 #ifdef ENABLE_PF1_PROXY
-#define DP_EAL_PF1_MAC_ADDR_SIZE 18
-static char eal_pf1_proxy_mac_addr_str[DP_EAL_PF1_MAC_ADDR_SIZE] = {0};
-static const char *eal_pf1_proxy_dev_name = "pf1-tap";
-static char eal_pf1_proxy_params[DP_EAL_A_MAXLEN] = {0};
-static bool dp_conf_pf1_proxy_enabled = false;
+static char dp_conf_pf1_proxy[IF_NAMESIZE] = {0};
 
-const char *dp_get_eal_pf1_proxy_mac_addr(void)
+const char *dp_conf_get_pf1_proxy(void)
 {
-	return eal_pf1_proxy_mac_addr_str;
-}
-
-const char *dp_get_eal_pf1_proxy_dev_name(void)
-{
-	return eal_pf1_proxy_dev_name;
-}
-
-const char *dp_generate_eal_pf1_proxy_params(void)
-{
-	snprintf(eal_pf1_proxy_params, sizeof(eal_pf1_proxy_params), "net_tap0,iface=%s,mac=%s",
-				dp_get_eal_pf1_proxy_dev_name(), dp_get_eal_pf1_proxy_mac_addr());
-	return eal_pf1_proxy_params;
+	return dp_conf_pf1_proxy;
 }
 
 bool dp_conf_is_pf1_proxy_enabled(void)
 {
-	return dp_conf_pf1_proxy_enabled;
+	return *dp_conf_pf1_proxy;
 }
 #endif
 
@@ -299,15 +283,12 @@ static int parse_line(char *line, int lineno)
 	if (!strcmp(key, "a-pf0"))
 		return dp_argparse_string(value, eal_a_pf0, sizeof(eal_a_pf0));
 
-	if (!strcmp(key, "a-pf1")) // TODO: throw an error when pf0 and pf1 are present and nic is in the mpesw mode
+	if (!strcmp(key, "a-pf1"))
 		return dp_argparse_string(value, eal_a_pf1, sizeof(eal_a_pf1));
+
 #ifdef ENABLE_PF1_PROXY
-	else {
-		if (!strcmp(key, "pf1-proxy")) {
-			dp_conf_pf1_proxy_enabled = true;
-			return dp_argparse_string(value, eal_pf1_proxy_mac_addr_str, sizeof(eal_pf1_proxy_mac_addr_str));
-		}
-	}
+	if (!strcmp(key, "pf1-proxy"))
+		return dp_argparse_string(value, dp_conf_pf1_proxy, sizeof(dp_conf_pf1_proxy));
 #endif
 
 	// Otherwise support all long options

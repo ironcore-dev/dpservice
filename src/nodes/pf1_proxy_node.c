@@ -13,7 +13,7 @@ static uint16_t pf1_tap_port_id;
 static int pf1_proxy_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 	pf1_port_id = dp_get_pf1()->port_id;
-	pf1_tap_port_id = dp_get_pf_proxy_tap_port()->port_id;
+	pf1_tap_port_id = dp_get_pf1_proxy()->port_id;
 	return DP_OK;
 }
 

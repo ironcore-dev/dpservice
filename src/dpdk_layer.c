@@ -46,9 +46,9 @@ static int dp_dpdk_layer_init_unsafe(void)
 #ifdef ENABLE_PF1_PROXY
 	if (dp_conf_is_pf1_proxy_enabled()) {
 		dp_layer.rte_jumbo_mempool = rte_pktmbuf_pool_create("jumbo_mbuf_pool", DP_JUMBO_MBUF_POOL_SIZE,
-													DP_MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE,
-													DP_JUMBO_MBUF_BUF_SIZE,
-													rte_socket_id());
+															 DP_MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE,
+															 DP_JUMBO_MBUF_BUF_SIZE,
+															 rte_socket_id());
 		if (!dp_layer.rte_jumbo_mempool) {
 			DPS_LOG_ERR("Cannot create jumbo mbuf pool", DP_LOG_RET(rte_errno));
 			return DP_ERROR;

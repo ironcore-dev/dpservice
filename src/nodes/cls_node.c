@@ -136,7 +136,7 @@ static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
 	const struct rte_ipv6_hdr *ipv6_hdr;
 	uint32_t l3_type;
 
-	if (m->port == dp_get_pf_proxy_tap_port()->port_id)
+	if (m->port == dp_get_pf1_proxy()->port_id)
 		return true;
 
 	// this duplicates code from the main classifier, to pass underlay/virtsvc packets

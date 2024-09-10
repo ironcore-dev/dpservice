@@ -121,16 +121,16 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 }
 
 #ifdef ENABLE_PF1_PROXY
-static int dp_graph_init_proxy_tap(void)
+static int dp_graph_init_pf1_proxy(void)
 {
 	if (!dp_conf_is_pf1_proxy_enabled())
 		return DP_OK;
 
-	const struct dp_port *port = dp_get_pf_proxy_tap_port();
+	const struct dp_port *port = dp_get_pf1_proxy();
 	uint16_t port_id = port->port_id;
 
 	if (DP_FAILED(rx_node_create(port_id, 0))
-			|| DP_FAILED(tx_node_create(port_id)))
+			|| DP_FAILED(tx_node_create(port_id)))  // TODO wait, this is never used! (rewire CLS or remove this)
 		return DP_ERROR;
 
 	return DP_OK;
@@ -189,7 +189,7 @@ int dp_graph_init(void)
 		return DP_ERROR;
 
 #ifdef ENABLE_PF1_PROXY
-	if (DP_FAILED(dp_graph_init_proxy_tap()))
+	if (DP_FAILED(dp_graph_init_pf1_proxy()))
 		return DP_ERROR;
 #endif
 
