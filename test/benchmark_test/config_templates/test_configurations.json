@@ -19,7 +19,7 @@
 		{
 			"machine_name": "hypervisor-1",
 			"host_address": "192.168.23.166",
-			"user_name": "tli",
+			"user_name": "",
 			"port": 22,
 			"vms": [
 				{
@@ -46,7 +46,7 @@
 			"machine_name": "hypervisor-2",
 			"role": "local",
 			"host_address": "192.168.23.86",
-			"user_name": "tli",
+			"user_name": "",
 			"port": 22,
 			"vms": [
 				{
