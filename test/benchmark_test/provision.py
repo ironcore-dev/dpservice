@@ -249,7 +249,7 @@ def upload_vm_disk_image(machine, hypervisor_info, src_disk_image_path):
 		for vm in hypervisor_info['vms']:
 			vm_name = vm['machine_name']
 			print(f"Uploading vm disk image for remote machine {vm_name}")
-			dst_disk_image_path = os.path.expanduser(f'{target_provision_tmpls_output_path}/{hypervisor_info['machine_name']}/{vm_name}.raw')
+			dst_disk_image_path = os.path.expanduser(f"{target_provision_tmpls_output_path}/{hypervisor_info['machine_name']}/{vm_name}.raw")
 			machine.upload("sftp", src_disk_image_path, dst_disk_image_path)
 			task = [
 				{"command": f'test -e {dst_disk_image_path} && echo "exists" || echo "not exists"'}
