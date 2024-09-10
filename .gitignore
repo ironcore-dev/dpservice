@@ -16,3 +16,4 @@ scapy-script/*
 code_check/_checkpatch.pl
 .out
 test/benchmark_test/provision_tmpls
+test/benchmark_test/config_templates

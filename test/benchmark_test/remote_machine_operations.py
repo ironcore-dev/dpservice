@@ -431,6 +431,21 @@ def remote_machine_op_vm_config_rm_default_route(machine_name, default_gw="192.1
 		if machine:
 			machine.logger.error(f"Failed to remove the default route: {e}")
 
+def remote_machine_op_vm_config_nft_default_accept(machine_name):
+	try:
+		machine = get_remote_machine(machine_name)
+		if not machine.parent_machine:
+			raise NotImplementedError(
+				f"Cannot rm default route on a non-vm machine {machine_name}")
+
+		vm_task = [
+			{"command": f"nft add chain inet filter input '{{ policy accept; }}'", "sudo": True}
+		]
+		machine.exec_task(vm_task)
+	except Exception as e:
+		if machine:
+			machine.logger.error(f"Failed to remove the default route: {e}")
+
 
 def remote_machine_op_vm_config_tmp_dir(machine_name):
 	machine = None

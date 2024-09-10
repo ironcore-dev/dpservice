@@ -88,6 +88,7 @@ def init_vms(env_config, reboot_vm):
 					remote_machine_op_reboot(vm_info["machine_name"])
 				remote_machine_op_vm_config_rm_default_route(
 					vm_info["machine_name"])
+				remote_machine_op_vm_config_nft_default_accept(vm_info["machine_name"])
 				remote_machine_op_vm_config_tmp_dir(vm_info["machine_name"])
 				remote_machine_op_terminate_processes(vm_info["machine_name"])
 				remote_machine_op_upload(
