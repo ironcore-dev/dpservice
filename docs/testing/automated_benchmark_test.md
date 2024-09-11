@@ -2,49 +2,24 @@
 Automated benchmarking tests are additional functional and performance tests to the existing TAP device-based ones. This test suit relies on a configured environment including hypervisors and started VMs, as well as configured SSH authorized key of the execution machine starting the benchmarking tests. In the end, running these benchmarking tests is useful for verifying if dpservice works correctly together with actual running VMs for both offloading and non-offloading modes. It also verifies if networking performance meets specified values during dpservice development.
 
 # Required hypervisor setup
-To successfully run these automated benchmarking tests, currently, 2 hypervisors and 3 VMs need to be prepared beforehand, especially putting the ssh key of the machine executing the benchmarking tests into the above mentioned hypervisors.
+To successfully run these automated benchmarking tests, currently, 2 hypervisors and 3 VMs need to be prepared beforehand.
+
+Please prepare the ssh private/public key pairs and put them under the `.ssh` directory of the server executing the provision script.
+
+The provided script, `hack/connectivity_test/prepare_hypervisor.sh`, can perform extra setups at one time. Please run this script on the involved servers, and the following manual steps can be ignored.
 
 ## Prerequisite
 
 1. Ensure the script execution machine can compile dpservice, especiall dpservice-cli within the directory.
 2. Install the following python libraries on your executing machine by executing
 ```
-apt install python3-termcolor
-apt install python3-psutil
-apt install python3-paramiko
+apt install -y python3-termcolor python3-psutil python3-paramiko python3-jinja2
 ```
 
-## Extra configuration on hypervisors running Gardenlinux
-On hypervisors running gardenlinux, it is also necessary to open ports to allow the DHCP service to provide IP addresses to VMs to be able for access. For example, the most convenient way is to  change the default input filter policy to 'accept' by importing the following nft table rules.
-
-The provided script, `hack/connectivity_test/prepare_hypervisor.sh`, can perform the following actions at one time.
-
+## Configuration on hypervisors running Gardenlinux
+If the two Servers, that host VMs in tests, run Gardenlinux, and they require extra configurations so that provisioning and benchmarking tests can work.
 ```
-command: sudo nft -f filter_table.nft
-filter_table.nft:
-	table inet filter {
-			chain input {
-					type filter hook input priority filter; policy accept;
-					counter packets 1458372 bytes 242766426
-					iifname "lo" counter packets 713890 bytes 141369289 accept
-					ip daddr 127.0.0.1 counter packets 0 bytes 0 accept
-					icmp type echo-request limit rate 5/second burst 5 packets accept
-					ip6 saddr ::1 ip6 daddr ::1 counter packets 0 bytes 0 accept
-					icmpv6 type { echo-request, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } accept
-					ct state established,related counter packets 627814 bytes 93897896 accept
-					tcp dport 22 ct state new counter packets 362 bytes 23104 accept
-					rt type 0 counter packets 0 bytes 0 drop
-					meta l4proto ipv6-icmp counter packets 0 bytes 0 accept
-			}
-
-			chain forward {
-					type filter hook forward priority filter; policy accept;
-			}
-
-			chain output {
-					type filter hook output priority filter; policy accept;
-			}
-	}
+sudo nft add chain inet filter input '{ policy accept; }'
 ```
 
 Additionally, if the used hypervisors are running Gardenlinux, it is needed to remount `/tmp` to allow execute binary files being uploaded to it, due to the strict security policy. Simply execute `sudo mount -o remount,exec /tmp`.
@@ -94,7 +69,7 @@ The configuration file, `/test/benchmark_test/config_templates/test_configuratio
 
 4. "machine_name" field is NOT expected to be changed.
 
-## Ignition file,
+## Ignition file
 To have a complete ignition file template, `./benchmark_test/config_templates/provision_tmpl.ign`, please contact the maintainers for a proper hashed password to fill in.
 
 
@@ -106,7 +81,7 @@ The most commonly used commands to run the provision script are as follows.
 
 
 # Execution of test script
-This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`.
+This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`. In oder to run dpservice either natively or via container, please make sure that a valid dp_service.conf file is created under `/tmp`.
 
 ## dpservice-cli
 The testing script assumes that dpservice-cli exists under '/tmp' on hypervisors. If you have never run this test suite before, please first compile your local dpservice project by using `meson` and `ninja` commands. Because dpservice-cli is already included in the dpservice repository, the compiled dpservice-cli binary will be transferred to hypervisors automatically.
