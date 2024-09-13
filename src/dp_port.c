@@ -33,16 +33,16 @@ static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
 		.mq_mode = RTE_ETH_MQ_RX_NONE,
 	},
-	.txmode = {
-		.offloads =
-			RTE_ETH_TX_OFFLOAD_IPV4_CKSUM |
-			RTE_ETH_TX_OFFLOAD_UDP_CKSUM |
-			RTE_ETH_TX_OFFLOAD_TCP_CKSUM |
-			RTE_ETH_TX_OFFLOAD_IP_TNL_TSO
-	},
-	.intr_conf = {
-		.lsc = 1, /**< lsc interrupt feature enabled */
-	},
+// 	.txmode = {
+// 		.offloads =
+// 			RTE_ETH_TX_OFFLOAD_IPV4_CKSUM |
+// 			RTE_ETH_TX_OFFLOAD_UDP_CKSUM |
+// 			RTE_ETH_TX_OFFLOAD_TCP_CKSUM |
+// 			RTE_ETH_TX_OFFLOAD_IP_TNL_TSO
+// 	},
+// 	.intr_conf = {
+// 		.lsc = 1, /**< lsc interrupt feature enabled */
+// 	},
 };
 
 static const struct rte_meter_srtcm_params dp_srtcm_params_base = {
@@ -117,12 +117,25 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		return DP_ERROR;
 	}
 
+	txq_conf = dev_info->default_txconf;
+	txq_conf.offloads = port_conf.txmode.offloads;
+
+	for (uint16_t i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
+		ret = rte_eth_tx_queue_setup(port->port_id, i, 256,
+									 port->socket_id,
+									 &txq_conf);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
+			return DP_ERROR;
+		}
+	}
+
 	rxq_conf = dev_info->default_rxconf;
 	rxq_conf.offloads = port_conf.rxmode.offloads;
 
 	/* RX and TX queues config */
 	for (uint16_t i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
-		ret = rte_eth_rx_queue_setup(port->port_id, i, 1024,
+		ret = rte_eth_rx_queue_setup(port->port_id, i, 256,
 									 port->socket_id,
 									 &rxq_conf,
 									 dp_layer->rte_mempool);  // TODO this can be different for PF1+proxy and the rest?
@@ -132,28 +145,15 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		}
 	}
 
-	txq_conf = dev_info->default_txconf;
-	txq_conf.offloads = port_conf.txmode.offloads;
-
-	for (uint16_t i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
-		ret = rte_eth_tx_queue_setup(port->port_id, i, 2048,
-									 port->socket_id,
-									 &txq_conf);
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
-			return DP_ERROR;
-		}
-	}
-
 	/* dp-service specific config */
-	if (!port->is_pf) {
+// 	if (!port->is_pf) {
 		DPS_LOG_INFO("INIT setting port to promiscuous mode", DP_LOG_PORT(port));
 		ret = rte_eth_promiscuous_enable(port->port_id);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
-	}
+// 	}
 
 	if (DP_FAILED(dp_load_mac(port))) {
 		DPS_LOG_ERR("Cannot retrieve MAC address", DP_LOG_PORT(port));
@@ -233,8 +233,8 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
 
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return NULL;
+// 	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+// 		return NULL;
 
 	if (is_pf) {
 		if (DP_FAILED(dp_port_register_pf(port)))
@@ -615,12 +615,12 @@ static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 	if (port->port_id == 0) {
 		// if (DP_FAILED(dp_create_pf_async_isolation_templates_to_group(port))) {
 		// 	DPS_LOG_ERR("Failed to create pf async isolation templates TEST", DP_LOG_PORTID(port->port_id));
-		// 	return DP_ERROR;
-		// }
-		if (DP_FAILED(dp_create_pf_async_isolation_templates_proxy(port))) {
-			DPS_LOG_ERR("Failed to create pf async isolation templates TEST", DP_LOG_PORTID(port->port_id));
-			return DP_ERROR;
-		}
+// 			return DP_ERROR;
+// 		}
+// 		if (DP_FAILED(dp_create_pf_async_isolation_templates_proxy(port))) {
+// 			DPS_LOG_ERR("Failed to create pf async isolation templates TEST", DP_LOG_PORTID(port->port_id));
+// 			return DP_ERROR;
+// 		}
 	}
 #ifdef ENABLE_VIRTSVC
 	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_TCP))
@@ -633,6 +633,13 @@ static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 	return DP_OK;
 }
 
+void dp_async_test(void)
+{
+	if (DP_FAILED(dp_port_create_default_pf_async_templates(dp_get_port_by_pf_index(0)))
+		|| DP_FAILED(dp_port_install_async_isolated_mode(dp_get_port_by_pf_index(0))))
+		rte_panic("fail async\n");
+}
+
 static int dp_init_port(struct dp_port *port)
 {
 	// TAP devices do not support offloading/isolation
@@ -641,9 +648,9 @@ static int dp_init_port(struct dp_port *port)
 
 	if (port->is_pf) {
 		if (dp_conf_is_multiport_eswitch()) {
-			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
-				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
-				return DP_ERROR;
+// 			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
+// 				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
+// 				return DP_ERROR;
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
 				return DP_ERROR;

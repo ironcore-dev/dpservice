@@ -106,7 +106,8 @@ int dp_log_init(void)
 		return ret;
 	}
 
-	rte_log_set_print_func(dp_log_eal);
+	(void)dp_log_eal;
+// 	rte_log_set_print_func(dp_log_eal);
 
 	log_json = dp_conf_get_log_format() == DP_CONF_LOG_FORMAT_JSON;
 	if (log_json) {

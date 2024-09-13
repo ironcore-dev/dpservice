@@ -58,6 +58,7 @@ struct dp_port_async_template {
 enum dp_port_async_template_type {
 	DP_PORT_ASYNC_TEMPLATE_PF_ISOLATION,
 	DP_PORT_ASYNC_TEMPLATE_PF_PROXY,
+	DP_PORT_ASYNC_TEMPLATE_PF_PROXY_BACK,
 #ifdef ENABLE_VIRTSVC
 	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION,
 	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION,
@@ -71,6 +72,11 @@ enum dp_port_async_flow_type {
 	DP_PORT_ASYNC_FLOW_ISOLATE_GROUP,
 	DP_PORT_ASYNC_FLOW_ISOLATE_PROXY,
 	DP_PORT_ASYNC_FLOW_COUNT,
+};
+
+struct test_default_async_rules {
+			struct dp_port_async_template	*default_templates[DP_PORT_ASYNC_TEMPLATE_COUNT];
+			struct rte_flow					*default_flows[DP_PORT_ASYNC_FLOW_COUNT];
 };
 
 struct dp_port {
@@ -123,6 +129,8 @@ struct dp_port *dp_get_port_by_name(const char *pci_name);
 int dp_ports_init(void);
 void dp_ports_stop(void);
 void dp_ports_free(void);
+
+void dp_async_test(void);
 
 int dp_start_port(struct dp_port *port);
 #ifdef ENABLE_PF1_PROXY

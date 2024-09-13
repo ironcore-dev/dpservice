@@ -29,10 +29,13 @@
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_thread.h"
 #include "rte_flow/dp_rte_async_flow.h"
+#include "rte_flow/dp_rte_async_flow_isolation.h"
 
 static char **dp_argv;
 static int dp_argc;
 static char *dp_mlx_args[4];
+
+struct rte_mempool *test_mempool;
 
 static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 {
@@ -108,12 +111,14 @@ static void dp_eal_cleanup(void)
 		dp_args_free_mellanox();
 }
 
+bool stop = false;
 static void signal_handler(int signum)
 {
 	if (signum == SIGINT || signum == SIGTERM) {
 		// this is specifically printf() to communicate with the sender
 		printf("\n\nSignal %d received, preparing to exit...\n", signum);
 		dp_force_quit();
+		stop = true;
 	}
 }
 
@@ -155,6 +160,43 @@ static int init_interfaces(void)
 		|| DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
 
+	int ret;
+	ret = rte_eth_dev_start(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_stop(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_stop(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_stop(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	DP_FOREACH_PORT(&_dp_ports, port) {
+		if (DP_FAILED(dp_configure_async_flows(port->port_id)))
+			rte_panic("failed\n");
+	}
+
 	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(0))))
 		return DP_ERROR;
 
@@ -165,6 +207,14 @@ static int init_interfaces(void)
 	if (DP_FAILED(dp_start_pf_proxy_tap_port()))
 		return DP_ERROR;
 #endif
+
+	ret = rte_eth_dev_start(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	dp_async_test();
 
 	// VFs are started by GRPC later
 
@@ -217,6 +267,250 @@ end:
 	return result;
 }
 
+static int init_ethdev(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+{
+	int socket_id = rte_eth_dev_socket_id(port_id);
+	struct rte_eth_txconf txq_conf;
+	struct rte_eth_rxconf rxq_conf;
+	struct rte_eth_conf port_conf = { .rxmode = { .mq_mode = RTE_ETH_MQ_RX_NONE, }, };
+	int ret;
+
+	/* Default config */
+	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
+
+	ret = rte_eth_dev_configure(port_id, 1, 1, &port_conf);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure ethernet device", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	txq_conf = dev_info->default_txconf;
+	txq_conf.offloads = port_conf.txmode.offloads;
+
+	ret = rte_eth_tx_queue_setup(port_id, 0, 256, socket_id, &txq_conf);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Tx queue setup failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	rxq_conf = dev_info->default_rxconf;
+	rxq_conf.offloads = port_conf.rxmode.offloads;
+
+	ret = rte_eth_rx_queue_setup(port_id, 0, 256, socket_id, &rxq_conf, test_mempool);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	ret = rte_eth_promiscuous_enable(port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+static int init_port(uint16_t port_id)
+{
+	struct rte_eth_dev_info dev_info;
+	int ret;
+
+	ret = rte_eth_dev_info_get(port_id, &dev_info);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot get device info", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	return init_ethdev(port_id, &dev_info);
+}
+
+static int configure_flows(uint16_t port_id)
+{
+	static const struct rte_flow_port_attr port_attr = {
+		.nb_counters = 0,
+		.nb_aging_objects = 0,
+		.nb_meters = 0,
+		.flags = 0,
+	};
+	static const struct rte_flow_queue_attr queue_attr = {
+		.size = 64,
+	};
+	const struct rte_flow_queue_attr *attr_list[1];
+	struct rte_flow_error error;
+	int ret;
+
+	attr_list[0] = &queue_attr;
+
+	ret = rte_flow_configure(port_id, &port_attr, 1, attr_list, &error);
+	if (DP_FAILED(ret))
+		DPS_LOG_ERR("Failed to configure port's queue attr",
+					DP_LOG_PORTID(port_id), DP_LOG_RET(ret), DP_LOG_FLOW_ERROR(error.message));
+
+	return ret;
+}
+
+static int isolate(uint16_t port_id)
+{
+	struct rte_flow_error error;
+	int ret;
+
+	ret = rte_flow_isolate(port_id, 1, &error);
+	if (DP_FAILED(ret))
+		DPS_LOG_ERR("Flows cannot be isolated", DP_LOG_PORTID(port_id), DP_LOG_FLOW_ERROR(error.message), DP_LOG_RET(ret));
+	return ret;
+}
+
+static int negotiate(uint16_t port_id)
+{
+	uint64_t rx_meta_features = 0;
+	int ret;
+
+	rx_meta_features |= RTE_ETH_RX_METADATA_USER_FLAG;
+	rx_meta_features |= RTE_ETH_RX_METADATA_USER_MARK;
+	rx_meta_features |= RTE_ETH_RX_METADATA_TUNNEL_ID;
+
+	ret = rte_eth_rx_metadata_negotiate(port_id, &rx_meta_features);
+	if (ret == 0) {
+		if (!(rx_meta_features & RTE_ETH_RX_METADATA_USER_FLAG))
+			DPS_LOG_WARNING("Flow action FLAG will not affect Rx mbufs", DP_LOG_PORTID(port_id));
+		if (!(rx_meta_features & RTE_ETH_RX_METADATA_USER_MARK))
+			DPS_LOG_WARNING("Flow action MARK will not affect Rx mbufs", DP_LOG_PORTID(port_id));
+		if (!(rx_meta_features & RTE_ETH_RX_METADATA_TUNNEL_ID))
+			DPS_LOG_WARNING("Flow tunnel offload support might be limited or unavailable", DP_LOG_PORTID(port_id));
+	} else if (ret != -ENOTSUP) {
+		DPS_LOG_ERR("Error when negotiating Rx meta features", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
+	}
+
+	return ret;
+}
+
+static int run_test(void)
+{
+	int ret;
+
+	if (DP_FAILED(negotiate(0))
+		|| DP_FAILED(negotiate(1))
+		|| DP_FAILED(negotiate(6)))
+		return DP_ERROR;
+
+	if (DP_FAILED(isolate(0)))
+		return DP_ERROR;
+	if (DP_FAILED(isolate(1)))
+		return DP_ERROR;
+	if (DP_FAILED(isolate(6)))
+		return DP_ERROR;
+
+	test_mempool = rte_pktmbuf_pool_create("test_mbuf_pool", DP_MBUF_POOL_SIZE,
+												   DP_MEMPOOL_CACHE_SIZE, DP_MBUF_PRIV_DATA_SIZE,
+												   (9118 + RTE_PKTMBUF_HEADROOM),
+												   -1);
+
+	ret = init_port(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot init ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	ret = init_port(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot init ethernet port", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	ret = init_port(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot init ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	ret = rte_eth_dev_stop(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_stop(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_stop(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	ret = configure_flows(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure flows", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = configure_flows(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure flows", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = configure_flows(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot configure flows", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	ret = rte_eth_dev_start(0);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(0), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(1);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(1), DP_LOG_RET(ret));
+		return ret;
+	}
+	ret = rte_eth_dev_start(6);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORTID(6), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	struct test_default_async_rules default_async_rules = {0};
+	if (DP_FAILED(dp_create_pf_async_isolation_templates_proxy(0, &default_async_rules)))
+		return DP_ERROR;
+
+	if (DP_FAILED(dp_create_pf_async_isolation_rules_test(&default_async_rules)))
+		return DP_ERROR;
+
+	FILE *file = stdout;
+	struct rte_flow_error error;
+	ret = rte_flow_dev_dump(0, NULL, file, &error);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to dump rte async flow rules",
+					DP_LOG_PORTID(0), DP_LOG_RET(ret), DP_LOG_FLOW_ERROR(error.message));
+		return ret;
+	}
+
+	printf("All ok, entering loop\n");
+	while (!stop) {
+		sleep(1);
+	}
+
+	return DP_OK;
+}
+
 static int run_service(void)
 {
 	int result;
@@ -243,10 +537,12 @@ static int run_service(void)
 	// from this point on, only DPS_LOG should be used
 
 	if (DP_FAILED(setup_sighandlers())
-		|| DP_FAILED(dp_dpdk_layer_init()))
+		/*|| DP_FAILED(dp_dpdk_layer_init())*/)
 		return DP_ERROR;
 
-	result = run_dpdk_service();
+	result = run_test();
+
+// 	result = run_dpdk_service();
 
 	dp_dpdk_layer_free();
 

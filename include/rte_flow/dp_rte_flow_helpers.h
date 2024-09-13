@@ -43,15 +43,11 @@ static const struct rte_flow_item_ethdev dp_flow_item_rep_port_1 = {
 };
 
 static const struct rte_flow_item_ethdev dp_flow_item_rep_port_127 = {
-	.port_id = 127,
+	.port_id = 6,
 };
 
 static const struct rte_flow_item_ethdev dp_flow_item_ethdev_mask = {
-	.port_id = 1,
-};
-
-static const struct rte_flow_item_ethdev dp_flow_item_rep_port_126 = {
-	.port_id = 125,
+	.port_id = 0xffff,
 };
 
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_ipip = {

@@ -23,7 +23,7 @@ static const struct rte_flow_queue_attr queue_attr = {
 };
 
 static const struct rte_flow_op_attr postponed_op_attr = {
-	.postpone = 1
+	.postpone = 0
 };
 
 int dp_configure_async_flows(uint16_t port_id)
