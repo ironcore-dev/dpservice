@@ -126,7 +126,7 @@ class DpService:
 				elif key == "pf1":
 					PF1.tap = value
 				elif key == "pf1-proxy":
-					PF1.tap = "pf1-tap"
+					PF1.tap = "pf1-tap" # TODO works for now, but make better
 				elif key == "vf-pattern":
 					# MACs cannot be changed for VFs, use actual values
 					VM1.mac = get_if_hwaddr(f"{value}0")

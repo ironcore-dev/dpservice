@@ -131,11 +131,11 @@ static int dp_graph_init_pf1_proxy(void)
 		return DP_OK;
 
 	// pf1-proxy is not part of dp_ports list
-	// so create a separate Rx/Tx and wire Tx to CLS node
+	// so create a separate Tx and wire Tx to CLS node
 	port_id = dp_get_pf1_proxy()->port_id;
 
-	if (DP_FAILED(rx_node_create(port_id, 0))
-		|| DP_FAILED(tx_node_create(port_id)))
+	// Note that there is no Rx node since all pf1-proxy -> pf1 packets are offloaded
+	if (DP_FAILED(tx_node_create(port_id)))
 		return DP_ERROR;
 
 	snprintf(name, sizeof(name), "tx-%u", port_id);

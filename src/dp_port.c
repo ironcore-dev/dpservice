@@ -17,6 +17,7 @@
 #include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_async_flow.h"
 #include "rte_flow/dp_rte_async_flow_isolation.h"
+#include "rte_flow/dp_rte_async_flow_pf1_proxy.h"
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_capture.h"
@@ -557,6 +558,17 @@ static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
+#ifdef ENABLE_PF1_PROXY
+	// Even though this is PF1 linking to VF on PF1, the rules need to be created in PF0 (multiport-eswitch mode)
+	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf0()) {
+		if (DP_FAILED(dp_create_pf_async_from_proxy_templates(port))
+			|| DP_FAILED(dp_create_pf_async_to_proxy_templates(port))
+		) {
+			DPS_LOG_ERR("Failed to create pf async proxy templates", DP_LOG_PORT(port));
+			return DP_ERROR;
+		}
+	}
+#endif
 #ifdef ENABLE_VIRTSVC
 	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_TCP))
 		|| DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_UDP))

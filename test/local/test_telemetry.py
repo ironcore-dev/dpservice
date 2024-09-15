@@ -69,7 +69,6 @@ def get_telemetry(request):
 	return response
 
 def check_tel_graph(key):
-	expected_tel_rx_node_count = 7 if PF1.tap == "pf1-tap" else 6
 	tel = get_telemetry(f"/dp_service/graph/{key}")
 	assert tel is not None, \
 		"Missing graph telemetry"
@@ -78,8 +77,8 @@ def check_tel_graph(key):
 	# Check for rx-X-0 pattern where X can be any number
 	rx_nodes = [node for node in tel["Node_0_to_255"] if re.match(r'rx-\d+-0', node)]
 
-	assert len(rx_nodes) == expected_tel_rx_node_count, \
-		f"Expected {expected_tel_rx_node_count} 'rx-X-0' nodes, found {len(rx_nodes)} in {key} graph telemetry"
+	assert len(rx_nodes) == 6, \
+		f"Expected 6 'rx-X-0' nodes, found {len(rx_nodes)} in {key} graph telemetry"
 
 
 def test_telemetry_graph(request, prepare_ifaces):
@@ -139,17 +138,15 @@ def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 		else:
 			assert metric.startswith("#"), \
 				f"Unknown exported metric '{metric.split('{')[0]}' found"
-	# meson options (e.g. enable_pf1_proxy) are hard to do in these scripts, so just check manually
+	# meson options (e.g. enable_virtual_services) are hard to do in these scripts, so just check manually
 	graph_nodes = GRAPH_NODES
 	iface_stats = IFACE_STATS
-	if 'pf1_proxy' in graph_stats:
-		graph_nodes += ('pf1_proxy',)
 	if 'virtsvc' in graph_stats:
 		graph_nodes += ('virtsvc',)
 	if request.config.getoption("--hw"):
 		iface_stats += HW_IFACE_STATS
 		if PF1.tap == "pf1-tap":
-			graph_nodes += ('rx-6-0',)
+			graph_nodes += ('tx-6',)
 	if 'rx_q1_bytes' in interface_stats:
 		iface_stats += HW_PF1_IFACE_STATS
 	assert graph_stats == set(graph_nodes), \
