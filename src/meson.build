@@ -73,6 +73,11 @@ if get_option('enable_virtual_services')
     'dp_virtsvc.c',
   ]
 endif
+if get_option('enable_pf1_proxy')
+  dp_sources += [
+    'rte_flow/dp_rte_async_flow_pf1_proxy.c',
+  ]
+endif
 
 exe = executable('dpservice-bin',
   sources: [ dp_sources, grpc_generated, version_h ],
