@@ -614,6 +614,9 @@ static int dp_init_port(struct dp_port *port)
 
 int dp_start_port(struct dp_port *port)
 {
+	struct rte_eth_link link = {
+		.link_status = RTE_ETH_LINK_DOWN
+	};
 	int ret;
 
 	ret = rte_eth_dev_start(port->port_id);
@@ -628,7 +631,15 @@ int dp_start_port(struct dp_port *port)
 		return ret;
 	}
 
-	port->link_status = RTE_ETH_LINK_UP;
+	if (port->is_pf) {
+		// this really only fails on bad arguments (or incompatible driver)
+		ret = rte_eth_link_get(port->port_id, &link);
+		if (DP_FAILED(ret))
+			DPS_LOG_WARNING("Unable to get the initial link status, assuming it down", DP_LOG_PORT(port), DP_LOG_RET(ret));
+	} else
+		link.link_status = RTE_ETH_LINK_UP;
+
+	port->link_status = link.link_status;
 	port->allocated = true;
 	return DP_OK;
 }
