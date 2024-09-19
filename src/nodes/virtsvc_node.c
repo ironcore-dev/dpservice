@@ -16,22 +16,13 @@
 #include "nodes/common_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
-DP_NODE_REGISTER(VIRTSVC, virtsvc, DP_NODE_DEFAULT_NEXT_ONLY);
+DP_NODE_REGISTER_NOINIT(VIRTSVC, virtsvc, DP_NODE_DEFAULT_NEXT_ONLY);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
 
 int virtsvc_node_append_tx(uint16_t port_id, const char *tx_node_name)
 {
 	return dp_node_append_tx(DP_NODE_GET_SELF(virtsvc), next_tx_index, port_id, tx_node_name);
-}
-
-// runtime constant, precompute
-static const union dp_ipv6 *service_ul_ip;
-
-static int virtsvc_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
-{
-	service_ul_ip = dp_conf_get_underlay_ip();
-	return DP_OK;
 }
 
 static __rte_always_inline void virtsvc_tcp_state_change(struct dp_virtsvc_conn *conn, uint8_t tcp_flags)
@@ -102,7 +93,7 @@ static __rte_always_inline uint16_t virtsvc_request_next(struct rte_node *node,
 	ipv6_hdr->payload_len = htons((uint16_t)(hdr_total_len - sizeof(struct rte_ipv4_hdr)));
 	ipv6_hdr->proto = proto;
 	ipv6_hdr->hop_limits = ttl;
-	dp_set_src_ipv6(ipv6_hdr, service_ul_ip);
+	dp_set_src_ipv6(ipv6_hdr, &virtsvc->ul_addr);
 	dp_set_dst_ipv6(ipv6_hdr, &virtsvc->service_addr);
 	m->ol_flags |= RTE_MBUF_F_TX_IPV6;
 	m->tx_offload = 0;
