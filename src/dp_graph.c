@@ -10,6 +10,7 @@
 #include "dp_timers.h"
 #include "monitoring/dp_graphtrace.h"
 #include "nodes/arp_node.h"
+#include "nodes/cls_node.h"
 #include "nodes/dhcp_node.h"
 #include "nodes/dhcpv6_node.h"
 #include "nodes/ipip_encap_node.h"
@@ -123,14 +124,28 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 #ifdef ENABLE_PF1_PROXY
 static int dp_graph_init_pf1_proxy(void)
 {
+	char name[RTE_NODE_NAMESIZE];
+	uint16_t port_id;
+
 	if (!dp_conf_is_pf1_proxy_enabled())
 		return DP_OK;
 
-	const struct dp_port *port = dp_get_pf1_proxy();
-	uint16_t port_id = port->port_id;
+	// pf1-proxy is not part of dp_ports list
+	// so create a separate Rx/Tx and wire Tx to CLS node
+	port_id = dp_get_pf1_proxy()->port_id;
 
 	if (DP_FAILED(rx_node_create(port_id, 0))
-			|| DP_FAILED(tx_node_create(port_id)))  // TODO wait, this is never used! (rewire CLS or remove this)
+		|| DP_FAILED(tx_node_create(port_id)))
+		return DP_ERROR;
+
+	snprintf(name, sizeof(name), "tx-%u", port_id);
+	if (DP_FAILED(cls_node_append_tx(port_id, name)))
+		return DP_ERROR;
+
+	// also wire the PF1 Tx for return path
+	port_id = dp_get_pf1()->port_id;
+	snprintf(name, sizeof(name), "tx-%u", port_id);
+	if (DP_FAILED(cls_node_append_tx(port_id, name)))
 		return DP_ERROR;
 
 	return DP_OK;

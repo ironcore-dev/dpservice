@@ -73,11 +73,6 @@ if get_option('enable_virtual_services')
     'dp_virtsvc.c',
   ]
 endif
-if get_option('enable_pf1_proxy')
-  dp_sources += [
-    'nodes/pf1_proxy_node.c',
-  ]
-endif
 
 exe = executable('dpservice-bin',
   sources: [ dp_sources, grpc_generated, version_h ],

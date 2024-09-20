@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include "nodes/cls_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
@@ -23,31 +24,43 @@
 #	define VIRTSVC_NEXT(NEXT)
 #endif
 
-#ifdef ENABLE_PF1_PROXY
-#define PF1_PROXY_NEXT(NEXT) NEXT(CLS_NEXT_PF1_PROXY, "pf1_proxy")
-#else
-#define PF1_PROXY_NEXT(NEXT)
-#endif
-
 #define NEXT_NODES(NEXT) \
 	NEXT(CLS_NEXT_ARP, "arp") \
 	NEXT(CLS_NEXT_IPV6_ND, "ipv6_nd") \
 	NEXT(CLS_NEXT_CONNTRACK, "conntrack") \
 	NEXT(CLS_NEXT_IPIP_DECAP, "ipip_decap") \
-	PF1_PROXY_NEXT(NEXT) \
 	VIRTSVC_NEXT(NEXT)
 
-#ifdef ENABLE_VIRTSVC
 DP_NODE_REGISTER(CLS, cls, NEXT_NODES);
+
+#ifdef ENABLE_PF1_PROXY
+static bool pf1_proxy_enabled = false;
+static uint16_t pf1_port_id;
+static uint16_t pf1_proxy_port_id;
+#endif
+
 static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
+#ifdef ENABLE_PF1_PROXY
+	pf1_proxy_enabled = dp_conf_is_pf1_proxy_enabled();
+	pf1_port_id = dp_get_pf1()->port_id;
+	pf1_proxy_port_id = dp_get_pf1_proxy()->port_id;
+#endif
+#ifdef ENABLE_VIRTSVC
 	virtsvc_present = dp_virtsvc_get_count() > 0;
 	virtsvc_ipv4_tree = dp_virtsvc_get_ipv4_tree();
 	virtsvc_ipv6_tree = dp_virtsvc_get_ipv6_tree();
+#endif
 	return DP_OK;
 }
-#else
-DP_NODE_REGISTER_NOINIT(CLS, cls, NEXT_NODES);
+
+#ifdef ENABLE_PF1_PROXY
+static uint16_t next_tx_index[DP_MAX_PORTS];
+
+int cls_node_append_tx(uint16_t port_id, const char *tx_node_name)
+{
+	return dp_node_append_tx(DP_NODE_GET_SELF(cls), next_tx_index, port_id, tx_node_name);
+}
 #endif
 
 static __rte_always_inline int is_arp(const struct rte_ether_hdr *ether_hdr)
@@ -126,47 +139,6 @@ static __rte_always_inline struct dp_virtsvc *get_incoming_virtsvc(const struct 
 }
 #endif
 
-#ifdef ENABLE_PF1_PROXY
-static __rte_always_inline bool pf1_tap_proxy_forward(struct rte_mbuf *m)
-{
-	if (!dp_conf_is_pf1_proxy_enabled())
-		return false;
-
-	const struct rte_ether_hdr *ether_hdr;
-	const struct rte_ipv6_hdr *ipv6_hdr;
-	uint32_t l3_type;
-
-	if (m->port == dp_get_pf1_proxy()->port_id)
-		return true;
-
-	// this duplicates code from the main classifier, to pass underlay/virtsvc packets
-	// TODO needs reworking if proxy is kept as a long-term solution
-	if (m->port == dp_get_pf1()->port_id) {
-		if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
-			return true;
-
-		ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-		l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
-
-		if (RTE_ETH_IS_IPV6_HDR(l3_type)) {
-			ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
-			if (ipv6_hdr->proto == IPPROTO_IPIP || ipv6_hdr->proto == IPPROTO_IPV6)
-				return false;
-#ifdef ENABLE_VIRTSVC
-			if (virtsvc_present) {
-				if (get_incoming_virtsvc(ipv6_hdr))
-					return false;
-			}
-#endif
-		}
-
-		return true;
-	}
-
-	return false;
-}
-#endif
-
 static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
 	const struct rte_ether_hdr *ether_hdr;
@@ -176,12 +148,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_port *port;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
-#endif
-
-#ifdef ENABLE_PF1_PROXY
-	// TODO this is not the best way as this function duplicates work, needs reworking if pf1-proxy is kept in the future
-	if (unlikely(pf1_tap_proxy_forward(m)))
-		return CLS_NEXT_PF1_PROXY;
 #endif
 
 	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
@@ -244,8 +210,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				df->l3_type = RTE_ETHER_TYPE_IPV6;
 				break;
 			default:
-				df->l3_type = ntohs(ether_hdr->ether_type);
-				return CLS_NEXT_CONNTRACK;
+				return CLS_NEXT_DROP;
 			}
 			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
 			dp_extract_underlay_header(df, ipv6_hdr);
@@ -260,6 +225,26 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	return CLS_NEXT_DROP;
 }
+
+#ifdef ENABLE_PF1_PROXY
+static __rte_always_inline rte_edge_t get_next_index_proxy(__rte_unused struct rte_node *node, struct rte_mbuf *m)
+{
+	rte_edge_t next;
+
+	if (!pf1_proxy_enabled)
+		return get_next_index(node, m);
+
+	if (m->port == pf1_proxy_port_id)
+		return next_tx_index[pf1_port_id];
+
+	next = get_next_index(node, m);
+	if (unlikely(next == CLS_NEXT_DROP && m->port == pf1_port_id))
+		return next_tx_index[pf1_proxy_port_id];
+
+	return next;
+}
+#define get_next_index get_next_index_proxy
+#endif
 
 static uint16_t cls_node_process(struct rte_graph *graph,
 								 struct rte_node *node,
