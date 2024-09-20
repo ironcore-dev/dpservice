@@ -576,9 +576,13 @@ static int dp_init_port(struct dp_port *port)
 
 	if (port->is_pf) {
 		if (dp_conf_is_multiport_eswitch()) {
-			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
-				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
-				return DP_ERROR;
+			// no isolation on proxied PF
+#ifdef ENABLE_PF1_PROXY
+			if (port == dp_get_pf0() || !dp_conf_is_pf1_proxy_enabled())
+#endif
+				if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
+					|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
+					return DP_ERROR;
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
 				return DP_ERROR;
