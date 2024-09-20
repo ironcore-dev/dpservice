@@ -90,10 +90,20 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	return _dp_port_table[port_id];
 }
 
+static void dp_set_neighmac(struct dp_port *port, const struct rte_ether_addr *mac)
+{
+	char strmac[18];
+
+	rte_ether_addr_copy(mac, &port->neigh_mac);
+
+	snprintf(strmac, sizeof(strmac), RTE_ETHER_ADDR_PRT_FMT, RTE_ETHER_ADDR_BYTES(&port->neigh_mac));
+	DPS_LOG_INFO("Setting neighboring MAC", _DP_LOG_STR("mac", strmac), DP_LOG_PORT(port));
+}
+
 static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-	struct rte_ether_addr pf_neigh_mac;
+	struct rte_ether_addr pf_neigh_mac = {0};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
 	struct rte_eth_conf port_conf = port_conf_default;
@@ -174,8 +184,15 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	if (port->is_pf) {
 		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->own_mac)))
 			return DP_ERROR;
-		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
+		dp_set_neighmac(port, &pf_neigh_mac);
 	}
+#ifdef ENABLE_PF1_PROXY
+	else if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1_proxy())
+		dp_set_neighmac(port, &dp_get_pf1()->neigh_mac);
+#endif
+
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+		return DP_ERROR;
 
 	return DP_OK;
 }
@@ -198,6 +215,28 @@ static int dp_port_flow_isolate(uint16_t port_id)
 	return DP_OK;
 }
 
+static int dp_get_port_socket_id(uint16_t port_id)
+{
+	int socket_id;
+
+	if (port_id >= RTE_DIM(_dp_port_table)) {
+		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+		return DP_ERROR;
+	}
+
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket, using 'any'", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return DP_ERROR;
+		}
+	}
+
+	return socket_id;
+}
+
 static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, bool is_pf, bool is_proxied)
 {
 	static int last_pf1_hairpin_tx_rx_queue_offset = 1;
@@ -205,25 +244,14 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	int socket_id;
 	int ret;
 
-	if (port_id >= RTE_DIM(_dp_port_table)) {
-		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+	socket_id = dp_get_port_socket_id(port_id);
+	if (DP_FAILED(socket_id) && socket_id != SOCKET_ID_ANY)
 		return NULL;
-	}
 
 	if (is_pf && !is_proxied) {
 		if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
 			if (DP_FAILED(dp_port_flow_isolate(port_id)))
 				return NULL;
-	}
-
-	socket_id = rte_eth_dev_socket_id(port_id);
-	if (DP_FAILED(socket_id)) {
-		if (socket_id == SOCKET_ID_ANY) {
-			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
-		} else {
-			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
-			return NULL;
-		}
 	}
 
 	// oveflow check done by liming the number of calls to this function
@@ -238,11 +266,6 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
-
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return NULL;
-
-	// TODO should proxied PF be promiscuous? To send everything?
 
 	if (is_pf) {
 		ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
@@ -267,22 +290,14 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 }
 
 #ifdef ENABLE_PF1_PROXY
-// TODO needs cleanup maybe merging!
 static struct dp_port *dp_port_init_pf1_proxy_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_port *port;
 	int socket_id;
-	int ret;
 
-	socket_id = rte_eth_dev_socket_id(port_id);
-	if (DP_FAILED(socket_id)) {
-		if (socket_id == SOCKET_ID_ANY) {
-			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
-		} else {
-			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
-			return NULL;
-		}
-	}
+	socket_id = dp_get_port_socket_id(port_id);
+	if (DP_FAILED(socket_id) && socket_id != SOCKET_ID_ANY)
+		return NULL;
 
 	port = &_dp_pf1_proxy_port;
 	port->is_pf = false;
@@ -292,17 +307,6 @@ static struct dp_port *dp_port_init_pf1_proxy_interface(uint16_t port_id, struct
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
-
-	// TODO eswitch is implied by the proxy
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return NULL;
-
-	DPS_LOG_INFO("INIT setting PF1 proxy to promiscuous mode", DP_LOG_PORT(port));
-	ret = rte_eth_promiscuous_enable(port->port_id);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
-		return NULL;
-	}
 
 	return port;
 }
@@ -324,61 +328,67 @@ static int dp_port_set_up_hairpins(void)
 	return DP_OK;
 }
 
+static int dp_find_port(const char *iface_name, uint16_t *out_port_id, struct rte_eth_dev_info *out_dev_info)
+{
+	uint16_t port_id;
+	char ifname[IF_NAMESIZE] = {0};
+
+	RTE_ETH_FOREACH_DEV(port_id) {
+		if (DP_FAILED(dp_get_dev_info(port_id, out_dev_info, ifname)))
+			return DP_ERROR;
+		if (!strncmp(iface_name, ifname, sizeof(ifname))) {
+			*out_port_id = port_id;
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("No such interface", DP_LOG_NAME(iface_name));
+	return DP_ERROR;
+}
+
 static int dp_port_init_pf(const char *pf_name)
 {
 	uint16_t port_id;
 	struct rte_eth_dev_info dev_info;
-	char ifname[IF_NAMESIZE] = {0};
 	struct dp_port *port;
 	bool proxied;
 
-	RTE_ETH_FOREACH_DEV(port_id) {
-		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
-			return DP_ERROR;
-		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
-			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
+	if (DP_FAILED(dp_find_port(pf_name, &port_id, &dev_info)))
+		return DP_ERROR;
+
+	DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(pf_name));
 #ifdef ENABLE_PF1_PROXY
-			proxied = dp_conf_is_pf1_proxy_enabled() && !strncmp(pf_name, dp_conf_get_pf1_name(), sizeof(ifname));
+	proxied = dp_conf_is_pf1_proxy_enabled() && !strcmp(pf_name, dp_conf_get_pf1_name());
 #else
-			proxied = false;
+	proxied = false;
 #endif
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF, proxied);
-			if (!port)
-				return DP_ERROR;
-			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
-			return DP_OK;
-		}
-	}
-	DPS_LOG_ERR("No such PF", DP_LOG_NAME(pf_name));
-	return DP_ERROR;
+	port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF, proxied);
+	if (!port)
+		return DP_ERROR;
+
+	snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
+	return DP_OK;
 }
 
 #ifdef ENABLE_PF1_PROXY
-// TODO this can be merged with the others maybe
 static int dp_port_init_pf1_proxy(const char *pf1_proxy_name)
 {
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	struct dp_port *port;
+
 	if (!dp_conf_is_pf1_proxy_enabled())
 		return DP_OK;
 
-	uint16_t port_id;
-	struct rte_eth_dev_info dev_info;
-	char ifname[IF_NAMESIZE] = {0};
-	struct dp_port *port;
+	if (DP_FAILED(dp_find_port(pf1_proxy_name, &port_id, &dev_info)))
+		return DP_ERROR;
 
-	RTE_ETH_FOREACH_DEV(port_id) {
-		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
-			return DP_ERROR;
-		if (!strncmp(pf1_proxy_name, ifname, sizeof(ifname))) {
-			DPS_LOG_INFO("INIT initializing PF1 proxy port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_pf1_proxy_interface(port_id, &dev_info);
-			if (!port)
-				return DP_ERROR;
-			snprintf(port->port_name, sizeof(port->port_name), "%s", pf1_proxy_name);
-			return DP_OK;
-		}
-	}
-	DPS_LOG_ERR("No such PF1 proxy port", DP_LOG_NAME(pf1_proxy_name));
-	return DP_ERROR;
+	DPS_LOG_INFO("INIT initializing PF1 proxy port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(pf1_proxy_name));
+	port = dp_port_init_pf1_proxy_interface(port_id, &dev_info);
+	if (!port)
+		return DP_ERROR;
+
+	snprintf(port->port_name, sizeof(port->port_name), "%s", pf1_proxy_name);
+	return DP_OK;
 }
 #endif
 
