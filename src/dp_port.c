@@ -462,6 +462,8 @@ static int dp_stop_eth_port(struct dp_port *port)
 {
 	int ret;
 
+	DPS_LOG_INFO("Stopping port", DP_LOG_PORT(port));
+
 	if (dp_conf_is_multiport_eswitch()) {
 #ifdef ENABLE_VIRTSVC
 		if (port->is_pf)
@@ -619,6 +621,8 @@ int dp_start_port(struct dp_port *port)
 	};
 	int ret;
 
+	DPS_LOG_INFO("Starting port", DP_LOG_PORT(port));
+
 	ret = rte_eth_dev_start(port->port_id);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORT(port), DP_LOG_RET(ret));
@@ -641,6 +645,22 @@ int dp_start_port(struct dp_port *port)
 
 	port->link_status = link.link_status;
 	port->allocated = true;
+	return DP_OK;
+}
+
+int dp_start_pf_port(uint16_t index)
+{
+	struct dp_port *port = dp_get_port_by_pf_index(index);
+
+	if (!port) {
+		DPS_LOG_ERR("Invalid PF index", DP_LOG_VALUE(index), DP_LOG_MAX(DP_MAX_PF_PORTS));
+		return DP_ERROR;
+	}
+
+	if (DP_FAILED(dp_start_port(port)))
+		return DP_ERROR;
+
+	DPS_LOG_INFO("Received initial PF link state", DP_LOG_LINKSTATE(port->link_status), DP_LOG_PORT(port));
 	return DP_OK;
 }
 
