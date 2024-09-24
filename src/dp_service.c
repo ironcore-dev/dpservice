@@ -160,10 +160,10 @@ static int init_interfaces(void)
 		|| DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(0))))
+	if (DP_FAILED(dp_start_pf_port(0)))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_start_port(dp_get_port_by_pf_index(1))))
+	if (DP_FAILED(dp_start_pf_port(1)))
 		return DP_ERROR;
 
 #ifdef ENABLE_PF1_PROXY

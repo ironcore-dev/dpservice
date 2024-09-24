@@ -129,6 +129,7 @@ void dp_ports_stop(void);
 void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
+int dp_start_pf_port(uint16_t index);
 #ifdef ENABLE_PF1_PROXY
 int dp_start_pf1_proxy_port(void);
 #endif

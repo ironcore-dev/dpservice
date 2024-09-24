@@ -68,10 +68,7 @@ int dp_link_status_change_event_callback(uint16_t port_id,
 		return ret;
 	}
 
-	if (DP_FAILED(dp_send_event_link_msg(port_id, link.link_status)))
-		return DP_ERROR;
-
-	return DP_OK;
+	return dp_send_event_link_msg(port_id, link.link_status);
 }
 
 void dp_process_event_link_msg(struct rte_mbuf *m)
@@ -88,6 +85,7 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 	}
 
 	port->link_status = status;
+	DPS_LOG_INFO("PF link state changed", DP_LOG_LINKSTATE(port->link_status), DP_LOG_PORT(port));
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows
