@@ -140,32 +140,31 @@ process_multiport_eswitch_mode() {
 }
 
 function create_vf() {
-	local pf="${devs[0]}"
+	local pf0="${devs[0]}"
+	local pf1="${devs[1]}"
 
 	if [[ "$IS_ARM_WITH_BLUEFIELD" == "true" ]]; then
 		actualvfs=$NUMVFS
 		log "Skipping VF creation for BlueField card on ARM"
 		# enable switchdev mode, this operation takes most time
-		process_switchdev_mode "$pf"
+		process_switchdev_mode "$pf0"
 		return
 	fi
 
 	if [[ "$CONFIG_ONLY" == "true" ]]; then
-		actualvfs=$(cat /sys/bus/pci/devices/$pf/sriov_numvfs)
+		actualvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_numvfs)
 		log "Skipping VF creation as requested"
 		return
 	fi
 
 	# we disable automatic binding so that VFs don't get created, saves a lot of time
 	# plus we don't need to unbind them before enabling switchdev mode
-	log "disabling automatic binding of VFs on pf: $pf"
-	echo 0 > /sys/bus/pci/devices/$pf/sriov_drivers_autoprobe
-
-	# calculating amount of VFs to create, 126 if more are available, or maximum available
-	totalvfs=$(cat /sys/bus/pci/devices/$pf/sriov_totalvfs)
-	actualvfs=$((NUMVFS<totalvfs ? NUMVFS : totalvfs))
-	log "creating $actualvfs virtual functions"
-	echo $actualvfs > /sys/bus/pci/devices/$pf/sriov_numvfs
+	log "disabling automatic binding of VFs on pf0 '$pf0'"
+	echo 0 > /sys/bus/pci/devices/$pf0/sriov_drivers_autoprobe
+	if [[ "$OPT_PF1_PROXY" == "true" ]]; then
+		log "enabling automatic binding of VFs on pf1 '$pf1'"
+		echo 1 > /sys/bus/pci/devices/$pf1/sriov_drivers_autoprobe
+	fi
 
 	if [[ "$IS_X86_WITH_MLX" == "true" ]]; then
 		# enable switchdev mode, this operation takes most time
@@ -174,7 +173,7 @@ function create_vf() {
 				process_switchdev_mode "$pf"
 			done
 		else
-			process_switchdev_mode "$pf"
+			process_switchdev_mode "$pf0"
 		fi
 	fi
 
@@ -183,17 +182,58 @@ function create_vf() {
 			process_multiport_eswitch_mode "$pf"
 		done
 	fi
+
+	# calculating amount of VFs to create, 126 if more are available, or maximum available
+	totalvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_totalvfs)
+	actualvfs=$((NUMVFS<totalvfs ? NUMVFS : totalvfs))
+	log "creating $actualvfs virtual functions"
+	echo $actualvfs > /sys/bus/pci/devices/$pf0/sriov_numvfs
+	if [[ "$OPT_PF1_PROXY" == "true" ]]; then
+		log "creating pf1-proxy virtual function"
+		echo 1 > /sys/bus/pci/devices/$pf1/sriov_numvfs
+		log "configuring pf1-proxy"
+		local pf1proxy=$(get_pf1_proxy $pf1)
+		ip link set $pf1proxy mtu 9100
+		ip link set $pf1proxy up
+		local pf1_name=$(get_ifname 1)
+		local pf1_mac=$(cat /sys/class/net/$pf1_name/address)
+		local pf1proxy_vf=$(get_pf1_proxy_vf)
+		ip link set $pf1proxy_vf mtu 9100
+		ip link set $pf1proxy_vf address $pf1_mac
+		ip link set $pf1proxy_vf up
+	fi
 }
 
 function get_pattern() {
 	local dev=$1
 	pattern=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk '{print $5}' | sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | uniq)
 	if [ -z "$pattern" ]; then
-		err "can't determine the pattern for $dev"
+		err "can't determine the vf pattern for $dev"
 	elif [ $(wc -l <<< "$pattern") -ne 1 ]; then
-		err "multiple patterns found for $dev"
+		err "multiple vf patterns found for $dev"
 	fi
 	echo "$pattern"
+}
+
+function get_pf1_proxy() {
+	local dev=$1
+	proxy=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk '{print $5}' | uniq)
+	if [ -z "$proxy" ]; then
+		err "can't determine the pf1-proxy vf for $dev"
+	elif [ $(wc -l <<< "$proxy") -ne 1 ]; then
+		err "multiple pf1-proxy devices found for $dev"
+	fi
+	echo "$proxy"
+}
+
+function get_pf1_proxy_vf() {
+	vf=$(devlink port | grep auxiliary/mlx5_core.eth.2/ | grep virtual | awk '{print $5}' | uniq)
+	if [ -z "$vf" ]; then
+		err "can't determine the pf1-proxy vf"
+	elif [ $(wc -l <<< "$vf") -ne 1 ]; then
+		err "multiple pf1-proxy vfs found"
+	fi
+	echo "$vf"
 }
 
 function get_ifname() {
@@ -211,13 +251,6 @@ function get_ipv6() {
 	done < <(ip -6 -o addr show lo | awk '{print $4}')
 }
 
-
-function get_pf_mac() {
-	local pci_dev=${devs[$1]}
-	local pf=$(get_ifname $1)
-	cat /sys/bus/pci/devices/$pci_dev/net/$pf/address
-}
-
 function make_config() {
 	if [[ "$IS_X86_WITH_BLUEFIELD" == "true" ]]; then
 		log "Skipping config file creation on AMD/Intel 64-bit host with Bluefield"
@@ -233,7 +266,7 @@ function make_config() {
 	if [[ "$OPT_MULTIPORT" == "true" ]]; then
 		echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=1,representor=pf[0-1]vf[0-$[$actualvfs-1]]"
 		if [[ "$OPT_PF1_PROXY" == "true" ]]; then
-			echo "pf1-proxy $(get_pf_mac 1)"
+			echo "pf1-proxy $(get_pf1_proxy ${devs[1]})"
 		fi
 		echo "multiport-eswitch"
 	else
@@ -244,7 +277,7 @@ function make_config() {
 	if [[ "$OPT_MULTIPORT" == "true" ]]; then
 		log "dpservice configured in multiport-eswitch mode"
 		if [[ "$OPT_PF1_PROXY" == "true" ]]; then
-			log "dpservice will create a TAP device to proxy PF1"
+			log "dpservice will create a PF1-proxy"
 		fi
 	else
 		log "dpservice configured in normal mode"
