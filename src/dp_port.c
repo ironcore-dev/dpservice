@@ -40,12 +40,6 @@ static const struct rte_eth_conf port_conf_default = {
 			RTE_ETH_TX_OFFLOAD_TCP_CKSUM |
 			RTE_ETH_TX_OFFLOAD_IP_TNL_TSO
 	},
-	.rx_adv_conf = {
-		.rss_conf = {
-			.rss_key = NULL,
-			.rss_hf = RTE_ETH_RSS_IP,
-		},
-	},
 	.intr_conf = {
 		.lsc = 1, /**< lsc interrupt feature enabled */
 	},
