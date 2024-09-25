@@ -5,6 +5,7 @@
 #define __INCLUDE_DP_MONITORING_H__
 
 #include <stdint.h>
+#include <rte_ether.h>
 #include <rte_mbuf.h>
 #include "dp_ipaddr.h"
 
@@ -17,6 +18,7 @@ extern "C" {
 enum dp_event_type {
 	DP_EVENT_TYPE_LINK_STATUS,
 	DP_EVENT_TYPE_FLOW_AGING,
+	DP_EVENT_TYPE_NEIGHMAC,
 };
 
 struct dp_event_msg_head {
@@ -28,10 +30,16 @@ struct dp_link_status {
 	uint8_t status;
 };
 
+struct dp_neighmac {
+	uint16_t port_id;
+	struct rte_ether_addr mac;
+};
+
 struct dp_event_msg {
 	struct dp_event_msg_head msg_head;
 	union {
 		struct dp_link_status link_status;
+		struct dp_neighmac neighmac;
 	} event_entry;
 };
 

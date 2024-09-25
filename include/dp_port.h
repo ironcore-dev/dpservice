@@ -7,8 +7,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/if.h>
-#include <rte_pci.h>
 #include <rte_meter.h>
+#include <rte_pci.h>
+#include <rte_timer.h>
 #include "dp_conf.h"
 #include "dp_firewall.h"
 #include "dp_internal_stats.h"
@@ -107,6 +108,8 @@ struct dp_port {
 			struct rte_flow					*default_flows[DP_PORT_ASYNC_FLOW_COUNT];
 		} default_async_rules;
 	};
+	struct rte_timer				neighmac_timer;
+	uint8_t							neighmac_period;
 };
 
 struct dp_ports {
@@ -136,7 +139,9 @@ int dp_start_pf1_proxy_port(void);
 #endif
 int dp_stop_port(struct dp_port *port);
 
-int dp_acquire_neigh_mac(struct dp_port *port);
+void dp_start_acquiring_neigh_mac(struct dp_port *port);
+void dp_stop_acquiring_neigh_mac(struct dp_port *port);
+int dp_set_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac);
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap);
 
