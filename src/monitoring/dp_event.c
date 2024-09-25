@@ -88,7 +88,9 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 	DPS_LOG_INFO("PF link state changed", DP_LOG_LINKSTATE(port->link_status), DP_LOG_PORT(port));
 
 	if (status == RTE_ETH_LINK_UP)
-		dp_acquire_neigh_mac(port);
+		dp_start_acquiring_neigh_mac(port);
+	else
+		dp_stop_acquiring_neigh_mac(port);
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows
@@ -119,4 +121,29 @@ void dp_process_event_flow_aging_msg(__rte_unused struct rte_mbuf *m)
 	// dp_process_aged_flows_non_offload() also takes care of expired tcp hw rte flow rules via the query mechanism,
 	// which enables fully control of hw rules' lifecycle from the software path for tcp flows.
 	dp_process_aged_flows_non_offload();
+}
+
+// Neighboring router MAC message - sent after acquiring it (sometimes asynchronously from a timer)
+
+int dp_send_event_neighmac_msg(uint16_t port_id, struct rte_ether_addr *neighmac)
+{
+	struct dp_event_msg neighmac_msg = {
+		.msg_head = {
+			.type = DP_EVENT_TYPE_NEIGHMAC,
+		},
+		.event_entry = {
+			.neighmac = {
+				.port_id = port_id,
+				.mac = *neighmac,
+			}
+		}
+	};
+	return dp_send_event_msg(&neighmac_msg);
+}
+
+void dp_process_event_neighmac_msg(struct rte_mbuf *m)
+{
+	struct dp_event_msg *neighmac_msg = rte_pktmbuf_mtod(m, struct dp_event_msg *);
+
+	dp_set_neigh_mac(neighmac_msg->event_entry.neighmac.port_id, &neighmac_msg->event_entry.neighmac.mac);
 }

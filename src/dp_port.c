@@ -29,6 +29,10 @@
 #define DP_PORT_PROXIED true
 #define DP_PORT_NORMAL false
 
+#define DP_PORT_NEIGHMAC_INITIAL_PERIOD 1
+#define DP_PORT_NEIGHMAC_BACKOFF_COEF 2
+#define DP_PORT_NEIGHMAC_MAX_PERIOD 60
+
 #define DP_METER_CIR_BASE_VALUE  (1024 * 1024) // 1 Mbits
 #define DP_METER_EBS_BREAK_VALUE 100     // 100 Mbits/s, it used to differentiate different ebs calculation strategy to achieve relative stable metering results. epirical value.
 #define DP_METER_MBITS_TO_BYTES  (1024 * 1024 / 8)
@@ -254,6 +258,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 			DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
 			return NULL;
 		}
+		rte_timer_init(&port->neighmac_timer);
 	} else {
 		// All VFs belong to pf0, assign a tx queue from pf1 for it
 		if (dp_conf_is_offload_enabled()) {
@@ -292,6 +297,7 @@ static struct dp_port *dp_port_init_pf1_proxy_interface(uint16_t port_id, struct
 	port->port_id = port_id;
 	port->socket_id = socket_id;
 	port->if_index = if_index;
+	rte_timer_init(&port->neighmac_timer);
 	_dp_port_table[port_id] = port;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
@@ -570,6 +576,83 @@ static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 	return DP_OK;
 }
 
+
+static void dp_acquire_neigh_mac(struct dp_port *port);
+
+static void dp_neighmac_timer_cb(__rte_unused struct rte_timer *timer, void *arg)
+{
+	struct dp_port *port = arg;
+
+	port->neighmac_period *= DP_PORT_NEIGHMAC_BACKOFF_COEF;
+	if (port->neighmac_period > DP_PORT_NEIGHMAC_MAX_PERIOD)
+		port->neighmac_period = DP_PORT_NEIGHMAC_MAX_PERIOD;
+
+	dp_acquire_neigh_mac(port);
+}
+
+static void dp_acquire_neigh_mac(struct dp_port *port)
+{
+	struct rte_ether_addr pf_neigh_mac = {0};
+	int ret;
+
+	if (DP_FAILED(dp_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac))) {
+		DPS_LOG_WARNING("No neighboring router, setting timer", DP_LOG_VALUE(port->neighmac_period), DP_LOG_PORT(port));
+
+		// need to use the same lcore each time, thus staying on main one even when called from the worker
+		ret = rte_timer_reset(&port->neighmac_timer, port->neighmac_period * rte_get_timer_hz(),
+							  SINGLE, rte_get_main_lcore(), dp_neighmac_timer_cb, port);
+		if (DP_FAILED(ret))
+			DPS_LOG_WARNING("Cannot start neigboring router timer", DP_LOG_PORT(port), DP_LOG_RET(ret));
+
+		return;
+	}
+
+#ifdef ENABLE_PF1_PROXY
+	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1_proxy())
+		port = dp_get_port_by_pf_index(1);
+#endif
+	if (DP_FAILED(dp_send_event_neighmac_msg(port->port_id, &pf_neigh_mac)))
+		DPS_LOG_WARNING("Cannot send neigboring router mac to worker thread");
+}
+
+void dp_start_acquiring_neigh_mac(struct dp_port *port)
+{
+#ifdef ENABLE_PF1_PROXY
+	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1())
+		port = &_dp_pf1_proxy_port;
+#endif
+	port->neighmac_period = DP_PORT_NEIGHMAC_INITIAL_PERIOD;
+	dp_acquire_neigh_mac(port);
+}
+
+void dp_stop_acquiring_neigh_mac(struct dp_port *port)
+{
+#ifdef ENABLE_PF1_PROXY
+	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1())
+		port = &_dp_pf1_proxy_port;
+#endif
+	rte_timer_stop_sync(&port->neighmac_timer);
+}
+
+int dp_set_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+{
+	struct dp_port *port;
+	char strmac[18];
+
+	port = dp_get_port_by_id(port_id);
+	if (!port) {
+		DPS_LOG_WARNING("Cannot set neighboring router, port invalid", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
+	}
+
+	rte_ether_addr_copy(mac, &port->neigh_mac);
+
+	snprintf(strmac, sizeof(strmac), RTE_ETHER_ADDR_PRT_FMT, RTE_ETHER_ADDR_BYTES(&port->neigh_mac));
+	DPS_LOG_INFO("Setting PF neighboring router", _DP_LOG_STR("mac", strmac), DP_LOG_PORT(port));
+	return DP_OK;
+}
+
+
 static int dp_init_port(struct dp_port *port)
 {
 	// TAP devices do not support offloading/isolation
@@ -655,7 +738,7 @@ int dp_start_pf_port(uint16_t index)
 		// Do not use PF1 in pf1-proxy mode as Linux does not use it then (thus the mac will never be there)
 		if (!dp_conf_is_pf1_proxy_enabled() || port != dp_get_pf1())
 #endif
-			dp_acquire_neigh_mac(port);
+			dp_start_acquiring_neigh_mac(port);
 
 	return DP_OK;
 }
@@ -672,7 +755,7 @@ int dp_start_pf1_proxy_port(void)
 	}
 
 	if (dp_get_pf1()->link_status == RTE_ETH_LINK_UP)
-		dp_acquire_neigh_mac(&_dp_pf1_proxy_port);
+		dp_start_acquiring_neigh_mac(&_dp_pf1_proxy_port);
 
 	_dp_pf1_proxy_port.allocated = true;
 	return DP_OK;
@@ -688,36 +771,6 @@ int dp_stop_port(struct dp_port *port)
 		return DP_ERROR;
 
 	port->allocated = false;
-	return DP_OK;
-}
-
-
-static void dp_set_neighmac(struct dp_port *port, const struct rte_ether_addr *mac)
-{
-	char strmac[18];
-
-	rte_ether_addr_copy(mac, &port->neigh_mac);
-
-	snprintf(strmac, sizeof(strmac), RTE_ETHER_ADDR_PRT_FMT, RTE_ETHER_ADDR_BYTES(&port->neigh_mac));
-	DPS_LOG_INFO("Setting neighboring MAC", _DP_LOG_STR("mac", strmac), DP_LOG_PORT(port));
-}
-
-int dp_acquire_neigh_mac(struct dp_port *port)
-{
-	struct rte_ether_addr pf_neigh_mac = {0};
-
-#ifdef ENABLE_PF1_PROXY
-	// The pf1-proxy VF is actually the interface that Linux uses (thus has the right value)
-	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1())
-		port = &_dp_pf1_proxy_port;
-#endif
-
-	if (DP_FAILED(dp_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac))) {
-		DPS_LOG_WARNING("No PF neighboring router", DP_LOG_PORT(port));
-		return DP_ERROR;
-	}
-
-	dp_set_neighmac(port, &pf_neigh_mac);
 	return DP_OK;
 }
 
