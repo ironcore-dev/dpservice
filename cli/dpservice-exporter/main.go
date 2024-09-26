@@ -23,7 +23,10 @@ const (
 	sleepTime  = 10 * time.Second
 )
 
-var version = "unknown"
+var (
+	version  = "unknown"
+	grpcPort uint64
+)
 
 func main() {
 	var conn net.Conn
@@ -37,6 +40,7 @@ func main() {
 	flag.StringVar(&hostnameFlag, "hostname", "", "Hostname to use (defaults to current hostname)")
 	flag.IntVar(&pollIntervalFlag, "poll-interval", 20, "Polling interval in seconds")
 	flag.Uint64Var(&exporterPort, "port", 9064, "Port on which exporter will be running.")
+	flag.Uint64Var(&grpcPort, "grpc-port", 1337, "Port on which dpservice is running.")
 	getVersion := flag.Bool("v", false, "Print version and exit")
 	flag.Parse()
 
@@ -77,7 +81,7 @@ func main() {
 				conn = connectToDpdkTelemetry(log)
 				log.Infof("Reconnected to %s", metrics.SocketPath)
 			} else {
-			    metrics.Update(conn, host, log)
+				metrics.Update(conn, host, log)
 			}
 
 			time.Sleep(time.Duration(pollIntervalFlag) * time.Second)
@@ -94,13 +98,14 @@ func main() {
 
 // Tests if DPDK telemetry connection is working by writing to the connection
 func testDpdkConnection(conn net.Conn, log *logrus.Logger) bool {
-    // Check if TCP port 1337 on localhost is open
-    tcpConn, err := net.DialTimeout("tcp", "127.0.0.1:1337", 2*time.Second)
-    if err != nil {
-        log.Warningf("TCP port 1337 on localhost is not open: %v", err)
-        return false
-    }
-    defer tcpConn.Close()
+	// Check if dpservice TCP port on localhost is open
+	dpserviceAddress := fmt.Sprintf("127.0.0.1:%d", grpcPort)
+	tcpConn, err := net.DialTimeout("tcp", dpserviceAddress, 2*time.Second)
+	if err != nil {
+		log.Warningf("TCP port %d on localhost is not open: %v", grpcPort, err)
+		return false
+	}
+	defer tcpConn.Close()
 
 	_, err = conn.Write([]byte("/"))
 	if err != nil {
