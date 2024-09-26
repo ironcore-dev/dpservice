@@ -14,7 +14,7 @@ class Exporter:
 		self.cmd = build_path + "/cli/dpservice-exporter/dpservice-exporter"
 
 	def start(self):
-		self.process = subprocess.Popen([self.cmd, f"-port={exporter_port}"])
+		self.process = subprocess.Popen([self.cmd, f"-port={exporter_port}", f"--grpc-port={grpc-port}"])
 
 	def stop(self):
 		if self.process:
