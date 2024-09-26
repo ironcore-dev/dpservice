@@ -37,16 +37,25 @@ extern "C" {
 // there are three periodic messages (ARP, ND, ND-RA) that could be sent at once
 #define DP_PERIODIC_Q_SIZE	(DP_MAX_PORTS * 3)
 
-// 40Gb/s with 1500B packets means ~9M packets/s
-// assuming 0.1s delay in processing means ~900k mbufs needed
+// 40Gb/s with 1500B packets means ~3.3M packets/s
+// assuming 0.1s delay in processing means ~350k mbufs needed
 #ifdef ENABLE_PYTEST
 #define DP_MBUF_POOL_SIZE	(50*1024)
 #else
-#define DP_MBUF_POOL_SIZE	(900*1024)
+#define DP_MBUF_POOL_SIZE	(350*1024)
+#endif
+#define DP_MBUF_BUF_SIZE	(1518 + RTE_PKTMBUF_HEADROOM)
+
+#ifdef ENABLE_PF1_PROXY
+#define DP_JUMBO_MBUF_POOL_SIZE	(50*1024)
+#define DP_JUMBO_MBUF_BUF_SIZE	(9118 + RTE_PKTMBUF_HEADROOM)
 #endif
 
 struct dp_dpdk_layer {
 	struct rte_mempool	*rte_mempool;
+#ifdef ENABLE_PF1_PROXY
+	struct rte_mempool	*rte_jumbo_mempool;
+#endif
 	struct rte_ring		*grpc_tx_queue;
 	struct rte_ring		*grpc_rx_queue;
 	struct rte_ring		*periodic_msg_queue;

@@ -96,6 +96,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	struct rte_eth_rxconf rxq_conf;
 	struct rte_eth_conf port_conf = port_conf_default;
 	uint16_t nr_hairpin_queues;
+	struct rte_mempool *mempool;
 	int ret;
 
 	/* Default config */
@@ -122,10 +123,15 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 
 	/* RX and TX queues config */
 	for (uint16_t i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
+		mempool = dp_layer->rte_mempool;
+#ifdef ENABLE_PF1_PROXY
+		if (dp_conf_is_pf1_proxy_enabled() && (port == dp_get_pf1() || port == &_dp_pf_proxy_tap_port))
+			mempool = dp_layer->rte_jumbo_mempool;
+#endif
 		ret = rte_eth_rx_queue_setup(port->port_id, i, 1024,
 									 port->socket_id,
 									 &rxq_conf,
-									 dp_layer->rte_mempool);
+									 mempool);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Rx queue setup failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return DP_ERROR;
@@ -225,6 +231,9 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	port->socket_id = socket_id;
 	_dp_port_table[port_id] = port;
 
+	if (is_pf && DP_FAILED(dp_port_register_pf(port)))
+		return NULL;
+
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
 
@@ -232,8 +241,6 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 		return NULL;
 
 	if (is_pf) {
-		if (DP_FAILED(dp_port_register_pf(port)))
-			return NULL;
 		ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
