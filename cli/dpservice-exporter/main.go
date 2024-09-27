@@ -77,7 +77,7 @@ func main() {
 				conn = connectToDpdkTelemetry(log)
 				log.Infof("Reconnected to %s", metrics.SocketPath)
 			} else {
-			    metrics.Update(conn, host, log)
+				metrics.Update(conn, host, log)
 			}
 
 			time.Sleep(time.Duration(pollIntervalFlag) * time.Second)
@@ -94,13 +94,13 @@ func main() {
 
 // Tests if DPDK telemetry connection is working by writing to the connection
 func testDpdkConnection(conn net.Conn, log *logrus.Logger) bool {
-    // Check if TCP port 1337 on localhost is open
-    tcpConn, err := net.DialTimeout("tcp", "127.0.0.1:1337", 2*time.Second)
-    if err != nil {
-        log.Warningf("TCP port 1337 on localhost is not open: %v", err)
-        return false
-    }
-    defer tcpConn.Close()
+	// Check if TCP port 1337 on localhost is open
+	tcpConn, err := net.DialTimeout("tcp", "127.0.0.1:1337", 2*time.Second)
+	if err != nil {
+		log.Warningf("TCP port 1337 on localhost is not open: %v", err)
+		return false
+	}
+	defer tcpConn.Close()
 
 	_, err = conn.Write([]byte("/"))
 	if err != nil {
