@@ -51,13 +51,13 @@ if get_option('enable_virtual_services')
   add_global_arguments('-DENABLE_VIRTSVC', language: ['c', 'cpp'])
 endif
 if get_option('enable_static_underlay_ip')
-  add_global_arguments('-DENABLE_STATIC_UNDERLAY_IP', language: 'c')
+  add_global_arguments('-DENABLE_STATIC_UNDERLAY_IP', language: ['c', 'cpp'])
 endif
 if get_option('enable_tests')
-  add_global_arguments('-DENABLE_PYTEST', language: 'c')
+  add_global_arguments('-DENABLE_PYTEST', language: ['c', 'cpp'])
 endif
 if get_option('enable_pf1_proxy')
-  add_global_arguments('-DENABLE_PF1_PROXY', language: 'c')
+  add_global_arguments('-DENABLE_PF1_PROXY', language: ['c', 'cpp'])
 endif
 
 dpdk_dep = dependency('libdpdk', version: '>=21.11.0')
