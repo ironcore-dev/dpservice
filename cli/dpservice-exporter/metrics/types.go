@@ -75,7 +75,11 @@ type DpServiceGraphCallCount struct {
 	GraphCallCnt GraphCallCount `json:"/dp_service/graph/call_count"`
 }
 
-type DpServiceHeapInfo struct {
+type EalHeapList struct {
+	Value []int `json:"/eal/heap_list"`
+}
+
+type EalHeapInfo struct {
 	Value map[string]any `json:"/eal/heap_info"`
 }
 

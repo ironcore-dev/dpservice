@@ -46,12 +46,17 @@ func queryTelemetry(conn net.Conn, log *logrus.Logger, command string, response 
 }
 
 func Update(conn net.Conn, hostname string, log *logrus.Logger) {
-	var dpserviceHeapInfo DpServiceHeapInfo
-	queryTelemetry(conn, log, "/eal/heap_info,0", &dpserviceHeapInfo)
-	for key, value := range dpserviceHeapInfo.Value {
-		// Only export metrics of type float64 (/eal/heap_info contains also some string values)
-		if v, ok := value.(float64); ok {
-			HeapInfo.With(prometheus.Labels{"node_name": hostname, "info": key}).Set(v)
+	var ealHeapList EalHeapList
+	queryTelemetry(conn, log, "/eal/heap_list", &ealHeapList)
+
+	for _, id := range ealHeapList.Value {
+		var ealHeapInfo EalHeapInfo
+		queryTelemetry(conn, log, fmt.Sprintf("/eal/heap_info,%d", id), &ealHeapInfo)
+		for key, value := range ealHeapInfo.Value {
+			// Only export metrics of type float64 (/eal/heap_info contains also some string values)
+			if v, ok := value.(float64); ok {
+				HeapInfo.With(prometheus.Labels{"node_name": hostname, "info": key}).Set(v)
+			}
 		}
 	}
 
