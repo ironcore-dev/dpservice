@@ -150,6 +150,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_virtsvc *virtsvc;
 #endif
 
+	// this is where pf1-proxy -> pf1 should happen, but that is done via rte_flow rule
+
 	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
 		return CLS_NEXT_DROP;
 
@@ -229,16 +231,9 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 #ifdef ENABLE_PF1_PROXY
 static __rte_always_inline rte_edge_t get_next_index_proxy(__rte_unused struct rte_node *node, struct rte_mbuf *m)
 {
-	rte_edge_t next;
+	rte_edge_t next = get_next_index(node, m);
 
-	if (!pf1_proxy_enabled)
-		return get_next_index(node, m);
-
-	if (m->port == pf1_proxy_port_id)
-		return next_tx_index[pf1_port_id];
-
-	next = get_next_index(node, m);
-	if (unlikely(next == CLS_NEXT_DROP && m->port == pf1_port_id))
+	if (next == CLS_NEXT_DROP && pf1_proxy_enabled && m->port == pf1_port_id)
 		return next_tx_index[pf1_proxy_port_id];
 
 	return next;
