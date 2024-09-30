@@ -6,6 +6,7 @@
 | -v, --version | None | display version and exit |  |
 | --pf0 | IFNAME | first physical interface (e.g. eth0) |  |
 | --pf1 | IFNAME | second physical interface (e.g. eth1) |  |
+| --pf1-proxy | IFNAME | VF representor to use as a proxy for pf1 packets |  |
 | --ipv6 | ADDR6 | IPv6 underlay address |  |
 | --vf-pattern | PATTERN | virtual interface name pattern (e.g. 'eth1vf') |  |
 | --dhcp-mtu | SIZE | set the mtu field in DHCP responses (68 - 1500) |  |
