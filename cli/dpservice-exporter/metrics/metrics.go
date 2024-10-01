@@ -78,6 +78,25 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 		if err != nil {
 			return err
 		}
+		// set link status only for PF interfaces
+		// if interface name doesn't contain "representor" it is PF interface
+		if !strings.Contains(ethdevInfo.Value.Name, "representor") {
+			var ethdevLinkStatus EthdevLinkStatus
+			err = queryTelemetry(conn, log, fmt.Sprintf("/ethdev/link_status,%d", id), &ethdevLinkStatus)
+			if err != nil {
+				return err
+			}
+			var linkStatus float64
+			if strings.ToLower(ethdevLinkStatus.Value.Status) == "up" {
+				linkStatus = float64(1)
+			} else if strings.ToLower(ethdevLinkStatus.Value.Status) == "down" {
+				linkStatus = float64(0)
+			} else {
+				// if there is problem getting the link status skip this update
+				continue
+			}
+			InterfaceStat.With(prometheus.Labels{"interface": ethdevInfo.Value.Name, "stat_name": "link_status"}).Set(linkStatus)
+		}
 
 		var ethdevXstats EthdevXstats
 		err = queryTelemetry(conn, log, fmt.Sprintf("/ethdev/xstats,%d", id), &ethdevXstats)
