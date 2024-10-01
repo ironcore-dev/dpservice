@@ -49,6 +49,14 @@ type EthdevInfo struct {
 	} `json:"/ethdev/info"`
 }
 
+type EthdevLinkStatus struct {
+	Value struct {
+		Duplex string `json:"duplex,omitempty"`
+		Speed  int    `json:"speed,omitempty"`
+		Status string `json:"status,omitempty"`
+	} `json:"/ethdev/link_status"`
+}
+
 type EthdevXstats struct {
 	Value map[string]float64 `json:"/ethdev/xstats"`
 }
