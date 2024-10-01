@@ -267,6 +267,7 @@ function make_config() {
 		echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=1,representor=pf[0-1]vf[0-$[$actualvfs-1]]"
 		if [[ "$OPT_PF1_PROXY" == "true" ]]; then
 			echo "pf1-proxy $(get_pf1_proxy ${devs[1]})"
+			echo "pf1-proxy-vf $(get_pf1_proxy_vf)"
 		fi
 		echo "multiport-eswitch"
 	else

@@ -23,6 +23,9 @@ _OPT_SHOPT_MAX = 255,
 #ifdef ENABLE_PF1_PROXY
 	OPT_PF1_PROXY,
 #endif
+#ifdef ENABLE_PF1_PROXY
+	OPT_PF1_PROXY_VF,
+#endif
 	OPT_IPV6,
 	OPT_VF_PATTERN,
 	OPT_DHCP_MTU,
@@ -61,6 +64,9 @@ static const struct option dp_conf_longopts[] = {
 	{ "pf1", 1, 0, OPT_PF1 },
 #ifdef ENABLE_PF1_PROXY
 	{ "pf1-proxy", 1, 0, OPT_PF1_PROXY },
+#endif
+#ifdef ENABLE_PF1_PROXY
+	{ "pf1-proxy-vf", 1, 0, OPT_PF1_PROXY_VF },
 #endif
 	{ "ipv6", 1, 0, OPT_IPV6 },
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
@@ -114,6 +120,9 @@ static char pf1_name[IF_NAMESIZE];
 #ifdef ENABLE_PF1_PROXY
 static char pf1_proxy[IF_NAMESIZE];
 #endif
+#ifdef ENABLE_PF1_PROXY
+static char pf1_proxy_vf[IF_NAMESIZE];
+#endif
 static char vf_pattern[IF_NAMESIZE];
 static int dhcp_mtu = 1500;
 static int wcmp_perc = 100;
@@ -147,6 +156,13 @@ const char *dp_conf_get_pf1_name(void)
 const char *dp_conf_get_pf1_proxy(void)
 {
 	return pf1_proxy;
+}
+
+#endif
+#ifdef ENABLE_PF1_PROXY
+const char *dp_conf_get_pf1_proxy_vf(void)
+{
+	return pf1_proxy_vf;
 }
 
 #endif
@@ -249,6 +265,9 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 #ifdef ENABLE_PF1_PROXY
 		"     --pf1-proxy=IFNAME                 VF representor to use as a proxy for pf1 packets\n"
 #endif
+#ifdef ENABLE_PF1_PROXY
+		"     --pf1-proxy-vf=IFNAME              VF interface of the pf1-proxy VF representor\n"
+#endif
 		"     --ipv6=ADDR6                       IPv6 underlay address\n"
 		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
 		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
@@ -290,6 +309,10 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 #ifdef ENABLE_PF1_PROXY
 	case OPT_PF1_PROXY:
 		return dp_argparse_string(arg, pf1_proxy, ARRAY_SIZE(pf1_proxy));
+#endif
+#ifdef ENABLE_PF1_PROXY
+	case OPT_PF1_PROXY_VF:
+		return dp_argparse_string(arg, pf1_proxy_vf, ARRAY_SIZE(pf1_proxy_vf));
 #endif
 	case OPT_IPV6:
 		return dp_argparse_opt_ipv6(arg);

@@ -89,6 +89,7 @@ struct dp_port {
 	char							dev_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
+	uint32_t						if_index;
 	struct rte_ether_addr			own_mac;
 	struct rte_ether_addr			neigh_mac;
 	struct dp_port_iface			iface;
@@ -134,6 +135,8 @@ int dp_start_pf_port(uint16_t index);
 int dp_start_pf1_proxy_port(void);
 #endif
 int dp_stop_port(struct dp_port *port);
+
+int dp_acquire_neigh_mac(struct dp_port *port);
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap);
 
