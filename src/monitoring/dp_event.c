@@ -86,6 +86,9 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 
 	port->link_status = status;
 	DPS_LOG_INFO("PF link state changed", DP_LOG_LINKSTATE(port->link_status), DP_LOG_PORT(port));
+
+	if (status == RTE_ETH_LINK_UP)
+		dp_acquire_neigh_mac(port);
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows

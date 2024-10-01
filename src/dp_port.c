@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "dp_error.h"
+#include "dp_port.h"
 #include <rte_bus_pci.h>
 #include "dp_conf.h"
+#include "dp_error.h"
 #include "dp_hairpin.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_netlink.h"
-#include "dp_port.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
@@ -91,20 +91,9 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	return _dp_port_table[port_id];
 }
 
-static void dp_set_neighmac(struct dp_port *port, const struct rte_ether_addr *mac)
-{
-	char strmac[18];
-
-	rte_ether_addr_copy(mac, &port->neigh_mac);
-
-	snprintf(strmac, sizeof(strmac), RTE_ETHER_ADDR_PRT_FMT, RTE_ETHER_ADDR_BYTES(&port->neigh_mac));
-	DPS_LOG_INFO("Setting neighboring MAC", _DP_LOG_STR("mac", strmac), DP_LOG_PORT(port));
-}
-
 static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-	struct rte_ether_addr pf_neigh_mac = {0};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
 	struct rte_eth_conf port_conf = port_conf_default;
@@ -182,16 +171,6 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
 	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
 
-	if (port->is_pf) {
-		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->own_mac)))
-			return DP_ERROR;
-		dp_set_neighmac(port, &pf_neigh_mac);
-	}
-#ifdef ENABLE_PF1_PROXY
-	else if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1_proxy())
-		dp_set_neighmac(port, &dp_get_pf1()->neigh_mac);
-#endif
-
 	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return DP_ERROR;
 
@@ -260,6 +239,7 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 	port->is_pf = is_pf;
 	port->port_id = port_id;
 	port->socket_id = socket_id;
+	port->if_index = dev_info->if_index;
 	_dp_port_table[port_id] = port;
 
 	if (is_pf && DP_FAILED(dp_port_register_pf(port)))
@@ -294,16 +274,24 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 static struct dp_port *dp_port_init_pf1_proxy_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_port *port;
+	uint32_t if_index;
 	int socket_id;
 
 	socket_id = dp_get_port_socket_id(port_id);
 	if (DP_FAILED(socket_id) && socket_id != SOCKET_ID_ANY)
 		return NULL;
 
+	if_index = if_nametoindex(dp_conf_get_pf1_proxy_vf());
+	if (if_index == 0) {
+		DPS_LOG_ERR("Cannot get pf1-proxy vf interface index", DP_LOG_IFACE(dp_conf_get_pf1_proxy_vf()));
+		return NULL;
+	}
+
 	port = &_dp_pf1_proxy_port;
 	port->is_pf = false;
 	port->port_id = port_id;
 	port->socket_id = socket_id;
+	port->if_index = if_index;
 	_dp_port_table[port_id] = port;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
@@ -661,6 +649,14 @@ int dp_start_pf_port(uint16_t index)
 		return DP_ERROR;
 
 	DPS_LOG_INFO("Received initial PF link state", DP_LOG_LINKSTATE(port->link_status), DP_LOG_PORT(port));
+
+	if (port->link_status == RTE_ETH_LINK_UP)
+#ifdef ENABLE_PF1_PROXY
+		// Do not use PF1 in pf1-proxy mode as Linux does not use it then (thus the mac will never be there)
+		if (!dp_conf_is_pf1_proxy_enabled() || port != dp_get_pf1())
+#endif
+			dp_acquire_neigh_mac(port);
+
 	return DP_OK;
 }
 
@@ -674,6 +670,9 @@ int dp_start_pf1_proxy_port(void)
 		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORT(&_dp_pf1_proxy_port), DP_LOG_RET(ret));
 		return ret;
 	}
+
+	if (dp_get_pf1()->link_status == RTE_ETH_LINK_UP)
+		dp_acquire_neigh_mac(&_dp_pf1_proxy_port);
 
 	_dp_pf1_proxy_port.allocated = true;
 	return DP_OK;
@@ -691,6 +690,37 @@ int dp_stop_port(struct dp_port *port)
 	port->allocated = false;
 	return DP_OK;
 }
+
+
+static void dp_set_neighmac(struct dp_port *port, const struct rte_ether_addr *mac)
+{
+	char strmac[18];
+
+	rte_ether_addr_copy(mac, &port->neigh_mac);
+
+	snprintf(strmac, sizeof(strmac), RTE_ETHER_ADDR_PRT_FMT, RTE_ETHER_ADDR_BYTES(&port->neigh_mac));
+	DPS_LOG_INFO("Setting neighboring MAC", _DP_LOG_STR("mac", strmac), DP_LOG_PORT(port));
+}
+
+int dp_acquire_neigh_mac(struct dp_port *port)
+{
+	struct rte_ether_addr pf_neigh_mac = {0};
+
+#ifdef ENABLE_PF1_PROXY
+	// The pf1-proxy VF is actually the interface that Linux uses (thus has the right value)
+	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1())
+		port = &_dp_pf1_proxy_port;
+#endif
+
+	if (DP_FAILED(dp_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac))) {
+		DPS_LOG_WARNING("No PF neighboring router", DP_LOG_PORT(port));
+		return DP_ERROR;
+	}
+
+	dp_set_neighmac(port, &pf_neigh_mac);
+	return DP_OK;
+}
+
 
 static int dp_port_total_flow_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap)
 {
