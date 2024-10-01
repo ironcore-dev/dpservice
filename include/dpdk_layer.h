@@ -44,10 +44,12 @@ extern "C" {
 #else
 #define DP_MBUF_POOL_SIZE	(350*1024)
 #endif
-#define DP_MBUF_BUF_SIZE	(1518 + RTE_PKTMBUF_HEADROOM)
+// max Ether MTU 1500 + frame header 14 + frame footer 4 + IPv6 tunnel header 40
+#define DP_MBUF_BUF_SIZE	(1558 + RTE_PKTMBUF_HEADROOM)
 
 #ifdef ENABLE_PF1_PROXY
 #define DP_JUMBO_MBUF_POOL_SIZE	(50*1024)
+// max Jumbo Ether MTU 9100 + frame header 14 + frame footer 4
 #define DP_JUMBO_MBUF_BUF_SIZE	(9118 + RTE_PKTMBUF_HEADROOM)
 #endif
 
