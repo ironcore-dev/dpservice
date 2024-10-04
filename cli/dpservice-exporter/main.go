@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"os/user"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -72,10 +73,7 @@ func main() {
 	}
 
 	r := prometheus.NewRegistry()
-	r.MustRegister(metrics.InterfaceStat)
-	r.MustRegister(metrics.CallCount)
-	r.MustRegister(metrics.HeapInfo)
-	r.MustRegister(metrics.HashTableSaturation)
+	registerAllMetrics(r, log)
 
 	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
 
@@ -200,5 +198,30 @@ func periodicMetricsUpdate(log *logrus.Logger, exitChan chan struct{}) {
 			return
 		}
 		time.Sleep(time.Duration(pollIntervalFlag) * time.Second)
+	}
+}
+
+func registerAllMetrics(r *prometheus.Registry, log *logrus.Logger) {
+	metricsList := []prometheus.Collector{
+		metrics.DpdkEthdevErrors,
+		metrics.DpdkEthdevPackets,
+		metrics.DpdkEthdevBytes,
+		metrics.DpdkEthdevMisc,
+		metrics.DpdkEthdevLinkStatus,
+		metrics.DpdkHeapInfo,
+		metrics.DpserviceUsedNatPortsCount,
+		metrics.DpserviceFwRulesCount,
+		metrics.DpserviceVirtsvcUsedPortsCount,
+		metrics.DpserviceCallCount,
+		metrics.DpserviceHashTableSaturation,
+	}
+
+	for _, metric := range metricsList {
+		v := reflect.ValueOf(metric)
+		if v.Kind() == reflect.Ptr && v.Elem().CanInterface() {
+			r.MustRegister(v.Elem().Interface().(prometheus.Collector))
+		} else {
+			log.Errorf("Invalid metric type: %T", metric)
+		}
 	}
 }
