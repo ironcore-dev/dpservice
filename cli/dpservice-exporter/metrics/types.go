@@ -49,6 +49,14 @@ type EthdevInfo struct {
 	} `json:"/ethdev/info"`
 }
 
+type EthdevLinkStatus struct {
+	Value struct {
+		Duplex string `json:"duplex,omitempty"`
+		Speed  int    `json:"speed,omitempty"`
+		Status string `json:"status,omitempty"`
+	} `json:"/ethdev/link_status"`
+}
+
 type EthdevXstats struct {
 	Value map[string]float64 `json:"/ethdev/xstats"`
 }
@@ -75,7 +83,11 @@ type DpServiceGraphCallCount struct {
 	GraphCallCnt GraphCallCount `json:"/dp_service/graph/call_count"`
 }
 
-type DpServiceHeapInfo struct {
+type EalHeapList struct {
+	Value []int `json:"/eal/heap_list"`
+}
+
+type EalHeapInfo struct {
 	Value map[string]any `json:"/eal/heap_info"`
 }
 
