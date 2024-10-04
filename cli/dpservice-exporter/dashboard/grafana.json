@@ -24,10 +24,23 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 40,
+  "id": 28,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 18,
+      "panels": [],
+      "title": "Heap Info",
+      "type": "row"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -92,7 +105,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 2,
       "options": {
@@ -187,7 +200,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 5,
       "options": {
@@ -282,7 +295,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 10
       },
       "id": 6,
       "options": {
@@ -377,7 +390,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 9
+        "y": 10
       },
       "id": 7,
       "options": {
@@ -472,7 +485,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 19
       },
       "id": 8,
       "options": {
@@ -567,7 +580,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 19
       },
       "id": 9,
       "options": {
@@ -599,6 +612,445 @@
       "type": "timeseries"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 17,
+      "panels": [],
+      "title": "DPDK Ethdev statistics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "<replace>"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 1,
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "index": 0,
+                  "text": "DOWN"
+                },
+                "1": {
+                  "index": 1,
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bool_on_off"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "<replace>"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "dpdk_ethdev_link_status{cluster=~\"$cluster\", pod=~\"$pod\", name=~\"$ethdev\"}",
+          "legendFormat": "{{cluster}} {{pod}} {{name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DPDK Ethdev PF Link Status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "<replace>"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "<replace>"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sort(dpdk_ethdev_errors{cluster=~\"$cluster\", pod=~\"$pod\", name=~\"$ethdev\"})",
+          "legendFormat": "{{cluster}} {{pod}} {{name}} {{stat}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DPDK Ethdev Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "<replace>"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "<replace>"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sort(dpdk_ethdev_packets{cluster=~\"$cluster\", pod=~\"$pod\", name=~\"$ethdev\"})",
+          "legendFormat": "{{cluster}} {{pod}} {{name}} {{stat}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DPDK Ethdev Packets",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "<replace>"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "<replace>"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sort(dpdk_ethdev_bytes{cluster=~\"$cluster\", pod=~\"$pod\", name=~\"$ethdev\"})",
+          "legendFormat": "{{cluster}} {{pod}} {{name}} {{stat}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DPDK Ethdev Bytes",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 16,
+      "panels": [],
+      "title": "DP-Service statisics",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "<replace>"
@@ -661,7 +1113,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 46
       },
       "id": 4,
       "options": {
@@ -687,13 +1139,13 @@
             "uid": "<replace>"
           },
           "editorMode": "code",
-          "expr": "sort(dpdk_interface_stat{stat_name=\"nat_used_port_count\", cluster=~\"$cluster\", pod=~\"$pod\", interface=~\"$interface\"})",
-          "legendFormat": "{{cluster}} {{pod}} {{interface}}",
+          "expr": "sort(dps_nat_used_ports_count{cluster=~\"$cluster\", pod=~\"$pod\", interface_id=~\"$interface\"})",
+          "legendFormat": "{{cluster}} {{pod}} {{interface_id}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "DP-Service NAT Used Ports",
+      "title": "DP-Service NAT Used Ports per Interface",
       "type": "timeseries"
     },
     {
@@ -759,7 +1211,105 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 56
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "<replace>"
+          },
+          "editorMode": "code",
+          "expr": "dps_firewall_rules_count{cluster=~\"$cluster\", pod=~\"$pod\", interface_id=~\"$interface\"}",
+          "legendFormat": "{{cluster}} {{pod}} {{interface_id}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "DP-Service Firewall Rules Used per Interface",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "<replace>"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 66
       },
       "id": 3,
       "options": {
@@ -785,8 +1335,8 @@
             "uid": "<replace>"
           },
           "editorMode": "code",
-          "expr": "dpdk_interface_stat{stat_name=\"virtsvc_used_port_count\", cluster=~\"$cluster\", pod=~\"$pod\"}",
-          "legendFormat": "{{cluster}} {{pod}} {{interface}}",
+          "expr": "dps_virtsvc_used_ports_count{cluster=~\"$cluster\", pod=~\"$pod\"}",
+          "legendFormat": "{{cluster}} {{pod}} {{address}}",
           "range": true,
           "refId": "A"
         }
@@ -857,130 +1407,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 47
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "sortBy": "Last *",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "<replace>"
-          },
-          "editorMode": "code",
-          "expr": "dpdk_interface_stat{stat_name=\"firewall_rule_count\", cluster=~\"$cluster\", pod=~\"$pod\", interface=~\"$interface\"}",
-          "legendFormat": "{{cluster}} {{pod}} iface: {{interface}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "DP-Service Firewall Rules Used per Interface",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "<replace>"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "prometheus/lab1-vm3-prometheus dp-service-j2ht9 conntrack_table_entries"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 57
+        "y": 76
       },
       "id": 10,
       "options": {
@@ -1006,8 +1433,8 @@
             "uid": "<replace>"
           },
           "editorMode": "code",
-          "expr": "hash_table_saturation{table_name=~\"$hash_table\", cluster=~\"$cluster\", pod=~\"$pod\"}",
-          "legendFormat": "{{cluster}} {{pod}} {{table_name}}_{{stat_name}}",
+          "expr": "dps_hash_table_saturation{table=~\"$hash_table\", cluster=~\"$cluster\", pod=~\"$pod\"}",
+          "legendFormat": "{{cluster}} {{pod}} {{table}}_{{stat}}",
           "range": true,
           "refId": "A"
         }
@@ -1097,16 +1524,16 @@
           "type": "prometheus",
           "uid": "<replace>"
         },
-        "definition": "label_values(hash_table_saturation,table_name)",
+        "definition": "label_values(dpdk_ethdev_packets,name)",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": true,
-        "name": "hash_table",
+        "name": "ethdev",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(hash_table_saturation,table_name)",
+          "query": "label_values(dpdk_ethdev_packets,name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -1129,7 +1556,7 @@
           "type": "prometheus",
           "uid": "<replace>"
         },
-        "definition": "label_values(dpdk_interface_stat,interface)",
+        "definition": "label_values(dps_firewall_rules_count,interface_id)",
         "hide": 0,
         "includeAll": true,
         "label": "",
@@ -1138,7 +1565,39 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(dpdk_interface_stat,interface)",
+          "query": "label_values(dps_firewall_rules_count,interface_id)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "<replace>"
+        },
+        "definition": "label_values(dps_hash_table_saturation,table)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "",
+        "multi": true,
+        "name": "hash_table",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(dps_hash_table_saturation,table)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -1159,4 +1618,4 @@
   "uid": "<replace>",
   "version": 1,
   "weekStart": ""
-  }
+}
