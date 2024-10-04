@@ -6,36 +6,92 @@ package metrics
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	InterfaceStat = prometheus.NewGaugeVec(
+	DpdkEthdevErrors = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "dpdk_interface_stat",
-			Help: "Dp-Service interface statistic",
+			Name: "dpdk_ethdev_errors",
+			Help: "DPDK ethdev errors",
 		},
-		[]string{"interface", "stat_name"},
+		[]string{"name", "stat"},
 	)
 
-	CallCount = prometheus.NewGaugeVec(
+	DpdkEthdevPackets = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "dpdk_graph_stat",
-			Help: "Dp-Service graph statistics",
+			Name: "dpdk_ethdev_packets",
+			Help: "DPDK ethdev packets",
 		},
-		[]string{"node_name", "graph_node"},
+		[]string{"name", "stat"},
 	)
 
-	HeapInfo = prometheus.NewGaugeVec(
+	DpdkEthdevBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dpdk_ethdev_bytes",
+			Help: "DPDK ethdev bytes",
+		},
+		[]string{"name", "stat"},
+	)
+
+	DpdkEthdevMisc = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dpdk_ethdev_misc",
+			Help: "Other DPDK ethdev statistics",
+		},
+		[]string{"name", "stat"},
+	)
+
+	DpdkEthdevLinkStatus = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dpdk_ethdev_link_status",
+			Help: "Link status of DPDK ethdev",
+		},
+		[]string{"name"},
+	)
+
+	DpdkHeapInfo = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "dpdk_heap_info",
-			Help: "Dp-Service heap info",
+			Help: "Dpservice heap info",
 		},
-		[]string{"node_name", "info"},
+		[]string{"node", "info"},
 	)
 
-	HashTableSaturation = prometheus.NewGaugeVec(
+	DpserviceUsedNatPortsCount = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "hash_table_saturation",
-			Help: "Dp-Service hash table saturation",
+			Name: "dps_nat_used_ports_count",
+			Help: "Count of used NAT ports on interface",
 		},
-		[]string{"table_name", "stat_name"},
+		[]string{"interface_id"},
+	)
+
+	DpserviceFwRulesCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dps_firewall_rules_count",
+			Help: "Count of firewall rules on interface",
+		},
+		[]string{"interface_id"},
+	)
+
+	DpserviceVirtsvcUsedPortsCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dps_virtsvc_used_ports_count",
+			Help: "Count of used virtual service ports",
+		},
+		[]string{"address"},
+	)
+
+	DpserviceCallCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dps_graph_call_count",
+			Help: "Dpservice graph statistics",
+		},
+		[]string{"node", "graph_node"},
+	)
+
+	DpserviceHashTableSaturation = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dps_hash_table_saturation",
+			Help: "Dpservice hash table saturation",
+		},
+		[]string{"table", "stat"},
 	)
 )
 
@@ -61,11 +117,11 @@ type EthdevXstats struct {
 	Value map[string]float64 `json:"/ethdev/xstats"`
 }
 
-type DpServiceNatPort struct {
+type DpServiceNatPortCount struct {
 	Value map[string]int `json:"/dp_service/nat/used_port_count"`
 }
 
-type DpServiceVirtsvcPort struct {
+type DpServiceVirtsvcPortCount struct {
 	Value map[string]int `json:"/dp_service/virtsvc/used_port_count"`
 }
 
