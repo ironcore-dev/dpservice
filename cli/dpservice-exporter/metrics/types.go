@@ -8,24 +8,24 @@ import "github.com/prometheus/client_golang/prometheus"
 var (
 	DpdkEthdevErrors = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "dpdk_ethdev_errors",
-			Help: "DPDK ethdev errors",
+			Name: "dpdk_ethdev_errors_total",
+			Help: "DPDK total ethdev errors",
 		},
 		[]string{"name", "stat"},
 	)
 
 	DpdkEthdevPackets = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "dpdk_ethdev_packets",
-			Help: "DPDK ethdev packets",
+			Name: "dpdk_ethdev_packets_total",
+			Help: "DPDK total ethdev packets",
 		},
 		[]string{"name", "stat"},
 	)
 
 	DpdkEthdevBytes = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "dpdk_ethdev_bytes",
-			Help: "DPDK ethdev bytes",
+			Name: "dpdk_ethdev_bytes_total",
+			Help: "DPDK total ethdev bytes",
 		},
 		[]string{"name", "stat"},
 	)
