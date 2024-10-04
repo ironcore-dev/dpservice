@@ -50,19 +50,19 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 	var ealHeapList EalHeapList
 	err := queryTelemetry(conn, log, "/eal/heap_list", &ealHeapList)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query eal heap list: %v", err)
 	}
 
 	for _, id := range ealHeapList.Value {
 		var ealHeapInfo EalHeapInfo
 		err = queryTelemetry(conn, log, fmt.Sprintf("/eal/heap_info,%d", id), &ealHeapInfo)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to query eal heap info: %v", err)
 		}
 		for key, value := range ealHeapInfo.Value {
 			// Only export metrics of type float64 (/eal/heap_info contains also some string values)
 			if v, ok := value.(float64); ok {
-				HeapInfo.With(prometheus.Labels{"node_name": hostname, "info": key}).Set(v)
+				DpdkHeapInfo.With(prometheus.Labels{"node": hostname, "info": key}).Set(v)
 			}
 		}
 	}
@@ -76,7 +76,7 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 		var ethdevInfo EthdevInfo
 		err = queryTelemetry(conn, log, fmt.Sprintf("/ethdev/info,%d", id), &ethdevInfo)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to query ethdev info: %v", err)
 		}
 		// set link status only for PF interfaces
 		// if interface name doesn't contain "representor" it is PF interface
@@ -84,7 +84,7 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 			var ethdevLinkStatus EthdevLinkStatus
 			err = queryTelemetry(conn, log, fmt.Sprintf("/ethdev/link_status,%d", id), &ethdevLinkStatus)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to query ethdev link status: %v", err)
 			}
 			var linkStatus float64
 			if strings.ToLower(ethdevLinkStatus.Value.Status) == "up" {
@@ -95,64 +95,72 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 				// if there is problem getting the link status skip this update
 				continue
 			}
-			InterfaceStat.With(prometheus.Labels{"interface": ethdevInfo.Value.Name, "stat_name": "link_status"}).Set(linkStatus)
+			DpdkEthdevLinkStatus.With(prometheus.Labels{"name": ethdevInfo.Value.Name}).Set(linkStatus)
 		}
 
 		var ethdevXstats EthdevXstats
 		err = queryTelemetry(conn, log, fmt.Sprintf("/ethdev/xstats,%d", id), &ethdevXstats)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to query ethdev xstats: %v", err)
 		}
 
 		for statName, statValueFloat := range ethdevXstats.Value {
-			InterfaceStat.With(prometheus.Labels{"interface": ethdevInfo.Value.Name, "stat_name": statName}).Set(statValueFloat)
+			if strings.Contains(statName, "bytes") {
+				DpdkEthdevBytes.With(prometheus.Labels{"name": ethdevInfo.Value.Name, "stat": statName}).Set(statValueFloat)
+			} else if strings.Contains(statName, "packets") {
+				DpdkEthdevPackets.With(prometheus.Labels{"name": ethdevInfo.Value.Name, "stat": statName}).Set(statValueFloat)
+			} else if strings.Contains(statName, "errors") {
+				DpdkEthdevErrors.With(prometheus.Labels{"name": ethdevInfo.Value.Name, "stat": statName}).Set(statValueFloat)
+			} else {
+				DpdkEthdevMisc.With(prometheus.Labels{"name": ethdevInfo.Value.Name, "stat": statName}).Set(statValueFloat)
+			}
 		}
 	}
 
-	var dpserviceNatPort DpServiceNatPort
-	err = queryTelemetry(conn, log, "/dp_service/nat/used_port_count", &dpserviceNatPort)
+	var dpserviceNatPortCount DpServiceNatPortCount
+	err = queryTelemetry(conn, log, "/dp_service/nat/used_port_count", &dpserviceNatPortCount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query used nat port count: %v", err)
 	}
-	for ifName, portCount := range dpserviceNatPort.Value {
-		InterfaceStat.With(prometheus.Labels{"interface": ifName, "stat_name": "nat_used_port_count"}).Set(float64(portCount))
+	for ifaceName, portCount := range dpserviceNatPortCount.Value {
+		DpserviceUsedNatPortsCount.With(prometheus.Labels{"interface_id": ifaceName}).Set(float64(portCount))
 	}
 
-	var dpserviceVirtsvcPort DpServiceVirtsvcPort
-	err = queryTelemetry(conn, log, "/dp_service/virtsvc/used_port_count", &dpserviceVirtsvcPort)
+	var dpserviceVirtsvcPortCount DpServiceVirtsvcPortCount
+	err = queryTelemetry(conn, log, "/dp_service/virtsvc/used_port_count", &dpserviceVirtsvcPortCount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query used virtsvc port count: %v", err)
 	}
-	for ifName, portCount := range dpserviceVirtsvcPort.Value {
-		InterfaceStat.With(prometheus.Labels{"interface": ifName, "stat_name": "virtsvc_used_port_count"}).Set(float64(portCount))
+	for virtsvc, portCount := range dpserviceVirtsvcPortCount.Value {
+		DpserviceVirtsvcUsedPortsCount.With(prometheus.Labels{"address": virtsvc}).Set(float64(portCount))
 	}
 
 	var dpserviceFirewallRuleCount DpServiceFirewallRuleCount
 	err = queryTelemetry(conn, log, "/dp_service/firewall/rule_count", &dpserviceFirewallRuleCount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query firewall rule count: %v", err)
 	}
-	for ifName, fwRuleCount := range dpserviceFirewallRuleCount.Value {
-		InterfaceStat.With(prometheus.Labels{"interface": ifName, "stat_name": "firewall_rule_count"}).Set(float64(fwRuleCount))
+	for ifaceName, fwRuleCount := range dpserviceFirewallRuleCount.Value {
+		DpserviceFwRulesCount.With(prometheus.Labels{"interface_id": ifaceName}).Set(float64(fwRuleCount))
 	}
 
 	var dpserviceCallCount DpServiceGraphCallCount
 	err = queryTelemetry(conn, log, "/dp_service/graph/call_count", &dpserviceCallCount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query call count: %v", err)
 	}
 	for graphNodeName, callCount := range dpserviceCallCount.GraphCallCnt.Node_0_to_255 {
-		CallCount.With(prometheus.Labels{"node_name": hostname, "graph_node": graphNodeName}).Set(callCount)
+		DpserviceCallCount.With(prometheus.Labels{"node": hostname, "graph_node": graphNodeName}).Set(callCount)
 	}
 
 	var dpServiceHashTableSaturation DpServiceHashTableSaturation
 	err = queryTelemetry(conn, log, "/dp_service/table/saturation", &dpServiceHashTableSaturation)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query table saturation: %v", err)
 	}
 	for table, saturation := range dpServiceHashTableSaturation.Value {
-		HashTableSaturation.With(prometheus.Labels{"table_name": table, "stat_name": "capacity"}).Set(saturation.Capacity)
-		HashTableSaturation.With(prometheus.Labels{"table_name": table, "stat_name": "entries"}).Set(saturation.Entries)
+		DpserviceHashTableSaturation.With(prometheus.Labels{"table": table, "stat": "capacity"}).Set(saturation.Capacity)
+		DpserviceHashTableSaturation.With(prometheus.Labels{"table": table, "stat": "entries"}).Set(saturation.Entries)
 	}
 	return nil
 }
