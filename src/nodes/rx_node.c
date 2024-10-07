@@ -19,7 +19,7 @@ DP_NODE_REGISTER_SOURCE(RX, rx, NEXT_NODES);
 
 // there are multiple Tx nodes, one per port, node context is needed
 struct rx_node_ctx {
-	struct dp_port *port;
+	const struct dp_port *port;
 	uint16_t	queue_id;
 };
 static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ,
@@ -53,7 +53,7 @@ static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;
 	uint16_t port_id;
-	struct dp_port *port;
+	const struct dp_port *port;
 
 	// Find this node's dedicated port to be used in processing
 	for (port_id = 0; port_id < RTE_DIM(rx_node_ids); ++port_id)

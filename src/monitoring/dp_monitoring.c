@@ -21,6 +21,9 @@ void dp_process_event_msg(struct rte_mbuf *m)
 	case DP_EVENT_TYPE_FLOW_AGING:
 		dp_process_event_flow_aging_msg(m);
 		break;
+	case DP_EVENT_TYPE_NEIGHMAC:
+		dp_process_event_neighmac_msg(m);
+		break;
 	}
 
 	rte_pktmbuf_free(m);

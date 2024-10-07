@@ -75,7 +75,7 @@ if get_option('enable_virtual_services')
 endif
 if get_option('enable_pf1_proxy')
   dp_sources += [
-    'nodes/pf1_proxy_node.c',
+    'rte_flow/dp_rte_async_flow_pf1_proxy.c',
   ]
 endif
 

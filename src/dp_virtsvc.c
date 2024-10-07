@@ -169,6 +169,7 @@ int dp_virtsvc_init(int socket_id)
 		dp_virtservices_end->virtual_port = rule->virtual_port;
 		dp_virtservices_end->service_port = rule->service_port;
 		dp_copy_ipv6(&dp_virtservices_end->service_addr, &rule->service_addr);
+		dp_generate_ul_ipv6(&dp_virtservices_end->ul_addr);
 		// last_assigned_port is 0 due to zmalloc()
 		snprintf(hashtable_name, sizeof(hashtable_name), "virtsvc_table_%u", i);
 		dp_virtservices_end->open_ports = dp_create_jhash_table(DP_VIRTSVC_PORTCOUNT,
@@ -264,7 +265,8 @@ uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
 													  service->service_port,
 													  service->proto == IPPROTO_TCP
 														? tcp_template_table
-														: udp_template_table);
+														: udp_template_table,
+													  &service->ul_addr);
 		if (!flow) {
 			DPS_LOG_ERR("Cannot create async virtsvc isolation rule", DP_LOG_VIRTSVC(service));
 			break;

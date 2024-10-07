@@ -46,6 +46,7 @@ struct dp_virtsvc {
 	rte_be16_t		service_port;
 	uint8_t			proto;
 	uint16_t		last_assigned_port;
+	union dp_ipv6	ul_addr;
 	struct rte_hash	*open_ports;
 	struct dp_virtsvc_conn connections[DP_VIRTSVC_PORTCOUNT];
 	struct rte_flow	*isolation_rules[DP_MAX_PF_PORTS];
