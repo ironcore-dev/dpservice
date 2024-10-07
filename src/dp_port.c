@@ -17,6 +17,7 @@
 #include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_async_flow.h"
 #include "rte_flow/dp_rte_async_flow_isolation.h"
+#include "rte_flow/dp_rte_async_flow_pf1_proxy.h"
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_capture.h"
@@ -24,6 +25,9 @@
 
 #define DP_PORT_INIT_PF true
 #define DP_PORT_INIT_VF false
+
+#define DP_PORT_PROXIED true
+#define DP_PORT_NORMAL false
 
 #define DP_METER_CIR_BASE_VALUE  (1024 * 1024) // 1 Mbits
 #define DP_METER_EBS_BREAK_VALUE 100     // 100 Mbits/s, it used to differentiate different ebs calculation strategy to achieve relative stable metering results. epirical value.
@@ -53,11 +57,10 @@ static const struct rte_meter_srtcm_params dp_srtcm_params_base = {
 
 struct dp_port *_dp_port_table[DP_MAX_PORTS];
 struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
-struct dp_ports _dp_ports;
-
 #ifdef ENABLE_PF1_PROXY
-struct dp_port _dp_pf_proxy_tap_port;
+struct dp_port _dp_pf1_proxy_port;
 #endif
+struct dp_ports _dp_ports;
 
 static int dp_port_register_pf(struct dp_port *port)
 {
@@ -88,10 +91,20 @@ struct dp_port *dp_get_port_by_name(const char *pci_name)
 	return _dp_port_table[port_id];
 }
 
+static void dp_set_neighmac(struct dp_port *port, const struct rte_ether_addr *mac)
+{
+	char strmac[18];
+
+	rte_ether_addr_copy(mac, &port->neigh_mac);
+
+	snprintf(strmac, sizeof(strmac), RTE_ETHER_ADDR_PRT_FMT, RTE_ETHER_ADDR_BYTES(&port->neigh_mac));
+	DPS_LOG_INFO("Setting neighboring MAC", _DP_LOG_STR("mac", strmac), DP_LOG_PORT(port));
+}
+
 static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-	struct rte_ether_addr pf_neigh_mac;
+	struct rte_ether_addr pf_neigh_mac = {0};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
 	struct rte_eth_conf port_conf = port_conf_default;
@@ -125,7 +138,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	for (uint16_t i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
 		mempool = dp_layer->rte_mempool;
 #ifdef ENABLE_PF1_PROXY
-		if (dp_conf_is_pf1_proxy_enabled() && (port == dp_get_pf1() || port == &_dp_pf_proxy_tap_port))
+		if (dp_conf_is_pf1_proxy_enabled() && (port == dp_get_pf1() || port == dp_get_pf1_proxy()))
 			mempool = dp_layer->rte_jumbo_mempool;
 #endif
 		ret = rte_eth_rx_queue_setup(port->port_id, i, 1024,
@@ -172,8 +185,15 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	if (port->is_pf) {
 		if (DP_FAILED(dp_get_pf_neigh_mac(dev_info->if_index, &pf_neigh_mac, &port->own_mac)))
 			return DP_ERROR;
-		rte_ether_addr_copy(&pf_neigh_mac, &port->neigh_mac);
+		dp_set_neighmac(port, &pf_neigh_mac);
 	}
+#ifdef ENABLE_PF1_PROXY
+	else if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf1_proxy())
+		dp_set_neighmac(port, &dp_get_pf1()->neigh_mac);
+#endif
+
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
+		return DP_ERROR;
 
 	return DP_OK;
 }
@@ -196,32 +216,43 @@ static int dp_port_flow_isolate(uint16_t port_id)
 	return DP_OK;
 }
 
-static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, bool is_pf)
+static int dp_get_port_socket_id(uint16_t port_id)
+{
+	int socket_id;
+
+	if (port_id >= RTE_DIM(_dp_port_table)) {
+		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+		return DP_ERROR;
+	}
+
+	socket_id = rte_eth_dev_socket_id(port_id);
+	if (DP_FAILED(socket_id)) {
+		if (socket_id == SOCKET_ID_ANY) {
+			DPS_LOG_WARNING("Cannot get numa socket, using 'any'", DP_LOG_PORTID(port_id));
+		} else {
+			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
+			return DP_ERROR;
+		}
+	}
+
+	return socket_id;
+}
+
+static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info, bool is_pf, bool is_proxied)
 {
 	static int last_pf1_hairpin_tx_rx_queue_offset = 1;
 	struct dp_port *port;
 	int socket_id;
 	int ret;
 
-	if (port_id >= RTE_DIM(_dp_port_table)) {
-		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+	socket_id = dp_get_port_socket_id(port_id);
+	if (DP_FAILED(socket_id) && socket_id != SOCKET_ID_ANY)
 		return NULL;
-	}
 
-	if (is_pf) {
+	if (is_pf && !is_proxied) {
 		if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_TAP)
 			if (DP_FAILED(dp_port_flow_isolate(port_id)))
 				return NULL;
-	}
-
-	socket_id = rte_eth_dev_socket_id(port_id);
-	if (DP_FAILED(socket_id)) {
-		if (socket_id == SOCKET_ID_ANY) {
-			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
-		} else {
-			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
-			return NULL;
-		}
 	}
 
 	// oveflow check done by liming the number of calls to this function
@@ -235,9 +266,6 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 		return NULL;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
-		return NULL;
-
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return NULL;
 
 	if (is_pf) {
@@ -263,90 +291,23 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 }
 
 #ifdef ENABLE_PF1_PROXY
-static struct dp_port *dp_port_init_proxied_pf_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
+static struct dp_port *dp_port_init_pf1_proxy_interface(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
 	struct dp_port *port;
 	int socket_id;
-	int ret;
 
-	if (port_id >= RTE_DIM(_dp_port_table)) {
-		DPS_LOG_ERR("Invalid port id", DP_LOG_PORTID(port_id), DP_LOG_MAX(RTE_DIM(_dp_port_table)));
+	socket_id = dp_get_port_socket_id(port_id);
+	if (DP_FAILED(socket_id) && socket_id != SOCKET_ID_ANY)
 		return NULL;
-	}
 
-	socket_id = rte_eth_dev_socket_id(port_id);
-	if (DP_FAILED(socket_id)) {
-		if (socket_id == SOCKET_ID_ANY) {
-			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
-		} else {
-			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
-			return NULL;
-		}
-	}
-
-	// oveflow check done by liming the number of calls to this function
-	port = _dp_ports.end++;
-	port->is_pf = true;
+	port = &_dp_pf1_proxy_port;
+	port->is_pf = false;
 	port->port_id = port_id;
 	port->socket_id = socket_id;
 	_dp_port_table[port_id] = port;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
 		return NULL;
-
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return NULL;
-
-	DPS_LOG_INFO("INIT setting proxied pf port to promiscuous mode", DP_LOG_PORT(port));
-	ret = rte_eth_promiscuous_enable(port->port_id);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
-		return NULL;
-	}
-
-	if (DP_FAILED(dp_port_register_pf(port)))
-		return NULL;
-	ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, dp_link_status_change_event_callback, NULL);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Cannot register link status callback", DP_LOG_RET(ret));
-		return NULL;
-	}
-
-	return port;
-}
-
-static struct dp_port *dp_port_init_proxy_tap(uint16_t port_id, struct rte_eth_dev_info *dev_info)
-{
-	// struct dp_port *port;
-	struct dp_port *port = &_dp_pf_proxy_tap_port;
-	int socket_id;
-	int ret;
-
-	socket_id = rte_eth_dev_socket_id(port_id);
-	if (DP_FAILED(socket_id)) {
-		if (socket_id == SOCKET_ID_ANY) {
-			DPS_LOG_WARNING("Cannot get numa socket", DP_LOG_PORTID(port_id));
-		} else {
-			DPS_LOG_ERR("Cannot get numa socket", DP_LOG_PORTID(port_id), DP_LOG_RET(rte_errno));
-			return NULL;
-		}
-	}
-
-	// oveflow check done by liming the number of calls to this function
-	// port = _dp_ports.end++;
-	port->is_pf = false;
-	port->port_id = port_id;
-	port->socket_id = socket_id;
-
-	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
-		return NULL;
-
-	DPS_LOG_INFO("INIT setting proxy tap to promiscuous mode", DP_LOG_PORT(port));
-	ret = rte_eth_promiscuous_enable(port->port_id);
-	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Promiscuous mode setting failed", DP_LOG_PORT(port), DP_LOG_RET(ret));
-		return NULL;
-	}
 
 	return port;
 }
@@ -368,61 +329,67 @@ static int dp_port_set_up_hairpins(void)
 	return DP_OK;
 }
 
+static int dp_find_port(const char *iface_name, uint16_t *out_port_id, struct rte_eth_dev_info *out_dev_info)
+{
+	uint16_t port_id;
+	char ifname[IF_NAMESIZE] = {0};
+
+	RTE_ETH_FOREACH_DEV(port_id) {
+		if (DP_FAILED(dp_get_dev_info(port_id, out_dev_info, ifname)))
+			return DP_ERROR;
+		if (!strncmp(iface_name, ifname, sizeof(ifname))) {
+			*out_port_id = port_id;
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("No such interface", DP_LOG_NAME(iface_name));
+	return DP_ERROR;
+}
+
 static int dp_port_init_pf(const char *pf_name)
 {
 	uint16_t port_id;
 	struct rte_eth_dev_info dev_info;
-	char ifname[IF_NAMESIZE] = {0};
 	struct dp_port *port;
+	bool proxied;
 
-	RTE_ETH_FOREACH_DEV(port_id) {
-		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
-			return DP_ERROR;
-		if (!strncmp(pf_name, ifname, sizeof(ifname))) {
-			DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
+	if (DP_FAILED(dp_find_port(pf_name, &port_id, &dev_info)))
+		return DP_ERROR;
+
+	DPS_LOG_INFO("INIT initializing PF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(pf_name));
 #ifdef ENABLE_PF1_PROXY
-			if (dp_conf_is_pf1_proxy_enabled() && strncmp(pf_name, dp_conf_get_pf1_name(), sizeof(ifname)) == 0)
-				port = dp_port_init_proxied_pf_interface(port_id, &dev_info);
-			else
-				port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+	proxied = dp_conf_is_pf1_proxy_enabled() && !strcmp(pf_name, dp_conf_get_pf1_name());
 #else
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF);
+	proxied = false;
 #endif
-			if (!port)
-				return DP_ERROR;
-			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
-			return DP_OK;
-		}
-	}
-	DPS_LOG_ERR("No such PF", DP_LOG_NAME(pf_name));
-	return DP_ERROR;
+	port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_PF, proxied);
+	if (!port)
+		return DP_ERROR;
+
+	snprintf(port->port_name, sizeof(port->port_name), "%s", pf_name);
+	return DP_OK;
 }
 
 #ifdef ENABLE_PF1_PROXY
-static int dp_port_init_tap_proxy(const char *pf_tap_proxy_name)
+static int dp_port_init_pf1_proxy(const char *pf1_proxy_name)
 {
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	struct dp_port *port;
+
 	if (!dp_conf_is_pf1_proxy_enabled())
 		return DP_OK;
 
-	uint16_t port_id;
-	struct rte_eth_dev_info dev_info;
-	char ifname[IF_NAMESIZE] = {0};
-	struct dp_port *port;
+	if (DP_FAILED(dp_find_port(pf1_proxy_name, &port_id, &dev_info)))
+		return DP_ERROR;
 
-	RTE_ETH_FOREACH_DEV(port_id) {
-		if (DP_FAILED(dp_get_dev_info(port_id, &dev_info, ifname)))
-			return DP_ERROR;
-		if (!strncmp(pf_tap_proxy_name, ifname, sizeof(ifname))) {
-			DPS_LOG_INFO("INIT initializing PF proxy tap port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_proxy_tap(port_id, &dev_info);
-			if (!port)
-				return DP_ERROR;
-			snprintf(port->port_name, sizeof(port->port_name), "%s", pf_tap_proxy_name);
-			return DP_OK;
-		}
-	}
-	DPS_LOG_ERR("No such PF proxy tap port", DP_LOG_NAME(pf_tap_proxy_name));
-	return DP_ERROR;
+	DPS_LOG_INFO("INIT initializing PF1 proxy port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(pf1_proxy_name));
+	port = dp_port_init_pf1_proxy_interface(port_id, &dev_info);
+	if (!port)
+		return DP_ERROR;
+
+	snprintf(port->port_name, sizeof(port->port_name), "%s", pf1_proxy_name);
+	return DP_OK;
 }
 #endif
 
@@ -439,7 +406,7 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 			return DP_ERROR;
 		if (strstr(ifname, vf_pattern) && ++vf_count <= num_of_vfs) {
 			DPS_LOG_INFO("INIT initializing VF port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
-			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_VF);
+			port = dp_port_init_interface(port_id, &dev_info, DP_PORT_INIT_VF, DP_PORT_NORMAL);
 			if (!port)
 				return DP_ERROR;
 			snprintf(port->port_name, sizeof(port->port_name), "%s", vf_pattern);
@@ -472,7 +439,7 @@ int dp_ports_init(void)
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
 #ifdef ENABLE_PF1_PROXY
-		|| DP_FAILED(dp_port_init_tap_proxy(dp_get_eal_pf1_proxy_dev_name()))
+		|| DP_FAILED(dp_port_init_pf1_proxy(dp_conf_get_pf1_proxy()))
 #endif
 		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
 		return DP_ERROR;
@@ -508,7 +475,7 @@ static int dp_stop_eth_port(struct dp_port *port)
 
 	ret = rte_eth_dev_stop(port->port_id);
 	if (DP_FAILED(ret))
-		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORTID(port->port_id), DP_LOG_RET(ret));
+		DPS_LOG_ERR("Cannot stop ethernet port", DP_LOG_PORT(port), DP_LOG_RET(ret));
 
 	return ret;
 }
@@ -518,12 +485,17 @@ void dp_ports_stop(void)
 	// in multiport-mode, PF0 needs to be stopped last
 	struct dp_port *pf0 = dp_get_port_by_pf_index(0);
 
+#ifdef ENABLE_PF1_PROXY
+	if (_dp_pf1_proxy_port.allocated)
+		dp_stop_eth_port(&_dp_pf1_proxy_port);
+#endif
+
 	// without stopping started ports, DPDK complains
 	DP_FOREACH_PORT(&_dp_ports, port) {
 		if (port->allocated && port != pf0)
 			dp_stop_eth_port(port);
 	}
-	if (pf0->allocated)
+	if (pf0 && pf0->allocated)
 		dp_stop_eth_port(pf0);
 }
 
@@ -581,16 +553,27 @@ static int dp_port_install_async_isolated_mode(struct dp_port *port)
 
 static int dp_port_create_default_pf_async_templates(struct dp_port *port)
 {
-	DPS_LOG_INFO("Installing PF async templates", DP_LOG_PORTID(port->port_id));
+	DPS_LOG_INFO("Installing PF async templates", DP_LOG_PORT(port));
 	if (DP_FAILED(dp_create_pf_async_isolation_templates(port))) {
-		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_ERR("Failed to create pf async isolation templates", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
+#ifdef ENABLE_PF1_PROXY
+	// Even though this is PF1 linking to VF on PF1, the rules need to be created in PF0 (multiport-eswitch mode)
+	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf0()) {
+		if (DP_FAILED(dp_create_pf_async_from_proxy_templates(port))
+			|| DP_FAILED(dp_create_pf_async_to_proxy_templates(port))
+		) {
+			DPS_LOG_ERR("Failed to create pf async proxy templates", DP_LOG_PORT(port));
+			return DP_ERROR;
+		}
+	}
+#endif
 #ifdef ENABLE_VIRTSVC
 	if (DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_TCP))
 		|| DP_FAILED(dp_create_virtsvc_async_isolation_templates(port, IPPROTO_UDP))
 	) {
-		DPS_LOG_ERR("Failed to create virtsvc async isolation templates", DP_LOG_PORTID(port->port_id));
+		DPS_LOG_ERR("Failed to create virtsvc async isolation templates", DP_LOG_PORT(port));
 		return DP_ERROR;
 	}
 #endif
@@ -605,9 +588,13 @@ static int dp_init_port(struct dp_port *port)
 
 	if (port->is_pf) {
 		if (dp_conf_is_multiport_eswitch()) {
-			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
-				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
-				return DP_ERROR;
+			// no isolation on proxied PF
+#ifdef ENABLE_PF1_PROXY
+			if (port == dp_get_pf0() || !dp_conf_is_pf1_proxy_enabled())
+#endif
+				if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
+					|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
+					return DP_ERROR;
 		} else
 			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
 				return DP_ERROR;
@@ -647,9 +634,18 @@ int dp_start_port(struct dp_port *port)
 }
 
 #ifdef ENABLE_PF1_PROXY
-int dp_start_pf_proxy_tap_port(void)
+int dp_start_pf1_proxy_port(void)
 {
-	return dp_start_port(&_dp_pf_proxy_tap_port);
+	int ret;
+
+	ret = rte_eth_dev_start(_dp_pf1_proxy_port.port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start ethernet port", DP_LOG_PORT(&_dp_pf1_proxy_port), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	_dp_pf1_proxy_port.allocated = true;
+	return DP_OK;
 }
 #endif
 

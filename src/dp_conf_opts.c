@@ -20,6 +20,9 @@ enum {
 _OPT_SHOPT_MAX = 255,
 	OPT_PF0,
 	OPT_PF1,
+#ifdef ENABLE_PF1_PROXY
+	OPT_PF1_PROXY,
+#endif
 	OPT_IPV6,
 	OPT_VF_PATTERN,
 	OPT_DHCP_MTU,
@@ -56,6 +59,9 @@ static const struct option dp_conf_longopts[] = {
 	{ "version", 0, 0, OPT_VERSION },
 	{ "pf0", 1, 0, OPT_PF0 },
 	{ "pf1", 1, 0, OPT_PF1 },
+#ifdef ENABLE_PF1_PROXY
+	{ "pf1-proxy", 1, 0, OPT_PF1_PROXY },
+#endif
 	{ "ipv6", 1, 0, OPT_IPV6 },
 	{ "vf-pattern", 1, 0, OPT_VF_PATTERN },
 	{ "dhcp-mtu", 1, 0, OPT_DHCP_MTU },
@@ -105,6 +111,9 @@ static const char *log_format_choices[] = {
 
 static char pf0_name[IF_NAMESIZE];
 static char pf1_name[IF_NAMESIZE];
+#ifdef ENABLE_PF1_PROXY
+static char pf1_proxy[IF_NAMESIZE];
+#endif
 static char vf_pattern[IF_NAMESIZE];
 static int dhcp_mtu = 1500;
 static int wcmp_perc = 100;
@@ -134,6 +143,13 @@ const char *dp_conf_get_pf1_name(void)
 	return pf1_name;
 }
 
+#ifdef ENABLE_PF1_PROXY
+const char *dp_conf_get_pf1_proxy(void)
+{
+	return pf1_proxy;
+}
+
+#endif
 const char *dp_conf_get_vf_pattern(void)
 {
 	return vf_pattern;
@@ -201,12 +217,14 @@ int dp_conf_get_flow_timeout(void)
 {
 	return flow_timeout;
 }
-#endif
 
+#endif
 bool dp_conf_is_multiport_eswitch(void)
 {
 	return multiport_eswitch;
 }
+
+
 
 /* These functions need to be implemented by the user of this generated code */
 static void dp_argparse_version(void);
@@ -228,6 +246,9 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		" -v, --version                          display version and exit\n"
 		"     --pf0=IFNAME                       first physical interface (e.g. eth0)\n"
 		"     --pf1=IFNAME                       second physical interface (e.g. eth1)\n"
+#ifdef ENABLE_PF1_PROXY
+		"     --pf1-proxy=IFNAME                 VF representor to use as a proxy for pf1 packets\n"
+#endif
 		"     --ipv6=ADDR6                       IPv6 underlay address\n"
 		"     --vf-pattern=PATTERN               virtual interface name pattern (e.g. 'eth1vf')\n"
 		"     --dhcp-mtu=SIZE                    set the mtu field in DHCP responses (68 - 1500)\n"
@@ -266,6 +287,10 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_string(arg, pf0_name, ARRAY_SIZE(pf0_name));
 	case OPT_PF1:
 		return dp_argparse_string(arg, pf1_name, ARRAY_SIZE(pf1_name));
+#ifdef ENABLE_PF1_PROXY
+	case OPT_PF1_PROXY:
+		return dp_argparse_string(arg, pf1_proxy, ARRAY_SIZE(pf1_proxy));
+#endif
 	case OPT_IPV6:
 		return dp_argparse_opt_ipv6(arg);
 	case OPT_VF_PATTERN:
