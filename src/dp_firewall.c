@@ -175,8 +175,6 @@ static __rte_always_inline enum dp_fwall_action dp_get_egress_action(const struc
 
 	if (rule)
 		return rule->action;
-	else if (egress_rule_count == 0)
-		return DP_FWALL_ACCEPT;
 	else
 		return DP_FWALL_DROP;
 }

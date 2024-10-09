@@ -41,8 +41,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		} else
 			action = DP_FWALL_DROP;
 		/* Ignore the drop actions till we have the metalnet ready to set the firewall rules */
-		// if (action == DP_FWALL_DROP)
-		// 	return FIREWALL_NEXT_DROP;
+		 if (action == DP_FWALL_DROP)
+			return FIREWALL_NEXT_DROP;
 	}
 
 	if (out_port->is_pf)
