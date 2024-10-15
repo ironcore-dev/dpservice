@@ -19,11 +19,10 @@ GRAPH_NODES = (
 	'tx-0', 'tx-1', 'tx-2', 'tx-3', 'tx-4', 'tx-5',
 )
 HEAP_INFO = ( 'Heap_id', 'Heap_size', 'Alloc_count', 'Free_count', 'Alloc_size', 'Free_size', 'Greatest_free_size' )
-IFACE_STATS = (
-	'rx_q0_errors', 'rx_q0_bytes', 'tx_q0_bytes', 'rx_q0_packets', 'tx_q0_packets',
-	'rx_good_bytes', 'tx_good_bytes', 'rx_good_packets', 'tx_good_packets',
-	'rx_errors', 'tx_errors', 'rx_missed_errors', 'rx_mbuf_allocation_errors',
-	'nat_used_port_count', 'firewall_rule_count',
+ETHDEV_STATS = (
+	'rx_good_bytes', 'rx_q0_bytes', 'tx_good_bytes', 'tx_q0_bytes',
+	'rx_errors', 'rx_mbuf_allocation_errors', 'rx_missed_errors', 'rx_q0_errors', 'tx_errors',
+	'rx_good_packets', 'rx_q0_packets', 'tx_good_packets', 'tx_q0_packets',
 )
 HW_IFACE_STATS = (
 	'rx_broadcast_bytes', 'rx_broadcast_packets', 'tx_broadcast_bytes', 'tx_broadcast_packets',
@@ -125,35 +124,43 @@ def test_telemetry_fwall(prepare_ifaces, grpc_client):
 
 def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
-	graph_stats, heap_info, interface_stats, htable_saturation = set(), set(), set(), set()
+	graph_stats, heap_info, ethdev_stats, htable_saturation = set(), set(), set(), set()
 	for metric in metrics.splitlines():
-		if metric.startswith('dpdk_graph_stat'):
+		if metric.startswith('dps_graph_call_count'):
 			graph_stats.add(metric.split('"')[1])
 		elif metric.startswith('dpdk_heap_info'):
 			heap_info.add(metric.split('"')[1])
-		elif metric.startswith('dpdk_interface_stat'):
-			interface_stats.add(metric.split('"')[3])
-		elif metric.startswith('hash_table_saturation'):
+		elif metric.startswith(('dpdk_ethdev_errors_total', 'dpdk_ethdev_bytes_total', 'dpdk_ethdev_packets_total')):
+			ethdev_stats.add(metric.split('"')[3])
+		elif metric.startswith('dps_hash_table_saturation'):
 			htable_saturation.add(metric.split('"')[3])
+		elif metric.startswith('dpdk_ethdev_link_status'):
+			linkStatus = metric.split(' ')[1]
+			assert linkStatus == '0' or linkStatus == '1', \
+				"Link status must be 0 or 1"
+		# these metrics don't have any stat label, only checking if they are not empty
+		elif metric.startswith(('dpdk_ethdev_misc', 'dps_firewall_rules_count', 'dps_virtsvc_used_ports_count', 'dps_nat_used_ports_count')):
+			assert len(metric.split(' ')) > 1, \
+				f"Empty exported metric '{metric.split('{')[0]}' found"
 		else:
 			assert metric.startswith("#"), \
 				f"Unknown exported metric '{metric.split('{')[0]}' found"
 	# meson options (e.g. enable_virtual_services) are hard to do in these scripts, so just check manually
 	graph_nodes = GRAPH_NODES
-	iface_stats = IFACE_STATS
+	iface_stats = ETHDEV_STATS
 	if 'virtsvc' in graph_stats:
 		graph_nodes += ('virtsvc',)
 	if request.config.getoption("--hw"):
 		iface_stats += HW_IFACE_STATS
 		if PF1.tap == "pf1-tap":
 			graph_nodes += ('tx-6',)
-	if 'rx_q1_bytes' in interface_stats:
+	if 'rx_q1_bytes' in ethdev_stats:
 		iface_stats += HW_PF1_IFACE_STATS
 	assert graph_stats == set(graph_nodes), \
 		"Unexpected graph telemetry in exporter output"
 	assert heap_info == set(HEAP_INFO), \
 		"Unexpected heap info in exporter output"
-	assert interface_stats == set(iface_stats) or interface_stats == set(iface_stats + ('virtsvc_used_port_count',)), \
-		"Unexpected interface statistics in exporter output"
+	assert ethdev_stats == set(iface_stats), \
+		"Unexpected ethdev statistics in exporter output"
 	assert htable_saturation == set(HASH_TABLES) or htable_saturation == set(HASH_TABLES + ('virtsvc_table_0', 'virtsvc_table_1')), \
 		"Unexpected hash table info in exporter output"
