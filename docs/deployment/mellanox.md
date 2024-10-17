@@ -38,6 +38,11 @@ Set the number of VFs to the needed value (max 126 at the moment) and enable bot
 Restart the machine for the changes to take effect.
 > These changes are done in the NIC itself, it does not matter if the host is an ephemeral image or if another host OS will boot later.
 
+### Multiport-eswitch
+For this mode to be functional, an additional firmware setting `LAG_RESOURCE_ALLOCATION=1` is needed.
+
+In some cases (looks like a nic/switch combination) performance is severly affected when VM traffic is happening. This has been observed to be fixed by setting `ROCE_CONTROL=1` (this means "disabled", the default is `2` meaning "enabled"). The actual cause of this is yet to be discovered.
+
 
 ## Dp-service setup
 Either `prepare.sh` script or `preparedp.service` systemd unit needs to be run before dp-service can work properly. This should already be done automatically if using the Docker image provided. Make sure this does not produce any errors.
