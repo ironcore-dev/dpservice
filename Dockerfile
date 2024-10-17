@@ -100,6 +100,7 @@ ARG DPSERVICE_FEATURES=""
 RUN meson setup release_build $DPSERVICE_FEATURES --buildtype=release && ninja -C release_build
 RUN CC=clang CXX=clang++ meson setup clang_build $DPSERVICE_FEATURES && ninja -C clang_build
 RUN meson setup xtratest_build $DPSERVICE_FEATURES -Denable_tests=true && ninja -C xtratest_build
+RUN meson setup pf1_proxy_build $DPSERVICE_FEATURES -Denable_pf1_proxy=true && ninja -C pf1_proxy_build
 
 
 # Test-image to run pytest
