@@ -46,3 +46,6 @@ In some cases (looks like a nic/switch combination) performance is severly affec
 
 ## Dp-service setup
 Either `prepare.sh` script or `preparedp.service` systemd unit needs to be run before dp-service can work properly. This should already be done automatically if using the Docker image provided. Make sure this does not produce any errors.
+
+### Multiport-eswitch
+The `prepare.sh` script supports `--multiport-eswitch` argument to set the card up in multiport-eswitch mode. There is an additional `--pf1-proxy` argument to also create a VF on PF1 for proxying PF1 traffic. Currently both arguments are needed to properly run dpservice in multiport-eswitch mode due to a (suspected) driver bug.
