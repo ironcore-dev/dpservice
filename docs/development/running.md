@@ -74,3 +74,16 @@ Without the help of scripts or config files, you can run the service directly (a
 `--vf_pattern` defines the prefix used by the virtual functions created by the smartnic and which need to be controlled by dp-service. These interfaces are then to be used by running VMs.
 
 `--ipv6` sets the underlay IPv6 address which should be used by dp-service for ingress/egress packets coming to/leaving the smartnic.
+
+#### Multiport-eswitch
+In this mode, only the PF0 (which is bonded with PF1) needs to be specified:
+```bash
+./dpservice-bin -a 0000:03:00.0,class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=1,representor=pf[0-1]vf[0-5] -l 0,1 -- --pf0=enp59s0f1 --pf1=enp59s0f1 --vf-pattern=enp59s0f0_ --ipv6=2a10:afc0:e01f:209:: --no-stats --no-offload --multiport-eswitch
+```
+
+#### PF1-proxy
+In multiport-eswitch mode, currently PF1 is not usable (suspected driver problem), so dpservice provides a way to proxy the communication over a separate VF on PF1.
+```bash
+./dpservice-bin -a 0000:03:00.0,class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=1,representor=pf[0-1]vf[0-5] -l 0,1 -- --pf0=enp59s0f1 --pf1=enp59s0f1 --vf-pattern=enp59s0f0_ --ipv6=2a10:afc0:e01f:209:: --no-stats --no-offload --multiport-eswitch --pf1-proxy enp59s0f1npf1vf0 --pf1-proxy-vf enp59s0f1v0
+```
+The `--pf1-proxy` is the representor used by dpservice for proxying packets. The `--pf1-proxy-vf` is the VF used by the Linux kernel to receive packets, i.e. the replacement for PF1. Without `--pf1-proxy-vf` dpservice is unable to determine the MAC address to use for host-host overlay traffic.
