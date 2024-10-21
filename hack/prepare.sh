@@ -13,7 +13,8 @@ OPT_MULTIPORT=false
 OPT_PF1_PROXY=false
 
 BLUEFIELD_IDENTIFIERS=("MT_0000000543", "MT_0000000541")
-NUMVFS=126
+MAX_NUMVFS_POSSIBLE=126
+NUMVFS_DESIRED=126
 CONFIG="/tmp/dp_service.conf"
 IS_X86_WITH_BLUEFIELD=false
 IS_ARM_WITH_BLUEFIELD=false
@@ -143,8 +144,12 @@ function create_vf() {
 	local pf0="${devs[0]}"
 	local pf1="${devs[1]}"
 
+	if [[ "$OPT_MULTIPORT" == "true" && "$NUMVFS_DESIRED" -eq "$MAX_NUMVFS_POSSIBLE" ]]; then
+		NUMVFS_DESIRED=$((NUMVFS_DESIRED - 1))
+	fi
+
 	if [[ "$IS_ARM_WITH_BLUEFIELD" == "true" ]]; then
-		actualvfs=$NUMVFS
+		actualvfs=$NUMVFS_DESIRED
 		log "Skipping VF creation for BlueField card on ARM"
 		# enable switchdev mode, this operation takes most time
 		process_switchdev_mode "$pf0"
@@ -185,7 +190,7 @@ function create_vf() {
 
 	# calculating amount of VFs to create, 126 if more are available, or maximum available
 	totalvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_totalvfs)
-	actualvfs=$((NUMVFS<totalvfs ? NUMVFS : totalvfs))
+	actualvfs=$((NUMVFS_DESIRED<totalvfs ? NUMVFS_DESIRED : totalvfs))
 	log "creating $actualvfs virtual functions"
 	echo $actualvfs > /sys/bus/pci/devices/$pf0/sriov_numvfs
 	if [[ "$OPT_PF1_PROXY" == "true" ]]; then
