@@ -7,8 +7,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/if.h>
-#include <rte_pci.h>
 #include <rte_meter.h>
+#include <rte_pci.h>
+#include <rte_timer.h>
 #include "dp_conf.h"
 #include "dp_firewall.h"
 #include "dp_internal_stats.h"
@@ -89,6 +90,7 @@ struct dp_port {
 	char							dev_name[RTE_ETH_NAME_MAX_LEN];
 	uint8_t							peer_pf_hairpin_tx_rx_queue_offset;
 	uint16_t						peer_pf_port_id;
+	uint32_t						if_index;
 	struct rte_ether_addr			own_mac;
 	struct rte_ether_addr			neigh_mac;
 	struct dp_port_iface			iface;
@@ -106,6 +108,8 @@ struct dp_port {
 			struct rte_flow					*default_flows[DP_PORT_ASYNC_FLOW_COUNT];
 		} default_async_rules;
 	};
+	struct rte_timer				neighmac_timer;
+	uint8_t							neighmac_period;
 };
 
 struct dp_ports {
@@ -129,10 +133,15 @@ void dp_ports_stop(void);
 void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
+int dp_start_pf_port(uint16_t index);
 #ifdef ENABLE_PF1_PROXY
 int dp_start_pf1_proxy_port(void);
 #endif
 int dp_stop_port(struct dp_port *port);
+
+void dp_start_acquiring_neigh_mac(struct dp_port *port);
+void dp_stop_acquiring_neigh_mac(struct dp_port *port);
+int dp_set_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac);
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap);
 
