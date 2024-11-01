@@ -60,6 +60,7 @@ int dp_link_status_change_event_callback(uint16_t port_id,
 										 __rte_unused void *ret_param)
 {
 	struct rte_eth_link link;
+	struct dp_port *port;
 	int ret;
 
 	ret = rte_eth_link_get_nowait(port_id, &link);
@@ -67,6 +68,17 @@ int dp_link_status_change_event_callback(uint16_t port_id,
 		DPS_LOG_ERR("Link change failed to get link", DP_LOG_PORTID(port_id), DP_LOG_RET(ret));
 		return ret;
 	}
+
+	port = dp_get_port_by_id(port_id);
+	if (!port) {
+		DPS_LOG_ERR("Link change failed to get port", DP_LOG_PORTID(port_id), DP_LOG_VALUE(link.link_status));
+		return DP_ERROR;
+	}
+
+	if (link.link_status == RTE_ETH_LINK_UP)
+		dp_start_acquiring_neigh_mac(port);
+	else
+		dp_stop_acquiring_neigh_mac(port);
 
 	return dp_send_event_link_msg(port_id, link.link_status);
 }
@@ -86,11 +98,6 @@ void dp_process_event_link_msg(struct rte_mbuf *m)
 
 	port->link_status = status;
 	DPS_LOG_INFO("PF link state changed", DP_LOG_LINKSTATE(port->link_status), DP_LOG_PORT(port));
-
-	if (status == RTE_ETH_LINK_UP)
-		dp_start_acquiring_neigh_mac(port);
-	else
-		dp_stop_acquiring_neigh_mac(port);
 }
 
 // Flow-aging message - sent periodically to age-out conntracked flows
