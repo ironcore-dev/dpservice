@@ -34,7 +34,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!cntrack)
 		goto out;
 
-	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG && df->l3_type == RTE_ETHER_TYPE_IPV4) {
+	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags)
+		&& df->flow_dir == DP_FLOW_DIR_ORG
+		&& df->l3_type == RTE_ETHER_TYPE_IPV4
+	) {
 		dst_ip = ntohl(df->dst.dst_addr);
 		vni = df->tun_info.dst_vni;
 		if (vni == 0)
@@ -57,8 +60,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					df->nat_type = DP_CHG_UL_DST_IP;
 					cntrack->nf_info.l4_type = df->l4_type;
 					dp_copy_ipv6(&cntrack->nf_info.underlay_dst, underlay_dst);
-
-					dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack); // no reverse traffic for relaying pkts
+					cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT_FWD;
 					return DNAT_NEXT_PACKET_RELAY;
 				}
 
@@ -88,7 +90,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return DNAT_NEXT_IPV4_LOOKUP;
 	}
 
-	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
+	if (DP_FLOW_HAS_FLAG_DST_NAT_FWD(cntrack->flow_flags)) {
 		df->nat_type = DP_CHG_UL_DST_IP;
 		return DNAT_NEXT_PACKET_RELAY;
 	}

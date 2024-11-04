@@ -297,6 +297,13 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 		dp_cntrack_tcp_state(flow_val, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}
+
+	// Network neighbour and LB forward flows are not allowed to have reply flows
+	if (unlikely((flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH
+				  || flow_val->nf_info.nat_type == DP_FLOW_LB_TYPE_FORWARD)
+				 && (df->flow_dir == DP_FLOW_DIR_REPLY)))
+		return DP_ERROR;
+
 	df->conntrack = flow_val;
 	dp_cntrack_set_pkt_offload_decision(df);
 
