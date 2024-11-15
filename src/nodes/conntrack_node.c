@@ -80,10 +80,10 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	case DP_VNF_TYPE_ALIAS_PFX:
 		return CONNTRACK_NEXT_FIREWALL;
 	case DP_VNF_TYPE_UNDEFINED:
-		return CONNTRACK_NEXT_DROP;
+		DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, CONNTRACK_NEXT_DROP);
 	}
 
-	return CONNTRACK_NEXT_DROP;
+	DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, CONNTRACK_NEXT_DROP);
 }
 
 static uint16_t conntrack_node_process(struct rte_graph *graph,

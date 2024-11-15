@@ -156,7 +156,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		&& (df->l3_type == RTE_ETHER_TYPE_IPV4 || df->l3_type == RTE_ETHER_TYPE_IPV6)) {
 		color = rte_meter_srtcm_color_blind_check(&in_port->port_srtcm, &in_port->port_srtcm_profile, rte_rdtsc(), df->l3_payload_length);
 		if (color == RTE_COLOR_RED)
-			return SNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, SNAT_NEXT_DROP);
 	}
 
 	if (!cntrack)
@@ -173,7 +173,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->nat_ip != 0)
 			&& df->flow_type == DP_FLOW_SOUTH_NORTH) {
 			if (DP_FAILED(dp_process_ipv4_snat(m, df, cntrack, port, snat_data)))
-				return SNAT_NEXT_DROP;
+				DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, SNAT_NEXT_DROP);
 		}
 
 		if (df->l3_type == RTE_ETHER_TYPE_IPV6
@@ -182,7 +182,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			&& dp_is_ipv6_nat64(&df->dst.dst_addr6)
 		) {
 			if (DP_FAILED(dp_process_ipv6_nat64(m, df, cntrack, port)))
-				return SNAT_NEXT_DROP;
+				DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, SNAT_NEXT_DROP);
 
 			return SNAT_NEXT_FIREWALL;
 		}
@@ -191,7 +191,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.is_v6)
-			return SNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, SNAT_NEXT_DROP);
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ipv4);
 
@@ -212,7 +212,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		&& (df->flow_dir == DP_FLOW_DIR_REPLY)
 	) {
 		if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.is_v6)
-			return SNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, SNAT_NEXT_DROP);
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		df->src.src_addr = ipv4_hdr->src_addr;
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.ipv4);
@@ -223,7 +223,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (DP_FLOW_HAS_FLAG_SRC_NAT64(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		if (DP_FAILED(dp_nat_chg_ipv6_to_ipv4_hdr(df, m, port->iface.nat_ip, &dest_ip4)))
-			return SNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, SNAT_NEXT_DROP);
 
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;

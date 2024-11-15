@@ -37,11 +37,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	out_port = dp_get_ip4_out_port(in_port, df->tun_info.dst_vni, df, &route, &ip);
 	if (!out_port)
-		return IPV4_LOOKUP_NEXT_DROP;
+		DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, IPV4_LOOKUP_NEXT_DROP);
 
 	if (out_port->is_pf) {
 		if (in_port->is_pf)
-			return IPV4_LOOKUP_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, IPV4_LOOKUP_NEXT_DROP);
 		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, &route.nh_ipv6);
 		out_port = dp_multipath_get_pf(df->dp_flow_hash);
 	} else {

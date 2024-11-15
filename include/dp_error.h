@@ -11,6 +11,9 @@ extern "C" {
 #include <assert.h>
 #include <rte_errno.h>
 
+#define DP_RETURN_REF_COUNT_REDUCE_DROP(var, X) \
+    do { dp_ref_dec(&(var)->ref_count); return X; } while (0)
+
 #define DP_OK 0
 #define DP_ERROR (-RTE_MAX_ERRNO)
 #define _DP_GRPC_ERRCODES (DP_ERROR-1)
