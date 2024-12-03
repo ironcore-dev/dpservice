@@ -330,8 +330,8 @@ type InterfaceSpec struct {
 	UnderlayRoute   *netip.Addr      `json:"underlay_route,omitempty"`
 	VirtualFunction *VirtualFunction `json:"virtual_function,omitempty"`
 	PXE             *PXE             `json:"pxe,omitempty"`
-	Nat             *Nat             `json:"-"`
-	VIP             *VirtualIP       `json:"-"`
+	Nat             *Nat             `json:"nat,omitempty"`
+	VIP             *VirtualIP       `json:"vip,omitempty"`
 	Metering        *MeteringParams  `json:"metering,omitempty"`
 }
 
