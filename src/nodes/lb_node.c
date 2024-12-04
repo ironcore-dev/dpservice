@@ -64,12 +64,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			}
 			/* ICMP error types conntrack keys are built from original TCP/UDP header, so let them slip */
 			if (df->l4_info.icmp_field.icmp_type != DP_IP_ICMP_TYPE_ERROR)
-				return LB_NEXT_DROP;
+				DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, LB_NEXT_DROP);
 		}
 
 		target_ip6 = dp_lb_get_backend_ip(&cntrack->flow_key[DP_FLOW_DIR_ORG], vni);
 		if (!target_ip6)
-			return LB_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, LB_NEXT_DROP);
 
 		dp_copy_ipv6(&df->tun_info.ul_src_addr6, &df->tun_info.ul_dst_addr6);  // same trick as in packet_relay_node.c
 		dp_copy_ipv6(&df->tun_info.ul_dst_addr6, target_ip6);
