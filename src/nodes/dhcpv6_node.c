@@ -247,8 +247,10 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 		memcpy(options, (void *)&reply_options.opt_iana, reply_options.opt_iana_len);
 		options += reply_options.opt_iana_len;
 	}
-	if (reply_options.opt_rapid_len)
+	if (reply_options.opt_rapid_len) {
 		memcpy(options, &reply_options.opt_rapid, reply_options.opt_rapid_len);
+		options += reply_options.opt_rapid_len;
+	}
 
 	// Add DNS server option
 	memcpy(options, &dns_opt.opt_code, sizeof(dns_opt.opt_code));
@@ -258,8 +260,10 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	memcpy(options, dhcpv6_dns->array, dhcpv6_dns->len);
 	options += dhcpv6_dns->len;
 
-	if (reply_options.pxe_mode != DP_PXE_MODE_NONE)
+	if (reply_options.pxe_mode != DP_PXE_MODE_NONE) {
 		memcpy(options, &reply_options.boot_file_url, reply_options.opt_boot_file_len);
+		options += reply_options.opt_boot_file_len;
+	}
 
 	return reply_options_len;
 }
