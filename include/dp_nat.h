@@ -16,6 +16,11 @@
 extern "C" {
 #endif
 
+#define DP_NAT_DNAT_TABLE_NAME "dnat_table"
+#define DP_NAT_SNAT_TABLE_NAME "snat_table"
+#define DP_NAT_PORTMAP_TABLE_NAME "nat_portmap_table"
+#define DP_NAT_PORTOVERLOAD_TABLE_NAME "nat_portoverload_table"
+
 #define DP_NETWORK_NAT_ALL_VNI		0
 
 struct nat_key {

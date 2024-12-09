@@ -20,6 +20,7 @@
 extern "C" {
 #endif
 
+#define DP_FLOW_TABLE_NAME				"conntrack_table"
 // arbitrary big number
 #define DP_FLOW_TABLE_MAX				850000
 

@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#define DP_IFACE_TABLE_NAME "interface_table"
+
 int dp_ifaces_init(int socket_id);
 void dp_ifaces_free(void);
 

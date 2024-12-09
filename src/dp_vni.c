@@ -11,7 +11,7 @@ struct rte_hash *vni_handle_tbl = NULL;
 int dp_vni_init(int socket_id)
 {
 	vni_handle_tbl = dp_create_jhash_table(DP_VNI_MAX_TABLE_SIZE, sizeof(struct dp_vni_key),
-										   "vni_table", socket_id);
+										   DP_VNI_TABLE_NAME, socket_id);
 	if (!vni_handle_tbl)
 		return DP_ERROR;
 

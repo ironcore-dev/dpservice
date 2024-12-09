@@ -1,1 +1,2 @@
 subdir('dump')
+subdir('inspect')
