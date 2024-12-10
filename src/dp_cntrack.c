@@ -127,9 +127,11 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
 	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
+		DPS_LOG_WARNING(" FLOW TIMEOUT IS NOW 24hrs");
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	} else {
+		DPS_LOG_WARNING(" flow timeout is now 30s");
 		flow_val->timeout_value = flow_timeout;
 		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_FINWAIT
 			|| flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN)

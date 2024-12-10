@@ -104,7 +104,7 @@ class _TCPTester:
 			client_pkt_check(pkt)
 		return pkt
 
-	def request_tcp(self, flags, payload=None):
+	def request_tcp(self, flags, payload=None, synattack=False):
 		server_thread = threading.Thread(target=self.reply_tcp)
 		server_thread.start()
 
@@ -148,6 +148,9 @@ class _TCPTester:
 					"Bad answer from server"
 			reply_seq += len(payload)
 
+		if synattack:
+			return
+
 		# send ACK
 		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac, type=0x0800) /
 				   IP(dst=self.server_ip, src=self.client_ip) /
@@ -179,6 +182,13 @@ class _TCPTester:
 	def leave_open(self):
 		self.reset()
 		self.request_tcp("S")
+
+	# Helper function to simulate a SYN attack
+	def synattack(self):
+		self.reset()
+		self.request_tcp("S", synattack=True)
+		self.request_tcp("S", synattack=True)
+		self.reset()
 
 
 class TCPTesterLocal(_TCPTester):
