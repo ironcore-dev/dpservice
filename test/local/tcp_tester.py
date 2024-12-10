@@ -9,6 +9,10 @@ class _TCPTester:
 	TCP_NORMAL_REQUEST = "Hello"
 	TCP_NORMAL_RESPONSE = "Same to you"
 
+	TCP_SYN_NORMAL = 0
+	TCP_SYN_RETRANSMIT = 1
+	TCP_SYN_SCAN = 2
+
 	def __init__(self, client_tap, client_mac, client_ip, client_port,
 					   server_tap, server_mac, server_ip, server_port,
 					   client_pkt_check=None, server_pkt_check=None):
@@ -40,7 +44,7 @@ class _TCPTester:
 			self.server_pkt_check(pkt)
 		return pkt
 
-	def reply_tcp(self):
+	def reply_tcp(self, syn_style):
 		pkt = self.get_server_packet()
 
 		# Received ACK only, just end
@@ -61,6 +65,10 @@ class _TCPTester:
 		reply_pkt = (self.get_server_l3_reply(pkt) /
 					 TCP(dport=pkt[TCP].sport, sport=pkt[TCP].dport, seq=self.tcp_receiver_seq, flags=flags, ack=pkt[TCP].seq+1, options=[("NOP", None)]))
 		delayed_sendp(reply_pkt, self.server_tap)
+
+		if syn_style == _TCPTester.TCP_SYN_RETRANSMIT:
+			delayed_sendp(reply_pkt, self.server_tap)
+			return
 
 		if flags != "A":
 			self.tcp_receiver_seq += 1
@@ -84,6 +92,9 @@ class _TCPTester:
 				self.tcp_receiver_seq += len(_TCPTester.TCP_NORMAL_RESPONSE)
 				# and continue with ACK
 
+		if syn_style != _TCPTester.TCP_SYN_NORMAL:
+			return
+
 		# Await ACK
 		pkt = self.get_server_packet()
 		assert pkt[TCP].flags == "A", \
@@ -104,8 +115,8 @@ class _TCPTester:
 			client_pkt_check(pkt)
 		return pkt
 
-	def request_tcp(self, flags, payload=None):
-		server_thread = threading.Thread(target=self.reply_tcp)
+	def request_tcp(self, flags, payload=None, syn_style=TCP_SYN_NORMAL):
+		server_thread = threading.Thread(target=self.reply_tcp, args=(syn_style,))
 		server_thread.start()
 
 		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac, type=0x0800) /
@@ -148,6 +159,9 @@ class _TCPTester:
 					"Bad answer from server"
 			reply_seq += len(payload)
 
+		if syn_style != _TCPTester.TCP_SYN_NORMAL:
+			return
+
 		# send ACK
 		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac, type=0x0800) /
 				   IP(dst=self.server_ip, src=self.client_ip) /
@@ -179,6 +193,17 @@ class _TCPTester:
 	def leave_open(self):
 		self.reset()
 		self.request_tcp("S")
+
+	# Helper function to simulate a SYN port scan
+	def syn_scan(self):
+		self.reset()
+		self.request_tcp("S", syn_style=_TCPTester.TCP_SYN_SCAN)
+		self.request_tcp("S", syn_style=_TCPTester.TCP_SYN_SCAN)
+
+	# Helper function to simulate a SYNACK being retransmitted
+	def syn_retrans(self):
+		self.reset()
+		self.request_tcp("S", syn_style=_TCPTester.TCP_SYN_RETRANSMIT)
 
 
 class TCPTesterLocal(_TCPTester):

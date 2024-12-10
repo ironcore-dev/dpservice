@@ -185,3 +185,34 @@ def test_external_lb_relay_algorithm(prepare_ipv4, grpc_client, fast_flow_timeou
 	for target in targets:
 		grpc_client.dellbtarget(lb_name, target)
 	grpc_client.dellb(lb_name)
+
+
+def test_syn_scan(request, prepare_ipv4, grpc_client, fast_flow_timeout):
+	if not fast_flow_timeout:
+		pytest.skip("Fast flow timeout needs to be enabled")
+
+	# Only allow one port for this test, so the next call would normally fail (NAT runs out of free ports)
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_min_port+1)
+
+	# This produces SYN-SYNACK-SYN-SYNACK
+	tester = TCPTesterPublic(VM1, 12344, nat_ul_ipv6, PF0, public_ip, 443)
+	tester.syn_scan()
+
+	age_out_flows()
+
+	# (the only) NAT port should once again be free now
+	tester.client_port = 54321
+	tester.request_rst()
+
+	age_out_flows()
+
+	# This produces SYN-SYNACK+SYNACK
+	tester.client_port = 12345
+	tester.syn_retrans()
+
+	age_out_flows()
+
+	tester.client_port = 54321
+	tester.request_rst()
+
+	grpc_client.delnat(VM1.name)
