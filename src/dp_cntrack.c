@@ -41,34 +41,36 @@ static __rte_always_inline void dp_cache_flow_val(struct flow_value *flow_val)
 	cached_flow_val = flow_val;
 }
 
-static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
+static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct dp_flow *df, struct rte_tcp_hdr *tcp_hdr)
 {
 	uint8_t tcp_flags = tcp_hdr->tcp_flags;
 
 	if (DP_TCP_PKT_FLAG_RST(tcp_flags)) {
-		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+		flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else if (DP_TCP_PKT_FLAG_FIN(tcp_flags)) {
 		// this is not entirely 1:1 mapping to fin sequence,
 		// but sufficient to determine if a tcp connection is almost successfuly closed
 		// (last ack is still pending)
-		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED)
-			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_FINWAIT;
+		if (flow_val->l4_state.tcp.state == DP_FLOW_TCP_STATE_ESTABLISHED)
+			flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_FINWAIT;
 		else
-			flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_RST_FIN;
+			flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_RST_FIN;
 	} else {
-		switch (flow_val->l4_state.tcp_state) {
+		switch (flow_val->l4_state.tcp.state) {
 		case DP_FLOW_TCP_STATE_NONE:
 		case DP_FLOW_TCP_STATE_RST_FIN:
-			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
+			if (DP_TCP_PKT_FLAG_ONLY_SYN(tcp_flags)) {
+				flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_NEW_SYN;
+				flow_val->l4_state.tcp.first_syn_flow_dir = df->flow_dir;
+			}
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
-			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
+			if (DP_TCP_PKT_FLAG_ONLY_SYNACK(tcp_flags) && df->flow_dir != flow_val->l4_state.tcp.first_syn_flow_dir)
+				flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
-			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
-				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
+			if (DP_TCP_PKT_FLAG_ONLY_ACK(tcp_flags) && df->flow_dir == flow_val->l4_state.tcp.first_syn_flow_dir)
+				flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
 		default:
 			// FIN-states already handled above
@@ -126,13 +128,13 @@ static __rte_always_inline void dp_cntrack_change_flow_offload_flags(struct rte_
 
 static __rte_always_inline void dp_cntrack_set_timeout_tcp_flow(struct rte_mbuf *m, struct flow_value *flow_val, struct dp_flow *df)
 {
-	if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_ESTABLISHED) {
+	if (flow_val->l4_state.tcp.state == DP_FLOW_TCP_STATE_ESTABLISHED) {
 		flow_val->timeout_value = DP_FLOW_TCP_EXTENDED_TIMEOUT;
 		dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	} else {
 		flow_val->timeout_value = flow_timeout;
-		if (flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_FINWAIT
-			|| flow_val->l4_state.tcp_state == DP_FLOW_TCP_STATE_RST_FIN)
+		if (flow_val->l4_state.tcp.state == DP_FLOW_TCP_STATE_FINWAIT
+			|| flow_val->l4_state.tcp.state == DP_FLOW_TCP_STATE_RST_FIN)
 			dp_cntrack_change_flow_offload_flags(m, flow_val, df);
 	}
 }
@@ -178,7 +180,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	dp_cntrack_init_flow_offload_flags(flow_val, df);
 
 	if (df->l4_type == IPPROTO_TCP)
-		flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NONE;
+		flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_NONE;
 
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
 	if (DP_FAILED(dp_add_flow(key, flow_val)))
@@ -294,7 +296,7 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 			tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv6_hdr(m) + 1);
 		else
 			return DP_ERROR;
-		dp_cntrack_tcp_state(flow_val, tcp_hdr);
+		dp_cntrack_tcp_state(flow_val, df, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}
 
