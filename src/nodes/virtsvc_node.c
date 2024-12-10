@@ -34,15 +34,15 @@ static __rte_always_inline void virtsvc_tcp_state_change(struct dp_virtsvc_conn 
 	} else {
 		switch (conn->state) {
 		case DP_VIRTSVC_CONN_TRANSIENT:
-			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
+			if (DP_TCP_PKT_FLAG_ONLY_SYN(tcp_flags))
 				conn->state = DP_VIRTSVC_CONN_TRANSIENT_SYN;
 			break;
 		case DP_VIRTSVC_CONN_TRANSIENT_SYN:
-			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
+			if (DP_TCP_PKT_FLAG_ONLY_SYNACK(tcp_flags))
 				conn->state = DP_VIRTSVC_CONN_TRANSIENT_SYNACK;
 			break;
 		case DP_VIRTSVC_CONN_TRANSIENT_SYNACK:
-			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
+			if (DP_TCP_PKT_FLAG_ONLY_ACK(tcp_flags))
 				conn->state = DP_VIRTSVC_CONN_ESTABLISHED;
 			break;
 		case DP_VIRTSVC_CONN_ESTABLISHED:

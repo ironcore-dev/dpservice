@@ -59,15 +59,15 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		switch (flow_val->l4_state.tcp_state) {
 		case DP_FLOW_TCP_STATE_NONE:
 		case DP_FLOW_TCP_STATE_RST_FIN:
-			if (DP_TCP_PKT_FLAG_SYN(tcp_flags) && df->flow_dir == DP_FLOW_DIR_ORG)
+			if (DP_TCP_PKT_FLAG_ONLY_SYN(tcp_flags) && df->flow_dir == DP_FLOW_DIR_ORG)
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
-			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags) && df->flow_dir == DP_FLOW_DIR_REPLY)
+			if (DP_TCP_PKT_FLAG_ONLY_SYNACK(tcp_flags) && df->flow_dir == DP_FLOW_DIR_REPLY)
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
-			if (DP_TCP_PKT_FLAG_ACK(tcp_flags) && df->flow_dir == DP_FLOW_DIR_ORG)
+			if (DP_TCP_PKT_FLAG_ONLY_ACK(tcp_flags) && df->flow_dir == DP_FLOW_DIR_ORG)
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
 		default:
