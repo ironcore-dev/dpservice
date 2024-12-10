@@ -41,7 +41,7 @@ static __rte_always_inline void dp_cache_flow_val(struct flow_value *flow_val)
 	cached_flow_val = flow_val;
 }
 
-static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct rte_tcp_hdr *tcp_hdr)
+static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val, struct dp_flow *df, struct rte_tcp_hdr *tcp_hdr)
 {
 	uint8_t tcp_flags = tcp_hdr->tcp_flags;
 
@@ -59,15 +59,15 @@ static __rte_always_inline void dp_cntrack_tcp_state(struct flow_value *flow_val
 		switch (flow_val->l4_state.tcp_state) {
 		case DP_FLOW_TCP_STATE_NONE:
 		case DP_FLOW_TCP_STATE_RST_FIN:
-			if (DP_TCP_PKT_FLAG_SYN(tcp_flags))
+			if (DP_TCP_PKT_FLAG_SYN(tcp_flags) && df->flow_dir == DP_FLOW_DIR_ORG)
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYN;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYN:
-			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags))
+			if (DP_TCP_PKT_FLAG_SYNACK(tcp_flags) && df->flow_dir == DP_FLOW_DIR_REPLY)
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_NEW_SYNACK;
 			break;
 		case DP_FLOW_TCP_STATE_NEW_SYNACK:
-			if (DP_TCP_PKT_FLAG_ACK(tcp_flags))
+			if (DP_TCP_PKT_FLAG_ACK(tcp_flags) && df->flow_dir == DP_FLOW_DIR_ORG)
 				flow_val->l4_state.tcp_state = DP_FLOW_TCP_STATE_ESTABLISHED;
 			break;
 		default:
@@ -294,7 +294,7 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 			tcp_hdr = (struct rte_tcp_hdr *)(dp_get_ipv6_hdr(m) + 1);
 		else
 			return DP_ERROR;
-		dp_cntrack_tcp_state(flow_val, tcp_hdr);
+		dp_cntrack_tcp_state(flow_val, df, tcp_hdr);
 		dp_cntrack_set_timeout_tcp_flow(m, flow_val, df);
 	}
 
