@@ -4,6 +4,16 @@
   "markdown": "../../docs/deployment/help_dpservice-inspect.md",
   "options": [
     {
+      "shopt": "o",
+      "lgopt": "output-format",
+      "arg": "FORMAT",
+      "help": "format of the output",
+      "var": "output_format",
+      "type": "enum",
+      "choices": [ "human", "table", "csv", "json" ],
+      "default": "human"
+    },
+    {
       "shopt": "t",
       "lgopt": "table",
       "arg": "NAME",

@@ -8,6 +8,13 @@
 /* Please edit dp_conf.json and re-run the script to update this file. */
 /***********************************************************************/
 
+enum dp_conf_output_format {
+	DP_CONF_OUTPUT_FORMAT_HUMAN,
+	DP_CONF_OUTPUT_FORMAT_TABLE,
+	DP_CONF_OUTPUT_FORMAT_CSV,
+	DP_CONF_OUTPUT_FORMAT_JSON,
+};
+
 enum dp_conf_table {
 	DP_CONF_TABLE_LIST,
 	DP_CONF_TABLE_CONNTRACK,
@@ -23,6 +30,7 @@ enum dp_conf_table {
 	DP_CONF_TABLE_VNI,
 };
 
+enum dp_conf_output_format dp_conf_get_output_format(void);
 enum dp_conf_table dp_conf_get_table(void);
 int dp_conf_get_numa_socket(void);
 bool dp_conf_is_dump(void);

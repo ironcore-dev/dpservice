@@ -17,6 +17,7 @@
 enum {
 	OPT_HELP = 'h',
 	OPT_VERSION = 'v',
+	OPT_OUTPUT_FORMAT = 'o',
 	OPT_TABLE = 't',
 	OPT_SOCKET = 's',
 _OPT_SHOPT_MAX = 255,
@@ -24,16 +25,25 @@ _OPT_SHOPT_MAX = 255,
 };
 
 #define OPTSTRING ":hv" \
+	"o:" \
 	"t:" \
 	"s:" \
 
 static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
+	{ "output-format", 1, 0, OPT_OUTPUT_FORMAT },
 	{ "table", 1, 0, OPT_TABLE },
 	{ "socket", 1, 0, OPT_SOCKET },
 	{ "dump", 0, 0, OPT_DUMP },
 	{ NULL, 0, 0, 0 }
+};
+
+static const char *output_format_choices[] = {
+	"human",
+	"table",
+	"csv",
+	"json",
 };
 
 static const char *table_choices[] = {
@@ -51,9 +61,15 @@ static const char *table_choices[] = {
 	"vni",
 };
 
+static enum dp_conf_output_format output_format = DP_CONF_OUTPUT_FORMAT_HUMAN;
 static enum dp_conf_table table = DP_CONF_TABLE_LIST;
 static int numa_socket = -1;
 static bool dump = false;
+
+enum dp_conf_output_format dp_conf_get_output_format(void)
+{
+	return output_format;
+}
 
 enum dp_conf_table dp_conf_get_table(void)
 {
@@ -79,11 +95,12 @@ static void dp_argparse_version(void);
 static inline void dp_argparse_help(const char *progname, FILE *outfile)
 {
 	fprintf(outfile, "Usage: %s [options]\n"
-		" -h, --help           display this help and exit\n"
-		" -v, --version        display version and exit\n"
-		" -t, --table=NAME     hash table to choose: 'list' (default), 'conntrack', 'dnat', 'iface', 'lb', 'lb_id', 'portmap', 'portoverload', 'snat', 'vnf', 'vnf_rev' or 'vni'\n"
-		" -s, --socket=NUMBER  NUMA socket to use\n"
-		"     --dump           dump table contents\n"
+		" -h, --help                  display this help and exit\n"
+		" -v, --version               display version and exit\n"
+		" -o, --output-format=FORMAT  format of the output: 'human' (default), 'table', 'csv' or 'json'\n"
+		" -t, --table=NAME            hash table to choose: 'list' (default), 'conntrack', 'dnat', 'iface', 'lb', 'lb_id', 'portmap', 'portoverload', 'snat', 'vnf', 'vnf_rev' or 'vni'\n"
+		" -s, --socket=NUMBER         NUMA socket to use\n"
+		"     --dump                  dump table contents\n"
 	, progname);
 }
 
@@ -91,6 +108,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 {
 	(void)arg;  // if no option uses an argument, this would be unused
 	switch (opt) {
+	case OPT_OUTPUT_FORMAT:
+		return dp_argparse_enum(arg, (int *)&output_format, output_format_choices, ARRAY_SIZE(output_format_choices));
 	case OPT_TABLE:
 		return dp_argparse_enum(arg, (int *)&table, table_choices, ARRAY_SIZE(table_choices));
 	case OPT_SOCKET:
