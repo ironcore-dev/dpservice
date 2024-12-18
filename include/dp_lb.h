@@ -11,6 +11,8 @@ extern "C" {
 #include "dp_flow.h"
 #include "grpc/dp_grpc_responder.h"
 
+#define DP_LB_TABLE_NAME			"loadbalancer_table"
+#define DP_LB_ID_TABLE_NAME			"loadbalancer_id_table"
 #define DP_LB_TABLE_MAX				256
 #define DP_LB_MAX_IPS_PER_VIP		64
 /* Needs to be a prime number at least 2xDP_LB_MAX_IPS_PER_VIP for a uniform distribution */

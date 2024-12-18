@@ -22,12 +22,12 @@ static struct rte_hash *id_map_lb_tbl = NULL;
 int dp_lb_init(int socket_id)
 {
 	lb_table = dp_create_jhash_table(DP_LB_TABLE_MAX, sizeof(struct lb_key),
-									 "loadbalancer_table", socket_id);
+									 DP_LB_TABLE_NAME, socket_id);
 	if (!lb_table)
 		return DP_ERROR;
 
 	id_map_lb_tbl = dp_create_jhash_table(DP_LB_TABLE_MAX, DP_LB_ID_MAX_LEN,
-										  "loadbalancer_id_table", socket_id);
+										  DP_LB_ID_TABLE_NAME, socket_id);
 	if (!id_map_lb_tbl)
 		return DP_ERROR;
 

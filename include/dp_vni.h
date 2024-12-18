@@ -20,6 +20,8 @@ extern "C" {
 
 extern struct rte_hash *vni_handle_tbl;
 
+#define DP_VNI_TABLE_NAME		"vni_table"
+
 #define DP_VNI_MAX_TABLE_SIZE	512
 
 // Protect array access

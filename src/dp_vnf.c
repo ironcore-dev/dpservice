@@ -19,12 +19,12 @@ static struct rte_hash *vnf_value_tbl = NULL;
 int dp_vnf_init(int socket_id)
 {
 	vnf_handle_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, sizeof(union dp_ipv6),
-										   "vnf_table", socket_id);
+										   DP_VNF_TABLE_NAME, socket_id);
 	if (!vnf_handle_tbl)
 		return DP_ERROR;
 
 	vnf_value_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, sizeof(struct dp_vnf),
-										  "reverse_vnf_table", socket_id);
+										  DP_VNF_REVERSE_TABLE_NAME, socket_id);
 	if (!vnf_value_tbl) {
 		dp_free_jhash_table(vnf_handle_tbl);
 		return DP_ERROR;

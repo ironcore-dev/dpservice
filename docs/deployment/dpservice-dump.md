@@ -11,6 +11,7 @@ Always make sure that the tool detaches cleanly (i.e. prints out `Graphtrace suc
 
 ## Examples
 `dpservice-dump` prints all ingress/egress packets processed by dp-service.
-`dpservice-dump --drops` also prints dropped packets.
-`dpservice-dump --nodes` also prints packets as they are [going through the graph](../concepts/graphtrace.md)
 
+`dpservice-dump --drops` also prints dropped packets.
+
+`dpservice-dump --nodes` also prints packets as they are [going through the graph](../concepts/graphtrace.md)

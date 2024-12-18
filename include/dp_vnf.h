@@ -13,6 +13,9 @@
 extern "C" {
 #endif
 
+#define DP_VNF_TABLE_NAME			"vnf_table"
+#define DP_VNF_REVERSE_TABLE_NAME	"reverse_vnf_table"
+
 #define DP_VNF_MATCH_ALL_PORT_IDS 0xFFFF
 
 // forward declaration as 'struct dp_grpc_responder' needs some definitions from here

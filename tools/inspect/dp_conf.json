@@ -1,0 +1,43 @@
+{
+  "header": "opts.h",
+  "source": "opts.c",
+  "markdown": "../../docs/deployment/help_dpservice-inspect.md",
+  "options": [
+    {
+      "shopt": "o",
+      "lgopt": "output-format",
+      "arg": "FORMAT",
+      "help": "format of the output",
+      "var": "output_format",
+      "type": "enum",
+      "choices": [ "human", "table", "csv", "json" ],
+      "default": "human"
+    },
+    {
+      "shopt": "t",
+      "lgopt": "table",
+      "arg": "NAME",
+      "help": "hash table to choose",
+      "var": "table",
+      "type": "enum",
+      "choices": [ "list", "conntrack", "dnat", "iface", "lb", "lb_id", "portmap", "portoverload", "snat", "vnf", "vnf_rev", "vni" ],
+      "default": "list"
+    },
+    {
+      "shopt": "s",
+      "lgopt": "socket",
+      "arg": "NUMBER",
+      "help": "NUMA socket to use",
+      "var": "numa_socket",
+      "type": "int",
+      "default": -1
+    },
+    {
+      "lgopt": "dump",
+      "help": "dump table contents",
+      "var": "dump",
+      "type": "bool",
+      "default": "false"
+    }
+  ]
+}

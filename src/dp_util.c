@@ -144,8 +144,8 @@ struct rte_hash *dp_create_jhash_table(int capacity, size_t key_len, const char 
 	else
 		hash_func = rte_jhash;
 
-	if ((unsigned int)snprintf(full_name, sizeof(full_name), "%s_%d", name, socket_id) >= RTE_HASH_NAMESIZE) {
-		DPS_LOG_ERR("jhash table name is too long", DP_LOG_NAME(full_name));
+	if (DP_FAILED(dp_get_jhash_table_full_name(name, socket_id, full_name, sizeof(full_name)))) {
+		DPS_LOG_ERR("jhash table name is too long", DP_LOG_NAME(name));
 		return NULL;
 	}
 

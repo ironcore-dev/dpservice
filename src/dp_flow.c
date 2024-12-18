@@ -27,7 +27,7 @@ static bool offload_mode_enabled = 0;
 int dp_flow_init(int socket_id)
 {
 	flow_table = dp_create_jhash_table(DP_FLOW_TABLE_MAX, sizeof(struct flow_key),
-									   "conntrack_table", socket_id);
+									   DP_FLOW_TABLE_NAME, socket_id);
 	if (!flow_table)
 		return DP_ERROR;
 

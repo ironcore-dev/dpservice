@@ -166,6 +166,7 @@ WORKDIR /
 COPY --from=builder \
 /workspace/build/src/dpservice-bin \
 /workspace/build/tools/dump/dpservice-dump \
+/workspace/build/tools/inspect/dpservice-inspect \
 /workspace/build/cli/dpservice-cli/dpservice-cli \
 /workspace/build/cli/dpservice-exporter/dpservice-exporter \
 /workspace/hack/prepare.sh \
