@@ -229,7 +229,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 }
 
 #ifdef ENABLE_PF1_PROXY
-static __rte_always_inline rte_edge_t get_next_index_proxy(__rte_unused struct rte_node *node, struct rte_mbuf *m)
+static __rte_always_inline rte_edge_t get_next_index_proxy(struct rte_node *node, struct rte_mbuf *m)
 {
 	rte_edge_t next = get_next_index(node, m);
 
