@@ -128,6 +128,7 @@ type Prefix struct {
 
 type PrefixMeta struct {
 	InterfaceID string `json:"interface_id"`
+	Vni         uint32 `json:"vni"`
 }
 
 func (m *Prefix) GetName() string {

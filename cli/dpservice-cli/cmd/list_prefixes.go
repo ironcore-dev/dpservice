@@ -80,16 +80,26 @@ func RunListPrefixes(
 		}
 
 		for _, iface := range ifaces.Items {
-			prefix, err := client.ListPrefixes(ctx, iface.ID)
-			if err != nil && prefix.Status.Code == 0 {
+			prefixes, err := client.ListPrefixes(ctx, iface.ID)
+			if err != nil && prefixes.Status.Code == 0 {
 				return fmt.Errorf("error getting prefixes: %w", err)
 			}
-			prefixList.Items = append(prefixList.Items, prefix.Items...)
+			for id := range prefixes.Items {
+				prefixes.Items[id].Vni = iface.Spec.VNI
+			}
+			prefixList.Items = append(prefixList.Items, prefixes.Items...)
 		}
 	} else {
 		prefixList, err = client.ListPrefixes(ctx, opts.InterfaceID)
 		if err != nil {
 			return fmt.Errorf("error listing prefixes: %w", err)
+		}
+		iface, err := client.GetInterface(ctx, opts.InterfaceID)
+		if err != nil {
+			return fmt.Errorf("error getting interface: %w", err)
+		}
+		for id := range prefixList.Items {
+			prefixList.Items[id].Vni = iface.Spec.VNI
 		}
 	}
 	// sort items in list
