@@ -290,11 +290,11 @@ func (t defaultTableConverter) interfaceTable(ifaces []api.Interface) (*TableDat
 }
 
 func (t defaultTableConverter) prefixTable(prefixes []api.Prefix) (*TableData, error) {
-	headers := []any{"Prefix", "UnderlayRoute"}
+	headers := []any{"VNI", "Prefix", "UnderlayRoute", "InterfaceID"}
 
 	columns := make([][]any, len(prefixes))
 	for i, prefix := range prefixes {
-		columns[i] = []any{prefix.Spec.Prefix, prefix.Spec.UnderlayRoute}
+		columns[i] = []any{prefix.Vni, prefix.Spec.Prefix, prefix.Spec.UnderlayRoute, prefix.InterfaceID}
 	}
 
 	return &TableData{
