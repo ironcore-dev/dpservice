@@ -9,6 +9,8 @@ import (
 )
 
 func Command() *cobra.Command {
+	cobra.EnableCaseInsensitive = true
+
 	dpdkClientOptions := &DPDKClientOptions{}
 	rendererOptions := &RendererOptions{}
 
