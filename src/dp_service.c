@@ -166,12 +166,6 @@ static int init_interfaces(void)
 	if (DP_FAILED(dp_start_pf_port(1)))
 		return DP_ERROR;
 
-#ifdef ENABLE_PF1_PROXY
-	if (dp_conf_is_pf1_proxy_enabled()
-		&& DP_FAILED(dp_start_pf1_proxy_port()))
-		return DP_ERROR;
-#endif
-
 	// VFs are started by GRPC later
 
 	if (DP_FAILED(dp_flow_init(pf0_socket_id))
@@ -241,21 +235,6 @@ static int run_service(void)
 			DP_EARLY_ERR("HW offloading is currently not supported for multi-port eswitch mode");
 			return DP_ERROR;
 		}
-#ifdef ENABLE_PF1_PROXY
-		if (dp_conf_is_pf1_proxy_enabled()) {
-			if (*dp_conf_get_pf1_proxy_vf() == '\0') {
-				DP_EARLY_ERR("PF1-proxy also requires --pf1-proxy-vf argument to be set");
-				return DP_ERROR;
-			}
-		}
-#endif
-	} else {
-#ifdef ENABLE_PF1_PROXY
-		if (dp_conf_is_pf1_proxy_enabled()) {
-			DP_EARLY_ERR("PF1-proxy is only supported for multiport-eswitch mode");
-			return DP_ERROR;
-		}
-#endif
 	}
 
 	if (DP_FAILED(dp_log_init()))

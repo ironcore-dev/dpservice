@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "nodes/cls_node.h"
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_graph.h>
@@ -33,19 +32,8 @@
 
 DP_NODE_REGISTER(CLS, cls, NEXT_NODES);
 
-#ifdef ENABLE_PF1_PROXY
-static bool pf1_proxy_enabled = false;
-static uint16_t pf1_port_id;
-static uint16_t pf1_proxy_port_id;
-#endif
-
 static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
-#ifdef ENABLE_PF1_PROXY
-	pf1_proxy_enabled = dp_conf_is_pf1_proxy_enabled();
-	pf1_port_id = dp_get_pf1()->port_id;
-	pf1_proxy_port_id = dp_get_pf1_proxy()->port_id;
-#endif
 #ifdef ENABLE_VIRTSVC
 	virtsvc_present = dp_virtsvc_get_count() > 0;
 	virtsvc_ipv4_tree = dp_virtsvc_get_ipv4_tree();
@@ -53,15 +41,6 @@ static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unuse
 #endif
 	return DP_OK;
 }
-
-#ifdef ENABLE_PF1_PROXY
-static uint16_t next_tx_index[DP_MAX_PORTS];
-
-int cls_node_append_tx(uint16_t port_id, const char *tx_node_name)
-{
-	return dp_node_append_tx(DP_NODE_GET_SELF(cls), next_tx_index, port_id, tx_node_name);
-}
-#endif
 
 static __rte_always_inline int is_arp(const struct rte_ether_hdr *ether_hdr)
 {
@@ -150,8 +129,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_virtsvc *virtsvc;
 #endif
 
-	// this is where pf1-proxy -> pf1 should happen, but that is done via rte_flow rule
-
 	if (unlikely((m->packet_type & RTE_PTYPE_L2_MASK) != RTE_PTYPE_L2_ETHER))
 		return CLS_NEXT_DROP;
 
@@ -227,19 +204,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	return CLS_NEXT_DROP;
 }
-
-#ifdef ENABLE_PF1_PROXY
-static __rte_always_inline rte_edge_t get_next_index_proxy(struct rte_node *node, struct rte_mbuf *m)
-{
-	rte_edge_t next = get_next_index(node, m);
-
-	if (next == CLS_NEXT_DROP && pf1_proxy_enabled && m->port == pf1_port_id)
-		return next_tx_index[pf1_proxy_port_id];
-
-	return next;
-}
-#define get_next_index get_next_index_proxy
-#endif
 
 static uint16_t cls_node_process(struct rte_graph *graph,
 								 struct rte_node *node,

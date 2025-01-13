@@ -152,8 +152,6 @@ def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 		graph_nodes += ('virtsvc',)
 	if request.config.getoption("--hw"):
 		iface_stats += HW_IFACE_STATS
-		if PF1.tap == "pf1-tap":
-			graph_nodes += ('tx-6',)
 	if 'rx_q1_bytes' in ethdev_stats:
 		iface_stats += HW_PF1_IFACE_STATS
 	assert graph_stats == set(graph_nodes), \

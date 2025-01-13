@@ -14,11 +14,7 @@ extern "C" {
 
 #define DP_MAX_PF_PORTS 2
 #define DP_MAX_VF_PORTS 126
-#ifdef ENABLE_PF1_PROXY
-#define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS + 1)
-#else
 #define DP_MAX_PORTS    (DP_MAX_PF_PORTS + DP_MAX_VF_PORTS)
-#endif
 
 #define DP_NR_STD_RX_QUEUES		1
 #define DP_NR_STD_TX_QUEUES		1
@@ -47,17 +43,8 @@ extern "C" {
 // max Ether MTU 1500 + frame header 14 + frame footer 4 + IPv6 tunnel header 40
 #define DP_MBUF_BUF_SIZE	(1558 + RTE_PKTMBUF_HEADROOM)
 
-#ifdef ENABLE_PF1_PROXY
-#define DP_JUMBO_MBUF_POOL_SIZE	(50*1024)
-// max Jumbo Ether MTU 9100 + frame header 14 + frame footer 4
-#define DP_JUMBO_MBUF_BUF_SIZE	(9118 + RTE_PKTMBUF_HEADROOM)
-#endif
-
 struct dp_dpdk_layer {
 	struct rte_mempool	*rte_mempool;
-#ifdef ENABLE_PF1_PROXY
-	struct rte_mempool	*rte_jumbo_mempool;
-#endif
 	struct rte_ring		*grpc_tx_queue;
 	struct rte_ring		*grpc_rx_queue;
 	struct rte_ring		*periodic_msg_queue;

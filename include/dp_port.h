@@ -58,10 +58,6 @@ struct dp_port_async_template {
 
 enum dp_port_async_template_type {
 	DP_PORT_ASYNC_TEMPLATE_PF_ISOLATION,
-#ifdef ENABLE_PF1_PROXY
-	DP_PORT_ASYNC_TEMPLATE_PF1_FROM_PROXY,
-	DP_PORT_ASYNC_TEMPLATE_PF1_TO_PROXY,
-#endif
 #ifdef ENABLE_VIRTSVC
 	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION,
 	DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION,
@@ -72,10 +68,6 @@ enum dp_port_async_template_type {
 enum dp_port_async_flow_type {
 	DP_PORT_ASYNC_FLOW_ISOLATE_IPIP,
 	DP_PORT_ASYNC_FLOW_ISOLATE_IPV6,
-#ifdef ENABLE_PF1_PROXY
-	DP_PORT_ASYNC_FLOW_PF1_FROM_PROXY,
-	DP_PORT_ASYNC_FLOW_PF1_TO_PROXY,
-#endif
 	DP_PORT_ASYNC_FLOW_COUNT,
 };
 
@@ -120,9 +112,6 @@ struct dp_ports {
 // hidden structures for inline functions to access
 extern struct dp_port *_dp_port_table[DP_MAX_PORTS];
 extern struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
-#ifdef ENABLE_PF1_PROXY
-extern struct dp_port _dp_pf1_proxy_port;
-#endif
 extern struct dp_ports _dp_ports;
 
 
@@ -134,9 +123,6 @@ void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
 int dp_start_pf_port(uint16_t index);
-#ifdef ENABLE_PF1_PROXY
-int dp_start_pf1_proxy_port(void);
-#endif
 int dp_stop_port(struct dp_port *port);
 
 void dp_start_acquiring_neigh_mac(struct dp_port *port);
@@ -209,14 +195,6 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 {
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }
-
-#ifdef ENABLE_PF1_PROXY
-static __rte_always_inline
-const struct dp_port *dp_get_pf1_proxy(void)
-{
-	return &_dp_pf1_proxy_port;
-}
-#endif
 
 #ifdef __cplusplus
 }

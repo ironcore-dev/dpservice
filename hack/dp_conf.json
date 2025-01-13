@@ -20,24 +20,6 @@
       "array_size": "IF_NAMESIZE"
     },
     {
-      "lgopt": "pf1-proxy",
-      "arg": "IFNAME",
-      "help": "VF representor to use as a proxy for pf1 packets",
-      "var": "pf1_proxy",
-      "type": "char",
-      "array_size": "IF_NAMESIZE",
-      "ifdef": "ENABLE_PF1_PROXY"
-    },
-    {
-      "lgopt": "pf1-proxy-vf",
-      "arg": "IFNAME",
-      "help": "VF interface of the pf1-proxy VF representor",
-      "var": "pf1_proxy_vf",
-      "type": "char",
-      "array_size": "IF_NAMESIZE",
-      "ifdef": "ENABLE_PF1_PROXY"
-    },
-    {
       "lgopt": "ipv6",
       "arg": "ADDR6",
       "help": "IPv6 underlay address"
