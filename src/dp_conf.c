@@ -38,13 +38,6 @@ static struct dp_conf_dhcp_dns dhcpv6_dns = {0};
 static struct dp_conf_virtual_services virtual_services = {0};
 #endif
 
-#ifdef ENABLE_PF1_PROXY
-bool dp_conf_is_pf1_proxy_enabled(void)
-{
-	return *pf1_proxy;
-}
-#endif
-
 int dp_conf_is_wcmp_enabled(void)
 {
 	return wcmp_perc < 100;

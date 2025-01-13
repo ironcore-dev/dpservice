@@ -38,12 +38,6 @@ union dp_flow_item_l4 {
 	struct rte_flow_item_icmp6 icmp6;
 };
 
-#ifdef ENABLE_PF1_PROXY
-static const struct rte_flow_item_ethdev dp_flow_item_ethdev_mask = {
-	.port_id = 0xffff,
-};
-#endif
-
 static const struct rte_flow_item_eth dp_flow_item_eth_mask = {
 	.hdr.ether_type = 0xffff,
 };
@@ -73,11 +67,6 @@ static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_src_dst_mask = {
 	.hdr.src_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 	.hdr.dst_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 	.hdr.proto = 0xff,
-};
-#endif
-#ifdef ENABLE_PF1_PROXY
-static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_only_mask = {
-	.hdr.dst_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 };
 #endif
 

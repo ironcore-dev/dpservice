@@ -27,12 +27,6 @@ enum dp_conf_log_format {
 
 const char *dp_conf_get_pf0_name(void);
 const char *dp_conf_get_pf1_name(void);
-#ifdef ENABLE_PF1_PROXY
-const char *dp_conf_get_pf1_proxy(void);
-#endif
-#ifdef ENABLE_PF1_PROXY
-const char *dp_conf_get_pf1_proxy_vf(void);
-#endif
 const char *dp_conf_get_vf_pattern(void);
 int dp_conf_get_dhcp_mtu(void);
 int dp_conf_get_wcmp_perc(void);

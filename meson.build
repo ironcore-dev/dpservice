@@ -56,9 +56,6 @@ endif
 if get_option('enable_tests')
   add_global_arguments('-DENABLE_PYTEST', language: ['c', 'cpp'])
 endif
-if get_option('enable_pf1_proxy')
-  add_global_arguments('-DENABLE_PF1_PROXY', language: ['c', 'cpp'])
-endif
 
 dpdk_dep = dependency('libdpdk', version: '>=21.11.0')
 proto_dep = dependency('protobuf')

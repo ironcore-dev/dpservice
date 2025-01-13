@@ -43,9 +43,11 @@ For this mode to be functional, an additional firmware setting `LAG_RESOURCE_ALL
 
 In some cases (looks like a nic/switch combination) performance is severly affected when VM traffic is happening. This has been observed to be fixed by setting `ROCE_CONTROL=1` (this means "disabled", the default is `2` meaning "enabled"). The actual cause of this is yet to be discovered.
 
+> For this to work, kernal has to have "TC recirculation support" (CONFIG_NET_TC_SKB_EXT) enabled. This is not the default for Debian.
+
 
 ## Dp-service setup
 Either `prepare.sh` script or `preparedp.service` systemd unit needs to be run before dp-service can work properly. This should already be done automatically if using the Docker image provided. Make sure this does not produce any errors.
 
 ### Multiport-eswitch
-The `prepare.sh` script supports `--multiport-eswitch` argument to set the card up in multiport-eswitch mode. There is an additional `--pf1-proxy` argument to also create a VF on PF1 for proxying PF1 traffic. Currently both arguments are needed to properly run dpservice in multiport-eswitch mode due to a (suspected) driver bug.
+The `prepare.sh` script supports `--multiport-eswitch` argument to set the card up in multiport-eswitch mode.

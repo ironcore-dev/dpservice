@@ -8,9 +8,6 @@
 #include "dp_virtsvc.h"
 #endif
 #include "rte_flow/dp_rte_async_flow.h"
-#ifdef ENABLE_PF1_PROXY
-#include "rte_flow/dp_rte_async_flow_pf1_proxy.h"
-#endif
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow_helpers.h"
 
@@ -230,14 +227,6 @@ int dp_create_pf_async_isolation_rules(struct dp_port *port)
 		port->default_async_rules.default_flows[DP_PORT_ASYNC_FLOW_ISOLATE_IPV6] = flow;
 		rule_count++;
 	}
-
-#ifdef ENABLE_PF1_PROXY
-	if (dp_conf_is_pf1_proxy_enabled() && port == dp_get_pf0()) {
-		rules_required += DP_PF1_PROXY_RULE_COUNT;
-		rule_count += dp_create_pf1_proxy_async_isolation_rules(port);
-		// cannot return, need to push all previous rules and then return error
-	}
-#endif
 
 #ifdef ENABLE_VIRTSVC
 	rules_required += dp_virtsvc_get_count();
