@@ -224,7 +224,7 @@ class TCPTesterVirtsvc(_TCPTester):
 	# Virtual-service communication, no tunnel, replace header with IPv6
 	def get_server_l3_reply(self, pkt):
 		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=6))
+				IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=6))
 
 class TCPTesterPublic(_TCPTester):
 	def __init__(self, client_vm, client_port, nat_ul_ipv6, pf_spec, server_ip, server_port, client_pkt_check=None, server_pkt_check=None):

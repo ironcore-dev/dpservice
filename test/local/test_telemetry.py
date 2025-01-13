@@ -27,7 +27,6 @@ ETHDEV_STATS = (
 HW_IFACE_STATS = (
 	'rx_broadcast_bytes', 'rx_broadcast_packets', 'tx_broadcast_bytes', 'tx_broadcast_packets',
 	'rx_multicast_bytes', 'rx_multicast_packets', 'tx_multicast_bytes', 'tx_multicast_packets',
-	'rx_out_of_buffer',
 	'rx_phy_bytes', 'rx_phy_crc_errors', 'rx_phy_discard_packets', 'rx_phy_in_range_len_errors', 'rx_phy_packets', 'rx_phy_symbol_errors',
 	'tx_phy_bytes', 'tx_phy_discard_packets', 'tx_phy_errors', 'tx_phy_packets',
 	'rx_prio0_buf_discard_packets', 'rx_prio0_cong_discard_packets',
@@ -41,7 +40,7 @@ HW_IFACE_STATS = (
 	'rx_unicast_bytes', 'rx_unicast_packets', 'tx_unicast_bytes', 'tx_unicast_packets',
 	'rx_vport_bytes', 'rx_vport_packets', 'tx_vport_bytes', 'tx_vport_packets',
 	'rx_wqe_errors',
-	'tx_pp_clock_queue_errors', 'tx_pp_jitter', 'tx_pp_missed_interrupt_errors', 'tx_pp_rearm_queue_errors', 'tx_pp_sync_lost', 'tx_pp_timestamp_future_errors', 'tx_pp_timestamp_order_errors', 'tx_pp_timestamp_past_errors', 'tx_pp_wander',
+	'tx_pp_clock_queue_errors', 'tx_pp_missed_interrupt_errors', 'tx_pp_rearm_queue_errors', 'tx_pp_timestamp_future_errors', 'tx_pp_timestamp_order_errors', 'tx_pp_timestamp_past_errors',
 )
 HW_PF1_IFACE_STATS = (
 	'rx_q1_bytes', 'rx_q1_errors', 'rx_q1_packets', 'tx_q1_bytes', 'tx_q1_packets',

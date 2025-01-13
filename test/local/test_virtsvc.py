@@ -23,7 +23,7 @@ def reply_udp(pf_name):
 	udp_used_port = pkt[UDP].sport
 
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=router_ul_ipv6, src=pkt[IPv6].dst, nh=17) /
+				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=17) /
 				 UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport))
 	delayed_sendp(reply_pkt, pf_name)
 
