@@ -655,7 +655,7 @@ void DeleteNeighborNatCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 
 const char* ListNeighborNatsCall::FillRequest(struct dpgrpc_request* request)
 {
-	DPGRPC_LOG_INFO("Getting NAT info",
+	DPGRPC_LOG_INFO("Listing neighbor Nats",
 					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()));
 	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->list_localnat))
 		return "Invalid nat_ip";

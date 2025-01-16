@@ -774,6 +774,10 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 	int32_t ret;
 	struct dpgrpc_nat *reply;
 
+	// VIP entries use the same table and have data->nat_ip set to 0 so they would match
+	if (nat_ip == 0)
+		return DP_GRPC_OK;
+
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
 		return DP_GRPC_OK;
 
