@@ -335,10 +335,10 @@ func (t defaultTableConverter) natTable(nats []api.Nat) (*TableData, error) {
 	var headers []any
 	// if command was get nat or there are no nats
 	if len(nats) > 0 && nats[0].InterfaceID != "" {
-		headers = []any{"InterfaceID", "IP", "MinPort", "MaxPort", "UnderlayRoute"}
+		headers = []any{"InterfaceID", "NatIP", "MinPort", "MaxPort", "UnderlayRoute"}
 		// if command was list nats
 	} else {
-		headers = []any{"VNI", "IP", "MinPort", "MaxPort", "UnderlayRoute", "NatType"}
+		headers = []any{"VNI", "IP", "MinPort", "MaxPort", "UnderlayRoute", "NatIP", "NatType"}
 	}
 
 	columns := make([][]any, len(nats))
@@ -348,7 +348,7 @@ func (t defaultTableConverter) natTable(nats []api.Nat) (*TableData, error) {
 			columns[i] = []any{nat.NatMeta.InterfaceID, nat.Spec.NatIP, nat.Spec.MinPort, nat.Spec.MaxPort, nat.Spec.UnderlayRoute}
 			// if command was list nats
 		} else {
-			columns[i] = []any{nat.Spec.Vni, nat.Spec.NatIP, nat.Spec.MinPort, nat.Spec.MaxPort, nat.Spec.UnderlayRoute}
+			columns[i] = []any{nat.Spec.Vni, nat.Spec.NatIP, nat.Spec.MinPort, nat.Spec.MaxPort, nat.Spec.UnderlayRoute, nat.Spec.ActualNatIP}
 			if len(nats) > 0 && nats[i].Spec.UnderlayRoute == nil {
 				columns[i] = append(columns[i], "Local")
 			} else {

@@ -802,23 +802,29 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 	var nats = make([]api.Nat, len(natEntries))
 	var nat api.Nat
 	for i, natEntry := range natEntries {
-
-		var underlayRoute, vipIP netip.Addr
+		var underlayRoute, natIP, nattedIP netip.Addr
 		if natEntry.GetUnderlayRoute() != nil {
 			underlayRoute, err = netip.ParseAddr(string(natEntry.GetUnderlayRoute()))
 			if err != nil {
 				return nil, fmt.Errorf("error parsing underlay route: %w", err)
 			}
 			nat.Spec.UnderlayRoute = &underlayRoute
-			nat.Spec.NatIP = nil
+			nat.Spec.NatIP = nil  // "natted" IP, i.e. local NIC IP is not applicable for neighnats
 			nat.Kind = api.NeighborNatKind
 		} else if natEntry.GetNatIp() != nil {
-			vipIP, err = netip.ParseAddr(string(natEntry.GetNatIp().GetAddress()))
+			nattedIP, err = netip.ParseAddr(string(natEntry.GetNatIp().GetAddress()))
+			if err != nil {
+				return nil, fmt.Errorf("error parsing natted ip: %w", err)
+			}
+			nat.Spec.NatIP = &nattedIP
+			nat.Kind = api.NatKind
+		}
+		if natEntry.GetActualNatIp() != nil {
+			natIP, err = netip.ParseAddr(string(natEntry.GetActualNatIp().GetAddress()))
 			if err != nil {
 				return nil, fmt.Errorf("error parsing nat ip: %w", err)
 			}
-			nat.Spec.NatIP = &vipIP
-			nat.Kind = api.NatKind
+			nat.Spec.ActualNatIP = &natIP
 		}
 		nat.Spec.MinPort = natEntry.MinPort
 		nat.Spec.MaxPort = natEntry.MaxPort

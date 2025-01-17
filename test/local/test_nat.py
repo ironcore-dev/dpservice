@@ -44,7 +44,7 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 	assert spec == localspec, \
 		"Failed to add NAT properly"
 
-	neighspec = { 'underlay_route': neigh_vni1_ul_ipv6, 'min_port': nat_neigh_min_port, 'max_port': nat_neigh_max_port, 'vni': vni1 }
+	neighspec = { 'underlay_route': neigh_vni1_ul_ipv6, 'min_port': nat_neigh_min_port, 'max_port': nat_neigh_max_port, 'vni': vni1, 'actual_nat_ip': nat_vip }
 	specs = grpc_client.listneighnats(nat_vip)
 	assert specs == [neighspec], \
 		"Invalid neighboring NAT list"

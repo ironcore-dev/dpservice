@@ -392,6 +392,7 @@ type NatSpec struct {
 	MaxPort       uint32      `json:"max_port"`
 	UnderlayRoute *netip.Addr `json:"underlay_route,omitempty"`
 	Vni           uint32      `json:"vni"`
+	ActualNatIP   *netip.Addr `json:"actual_nat_ip,omitempty"`
 }
 
 type NatList struct {

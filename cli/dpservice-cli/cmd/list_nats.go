@@ -53,17 +53,16 @@ type ListNatsOptions struct {
 }
 
 func (o *ListNatsOptions) AddFlags(fs *pflag.FlagSet) {
-	flag.AddrVar(fs, &o.NatIP, "nat-ip", o.NatIP, "NAT IP to get info for")
+	defaultAddr, err := netip.ParseAddr("0.0.0.0")
+	if err != nil {
+		defaultAddr = o.NatIP
+	}
+	flag.AddrVar(fs, &o.NatIP, "nat-ip", defaultAddr, "NAT IP to get info for")
 	fs.StringVar(&o.NatType, "nat-type", "0", "NAT type: Any = 0/Local = 1/Neigh(bor) = 2")
 	fs.StringVar(&o.SortBy, "sort-by", "", "Column to sort by.")
 }
 
 func (o *ListNatsOptions) MarkRequiredFlags(cmd *cobra.Command) error {
-	for _, name := range []string{"nat-ip"} {
-		if err := cmd.MarkFlagRequired(name); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

@@ -588,16 +588,20 @@ void ListLocalNatsCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	struct dpgrpc_nat *nat;
 	NatEntry *nat_entry;
+	IpAddress *natted_ip;
 	IpAddress *nat_ip;
 
 	FOREACH_MESSAGE(nat, reply) {
 		nat_entry = reply_.add_nat_entries();
-		nat_ip = new IpAddress();
-		GrpcConv::DpToGrpcAddress(&nat->addr, nat_ip);
-		nat_entry->set_allocated_nat_ip(nat_ip);
+		natted_ip = new IpAddress();
+		GrpcConv::DpToGrpcAddress(&nat->natted_ip, natted_ip);
+		nat_entry->set_allocated_nat_ip(natted_ip);
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
 		nat_entry->set_vni(nat->vni);
+		nat_ip = new IpAddress();
+		GrpcConv::DpToGrpcAddress(&nat->addr, nat_ip);
+		nat_entry->set_allocated_actual_nat_ip(nat_ip);
 	}
 }
 
@@ -665,6 +669,7 @@ void ListNeighborNatsCall::ParseReply(struct dpgrpc_reply* reply)
 {
 	struct dpgrpc_nat *nat;
 	NatEntry *nat_entry;
+	IpAddress *nat_ip;
 	char strbuf[INET6_ADDRSTRLEN];
 
 	FOREACH_MESSAGE(nat, reply) {
@@ -674,6 +679,9 @@ void ListNeighborNatsCall::ParseReply(struct dpgrpc_reply* reply)
 		nat_entry->set_min_port(nat->min_port);
 		nat_entry->set_max_port(nat->max_port);
 		nat_entry->set_vni(nat->vni);
+		nat_ip = new IpAddress();
+		GrpcConv::DpToGrpcAddress(&nat->addr, nat_ip);
+		nat_entry->set_allocated_actual_nat_ip(nat_ip);
 	}
 }
 

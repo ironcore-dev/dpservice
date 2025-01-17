@@ -194,8 +194,8 @@ def test_grpc_nat_list(prepare_ifaces, grpc_client):
 	grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	grpc_client.addnat(VM2.name, nat_vip, nat_local_max_port, nat_local_max_port+1)
 	# Local NAT list is not a list of NAT objects, need to create it manually
-	nat1spec = { "nat_ip": VM1.ip, "min_port": nat_local_min_port, "max_port": nat_local_max_port, "vni": VM1.vni }
-	nat2spec = { "nat_ip": VM2.ip, "min_port": nat_local_max_port, "max_port": nat_local_max_port+1, "vni": VM1.vni }
+	nat1spec = { "nat_ip": VM1.ip, "min_port": nat_local_min_port, "max_port": nat_local_max_port, "vni": VM1.vni, "actual_nat_ip": nat_vip }
+	nat2spec = { "nat_ip": VM2.ip, "min_port": nat_local_max_port, "max_port": nat_local_max_port+1, "vni": VM1.vni, "actual_nat_ip": nat_vip }
 	specs = grpc_client.listlocalnats(nat_vip)
 	# List order is apparently not the same as the order of operations
 	assert specs == [ nat2spec, nat1spec ], \
@@ -251,8 +251,8 @@ def test_grpc_neighnat_list(prepare_ifaces, grpc_client):
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
 	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_max_port, nat_neigh_max_port+1, neigh_vni1_ul_ipv6)
 	# Neighbor NAT list is not a list of NAT objects, need to create it manually
-	neigh1spec = { "min_port": nat_neigh_min_port, "max_port": nat_neigh_max_port, "underlay_route": neigh_vni1_ul_ipv6, "vni": vni1 }
-	neigh2spec = { "min_port": nat_neigh_max_port, "max_port": nat_neigh_max_port+1, "underlay_route": neigh_vni1_ul_ipv6, "vni": vni1 }
+	neigh1spec = { "min_port": nat_neigh_min_port, "max_port": nat_neigh_max_port, "underlay_route": neigh_vni1_ul_ipv6, "vni": vni1, "actual_nat_ip": nat_vip }
+	neigh2spec = { "min_port": nat_neigh_max_port, "max_port": nat_neigh_max_port+1, "underlay_route": neigh_vni1_ul_ipv6, "vni": vni1, "actual_nat_ip": nat_vip }
 	specs = grpc_client.listneighnats(nat_vip)
 	assert specs == [ neigh1spec, neigh2spec ], \
 		"Neighboring NATs not properly added to a list"

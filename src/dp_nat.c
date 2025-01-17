@@ -774,10 +774,6 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 	int32_t ret;
 	struct dpgrpc_nat *reply;
 
-	// VIP entries use the same table and have data->nat_ip set to 0 so they would match
-	if (nat_ip == 0)
-		return DP_GRPC_OK;
-
 	if (rte_hash_count(ipv4_snat_tbl) == 0)
 		return DP_GRPC_OK;
 
@@ -787,14 +783,16 @@ int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 		if (DP_FAILED(ret))
 			return DP_GRPC_ERR_ITERATOR;
 
-		if (data->nat_ip == nat_ip) {
+		// VIP entries use the same table and have data->nat_ip set to 0 so they would match when nat_ip is 0
+		if (data->nat_ip != 0 && (nat_ip == 0 || data->nat_ip == nat_ip)) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
 			reply->min_port = data->nat_port_range[0];
 			reply->max_port = data->nat_port_range[1];
-			dp_set_ipaddr4(&reply->addr, nkey->ip);
+			dp_set_ipaddr4(&reply->natted_ip, nkey->ip);
 			reply->vni = nkey->vni;
+			dp_set_ipaddr4(&reply->addr, data->nat_ip);
 		}
 	}
 	return DP_GRPC_OK;
@@ -808,7 +806,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	TAILQ_FOREACH(current, &nat_headp, entries) {
-		if (current->nat_ip == nat_ip) {
+		if (nat_ip == 0 || current->nat_ip == nat_ip) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
 				return DP_GRPC_ERR_OUT_OF_MEMORY;
@@ -816,6 +814,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 			reply->max_port = current->port_range[1];
 			reply->vni = current->vni;
 			dp_copy_ipv6(&reply->ul_addr6, &current->dst_ipv6);
+			dp_set_ipaddr4(&reply->addr, current->nat_ip);
 		}
 	}
 	return DP_GRPC_OK;

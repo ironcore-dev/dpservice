@@ -121,6 +121,7 @@ struct dpgrpc_nat {
 	uint32_t				vni;							// neighnat or reply only
 	union dp_ipv6			neigh_addr6;					// neighnat only
 	union dp_ipv6			ul_addr6;						// reply only
+	struct dp_ip_address	natted_ip;						// list localnats reply only
 };
 
 struct dpgrpc_lb_port {

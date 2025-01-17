@@ -98,11 +98,12 @@ message LbPort {
 }
 
 message NatEntry {
-	IpAddress nat_ip = 1;
+	IpAddress nat_ip = 1;        // TODO This is actually the local "natted" IP
 	uint32 min_port = 2;
 	uint32 max_port = 3;
 	bytes underlay_route = 4;
 	uint32 vni = 5;
+	IpAddress actual_nat_ip = 6; // The actual NAT IP
 }
 
 message Route {

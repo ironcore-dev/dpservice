@@ -910,11 +910,12 @@ type NatEntry struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	NatIp         *IpAddress `protobuf:"bytes,1,opt,name=nat_ip,json=natIp,proto3" json:"nat_ip,omitempty"`
+	NatIp         *IpAddress `protobuf:"bytes,1,opt,name=nat_ip,json=natIp,proto3" json:"nat_ip,omitempty"` // TODO This is actually the local "natted" IP
 	MinPort       uint32     `protobuf:"varint,2,opt,name=min_port,json=minPort,proto3" json:"min_port,omitempty"`
 	MaxPort       uint32     `protobuf:"varint,3,opt,name=max_port,json=maxPort,proto3" json:"max_port,omitempty"`
 	UnderlayRoute []byte     `protobuf:"bytes,4,opt,name=underlay_route,json=underlayRoute,proto3" json:"underlay_route,omitempty"`
 	Vni           uint32     `protobuf:"varint,5,opt,name=vni,proto3" json:"vni,omitempty"`
+	ActualNatIp   *IpAddress `protobuf:"bytes,6,opt,name=actual_nat_ip,json=actualNatIp,proto3" json:"actual_nat_ip,omitempty"` // The actual NAT IP
 }
 
 func (x *NatEntry) Reset() {
@@ -982,6 +983,13 @@ func (x *NatEntry) GetVni() uint32 {
 		return x.Vni
 	}
 	return 0
+}
+
+func (x *NatEntry) GetActualNatIp() *IpAddress {
+	if x != nil {
+		return x.ActualNatIp
+	}
+	return nil
 }
 
 type Route struct {
@@ -6298,7 +6306,7 @@ var file_proto_dpdk_proto_rawDesc = []byte{
 	0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x19, 0x2e, 0x64,
 	0x70, 0x64, 0x6b, 0x69, 0x72, 0x6f, 0x6e, 0x63, 0x6f, 0x72, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x50,
 	0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x52, 0x08, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f,
-	0x6c, 0x22, 0xac, 0x01, 0x0a, 0x08, 0x4e, 0x61, 0x74, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x31,
+	0x6c, 0x22, 0xec, 0x01, 0x0a, 0x08, 0x4e, 0x61, 0x74, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x31,
 	0x0a, 0x06, 0x6e, 0x61, 0x74, 0x5f, 0x69, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a,
 	0x2e, 0x64, 0x70, 0x64, 0x6b, 0x69, 0x72, 0x6f, 0x6e, 0x63, 0x6f, 0x72, 0x65, 0x2e, 0x76, 0x31,
 	0x2e, 0x49, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x52, 0x05, 0x6e, 0x61, 0x74, 0x49,
@@ -6309,6 +6317,10 @@ var file_proto_dpdk_proto_rawDesc = []byte{
 	0x6c, 0x61, 0x79, 0x5f, 0x72, 0x6f, 0x75, 0x74, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0c, 0x52,
 	0x0d, 0x75, 0x6e, 0x64, 0x65, 0x72, 0x6c, 0x61, 0x79, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x12, 0x10,
 	0x0a, 0x03, 0x76, 0x6e, 0x69, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x76, 0x6e, 0x69,
+	0x12, 0x3e, 0x0a, 0x0d, 0x61, 0x63, 0x74, 0x75, 0x61, 0x6c, 0x5f, 0x6e, 0x61, 0x74, 0x5f, 0x69,
+	0x70, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x64, 0x70, 0x64, 0x6b, 0x69, 0x72,
+	0x6f, 0x6e, 0x63, 0x6f, 0x72, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x49, 0x70, 0x41, 0x64, 0x64, 0x72,
+	0x65, 0x73, 0x73, 0x52, 0x0b, 0x61, 0x63, 0x74, 0x75, 0x61, 0x6c, 0x4e, 0x61, 0x74, 0x49, 0x70,
 	0x22, 0xb6, 0x01, 0x0a, 0x05, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x12, 0x2f, 0x0a, 0x06, 0x70, 0x72,
 	0x65, 0x66, 0x69, 0x78, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x64, 0x70, 0x64,
 	0x6b, 0x69, 0x72, 0x6f, 0x6e, 0x63, 0x6f, 0x72, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x72, 0x65,
@@ -7401,194 +7413,195 @@ var file_proto_dpdk_proto_depIdxs = []int32{
 	23,  // 2: dpdkironcore.v1.Interface.meteringParams:type_name -> dpdkironcore.v1.MeteringParams
 	2,   // 3: dpdkironcore.v1.LbPort.protocol:type_name -> dpdkironcore.v1.Protocol
 	9,   // 4: dpdkironcore.v1.NatEntry.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	10,  // 5: dpdkironcore.v1.Route.prefix:type_name -> dpdkironcore.v1.Prefix
-	9,   // 6: dpdkironcore.v1.Route.nexthop_address:type_name -> dpdkironcore.v1.IpAddress
-	9,   // 7: dpdkironcore.v1.Loadbalancer.ip:type_name -> dpdkironcore.v1.IpAddress
-	15,  // 8: dpdkironcore.v1.Loadbalancer.ports:type_name -> dpdkironcore.v1.LbPort
-	19,  // 9: dpdkironcore.v1.ProtocolFilter.icmp:type_name -> dpdkironcore.v1.IcmpFilter
-	20,  // 10: dpdkironcore.v1.ProtocolFilter.tcp:type_name -> dpdkironcore.v1.TcpFilter
-	21,  // 11: dpdkironcore.v1.ProtocolFilter.udp:type_name -> dpdkironcore.v1.UdpFilter
-	3,   // 12: dpdkironcore.v1.FirewallRule.direction:type_name -> dpdkironcore.v1.TrafficDirection
-	4,   // 13: dpdkironcore.v1.FirewallRule.action:type_name -> dpdkironcore.v1.FirewallAction
-	10,  // 14: dpdkironcore.v1.FirewallRule.source_prefix:type_name -> dpdkironcore.v1.Prefix
-	10,  // 15: dpdkironcore.v1.FirewallRule.destination_prefix:type_name -> dpdkironcore.v1.Prefix
-	22,  // 16: dpdkironcore.v1.FirewallRule.protocol_filter:type_name -> dpdkironcore.v1.ProtocolFilter
-	8,   // 17: dpdkironcore.v1.CheckInitializedResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 18: dpdkironcore.v1.InitializeResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 19: dpdkironcore.v1.GetVersionResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 20: dpdkironcore.v1.ListInterfacesResponse.status:type_name -> dpdkironcore.v1.Status
-	11,  // 21: dpdkironcore.v1.ListInterfacesResponse.interfaces:type_name -> dpdkironcore.v1.Interface
-	8,   // 22: dpdkironcore.v1.GetInterfaceResponse.status:type_name -> dpdkironcore.v1.Status
-	11,  // 23: dpdkironcore.v1.GetInterfaceResponse.interface:type_name -> dpdkironcore.v1.Interface
-	0,   // 24: dpdkironcore.v1.CreateInterfaceRequest.interface_type:type_name -> dpdkironcore.v1.InterfaceType
-	12,  // 25: dpdkironcore.v1.CreateInterfaceRequest.ipv4_config:type_name -> dpdkironcore.v1.IpConfig
-	12,  // 26: dpdkironcore.v1.CreateInterfaceRequest.ipv6_config:type_name -> dpdkironcore.v1.IpConfig
-	13,  // 27: dpdkironcore.v1.CreateInterfaceRequest.pxe_config:type_name -> dpdkironcore.v1.PxeConfig
-	23,  // 28: dpdkironcore.v1.CreateInterfaceRequest.metering_parameters:type_name -> dpdkironcore.v1.MeteringParams
-	8,   // 29: dpdkironcore.v1.CreateInterfaceResponse.status:type_name -> dpdkironcore.v1.Status
-	14,  // 30: dpdkironcore.v1.CreateInterfaceResponse.vf:type_name -> dpdkironcore.v1.VirtualFunction
-	8,   // 31: dpdkironcore.v1.DeleteInterfaceResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 32: dpdkironcore.v1.ListPrefixesResponse.status:type_name -> dpdkironcore.v1.Status
-	10,  // 33: dpdkironcore.v1.ListPrefixesResponse.prefixes:type_name -> dpdkironcore.v1.Prefix
-	10,  // 34: dpdkironcore.v1.CreatePrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
-	8,   // 35: dpdkironcore.v1.CreatePrefixResponse.status:type_name -> dpdkironcore.v1.Status
-	10,  // 36: dpdkironcore.v1.DeletePrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
-	8,   // 37: dpdkironcore.v1.DeletePrefixResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 38: dpdkironcore.v1.ListLoadBalancerPrefixesResponse.status:type_name -> dpdkironcore.v1.Status
-	10,  // 39: dpdkironcore.v1.ListLoadBalancerPrefixesResponse.prefixes:type_name -> dpdkironcore.v1.Prefix
-	10,  // 40: dpdkironcore.v1.CreateLoadBalancerPrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
-	8,   // 41: dpdkironcore.v1.CreateLoadBalancerPrefixResponse.status:type_name -> dpdkironcore.v1.Status
-	10,  // 42: dpdkironcore.v1.DeleteLoadBalancerPrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
-	8,   // 43: dpdkironcore.v1.DeleteLoadBalancerPrefixResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 44: dpdkironcore.v1.CreateVipRequest.vip_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 45: dpdkironcore.v1.CreateVipResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 46: dpdkironcore.v1.GetVipResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 47: dpdkironcore.v1.GetVipResponse.vip_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 48: dpdkironcore.v1.DeleteVipResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 49: dpdkironcore.v1.CreateLoadBalancerRequest.loadbalanced_ip:type_name -> dpdkironcore.v1.IpAddress
-	15,  // 50: dpdkironcore.v1.CreateLoadBalancerRequest.loadbalanced_ports:type_name -> dpdkironcore.v1.LbPort
-	8,   // 51: dpdkironcore.v1.CreateLoadBalancerResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 52: dpdkironcore.v1.GetLoadBalancerResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 53: dpdkironcore.v1.GetLoadBalancerResponse.loadbalanced_ip:type_name -> dpdkironcore.v1.IpAddress
-	15,  // 54: dpdkironcore.v1.GetLoadBalancerResponse.loadbalanced_ports:type_name -> dpdkironcore.v1.LbPort
-	8,   // 55: dpdkironcore.v1.DeleteLoadBalancerResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 56: dpdkironcore.v1.ListLoadBalancersResponse.status:type_name -> dpdkironcore.v1.Status
-	18,  // 57: dpdkironcore.v1.ListLoadBalancersResponse.loadbalancers:type_name -> dpdkironcore.v1.Loadbalancer
-	9,   // 58: dpdkironcore.v1.CreateLoadBalancerTargetRequest.target_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 59: dpdkironcore.v1.CreateLoadBalancerTargetResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 60: dpdkironcore.v1.ListLoadBalancerTargetsResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 61: dpdkironcore.v1.ListLoadBalancerTargetsResponse.target_ips:type_name -> dpdkironcore.v1.IpAddress
-	9,   // 62: dpdkironcore.v1.DeleteLoadBalancerTargetRequest.target_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 63: dpdkironcore.v1.DeleteLoadBalancerTargetResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 64: dpdkironcore.v1.CreateNatRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 65: dpdkironcore.v1.CreateNatResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 66: dpdkironcore.v1.GetNatResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 67: dpdkironcore.v1.GetNatResponse.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 68: dpdkironcore.v1.DeleteNatResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 69: dpdkironcore.v1.CreateNeighborNatRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 70: dpdkironcore.v1.CreateNeighborNatResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 71: dpdkironcore.v1.DeleteNeighborNatRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 72: dpdkironcore.v1.DeleteNeighborNatResponse.status:type_name -> dpdkironcore.v1.Status
-	9,   // 73: dpdkironcore.v1.ListLocalNatsRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 74: dpdkironcore.v1.ListLocalNatsResponse.status:type_name -> dpdkironcore.v1.Status
-	16,  // 75: dpdkironcore.v1.ListLocalNatsResponse.nat_entries:type_name -> dpdkironcore.v1.NatEntry
-	9,   // 76: dpdkironcore.v1.ListNeighborNatsRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
-	8,   // 77: dpdkironcore.v1.ListNeighborNatsResponse.status:type_name -> dpdkironcore.v1.Status
-	16,  // 78: dpdkironcore.v1.ListNeighborNatsResponse.nat_entries:type_name -> dpdkironcore.v1.NatEntry
-	8,   // 79: dpdkironcore.v1.ListRoutesResponse.status:type_name -> dpdkironcore.v1.Status
-	17,  // 80: dpdkironcore.v1.ListRoutesResponse.routes:type_name -> dpdkironcore.v1.Route
-	17,  // 81: dpdkironcore.v1.CreateRouteRequest.route:type_name -> dpdkironcore.v1.Route
-	8,   // 82: dpdkironcore.v1.CreateRouteResponse.status:type_name -> dpdkironcore.v1.Status
-	17,  // 83: dpdkironcore.v1.DeleteRouteRequest.route:type_name -> dpdkironcore.v1.Route
-	8,   // 84: dpdkironcore.v1.DeleteRouteResponse.status:type_name -> dpdkironcore.v1.Status
-	5,   // 85: dpdkironcore.v1.CheckVniInUseRequest.type:type_name -> dpdkironcore.v1.VniType
-	8,   // 86: dpdkironcore.v1.CheckVniInUseResponse.status:type_name -> dpdkironcore.v1.Status
-	5,   // 87: dpdkironcore.v1.ResetVniRequest.type:type_name -> dpdkironcore.v1.VniType
-	8,   // 88: dpdkironcore.v1.ResetVniResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 89: dpdkironcore.v1.ListFirewallRulesResponse.status:type_name -> dpdkironcore.v1.Status
-	24,  // 90: dpdkironcore.v1.ListFirewallRulesResponse.rules:type_name -> dpdkironcore.v1.FirewallRule
-	24,  // 91: dpdkironcore.v1.CreateFirewallRuleRequest.rule:type_name -> dpdkironcore.v1.FirewallRule
-	8,   // 92: dpdkironcore.v1.CreateFirewallRuleResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 93: dpdkironcore.v1.GetFirewallRuleResponse.status:type_name -> dpdkironcore.v1.Status
-	24,  // 94: dpdkironcore.v1.GetFirewallRuleResponse.rule:type_name -> dpdkironcore.v1.FirewallRule
-	8,   // 95: dpdkironcore.v1.DeleteFirewallRuleResponse.status:type_name -> dpdkironcore.v1.Status
-	6,   // 96: dpdkironcore.v1.CapturedInterface.interface_type:type_name -> dpdkironcore.v1.CaptureInterfaceType
-	9,   // 97: dpdkironcore.v1.CaptureConfig.sink_node_ip:type_name -> dpdkironcore.v1.IpAddress
-	103, // 98: dpdkironcore.v1.CaptureConfig.interfaces:type_name -> dpdkironcore.v1.CapturedInterface
-	104, // 99: dpdkironcore.v1.CaptureStartRequest.capture_config:type_name -> dpdkironcore.v1.CaptureConfig
-	8,   // 100: dpdkironcore.v1.CaptureStartResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 101: dpdkironcore.v1.CaptureStopResponse.status:type_name -> dpdkironcore.v1.Status
-	8,   // 102: dpdkironcore.v1.CaptureStatusResponse.status:type_name -> dpdkironcore.v1.Status
-	104, // 103: dpdkironcore.v1.CaptureStatusResponse.capture_config:type_name -> dpdkironcore.v1.CaptureConfig
-	25,  // 104: dpdkironcore.v1.DPDKironcore.CheckInitialized:input_type -> dpdkironcore.v1.CheckInitializedRequest
-	27,  // 105: dpdkironcore.v1.DPDKironcore.Initialize:input_type -> dpdkironcore.v1.InitializeRequest
-	29,  // 106: dpdkironcore.v1.DPDKironcore.GetVersion:input_type -> dpdkironcore.v1.GetVersionRequest
-	31,  // 107: dpdkironcore.v1.DPDKironcore.ListInterfaces:input_type -> dpdkironcore.v1.ListInterfacesRequest
-	33,  // 108: dpdkironcore.v1.DPDKironcore.GetInterface:input_type -> dpdkironcore.v1.GetInterfaceRequest
-	35,  // 109: dpdkironcore.v1.DPDKironcore.CreateInterface:input_type -> dpdkironcore.v1.CreateInterfaceRequest
-	37,  // 110: dpdkironcore.v1.DPDKironcore.DeleteInterface:input_type -> dpdkironcore.v1.DeleteInterfaceRequest
-	39,  // 111: dpdkironcore.v1.DPDKironcore.ListPrefixes:input_type -> dpdkironcore.v1.ListPrefixesRequest
-	41,  // 112: dpdkironcore.v1.DPDKironcore.CreatePrefix:input_type -> dpdkironcore.v1.CreatePrefixRequest
-	43,  // 113: dpdkironcore.v1.DPDKironcore.DeletePrefix:input_type -> dpdkironcore.v1.DeletePrefixRequest
-	45,  // 114: dpdkironcore.v1.DPDKironcore.ListLoadBalancerPrefixes:input_type -> dpdkironcore.v1.ListLoadBalancerPrefixesRequest
-	47,  // 115: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerPrefix:input_type -> dpdkironcore.v1.CreateLoadBalancerPrefixRequest
-	49,  // 116: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerPrefix:input_type -> dpdkironcore.v1.DeleteLoadBalancerPrefixRequest
-	51,  // 117: dpdkironcore.v1.DPDKironcore.CreateVip:input_type -> dpdkironcore.v1.CreateVipRequest
-	53,  // 118: dpdkironcore.v1.DPDKironcore.GetVip:input_type -> dpdkironcore.v1.GetVipRequest
-	55,  // 119: dpdkironcore.v1.DPDKironcore.DeleteVip:input_type -> dpdkironcore.v1.DeleteVipRequest
-	57,  // 120: dpdkironcore.v1.DPDKironcore.CreateLoadBalancer:input_type -> dpdkironcore.v1.CreateLoadBalancerRequest
-	59,  // 121: dpdkironcore.v1.DPDKironcore.GetLoadBalancer:input_type -> dpdkironcore.v1.GetLoadBalancerRequest
-	61,  // 122: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancer:input_type -> dpdkironcore.v1.DeleteLoadBalancerRequest
-	63,  // 123: dpdkironcore.v1.DPDKironcore.ListLoadBalancers:input_type -> dpdkironcore.v1.ListLoadBalancersRequest
-	65,  // 124: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerTarget:input_type -> dpdkironcore.v1.CreateLoadBalancerTargetRequest
-	67,  // 125: dpdkironcore.v1.DPDKironcore.ListLoadBalancerTargets:input_type -> dpdkironcore.v1.ListLoadBalancerTargetsRequest
-	69,  // 126: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerTarget:input_type -> dpdkironcore.v1.DeleteLoadBalancerTargetRequest
-	71,  // 127: dpdkironcore.v1.DPDKironcore.CreateNat:input_type -> dpdkironcore.v1.CreateNatRequest
-	73,  // 128: dpdkironcore.v1.DPDKironcore.GetNat:input_type -> dpdkironcore.v1.GetNatRequest
-	75,  // 129: dpdkironcore.v1.DPDKironcore.DeleteNat:input_type -> dpdkironcore.v1.DeleteNatRequest
-	81,  // 130: dpdkironcore.v1.DPDKironcore.ListLocalNats:input_type -> dpdkironcore.v1.ListLocalNatsRequest
-	77,  // 131: dpdkironcore.v1.DPDKironcore.CreateNeighborNat:input_type -> dpdkironcore.v1.CreateNeighborNatRequest
-	79,  // 132: dpdkironcore.v1.DPDKironcore.DeleteNeighborNat:input_type -> dpdkironcore.v1.DeleteNeighborNatRequest
-	83,  // 133: dpdkironcore.v1.DPDKironcore.ListNeighborNats:input_type -> dpdkironcore.v1.ListNeighborNatsRequest
-	85,  // 134: dpdkironcore.v1.DPDKironcore.ListRoutes:input_type -> dpdkironcore.v1.ListRoutesRequest
-	87,  // 135: dpdkironcore.v1.DPDKironcore.CreateRoute:input_type -> dpdkironcore.v1.CreateRouteRequest
-	89,  // 136: dpdkironcore.v1.DPDKironcore.DeleteRoute:input_type -> dpdkironcore.v1.DeleteRouteRequest
-	91,  // 137: dpdkironcore.v1.DPDKironcore.CheckVniInUse:input_type -> dpdkironcore.v1.CheckVniInUseRequest
-	93,  // 138: dpdkironcore.v1.DPDKironcore.ResetVni:input_type -> dpdkironcore.v1.ResetVniRequest
-	95,  // 139: dpdkironcore.v1.DPDKironcore.ListFirewallRules:input_type -> dpdkironcore.v1.ListFirewallRulesRequest
-	97,  // 140: dpdkironcore.v1.DPDKironcore.CreateFirewallRule:input_type -> dpdkironcore.v1.CreateFirewallRuleRequest
-	99,  // 141: dpdkironcore.v1.DPDKironcore.GetFirewallRule:input_type -> dpdkironcore.v1.GetFirewallRuleRequest
-	101, // 142: dpdkironcore.v1.DPDKironcore.DeleteFirewallRule:input_type -> dpdkironcore.v1.DeleteFirewallRuleRequest
-	105, // 143: dpdkironcore.v1.DPDKironcore.CaptureStart:input_type -> dpdkironcore.v1.CaptureStartRequest
-	107, // 144: dpdkironcore.v1.DPDKironcore.CaptureStop:input_type -> dpdkironcore.v1.CaptureStopRequest
-	109, // 145: dpdkironcore.v1.DPDKironcore.CaptureStatus:input_type -> dpdkironcore.v1.CaptureStatusRequest
-	26,  // 146: dpdkironcore.v1.DPDKironcore.CheckInitialized:output_type -> dpdkironcore.v1.CheckInitializedResponse
-	28,  // 147: dpdkironcore.v1.DPDKironcore.Initialize:output_type -> dpdkironcore.v1.InitializeResponse
-	30,  // 148: dpdkironcore.v1.DPDKironcore.GetVersion:output_type -> dpdkironcore.v1.GetVersionResponse
-	32,  // 149: dpdkironcore.v1.DPDKironcore.ListInterfaces:output_type -> dpdkironcore.v1.ListInterfacesResponse
-	34,  // 150: dpdkironcore.v1.DPDKironcore.GetInterface:output_type -> dpdkironcore.v1.GetInterfaceResponse
-	36,  // 151: dpdkironcore.v1.DPDKironcore.CreateInterface:output_type -> dpdkironcore.v1.CreateInterfaceResponse
-	38,  // 152: dpdkironcore.v1.DPDKironcore.DeleteInterface:output_type -> dpdkironcore.v1.DeleteInterfaceResponse
-	40,  // 153: dpdkironcore.v1.DPDKironcore.ListPrefixes:output_type -> dpdkironcore.v1.ListPrefixesResponse
-	42,  // 154: dpdkironcore.v1.DPDKironcore.CreatePrefix:output_type -> dpdkironcore.v1.CreatePrefixResponse
-	44,  // 155: dpdkironcore.v1.DPDKironcore.DeletePrefix:output_type -> dpdkironcore.v1.DeletePrefixResponse
-	46,  // 156: dpdkironcore.v1.DPDKironcore.ListLoadBalancerPrefixes:output_type -> dpdkironcore.v1.ListLoadBalancerPrefixesResponse
-	48,  // 157: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerPrefix:output_type -> dpdkironcore.v1.CreateLoadBalancerPrefixResponse
-	50,  // 158: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerPrefix:output_type -> dpdkironcore.v1.DeleteLoadBalancerPrefixResponse
-	52,  // 159: dpdkironcore.v1.DPDKironcore.CreateVip:output_type -> dpdkironcore.v1.CreateVipResponse
-	54,  // 160: dpdkironcore.v1.DPDKironcore.GetVip:output_type -> dpdkironcore.v1.GetVipResponse
-	56,  // 161: dpdkironcore.v1.DPDKironcore.DeleteVip:output_type -> dpdkironcore.v1.DeleteVipResponse
-	58,  // 162: dpdkironcore.v1.DPDKironcore.CreateLoadBalancer:output_type -> dpdkironcore.v1.CreateLoadBalancerResponse
-	60,  // 163: dpdkironcore.v1.DPDKironcore.GetLoadBalancer:output_type -> dpdkironcore.v1.GetLoadBalancerResponse
-	62,  // 164: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancer:output_type -> dpdkironcore.v1.DeleteLoadBalancerResponse
-	64,  // 165: dpdkironcore.v1.DPDKironcore.ListLoadBalancers:output_type -> dpdkironcore.v1.ListLoadBalancersResponse
-	66,  // 166: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerTarget:output_type -> dpdkironcore.v1.CreateLoadBalancerTargetResponse
-	68,  // 167: dpdkironcore.v1.DPDKironcore.ListLoadBalancerTargets:output_type -> dpdkironcore.v1.ListLoadBalancerTargetsResponse
-	70,  // 168: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerTarget:output_type -> dpdkironcore.v1.DeleteLoadBalancerTargetResponse
-	72,  // 169: dpdkironcore.v1.DPDKironcore.CreateNat:output_type -> dpdkironcore.v1.CreateNatResponse
-	74,  // 170: dpdkironcore.v1.DPDKironcore.GetNat:output_type -> dpdkironcore.v1.GetNatResponse
-	76,  // 171: dpdkironcore.v1.DPDKironcore.DeleteNat:output_type -> dpdkironcore.v1.DeleteNatResponse
-	82,  // 172: dpdkironcore.v1.DPDKironcore.ListLocalNats:output_type -> dpdkironcore.v1.ListLocalNatsResponse
-	78,  // 173: dpdkironcore.v1.DPDKironcore.CreateNeighborNat:output_type -> dpdkironcore.v1.CreateNeighborNatResponse
-	80,  // 174: dpdkironcore.v1.DPDKironcore.DeleteNeighborNat:output_type -> dpdkironcore.v1.DeleteNeighborNatResponse
-	84,  // 175: dpdkironcore.v1.DPDKironcore.ListNeighborNats:output_type -> dpdkironcore.v1.ListNeighborNatsResponse
-	86,  // 176: dpdkironcore.v1.DPDKironcore.ListRoutes:output_type -> dpdkironcore.v1.ListRoutesResponse
-	88,  // 177: dpdkironcore.v1.DPDKironcore.CreateRoute:output_type -> dpdkironcore.v1.CreateRouteResponse
-	90,  // 178: dpdkironcore.v1.DPDKironcore.DeleteRoute:output_type -> dpdkironcore.v1.DeleteRouteResponse
-	92,  // 179: dpdkironcore.v1.DPDKironcore.CheckVniInUse:output_type -> dpdkironcore.v1.CheckVniInUseResponse
-	94,  // 180: dpdkironcore.v1.DPDKironcore.ResetVni:output_type -> dpdkironcore.v1.ResetVniResponse
-	96,  // 181: dpdkironcore.v1.DPDKironcore.ListFirewallRules:output_type -> dpdkironcore.v1.ListFirewallRulesResponse
-	98,  // 182: dpdkironcore.v1.DPDKironcore.CreateFirewallRule:output_type -> dpdkironcore.v1.CreateFirewallRuleResponse
-	100, // 183: dpdkironcore.v1.DPDKironcore.GetFirewallRule:output_type -> dpdkironcore.v1.GetFirewallRuleResponse
-	102, // 184: dpdkironcore.v1.DPDKironcore.DeleteFirewallRule:output_type -> dpdkironcore.v1.DeleteFirewallRuleResponse
-	106, // 185: dpdkironcore.v1.DPDKironcore.CaptureStart:output_type -> dpdkironcore.v1.CaptureStartResponse
-	108, // 186: dpdkironcore.v1.DPDKironcore.CaptureStop:output_type -> dpdkironcore.v1.CaptureStopResponse
-	110, // 187: dpdkironcore.v1.DPDKironcore.CaptureStatus:output_type -> dpdkironcore.v1.CaptureStatusResponse
-	146, // [146:188] is the sub-list for method output_type
-	104, // [104:146] is the sub-list for method input_type
-	104, // [104:104] is the sub-list for extension type_name
-	104, // [104:104] is the sub-list for extension extendee
-	0,   // [0:104] is the sub-list for field type_name
+	9,   // 5: dpdkironcore.v1.NatEntry.actual_nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	10,  // 6: dpdkironcore.v1.Route.prefix:type_name -> dpdkironcore.v1.Prefix
+	9,   // 7: dpdkironcore.v1.Route.nexthop_address:type_name -> dpdkironcore.v1.IpAddress
+	9,   // 8: dpdkironcore.v1.Loadbalancer.ip:type_name -> dpdkironcore.v1.IpAddress
+	15,  // 9: dpdkironcore.v1.Loadbalancer.ports:type_name -> dpdkironcore.v1.LbPort
+	19,  // 10: dpdkironcore.v1.ProtocolFilter.icmp:type_name -> dpdkironcore.v1.IcmpFilter
+	20,  // 11: dpdkironcore.v1.ProtocolFilter.tcp:type_name -> dpdkironcore.v1.TcpFilter
+	21,  // 12: dpdkironcore.v1.ProtocolFilter.udp:type_name -> dpdkironcore.v1.UdpFilter
+	3,   // 13: dpdkironcore.v1.FirewallRule.direction:type_name -> dpdkironcore.v1.TrafficDirection
+	4,   // 14: dpdkironcore.v1.FirewallRule.action:type_name -> dpdkironcore.v1.FirewallAction
+	10,  // 15: dpdkironcore.v1.FirewallRule.source_prefix:type_name -> dpdkironcore.v1.Prefix
+	10,  // 16: dpdkironcore.v1.FirewallRule.destination_prefix:type_name -> dpdkironcore.v1.Prefix
+	22,  // 17: dpdkironcore.v1.FirewallRule.protocol_filter:type_name -> dpdkironcore.v1.ProtocolFilter
+	8,   // 18: dpdkironcore.v1.CheckInitializedResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 19: dpdkironcore.v1.InitializeResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 20: dpdkironcore.v1.GetVersionResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 21: dpdkironcore.v1.ListInterfacesResponse.status:type_name -> dpdkironcore.v1.Status
+	11,  // 22: dpdkironcore.v1.ListInterfacesResponse.interfaces:type_name -> dpdkironcore.v1.Interface
+	8,   // 23: dpdkironcore.v1.GetInterfaceResponse.status:type_name -> dpdkironcore.v1.Status
+	11,  // 24: dpdkironcore.v1.GetInterfaceResponse.interface:type_name -> dpdkironcore.v1.Interface
+	0,   // 25: dpdkironcore.v1.CreateInterfaceRequest.interface_type:type_name -> dpdkironcore.v1.InterfaceType
+	12,  // 26: dpdkironcore.v1.CreateInterfaceRequest.ipv4_config:type_name -> dpdkironcore.v1.IpConfig
+	12,  // 27: dpdkironcore.v1.CreateInterfaceRequest.ipv6_config:type_name -> dpdkironcore.v1.IpConfig
+	13,  // 28: dpdkironcore.v1.CreateInterfaceRequest.pxe_config:type_name -> dpdkironcore.v1.PxeConfig
+	23,  // 29: dpdkironcore.v1.CreateInterfaceRequest.metering_parameters:type_name -> dpdkironcore.v1.MeteringParams
+	8,   // 30: dpdkironcore.v1.CreateInterfaceResponse.status:type_name -> dpdkironcore.v1.Status
+	14,  // 31: dpdkironcore.v1.CreateInterfaceResponse.vf:type_name -> dpdkironcore.v1.VirtualFunction
+	8,   // 32: dpdkironcore.v1.DeleteInterfaceResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 33: dpdkironcore.v1.ListPrefixesResponse.status:type_name -> dpdkironcore.v1.Status
+	10,  // 34: dpdkironcore.v1.ListPrefixesResponse.prefixes:type_name -> dpdkironcore.v1.Prefix
+	10,  // 35: dpdkironcore.v1.CreatePrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
+	8,   // 36: dpdkironcore.v1.CreatePrefixResponse.status:type_name -> dpdkironcore.v1.Status
+	10,  // 37: dpdkironcore.v1.DeletePrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
+	8,   // 38: dpdkironcore.v1.DeletePrefixResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 39: dpdkironcore.v1.ListLoadBalancerPrefixesResponse.status:type_name -> dpdkironcore.v1.Status
+	10,  // 40: dpdkironcore.v1.ListLoadBalancerPrefixesResponse.prefixes:type_name -> dpdkironcore.v1.Prefix
+	10,  // 41: dpdkironcore.v1.CreateLoadBalancerPrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
+	8,   // 42: dpdkironcore.v1.CreateLoadBalancerPrefixResponse.status:type_name -> dpdkironcore.v1.Status
+	10,  // 43: dpdkironcore.v1.DeleteLoadBalancerPrefixRequest.prefix:type_name -> dpdkironcore.v1.Prefix
+	8,   // 44: dpdkironcore.v1.DeleteLoadBalancerPrefixResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 45: dpdkironcore.v1.CreateVipRequest.vip_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 46: dpdkironcore.v1.CreateVipResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 47: dpdkironcore.v1.GetVipResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 48: dpdkironcore.v1.GetVipResponse.vip_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 49: dpdkironcore.v1.DeleteVipResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 50: dpdkironcore.v1.CreateLoadBalancerRequest.loadbalanced_ip:type_name -> dpdkironcore.v1.IpAddress
+	15,  // 51: dpdkironcore.v1.CreateLoadBalancerRequest.loadbalanced_ports:type_name -> dpdkironcore.v1.LbPort
+	8,   // 52: dpdkironcore.v1.CreateLoadBalancerResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 53: dpdkironcore.v1.GetLoadBalancerResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 54: dpdkironcore.v1.GetLoadBalancerResponse.loadbalanced_ip:type_name -> dpdkironcore.v1.IpAddress
+	15,  // 55: dpdkironcore.v1.GetLoadBalancerResponse.loadbalanced_ports:type_name -> dpdkironcore.v1.LbPort
+	8,   // 56: dpdkironcore.v1.DeleteLoadBalancerResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 57: dpdkironcore.v1.ListLoadBalancersResponse.status:type_name -> dpdkironcore.v1.Status
+	18,  // 58: dpdkironcore.v1.ListLoadBalancersResponse.loadbalancers:type_name -> dpdkironcore.v1.Loadbalancer
+	9,   // 59: dpdkironcore.v1.CreateLoadBalancerTargetRequest.target_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 60: dpdkironcore.v1.CreateLoadBalancerTargetResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 61: dpdkironcore.v1.ListLoadBalancerTargetsResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 62: dpdkironcore.v1.ListLoadBalancerTargetsResponse.target_ips:type_name -> dpdkironcore.v1.IpAddress
+	9,   // 63: dpdkironcore.v1.DeleteLoadBalancerTargetRequest.target_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 64: dpdkironcore.v1.DeleteLoadBalancerTargetResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 65: dpdkironcore.v1.CreateNatRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 66: dpdkironcore.v1.CreateNatResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 67: dpdkironcore.v1.GetNatResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 68: dpdkironcore.v1.GetNatResponse.nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 69: dpdkironcore.v1.DeleteNatResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 70: dpdkironcore.v1.CreateNeighborNatRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 71: dpdkironcore.v1.CreateNeighborNatResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 72: dpdkironcore.v1.DeleteNeighborNatRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 73: dpdkironcore.v1.DeleteNeighborNatResponse.status:type_name -> dpdkironcore.v1.Status
+	9,   // 74: dpdkironcore.v1.ListLocalNatsRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 75: dpdkironcore.v1.ListLocalNatsResponse.status:type_name -> dpdkironcore.v1.Status
+	16,  // 76: dpdkironcore.v1.ListLocalNatsResponse.nat_entries:type_name -> dpdkironcore.v1.NatEntry
+	9,   // 77: dpdkironcore.v1.ListNeighborNatsRequest.nat_ip:type_name -> dpdkironcore.v1.IpAddress
+	8,   // 78: dpdkironcore.v1.ListNeighborNatsResponse.status:type_name -> dpdkironcore.v1.Status
+	16,  // 79: dpdkironcore.v1.ListNeighborNatsResponse.nat_entries:type_name -> dpdkironcore.v1.NatEntry
+	8,   // 80: dpdkironcore.v1.ListRoutesResponse.status:type_name -> dpdkironcore.v1.Status
+	17,  // 81: dpdkironcore.v1.ListRoutesResponse.routes:type_name -> dpdkironcore.v1.Route
+	17,  // 82: dpdkironcore.v1.CreateRouteRequest.route:type_name -> dpdkironcore.v1.Route
+	8,   // 83: dpdkironcore.v1.CreateRouteResponse.status:type_name -> dpdkironcore.v1.Status
+	17,  // 84: dpdkironcore.v1.DeleteRouteRequest.route:type_name -> dpdkironcore.v1.Route
+	8,   // 85: dpdkironcore.v1.DeleteRouteResponse.status:type_name -> dpdkironcore.v1.Status
+	5,   // 86: dpdkironcore.v1.CheckVniInUseRequest.type:type_name -> dpdkironcore.v1.VniType
+	8,   // 87: dpdkironcore.v1.CheckVniInUseResponse.status:type_name -> dpdkironcore.v1.Status
+	5,   // 88: dpdkironcore.v1.ResetVniRequest.type:type_name -> dpdkironcore.v1.VniType
+	8,   // 89: dpdkironcore.v1.ResetVniResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 90: dpdkironcore.v1.ListFirewallRulesResponse.status:type_name -> dpdkironcore.v1.Status
+	24,  // 91: dpdkironcore.v1.ListFirewallRulesResponse.rules:type_name -> dpdkironcore.v1.FirewallRule
+	24,  // 92: dpdkironcore.v1.CreateFirewallRuleRequest.rule:type_name -> dpdkironcore.v1.FirewallRule
+	8,   // 93: dpdkironcore.v1.CreateFirewallRuleResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 94: dpdkironcore.v1.GetFirewallRuleResponse.status:type_name -> dpdkironcore.v1.Status
+	24,  // 95: dpdkironcore.v1.GetFirewallRuleResponse.rule:type_name -> dpdkironcore.v1.FirewallRule
+	8,   // 96: dpdkironcore.v1.DeleteFirewallRuleResponse.status:type_name -> dpdkironcore.v1.Status
+	6,   // 97: dpdkironcore.v1.CapturedInterface.interface_type:type_name -> dpdkironcore.v1.CaptureInterfaceType
+	9,   // 98: dpdkironcore.v1.CaptureConfig.sink_node_ip:type_name -> dpdkironcore.v1.IpAddress
+	103, // 99: dpdkironcore.v1.CaptureConfig.interfaces:type_name -> dpdkironcore.v1.CapturedInterface
+	104, // 100: dpdkironcore.v1.CaptureStartRequest.capture_config:type_name -> dpdkironcore.v1.CaptureConfig
+	8,   // 101: dpdkironcore.v1.CaptureStartResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 102: dpdkironcore.v1.CaptureStopResponse.status:type_name -> dpdkironcore.v1.Status
+	8,   // 103: dpdkironcore.v1.CaptureStatusResponse.status:type_name -> dpdkironcore.v1.Status
+	104, // 104: dpdkironcore.v1.CaptureStatusResponse.capture_config:type_name -> dpdkironcore.v1.CaptureConfig
+	25,  // 105: dpdkironcore.v1.DPDKironcore.CheckInitialized:input_type -> dpdkironcore.v1.CheckInitializedRequest
+	27,  // 106: dpdkironcore.v1.DPDKironcore.Initialize:input_type -> dpdkironcore.v1.InitializeRequest
+	29,  // 107: dpdkironcore.v1.DPDKironcore.GetVersion:input_type -> dpdkironcore.v1.GetVersionRequest
+	31,  // 108: dpdkironcore.v1.DPDKironcore.ListInterfaces:input_type -> dpdkironcore.v1.ListInterfacesRequest
+	33,  // 109: dpdkironcore.v1.DPDKironcore.GetInterface:input_type -> dpdkironcore.v1.GetInterfaceRequest
+	35,  // 110: dpdkironcore.v1.DPDKironcore.CreateInterface:input_type -> dpdkironcore.v1.CreateInterfaceRequest
+	37,  // 111: dpdkironcore.v1.DPDKironcore.DeleteInterface:input_type -> dpdkironcore.v1.DeleteInterfaceRequest
+	39,  // 112: dpdkironcore.v1.DPDKironcore.ListPrefixes:input_type -> dpdkironcore.v1.ListPrefixesRequest
+	41,  // 113: dpdkironcore.v1.DPDKironcore.CreatePrefix:input_type -> dpdkironcore.v1.CreatePrefixRequest
+	43,  // 114: dpdkironcore.v1.DPDKironcore.DeletePrefix:input_type -> dpdkironcore.v1.DeletePrefixRequest
+	45,  // 115: dpdkironcore.v1.DPDKironcore.ListLoadBalancerPrefixes:input_type -> dpdkironcore.v1.ListLoadBalancerPrefixesRequest
+	47,  // 116: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerPrefix:input_type -> dpdkironcore.v1.CreateLoadBalancerPrefixRequest
+	49,  // 117: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerPrefix:input_type -> dpdkironcore.v1.DeleteLoadBalancerPrefixRequest
+	51,  // 118: dpdkironcore.v1.DPDKironcore.CreateVip:input_type -> dpdkironcore.v1.CreateVipRequest
+	53,  // 119: dpdkironcore.v1.DPDKironcore.GetVip:input_type -> dpdkironcore.v1.GetVipRequest
+	55,  // 120: dpdkironcore.v1.DPDKironcore.DeleteVip:input_type -> dpdkironcore.v1.DeleteVipRequest
+	57,  // 121: dpdkironcore.v1.DPDKironcore.CreateLoadBalancer:input_type -> dpdkironcore.v1.CreateLoadBalancerRequest
+	59,  // 122: dpdkironcore.v1.DPDKironcore.GetLoadBalancer:input_type -> dpdkironcore.v1.GetLoadBalancerRequest
+	61,  // 123: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancer:input_type -> dpdkironcore.v1.DeleteLoadBalancerRequest
+	63,  // 124: dpdkironcore.v1.DPDKironcore.ListLoadBalancers:input_type -> dpdkironcore.v1.ListLoadBalancersRequest
+	65,  // 125: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerTarget:input_type -> dpdkironcore.v1.CreateLoadBalancerTargetRequest
+	67,  // 126: dpdkironcore.v1.DPDKironcore.ListLoadBalancerTargets:input_type -> dpdkironcore.v1.ListLoadBalancerTargetsRequest
+	69,  // 127: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerTarget:input_type -> dpdkironcore.v1.DeleteLoadBalancerTargetRequest
+	71,  // 128: dpdkironcore.v1.DPDKironcore.CreateNat:input_type -> dpdkironcore.v1.CreateNatRequest
+	73,  // 129: dpdkironcore.v1.DPDKironcore.GetNat:input_type -> dpdkironcore.v1.GetNatRequest
+	75,  // 130: dpdkironcore.v1.DPDKironcore.DeleteNat:input_type -> dpdkironcore.v1.DeleteNatRequest
+	81,  // 131: dpdkironcore.v1.DPDKironcore.ListLocalNats:input_type -> dpdkironcore.v1.ListLocalNatsRequest
+	77,  // 132: dpdkironcore.v1.DPDKironcore.CreateNeighborNat:input_type -> dpdkironcore.v1.CreateNeighborNatRequest
+	79,  // 133: dpdkironcore.v1.DPDKironcore.DeleteNeighborNat:input_type -> dpdkironcore.v1.DeleteNeighborNatRequest
+	83,  // 134: dpdkironcore.v1.DPDKironcore.ListNeighborNats:input_type -> dpdkironcore.v1.ListNeighborNatsRequest
+	85,  // 135: dpdkironcore.v1.DPDKironcore.ListRoutes:input_type -> dpdkironcore.v1.ListRoutesRequest
+	87,  // 136: dpdkironcore.v1.DPDKironcore.CreateRoute:input_type -> dpdkironcore.v1.CreateRouteRequest
+	89,  // 137: dpdkironcore.v1.DPDKironcore.DeleteRoute:input_type -> dpdkironcore.v1.DeleteRouteRequest
+	91,  // 138: dpdkironcore.v1.DPDKironcore.CheckVniInUse:input_type -> dpdkironcore.v1.CheckVniInUseRequest
+	93,  // 139: dpdkironcore.v1.DPDKironcore.ResetVni:input_type -> dpdkironcore.v1.ResetVniRequest
+	95,  // 140: dpdkironcore.v1.DPDKironcore.ListFirewallRules:input_type -> dpdkironcore.v1.ListFirewallRulesRequest
+	97,  // 141: dpdkironcore.v1.DPDKironcore.CreateFirewallRule:input_type -> dpdkironcore.v1.CreateFirewallRuleRequest
+	99,  // 142: dpdkironcore.v1.DPDKironcore.GetFirewallRule:input_type -> dpdkironcore.v1.GetFirewallRuleRequest
+	101, // 143: dpdkironcore.v1.DPDKironcore.DeleteFirewallRule:input_type -> dpdkironcore.v1.DeleteFirewallRuleRequest
+	105, // 144: dpdkironcore.v1.DPDKironcore.CaptureStart:input_type -> dpdkironcore.v1.CaptureStartRequest
+	107, // 145: dpdkironcore.v1.DPDKironcore.CaptureStop:input_type -> dpdkironcore.v1.CaptureStopRequest
+	109, // 146: dpdkironcore.v1.DPDKironcore.CaptureStatus:input_type -> dpdkironcore.v1.CaptureStatusRequest
+	26,  // 147: dpdkironcore.v1.DPDKironcore.CheckInitialized:output_type -> dpdkironcore.v1.CheckInitializedResponse
+	28,  // 148: dpdkironcore.v1.DPDKironcore.Initialize:output_type -> dpdkironcore.v1.InitializeResponse
+	30,  // 149: dpdkironcore.v1.DPDKironcore.GetVersion:output_type -> dpdkironcore.v1.GetVersionResponse
+	32,  // 150: dpdkironcore.v1.DPDKironcore.ListInterfaces:output_type -> dpdkironcore.v1.ListInterfacesResponse
+	34,  // 151: dpdkironcore.v1.DPDKironcore.GetInterface:output_type -> dpdkironcore.v1.GetInterfaceResponse
+	36,  // 152: dpdkironcore.v1.DPDKironcore.CreateInterface:output_type -> dpdkironcore.v1.CreateInterfaceResponse
+	38,  // 153: dpdkironcore.v1.DPDKironcore.DeleteInterface:output_type -> dpdkironcore.v1.DeleteInterfaceResponse
+	40,  // 154: dpdkironcore.v1.DPDKironcore.ListPrefixes:output_type -> dpdkironcore.v1.ListPrefixesResponse
+	42,  // 155: dpdkironcore.v1.DPDKironcore.CreatePrefix:output_type -> dpdkironcore.v1.CreatePrefixResponse
+	44,  // 156: dpdkironcore.v1.DPDKironcore.DeletePrefix:output_type -> dpdkironcore.v1.DeletePrefixResponse
+	46,  // 157: dpdkironcore.v1.DPDKironcore.ListLoadBalancerPrefixes:output_type -> dpdkironcore.v1.ListLoadBalancerPrefixesResponse
+	48,  // 158: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerPrefix:output_type -> dpdkironcore.v1.CreateLoadBalancerPrefixResponse
+	50,  // 159: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerPrefix:output_type -> dpdkironcore.v1.DeleteLoadBalancerPrefixResponse
+	52,  // 160: dpdkironcore.v1.DPDKironcore.CreateVip:output_type -> dpdkironcore.v1.CreateVipResponse
+	54,  // 161: dpdkironcore.v1.DPDKironcore.GetVip:output_type -> dpdkironcore.v1.GetVipResponse
+	56,  // 162: dpdkironcore.v1.DPDKironcore.DeleteVip:output_type -> dpdkironcore.v1.DeleteVipResponse
+	58,  // 163: dpdkironcore.v1.DPDKironcore.CreateLoadBalancer:output_type -> dpdkironcore.v1.CreateLoadBalancerResponse
+	60,  // 164: dpdkironcore.v1.DPDKironcore.GetLoadBalancer:output_type -> dpdkironcore.v1.GetLoadBalancerResponse
+	62,  // 165: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancer:output_type -> dpdkironcore.v1.DeleteLoadBalancerResponse
+	64,  // 166: dpdkironcore.v1.DPDKironcore.ListLoadBalancers:output_type -> dpdkironcore.v1.ListLoadBalancersResponse
+	66,  // 167: dpdkironcore.v1.DPDKironcore.CreateLoadBalancerTarget:output_type -> dpdkironcore.v1.CreateLoadBalancerTargetResponse
+	68,  // 168: dpdkironcore.v1.DPDKironcore.ListLoadBalancerTargets:output_type -> dpdkironcore.v1.ListLoadBalancerTargetsResponse
+	70,  // 169: dpdkironcore.v1.DPDKironcore.DeleteLoadBalancerTarget:output_type -> dpdkironcore.v1.DeleteLoadBalancerTargetResponse
+	72,  // 170: dpdkironcore.v1.DPDKironcore.CreateNat:output_type -> dpdkironcore.v1.CreateNatResponse
+	74,  // 171: dpdkironcore.v1.DPDKironcore.GetNat:output_type -> dpdkironcore.v1.GetNatResponse
+	76,  // 172: dpdkironcore.v1.DPDKironcore.DeleteNat:output_type -> dpdkironcore.v1.DeleteNatResponse
+	82,  // 173: dpdkironcore.v1.DPDKironcore.ListLocalNats:output_type -> dpdkironcore.v1.ListLocalNatsResponse
+	78,  // 174: dpdkironcore.v1.DPDKironcore.CreateNeighborNat:output_type -> dpdkironcore.v1.CreateNeighborNatResponse
+	80,  // 175: dpdkironcore.v1.DPDKironcore.DeleteNeighborNat:output_type -> dpdkironcore.v1.DeleteNeighborNatResponse
+	84,  // 176: dpdkironcore.v1.DPDKironcore.ListNeighborNats:output_type -> dpdkironcore.v1.ListNeighborNatsResponse
+	86,  // 177: dpdkironcore.v1.DPDKironcore.ListRoutes:output_type -> dpdkironcore.v1.ListRoutesResponse
+	88,  // 178: dpdkironcore.v1.DPDKironcore.CreateRoute:output_type -> dpdkironcore.v1.CreateRouteResponse
+	90,  // 179: dpdkironcore.v1.DPDKironcore.DeleteRoute:output_type -> dpdkironcore.v1.DeleteRouteResponse
+	92,  // 180: dpdkironcore.v1.DPDKironcore.CheckVniInUse:output_type -> dpdkironcore.v1.CheckVniInUseResponse
+	94,  // 181: dpdkironcore.v1.DPDKironcore.ResetVni:output_type -> dpdkironcore.v1.ResetVniResponse
+	96,  // 182: dpdkironcore.v1.DPDKironcore.ListFirewallRules:output_type -> dpdkironcore.v1.ListFirewallRulesResponse
+	98,  // 183: dpdkironcore.v1.DPDKironcore.CreateFirewallRule:output_type -> dpdkironcore.v1.CreateFirewallRuleResponse
+	100, // 184: dpdkironcore.v1.DPDKironcore.GetFirewallRule:output_type -> dpdkironcore.v1.GetFirewallRuleResponse
+	102, // 185: dpdkironcore.v1.DPDKironcore.DeleteFirewallRule:output_type -> dpdkironcore.v1.DeleteFirewallRuleResponse
+	106, // 186: dpdkironcore.v1.DPDKironcore.CaptureStart:output_type -> dpdkironcore.v1.CaptureStartResponse
+	108, // 187: dpdkironcore.v1.DPDKironcore.CaptureStop:output_type -> dpdkironcore.v1.CaptureStopResponse
+	110, // 188: dpdkironcore.v1.DPDKironcore.CaptureStatus:output_type -> dpdkironcore.v1.CaptureStatusResponse
+	147, // [147:189] is the sub-list for method output_type
+	105, // [105:147] is the sub-list for method input_type
+	105, // [105:105] is the sub-list for extension type_name
+	105, // [105:105] is the sub-list for extension extendee
+	0,   // [0:105] is the sub-list for field type_name
 }
 
 func init() { file_proto_dpdk_proto_init() }
