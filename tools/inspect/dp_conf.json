@@ -4,6 +4,14 @@
   "markdown": "../../docs/deployment/help_dpservice-inspect.md",
   "options": [
     {
+      "lgopt": "file-prefix",
+      "arg": "PREFIX",
+      "help": "prefix for hugepage filenames",
+      "var": "eal_file_prefix",
+      "type": "char",
+      "array_size": 32
+    },
+    {
       "shopt": "o",
       "lgopt": "output-format",
       "arg": "FORMAT",

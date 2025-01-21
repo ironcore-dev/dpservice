@@ -4,6 +4,14 @@
   "markdown": "../../docs/deployment/help_dpservice-dump.md",
   "options": [
     {
+      "lgopt": "file-prefix",
+      "arg": "PREFIX",
+      "help": "prefix for hugepage filenames",
+      "var": "eal_file_prefix",
+      "type": "char",
+      "array_size": 32
+    },
+    {
       "lgopt": "drops",
       "help": "show dropped packets",
       "var": "showing_drops",

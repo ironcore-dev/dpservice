@@ -8,7 +8,9 @@
 extern "C" {
 #endif
 
-int dp_secondary_eal_init(void);
+#define DP_SECONDARY_FILE_PREFIX_DEFAULT ""
+
+int dp_secondary_eal_init(const char *file_prefix);
 
 void dp_secondary_eal_cleanup(void);
 

@@ -21,6 +21,7 @@ enum {
 	OPT_TABLE = 't',
 	OPT_SOCKET = 's',
 _OPT_SHOPT_MAX = 255,
+	OPT_FILE_PREFIX,
 	OPT_DUMP,
 };
 
@@ -32,6 +33,7 @@ _OPT_SHOPT_MAX = 255,
 static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
+	{ "file-prefix", 1, 0, OPT_FILE_PREFIX },
 	{ "output-format", 1, 0, OPT_OUTPUT_FORMAT },
 	{ "table", 1, 0, OPT_TABLE },
 	{ "socket", 1, 0, OPT_SOCKET },
@@ -61,10 +63,16 @@ static const char *table_choices[] = {
 	"vni",
 };
 
+static char eal_file_prefix[32];
 static enum dp_conf_output_format output_format = DP_CONF_OUTPUT_FORMAT_HUMAN;
 static enum dp_conf_table table = DP_CONF_TABLE_LIST;
 static int numa_socket = -1;
 static bool dump = false;
+
+const char *dp_conf_get_eal_file_prefix(void)
+{
+	return eal_file_prefix;
+}
 
 enum dp_conf_output_format dp_conf_get_output_format(void)
 {
@@ -97,6 +105,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 	fprintf(outfile, "Usage: %s [options]\n"
 		" -h, --help                  display this help and exit\n"
 		" -v, --version               display version and exit\n"
+		"     --file-prefix=PREFIX    prefix for hugepage filenames\n"
 		" -o, --output-format=FORMAT  format of the output: 'human' (default), 'table', 'csv' or 'json'\n"
 		" -t, --table=NAME            hash table to choose: 'list' (default), 'conntrack', 'dnat', 'iface', 'lb', 'lb_id', 'portmap', 'portoverload', 'snat', 'vnf', 'vnf_rev' or 'vni'\n"
 		" -s, --socket=NUMBER         NUMA socket to use\n"
@@ -108,6 +117,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 {
 	(void)arg;  // if no option uses an argument, this would be unused
 	switch (opt) {
+	case OPT_FILE_PREFIX:
+		return dp_argparse_string(arg, eal_file_prefix, ARRAY_SIZE(eal_file_prefix));
 	case OPT_OUTPUT_FORMAT:
 		return dp_argparse_enum(arg, (int *)&output_format, output_format_choices, ARRAY_SIZE(output_format_choices));
 	case OPT_TABLE:
