@@ -18,6 +18,7 @@ enum {
 	OPT_HELP = 'h',
 	OPT_VERSION = 'v',
 _OPT_SHOPT_MAX = 255,
+	OPT_FILE_PREFIX,
 	OPT_DROPS,
 	OPT_NODES,
 	OPT_FILTER,
@@ -30,6 +31,7 @@ _OPT_SHOPT_MAX = 255,
 static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
 	{ "version", 0, 0, OPT_VERSION },
+	{ "file-prefix", 1, 0, OPT_FILE_PREFIX },
 	{ "drops", 0, 0, OPT_DROPS },
 	{ "nodes", 1, 0, OPT_NODES },
 	{ "filter", 1, 0, OPT_FILTER },
@@ -38,8 +40,14 @@ static const struct option dp_conf_longopts[] = {
 	{ NULL, 0, 0, 0 }
 };
 
+static char eal_file_prefix[32];
 static bool showing_drops = false;
 static bool stop_mode = false;
+
+const char *dp_conf_get_eal_file_prefix(void)
+{
+	return eal_file_prefix;
+}
 
 bool dp_conf_is_showing_drops(void)
 {
@@ -63,13 +71,14 @@ static int dp_argparse_opt_pcap(const char *arg);
 static inline void dp_argparse_help(const char *progname, FILE *outfile)
 {
 	fprintf(outfile, "Usage: %s [options]\n"
-		" -h, --help           display this help and exit\n"
-		" -v, --version        display version and exit\n"
-		"     --drops          show dropped packets\n"
-		"     --nodes=REGEX    show graph node traversal, limit to REGEX-matched nodes (empty string for all)\n"
-		"     --filter=FILTER  show only packets matching a pcap-style FILTER\n"
-		"     --pcap=FILE      write packets into a PCAP file\n"
-		"     --stop           do nothing, only make sure tracing is disabled in dp-service\n"
+		" -h, --help                display this help and exit\n"
+		" -v, --version             display version and exit\n"
+		"     --file-prefix=PREFIX  prefix for hugepage filenames\n"
+		"     --drops               show dropped packets\n"
+		"     --nodes=REGEX         show graph node traversal, limit to REGEX-matched nodes (empty string for all)\n"
+		"     --filter=FILTER       show only packets matching a pcap-style FILTER\n"
+		"     --pcap=FILE           write packets into a PCAP file\n"
+		"     --stop                do nothing, only make sure tracing is disabled in dp-service\n"
 	, progname);
 }
 
@@ -77,6 +86,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 {
 	(void)arg;  // if no option uses an argument, this would be unused
 	switch (opt) {
+	case OPT_FILE_PREFIX:
+		return dp_argparse_string(arg, eal_file_prefix, ARRAY_SIZE(eal_file_prefix));
 	case OPT_DROPS:
 		return dp_argparse_store_true(&showing_drops);
 	case OPT_NODES:

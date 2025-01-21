@@ -30,6 +30,7 @@ enum dp_conf_table {
 	DP_CONF_TABLE_VNI,
 };
 
+const char *dp_conf_get_eal_file_prefix(void);
 enum dp_conf_output_format dp_conf_get_output_format(void);
 enum dp_conf_table dp_conf_get_table(void);
 int dp_conf_get_numa_socket(void);

@@ -388,7 +388,7 @@ int main(int argc, char **argv)
 		break;
 	}
 
-	ret = dp_secondary_eal_init();
+	ret = dp_secondary_eal_init(dp_conf_get_eal_file_prefix());
 	if (DP_FAILED(ret)) {
 		fprintf(stderr, "Cannot init EAL %s\n", dp_strerror_verbose(ret));
 		return EXIT_FAILURE;

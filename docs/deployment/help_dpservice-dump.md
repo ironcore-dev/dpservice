@@ -4,6 +4,7 @@
 |--------|----------|-------------|---------|
 | -h, --help | None | display this help and exit |  |
 | -v, --version | None | display version and exit |  |
+| --file-prefix | PREFIX | prefix for hugepage filenames |  |
 | --drops | None | show dropped packets |  |
 | --nodes | REGEX | show graph node traversal, limit to REGEX-matched nodes (empty string for all) |  |
 | --filter | FILTER | show only packets matching a pcap-style FILTER |  |

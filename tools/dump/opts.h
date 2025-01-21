@@ -8,6 +8,7 @@
 /* Please edit dp_conf.json and re-run the script to update this file. */
 /***********************************************************************/
 
+const char *dp_conf_get_eal_file_prefix(void);
 bool dp_conf_is_showing_drops(void);
 bool dp_conf_is_stop_mode(void);
 

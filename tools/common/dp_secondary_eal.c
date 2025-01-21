@@ -18,11 +18,15 @@ static const char *eal_arg_strings[] = {
 	"--log-level=6",				// hide DPDK's informational messages (level 7)
 };
 
-static char *eal_args_mem[RTE_DIM(eal_arg_strings)];
+static char *eal_args_mem[RTE_DIM(eal_arg_strings) + 1];  // +1 for optional --file-prefix
 static char *eal_args[RTE_DIM(eal_args_mem)];
 
-int dp_secondary_eal_init(void)
+
+int dp_secondary_eal_init(const char *file_prefix)
 {
+	char eal_file_prefix[64] = {};
+
+	// Required arguments
 	for (size_t i = 0; i < RTE_DIM(eal_arg_strings); ++i) {
 		eal_args[i] = eal_args_mem[i] = strdup(eal_arg_strings[i]);
 		if (!eal_args[i]) {
@@ -32,8 +36,15 @@ int dp_secondary_eal_init(void)
 			return DP_ERROR;
 		}
 	}
+
+	// Optional arguments
+	if (file_prefix && *file_prefix)
+		snprintf(eal_file_prefix, sizeof(eal_file_prefix), "--file-prefix=%s", file_prefix);  // can get cut off, but file_prefix length is limited by argparse
+	eal_args[RTE_DIM(eal_arg_strings)] = eal_args_mem[RTE_DIM(eal_arg_strings)] = strdup(eal_file_prefix);
+
 	return rte_eal_init(RTE_DIM(eal_args), eal_args);
 }
+
 
 void dp_secondary_eal_cleanup(void)
 {
