@@ -9,6 +9,7 @@ dpservice_inspect_sources = [
   'inspect_vnf.c',
   'inspect_vni.c',
   'main.c',
+  '../common/dp_secondary_eal.c',
   '../../src/dp_argparse.c',
   '../../src/dp_error.c',
   '../../src/dp_ipaddr.c',
