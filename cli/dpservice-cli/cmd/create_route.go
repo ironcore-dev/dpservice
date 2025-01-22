@@ -90,7 +90,7 @@ func RunCreateRoute(
 				IP:  &opts.NextHopIP,
 			}},
 	})
-	if err != nil && route.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating route: %w", err)
 	}
 

@@ -71,7 +71,7 @@ func RunDeleteLoadBalancerTarget(ctx context.Context, dpdkClientFactory DPDKClie
 	defer DpdkClose(cleanup)
 
 	lbtarget, err := client.DeleteLoadBalancerTarget(ctx, opts.LoadBalancerID, &opts.TargetIP)
-	if err != nil && lbtarget.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting neighbor nat: %w", err)
 	}
 

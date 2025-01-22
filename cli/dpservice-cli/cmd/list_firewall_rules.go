@@ -75,13 +75,13 @@ func RunListFirewallRules(
 	}
 	if opts.InterfaceID == "" {
 		ifaces, err := client.ListInterfaces(ctx)
-		if err != nil && ifaces.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error listing interfaces: %w", err)
 		}
 
 		for _, iface := range ifaces.Items {
 			fwrule, err := client.ListFirewallRules(ctx, iface.ID)
-			if err != nil && fwrule.Status.Code == 0 {
+			if err != nil {
 				return fmt.Errorf("error getting firewall rules: %w", err)
 			}
 			fwruleList.Items = append(fwruleList.Items, fwrule.Items...)

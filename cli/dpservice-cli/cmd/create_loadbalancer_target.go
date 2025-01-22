@@ -84,7 +84,7 @@ func RunCreateLoadBalancerTarget(
 		LoadBalancerTargetMeta: api.LoadBalancerTargetMeta{LoadbalancerID: opts.LoadBalancerID},
 		Spec:                   api.LoadBalancerTargetSpec{TargetIP: &opts.TargetIP},
 	})
-	if err != nil && lbtarget.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating loadbalancer target: %w", err)
 	}
 

@@ -71,7 +71,7 @@ func RunDeleteLoadBalancerPrefix(ctx context.Context, dpdkClientFactory DPDKClie
 	defer DpdkClose(cleanup)
 
 	lbprefix, err := client.DeleteLoadBalancerPrefix(ctx, opts.InterfaceID, &opts.Prefix)
-	if err != nil && lbprefix.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting loadbalancer prefix: %w", err)
 	}
 

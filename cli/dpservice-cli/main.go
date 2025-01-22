@@ -25,10 +25,11 @@ func main() {
 		}
 		// check if it is Server side error
 		if err.Error() == strconv.Itoa(errors.SERVER_ERROR) || strings.Contains(err.Error(), "error code") {
+			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 			os.Exit(errors.SERVER_ERROR)
 		}
 		// else it is Client side error
-		fmt.Fprintf(os.Stderr, "Error running command: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Client error: %v\n", err)
 		os.Exit(errors.CLIENT_ERROR)
 	}
 }

@@ -71,7 +71,7 @@ func RunDeleteRoute(ctx context.Context, dpdkClientFactory DPDKClientFactory, re
 	defer DpdkClose(cleanup)
 
 	route, err := client.DeleteRoute(ctx, opts.VNI, &opts.Prefix)
-	if err != nil && route.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting route: %w", err)
 	}
 

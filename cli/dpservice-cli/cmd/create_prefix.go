@@ -87,7 +87,7 @@ func RunCreatePrefix(
 			Prefix: opts.Prefix,
 		},
 	})
-	if err != nil && prefix.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating prefix: %w", err)
 	}
 

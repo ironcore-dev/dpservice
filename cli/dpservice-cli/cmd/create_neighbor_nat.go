@@ -89,7 +89,7 @@ func RunCreateNeighborNat(ctx context.Context, dpdkClientFactory DPDKClientFacto
 	}
 
 	nnat, err := client.CreateNeighborNat(ctx, neigbhorNat)
-	if err != nil && nnat.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating neighbor nat: %w", err)
 	}
 

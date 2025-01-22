@@ -85,7 +85,7 @@ func RunDeleteNeighborNat(ctx context.Context, dpdkClientFactory DPDKClientFacto
 		},
 	}
 	nnat, err := client.DeleteNeighborNat(ctx, &neigbhorNat)
-	if err != nil && nnat.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting neighbor nat: %w", err)
 	}
 

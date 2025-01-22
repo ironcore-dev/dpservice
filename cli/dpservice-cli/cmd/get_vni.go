@@ -74,7 +74,7 @@ func RunGetVni(
 	defer DpdkClose(cleanup)
 
 	vni, err := client.GetVni(ctx, opts.VNI, opts.VniType)
-	if err != nil && vni.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error getting vni: %w", err)
 	}
 

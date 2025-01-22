@@ -69,7 +69,7 @@ func RunGetNat(
 
 	if opts.InterfaceID == "" {
 		ifaces, err := client.ListInterfaces(ctx)
-		if err != nil && ifaces.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error listing interfaces: %w", err)
 		}
 		natList := api.NatList{
@@ -77,7 +77,7 @@ func RunGetNat(
 		}
 		for _, iface := range ifaces.Items {
 			nat, err := client.GetNat(ctx, iface.ID)
-			if err != nil && nat.Status.Code == 0 {
+			if err != nil {
 				return fmt.Errorf("error getting nat: %w", err)
 			}
 			natList.Items = append(natList.Items, *nat)
@@ -87,7 +87,7 @@ func RunGetNat(
 	}
 
 	nat, err := client.GetNat(ctx, opts.InterfaceID)
-	if err != nil && nat.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error getting nat: %w", err)
 	}
 

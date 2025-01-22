@@ -67,7 +67,7 @@ func RunDeleteNat(ctx context.Context, dpdkClientFactory DPDKClientFactory, rend
 	defer DpdkClose(cleanup)
 
 	nat, err := client.DeleteNat(ctx, opts.InterfaceID)
-	if err != nil && nat.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting nat: %w", err)
 	}
 

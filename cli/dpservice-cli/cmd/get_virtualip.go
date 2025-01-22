@@ -70,30 +70,22 @@ func RunGetVirtualIP(
 
 	if opts.InterfaceID == "" {
 		ifaces, err := client.ListInterfaces(ctx)
-		if err != nil && ifaces.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error listing interfaces: %w", err)
 		}
+		if len(ifaces.Items) == 0 {
+			return fmt.Errorf("error getting virtual ip: [error code %d] NO_VM", errors.NO_VM)
+		}
+
 		virtualIPs := make([]*api.VirtualIP, 0, len(ifaces.Items))
 		for _, iface := range ifaces.Items {
 			vip, err := client.GetVirtualIP(ctx, iface.ID, errors.Ignore(errors.SNAT_NO_DATA))
-			if err != nil && vip.Status.Code == 0 {
+			if err != nil {
 				return fmt.Errorf("error getting virtual ip: %w", err)
 			}
 			if vip.Status.Code == 0 {
 				virtualIPs = append(virtualIPs, vip)
 			}
-		}
-		if len(virtualIPs) == 0 {
-			noVipFound := api.VirtualIP{
-				TypeMeta: api.TypeMeta{
-					Kind: api.VirtualIPKind,
-				},
-				Status: api.Status{
-					Code:    errors.SNAT_NO_DATA,
-					Message: "SNAT_NO_DATA",
-				},
-			}
-			return rendererFactory.RenderObject("no interface has virtual ip configured", os.Stdout, &noVipFound)
 		}
 		for _, vip := range virtualIPs {
 			err = rendererFactory.RenderObject("", os.Stdout, vip)
@@ -105,7 +97,7 @@ func RunGetVirtualIP(
 	}
 
 	virtualIP, err := client.GetVirtualIP(ctx, opts.InterfaceID)
-	if err != nil && virtualIP.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error getting virtual ip: %w", err)
 	}
 

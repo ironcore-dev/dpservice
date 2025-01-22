@@ -100,14 +100,19 @@ func (c *client) GetLoadBalancer(ctx context.Context, id string, ignoredErrors .
 func (c *client) ListLoadBalancers(ctx context.Context, ignoredErrors ...[]uint32) (*api.LoadBalancerList, error) {
 	res, err := c.DPDKironcoreClient.ListLoadBalancers(ctx, &dpdkproto.ListLoadBalancersRequest{})
 	if err != nil {
-		return nil, err
+		return &api.LoadBalancerList{}, err
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return &api.LoadBalancerList{
+			TypeMeta: api.TypeMeta{Kind: api.LoadBalancerListKind},
+			Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 	}
 
 	lbs := make([]api.LoadBalancer, len(res.GetLoadbalancers()))
 	for i, dpdkLb := range res.GetLoadbalancers() {
 		lb, err := api.ProtoLoadBalancerToLoadBalancer(dpdkLb)
 		if err != nil {
-			return nil, err
+			return &api.LoadBalancerList{}, err
 		}
 
 		lbs[i] = *lb
@@ -177,14 +182,19 @@ func (c *client) ListLoadBalancerPrefixes(ctx context.Context, interfaceID strin
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
-		return nil, err
+		return &api.PrefixList{}, err
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return &api.PrefixList{
+			TypeMeta: api.TypeMeta{Kind: api.PrefixListKind},
+			Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 	}
 
 	prefixes := make([]api.Prefix, len(res.GetPrefixes()))
 	for i, dpdkPrefix := range res.GetPrefixes() {
 		prefix, err := api.ProtoPrefixToPrefix(interfaceID, dpdkPrefix)
 		if err != nil {
-			return nil, err
+			return &api.PrefixList{}, err
 		}
 		prefix.Kind = api.LoadBalancerPrefixKind
 
@@ -273,7 +283,7 @@ func (c *client) ListLoadBalancerTargets(ctx context.Context, loadBalancerID str
 		lbtarget.TypeMeta.Kind = api.LoadBalancerTargetKind
 		lbtarget.Spec.TargetIP, err = api.ProtoIpAddressToNetIPAddr(dpdkLBtarget)
 		if err != nil {
-			return nil, err
+			return &api.LoadBalancerTargetList{}, err
 		}
 		lbtarget.LoadBalancerTargetMeta.LoadbalancerID = loadBalancerID
 
@@ -346,14 +356,19 @@ func (c *client) GetInterface(ctx context.Context, id string, ignoredErrors ...[
 func (c *client) ListInterfaces(ctx context.Context, ignoredErrors ...[]uint32) (*api.InterfaceList, error) {
 	res, err := c.DPDKironcoreClient.ListInterfaces(ctx, &dpdkproto.ListInterfacesRequest{})
 	if err != nil {
-		return nil, err
+		return &api.InterfaceList{}, err
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return &api.InterfaceList{
+			TypeMeta: api.TypeMeta{Kind: api.InterfaceListKind},
+			Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 	}
 
 	ifaces := make([]api.Interface, len(res.GetInterfaces()))
 	for i, dpdkIface := range res.GetInterfaces() {
 		iface, err := api.ProtoInterfaceToInterface(dpdkIface)
 		if err != nil {
-			return nil, err
+			return &api.InterfaceList{}, err
 		}
 
 		ifaces[i] = *iface
@@ -492,14 +507,19 @@ func (c *client) ListPrefixes(ctx context.Context, interfaceID string, ignoredEr
 		InterfaceId: []byte(interfaceID),
 	})
 	if err != nil {
-		return nil, err
+		return &api.PrefixList{}, err
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return &api.PrefixList{
+			TypeMeta: api.TypeMeta{Kind: api.PrefixListKind},
+			Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 	}
 
 	prefixes := make([]api.Prefix, len(res.GetPrefixes()))
 	for i, dpdkPrefix := range res.GetPrefixes() {
 		prefix, err := api.ProtoPrefixToPrefix(interfaceID, dpdkPrefix)
 		if err != nil {
-			return nil, err
+			return &api.PrefixList{}, err
 		}
 
 		prefixes[i] = *prefix
@@ -569,12 +589,12 @@ func (c *client) DeletePrefix(ctx context.Context, interfaceID string, prefix *n
 
 func (c *client) CreateRoute(ctx context.Context, route *api.Route, ignoredErrors ...[]uint32) (*api.Route, error) {
 	if route.Spec.Prefix == nil {
-		return nil, fmt.Errorf("prefix needs to be specified")
+		return &api.Route{}, fmt.Errorf("prefix needs to be specified")
 	}
 	routePrefixAddr := route.Spec.Prefix.Addr()
 
 	if route.Spec.NextHop == nil {
-		return nil, fmt.Errorf("nextHop needs to be specified")
+		return &api.Route{}, fmt.Errorf("nextHop needs to be specified")
 	}
 	res, err := c.DPDKironcoreClient.CreateRoute(ctx, &dpdkproto.CreateRouteRequest{
 		Vni: route.VNI,
@@ -641,14 +661,19 @@ func (c *client) ListRoutes(ctx context.Context, vni uint32, ignoredErrors ...[]
 		Vni: vni,
 	})
 	if err != nil {
-		return nil, err
+		return &api.RouteList{}, err
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return &api.RouteList{
+			TypeMeta: api.TypeMeta{Kind: api.RouteListKind},
+			Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 	}
 
 	routes := make([]api.Route, len(res.GetRoutes()))
 	for i, dpdkRoute := range res.GetRoutes() {
 		route, err := api.ProtoRouteToRoute(vni, dpdkRoute)
 		if err != nil {
-			return nil, err
+			return &api.RouteList{}, err
 		}
 
 		routes[i] = *route
@@ -729,7 +754,7 @@ func (c *client) ListLocalNats(ctx context.Context, natIP *netip.Addr, ignoredEr
 
 func (c *client) CreateNeighborNat(ctx context.Context, nNat *api.NeighborNat, ignoredErrors ...[]uint32) (*api.NeighborNat, error) {
 	if nNat.Spec.UnderlayRoute == nil {
-		return nil, fmt.Errorf("underlayRoute needs to be specified")
+		return &api.NeighborNat{}, fmt.Errorf("underlayRoute needs to be specified")
 	}
 	res, err := c.DPDKironcoreClient.CreateNeighborNat(ctx, &dpdkproto.CreateNeighborNatRequest{
 		NatIp:         api.NetIPAddrToProtoIpAddress(nNat.NatIP),
@@ -763,7 +788,7 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 	case "any", "0", "":
 		nType = 0
 	default:
-		return nil, fmt.Errorf("nat type can be only: Any = 0/Local = 1/Neigh(bor) = 2")
+		return &api.NatList{}, fmt.Errorf("nat type can be only: Any = 0/Local = 1/Neigh(bor) = 2")
 	}
 
 	req := api.NetIPAddrToProtoIpAddress(natIP)
@@ -775,25 +800,35 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 	case 0:
 		res1, err1 := c.DPDKironcoreClient.ListLocalNats(ctx, &dpdkproto.ListLocalNatsRequest{NatIp: req})
 		if err1 != nil {
-			return nil, err1
+			return &api.NatList{}, err1
 		}
 		res2, err2 := c.DPDKironcoreClient.ListNeighborNats(ctx, &dpdkproto.ListNeighborNatsRequest{NatIp: req})
 		if err2 != nil {
-			return nil, err2
+			return &api.NatList{}, err2
 		}
 		natEntries = append(natEntries, res1.NatEntries...)
 		natEntries = append(natEntries, res2.NatEntries...)
 	case 1:
 		res, err := c.DPDKironcoreClient.ListLocalNats(ctx, &dpdkproto.ListLocalNatsRequest{NatIp: req})
 		if err != nil {
-			return nil, err
+			return &api.NatList{}, err
+		}
+		if res.GetStatus().GetCode() != 0 {
+			return &api.NatList{
+				TypeMeta: api.TypeMeta{Kind: api.NatListKind},
+				Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 		}
 		natEntries = res.GetNatEntries()
 		status = res.Status
 	case 2:
 		res, err := c.DPDKironcoreClient.ListNeighborNats(ctx, &dpdkproto.ListNeighborNatsRequest{NatIp: req})
 		if err != nil {
-			return nil, err
+			return &api.NatList{}, err
+		}
+		if res.GetStatus().GetCode() != 0 {
+			return &api.NatList{
+				TypeMeta: api.TypeMeta{Kind: api.NatListKind},
+				Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
 		}
 		natEntries = res.GetNatEntries()
 		status = res.Status
@@ -806,7 +841,7 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 		if natEntry.GetUnderlayRoute() != nil {
 			underlayRoute, err = netip.ParseAddr(string(natEntry.GetUnderlayRoute()))
 			if err != nil {
-				return nil, fmt.Errorf("error parsing underlay route: %w", err)
+				return &api.NatList{}, fmt.Errorf("error parsing underlay route: %w", err)
 			}
 			nat.Spec.UnderlayRoute = &underlayRoute
 			nat.Spec.NatIP = nil  // "natted" IP, i.e. local NIC IP is not applicable for neighnats
@@ -822,7 +857,7 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 		if natEntry.GetActualNatIp() != nil {
 			natIP, err = netip.ParseAddr(string(natEntry.GetActualNatIp().GetAddress()))
 			if err != nil {
-				return nil, fmt.Errorf("error parsing nat ip: %w", err)
+				return &api.NatList{}, fmt.Errorf("error parsing nat ip: %w", err)
 			}
 			nat.Spec.ActualNatIP = &natIP
 		}
@@ -871,6 +906,11 @@ func (c *client) ListFirewallRules(ctx context.Context, interfaceID string, igno
 	if err != nil {
 		return &api.FirewallRuleList{}, err
 	}
+	if res.GetStatus().GetCode() != 0 {
+		return &api.FirewallRuleList{
+			TypeMeta: api.TypeMeta{Kind: api.FirewallRuleListKind},
+			Status:   api.ProtoStatusToStatus(res.Status)}, errors.GetError(res.Status, ignoredErrors)
+	}
 
 	fwRules := make([]api.FirewallRule, len(res.GetRules()))
 	for i, dpdkFwRule := range res.GetRules() {
@@ -915,11 +955,11 @@ func (c *client) CreateFirewallRule(ctx context.Context, fwRule *api.FirewallRul
 	}
 
 	if fwRule.Spec.SourcePrefix == nil {
-		return nil, fmt.Errorf("source prefix needs to be specified")
+		return &api.FirewallRule{}, fmt.Errorf("source prefix needs to be specified")
 	}
 	fwRuleSrcPrefixAddr := fwRule.Spec.SourcePrefix.Addr()
 	if fwRule.Spec.DestinationPrefix == nil {
-		return nil, fmt.Errorf("destination prefix needs to be specified")
+		return &api.FirewallRule{}, fmt.Errorf("destination prefix needs to be specified")
 	}
 	fwRuleDstPrefixAddr := fwRule.Spec.DestinationPrefix.Addr()
 	req := dpdkproto.CreateFirewallRuleRequest{

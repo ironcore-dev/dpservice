@@ -87,7 +87,7 @@ func RunCreateLoadBalancerPrefix(
 			Prefix: opts.Prefix,
 		},
 	})
-	if err != nil && lbprefix.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating loadbalancer prefix: %w", err)
 	}
 

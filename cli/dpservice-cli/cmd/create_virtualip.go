@@ -84,7 +84,7 @@ func RunCreateVirtualIP(
 			IP: &opts.Vip,
 		},
 	})
-	if err != nil && virtualIP.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating virtual ip: %w", err)
 	}
 

@@ -93,7 +93,7 @@ func RunCreateLoadBalancer(ctx context.Context, dpdkClientFactory DPDKClientFact
 			Lbports: ports,
 		},
 	})
-	if err != nil && lb.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating loadbalancer: %w", err)
 	}
 

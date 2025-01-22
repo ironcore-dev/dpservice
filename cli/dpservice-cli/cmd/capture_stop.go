@@ -41,7 +41,7 @@ func RunCaptureStop(ctx context.Context, dpdkClientFactory DPDKClientFactory, re
 
 	captureStop, err := dpdkClient.CaptureStop(ctx)
 
-	if err != nil && captureStop.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error stopping capturing: %w", err)
 	}
 

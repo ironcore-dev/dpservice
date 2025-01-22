@@ -46,7 +46,7 @@ func RunCaptureStatus(
 	}()
 
 	capture, err := client.CaptureStatus(ctx)
-	if err != nil && capture.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error checking initialization status: %w", err)
 	}
 

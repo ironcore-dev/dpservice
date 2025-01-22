@@ -67,7 +67,7 @@ func RunDeleteLoadBalancer(ctx context.Context, dpdkClientFactory DPDKClientFact
 	defer DpdkClose(cleanup)
 
 	lb, err := client.DeleteLoadBalancer(ctx, opts.ID)
-	if err != nil && lb.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting loadbalancer: %w", err)
 	}
 

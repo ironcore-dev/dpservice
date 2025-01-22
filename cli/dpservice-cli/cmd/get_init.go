@@ -46,7 +46,7 @@ func RunGetInit(
 	}()
 
 	init, err := client.CheckInitialized(ctx)
-	if err != nil && init.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error checking initialization status: %w", err)
 	}
 

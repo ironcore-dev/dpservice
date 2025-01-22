@@ -78,7 +78,7 @@ func RunInit(
 	}
 	// else initialize and show uuid
 	init, err := client.Initialize(ctx)
-	if err != nil && res.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error initializing: %w", err)
 	}
 
