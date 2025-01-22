@@ -75,7 +75,7 @@ func RunGetLoadBalancer(
 		)
 	} else {
 		lb, err := client.GetLoadBalancer(ctx, opts.ID)
-		if err != nil && lb.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error getting loadbalancer: %w", err)
 		}
 

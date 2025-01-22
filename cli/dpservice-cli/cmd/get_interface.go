@@ -74,7 +74,7 @@ func RunGetInterface(
 		)
 	} else {
 		iface, err := client.GetInterface(ctx, opts.ID)
-		if err != nil && iface.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error getting interface: %w", err)
 		}
 

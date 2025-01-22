@@ -72,7 +72,7 @@ func RunGetVersion(
 			ClientVersion: util.BuildVersion,
 		},
 	})
-	if err != nil && svcVersion.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error getting version: %w", err)
 	}
 	return rendererFactory.RenderObject("", os.Stdout, svcVersion)

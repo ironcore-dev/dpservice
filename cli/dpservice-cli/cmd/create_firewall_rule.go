@@ -199,7 +199,7 @@ func RunCreateFirewallRule(ctx context.Context, dpdkClientFactory DPDKClientFact
 				Filter: protocolFilter.Filter},
 		},
 	})
-	if err != nil && fwrule.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating firewall rule: %w", err)
 	}
 

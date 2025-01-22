@@ -71,7 +71,7 @@ func RunDeletePrefix(ctx context.Context, dpdkClientFactory DPDKClientFactory, r
 	defer DpdkClose(cleanup)
 
 	prefix, err := client.DeletePrefix(ctx, opts.InterfaceID, &opts.Prefix)
-	if err != nil && prefix.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting prefix: %w", err)
 	}
 

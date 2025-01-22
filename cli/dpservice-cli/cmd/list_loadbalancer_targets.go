@@ -75,7 +75,7 @@ func RunListLoadBalancerTargets(
 	defer DpdkClose(cleanup)
 
 	lbtargets, err := client.ListLoadBalancerTargets(ctx, opts.LoadBalancerID)
-	if err != nil && lbtargets.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error listing loadbalancer targets: %w", err)
 	}
 

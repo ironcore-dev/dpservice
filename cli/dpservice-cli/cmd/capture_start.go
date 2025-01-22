@@ -148,7 +148,7 @@ func RunCaptureStart(ctx context.Context, dpdkClientFactory DPDKClientFactory, r
 		},
 	})
 
-	if err != nil && capture.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error initializing packet capturing: %w", err)
 	}
 

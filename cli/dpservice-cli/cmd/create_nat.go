@@ -85,7 +85,7 @@ func RunCreateNat(ctx context.Context, dpdkClientFactory DPDKClientFactory, rend
 			MaxPort: opts.MaxPort,
 		},
 	})
-	if err != nil && nat.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating nat: %w", err)
 	}
 

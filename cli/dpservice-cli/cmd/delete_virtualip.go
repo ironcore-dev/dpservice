@@ -67,7 +67,7 @@ func RunDeleteVirtualIP(ctx context.Context, dpdkClientFactory DPDKClientFactory
 	defer DpdkClose(cleanup)
 
 	virtualIP, err := client.DeleteVirtualIP(ctx, opts.InterfaceID)
-	if err != nil && virtualIP.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting virtual ip: %w", err)
 	}
 

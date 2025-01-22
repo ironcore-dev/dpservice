@@ -86,7 +86,7 @@ func RunGetFirewallRule(
 		)
 	} else {
 		fwrule, err := client.GetFirewallRule(ctx, opts.InterfaceID, opts.RuleID)
-		if err != nil && fwrule.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error getting firewall rule: %w", err)
 		}
 

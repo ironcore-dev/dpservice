@@ -69,7 +69,7 @@ func RunDeleteFirewallRule(ctx context.Context, dpdkClientFactory DPDKClientFact
 	defer DpdkClose(cleanup)
 
 	fwrule, err := client.DeleteFirewallRule(ctx, opts.InterfaceID, opts.RuleID)
-	if err != nil && fwrule.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting firewall rule: %w", err)
 	}
 

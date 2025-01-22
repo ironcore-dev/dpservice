@@ -76,13 +76,13 @@ func RunListLoadBalancerPrefixes(
 	}
 	if opts.InterfaceID == "" {
 		ifaces, err := client.ListInterfaces(ctx)
-		if err != nil && ifaces.Status.Code == 0 {
+		if err != nil {
 			return fmt.Errorf("error listing interfaces: %w", err)
 		}
 
 		for _, iface := range ifaces.Items {
 			prefixes, err := client.ListLoadBalancerPrefixes(ctx, iface.ID)
-			if err != nil && prefixes.Status.Code == 0 {
+			if err != nil {
 				return fmt.Errorf("error getting loadbalancer prefixes: %w", err)
 			}
 			for id := range prefixes.Items {

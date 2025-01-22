@@ -97,7 +97,7 @@ func RunCreateInterface(ctx context.Context, dpdkClientFactory DPDKClientFactory
 			Metering: &api.MeteringParams{TotalRate: opts.TotalMeterRate, PublicRate: opts.PublicMeterRate},
 		},
 	})
-	if err != nil && iface.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error creating interface: %w", err)
 	}
 

@@ -67,7 +67,7 @@ func RunDeleteInterface(ctx context.Context, dpdkClientFactory DPDKClientFactory
 	defer DpdkClose(cleanup)
 
 	iface, err := client.DeleteInterface(ctx, opts.ID)
-	if err != nil && iface.Status.Code == 0 {
+	if err != nil {
 		return fmt.Errorf("error deleting interface: %w", err)
 	}
 
