@@ -162,6 +162,13 @@
       "ifdef": "ENABLE_PYTEST"
     },
     {
+      "lgopt": "second",
+      "help": "DEBUG ONLY start as a second dpservice",
+      "var": "second",
+      "type": "bool",
+      "default": "false"
+    },
+    {
       "lgopt": "multiport-eswitch",
       "help": "run on NIC configured in multiport e-switch mode",
       "var": "multiport_eswitch",

@@ -17,6 +17,8 @@
 	NEXT(RX_NEXT_CLS, "cls")
 DP_NODE_REGISTER_SOURCE(RX, rx, NEXT_NODES);
 
+static bool processing_enabled = true;
+
 // there are multiple Tx nodes, one per port, node context is needed
 struct rx_node_ctx {
 	const struct dp_port *port;
@@ -91,6 +93,9 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	if (unlikely(!ctx->port->allocated))
 		return 0;
 
+	if (unlikely(!processing_enabled))
+		return 0;
+
 	n_pkts = rte_eth_rx_burst(ctx->port->port_id,
 							  ctx->queue_id,
 							  (struct rte_mbuf **)objs,
@@ -114,3 +119,10 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 
 	return n_pkts;
 }
+
+void rx_node_set_processing(bool enabled)
+{
+	DPS_LOG_WARNING("Setting Rx node processing", DP_LOG_VALUE(enabled));
+	processing_enabled = enabled;
+}
+

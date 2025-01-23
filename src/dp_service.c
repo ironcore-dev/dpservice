@@ -28,6 +28,7 @@
 #endif
 #include "dpdk_layer.h"
 #include "grpc/dp_grpc_thread.h"
+#include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_async_flow.h"
 
 static char **dp_argv;
@@ -243,6 +244,8 @@ static int run_service(void)
 	dp_log_set_thread_name("control");
 	DPS_LOG_INFO("Starting DP Service version " DP_SERVICE_VERSION);
 	// from this point on, only DPS_LOG should be used
+
+	rx_node_set_processing(!dp_conf_is_second());
 
 	if (DP_FAILED(setup_sighandlers())
 		|| DP_FAILED(dp_dpdk_layer_init()))

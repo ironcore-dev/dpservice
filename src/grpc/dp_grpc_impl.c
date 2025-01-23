@@ -21,6 +21,7 @@
 #include "grpc/dp_grpc_api.h"
 #include "grpc/dp_grpc_responder.h"
 #include "monitoring/dp_monitoring.h"
+#include "nodes/rx_node.h"
 #include "rte_flow/dp_rte_flow_capture.h"
 
 
@@ -901,8 +902,11 @@ static int dp_process_capture_start(struct dp_grpc_responder *responder)
 
 static int dp_process_capture_stop(struct dp_grpc_responder *responder)
 {
-	struct dpgrpc_capture_stop	*reply = dp_grpc_single_reply(responder);
+	struct dpgrpc_capture_stop *reply = dp_grpc_single_reply(responder);
 	int ret;
+
+	rx_node_set_processing(false);
+	return DP_GRPC_OK;
 
 	if (!dp_is_capture_enabled())
 		return DP_GRPC_ERR_NOT_ACTIVE;
@@ -924,6 +928,9 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 	const struct dp_ports *ports = dp_get_ports();
 	const struct dp_capture_hdr_config *capture_hdr_config = dp_get_capture_hdr_config();
 	uint8_t count = 0;
+
+	rx_node_set_processing(true);
+	return DP_GRPC_OK;
 
 	if (!dp_is_capture_enabled()) {
 		memset(reply, 0, sizeof(*reply));
