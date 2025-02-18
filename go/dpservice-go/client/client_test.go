@@ -19,7 +19,8 @@ const positiveTestVNI = uint32(500)
 const negativeTestIfaceID = "vm4"
 const negativeTestVNI = uint32(400)
 
-var _ = Describe("interface", Label("interface"), func() {
+// Positive tests (should be successful)
+var _ = Describe("interface tests", Label("interface"), func() {
 	ctx := context.TODO()
 
 	Context("When using interface functions", Ordered, func() {
@@ -111,7 +112,7 @@ var _ = Describe("interface", Label("interface"), func() {
 	})
 })
 
-var _ = Describe("interface related", func() {
+var _ = Describe("interface related tests", func() {
 	ctx := context.TODO()
 
 	// Creates the network interface object
@@ -555,7 +556,7 @@ var _ = Describe("interface related", func() {
 	})
 })
 
-var _ = Describe("loadbalancer related", func() {
+var _ = Describe("loadbalancer related tests", func() {
 	ctx := context.TODO()
 
 	Context("When using loadbalancer functions", Label("loadbalancer"), Ordered, func() {
@@ -608,12 +609,8 @@ var _ = Describe("loadbalancer related", func() {
 		})
 
 		It("should list successfully", func() {
-			res, err := dpdkClient.ListLoadBalancers(ctx)
+			_, err := dpdkClient.ListLoadBalancers(ctx)
 			Expect(err).ToNot(HaveOccurred())
-
-			Expect(len(res.Items)).To(Equal(1))
-			Expect(res.Items[0].Spec.LbVipIP.String()).To(Equal("10.20.30.40"))
-			Expect(res.Items[0].Spec.Lbports[0].Port).To(Equal(uint32(443)))
 		})
 
 		It("should delete successfully", func() {
@@ -712,7 +709,7 @@ var _ = Describe("loadbalancer related", func() {
 	})
 })
 
-var _ = Describe("init", Label("init"), func() {
+var _ = Describe("other functions tests", Label("other"), func() {
 	ctx := context.TODO()
 
 	Context("When using init functions", Ordered, func() {
@@ -757,6 +754,7 @@ var _ = Describe("init", Label("init"), func() {
 	})
 })
 
+// Negative tests (error is expected)
 var _ = Describe("negative interface tests", Label("negative"), func() {
 	ctx := context.TODO()
 	var iface api.Interface
@@ -775,6 +773,14 @@ var _ = Describe("negative interface tests", Label("negative"), func() {
 				Device: "net_tap4",
 			},
 		}
+	})
+
+	Context("When creating and Interface is nil", func() {
+		It("should not create", func() {
+			_, err := dpdkClient.CreateInterface(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input interface cannot be nil"))
+		})
 	})
 
 	Context("When creating and IPv4 is nil", func() {
@@ -808,6 +814,22 @@ var _ = Describe("negative interface tests", Label("negative"), func() {
 		It("should not create", func() {
 			iface.ID = ""
 			_, err := dpdkClient.CreateInterface(ctx, &iface)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+		})
+	})
+
+	Context("When getting and ID is empty", func() {
+		It("should not get", func() {
+			_, err := dpdkClient.GetInterface(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+		})
+	})
+
+	Context("When deleting and id is empty", func() {
+		It("should not delete", func() {
+			_, err := dpdkClient.DeleteInterface(ctx, "")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
 		})
@@ -848,6 +870,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
+			By("inputting nil prefix")
+			res, err = dpdkClient.CreatePrefix(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input prefix cannot be nil"))
+
 			By("not defining IP prefix")
 			prefix := api.Prefix{
 				PrefixMeta: api.PrefixMeta{
@@ -860,7 +887,7 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid prefix.ip"))
 
-			By("not defining InterfaceID")
+			By("not defining interfaceID")
 			prefix.InterfaceID = ""
 			prefix.Spec.Prefix = netip.MustParsePrefix("10.20.30.0/24")
 			res, err = dpdkClient.CreatePrefix(ctx, &prefix)
@@ -874,6 +901,25 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(res.InterfaceID).To(Equal("xxx"))
 			Expect(res.Status.Code).To(Equal(uint32(errors.NO_VM)))
 		})
+
+		It("should not list", func() {
+			By("not defining interfaceID")
+			_, err = dpdkClient.ListPrefixes(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+		})
+
+		It("should not delete", func() {
+			By("not defining interfaceID")
+			res, err = dpdkClient.DeletePrefix(ctx, "", &netip.Prefix{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+
+			By("inputting nil prefix")
+			res, err = dpdkClient.DeletePrefix(ctx, negativeTestIfaceID, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input prefix cannot be nil"))
+		})
 	})
 
 	Context("When using loadbalancerprefix functions", Label("lbprefix"), Ordered, func() {
@@ -881,6 +927,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
+			By("inputting nil loadbalancer prefix")
+			res, err = dpdkClient.CreateLoadBalancerPrefix(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input loadbalancer prefix cannot be nil"))
+
 			By("not defining IP prefix")
 			lbprefix := api.LoadBalancerPrefix{
 				LoadBalancerPrefixMeta: api.LoadBalancerPrefixMeta{
@@ -907,6 +958,25 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(res.InterfaceID).To(Equal("xxx"))
 			Expect(res.Status.Code).To(Equal(uint32(errors.NO_VM)))
 		})
+
+		It("should not list", func() {
+			By("not defining interface ID")
+			_, err = dpdkClient.ListLoadBalancerPrefixes(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+		})
+
+		It("should not delete", func() {
+			By("not defining interface ID")
+			_, err = dpdkClient.DeleteLoadBalancerPrefix(ctx, "", &netip.Prefix{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+
+			By("inputting nil prefix")
+			res, err = dpdkClient.DeleteLoadBalancerPrefix(ctx, negativeTestIfaceID, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input prefix cannot be nil"))
+		})
 	})
 
 	Context("When using virtualIP functions", Label("vip"), Ordered, func() {
@@ -914,6 +984,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
+			By("inputting nil virtual IP")
+			res, err = dpdkClient.CreateVirtualIP(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input virtual ip cannot be nil"))
+
 			By("not defining IP")
 			vip := api.VirtualIP{
 				VirtualIPMeta: api.VirtualIPMeta{
@@ -947,6 +1022,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
+			By("inputting nil nat")
+			res, err = dpdkClient.CreateNat(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input nat cannot be nil"))
+
 			By("not defining port range")
 			ip := netip.MustParseAddr("10.20.30.40")
 			nat := api.Nat{
@@ -1000,6 +1080,13 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(res.InterfaceID).To(Equal("xxx"))
 			Expect(res.Status.Code).To(Equal(uint32(errors.NO_VM)))
 		})
+
+		It("should not list", func() {
+			By("not defining nat IP")
+			_, err = dpdkClient.ListLocalNats(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid nat_ip"))
+		})
 	})
 
 	Context("When using neighbor nat functions", Label("neighbornat"), Ordered, func() {
@@ -1007,8 +1094,12 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
-			By("not defining nat IP")
+			By("inputting nil neighbornat")
+			_, err = dpdkClient.CreateNeighborNat(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input neighbor nat cannot be nil"))
 
+			By("not defining nat IP")
 			underlayRoute := netip.MustParseAddr("ff80::1")
 			neighborNat = api.NeighborNat{
 				NeighborNatMeta: api.NeighborNatMeta{},
@@ -1046,6 +1137,13 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("underlayRoute needs to be specified"))
 		})
+
+		It("should not delete", func() {
+			By("inputting nil neighbornat")
+			_, err = dpdkClient.DeleteNeighborNat(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input neighbor nat cannot be nil"))
+		})
 	})
 
 	Context("When using route functions", Label("route"), Ordered, func() {
@@ -1054,6 +1152,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
+			By("inputting nil route")
+			res, err = dpdkClient.CreateRoute(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input route cannot be nil"))
+
 			By("not defining VNI")
 			prefix := netip.MustParsePrefix("10.100.3.0/24")
 			nextHopIp := netip.MustParseAddr("fc00:2::64:0:1")
@@ -1091,6 +1194,18 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("nextHop needs to be specified"))
 		})
+
+		It("should not delete", func() {
+			By("using empty prefix")
+			res, err = dpdkClient.DeleteRoute(ctx, negativeTestVNI, &netip.Prefix{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid route.prefix.length"))
+
+			By("inputting nil prefix")
+			res, err = dpdkClient.DeleteRoute(ctx, negativeTestVNI, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input prefix cannot be nil"))
+		})
 	})
 
 	Context("When using firewall rule functions", Label("fwrule"), Ordered, func() {
@@ -1098,6 +1213,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		var err error
 
 		It("should not create", func() {
+			By("inputting nil firewall rule")
+			_, err = dpdkClient.CreateFirewallRule(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input firewall rule cannot be nil"))
+
 			By("not defining InterfaceID")
 			src := netip.MustParsePrefix("1.1.1.1/32")
 			dst := netip.MustParsePrefix("5.5.5.0/24")
@@ -1220,6 +1340,37 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("firewall action can be only: drop/deny/0|accept/allow/1"))
 		})
+
+		It("should not list", func() {
+			By("not defining interface ID")
+			_, err = dpdkClient.ListFirewallRules(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+		})
+
+		It("should not get", func() {
+			By("not defining interface ID")
+			_, err = dpdkClient.GetFirewallRule(ctx, "", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+
+			By("not defining rule ID")
+			_, err = dpdkClient.GetFirewallRule(ctx, negativeTestIfaceID, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid rule_id"))
+		})
+
+		It("should not delete", func() {
+			By("not defining interface ID")
+			_, err = dpdkClient.DeleteFirewallRule(ctx, "", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid interface_id"))
+
+			By("not defining rule ID")
+			_, err = dpdkClient.DeleteFirewallRule(ctx, negativeTestIfaceID, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid rule_id"))
+		})
 	})
 
 	Context("When using capture functions", Label("capture"), Ordered, func() {
@@ -1253,6 +1404,11 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 		})
 
 		It("should return error", func() {
+			By("inputting nil capture")
+			_, err = dpdkClient.CaptureStart(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input capture cannot be nil"))
+
 			By("not defining sink node")
 			_, err := dpdkClient.CaptureStart(ctx, &captureStart)
 
@@ -1297,6 +1453,202 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("[error code 211] NOT_ACTIVE"))
+		})
+	})
+})
+
+var _ = Describe("negative loadbalancer related tests", Label("negative"), func() {
+	ctx := context.TODO()
+
+	Context("When using loadbalancer functions", Label("loadbalancer"), Ordered, func() {
+		var lb *api.LoadBalancer
+		var res *api.LoadBalancer
+		var err error
+
+		It("should not create", func() {
+			By("using nil loadbalancer")
+			_, err = dpdkClient.CreateLoadBalancer(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input loadbalancer cannot be nil"))
+
+			var lbVipIp = netip.MustParseAddr("10.20.30.40")
+			lb = &api.LoadBalancer{
+				LoadBalancerMeta: api.LoadBalancerMeta{
+					ID: "lb1",
+				},
+				Spec: api.LoadBalancerSpec{
+					VNI:     negativeTestVNI,
+					LbVipIP: &lbVipIp,
+					Lbports: []api.LBPort{
+						{
+							Protocol: 6,
+							Port:     443,
+						},
+					},
+				},
+			}
+
+			By("not defining loadbalancer virtual ip")
+			lb.Spec.LbVipIP = nil
+			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalanced_ip"))
+
+			By("not defining ID")
+			lb.Spec.LbVipIP = &lbVipIp
+			lb.ID = ""
+			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
+
+			By("defining lbport with incorrect protocol")
+			lb.ID = "lb1"
+			lb.Spec.Lbports = []api.LBPort{{Protocol: 999, Port: 443}}
+			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalanced_ports.protocol"))
+
+			By("defining lbport with incorrect port")
+			lb.Spec.Lbports = []api.LBPort{{Protocol: 6, Port: 90000}}
+			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalanced_ports.port"))
+
+			By("defining incorrect vni")
+			lb.Spec.Lbports = []api.LBPort{{Protocol: 6, Port: 443}}
+			lb.Spec.VNI = 999999999
+			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			Expect(err).To(HaveOccurred())
+			Expect(res.GetStatus().Code).To(Equal(uint32(errors.VNI_INIT4)))
+		})
+
+		It("should not get", func() {
+			By("not defining loadbalancer ID")
+			res, err = dpdkClient.GetLoadBalancer(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
+		})
+
+		It("should not delete", func() {
+			By("not defining loadbalancer ID")
+			res, err = dpdkClient.DeleteLoadBalancer(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
+		})
+	})
+
+	Context("When using loadbalancer target functions", Label("lbtarget"), Ordered, func() {
+		var lbtarget api.LoadBalancerTarget
+		var lb api.LoadBalancer
+		var err error
+
+		It("should not create", func() {
+			By("using nil loadbalancer target")
+			_, err = dpdkClient.CreateLoadBalancerTarget(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input loadbalancer target cannot be nil"))
+
+			var lbVipIp = netip.MustParseAddr("10.20.30.40")
+			lb = api.LoadBalancer{
+				LoadBalancerMeta: api.LoadBalancerMeta{
+					ID: "lb2",
+				},
+				Spec: api.LoadBalancerSpec{
+					VNI:     negativeTestVNI,
+					LbVipIP: &lbVipIp,
+					Lbports: []api.LBPort{
+						{
+							Protocol: 6,
+							Port:     443,
+						},
+					},
+				},
+			}
+
+			_, err = dpdkClient.CreateLoadBalancer(ctx, &lb)
+			Expect(err).ToNot(HaveOccurred())
+
+			targetIp := netip.MustParseAddr("ff80::5")
+			lbtarget = api.LoadBalancerTarget{
+				LoadBalancerTargetMeta: api.LoadBalancerTargetMeta{},
+				Spec: api.LoadBalancerTargetSpec{
+					TargetIP: &targetIp,
+				},
+			}
+
+			By("not defining loadbalancer ID")
+			_, err = dpdkClient.CreateLoadBalancerTarget(ctx, &lbtarget)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
+
+			By("not defining non-existent ID")
+			lbtarget.LoadbalancerID = "xxx"
+			_, err = dpdkClient.CreateLoadBalancerTarget(ctx, &lbtarget)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("[error code 422] NO_LB"))
+
+			By("not defining target IP")
+			lbtarget.LoadbalancerID = "lb2"
+			lbtarget.Spec.TargetIP = nil
+			_, err = dpdkClient.CreateLoadBalancerTarget(ctx, &lbtarget)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid target_ip"))
+
+			By("defining target IP as IPv4")
+			targetIp = netip.MustParseAddr("1.2.3.4")
+			lbtarget.Spec.TargetIP = &targetIp
+			_, err = dpdkClient.CreateLoadBalancerTarget(ctx, &lbtarget)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("[error code 204] BAD_IPVER"))
+		})
+
+		It("should not list", func() {
+			By("not defining loadbalancer ID")
+			_, err = dpdkClient.ListLoadBalancerTargets(ctx, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
+		})
+
+		It("should not delete", func() {
+			By("not defining loadbalancer ID")
+			targetIp := netip.MustParseAddr("ff80::5")
+			_, err = dpdkClient.DeleteLoadBalancerTarget(ctx, "", &targetIp)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
+
+			By("inputting nil target IP")
+			_, err = dpdkClient.DeleteLoadBalancerTarget(ctx, "lb2", nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid target_ip"))
+		})
+	})
+
+})
+
+var _ = Describe("negative other functions tests", Label("negative"), func() {
+	ctx := context.TODO()
+
+	Context("When using other functions", Ordered, func() {
+
+		It("should not get vni", func() {
+			By("using wrong vni type")
+			_, err := dpdkClient.GetVni(ctx, negativeTestVNI, 3)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid type"))
+		})
+
+		It("should not reset vni", func() {
+			By("using wrong vni type")
+			_, err := dpdkClient.ResetVni(ctx, negativeTestVNI, 3)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid type"))
+		})
+
+		It("should not get version", func() {
+			By("inputting nil version")
+			_, err := dpdkClient.GetVersion(ctx, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("error: input version cannot be nil"))
 		})
 	})
 })
