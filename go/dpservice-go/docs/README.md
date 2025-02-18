@@ -1,10 +1,12 @@
-# Generate bindings
+# Generate gRPC bindings
 
-To regenerate the Golang bindings run
+To manually regenerate the gRPC Go bindings run:
 
 ```shell
 make clean generate
 ```
+
+This will generate gRPC Go files from [protofile](/proto/dpdk.proto) into proto [folder](/go/dpservice-go/proto/)
 
 ## Usage examples
 
@@ -29,4 +31,25 @@ func main() {
     client := dpdkproto.NewDPDKironcoreClient(conn)
     ...
 }
+```
+
+## Testing
+
+Tests are created with use of Ginkgo and Gomega frameworks.
+Test cases are running in parallel and can be filtered by label.
+They are split to positive and negative: positive tests are expected to be successfull, negative tests are expected to return error.
+
+To run the test of dpservice-go gRPC library, you need to have dpservice-bin running on the same host on port 1337 and dpservice needs to be uninitialized.
+If dpservice is already initialized, tests will fail in BeforeSuite stage. When rerunning tests, dpservice needs to be restarted before each run.
+
+To run all tests:
+
+```shell
+make test
+```
+
+To filter tests (one or more labels can be filtered):
+
+```shell
+make test labels=<string>,<string>,...
 ```

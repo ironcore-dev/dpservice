@@ -40,14 +40,23 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	// setup net-dpservice client
+	// setup dpservice-cli client
 	ctxGrpc, ctxCancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 
-	conn, err := grpc.DialContext(ctxGrpc, dpserviceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.NewClient(dpserviceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	Expect(err).NotTo(HaveOccurred())
 
 	dpdkProtoClient = dpdkproto.NewDPDKironcoreClient(conn)
 	dpdkClient = NewClient(dpdkProtoClient)
+
+	// running gRPC command before initialization should return error
+	_, err = dpdkClient.ListInterfaces(context.TODO())
+	Expect(err).To(HaveOccurred())
+	Expect(err.Error()).To(Equal("rpc error: code = Aborted desc = not initialized"))
+
+	_, err = dpdkClient.GetInterface(context.TODO(), "vm1")
+	Expect(err).To(HaveOccurred())
+	Expect(err.Error()).To(Equal("rpc error: code = Aborted desc = not initialized"))
 
 	_, err = dpdkClient.Initialize(context.TODO())
 	Expect(err).NotTo(HaveOccurred())
