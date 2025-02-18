@@ -24,7 +24,7 @@ type Client interface {
 	CreateLoadBalancerPrefix(ctx context.Context, prefix *api.LoadBalancerPrefix, ignoredErrors ...[]uint32) (*api.LoadBalancerPrefix, error)
 	DeleteLoadBalancerPrefix(ctx context.Context, interfaceID string, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.LoadBalancerPrefix, error)
 
-	ListLoadBalancerTargets(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.LoadBalancerTargetList, error)
+	ListLoadBalancerTargets(ctx context.Context, loadbalancerID string, ignoredErrors ...[]uint32) (*api.LoadBalancerTargetList, error)
 	CreateLoadBalancerTarget(ctx context.Context, lbtarget *api.LoadBalancerTarget, ignoredErrors ...[]uint32) (*api.LoadBalancerTarget, error)
 	DeleteLoadBalancerTarget(ctx context.Context, id string, targetIP *netip.Addr, ignoredErrors ...[]uint32) (*api.LoadBalancerTarget, error)
 
@@ -126,6 +126,9 @@ func (c *client) ListLoadBalancers(ctx context.Context, ignoredErrors ...[]uint3
 }
 
 func (c *client) CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, ignoredErrors ...[]uint32) (*api.LoadBalancer, error) {
+	if lb == nil {
+		return &api.LoadBalancer{}, fmt.Errorf("error: input loadbalancer cannot be nil")
+	}
 	var lbPorts = make([]*dpdkproto.LbPort, 0, len(lb.Spec.Lbports))
 	for _, p := range lb.Spec.Lbports {
 		lbPort := &dpdkproto.LbPort{Port: p.Port, Protocol: dpdkproto.Protocol(p.Protocol)}
@@ -210,6 +213,9 @@ func (c *client) ListLoadBalancerPrefixes(ctx context.Context, interfaceID strin
 }
 
 func (c *client) CreateLoadBalancerPrefix(ctx context.Context, lbprefix *api.LoadBalancerPrefix, ignoredErrors ...[]uint32) (*api.LoadBalancerPrefix, error) {
+	if lbprefix == nil {
+		return &api.LoadBalancerPrefix{}, fmt.Errorf("error: input loadbalancer prefix cannot be nil")
+	}
 	lbPrefixAddr := lbprefix.Spec.Prefix.Addr()
 	res, err := c.DPDKironcoreClient.CreateLoadBalancerPrefix(ctx, &dpdkproto.CreateLoadBalancerPrefixRequest{
 		InterfaceId: []byte(lbprefix.InterfaceID),
@@ -241,6 +247,9 @@ func (c *client) CreateLoadBalancerPrefix(ctx context.Context, lbprefix *api.Loa
 }
 
 func (c *client) DeleteLoadBalancerPrefix(ctx context.Context, interfaceID string, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.LoadBalancerPrefix, error) {
+	if prefix == nil {
+		return &api.LoadBalancerPrefix{}, fmt.Errorf("error: input prefix cannot be nil")
+	}
 	lbPrefixAddr := prefix.Addr()
 	res, err := c.DPDKironcoreClient.DeleteLoadBalancerPrefix(ctx, &dpdkproto.DeleteLoadBalancerPrefixRequest{
 		InterfaceId: []byte(interfaceID),
@@ -299,6 +308,9 @@ func (c *client) ListLoadBalancerTargets(ctx context.Context, loadBalancerID str
 }
 
 func (c *client) CreateLoadBalancerTarget(ctx context.Context, lbtarget *api.LoadBalancerTarget, ignoredErrors ...[]uint32) (*api.LoadBalancerTarget, error) {
+	if lbtarget == nil {
+		return &api.LoadBalancerTarget{}, fmt.Errorf("error: input loadbalancer target cannot be nil")
+	}
 	res, err := c.DPDKironcoreClient.CreateLoadBalancerTarget(ctx, &dpdkproto.CreateLoadBalancerTargetRequest{
 		LoadbalancerId: []byte(lbtarget.LoadBalancerTargetMeta.LoadbalancerID),
 		TargetIp:       api.NetIPAddrToProtoIpAddress(lbtarget.Spec.TargetIP),
@@ -382,6 +394,9 @@ func (c *client) ListInterfaces(ctx context.Context, ignoredErrors ...[]uint32) 
 }
 
 func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, ignoredErrors ...[]uint32) (*api.Interface, error) {
+	if iface == nil {
+		return &api.Interface{}, fmt.Errorf("error: input interface cannot be nil")
+	}
 	req := dpdkproto.CreateInterfaceRequest{
 		InterfaceType:      dpdkproto.InterfaceType_VIRTUAL,
 		InterfaceId:        []byte(iface.ID),
@@ -458,6 +473,9 @@ func (c *client) GetVirtualIP(ctx context.Context, interfaceID string, ignoredEr
 }
 
 func (c *client) CreateVirtualIP(ctx context.Context, virtualIP *api.VirtualIP, ignoredErrors ...[]uint32) (*api.VirtualIP, error) {
+	if virtualIP == nil {
+		return &api.VirtualIP{}, fmt.Errorf("error: input virtual ip cannot be nil")
+	}
 	res, err := c.DPDKironcoreClient.CreateVip(ctx, &dpdkproto.CreateVipRequest{
 		InterfaceId: []byte(virtualIP.InterfaceID),
 		VipIp:       api.NetIPAddrToProtoIpAddress(virtualIP.Spec.IP),
@@ -534,6 +552,9 @@ func (c *client) ListPrefixes(ctx context.Context, interfaceID string, ignoredEr
 }
 
 func (c *client) CreatePrefix(ctx context.Context, prefix *api.Prefix, ignoredErrors ...[]uint32) (*api.Prefix, error) {
+	if prefix == nil {
+		return &api.Prefix{}, fmt.Errorf("error: input prefix cannot be nil")
+	}
 	prefixAddr := prefix.Spec.Prefix.Addr()
 	res, err := c.DPDKironcoreClient.CreatePrefix(ctx, &dpdkproto.CreatePrefixRequest{
 		InterfaceId: []byte(prefix.InterfaceID),
@@ -564,6 +585,9 @@ func (c *client) CreatePrefix(ctx context.Context, prefix *api.Prefix, ignoredEr
 }
 
 func (c *client) DeletePrefix(ctx context.Context, interfaceID string, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.Prefix, error) {
+	if prefix == nil {
+		return &api.Prefix{}, fmt.Errorf("error: input prefix cannot be nil")
+	}
 	prefixAddr := prefix.Addr()
 	res, err := c.DPDKironcoreClient.DeletePrefix(ctx, &dpdkproto.DeletePrefixRequest{
 		InterfaceId: []byte(interfaceID),
@@ -588,6 +612,10 @@ func (c *client) DeletePrefix(ctx context.Context, interfaceID string, prefix *n
 }
 
 func (c *client) CreateRoute(ctx context.Context, route *api.Route, ignoredErrors ...[]uint32) (*api.Route, error) {
+	if route == nil {
+		return &api.Route{}, fmt.Errorf("error: input route cannot be nil")
+	}
+
 	if route.Spec.Prefix == nil {
 		return &api.Route{}, fmt.Errorf("prefix needs to be specified")
 	}
@@ -627,6 +655,9 @@ func (c *client) CreateRoute(ctx context.Context, route *api.Route, ignoredError
 }
 
 func (c *client) DeleteRoute(ctx context.Context, vni uint32, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.Route, error) {
+	if prefix == nil {
+		return &api.Route{}, fmt.Errorf("error: input prefix cannot be nil")
+	}
 	routePrefixAddr := prefix.Addr()
 	res, err := c.DPDKironcoreClient.DeleteRoute(ctx, &dpdkproto.DeleteRouteRequest{
 		Vni: vni,
@@ -702,6 +733,9 @@ func (c *client) GetNat(ctx context.Context, interfaceID string, ignoredErrors .
 }
 
 func (c *client) CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[]uint32) (*api.Nat, error) {
+	if nat == nil {
+		return &api.Nat{}, fmt.Errorf("error: input nat cannot be nil")
+	}
 	res, err := c.DPDKironcoreClient.CreateNat(ctx, &dpdkproto.CreateNatRequest{
 		InterfaceId: []byte(nat.NatMeta.InterfaceID),
 		NatIp:       api.NetIPAddrToProtoIpAddress(nat.Spec.NatIP),
@@ -753,6 +787,9 @@ func (c *client) ListLocalNats(ctx context.Context, natIP *netip.Addr, ignoredEr
 }
 
 func (c *client) CreateNeighborNat(ctx context.Context, nNat *api.NeighborNat, ignoredErrors ...[]uint32) (*api.NeighborNat, error) {
+	if nNat == nil {
+		return &api.NeighborNat{}, fmt.Errorf("error: input neighbor nat cannot be nil")
+	}
 	if nNat.Spec.UnderlayRoute == nil {
 		return &api.NeighborNat{}, fmt.Errorf("underlayRoute needs to be specified")
 	}
@@ -844,7 +881,7 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 				return &api.NatList{}, fmt.Errorf("error parsing underlay route: %w", err)
 			}
 			nat.Spec.UnderlayRoute = &underlayRoute
-			nat.Spec.NatIP = nil  // "natted" IP, i.e. local NIC IP is not applicable for neighnats
+			nat.Spec.NatIP = nil // "natted" IP, i.e. local NIC IP is not applicable for neighnats
 			nat.Kind = api.NeighborNatKind
 		} else if natEntry.GetNatIp() != nil {
 			nattedIP, err = netip.ParseAddr(string(natEntry.GetNatIp().GetAddress()))
@@ -875,6 +912,9 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 }
 
 func (c *client) DeleteNeighborNat(ctx context.Context, neigbhorNat *api.NeighborNat, ignoredErrors ...[]uint32) (*api.NeighborNat, error) {
+	if neigbhorNat == nil {
+		return &api.NeighborNat{}, fmt.Errorf("error: input neighbor nat cannot be nil")
+	}
 	res, err := c.DPDKironcoreClient.DeleteNeighborNat(ctx, &dpdkproto.DeleteNeighborNatRequest{
 		NatIp:   api.NetIPAddrToProtoIpAddress(neigbhorNat.NatIP),
 		Vni:     neigbhorNat.Spec.Vni,
@@ -930,6 +970,10 @@ func (c *client) ListFirewallRules(ctx context.Context, interfaceID string, igno
 }
 
 func (c *client) CreateFirewallRule(ctx context.Context, fwRule *api.FirewallRule, ignoredErrors ...[]uint32) (*api.FirewallRule, error) {
+	if fwRule == nil {
+		return &api.FirewallRule{}, fmt.Errorf("error: input firewall rule cannot be nil")
+	}
+
 	var action, direction uint8
 
 	switch strings.ToLower(fwRule.Spec.FirewallAction) {
@@ -1109,6 +1153,9 @@ func (c *client) ResetVni(ctx context.Context, vni uint32, vniType uint8, ignore
 }
 
 func (c *client) GetVersion(ctx context.Context, version *api.Version, ignoredErrors ...[]uint32) (*api.Version, error) {
+	if version == nil {
+		return &api.Version{}, fmt.Errorf("error: input version cannot be nil")
+	}
 	version.ClientProtocol = strings.TrimSpace(dpdkproto.GeneratedFrom)
 	res, err := c.DPDKironcoreClient.GetVersion(ctx, &dpdkproto.GetVersionRequest{
 		ClientProtocol: version.ClientProtocol,
@@ -1128,6 +1175,10 @@ func (c *client) GetVersion(ctx context.Context, version *api.Version, ignoredEr
 }
 
 func (c *client) CaptureStart(ctx context.Context, capture *api.CaptureStart, ignoredErrors ...[]uint32) (*api.CaptureStart, error) {
+	if capture == nil {
+		return &api.CaptureStart{}, fmt.Errorf("error: input capture cannot be nil")
+	}
+
 	var interfaces = make([]*dpdkproto.CapturedInterface, 0, len(capture.Spec.Interfaces))
 
 	for _, iface := range capture.Spec.Interfaces {
