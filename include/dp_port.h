@@ -196,6 +196,12 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 	return index < RTE_DIM(_dp_pf_ports) ? _dp_pf_ports[index] : NULL;
 }
 
+static __rte_always_inline
+bool dp_conf_is_tap(void)
+{
+	return dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP;
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -268,10 +268,11 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 {
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
+	struct dp_port *in_port = dp_get_in_port(m);
+	bool is_tap = dp_conf_is_tap();
 
 	ipv4_hdr->hdr_checksum = 0;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4;
-	m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;
 	m->tx_offload = 0;
 	m->l2_len = sizeof(struct rte_ether_hdr);
 	m->l3_len = rte_ipv4_hdr_len(ipv4_hdr);
@@ -280,15 +281,21 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 	switch (df->l4_type) {
 		case IPPROTO_TCP:
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
-			tcp_hdr->cksum = 0;
-			m->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
 			m->l4_len = DP_TCP_HDR_LEN(tcp_hdr);
+			tcp_hdr->cksum = 0;
+			if (unlikely(is_tap))
+				tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+			else
+				m->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
 		break;
 		case IPPROTO_UDP:
 			udp_hdr =  (struct rte_udp_hdr *)(ipv4_hdr + 1);
-			udp_hdr->dgram_cksum = 0;
-			m->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
 			m->l4_len = sizeof(struct rte_udp_hdr);
+			udp_hdr->dgram_cksum = 0;
+			if (unlikely(is_tap))
+				udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
+			else
+				m->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
 		break;
 		case IPPROTO_ICMP:
 			m->l4_len = sizeof(struct rte_icmp_hdr);
@@ -296,6 +303,10 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 		default:
 		break;
 	}
+	if (unlikely(is_tap))
+		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
+	else
+		m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;
 }
 
 static void dp_calculate_icmp_checksum(struct rte_icmp_hdr *icmp_hdr, size_t icmp_len)
