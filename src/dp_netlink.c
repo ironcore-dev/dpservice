@@ -66,7 +66,7 @@ static int dp_recv_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bu
 	return (int)msg_len;
 }
 
-int dp_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac)
+int dp_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac, enum dp_conf_nic_type nic_type)
 {
 	struct sockaddr_nl sa = {
 		.nl_family = AF_NETLINK,
@@ -96,6 +96,12 @@ int dp_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const str
 	char reply[DP_NLINK_BUF_SIZE];
 	int reply_len;
 	int ret = DP_ERROR;
+
+	if (nic_type == DP_CONF_NIC_TYPE_TAP) {
+		// Return own mac address for TAP interfaces
+		*neigh = *own_mac;
+		return DP_OK;
+	}
 
 	sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 	if (sock < 0) {

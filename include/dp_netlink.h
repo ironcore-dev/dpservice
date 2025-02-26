@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include "dp_conf.h"
 
 #define DP_NLINK_BUF_SIZE 8192
 
@@ -26,7 +27,7 @@ struct dp_nlnk_req {
 	struct dp_nl_tlv if_tlv;
 };
 
-int dp_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac);
+int dp_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac, enum dp_conf_nic_type nic_type);
 
 #ifdef __cplusplus
 }

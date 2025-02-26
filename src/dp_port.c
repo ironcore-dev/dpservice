@@ -500,7 +500,7 @@ static void dp_acquire_neigh_mac(struct dp_port *port)
 	struct rte_ether_addr pf_neigh_mac = {0};
 	int ret;
 
-	if (DP_FAILED(dp_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac))) {
+	if (DP_FAILED(dp_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac, dp_conf_get_nic_type()))) {
 		DPS_LOG_WARNING("No neighboring router, setting timer", DP_LOG_VALUE(port->neighmac_period), DP_LOG_PORT(port));
 
 		// need to use the same lcore each time, thus staying on main one even when called from the worker
