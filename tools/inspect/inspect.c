@@ -15,6 +15,11 @@ const union dp_ipv6 *dp_conf_get_underlay_ip(void)
 {
 	return &dp_empty_ipv6;
 }
+bool dp_conf_is_second(void);
+bool dp_conf_is_second(void)
+{
+	return false;
+}
 
 
 static int dp_dump_table(const struct rte_hash *htable, int (*dumpfunc)(const void *key, const void *val), enum dp_inspect_output_format format)

@@ -76,6 +76,9 @@ void dp_generate_ul_ipv6(union dp_ipv6 *dest)
 
 	dest->_ul.prefix = dp_conf_get_underlay_ip()->_prefix;  // Use the same prefix as the host
 	dest->_ul.kernel = dest->_ul.reserved = 0;
+	// TODO discuss/change/comment
+	if (dp_conf_is_second())
+		dest->_ul.kernel = 1;
 #ifdef ENABLE_STATIC_UNDERLAY_IP
 	dest->_ul.random = 1;
 #else

@@ -93,6 +93,12 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	if (unlikely(!ctx->port->allocated))
 		return 0;
 
+	// TODO do this better, simply do not connect this Rx node to the graph!!
+	// TODO the same for pf1 in second!
+	if (dp_conf_is_second() && ctx->port->port_id == 0)
+		return 0;
+	// TODO maybe temporarily do an assert for !second && port_id == pf1? (but it's not even started...)
+
 	if (unlikely(!processing_enabled))
 		return 0;
 

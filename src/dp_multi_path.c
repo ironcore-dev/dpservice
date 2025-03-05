@@ -35,6 +35,10 @@ void dp_multipath_init(void)
 
 const struct dp_port *dp_multipath_get_pf(uint32_t hash)
 {
+	(void)hash;
+	// TODO this cannot be used with WCMP ever, so cover this in argument checks!
+	return dp_conf_is_second() ? dp_get_pf1() : dp_get_pf0();  // TODO runtime constant!!
+/*
 	const struct dp_port *owner_port = dp_get_pf0();
 	const struct dp_port *peer_port = dp_get_pf1();
 	enum egress_pf_port selected_port;
@@ -50,5 +54,5 @@ const struct dp_port *dp_multipath_get_pf(uint32_t hash)
 		return peer_port;
 	}
 
-	return owner_port;
+	return owner_port;*/
 }

@@ -129,6 +129,15 @@ static int dp_graph_init_nodes(void)
 	DP_FOREACH_PORT(ports, port) {
 		port_id = port->port_id;
 
+		// TODO make this look better, comment properly etc!
+		if (dp_conf_is_second()) {
+			if (port_id == dp_get_pf0()->port_id)
+				continue;
+		} else {
+			if (port_id == dp_get_pf1()->port_id)
+				continue;
+		}
+
 		// need to have one Rx and one Tx node per port
 		if (DP_FAILED(rx_node_create(port_id, 0))
 			|| DP_FAILED(tx_node_create(port_id)))

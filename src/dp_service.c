@@ -164,7 +164,9 @@ static int init_interfaces(void)
 	if (DP_FAILED(dp_start_pf_port(0)))
 		return DP_ERROR;
 
-	if (DP_FAILED(dp_start_pf_port(1)))
+	// TODO comment this or something ;)
+	// this takes care of PF1 duplication
+	if (dp_conf_is_second() && DP_FAILED(dp_start_pf_port(1)))
 		return DP_ERROR;
 
 	// VFs are started by GRPC later
@@ -245,7 +247,7 @@ static int run_service(void)
 	DPS_LOG_INFO("Starting DP Service version " DP_SERVICE_VERSION);
 	// from this point on, only DPS_LOG should be used
 
-	rx_node_set_processing(!dp_conf_is_second());
+// 	rx_node_set_processing(!dp_conf_is_second());
 
 	if (DP_FAILED(setup_sighandlers())
 		|| DP_FAILED(dp_dpdk_layer_init()))
