@@ -22,9 +22,9 @@ func CreateNat(dpdkClientFactory DPDKClientFactory, rendererFactory RendererFact
 	)
 
 	cmd := &cobra.Command{
-		Use:     "nat <--interface-id> <--nat-ip> <--minport> <--maxport>",
+		Use:     "nat <--interface-id> <--nat-ip> <--minport> <--maxport> [<--underlay>]",
 		Short:   "Create a NAT on interface",
-		Example: "dpservice-cli create nat --interface-id=vm1 --nat-ip=10.20.30.40 --minport=30000 --maxport=30100",
+		Example: "dpservice-cli create nat --interface-id=vm1 --nat-ip=10.20.30.40 --minport=30000 --maxport=30100 --underlay=fc00::5",
 		Aliases: NatAliases,
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,10 +46,11 @@ func CreateNat(dpdkClientFactory DPDKClientFactory, rendererFactory RendererFact
 }
 
 type CreateNatOptions struct {
-	InterfaceID string
-	NatIP       netip.Addr
-	MinPort     uint32
-	MaxPort     uint32
+	InterfaceID       string
+	NatIP             netip.Addr
+	MinPort           uint32
+	MaxPort           uint32
+	PreferredUnderlay netip.Addr
 }
 
 func (o *CreateNatOptions) AddFlags(fs *pflag.FlagSet) {
@@ -57,6 +58,7 @@ func (o *CreateNatOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint32Var(&o.MinPort, "minport", o.MinPort, "MinPort of NAT.")
 	fs.Uint32Var(&o.MaxPort, "maxport", o.MaxPort, "MaxPort of NAT.")
 	flag.AddrVar(fs, &o.NatIP, "nat-ip", o.NatIP, "NAT IP to assign to the interface.")
+	flag.AddrVar(fs, &o.PreferredUnderlay, "underlay", netip.IPv6Unspecified(), "IPv6 underlay address use for the NAT.")
 }
 
 func (o *CreateNatOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -80,9 +82,10 @@ func RunCreateNat(ctx context.Context, dpdkClientFactory DPDKClientFactory, rend
 			InterfaceID: opts.InterfaceID,
 		},
 		Spec: api.NatSpec{
-			NatIP:   &opts.NatIP,
-			MinPort: opts.MinPort,
-			MaxPort: opts.MaxPort,
+			NatIP:         &opts.NatIP,
+			MinPort:       opts.MinPort,
+			MaxPort:       opts.MaxPort,
+			UnderlayRoute: &opts.PreferredUnderlay,
 		},
 	})
 	if err != nil {

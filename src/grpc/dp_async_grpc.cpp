@@ -227,7 +227,8 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_IPV6STR(request_.ipv6_config().primary_address().c_str()),
 					DP_LOG_PCI(request_.device_name().c_str()),
 					DP_LOG_METER_TOTAL(request_.metering_parameters().total_rate()),
-					DP_LOG_METER_PUBLIC(request_.metering_parameters().public_rate()));
+					DP_LOG_METER_PUBLIC(request_.metering_parameters().public_rate()),
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (!GrpcConv::IsInterfaceIdValid(request_.interface_id()))
 		return "Invalid interface_id";
 	request->add_iface.vni = request_.vni();
@@ -252,6 +253,8 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid device_name";
 	if (SNPRINTF_FAILED(request->add_iface.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_iface.ul_addr6))
+		return "Invalid preferred_underlay_route";
 
 	request->add_iface.total_flow_rate_cap = request_.metering_parameters().total_rate();
 	request->add_iface.public_flow_rate_cap = request_.metering_parameters().public_rate();
@@ -321,7 +324,8 @@ const char* CreatePrefixCall::FillRequest(struct dpgrpc_request* request)
 	DPGRPC_LOG_INFO("Adding alias prefix",
 					DP_LOG_IFACE(request_.interface_id().c_str()),
 					DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
-					DP_LOG_PREFLEN(request_.prefix().length()));
+					DP_LOG_PREFLEN(request_.prefix().length()),
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (SNPRINTF_FAILED(request->add_pfx.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->del_pfx.addr))
@@ -329,6 +333,8 @@ const char* CreatePrefixCall::FillRequest(struct dpgrpc_request* request)
 	if (request_.prefix().length() > UINT8_MAX)
 		return "Invalid prefix.length";
 	request->del_pfx.length = (uint8_t)request_.prefix().length();
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_pfx.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreatePrefixCall::ParseReply(struct dpgrpc_reply* reply)
@@ -465,11 +471,14 @@ const char* CreateVipCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Setting virtual IP",
 					DP_LOG_IFACE(request_.interface_id().c_str()),
-					DP_LOG_IPV4STR(request_.vip_ip().address().c_str()));
+					DP_LOG_IPV4STR(request_.vip_ip().address().c_str()),
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (SNPRINTF_FAILED(request->add_vip.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.vip_ip(), &request->add_vip.addr))
 		return "Invalid vip_ip";
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_vip.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreateVipCall::ParseReply(struct dpgrpc_reply* reply)
@@ -519,7 +528,8 @@ const char* CreateNatCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_IFACE(request_.interface_id().c_str()),
 					DP_LOG_IPV4STR(request_.nat_ip().address().c_str()),
 					DP_LOG_MINPORT(request_.min_port()),
-					DP_LOG_MAXPORT(request_.max_port()));
+					DP_LOG_MAXPORT(request_.max_port()),
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (SNPRINTF_FAILED(request->add_nat.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.nat_ip(), &request->add_nat.addr))
@@ -532,6 +542,8 @@ const char* CreateNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid port range";
 	request->add_nat.min_port = (uint16_t)request_.min_port();
 	request->add_nat.max_port = (uint16_t)request_.max_port();
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_nat.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
@@ -694,7 +706,8 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 	DPGRPC_LOG_INFO("Creating loadbalancer",
 					DP_LOG_LBID(request_.loadbalancer_id().c_str()),
 					DP_LOG_VNI(request_.vni()),
-					DP_LOG_IPV4STR(request_.loadbalanced_ip().address().c_str()));
+					DP_LOG_IPV4STR(request_.loadbalanced_ip().address().c_str()),
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (SNPRINTF_FAILED(request->add_lb.lb_id, request_.loadbalancer_id()))
 		return "Invalid loadbalancer_id";
 	request->add_lb.vni = request_.vni();
@@ -702,6 +715,8 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid loadbalanced_ip";
 	if (request_.loadbalanced_ports_size() >= DP_LB_MAX_PORTS)
 		return "Too many loadbalanced_ports";
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_lb.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	for (int i = 0; i < request_.loadbalanced_ports_size(); ++i) {
 		DPGRPC_LOG_INFO("Adding loadbalanced port",
 						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
@@ -852,7 +867,8 @@ const char* CreateLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* req
 	DPGRPC_LOG_INFO("Adding loadbalancer target prefix",
 					DP_LOG_IFACE(request_.interface_id().c_str()),
 					DP_LOG_PREFIX(request_.prefix().ip().address().c_str()),
-					DP_LOG_PREFLEN(request_.prefix().length()));
+					DP_LOG_PREFLEN(request_.prefix().length()),
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (SNPRINTF_FAILED(request->add_lbpfx.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.prefix().ip(), &request->add_lbpfx.addr))
@@ -860,6 +876,8 @@ const char* CreateLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* req
 	if (request_.prefix().length() > UINT8_MAX)
 		return "Invalid prefix.length";
 	request->add_lbpfx.length = (uint8_t)request_.prefix().length();
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_lbpfx.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreateLoadBalancerPrefixCall::ParseReply(struct dpgrpc_reply* reply)

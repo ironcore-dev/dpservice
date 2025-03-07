@@ -22,6 +22,8 @@ namespace GrpcConv
 	bool StrToDpAddress(const std::string& str, struct dp_ip_address *dp_addr, IpVersion ipver);
 	bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr);
 
+	bool StrToPreferredUnderlay(const std::string& str, union dp_ipv6 *dst);
+
 	bool GrpcToDpVniType(const VniType& grpc_type, enum dpgrpc_vni_type *dp_type);
 
 	bool GrpcToDpFwallAction(const FirewallAction& grpc_action, enum dp_fwall_action *dp_action);

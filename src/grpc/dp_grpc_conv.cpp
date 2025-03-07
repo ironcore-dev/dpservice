@@ -68,6 +68,19 @@ bool GrpcToDpAddress(const IpAddress& grpc_addr, struct dp_ip_address *dp_addr)
 	return StrToDpAddress(grpc_addr.address(), dp_addr, grpc_addr.ipver());
 }
 
+bool StrToPreferredUnderlay(const std::string& str, union dp_ipv6 *dst)
+{
+	const std::string preferred_uderlay = str.empty() ? "::" : str;
+
+	if (!GrpcConv::StrToIpv6(preferred_uderlay, dst))
+		return false;
+
+	// requested address needs to fulfil some requirements (if provided)
+	return dp_ipv6_match(&dp_empty_ipv6, dst)
+		|| (dp_conf_get_underlay_ip()->_prefix == dst->_ul.prefix
+			&& (dst->_ul.flags & DP_UNDERLAY_FLAG_EXTERNALLY_GENERATED));
+}
+
 bool GrpcToDpVniType(const VniType& grpc_type, enum dpgrpc_vni_type *dp_type)
 {
 	switch (grpc_type) {

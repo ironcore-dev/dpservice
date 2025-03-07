@@ -534,3 +534,45 @@ def test_grpc_multireply(prepare_ifaces, grpc_client):
 	for subnet in range(30, 30+ENTRIES):
 		ov_target_pfx = f"192.168.{subnet}.0/32"
 		grpc_client.delroute(vni1, ov_target_pfx)
+
+
+# Tests for HA-related gRPC calls with pre-generated underlay addresses
+def test_grpc_external_underlays(prepare_ifaces, grpc_client):
+	# Externally generated addresses need to have the right bit set
+	preferred_iface_ul = "fc00:1::8000:0:1"
+	preferred_ul = "fc00:1::c000:0:2"
+
+	ul = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6, preferred_underlay=preferred_iface_ul)
+	assert ul == preferred_iface_ul, \
+		"Created interface did not use preferred underlay address"
+
+	ul = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80", preferred_underlay=preferred_ul)
+	assert ul == preferred_ul, \
+		"Created loadbalancer did not use preferred underlay address"
+	grpc_client.dellb(lb_name)
+
+	ul = grpc_client.addprefix(VM4.name, "1.2.3.0/24", preferred_underlay=preferred_ul)
+	assert ul == preferred_ul, \
+		"Created prefix did not use preferred underlay address"
+	grpc_client.delprefix(VM4.name, "1.2.3.0/24")
+
+	ul = grpc_client.addlbprefix(VM4.name, "1.2.3.0/24", preferred_underlay=preferred_ul)
+	assert ul == preferred_ul, \
+		"Created lbprefix did not use preferred underlay address"
+	grpc_client.dellbprefix(VM4.name, "1.2.3.0/24")
+
+	ul = grpc_client.addvip(VM4.name, vip_vip, preferred_underlay=preferred_ul)
+	assert ul == preferred_ul, \
+		"Created vip did not use preferred underlay address"
+	grpc_client.delvip(VM4.name)
+
+	ul = grpc_client.addnat(VM4.name, nat_vip, nat_local_min_port, nat_local_max_port, preferred_underlay=preferred_ul)
+	assert ul == preferred_ul, \
+		"Created nat did not use preferred underlay address"
+	grpc_client.delnat(VM4.name)
+
+	# Test proper collision detection
+	grpc_client.expect_error(401).addvip(VM4.name, vip_vip, preferred_underlay=preferred_iface_ul)
+
+	grpc_client.delinterface(VM4.name)
+

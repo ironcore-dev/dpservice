@@ -25,6 +25,9 @@ static_assert(sizeof(rte_be64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is
 	(IPV6)->bytes[8], (IPV6)->bytes[9], (IPV6)->bytes[10], (IPV6)->bytes[11], \
 	(IPV6)->bytes[12], (IPV6)->bytes[13], (IPV6)->bytes[14], (IPV6)->bytes[15] }
 
+#define DP_UNDERLAY_FLAG_EXTERNALLY_GENERATED 0x80
+#define DP_UNDERLAY_FLAG_SECONDARY_POOL 0x40
+
 // structure for holding IPv6 addresses
 // this way sizeof(dp_ipv6 *) is a meaningful value and passing the pointer only is safe
 union dp_ipv6 {
@@ -40,7 +43,7 @@ union dp_ipv6 {
 	struct __rte_packed {
 		rte_be64_t	prefix;
 		rte_be16_t	kernel;
-		uint8_t		reserved;
+		uint8_t		flags;
 		uint8_t		random;
 		rte_be32_t	local;
 	} _ul;

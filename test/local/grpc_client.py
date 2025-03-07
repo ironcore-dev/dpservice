@@ -121,12 +121,14 @@ class GrpcClient:
 	def getversion(self):
 		return self._getSpec("get version")
 
-	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None):
+	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None, preferred_underlay=None):
 		cmd = f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6}"
 		if pxe_server:
 			cmd += f" --pxe-server={pxe_server}"
 		if ipxe_file:
 			cmd += f" --pxe-file-name={ipxe_file}"
+		if preferred_underlay:
+			cmd += f" --underlay={preferred_underlay}"
 		return self._getUnderlayRoute(cmd)
 
 	def getinterface(self, vm_name):
@@ -147,8 +149,11 @@ class GrpcClient:
 	def listroutes(self, vni):
 		return self._getSpecList(f"list routes --vni={vni}")
 
-	def addprefix(self, vm_name, prefix):
-		return self._getUnderlayRoute(f"add prefix --interface-id={vm_name} --prefix={prefix}")
+	def addprefix(self, vm_name, prefix, preferred_underlay=None):
+		cmd = f"add prefix --interface-id={vm_name} --prefix={prefix}"
+		if preferred_underlay:
+			cmd += f" --underlay={preferred_underlay}"
+		return self._getUnderlayRoute(cmd)
 
 	def delprefix(self, vm_name, prefix):
 		self._call(f"del prefix --interface-id={vm_name} --prefix={prefix}")
@@ -156,8 +161,11 @@ class GrpcClient:
 	def listprefixes(self, vm_name):
 		return self._getSpecList(f"list prefixes --interface-id={vm_name}")
 
-	def createlb(self, name, vni, vip, portspecs):
-		return self._getUnderlayRoute(f"add loadbalancer --id={name} --vni={vni} --vip={vip} --lbports={portspecs}")
+	def createlb(self, name, vni, vip, portspecs, preferred_underlay=None):
+		cmd = f"add loadbalancer --id={name} --vni={vni} --vip={vip} --lbports={portspecs}"
+		if preferred_underlay:
+			cmd += f" --underlay={preferred_underlay}"
+		return self._getUnderlayRoute(cmd)
 
 	def getlb(self, name):
 		return self._getSpec(f"get loadbalancer --id={name}")
@@ -177,8 +185,11 @@ class GrpcClient:
 	def listlbtargets(self, lb_name):
 		return self._getSpecList(f"list lbtargets --lb-id={lb_name}")
 
-	def addlbprefix(self, vm_name, prefix):
-		return self._getUnderlayRoute(f"add lbprefix --interface-id={vm_name} --prefix={prefix}")
+	def addlbprefix(self, vm_name, prefix, preferred_underlay=None):
+		cmd = f"add lbprefix --interface-id={vm_name} --prefix={prefix}"
+		if preferred_underlay:
+			cmd += f" --underlay={preferred_underlay}"
+		return self._getUnderlayRoute(cmd)
 
 	def dellbprefix(self, vm_name, prefix):
 		self._call(f"del lbprefix --interface-id={vm_name} --prefix={prefix}")
@@ -186,8 +197,11 @@ class GrpcClient:
 	def listlbprefixes(self, vm_name):
 		return self._getSpecList(f"list lbprefixes --interface-id={vm_name}")
 
-	def addvip(self, vm_name, vip):
-		return self._getUnderlayRoute(f"add virtualip --interface-id={vm_name} --vip={vip}")
+	def addvip(self, vm_name, vip, preferred_underlay=None):
+		cmd = f"add virtualip --interface-id={vm_name} --vip={vip}"
+		if preferred_underlay:
+			cmd += f" --underlay={preferred_underlay}"
+		return self._getUnderlayRoute(cmd)
 
 	def getvip(self, vm_name):
 		return self._getSpec(f"get virtualip --interface-id={vm_name}")
@@ -195,8 +209,11 @@ class GrpcClient:
 	def delvip(self, vm_name):
 		self._call(f"del vip --interface-id={vm_name}")
 
-	def addnat(self, vm_name, vip, min_port, max_port):
-		return self._getUnderlayRoute(f"add nat --interface-id={vm_name} --nat-ip={vip} --minport={min_port} --maxport={max_port}")
+	def addnat(self, vm_name, vip, min_port, max_port, preferred_underlay=None):
+		cmd = f"add nat --interface-id={vm_name} --nat-ip={vip} --minport={min_port} --maxport={max_port}"
+		if preferred_underlay:
+			cmd += f" --underlay={preferred_underlay}"
+		return self._getUnderlayRoute(cmd)
 
 	def getnat(self, vm_name):
 		return self._getSpec(f"get nat --interface-id={vm_name}")
