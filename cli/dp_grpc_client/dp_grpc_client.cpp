@@ -114,6 +114,7 @@ static char icmp_code_str[30]={0};
 static char icmp_type_str[30]={0};
 static IpVersion version;
 static char get_nat_info_type_str[10]={0};
+static char underlay_str[64]={0};
 
 static int command;
 static int debug_mode;
@@ -192,6 +193,7 @@ static uint32_t priority = 1000;
 #define CMD_LINE_OPT_VNI_IN_USE		"vni_in_use"
 #define CMD_LINE_OPT_RESET_VNI		"reset_vni"
 #define CMD_LINE_OPT_GET_VERSION	"getver"
+#define CMD_LINE_OPT_UNDERLAY		"underlay"
 
 enum {
 	CMD_LINE_OPT_MIN_NUM = 256,
@@ -262,6 +264,7 @@ enum {
 	CMD_LINE_OPT_FWALL_PRIO_NUM,
 	CMD_LINE_OPT_FWALL_RULE_ID_NUM,
 	CMD_LINE_OPT_GET_VERSION_NUM,
+	CMD_LINE_OPT_UNDERLAY_NUM,
 };
 
 static const struct option lgopts[] = {
@@ -335,6 +338,7 @@ static const struct option lgopts[] = {
 	{CMD_LINE_OPT_FWALL_ICMP_TYP, 1, 0, CMD_LINE_OPT_FWALL_ICMP_TYP_NUM},
 	{CMD_LINE_OPT_FWALL_RULE_ID, 1, 0, CMD_LINE_OPT_FWALL_RULE_ID_NUM},
 	{CMD_LINE_OPT_GET_VERSION, 0, 0, CMD_LINE_OPT_GET_VERSION_NUM},
+	{CMD_LINE_OPT_UNDERLAY, 1, 0, CMD_LINE_OPT_UNDERLAY_NUM},
 	{NULL, 0, 0, 0},
 };
 
@@ -614,6 +618,9 @@ static int parse_args(int argc, char **argv)
 		case CMD_LINE_OPT_GET_VERSION_NUM:
 			command = DP_CMD_GET_VERSION;
 			break;
+		case CMD_LINE_OPT_UNDERLAY_NUM:
+			strncpy(underlay_str, optarg, 63);
+			break;
 		default:
 			dp_print_usage(prgname);
 			return -1;
@@ -650,6 +657,7 @@ public:
 			request.set_allocated_ipv6_config(ipv6_config);
 			request.set_allocated_pxe_config(pxe_config);
 			request.set_interface_type(InterfaceType::VIRTUAL);
+			request.set_preferred_underlay_route(underlay_str);;
 			if (vm_pci_str[0] != '\0')
 				request.set_device_name(vm_pci_str);
 			CALL_GRPC(CreateInterface, &context, request, &response);
@@ -1002,6 +1010,7 @@ public:
 			if(version == IpVersion::IPV4)
 				vip_ip->set_address(ip_str);
 			request.set_allocated_vip_ip(vip_ip);
+			request.set_preferred_underlay_route(underlay_str);
 			CALL_GRPC(CreateVip, &context, request, &reply);
 			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
@@ -1022,6 +1031,7 @@ public:
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
+			request.set_preferred_underlay_route(underlay_str);;
 			CALL_GRPC(CreatePrefix, &context, request, &reply);
 			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
@@ -1042,6 +1052,7 @@ public:
 			pfx->set_allocated_ip(pfx_ip);
 			pfx->set_length(length);
 			request.set_allocated_prefix(pfx);
+			request.set_preferred_underlay_route(underlay_str);;
 			CALL_GRPC(CreateLoadBalancerPrefix, &context, request, &reply);
 			printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}
@@ -1067,6 +1078,7 @@ public:
 			else
 				lb_ip->set_address(ip6_str);
 			request.set_allocated_loadbalanced_ip(lb_ip);
+			request.set_preferred_underlay_route(underlay_str);;
 
 			pt = strtok(port_str,",");
 			while (pt != NULL) {
@@ -1334,6 +1346,7 @@ public:
 		request.set_allocated_nat_ip(nat_ip);
 		request.set_min_port(min_port);
 		request.set_max_port(max_port);
+		request.set_preferred_underlay_route(underlay_str);;
 		CALL_GRPC(CreateNat, &context, request, &reply);
 		printf("Received underlay route : %s\n", reply.underlay_route().c_str());
 	}

@@ -94,12 +94,14 @@ class DpGrpcClient:
 		match = re.search(f"(?:^|[\n\r])Got protocol '([^']+)' on service '([^']+)'", output)
 		return { 'service_protocol': match.group(1), 'service_version': match.group(2) }
 
-	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None):
+	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None, preferred_underlay=None):
 		cmd = f"--addmachine {vm_name} --vm_pci {pci} --vni {vni} --ipv4 {ipv4} --ipv6 {ipv6}"
 		if pxe_server:
-			cmd += f" --pxe_ip={pxe_server}"
+			cmd += f" --pxe_ip {pxe_server}"
 		if ipxe_file:
-			cmd += f" --pxe_str={ipxe_file}"
+			cmd += f" --pxe_str {ipxe_file}"
+		if preferred_underlay:
+			cmd += f" --underlay {preferred_underlay}"
 		return self._getUnderlayRoute(cmd,
 			f"Allocated VF for you")
 
@@ -144,10 +146,13 @@ class DpGrpcClient:
 			specs.append({ "prefix": match.group(1)+'/'+match.group(2), "next_hop": { "vni": int(match.group(3)), "address": match.group(4) } })
 		return specs
 
-	def addprefix(self, vm_name, prefix):
+	def addprefix(self, vm_name, prefix, preferred_underlay=None):
 		pfx_addr, pfx_len = prefix.split('/')
 		__pfx_addr = self._getIpSpec(pfx_addr)
-		return self._getUnderlayRoute(f"--addpfx {vm_name} {__pfx_addr} --length {pfx_len}", "")
+		cmd = f"--addpfx {vm_name} {__pfx_addr} --length {pfx_len}"
+		if preferred_underlay:
+			cmd += f" --underlay {preferred_underlay}"
+		return self._getUnderlayRoute(cmd, "")
 
 	def delprefix(self, vm_name, prefix):
 		pfx_addr, pfx_len = prefix.split('/')
@@ -164,7 +169,7 @@ class DpGrpcClient:
 		specs.sort(key=lambda spec: spec['prefix'])
 		return specs
 
-	def createlb(self, name, vni, vip, portspecs):
+	def createlb(self, name, vni, vip, portspecs, preferred_underlay=None):
 		try:
 			specs = portspecs.split(',')
 			protos = ','.join([ spec.split('/')[0] for spec in specs ])
@@ -172,8 +177,10 @@ class DpGrpcClient:
 		except:
 			return None
 		__vip = self._getIpSpec(vip)
-		return self._getUnderlayRoute(f"--createlb {name} --vni {vni} {__vip} --port {ports} --protocol {protos}",
-			f"VIP {vip}, vni {vni}")
+		cmd = f"--createlb {name} --vni {vni} {__vip} --port {ports} --protocol {protos}"
+		if preferred_underlay:
+			cmd += f" --underlay {preferred_underlay}"
+		return self._getUnderlayRoute(cmd, f"VIP {vip}, vni {vni}")
 
 	def getlb(self, name):
 		output = self._call(f"--getlb {name}", "")
@@ -232,11 +239,13 @@ class DpGrpcClient:
 			specs.append({ 'target_ip': match.group(1) })
 		return specs
 
-	def addlbprefix(self, vm_name, vip):
+	def addlbprefix(self, vm_name, vip, preferred_underlay=None):
 		prefix, length = vip.split('/')
 		__prefix = self._getIpSpec(prefix)
-		return self._getUnderlayRoute(f"--addlbpfx {vm_name} {__prefix} --length {length}",
-			"Received underlay route : ")
+		cmd = f"--addlbpfx {vm_name} {__prefix} --length {length}"
+		if preferred_underlay:
+			cmd += f" --underlay {preferred_underlay}"
+		return self._getUnderlayRoute(cmd, "Received underlay route : ")
 
 	def dellbprefix(self, vm_name, vip):
 		prefix, length = vip.split('/')
@@ -254,9 +263,11 @@ class DpGrpcClient:
 		specs.sort(key=lambda spec: spec['prefix'])
 		return specs
 
-	def addvip(self, vm_name, vip):
-		return self._getUnderlayRoute(f"--addvip {vm_name} --ipv4 {vip}",
-			"Received underlay route : ")
+	def addvip(self, vm_name, vip, preferred_underlay=None):
+		cmd = f"--addvip {vm_name} --ipv4 {vip}"
+		if preferred_underlay:
+			cmd += f" --underlay {preferred_underlay}"
+		return self._getUnderlayRoute(cmd, "Received underlay route : ")
 
 	def getvip(self, vm_name):
 		output = self._call(f"--getvip {vm_name}", "")
@@ -268,9 +279,11 @@ class DpGrpcClient:
 	def delvip(self, vm_name):
 		self._call(f"--delvip {vm_name}", "VIP deleted")
 
-	def addnat(self, vm_name, vip, min_port, max_port):
-		return self._getUnderlayRoute(f"--addnat {vm_name} --ipv4 {vip} --min_port {min_port} --max_port {max_port}",
-			"Received underlay route : ")
+	def addnat(self, vm_name, vip, min_port, max_port, preferred_underlay=None):
+		cmd = f"--addnat {vm_name} --ipv4 {vip} --min_port {min_port} --max_port {max_port}"
+		if preferred_underlay:
+			cmd += f" --underlay {preferred_underlay}"
+		return self._getUnderlayRoute(cmd, "Received underlay route : ")
 
 	def getnat(self, vm_name):
 		output = self._call(f"--getnat {vm_name}", "")
@@ -288,7 +301,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: IP ([0-9\.]+), min_port ([0-9]+), max_port ([0-9]+), vni: ([0-9]+)', output):
-			specs.append({ 'nat_ip': match.group(1), 'min_port': int(match.group(2)), 'max_port': int(match.group(3)), 'vni': int(match.group(4)) })
+			specs.append({ 'actual_nat_ip': nat_vip, 'nat_ip': match.group(1), 'min_port': int(match.group(2)), 'max_port': int(match.group(3)), 'vni': int(match.group(4)) })
 		return specs
 
 	def listneighnats(self, nat_vip):
@@ -297,7 +310,7 @@ class DpGrpcClient:
 			return None
 		specs = []
 		for match in re.finditer(r'(?:^|[\n\r]) *[0-9]+: min_port ([0-9]+), max_port ([0-9]+), vni ([0-9]+) --> Underlay IPv6 ([a-f0-9:]+)', output):
-			specs.append({ 'underlay_route': match.group(4), 'min_port': int(match.group(1)), 'max_port': int(match.group(2)), 'vni': int(match.group(3)) })
+			specs.append({ 'actual_nat_ip': nat_vip, 'underlay_route': match.group(4), 'min_port': int(match.group(1)), 'max_port': int(match.group(2)), 'vni': int(match.group(3)) })
 		return specs
 
 	def addneighnat(self, nat_vip, vni, min_port, max_port, t_ipv6):

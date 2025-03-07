@@ -88,6 +88,7 @@ extern "C" {
 #define DP_LOG_PXE_PATH(VALUE) _DP_LOG_STR("pxe_path", VALUE)
 #define DP_LOG_IPV4STR(VALUE) _DP_LOG_STR("ipv4", VALUE)
 #define DP_LOG_IPV6STR(VALUE) _DP_LOG_STR("ipv6", VALUE)
+#define DP_LOG_UNDERLAY(VALUE) _DP_LOG_STR("underlay", VALUE)
 #define DP_LOG_LBID(VALUE) _DP_LOG_STR("lb_id", VALUE)
 #define DP_LOG_PREFIX(VALUE) _DP_LOG_STR("prefix", VALUE)
 #define DP_LOG_PREFLEN(VALUE) _DP_LOG_UINT("prefix_len", VALUE)
