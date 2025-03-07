@@ -84,7 +84,7 @@ struct dpgrpc_iface {
 	struct dp_ip_address	pxe_addr;							// request (create) only
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
-	union dp_ipv6			ul_addr6;							// reply only
+	union dp_ipv6			ul_addr6;
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
 };
@@ -97,6 +97,7 @@ struct dpgrpc_prefix {
 	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	struct dp_ip_address	addr;
 	uint8_t					length;
+	union dp_ipv6			ul_addr6;
 };
 
 struct dpgrpc_route {
@@ -110,7 +111,7 @@ struct dpgrpc_route {
 struct dpgrpc_vip {
 	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);
 	struct dp_ip_address	addr;
-	union dp_ipv6			ul_addr6;						// reply only
+	union dp_ipv6			ul_addr6;
 };
 
 struct dpgrpc_nat {
@@ -120,7 +121,7 @@ struct dpgrpc_nat {
 	uint16_t				max_port;
 	uint32_t				vni;							// neighnat or reply only
 	union dp_ipv6			neigh_addr6;					// neighnat only
-	union dp_ipv6			ul_addr6;						// reply only
+	union dp_ipv6			ul_addr6;
 	struct dp_ip_address	natted_ip;						// list localnats reply only
 };
 
@@ -134,7 +135,7 @@ struct dpgrpc_lb {
 	struct dp_ip_address	addr;
 	uint32_t				vni;
 	struct dpgrpc_lb_port	lbports[DP_LB_MAX_PORTS];
-	union dp_ipv6			ul_addr6;						// reply only
+	union dp_ipv6			ul_addr6;
 };
 
 struct dpgrpc_lb_id {

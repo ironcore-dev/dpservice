@@ -22,9 +22,9 @@ func CreateVirtualIP(dpdkClientFactory DPDKClientFactory, rendererFactory Render
 	)
 
 	cmd := &cobra.Command{
-		Use:     "virtualip <--vip> <--interface-id>",
+		Use:     "virtualip <--vip> <--interface-id> [<--underlay>]",
 		Short:   "Create a virtual IP on interface.",
-		Example: "dpservice-cli create virtualip --vip=20.20.20.20 --interface-id=vm1",
+		Example: "dpservice-cli create virtualip --vip=20.20.20.20 --interface-id=vm1 --underlay=fc00::6",
 		Aliases: VirtualIPAliases,
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,13 +46,15 @@ func CreateVirtualIP(dpdkClientFactory DPDKClientFactory, rendererFactory Render
 }
 
 type CreateVirtualIPOptions struct {
-	Vip         netip.Addr
-	InterfaceID string
+	Vip               netip.Addr
+	InterfaceID       string
+	PreferredUnderlay netip.Addr
 }
 
 func (o *CreateVirtualIPOptions) AddFlags(fs *pflag.FlagSet) {
 	flag.AddrVar(fs, &o.Vip, "vip", o.Vip, "Virtual IP to create on interface.")
 	fs.StringVar(&o.InterfaceID, "interface-id", o.InterfaceID, "Interface ID where to create the virtual IP.")
+	flag.AddrVar(fs, &o.PreferredUnderlay, "underlay", netip.IPv6Unspecified(), "IPv6 underlay address use for the VIP.")
 }
 
 func (o *CreateVirtualIPOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -81,7 +83,8 @@ func RunCreateVirtualIP(
 			InterfaceID: opts.InterfaceID,
 		},
 		Spec: api.VirtualIPSpec{
-			IP: &opts.Vip,
+			IP:            &opts.Vip,
+			UnderlayRoute: &opts.PreferredUnderlay,
 		},
 	})
 	if err != nil {

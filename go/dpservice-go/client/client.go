@@ -139,6 +139,7 @@ func (c *client) CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, i
 		Vni:               lb.Spec.VNI,
 		LoadbalancedIp:    api.NetIPAddrToProtoIpAddress(lb.Spec.LbVipIP),
 		LoadbalancedPorts: lbPorts,
+		PreferredUnderlayRoute: []byte(lb.Spec.UnderlayRoute.String()),
 	})
 	if err != nil {
 		return &api.LoadBalancer{}, err
@@ -223,6 +224,7 @@ func (c *client) CreateLoadBalancerPrefix(ctx context.Context, lbprefix *api.Loa
 			Ip:     api.NetIPAddrToProtoIpAddress(&lbPrefixAddr),
 			Length: uint32(lbprefix.Spec.Prefix.Bits()),
 		},
+		PreferredUnderlayRoute: []byte(lbprefix.Spec.UnderlayRoute.String()),
 	})
 	if err != nil {
 		return &api.LoadBalancerPrefix{}, err
@@ -405,6 +407,7 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 		Ipv6Config:         api.NetIPAddrToProtoIPConfig(iface.Spec.IPv6),
 		DeviceName:         iface.Spec.Device,
 		MeteringParameters: api.InterfaceMeteringParamsToProtoMeteringParams(iface.Spec.Metering),
+		PreferredUnderlayRoute: []byte(iface.Spec.UnderlayRoute.String()),
 	}
 	if iface.Spec.PXE != nil {
 		if iface.Spec.PXE.FileName != "" && iface.Spec.PXE.Server != "" {
@@ -479,6 +482,7 @@ func (c *client) CreateVirtualIP(ctx context.Context, virtualIP *api.VirtualIP, 
 	res, err := c.DPDKironcoreClient.CreateVip(ctx, &dpdkproto.CreateVipRequest{
 		InterfaceId: []byte(virtualIP.InterfaceID),
 		VipIp:       api.NetIPAddrToProtoIpAddress(virtualIP.Spec.IP),
+		PreferredUnderlayRoute: []byte(virtualIP.Spec.UnderlayRoute.String()),
 	})
 	if err != nil {
 		return &api.VirtualIP{}, err
@@ -562,6 +566,7 @@ func (c *client) CreatePrefix(ctx context.Context, prefix *api.Prefix, ignoredEr
 			Ip:     api.NetIPAddrToProtoIpAddress(&prefixAddr),
 			Length: uint32(prefix.Spec.Prefix.Bits()),
 		},
+		PreferredUnderlayRoute: []byte(prefix.Spec.UnderlayRoute.String()),
 	})
 	if err != nil {
 		return &api.Prefix{}, err
@@ -615,15 +620,13 @@ func (c *client) CreateRoute(ctx context.Context, route *api.Route, ignoredError
 	if route == nil {
 		return &api.Route{}, fmt.Errorf("error: input route cannot be nil")
 	}
-
 	if route.Spec.Prefix == nil {
 		return &api.Route{}, fmt.Errorf("prefix needs to be specified")
 	}
-	routePrefixAddr := route.Spec.Prefix.Addr()
-
 	if route.Spec.NextHop == nil {
 		return &api.Route{}, fmt.Errorf("nextHop needs to be specified")
 	}
+	routePrefixAddr := route.Spec.Prefix.Addr()
 	res, err := c.DPDKironcoreClient.CreateRoute(ctx, &dpdkproto.CreateRouteRequest{
 		Vni: route.VNI,
 		Route: &dpdkproto.Route{
@@ -741,6 +744,7 @@ func (c *client) CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[
 		NatIp:       api.NetIPAddrToProtoIpAddress(nat.Spec.NatIP),
 		MinPort:     nat.Spec.MinPort,
 		MaxPort:     nat.Spec.MaxPort,
+		PreferredUnderlayRoute: []byte(nat.Spec.UnderlayRoute.String()),
 	})
 	if err != nil {
 		return &api.Nat{}, err

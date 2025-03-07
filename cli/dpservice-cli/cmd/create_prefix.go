@@ -25,9 +25,9 @@ func CreatePrefix(
 	)
 
 	cmd := &cobra.Command{
-		Use:     "prefix <--prefix> <--interface-id>",
+		Use:     "prefix <--prefix> <--interface-id> [<--underlay>]",
 		Short:   "Create a prefix on interface.",
-		Example: "dpservice-cli create prefix --prefix=10.20.30.0/24 --interface-id=vm1",
+		Example: "dpservice-cli create prefix --prefix=10.20.30.0/24 --interface-id=vm1 --underlay=fc00::3",
 		Args:    cobra.ExactArgs(0),
 		Aliases: PrefixAliases,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -49,13 +49,15 @@ func CreatePrefix(
 }
 
 type CreatePrefixOptions struct {
-	Prefix      netip.Prefix
-	InterfaceID string
+	Prefix            netip.Prefix
+	InterfaceID       string
+	PreferredUnderlay netip.Addr
 }
 
 func (o *CreatePrefixOptions) AddFlags(fs *pflag.FlagSet) {
 	flag.PrefixVar(fs, &o.Prefix, "prefix", o.Prefix, "Prefix to create on the interface.")
 	fs.StringVar(&o.InterfaceID, "interface-id", o.InterfaceID, "ID of the interface where to create the prefix.")
+	flag.AddrVar(fs, &o.PreferredUnderlay, "underlay", netip.IPv6Unspecified(), "IPv6 underlay address use for the prefix.")
 }
 
 func (o *CreatePrefixOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -84,7 +86,8 @@ func RunCreatePrefix(
 			InterfaceID: opts.InterfaceID,
 		},
 		Spec: api.PrefixSpec{
-			Prefix: opts.Prefix,
+			Prefix:        opts.Prefix,
+			UnderlayRoute: &opts.PreferredUnderlay,
 		},
 	})
 	if err != nil {
