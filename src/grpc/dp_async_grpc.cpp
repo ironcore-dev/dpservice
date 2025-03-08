@@ -253,6 +253,8 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid device_name";
 	if (SNPRINTF_FAILED(request->add_iface.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_iface.ul_addr6))
+		return "Invalid preferred_underlay_route";
 
 	request->add_iface.total_flow_rate_cap = request_.metering_parameters().total_rate();
 	request->add_iface.public_flow_rate_cap = request_.metering_parameters().public_rate();
@@ -331,6 +333,8 @@ const char* CreatePrefixCall::FillRequest(struct dpgrpc_request* request)
 	if (request_.prefix().length() > UINT8_MAX)
 		return "Invalid prefix.length";
 	request->del_pfx.length = (uint8_t)request_.prefix().length();
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_pfx.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreatePrefixCall::ParseReply(struct dpgrpc_reply* reply)
@@ -473,6 +477,8 @@ const char* CreateVipCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid interface_id";
 	if (!GrpcConv::GrpcToDpAddress(request_.vip_ip(), &request->add_vip.addr))
 		return "Invalid vip_ip";
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_vip.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreateVipCall::ParseReply(struct dpgrpc_reply* reply)
@@ -536,6 +542,8 @@ const char* CreateNatCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid port range";
 	request->add_nat.min_port = (uint16_t)request_.min_port();
 	request->add_nat.max_port = (uint16_t)request_.max_port();
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_nat.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreateNatCall::ParseReply(struct dpgrpc_reply* reply)
@@ -707,6 +715,8 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid loadbalanced_ip";
 	if (request_.loadbalanced_ports_size() >= DP_LB_MAX_PORTS)
 		return "Too many loadbalanced_ports";
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_lb.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	for (int i = 0; i < request_.loadbalanced_ports_size(); ++i) {
 		DPGRPC_LOG_INFO("Adding loadbalanced port",
 						DP_LOG_LBID(request_.loadbalancer_id().c_str()),
@@ -866,6 +876,8 @@ const char* CreateLoadBalancerPrefixCall::FillRequest(struct dpgrpc_request* req
 	if (request_.prefix().length() > UINT8_MAX)
 		return "Invalid prefix.length";
 	request->add_lbpfx.length = (uint8_t)request_.prefix().length();
+	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_lbpfx.ul_addr6))
+		return "Invalid preferred_underlay_route";
 	return NULL;
 }
 void CreateLoadBalancerPrefixCall::ParseReply(struct dpgrpc_reply* reply)
