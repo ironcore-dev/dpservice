@@ -28,7 +28,10 @@ static int dp_create_vnf_route(union dp_ipv6 *ul_addr6 /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
 							   struct dp_ip_address *pfx_ip, uint8_t prefix_len)
 {
-	dp_generate_ul_ipv6(ul_addr6);
+	// if ul_addr6 already provided, try to use that one
+	// OPTIMIZATION: only allow this for "externally generated" addresses -> only single bit check needed
+	if (!(ul_addr6->_ul.flags & DP_UNDERLAY_FLAG_EXTERNALLY_GENERATED))
+		dp_generate_ul_ipv6(ul_addr6);
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
 }
 
