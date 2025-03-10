@@ -13,6 +13,7 @@
 #include "dp_log.h"
 #include "dp_netlink.h"
 #include "dp_util.h"
+#include "dp_port.h"
 
 static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *neigh,
 						 const struct rte_ether_addr *own_mac)
@@ -33,6 +34,9 @@ static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *
 				if (rt_attr->rta_type == NDA_LLADDR)
 					memcpy(&neigh->addr_bytes, RTA_DATA(rt_attr), sizeof(neigh->addr_bytes));
 			}
+			// If it is a tap device, we make an exception with own MAC address check. FeBOX case
+			if (dp_conf_is_tap_mode())
+				return DP_OK;
 			if (!DP_MAC_EQUAL(own_mac, neigh))
 				return DP_OK;
 		}

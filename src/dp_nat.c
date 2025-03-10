@@ -268,8 +268,7 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 {
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
-	struct dp_port *in_port = dp_get_in_port(m);
-	bool is_tap = dp_conf_is_tap();
+	bool is_tap = dp_conf_is_tap_mode();
 
 	ipv4_hdr->hdr_checksum = 0;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4;

@@ -197,7 +197,7 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 }
 
 static __rte_always_inline
-bool dp_conf_is_tap(void)
+bool dp_conf_is_tap_mode(void)
 {
 	return dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP;
 }
