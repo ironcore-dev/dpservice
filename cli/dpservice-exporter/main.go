@@ -35,11 +35,12 @@ var (
 
 func main() {
 	var err error
-	var hostnameFlag string
+	var hostnameFlag, filePrefix string
 	var exporterPort uint64
 	var exporterAddr netip.AddrPort
 
 	flag.StringVar(&hostnameFlag, "hostname", "", "Hostname to use (defaults to current hostname)")
+	flag.StringVar(&filePrefix, "file-prefix", "rte", "File prefix of dpservice dpdk telemetry socket.")
 	flag.IntVar(&pollIntervalFlag, "poll-interval", 20, "Polling interval in seconds")
 	flag.Uint64Var(&exporterPort, "port", 9064, "Port on which exporter will be running.")
 	flag.Uint64Var(&grpcPort, "grpc-port", 1337, "Port on which dpservice is running.")
@@ -68,8 +69,12 @@ func main() {
 	uid, err := getUID()
 	if err != nil {
 		log.Warningf("Could not get UID, assuming root: %v", err)
-	} else if uid != 0 {
-		metrics.SocketPath = fmt.Sprintf("/run/user/%d/dpdk/rte/dpdk_telemetry.v2", uid)
+	}
+	// Set DPDK telemetry socket path based on UID
+	if uid == 0 {
+		metrics.SocketPath = fmt.Sprintf("/var/run/dpdk/%s/dpdk_telemetry.v2", filePrefix)
+	} else {
+		metrics.SocketPath = fmt.Sprintf("/run/user/%d/dpdk/%s/dpdk_telemetry.v2", uid, filePrefix)
 	}
 
 	r := prometheus.NewRegistry()
@@ -162,11 +167,11 @@ func getHostname(hostnameFlag string) (string, error) {
 func getUID() (int, error) {
 	user, err := user.Current()
 	if err != nil {
-		return -1, fmt.Errorf("could not get user: %v", err)
+		return 0, fmt.Errorf("could not get user: %v", err)
 	}
 	uid, err := strconv.Atoi(user.Uid)
 	if err != nil {
-		return -1, fmt.Errorf("could not get uid: %v", err)
+		return 0, fmt.Errorf("could not get uid: %v", err)
 	}
 	return uid, nil
 }
