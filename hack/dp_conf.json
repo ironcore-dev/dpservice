@@ -167,6 +167,14 @@
       "var": "multiport_eswitch",
       "type": "bool",
       "default": "false"
+    },
+    {
+      "lgopt": "active-lockfile",
+      "arg": "PATH",
+      "help": "file to be locked before starting packet processing",
+      "var": "active_lockfile",
+      "type": "char",
+      "array_size": 256
     }
   ]
 }
