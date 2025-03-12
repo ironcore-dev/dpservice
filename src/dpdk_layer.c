@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "dpdk_layer.h"
+#include <sys/file.h>
 #include <rte_graph_worker.h>
 #include "dp_conf.h"
 #include "dp_error.h"
@@ -12,8 +13,12 @@
 #include "dp_util.h"
 #include "grpc/dp_grpc_service.h"
 #include "grpc/dp_grpc_thread.h"
+#include "nodes/rx_node.h"
 
 static volatile bool force_quit;
+static volatile bool standing_by = true;
+static int active_lockfd = -1;
+
 
 static struct dp_dpdk_layer dp_layer;
 
@@ -85,19 +90,64 @@ void dp_dpdk_layer_free(void)
 	rte_mempool_free(dp_layer.rte_mempool);
 }
 
+
 void dp_force_quit(void)
 {
 	DPS_LOG_INFO("Stopping service...");
 	force_quit = true;
 	dp_grpc_service_set_healthy(false);
+	// let the backup dpservice run while this one is slowly torn down
+	if (active_lockfd >= 0)
+		close(active_lockfd);
+}
+
+
+static uint32_t dp_standby_thread(__rte_unused void *arg)
+{
+	const char *active_lockfile = dp_conf_get_active_lockfile();
+	int ret;
+
+	dp_log_set_thread_name("standby");
+
+	if (*active_lockfile) {
+		active_lockfd = open(active_lockfile, O_CREAT | O_RDWR, 0600);
+		if (DP_FAILED(active_lockfd)) {
+			DPS_LOG_ERR("Cannot open active lockfile", DP_LOG_RET(errno));
+			dp_force_quit();
+			return DP_ERROR;
+		}
+		DPS_LOG_INFO("Acquiring active lock...");
+		ret = flock(active_lockfd, LOCK_EX);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Locking active lockfile failed", DP_LOG_RET(errno));
+			dp_force_quit();  // closes active_lockfd
+			return DP_ERROR;
+		}
+	} else
+		DPS_LOG_INFO("Active lock not requested");
+
+	DPS_LOG_INFO("Becoming active");
+	standing_by = false;
+	// active_lockfd intentionally left open so the lock is held
+	return DP_OK;
 }
 
 
 static int graph_main_loop(__rte_unused void *arg)
 {
 	struct rte_graph *graph = dp_graph_get();
+	struct timespec standby_sleep = { .tv_sec = 0, .tv_nsec = 1000000 };  // 1ms, low CPU load, high response time
 
 	dp_log_set_thread_name("worker");
+
+	// In standby mode (no packet processing), gRPC requests still need processing
+	while (!force_quit && standing_by) {
+		rte_graph_walk(graph);
+		nanosleep(&standby_sleep, NULL);
+	}
+
+	DPS_LOG_INFO("Starting packet processing");
+	rx_node_start_processing();
 
 	while (!force_quit)
 		rte_graph_walk(graph);
@@ -155,8 +205,16 @@ static int main_core_loop(void)
 int dp_dpdk_main_loop(void)
 {
 	int ret;
+	rte_thread_t lock_thread_id;
 
 	DPS_LOG_INFO("DPDK main loop started");
+
+	// dpservice starts in standby mode, wait for a file lock to become active
+	ret = rte_thread_create_control(&lock_thread_id, "standby-thread", dp_standby_thread, NULL);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot create standby thread", DP_LOG_RET(ret));
+		return ret;
+	}
 
 	/* Launch per-lcore init on every worker lcore */
 	ret = rte_eal_mp_remote_launch(graph_main_loop, NULL, SKIP_MAIN);

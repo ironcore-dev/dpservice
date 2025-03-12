@@ -15,6 +15,8 @@ int rx_node_create(uint16_t port_id, uint16_t queue_id);
 
 int rx_node_set_enabled(uint16_t port_id, bool enabled);
 
+void rx_node_start_processing(void);
+
 #ifdef __cplusplus
 }
 #endif

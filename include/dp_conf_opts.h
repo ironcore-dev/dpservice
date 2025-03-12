@@ -45,6 +45,7 @@ int dp_conf_get_grpc_port(void);
 int dp_conf_get_flow_timeout(void);
 #endif
 bool dp_conf_is_multiport_eswitch(void);
+const char *dp_conf_get_active_lockfile(void);
 
 enum dp_conf_runmode {
 	DP_CONF_RUNMODE_NORMAL, /**< Start normally */
