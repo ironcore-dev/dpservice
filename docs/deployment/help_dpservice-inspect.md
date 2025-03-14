@@ -4,7 +4,7 @@
 |--------|----------|-------------|---------|
 | -h, --help | None | display this help and exit |  |
 | -v, --version | None | display version and exit |  |
-| --file-prefix | PREFIX | prefix for hugepage filenames |  |
+| --file-prefix | PREFIX | prefix for hugepage filenames (overrides DP_FILE_PREFIX) |  |
 | -o, --output-format | FORMAT | format of the output | 'human' (default), 'table', 'csv' or 'json' |
 | -t, --table | NAME | hash table to choose | 'list' (default), 'conntrack', 'dnat', 'iface', 'lb', 'lb_id', 'portmap', 'portoverload', 'snat', 'vnf', 'vnf_rev' or 'vni' |
 | -s, --socket | NUMBER | NUMA socket to use |  |

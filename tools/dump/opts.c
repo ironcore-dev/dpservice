@@ -73,7 +73,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 	fprintf(outfile, "Usage: %s [options]\n"
 		" -h, --help                display this help and exit\n"
 		" -v, --version             display version and exit\n"
-		"     --file-prefix=PREFIX  prefix for hugepage filenames\n"
+		"     --file-prefix=PREFIX  prefix for hugepage filenames (overrides DP_FILE_PREFIX)\n"
 		"     --drops               show dropped packets\n"
 		"     --nodes=REGEX         show graph node traversal, limit to REGEX-matched nodes (empty string for all)\n"
 		"     --filter=FILTER       show only packets matching a pcap-style FILTER\n"
