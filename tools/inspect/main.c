@@ -119,6 +119,7 @@ static void dp_argparse_version(void)
 int main(int argc, char **argv)
 {
 	struct dp_inspect_spec spec;
+	const char *file_prefix;
 	int ret;
 
 	switch (dp_conf_parse_args(argc, argv)) {
@@ -130,7 +131,11 @@ int main(int argc, char **argv)
 		break;
 	}
 
-	ret = dp_secondary_eal_init(dp_conf_get_eal_file_prefix());
+	file_prefix = dp_conf_get_eal_file_prefix();
+	if (!*file_prefix)
+		file_prefix = getenv("DP_FILE_PREFIX");
+
+	ret = dp_secondary_eal_init(file_prefix);
 	if (DP_FAILED(ret)) {
 		fprintf(stderr, "Cannot init EAL %s\n", dp_strerror_verbose(ret));
 		return EXIT_FAILURE;

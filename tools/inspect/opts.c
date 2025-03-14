@@ -105,7 +105,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 	fprintf(outfile, "Usage: %s [options]\n"
 		" -h, --help                  display this help and exit\n"
 		" -v, --version               display version and exit\n"
-		"     --file-prefix=PREFIX    prefix for hugepage filenames\n"
+		"     --file-prefix=PREFIX    prefix for hugepage filenames (overrides DP_FILE_PREFIX)\n"
 		" -o, --output-format=FORMAT  format of the output: 'human' (default), 'table', 'csv' or 'json'\n"
 		" -t, --table=NAME            hash table to choose: 'list' (default), 'conntrack', 'dnat', 'iface', 'lb', 'lb_id', 'portmap', 'portoverload', 'snat', 'vnf', 'vnf_rev' or 'vni'\n"
 		" -s, --socket=NUMBER         NUMA socket to use\n"
