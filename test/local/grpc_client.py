@@ -60,7 +60,7 @@ class GrpcClient:
 			raise RuntimeError("Grpc client failed")
 		output = p.stdout.decode('utf8').strip()
 		if len(output) == 0:
-			return None
+			raise RuntimeError("Grpc client failed to deliver response")
 		print(" >", output.replace("\n", "\n > "))
 		response = json.loads(output)
 		status = response['status']

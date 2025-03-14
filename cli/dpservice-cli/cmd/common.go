@@ -5,13 +5,16 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/netip"
+	"regexp"
 	"strconv"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/renderer"
 	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/sources"
 	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
@@ -84,6 +87,17 @@ func CommandNames(cmds []*cobra.Command) []string {
 	return res
 }
 
+type JsonError struct {
+	Kind   string        `json:"kind"`
+	Spec   JsonErrorSpec `json:"spec"`
+	Status api.Status    `json:"status"`
+}
+
+type JsonErrorSpec struct {
+	Source  string `json:"source"`
+	Problem string `json:"problem"`
+}
+
 type RendererOptions struct {
 	Output string
 	Pretty bool
@@ -152,18 +166,89 @@ func (o *RendererOptions) RenderObject(operation string, w io.Writer, obj api.Ob
 		return fmt.Errorf("error rendering %s: %w", obj.GetKind(), err)
 	}
 	if obj.GetStatus().Code != 0 {
-		return fmt.Errorf(strconv.Itoa(apierrors.SERVER_ERROR))
+		return apierrors.NewStatusError(obj.GetStatus().Code, obj.GetStatus().Message)
 	}
 	return nil
 }
 
 func (o *RendererOptions) RenderList(operation string, w io.Writer, list api.List) error {
+	if list.GetStatus().Code != 0 {
+		operation = fmt.Sprintf("server error: %d, %s", list.GetStatus().Code, list.GetStatus().Message)
+		if o.Output == "table" {
+			o.Output = "name"
+		}
+	}
 	renderer, err := o.NewRenderer(operation, w)
 	if err != nil {
 		return fmt.Errorf("error creating renderer: %w", err)
 	}
 	if err := renderer.Render(list); err != nil {
 		return fmt.Errorf("error rendering %s: %w", list.GetItems()[0].GetKind(), err)
+	}
+	if list.GetStatus().Code != 0 {
+		return apierrors.NewStatusError(list.GetStatus().Code, list.GetStatus().Message)
+	}
+	return nil
+}
+
+func parseError(errStr string) (string, int, string, bool) {
+	re := regexp.MustCompile(`^(.*)\[error code (\d+)] (.*)$`)
+	matches := re.FindStringSubmatch(errStr)
+
+	if len(matches) != 4 {
+		return "", 0, "", false // No match
+	}
+
+	problem := matches[1]
+	codeStr := matches[2]
+	message := matches[3]
+
+	code, err := strconv.Atoi(codeStr)
+	if err != nil {
+		return "", 0, "", false // Invalid error code format
+	}
+
+	return problem, code, message, true
+}
+
+func RenderError(source string, w io.Writer, errMsg error, output string) error {
+	problem, code, msg, ok := parseError(errMsg.Error())
+	if !ok {
+		code = 100
+		source = "grpc"
+		msg = errMsg.Error()
+	}
+	jsonError := JsonError{
+		Kind: "Error",
+		Spec: JsonErrorSpec{
+			Source:  source,
+			Problem: problem,
+		},
+		Status: api.Status{
+			Code:    uint32(code),
+			Message: msg,
+		},
+	}
+
+	switch output {
+	case "yaml":
+		jsonData, err := json.Marshal(jsonError)
+		if err != nil {
+			return err
+		}
+		data, err := yaml.JSONToYAML(jsonData)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%v", string(data))
+	case "json":
+		jsonData, err := json.Marshal(jsonError)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%v\n", string(jsonData))
+	default:
+		fmt.Fprintf(w, "%s error: %v\n", source, errMsg)
 	}
 	return nil
 }
