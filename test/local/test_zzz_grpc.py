@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from helpers import *
+from grpc_client import ClientError, GrpcError, ServiceError
 import pytest
 
 
@@ -21,6 +22,40 @@ def test_grpc_getver(prepare_ifaces, grpc_client):
 	# Nothing good to test against atm.
 	assert spec['service_protocol'] == spec['service_version'], \
 		f"Service version mismatch"
+
+#
+# Make sure the client is working properly
+#
+def test_grpc_client_client_error(prepare_ifaces, grpc_client):
+	try:
+		grpc_client.addvip(VM4.name, "xxx")
+	except ClientError as e:
+		assert str(e) == 'Client error #1000: invalid argument "xxx" for "--vip" flag: ParseAddr("xxx"): unable to parse IP', \
+			"Invalid error from gRPC client"
+		return
+	assert False, \
+		"gRPC client did not fail as it should"
+
+def test_grpc_client_grpc_error(prepare_ifaces, grpc_client):
+	try:
+		grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, "0.0.0.0", "::")
+	except GrpcError as e:
+		print(e)
+		assert str(e) == 'gRPC error #3: Invalid ipv4_config.primary_address and ipv6_config.primary_address combination', \
+			"Invalid error from gRPC client"
+		return
+	assert False, \
+		"gRPC client did not fail as it should"
+
+def test_grpc_client_service_error(prepare_ifaces, grpc_client):
+	try:
+		grpc_client.addvip(VM4.name, vip_vip)
+	except ServiceError as e:
+		assert str(e) == "Service error #205: NO_VM", \
+			"Invalid error from gRPC client"
+		return
+	assert False, \
+		"gRPC client did not fail as it should"
 
 #
 # Following tests try to use the same pattern:

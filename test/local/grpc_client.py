@@ -15,12 +15,25 @@ import urllib.request
 from config import grpc_port
 
 
-class GrpcError(Exception):
-	def __init__(self, errcode, message):
+class GrpcClientError(Exception):
+	def __init__(self, errtype, errcode, message):
+		self.errtype = errtype
 		self.errcode = errcode
 		self.message = message
 	def __str__(self):
-		return f"Error #{self.errcode}: {self.message}";
+		return f"{self.errtype} error #{self.errcode}: {self.message}";
+
+class GrpcError(GrpcClientError):
+	def __init__(self, errcode, message):
+		super().__init__("gRPC", errcode, message)
+
+class ServiceError(GrpcClientError):
+	def __init__(self, errcode, message):
+		super().__init__("Service", errcode, message)
+
+class ClientError(GrpcClientError):
+	def __init__(self, errcode, message):
+		super().__init__("Client", errcode, message)
 
 class GrpcClient:
 
@@ -43,6 +56,20 @@ class GrpcClient:
 		self.expectFailure = True
 		return self
 
+	def _generateError(self, response):
+		source = response['spec']['source']
+		status = response['status']
+		errcode = status['code']
+		message = status['message']
+		if source == "server":
+			return ServiceError(errcode, message)
+		elif source == "grpc":
+			return GrpcError(errcode, message)
+		elif source == "client":
+			return ClientError(errcode, message)
+		else:
+			raise ValueError(f"gRPC client returned unknown error source '{source}'")
+
 	def _call(self, args):
 		expectedError = self.expectedError
 		self.expectedError = 0
@@ -51,35 +78,19 @@ class GrpcClient:
 
 		print("dpservice-cli", args)
 		p = subprocess.run([self.cmd, f"--address=localhost:{grpc_port}", '-o', 'json'] + shlex.split(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		# server errors (retcode 2) are handled as a JSON response too
-		if p.returncode != 0 and p.returncode != 2:
-			if len(p.stderr):
-				print(" !", p.stderr.decode('utf8').strip().replace("\n", "\n ! "))
-			if expectFailure:
-				return None
-			raise RuntimeError("Grpc client failed")
 		output = p.stdout.decode('utf8').strip()
 		if len(output) == 0:
-			return None
+			raise RuntimeError("Grpc client failed to deliver response")
 		print(" >", output.replace("\n", "\n > "))
 		response = json.loads(output)
-		status = response['status']
-		errcode = status['code']
-		if errcode != 0:
-			assert p.returncode == 2, \
-				"Grpc client process returned invalid error value"
-			message = status['message']
-			assert message, \
-				f"dp-service not sending any error message for error code {errcode}"
-			if expectedError == errcode:
+		if response['kind'] == "Error":
+			error = self._generateError(response)
+			print(error)
+			if ((isinstance(error, ServiceError) and error.errcode == expectedError)
+				or (isinstance(error, ClientError) and expectFailure)
+				or (isinstance(error, GrpcError) and expectFailure)):
 				return None
-			raise GrpcError(errcode, message)
-		else:
-			assert p.returncode == 0, \
-				"Grpc client returned an error value without status"
-			if expectedError:
-				raise AssertionError(f"Error {expectedError} expected, none received")
-
+			raise error
 		return response
 
 	def _getSpec(self, args):

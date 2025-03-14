@@ -886,7 +886,7 @@ func (c *client) ListNats(ctx context.Context, natIP *netip.Addr, natType string
 		} else if natEntry.GetNatIp() != nil {
 			nattedIP, err = netip.ParseAddr(string(natEntry.GetNatIp().GetAddress()))
 			if err != nil {
-				return nil, fmt.Errorf("error parsing natted ip: %w", err)
+				return &api.NatList{}, fmt.Errorf("error parsing natted ip: %w", err)
 			}
 			nat.Spec.NatIP = &nattedIP
 			nat.Kind = api.NatKind
