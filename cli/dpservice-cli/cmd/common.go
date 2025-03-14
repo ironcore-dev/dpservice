@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"os"
 	"strconv"
 	"time"
 
@@ -34,7 +35,11 @@ type DPDKClientOptions struct {
 }
 
 func (o *DPDKClientOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.Address, "address", "localhost:1337", "dpservice address.")
+	grpcPort := os.Getenv("DP_GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "1337"
+	}
+	fs.StringVar(&o.Address, "address", "localhost:"+grpcPort, "dpservice address (overrides DP_GRPC_PORT).")
 	fs.DurationVar(&o.ConnectTimeout, "connect-timeout", 4*time.Second, "Timeout to connect to the dpservice.")
 }
 
