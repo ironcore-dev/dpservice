@@ -6,7 +6,7 @@
     {
       "lgopt": "file-prefix",
       "arg": "PREFIX",
-      "help": "prefix for hugepage filenames",
+      "help": "prefix for hugepage filenames (overrides DP_FILE_PREFIX)",
       "var": "eal_file_prefix",
       "type": "char",
       "array_size": 32
