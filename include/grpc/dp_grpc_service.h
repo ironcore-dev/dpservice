@@ -4,6 +4,8 @@
 #ifndef __INCLUDE_DP_GRPC_SERVICE_H__
 #define __INCLUDE_DP_GRPC_SERVICE_H__
 
+#ifdef __cplusplus
+
 #include "../proto/dpdk.grpc.pb.h"
 
 #include <grpc/grpc.h>
@@ -12,6 +14,8 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include <uuid/uuid.h>
+
+#include "grpc/dp_grpc_health.h"
 
 #define DP_UUID_SIZE 37
 
@@ -29,6 +33,7 @@ private:
 	uuid_t binuuid;
 	char* uuid;
 	bool initialized = false;
+	std::unique_ptr<HealthService> health_service_;
 
 	void HandleRpcs();
 
@@ -42,6 +47,12 @@ public:
 	void SetInitStatus(bool status);
 	bool IsInitialized();
 	ServerCompletionQueue* GetCq() { return cq_.get(); }
+
+	void setHealthy(bool state);
 };
+
+#else  // not __cplusplus
+void dp_grpc_service_set_healthy(bool state);
+#endif
 
 #endif

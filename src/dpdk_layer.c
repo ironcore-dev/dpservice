@@ -10,6 +10,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_timers.h"
 #include "dp_util.h"
+#include "grpc/dp_grpc_service.h"
 #include "grpc/dp_grpc_thread.h"
 
 static volatile bool force_quit;
@@ -88,6 +89,7 @@ void dp_force_quit(void)
 {
 	DPS_LOG_INFO("Stopping service...");
 	force_quit = true;
+	dp_grpc_service_set_healthy(false);
 }
 
 
