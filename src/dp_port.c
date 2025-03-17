@@ -678,7 +678,7 @@ static int dp_port_public_flow_meter_config(struct dp_port *port, uint64_t publi
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap)
 {
-	int err;
+	int ret;
 
 	if (dp_conf_get_nic_type() != DP_CONF_NIC_TYPE_MELLANOX) {
 		if (public_flow_rate_cap != 0 || total_flow_rate_cap != 0)
@@ -693,26 +693,31 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 		return DP_ERROR;
 	}
 
-	err = dp_port_total_flow_meter_config(port, total_flow_rate_cap);
-	if (DP_FAILED(err)) {
-		if (err == -ENOENT)
+// disabled - not supported by DPDK/Mellanox anymore
+#if 0
+	ret = dp_port_total_flow_meter_config(port, total_flow_rate_cap);
+	if (DP_FAILED(ret)) {
+		if (ret == -ENOENT)
 			DPS_LOG_WARNING("Cannot find sysfs path or file to regulate traffic rate, thus total flow rate metering is ignored", DP_LOG_PORT(port));
 		else {
-			DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port));
-			return DP_ERROR;
+			DPS_LOG_ERR("Cannot set total flow meter", DP_LOG_PORT(port), DP_LOG_RET(ret));
+			return ret;
 		}
 	} else {
 		port->iface.total_flow_rate_cap = total_flow_rate_cap;
 	}
+#endif
 
-	if (DP_FAILED(dp_port_public_flow_meter_config(port, public_flow_rate_cap))) {
-		DPS_LOG_ERR("Cannot set public flow meter", DP_LOG_PORT(port));
-		if (DP_FAILED(dp_port_total_flow_meter_config(port, 0))) {
-			DPS_LOG_ERR("Cannot reset total flow meter", DP_LOG_PORT(port));
-			return DP_ERROR;
+	ret = dp_port_public_flow_meter_config(port, public_flow_rate_cap);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot set public flow meter", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		ret = dp_port_total_flow_meter_config(port, 0);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot reset total flow meter", DP_LOG_PORT(port), DP_LOG_RET(ret));
+			return ret;
 		}
 		port->iface.total_flow_rate_cap = 0;
-		return DP_ERROR;
+		return ret;
 	}
 	port->iface.public_flow_rate_cap = public_flow_rate_cap;
 
