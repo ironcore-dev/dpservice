@@ -57,11 +57,9 @@ spec:
         - mountPath: /var/run/dpdk/rte/
           name: socket-dir
         livenessProbe:
-          exec:
-            command:
-            - dpservice-cli
-            - get
-            - init
+          grpc:
+            port: 1337
+            service: ""
           initialDelaySeconds: 10
           periodSeconds: 10
       - name: prometheus-agent
