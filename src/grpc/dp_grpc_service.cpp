@@ -46,6 +46,14 @@ bool GRPCService::run(std::string listen_address)
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
 	builder.RegisterService(this);
+
+	health_service_.reset(new HealthService);
+	builder.RegisterService(health_service_.get());
+
+	// since health service supports permanent connections,
+	// set a keepalive similar to the one golang default implementation uses (as observed by tcpdump)
+	builder.SetOption(grpc::MakeChannelArgumentOption(GRPC_ARG_KEEPALIVE_TIME_MS, 15000));
+
 	this->cq_ = builder.AddCompletionQueue();
 	this->server_ = builder.BuildAndStart();
 	if (this->server_ == nullptr) {
@@ -54,6 +62,8 @@ bool GRPCService::run(std::string listen_address)
 	}
 
 	DPGRPC_LOG_INFO("Server started and listening", _DP_LOG_STR("grpc_server_address", listen_address.c_str()));
+	setHealthy(true);
+
 	HandleRpcs();
 	return true;
 }
@@ -131,4 +141,16 @@ void GRPCService::HandleRpcs()
 	}
 	DPGRPC_LOG_ERR("gRPC internal error (cannot read next message)");
 	rte_exit(EXIT_FAILURE, "gRPC service aborted\n");
+}
+
+void GRPCService::setHealthy(bool state)
+{
+	health_service_->SetServingStatus(state
+		? grpc::health::v1::HealthCheckResponse::SERVING
+		: grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+}
+
+extern "C" void dp_grpc_service_set_healthy(bool state)
+{
+	GRPCService::GetInstance()->setHealthy(state);
 }
