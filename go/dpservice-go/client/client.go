@@ -135,11 +135,11 @@ func (c *client) CreateLoadBalancer(ctx context.Context, lb *api.LoadBalancer, i
 		lbPorts = append(lbPorts, lbPort)
 	}
 	res, err := c.DPDKironcoreClient.CreateLoadBalancer(ctx, &dpdkproto.CreateLoadBalancerRequest{
-		LoadbalancerId:    []byte(lb.LoadBalancerMeta.ID),
-		Vni:               lb.Spec.VNI,
-		LoadbalancedIp:    api.NetIPAddrToProtoIpAddress(lb.Spec.LbVipIP),
-		LoadbalancedPorts: lbPorts,
-		PreferredUnderlayRoute: []byte(lb.Spec.UnderlayRoute.String()),
+		LoadbalancerId:         []byte(lb.LoadBalancerMeta.ID),
+		Vni:                    lb.Spec.VNI,
+		LoadbalancedIp:         api.NetIPAddrToProtoIpAddress(lb.Spec.LbVipIP),
+		LoadbalancedPorts:      lbPorts,
+		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(lb.Spec.UnderlayRoute),
 	})
 	if err != nil {
 		return &api.LoadBalancer{}, err
@@ -224,7 +224,7 @@ func (c *client) CreateLoadBalancerPrefix(ctx context.Context, lbprefix *api.Loa
 			Ip:     api.NetIPAddrToProtoIpAddress(&lbPrefixAddr),
 			Length: uint32(lbprefix.Spec.Prefix.Bits()),
 		},
-		PreferredUnderlayRoute: []byte(lbprefix.Spec.UnderlayRoute.String()),
+		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(lbprefix.Spec.UnderlayRoute),
 	})
 	if err != nil {
 		return &api.LoadBalancerPrefix{}, err
@@ -400,14 +400,14 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 		return &api.Interface{}, fmt.Errorf("error: input interface cannot be nil")
 	}
 	req := dpdkproto.CreateInterfaceRequest{
-		InterfaceType:      dpdkproto.InterfaceType_VIRTUAL,
-		InterfaceId:        []byte(iface.ID),
-		Vni:                iface.Spec.VNI,
-		Ipv4Config:         api.NetIPAddrToProtoIPConfig(iface.Spec.IPv4),
-		Ipv6Config:         api.NetIPAddrToProtoIPConfig(iface.Spec.IPv6),
-		DeviceName:         iface.Spec.Device,
-		MeteringParameters: api.InterfaceMeteringParamsToProtoMeteringParams(iface.Spec.Metering),
-		PreferredUnderlayRoute: []byte(iface.Spec.UnderlayRoute.String()),
+		InterfaceType:          dpdkproto.InterfaceType_VIRTUAL,
+		InterfaceId:            []byte(iface.ID),
+		Vni:                    iface.Spec.VNI,
+		Ipv4Config:             api.NetIPAddrToProtoIPConfig(iface.Spec.IPv4),
+		Ipv6Config:             api.NetIPAddrToProtoIPConfig(iface.Spec.IPv6),
+		DeviceName:             iface.Spec.Device,
+		MeteringParameters:     api.InterfaceMeteringParamsToProtoMeteringParams(iface.Spec.Metering),
+		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(iface.Spec.UnderlayRoute),
 	}
 	if iface.Spec.PXE != nil {
 		if iface.Spec.PXE.FileName != "" && iface.Spec.PXE.Server != "" {
@@ -480,9 +480,9 @@ func (c *client) CreateVirtualIP(ctx context.Context, virtualIP *api.VirtualIP, 
 		return &api.VirtualIP{}, fmt.Errorf("error: input virtual ip cannot be nil")
 	}
 	res, err := c.DPDKironcoreClient.CreateVip(ctx, &dpdkproto.CreateVipRequest{
-		InterfaceId: []byte(virtualIP.InterfaceID),
-		VipIp:       api.NetIPAddrToProtoIpAddress(virtualIP.Spec.IP),
-		PreferredUnderlayRoute: []byte(virtualIP.Spec.UnderlayRoute.String()),
+		InterfaceId:            []byte(virtualIP.InterfaceID),
+		VipIp:                  api.NetIPAddrToProtoIpAddress(virtualIP.Spec.IP),
+		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(virtualIP.Spec.UnderlayRoute),
 	})
 	if err != nil {
 		return &api.VirtualIP{}, err
@@ -566,7 +566,7 @@ func (c *client) CreatePrefix(ctx context.Context, prefix *api.Prefix, ignoredEr
 			Ip:     api.NetIPAddrToProtoIpAddress(&prefixAddr),
 			Length: uint32(prefix.Spec.Prefix.Bits()),
 		},
-		PreferredUnderlayRoute: []byte(prefix.Spec.UnderlayRoute.String()),
+		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(prefix.Spec.UnderlayRoute),
 	})
 	if err != nil {
 		return &api.Prefix{}, err
@@ -740,11 +740,11 @@ func (c *client) CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[
 		return &api.Nat{}, fmt.Errorf("error: input nat cannot be nil")
 	}
 	res, err := c.DPDKironcoreClient.CreateNat(ctx, &dpdkproto.CreateNatRequest{
-		InterfaceId: []byte(nat.NatMeta.InterfaceID),
-		NatIp:       api.NetIPAddrToProtoIpAddress(nat.Spec.NatIP),
-		MinPort:     nat.Spec.MinPort,
-		MaxPort:     nat.Spec.MaxPort,
-		PreferredUnderlayRoute: []byte(nat.Spec.UnderlayRoute.String()),
+		InterfaceId:            []byte(nat.NatMeta.InterfaceID),
+		NatIp:                  api.NetIPAddrToProtoIpAddress(nat.Spec.NatIP),
+		MinPort:                nat.Spec.MinPort,
+		MaxPort:                nat.Spec.MaxPort,
+		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(nat.Spec.UnderlayRoute),
 	})
 	if err != nil {
 		return &api.Nat{}, err
