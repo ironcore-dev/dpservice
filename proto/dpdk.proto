@@ -232,6 +232,7 @@ message CreateInterfaceRequest {
 	// Device with this name will be assigned if it exists, otherwise error is returned.
 	string device_name = 7;
 	MeteringParams metering_parameters = 8;
+	bytes preferred_underlay_route = 9;
 }
 
 message CreateInterfaceResponse {
@@ -260,6 +261,7 @@ message ListPrefixesResponse {
 message CreatePrefixRequest {
 	bytes interface_id = 1;
 	Prefix prefix = 2;
+	bytes preferred_underlay_route = 3;
 }
 
 message CreatePrefixResponse {
@@ -288,6 +290,7 @@ message ListLoadBalancerPrefixesResponse {
 message CreateLoadBalancerPrefixRequest {
 	bytes interface_id = 1;
 	Prefix prefix = 2;
+	bytes preferred_underlay_route = 3;
 }
 
 message CreateLoadBalancerPrefixResponse {
@@ -307,6 +310,7 @@ message DeleteLoadBalancerPrefixResponse {
 message CreateVipRequest {
 	bytes interface_id = 1;
 	IpAddress vip_ip = 2;
+	bytes preferred_underlay_route = 3;
 }
 
 message CreateVipResponse {
@@ -338,6 +342,7 @@ message CreateLoadBalancerRequest {
 	IpAddress loadbalanced_ip = 2;
 	uint32 vni = 3;
 	repeated LbPort loadbalanced_ports = 4;
+	bytes preferred_underlay_route = 5;
 }
 
 message CreateLoadBalancerResponse {
@@ -406,6 +411,7 @@ message CreateNatRequest {
 	IpAddress nat_ip = 2;
 	uint32 min_port = 3; // port should be uint16 (less than 65536)
 	uint32 max_port = 4;
+	bytes preferred_underlay_route = 5;
 }
 
 message CreateNatResponse {

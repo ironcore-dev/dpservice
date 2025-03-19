@@ -25,9 +25,9 @@ func CreateLoadBalancerPrefix(
 	)
 
 	cmd := &cobra.Command{
-		Use:     "lbprefix <--prefix> <--interface-id>",
+		Use:     "lbprefix <--prefix> <--interface-id> [<--underlay>]",
 		Short:   "Create a loadbalancer prefix",
-		Example: "dpservice-cli create lbprefix --prefix=10.10.10.0/24 --interface-id=vm1",
+		Example: "dpservice-cli create lbprefix --prefix=10.10.10.0/24 --interface-id=vm1 --underlay=fc00::2",
 		Args:    cobra.ExactArgs(0),
 		Aliases: LoadBalancerPrefixAliases,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -49,13 +49,15 @@ func CreateLoadBalancerPrefix(
 }
 
 type CreateLoadBalancerPrefixOptions struct {
-	Prefix      netip.Prefix
-	InterfaceID string
+	Prefix            netip.Prefix
+	InterfaceID       string
+	PreferredUnderlay netip.Addr
 }
 
 func (o *CreateLoadBalancerPrefixOptions) AddFlags(fs *pflag.FlagSet) {
 	flag.PrefixVar(fs, &o.Prefix, "prefix", o.Prefix, "Prefix to add to the interface.")
 	fs.StringVar(&o.InterfaceID, "interface-id", o.InterfaceID, "ID of the interface to create the prefix for.")
+	flag.AddrVar(fs, &o.PreferredUnderlay, "underlay", netip.IPv6Unspecified(), "IPv6 underlay address use for the prefix.")
 }
 
 func (o *CreateLoadBalancerPrefixOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -84,7 +86,8 @@ func RunCreateLoadBalancerPrefix(
 			InterfaceID: opts.InterfaceID,
 		},
 		Spec: api.LoadBalancerPrefixSpec{
-			Prefix: opts.Prefix,
+			Prefix:        opts.Prefix,
+			UnderlayRoute: &opts.PreferredUnderlay,
 		},
 	})
 	if err != nil {
