@@ -5,6 +5,8 @@ package client
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,8 +25,10 @@ import (
 var (
 	ctxCancel       context.CancelFunc
 	ctxGrpc         context.Context
-	dpserviceAddr   string = "127.0.0.1:1337"
-	dpdkProtoClient dpdkproto.DPDKironcoreClient
+	dpserviceIP     string
+	dpservicePort   string
+	dpserviceAddr   string
+	dpdkProtoClient dpdkproto.DPDKonmetalClient
 	dpdkClient      Client
 )
 
@@ -36,6 +40,11 @@ func TestGrpcFuncs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+func init() {
+	flag.StringVar(&dpserviceIP, "dpservice_ip", "127.0.0.1", "IP of dpservice")
+	flag.StringVar(&dpservicePort, "dpservice_port", "1337", "Port of dpservice")
+}
+
 var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
@@ -43,6 +52,7 @@ var _ = BeforeSuite(func() {
 	// setup dpservice-cli client
 	ctxGrpc, ctxCancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 
+	dpserviceAddr = fmt.Sprintf("%s:%s", dpserviceIP, dpservicePort)
 	conn, err := grpc.NewClient(dpserviceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	Expect(err).NotTo(HaveOccurred())
 

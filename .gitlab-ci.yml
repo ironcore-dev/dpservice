@@ -1,10 +1,22 @@
 stages:
+  - build_tester
+  - mr_test
   - build
+  - branch_test
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
 
 variables:
   GOPRIVATE: "gitlab.devops.telekom.de"
   GOPROXY: "https://proxy.golang.org"
   CODE_QUALITY_DISABLED: "true"
+  COMMITID: $CI_COMMIT_SHORT_SHA
+  TESTER_TAG: "mtr.devops.telekom.de/osc/onmetal/dpservice-tester:$COMMITID"
 
 .defaults_template:
   image: ${MTR_GITLAB_HOST}/osc/gardener/osc-builder:v4.0.0
@@ -18,6 +30,67 @@ variables:
     - mv $CI_PROJECT_DIR ${GOPATH}/src/${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
     - mkdir -p $CI_PROJECT_DIR
     - cd ${GOPATH}/src/${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
+
+.tester-run-tests:
+  image: docker:latest
+  tags:
+    - docker
+    - pes
+    - osc
+  needs:
+    - tester-build
+  services:
+    - docker:dind
+  before_script:
+    - |
+      running_containers=$(docker ps --format "{{.Names}}" --filter "name=dpservice-go-test-*")
+      if [ -n "$running_containers" ]; then
+        docker stop $running_containers
+      fi
+  script:
+    - docker load -i dpservice-tester.tar
+    # run dpservice-bin tests
+    - echo 2048 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+    - docker run --name dpservice-bin-test-$COMMITID --rm --privileged --mount type=bind,source=/dev/hugepages,target=/dev/hugepages $TESTER_TAG
+    # run dpservice-go tests
+    - docker run --name dpservice-go-test-$COMMITID --rm --entrypoint ./dp_service.py --privileged -p 1337:1337 --mount type=bind,source=/dev/hugepages,target=/dev/hugepages $TESTER_TAG --no-init &
+    - sleep 5
+    - DPSERVICE_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' dpservice-go-test-$COMMITID)
+    - apk add --no-cache go
+    - cd go/dpservice-go
+    - go test -v ./... -ginkgo.randomize-all -args -dpservice_ip=$DPSERVICE_IP
+  after_script:
+    - |
+      if [ "$(docker inspect -f '{{.State.Running}}' dpservice-go-test-$COMMITID 2>/dev/null)" = "true" ]; then
+          IMAGE_ID=$(docker inspect --format='{{.Image}}' dpservice-go-test-$COMMITID)
+          docker stop dpservice-go-test-$COMMITID
+          sleep 10
+          docker rmi $IMAGE_ID
+      fi
+
+tester-build:
+  stage: build_tester
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_MERGE_REQUEST_ID == null
+  image: docker:latest
+  tags:
+    - docker
+    - pes
+    - osc
+  script:
+    - docker build --build-arg=DPSERVICE_FEATURES="-Denable_virtual_services=true" --target tester -t "$TESTER_TAG" .
+    - docker save "$TESTER_TAG" -o dpservice-tester.tar
+  artifacts:
+    paths:
+      - dpservice-tester.tar
+    expire_in: 1 day
+
+tester-test-mr:
+  extends: .tester-run-tests
+  stage: mr_test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 build-dev:
   extends: .defaults_template
@@ -52,3 +125,10 @@ build-tag:
     - /^v(\d+)\.(\d+).*$/
   except:
     - branches
+
+tester-test-branch:
+  extends: .tester-run-tests
+  stage: branch_test
+  when: manual
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_MERGE_REQUEST_ID == null
