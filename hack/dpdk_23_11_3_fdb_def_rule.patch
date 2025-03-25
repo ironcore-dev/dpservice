@@ -1,0 +1,44 @@
+diff --git a/drivers/net/mlx5/mlx5.c b/drivers/net/mlx5/mlx5.c
+index 584a51b393..575ff03e8d 100644
+--- a/drivers/net/mlx5/mlx5.c
++++ b/drivers/net/mlx5/mlx5.c
+@@ -1437,7 +1437,12 @@ mlx5_dev_args_check_handler(const char *key, const char *val, void *opaque)
+ 	} else if (strcmp(MLX5_ALLOW_DUPLICATE_PATTERN, key) == 0) {
+ 		config->allow_duplicate_pattern = !!tmp;
+ 	} else if (strcmp(MLX5_FDB_DEFAULT_RULE_EN, key) == 0) {
+-		config->fdb_def_rule = !!tmp;
++		if (tmp > 2) {
++			DRV_LOG(ERR, "Invalid %s parameter.", key);
++			rte_errno = EINVAL;
++			return -rte_errno;
++		}
++		config->fdb_def_rule = tmp;
+ 	} else if (strcmp(MLX5_HWS_CNT_SERVICE_CORE, key) == 0) {
+ 		config->cnt_svc.service_core = tmp;
+ 	} else if (strcmp(MLX5_HWS_CNT_CYCLE_TIME, key) == 0) {
+diff --git a/drivers/net/mlx5/mlx5.h b/drivers/net/mlx5/mlx5.h
+index 55c29e31a2..382debdbfb 100644
+--- a/drivers/net/mlx5/mlx5.h
++++ b/drivers/net/mlx5/mlx5.h
+@@ -363,7 +363,7 @@ struct mlx5_sh_config {
+ 		uint32_t cycle_time; /* query cycle time in milli-second. */
+ 	} cnt_svc; /* configure for HW steering's counter's service. */
+ 	/* Allow/Prevent the duplicate rules pattern. */
+-	uint32_t fdb_def_rule:1; /* Create FDB default jump rule */
++	uint32_t fdb_def_rule:2; /* Create FDB default jump rule */
+ 	uint32_t repr_matching:1; /* Enable implicit vport matching in HWS FDB. */
+ };
+ 
+diff --git a/drivers/net/mlx5/mlx5_trigger.c b/drivers/net/mlx5/mlx5_trigger.c
+index fe2c512c5c..0289efe3f1 100644
+--- a/drivers/net/mlx5/mlx5_trigger.c
++++ b/drivers/net/mlx5/mlx5_trigger.c
+@@ -1514,7 +1514,7 @@ mlx5_traffic_enable_hws(struct rte_eth_dev *dev)
+ 		}
+ 		mlx5_txq_release(dev, i);
+ 	}
+-	if (config->fdb_def_rule) {
++	if (config->fdb_def_rule == 1) {
+ 		if ((priv->master || priv->representor) && config->dv_esw_en) {
+ 			if (!mlx5_flow_hw_esw_create_default_jump_flow(dev))
+ 				priv->fdb_def_rule = 1;

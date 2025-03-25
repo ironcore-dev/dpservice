@@ -236,7 +236,7 @@ function make_config() {
 	echo "vf-pattern $conf_vf_pattern"
 	echo "ipv6 $conf_ipv6"
 	if [[ "$OPT_MULTIPORT" == "true" ]]; then
-		echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=0,representor=pf[0-1]vf[0-$[$actualvfs-1]]"
+		echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,dv_flow_en=2,dv_esw_en=1,fdb_def_rule_en=2,representor=pf[0-1]vf[0-$[$actualvfs-1]]"
 		echo "multiport-eswitch"
 	else
 		echo "a-pf0 ${devs[0]},class=rxq_cqe_comp_en=0,rx_vec_en=1,representor=pf[0]vf[0-$[$actualvfs-1]]"
