@@ -44,6 +44,7 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	// ARP reply from VM
 	if (dp_arp_cycle_needed(port) && sender_ip == htonl(port->iface.cfg.own_ip)) {
 		rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &port->neigh_mac);
+		port->iface.arp_done = true;
 		return true;
 	}
 

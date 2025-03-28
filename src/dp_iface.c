@@ -92,6 +92,4 @@ void dp_delete_iface(struct dp_port *port)
 	dp_del_all_firewall_rules(port);
 
 	memset(&port->iface, 0, sizeof(port->iface));
-	// own mac address needs to be refilled due to the above cleaning process
-	dp_load_mac(port);
 }

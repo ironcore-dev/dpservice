@@ -43,6 +43,7 @@ struct dp_port_iface {
 	uint32_t				nat_ip;
 	uint16_t				nat_port_range[2];
 	bool					ready;
+	bool					arp_done;
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
 };
