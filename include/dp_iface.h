@@ -26,10 +26,7 @@ void dp_delete_iface(struct dp_port *port);
 static __rte_always_inline
 bool dp_arp_cycle_needed(const struct dp_port *port)
 {
-	static struct rte_ether_addr nul_mac = {0};
-
-	return port->iface.ready
-		&& rte_is_same_ether_addr(&port->neigh_mac, &nul_mac);
+	return port->iface.ready && !port->iface.arp_done;
 }
 
 static __rte_always_inline

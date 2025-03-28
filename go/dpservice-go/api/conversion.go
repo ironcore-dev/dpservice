@@ -204,6 +204,14 @@ func NetIPAddrToProtoIPConfig(addr *netip.Addr) *proto.IpConfig {
 	}
 }
 
+func NetIPAddrToByteSlice(addr *netip.Addr) []byte {
+	if addr == nil || !addr.IsValid() {
+		return nil
+	}
+
+	return []byte(addr.String())
+}
+
 func ProtoVirtualIPToVirtualIP(interfaceID string, dpdkVIP *proto.GetVipResponse) (*VirtualIP, error) {
 	ip, err := netip.ParseAddr(string(dpdkVIP.GetVipIp().GetAddress()))
 	if err != nil {

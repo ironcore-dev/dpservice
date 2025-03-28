@@ -22,9 +22,9 @@ func CreateLoadBalancer(dpdkClientFactory DPDKClientFactory, rendererFactory Ren
 	)
 
 	cmd := &cobra.Command{
-		Use:     "loadbalancer <--id> <--vni> <--vip> <--lbports>",
+		Use:     "loadbalancer <--id> <--vni> <--vip> <--lbports> [<--underlay>]",
 		Short:   "Create a loadbalancer",
-		Example: "dpservice-cli create loadbalancer --id=4 --vni=100 --vip=10.20.30.40 --lbports=TCP/443,UDP/53",
+		Example: "dpservice-cli create loadbalancer --id=4 --vni=100 --vip=10.20.30.40 --lbports=TCP/443,UDP/53 --underlay=fc00::4",
 		Aliases: LoadBalancerAliases,
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,10 +45,11 @@ func CreateLoadBalancer(dpdkClientFactory DPDKClientFactory, rendererFactory Ren
 }
 
 type CreateLoadBalancerOptions struct {
-	Id      string
-	VNI     uint32
-	LbVipIP netip.Addr
-	Lbports []string
+	Id                string
+	VNI               uint32
+	LbVipIP           netip.Addr
+	Lbports           []string
+	PreferredUnderlay netip.Addr
 }
 
 func (o *CreateLoadBalancerOptions) AddFlags(fs *pflag.FlagSet) {
@@ -56,6 +57,7 @@ func (o *CreateLoadBalancerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint32Var(&o.VNI, "vni", o.VNI, "VNI to add the loadbalancer to.")
 	flag.AddrVar(fs, &o.LbVipIP, "vip", o.LbVipIP, "VIP to assign to the loadbalancer.")
 	fs.StringSliceVar(&o.Lbports, "lbports", o.Lbports, "LB ports to assign to the loadbalancer.")
+	flag.AddrVar(fs, &o.PreferredUnderlay, "underlay", netip.IPv6Unspecified(), "IPv6 underlay address use for the loadbalancer.")
 }
 
 func (o *CreateLoadBalancerOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -88,9 +90,10 @@ func RunCreateLoadBalancer(ctx context.Context, dpdkClientFactory DPDKClientFact
 			ID: opts.Id,
 		},
 		Spec: api.LoadBalancerSpec{
-			VNI:     opts.VNI,
-			LbVipIP: &opts.LbVipIP,
-			Lbports: ports,
+			VNI:           opts.VNI,
+			LbVipIP:       &opts.LbVipIP,
+			Lbports:       ports,
+			UnderlayRoute: &opts.PreferredUnderlay,
 		},
 	})
 	if err != nil {

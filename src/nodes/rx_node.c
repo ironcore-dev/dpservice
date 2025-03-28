@@ -28,6 +28,16 @@ static_assert(sizeof(struct rx_node_ctx) <= RTE_NODE_CTX_SZ,
 // also some way to map ports to nodes is needed
 static rte_node_t rx_node_ids[DP_MAX_PORTS];
 
+// dpservice starts in "standby mode" (no processing of traffic)
+static volatile bool standing_by = true;
+
+
+void rx_node_start_processing(void)
+{
+	standing_by = false;
+}
+
+
 int rx_node_create(uint16_t port_id, uint16_t queue_id)
 {
 	char name[RTE_NODE_NAMESIZE];
@@ -89,6 +99,9 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 	RTE_SET_USED(cnt);  // this is a source node, input data is not present yet
 
 	if (unlikely(!ctx->port->allocated))
+		return 0;
+
+	if (unlikely(standing_by))
 		return 0;
 
 	n_pkts = rte_eth_rx_burst(ctx->port->port_id,

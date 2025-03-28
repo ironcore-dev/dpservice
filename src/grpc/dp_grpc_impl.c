@@ -28,7 +28,11 @@ static int dp_create_vnf_route(union dp_ipv6 *ul_addr6 /* out */,
 							   enum dp_vnf_type type, uint32_t vni, const struct dp_port *port,
 							   struct dp_ip_address *pfx_ip, uint8_t prefix_len)
 {
-	dp_generate_ul_ipv6(ul_addr6);
+	// if ul_addr6 already provided, try to use that one
+	// OPTIMIZATION: only allow this for "externally generated" addresses -> only single bit check needed
+	// (gRPC parser makes sure this bit is set for preferred_underlay addresses)
+	if (!(ul_addr6->_ul.flags & DP_UNDERLAY_FLAG_EXTERNALLY_GENERATED))
+		dp_generate_ul_ipv6(ul_addr6);
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
 }
 
@@ -63,27 +67,26 @@ static int dp_process_create_lb(struct dp_grpc_responder *responder)
 		.is_v6 = request->addr.is_v6,
 		// address is intentionally set to zero here
 	};
-	union dp_ipv6 ul_addr6;
 	int ret = DP_GRPC_OK;
 
-	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
+	if (DP_FAILED(dp_create_vnf_route(&request->ul_addr6, DP_VNF_TYPE_LB, request->vni, dp_get_pf0(), &pfx_ip, 0))) {
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
-	ret = dp_create_lb(request, &ul_addr6);
+	ret = dp_create_lb(request, &request->ul_addr6);
 	if (DP_FAILED(ret))
 		goto err_vnf;
 	if (DP_FAILED(dp_create_vni_route_tables(request->vni, dp_get_pf0()->socket_id))) {
 		ret = DP_GRPC_ERR_VNI_INIT4;
 		goto err_lb;
 	}
-	dp_copy_ipv6(&reply->addr6, &ul_addr6);
+	dp_copy_ipv6(&reply->addr6, &request->ul_addr6);
 	return DP_GRPC_OK;
 
 err_lb:
 	dp_delete_lb((void *)request->lb_id);
 err_vnf:
-	dp_del_vnf(&ul_addr6);
+	dp_del_vnf(&request->ul_addr6);
 err:
 	return ret;
 }
@@ -247,7 +250,6 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 		.is_v6 = request->addr.is_v6
 		// address is intentionally set to zero here
 	};
-	union dp_ipv6 ul_addr6;
 	uint32_t iface_ip, iface_vni;
 	struct dp_port *port;
 	uint32_t vip;
@@ -262,12 +264,12 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 	if (!request->addr.is_v6) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
-		if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_VIP, iface_vni, port, &pfx_ip, 0))) {
+		if (DP_FAILED(dp_create_vnf_route(&request->ul_addr6, DP_VNF_TYPE_VIP, iface_vni, port, &pfx_ip, 0))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
 		vip = request->addr.ipv4;
-		ret = dp_set_iface_vip_ip(iface_ip, vip, iface_vni, &ul_addr6);
+		ret = dp_set_iface_vip_ip(iface_ip, vip, iface_vni, &request->ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
@@ -275,7 +277,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 		if (DP_FAILED(ret))
 			goto err_snat;
 
-		dp_copy_ipv6(&reply->addr6, &ul_addr6);
+		dp_copy_ipv6(&reply->addr6, &request->ul_addr6);
 	} else {
 		ret = DP_GRPC_ERR_BAD_IPVER;
 		goto err;
@@ -285,7 +287,7 @@ static int dp_process_create_vip(struct dp_grpc_responder *responder)
 err_snat:
 	dp_del_iface_vip_ip(iface_ip, iface_vni);
 err_vnf:
-	dp_del_vnf(&ul_addr6);
+	dp_del_vnf(&request->ul_addr6);
 err:
 	return ret;
 }
@@ -349,7 +351,6 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	struct dpgrpc_route *reply = dp_grpc_single_reply(responder);
 
 	struct dp_port *port;
-	union dp_ipv6 ul_addr6;
 
 	port = dp_get_port_with_iface_id(request->iface_id);
 	if (!port)
@@ -358,10 +359,10 @@ static int dp_process_create_lbprefix(struct dp_grpc_responder *responder)
 	if (dp_vnf_lbprefix_exists(port->port_id, port->iface.vni, &request->addr, request->length))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
-	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, &request->addr, request->length)))
+	if (DP_FAILED(dp_create_vnf_route(&request->ul_addr6, DP_VNF_TYPE_LB_ALIAS_PFX, port->iface.vni, port, &request->addr, request->length)))
 		return DP_GRPC_ERR_VNF_INSERT;
 
-	dp_set_ipaddr6(&reply->trgt_addr, &ul_addr6);
+	dp_set_ipaddr6(&reply->trgt_addr, &request->ul_addr6);
 	return DP_GRPC_OK;
 }
 
@@ -382,7 +383,6 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 	struct dpgrpc_prefix *request = &responder->request.add_pfx;
 	struct dpgrpc_ul_addr *reply = dp_grpc_single_reply(responder);
 
-	union dp_ipv6 ul_addr6;
 	struct dp_port *port;
 	uint32_t iface_vni;
 	int ret;
@@ -396,12 +396,12 @@ static int dp_process_create_prefix(struct dp_grpc_responder *responder)
 	if (DP_FAILED(ret))
 		return ret;
 
-	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
+	if (DP_FAILED(dp_create_vnf_route(&request->ul_addr6, DP_VNF_TYPE_ALIAS_PFX, iface_vni, port, &request->addr, request->length))) {
 		dp_grpc_del_route(port, iface_vni, &request->addr, request->length);
 		return DP_GRPC_ERR_VNF_INSERT;
 	}
 
-	dp_copy_ipv6(&reply->addr6, &ul_addr6);
+	dp_copy_ipv6(&reply->addr6, &request->ul_addr6);
 	return DP_GRPC_OK;
 }
 
@@ -428,7 +428,6 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	struct dpgrpc_vf_pci *reply = dp_grpc_single_reply(responder);
 
 	struct dp_port *port;
-	union dp_ipv6 ul_addr6;
 	struct dp_ip_address pfx_ip = {
 		.is_v6 = false  // not actually relevant for this VNF
 	};
@@ -443,7 +442,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		ret = DP_GRPC_ERR_ALREADY_EXISTS;
 		goto err;
 	}
-	if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_INTERFACE_IP, request->vni, port, &pfx_ip, 0))) {
+	if (DP_FAILED(dp_create_vnf_route(&request->ul_addr6, DP_VNF_TYPE_INTERFACE_IP, request->vni, port, &pfx_ip, 0))) {
 		ret = DP_GRPC_ERR_VNF_INSERT;
 		goto err;
 	}
@@ -456,7 +455,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 		goto handle_err;
 	}
 
-	dp_copy_ipv6(&port->iface.ul_ipv6, &ul_addr6);
+	dp_copy_ipv6(&port->iface.ul_ipv6, &request->ul_addr6);
 	port->iface.cfg.own_ip = request->ip4_addr;
 	port->iface.cfg.ip_depth = DP_LPM_DHCP_IP_DEPTH;
 	dp_copy_ipv6(&port->iface.cfg.dhcp_ipv6, &request->ip6_addr);
@@ -503,7 +502,7 @@ iface_err:
 handle_err:
 	dp_unmap_iface_id(request->iface_id);
 err_vnf:
-	dp_del_vnf(&ul_addr6);
+	dp_del_vnf(&request->ul_addr6);
 err:
 	return ret;
 }
@@ -595,7 +594,6 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 		.is_v6 = request->addr.is_v6
 		// address is intentionally set to zero here
 	};
-	union dp_ipv6 ul_addr6;
 	struct dp_port *port;
 	uint32_t iface_ip, iface_vni;
 	int ret;
@@ -609,13 +607,13 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 	if (!request->addr.is_v6) {
 		iface_ip = port->iface.cfg.own_ip;
 		iface_vni = port->iface.vni;
-		if (DP_FAILED(dp_create_vnf_route(&ul_addr6, DP_VNF_TYPE_NAT, iface_vni, port, &pfx_ip, 0))) {
+		if (DP_FAILED(dp_create_vnf_route(&request->ul_addr6, DP_VNF_TYPE_NAT, iface_vni, port, &pfx_ip, 0))) {
 			ret = DP_GRPC_ERR_VNF_INSERT;
 			goto err;
 		}
 		ret = dp_set_iface_nat_ip(iface_ip, request->addr.ipv4, iface_vni,
 										request->min_port, request->max_port,
-										&ul_addr6);
+										&request->ul_addr6);
 		if (DP_FAILED(ret))
 			goto err_vnf;
 
@@ -625,7 +623,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 		port->iface.nat_ip = request->addr.ipv4;
 		port->iface.nat_port_range[0] = request->min_port;
 		port->iface.nat_port_range[1] = request->max_port;
-		dp_copy_ipv6(&reply->addr6, &ul_addr6);
+		dp_copy_ipv6(&reply->addr6, &request->ul_addr6);
 	} else {
 		ret = DP_GRPC_ERR_BAD_IPVER;
 		goto err;
@@ -635,7 +633,7 @@ static int dp_process_create_nat(struct dp_grpc_responder *responder)
 err_dnat:
 	dp_del_iface_nat_ip(iface_ip, iface_vni);
 err_vnf:
-	dp_del_vnf(&ul_addr6);
+	dp_del_vnf(&request->ul_addr6);
 err:
 	return ret;
 

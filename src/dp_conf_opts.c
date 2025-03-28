@@ -47,6 +47,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_FLOW_TIMEOUT,
 #endif
 	OPT_MULTIPORT_ESWITCH,
+	OPT_ACTIVE_LOCKFILE,
 };
 
 #define OPTSTRING ":hv" \
@@ -83,6 +84,7 @@ static const struct option dp_conf_longopts[] = {
 	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
 #endif
 	{ "multiport-eswitch", 0, 0, OPT_MULTIPORT_ESWITCH },
+	{ "active-lockfile", 1, 0, OPT_ACTIVE_LOCKFILE },
 	{ NULL, 0, 0, 0 }
 };
 
@@ -123,6 +125,7 @@ static int grpc_port = 1337;
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 #endif
 static bool multiport_eswitch = false;
+static char active_lockfile[256];
 
 const char *dp_conf_get_pf0_name(void)
 {
@@ -208,6 +211,11 @@ bool dp_conf_is_multiport_eswitch(void)
 	return multiport_eswitch;
 }
 
+const char *dp_conf_get_active_lockfile(void)
+{
+	return active_lockfile;
+}
+
 
 
 /* These functions need to be implemented by the user of this generated code */
@@ -257,6 +265,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
 #endif
 		"     --multiport-eswitch                run on NIC configured in multiport e-switch mode\n"
+		"     --active-lockfile=PATH             file to be locked before starting packet processing\n"
 	, progname);
 }
 
@@ -314,6 +323,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 #endif
 	case OPT_MULTIPORT_ESWITCH:
 		return dp_argparse_store_true(&multiport_eswitch);
+	case OPT_ACTIVE_LOCKFILE:
+		return dp_argparse_string(arg, active_lockfile, ARRAY_SIZE(active_lockfile));
 	default:
 		fprintf(stderr, "Unimplemented option %d\n", opt);
 		return DP_ERROR;
