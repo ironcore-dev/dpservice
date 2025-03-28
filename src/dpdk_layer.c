@@ -146,8 +146,10 @@ static int graph_main_loop(__rte_unused void *arg)
 		nanosleep(&standby_sleep, NULL);
 	}
 
-	DPS_LOG_INFO("Starting packet processing");
-	rx_node_start_processing();
+	if (!force_quit) {
+		DPS_LOG_INFO("Starting packet processing");
+		rx_node_start_processing();
+	}
 
 	while (!force_quit)
 		rte_graph_walk(graph);
