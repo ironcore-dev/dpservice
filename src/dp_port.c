@@ -159,6 +159,12 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 		return DP_ERROR;
 	}
 
+	// guess the inital VM MAC until ARP arrives
+	if (!port->is_pf) {
+		rte_ether_addr_copy(&port->own_mac, &port->neigh_mac);
+		port->iface.arp_done = false;
+	}
+
 	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
 	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
 
