@@ -24,7 +24,7 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	uint32_t cksum;
 
 	if (icmp_hdr->icmp_type != RTE_IP_ICMP_ECHO_REQUEST)
-		return PACKET_RELAY_NEXT_DROP;
+		DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, PACKET_RELAY_NEXT_DROP);
 
 	// rewrite the packet and send it back
 	icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
@@ -53,7 +53,7 @@ static __rte_always_inline rte_edge_t lb_nnat_icmpv6_reply(struct dp_flow *df, s
 	union dp_ipv6 temp_addr;
 
 	if (icmp6_hdr->icmp_type != DP_ICMPV6_ECHO_REQUEST)
-		return PACKET_RELAY_NEXT_DROP;
+		DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, PACKET_RELAY_NEXT_DROP);
 
 	icmp6_hdr->icmp_type = DP_ICMPV6_ECHO_REPLY;
 
@@ -92,7 +92,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == IPPROTO_ICMPV6)
 		return lb_nnat_icmpv6_reply(df, m);
 
-	return PACKET_RELAY_NEXT_DROP;
+	DP_RETURN_REF_COUNT_REDUCE_DROP(df->conntrack, PACKET_RELAY_NEXT_DROP);
 }
 
 static uint16_t packet_relay_node_process(struct rte_graph *graph,
