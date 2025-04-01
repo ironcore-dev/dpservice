@@ -1,3 +1,12 @@
+This a patch to revert the effect of commit cf9a91c67b88071a03beb32a3ea9970e6ee00391.
+(https://github.com/DPDK/dpdk/commit/cf9a91c67b88071a03beb32a3ea9970e6ee00391)
+Before this commit, HA dpservice was able to run fine with fdb_def_rule_en=0.
+After this commit, it would require manually setting up complex rte_flow rules
+to achieve the same effect.
+This patch simply immitates the old behavior by skipping over one call.
+More details are to be found in the commit message.
+
+
 diff --git a/drivers/net/mlx5/mlx5.c b/drivers/net/mlx5/mlx5.c
 index 584a51b393..575ff03e8d 100644
 --- a/drivers/net/mlx5/mlx5.c

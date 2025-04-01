@@ -1,3 +1,11 @@
+This is the original patch from upstream DPDK.
+Dpservice needs to revert it for MTU to stay untouched.
+Reason being that dpservice actually only handles custom underlay traffic,
+that uses MTU 1500+overhead and not the full 9100 MTU setup on a node.
+Using this patch forces dpservice to support MTU 9100,
+which increases memory footprint significantly.
+---
+
 From 4032e7572a85005127d65ded4460ddbbfcf780f9 Mon Sep 17 00:00:00 2001
 From: Dariusz Sosnowski <dsosnowski@nvidia.com>
 Date: Mon, 8 Jul 2024 12:59:31 +0200
