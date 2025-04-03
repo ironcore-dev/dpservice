@@ -1,15 +1,15 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "grpc/dp_async_grpc.h"
+#include "grpc/dp_async_grpc.hpp"
 #include <arpa/inet.h>
 #include <rte_ether.h>
 #include <rte_mbuf.h>
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_util.h"
-#include "grpc/dp_grpc_conv.h"
-#include "grpc/dp_grpc_service.h"
+#include "grpc/dp_grpc_conv.hpp"
+#include "grpc/dp_grpc_service.hpp"
 
 // this is arbitrary, just not error or DP_OK
 #define DP_GRPC_REPLY_NOT_READY 1

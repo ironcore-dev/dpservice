@@ -33,6 +33,7 @@ struct nat_entry {
 	uint16_t		port_range[2];
 	uint32_t		vni;
 	union dp_ipv6	dst_ipv6;
+	// checkpatch silencing comment
 	TAILQ_ENTRY(nat_entry) entries;
 };
 

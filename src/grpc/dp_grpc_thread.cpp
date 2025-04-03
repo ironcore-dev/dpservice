@@ -7,7 +7,7 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_log.h"
-#include "grpc/dp_grpc_service.h"
+#include "grpc/dp_grpc_service.hpp"
 
 static rte_thread_t grpc_thread_id;
 // pthread_t is opaque, must use another value for checking

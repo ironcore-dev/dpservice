@@ -11,7 +11,7 @@
 #include "dp_mbuf_dyn.h"
 #include "dp_timers.h"
 #include "dp_util.h"
-#include "grpc/dp_grpc_service.h"
+#include "grpc/dp_grpc_service.hpp"
 #include "grpc/dp_grpc_thread.h"
 #include "nodes/rx_node.h"
 

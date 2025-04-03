@@ -15,7 +15,7 @@
 #include <grpcpp/server_context.h>
 #include <uuid/uuid.h>
 
-#include "grpc/dp_grpc_health.h"
+#include "grpc/dp_grpc_health.hpp"
 
 #define DP_UUID_SIZE 37
 

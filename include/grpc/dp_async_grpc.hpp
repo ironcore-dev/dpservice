@@ -13,7 +13,7 @@
 #include <grpcpp/server_context.h>
 #include "dp_error.h"
 #include "dp_grpc_api.h"
-#include "dp_grpc_conv.h"
+#include "dp_grpc_conv.hpp"
 #include "dp_firewall.h"
 
 // unfortunately, templates are not usable due to the fact that the RequestXxx() is always different
@@ -52,7 +52,7 @@ using grpc::ServerCompletionQueue;
 
 using namespace dpdkironcore::v1;
 
-#include "dp_grpc_service.h"
+#include "dp_grpc_service.hpp"
 
 enum CallState { REQUEST, AWAIT_MSG, FINISH };
 

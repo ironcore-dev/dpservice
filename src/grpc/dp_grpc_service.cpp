@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "grpc/dp_grpc_service.h"
-#include "grpc/dp_async_grpc.h"
+#include "grpc/dp_grpc_service.hpp"
+#include "grpc/dp_async_grpc.hpp"
 #include "dp_lpm.h"
 #include "dp_port.h"
 #include "dpdk_layer.h"

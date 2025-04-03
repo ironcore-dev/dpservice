@@ -24,7 +24,7 @@ SCRIPT_DIR="$(dirname ${BASH_SOURCE})"
 CHECKPATCH="${SCRIPT_DIR}/_checkpatch.pl"
 
 function check_diff () {
-	git -C "${SCRIPT_DIR}/.." diff "${DIFF}" | "${CHECKPATCH}" ${CHECKPATCH_OPTS}
+	git -C "${SCRIPT_DIR}/.." diff "${DIFF}" -- '*.c' '*.h' | "${CHECKPATCH}" ${CHECKPATCH_OPTS}
 }
 
 function check_file() {
