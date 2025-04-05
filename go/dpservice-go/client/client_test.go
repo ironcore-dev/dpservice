@@ -44,6 +44,7 @@ var _ = Describe("interface tests", Label("interface"), func() {
 						TotalRate:  100,
 						PublicRate: 50,
 					},
+					HostName: "tap5Host",
 				},
 			}
 
@@ -82,6 +83,7 @@ var _ = Describe("interface tests", Label("interface"), func() {
 
 			Expect(res.Spec.IPv4.String()).To(Equal("10.200.1.5"))
 			Expect(res.Spec.IPv6.String()).To(Equal("2000:200:1::5"))
+			Expect(res.Spec.HostName).To(Equal("tap5Host"))
 			Expect(res.Spec.Metering.TotalRate).To(Equal(uint64(0))) //MeteringRarams shouldn't take any effect on tap devices
 			Expect(res.Spec.Metering.PublicRate).To(Equal(uint64(0)))
 		})

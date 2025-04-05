@@ -24,7 +24,7 @@ func CreateInterface(dpdkClientFactory DPDKClientFactory, rendererFactory Render
 	cmd := &cobra.Command{
 		Use:     "interface <--id> <--ipv4> [<--ipv6>] <--vni> <--device> [<--underlay>] [<--total-meter-rate>] [<--public-meter-rate>]",
 		Short:   "Create an interface",
-		Example: "dpservice-cli create interface --id=vm4 --ipv4=10.200.1.4 --ipv6=2000:200:1::4 --vni=200 --device=net_tap5 --underlay=fc00::1 --total-meter-rate=1000(mbits/s) --public-meter-rate=500(mbits/s)",
+		Example: "dpservice-cli create interface --id=vm4 --ipv4=10.200.1.4 --ipv6=2000:200:1::4 --vni=200 --device=net_tap5 --underlay=fc00::1 --total-meter-rate=1000(mbits/s) --public-meter-rate=500(mbits/s) --hostname=my-vm",
 		Aliases: InterfaceAliases,
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,6 +55,7 @@ type CreateInterfaceOptions struct {
 	PxeFileName       string
 	TotalMeterRate    uint64
 	PublicMeterRate   uint64
+	Hostname          string
 }
 
 func (o *CreateInterfaceOptions) AddFlags(fs *pflag.FlagSet) {
@@ -68,6 +69,7 @@ func (o *CreateInterfaceOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.PxeFileName, "pxe-file-name", o.PxeFileName, "PXE boot file name.")
 	fs.Uint64Var(&o.TotalMeterRate, "total-meter-rate", 0, "Total meter rate.")
 	fs.Uint64Var(&o.PublicMeterRate, "public-meter-rate", 0, "Public meter rate.")
+	fs.StringVar(&o.Hostname, "hostname", o.Hostname, "Hostname for the interface.")
 }
 
 func (o *CreateInterfaceOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -98,6 +100,7 @@ func RunCreateInterface(ctx context.Context, dpdkClientFactory DPDKClientFactory
 			UnderlayRoute: &opts.PreferredUnderlay,
 			PXE:           &api.PXE{Server: opts.PxeServer, FileName: opts.PxeFileName},
 			Metering:      &api.MeteringParams{TotalRate: opts.TotalMeterRate, PublicRate: opts.PublicMeterRate},
+			HostName:      opts.Hostname,
 		},
 	})
 	if err != nil {

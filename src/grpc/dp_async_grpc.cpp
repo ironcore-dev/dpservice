@@ -228,7 +228,8 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_PCI(request_.device_name().c_str()),
 					DP_LOG_METER_TOTAL(request_.metering_parameters().total_rate()),
 					DP_LOG_METER_PUBLIC(request_.metering_parameters().public_rate()),
-					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
+					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()),
+					DP_LOG_HOSTNAME(request_.hostname().c_str()));
 	if (!GrpcConv::IsInterfaceIdValid(request_.interface_id()))
 		return "Invalid interface_id";
 	request->add_iface.vni = request_.vni();
@@ -253,6 +254,8 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 		return "Invalid device_name";
 	if (SNPRINTF_FAILED(request->add_iface.iface_id, request_.interface_id()))
 		return "Invalid interface_id";
+	if (!request_.hostname().empty() && SNPRINTF_FAILED(request->add_iface.hostname, request_.hostname()))
+		return "Invalid hostname";
 	if (!GrpcConv::StrToPreferredUnderlay(request_.preferred_underlay_route(), &request->add_iface.ul_addr6))
 		return "Invalid preferred_underlay_route";
 

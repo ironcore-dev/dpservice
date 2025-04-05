@@ -83,6 +83,7 @@ struct dpgrpc_iface {
 	uint32_t				vni;
 	struct dp_ip_address	pxe_addr;							// request (create) only
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];		// request (create) only
+	char					hostname[DP_IFACE_HOSTNAME_MAX_LEN];
 	char					pci_name[RTE_ETH_NAME_MAX_LEN];
 	union dp_ipv6			ul_addr6;
 	uint64_t				total_flow_rate_cap;

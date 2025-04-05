@@ -461,6 +461,9 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
 	dp_copy_ipaddr(&port->iface.cfg.pxe_ip, &request->pxe_addr);
+	// Ensure null termination even if source is exactly max length
+	rte_memcpy(port->iface.cfg.hostname, request->hostname, sizeof(port->iface.cfg.hostname) - 1);
+	port->iface.cfg.hostname[sizeof(port->iface.cfg.hostname) - 1] = '\0';
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {
@@ -558,6 +561,8 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 	rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
 	dp_copy_ipv6(&reply->ul_addr6, &port->iface.ul_ipv6);
+	static_assert(sizeof(reply->hostname) == sizeof(port->iface.cfg.hostname), "Incompatible hostname size");
+	rte_memcpy(reply->hostname, port->iface.cfg.hostname, sizeof(reply->hostname));
 	reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 	reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
 	return DP_GRPC_OK;
@@ -764,6 +769,8 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		static_assert(sizeof(reply->pci_name) == sizeof(port->dev_name), "Incompatible PCI name size");
 		rte_memcpy(reply->pci_name, port->dev_name, sizeof(reply->pci_name));
 		dp_copy_ipv6(&reply->ul_addr6, &port->iface.ul_ipv6);
+		static_assert(sizeof(reply->hostname) == sizeof(port->iface.cfg.hostname), "Incompatible hostname size");
+		rte_memcpy(reply->hostname, port->iface.cfg.hostname, sizeof(reply->hostname));
 		reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 		reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
 	}

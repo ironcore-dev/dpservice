@@ -408,6 +408,7 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 		DeviceName:             iface.Spec.Device,
 		MeteringParameters:     api.InterfaceMeteringParamsToProtoMeteringParams(iface.Spec.Metering),
 		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(iface.Spec.UnderlayRoute),
+		Hostname:               iface.Spec.HostName,
 	}
 	if iface.Spec.PXE != nil {
 		if iface.Spec.PXE.FileName != "" && iface.Spec.PXE.Server != "" {
