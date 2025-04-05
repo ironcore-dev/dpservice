@@ -86,6 +86,7 @@ extern "C" {
 #define DP_LOG_PCI(VALUE) _DP_LOG_STR("pci", VALUE)
 #define DP_LOG_PXE_SRV(VALUE) _DP_LOG_STR("pxe_server", VALUE)
 #define DP_LOG_PXE_PATH(VALUE) _DP_LOG_STR("pxe_path", VALUE)
+#define DP_LOG_HOSTNAME(VALUE) _DP_LOG_STR("hostname", VALUE)
 #define DP_LOG_IPV4STR(VALUE) _DP_LOG_STR("ipv4", VALUE)
 #define DP_LOG_IPV6STR(VALUE) _DP_LOG_STR("ipv6", VALUE)
 #define DP_LOG_UNDERLAY(VALUE) _DP_LOG_STR("underlay", VALUE)

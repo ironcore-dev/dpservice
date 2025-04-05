@@ -334,6 +334,7 @@ type InterfaceSpec struct {
 	Nat             *Nat             `json:"nat,omitempty"`
 	VIP             *VirtualIP       `json:"vip,omitempty"`
 	Metering        *MeteringParams  `json:"metering,omitempty"`
+	HostName        string           `json:"hostname,omitempty"`
 }
 
 type VirtualFunction struct {

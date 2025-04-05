@@ -21,6 +21,7 @@ extern "C" {
 #endif
 
 #define DP_IFACE_ID_MAX_LEN	64
+#define DP_IFACE_HOSTNAME_MAX_LEN 64
 
 struct dp_iface_cfg {
 	uint32_t				own_ip;
@@ -31,6 +32,7 @@ struct dp_iface_cfg {
 	uint8_t					ip6_depth;
 	struct dp_ip_address	pxe_ip;
 	char					pxe_str[DP_IFACE_PXE_MAX_LEN];
+	char					hostname[DP_IFACE_HOSTNAME_MAX_LEN];
 };
 
 struct dp_port_iface {

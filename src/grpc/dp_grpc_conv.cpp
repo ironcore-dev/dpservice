@@ -216,6 +216,7 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	grpc_iface->set_pci_name(dp_iface->pci_name);
 	DP_IPV6_TO_STR(&dp_iface->ul_addr6, strbuf);
 	grpc_iface->set_underlay_route(strbuf);
+	grpc_iface->set_hostname(dp_iface->hostname);
 	metering_params = new MeteringParams();
 	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
 	metering_params->set_public_rate(dp_iface->public_flow_rate_cap);

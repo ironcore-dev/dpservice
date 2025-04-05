@@ -121,7 +121,7 @@ class GrpcClient:
 	def getversion(self):
 		return self._getSpec("get version")
 
-	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None, preferred_underlay=None):
+	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None, preferred_underlay=None, hostname=None):
 		cmd = f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6}"
 		if pxe_server:
 			cmd += f" --pxe-server={pxe_server}"
@@ -129,6 +129,8 @@ class GrpcClient:
 			cmd += f" --pxe-file-name={ipxe_file}"
 		if preferred_underlay:
 			cmd += f" --underlay={preferred_underlay}"
+		if hostname:
+			cmd += f" --hostname={hostname}"
 		return self._getUnderlayRoute(cmd)
 
 	def getinterface(self, vm_name):

@@ -153,6 +153,7 @@ func ProtoInterfaceToInterface(dpdkIface *proto.Interface) (*Interface, error) {
 			IPv6:          &primaryIpv6,
 			UnderlayRoute: &underlayRoute,
 			Metering:      ProtoMeteringParamsToInterfaceMeteringParams(dpdkIface.GetMeteringParams()),
+			HostName:      dpdkIface.Hostname,
 		},
 	}, nil
 }
