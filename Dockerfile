@@ -3,6 +3,8 @@ FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
 
 ARG TARGETARCH
 ARG DPDK_VER=23.11.3
+ARG DPDK_BUILDTYPE=release
+ARG DPSERVICE_BUILDTYPE=debug
 ARG DPSERVICE_FEATURES=""
 
 WORKDIR /workspace
@@ -74,7 +76,7 @@ net/octeontx_ep,net/pcap,net/pfe,net/qede,net/sfc,net/softnic,net/thunderx,net/t
 net/vdev_ntsvc,net/vhost,net/virtio,net/vmxnet3,net/bnx2x,net/netsvc,net/vdev_netsvc,\
 crypto/dpaa_sec,crypto/bcmfs,crypto/caam_jr,crypto/cnxk,dpaa_sec,crypto/dpaa2_sec,crypto/nitrox,\
 crypto/null,crypto/octeontx,crypto/octeontx2,crypto/scheduler,crypto/virtio -Ddisable_libs=power,\
-vhost,gpudev build -Ddisable_apps="*" -Dtests=false
+vhost,gpudev build -Ddisable_apps="*" -Dtests=false -Dbuildtype=$DPDK_BUILDTYPE
 RUN cd $DPDK_DIR/build && ninja
 RUN cd $DPDK_DIR/build && ninja install
 
@@ -93,7 +95,7 @@ COPY include/ include/
 COPY .git/ .git/
 
 # Compile dpservice itself
-RUN meson setup build -Dbuild_dpservice_cli=true $DPSERVICE_FEATURES && ninja -C build
+RUN meson setup build -Dbuild_dpservice_cli=true -Dbuildtype=$DPSERVICE_BUILDTYPE $DPSERVICE_FEATURES && ninja -C build
 
 
 # Extended build image for test-image
