@@ -123,7 +123,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 
 	/* RX and TX queues config */
 	for (uint16_t i = 0; i < DP_NR_STD_RX_QUEUES; ++i) {
-		ret = rte_eth_rx_queue_setup(port->port_id, i, 1024,
+		ret = rte_eth_rx_queue_setup(port->port_id, i, DP_RX_QUEUE_SIZE,
 									 port->socket_id,
 									 &rxq_conf,
 									 dp_layer->rte_mempool);
@@ -137,7 +137,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	txq_conf.offloads = port_conf.txmode.offloads;
 
 	for (uint16_t i = 0; i < DP_NR_STD_TX_QUEUES; ++i) {
-		ret = rte_eth_tx_queue_setup(port->port_id, i, 2048,
+		ret = rte_eth_tx_queue_setup(port->port_id, i, DP_TX_QUEUE_SIZE,
 									 port->socket_id,
 									 &txq_conf);
 		if (DP_FAILED(ret)) {
