@@ -33,13 +33,25 @@ extern "C" {
 // there are three periodic messages (ARP, ND, ND-RA) that could be sent at once
 #define DP_PERIODIC_Q_SIZE	(DP_MAX_PORTS * 3)
 
-// 40Gb/s with 1500B packets means ~3.3M packets/s
-// assuming 0.1s delay in processing means ~350k mbufs needed
+// While dpservice is processing RTE_GRAPH_BURST_SIZE, the NIC will store packets here
+// Seen recommendations to keep this at 2*RTE_GRAPH_BURST_SIZE or 4*RTE_GRAPH_BURST_SIZE
+#define DP_RX_QUEUE_SIZE (4 * RTE_GRAPH_BURST_SIZE)
+// Seen this recommended to be bigger than Rx because multiple Rx streams share the same Tx
+// but in our case we are only using one worker thread, so there is no concurrent Tx
+#define DP_TX_QUEUE_SIZE DP_RX_QUEUE_SIZE
+
 #ifdef ENABLE_PYTEST
 #define DP_MBUF_POOL_SIZE	(50*1024)
 #else
-#define DP_MBUF_POOL_SIZE	(350*1024)
+// packet pool needs to be able to hold all packets from all port Rx queues
+// (as requested in the configure stage via DP_RX_QUEUE_SIZE)
+// then also all packets in a burst can allocate a chunk - RTE_GRAPH_BURST_SIZE
+// then there are service queues/periodic/grpc/...
+// thus a headroom of 4k should be OK
+#define DP_MBUF_POOL_HEADROOM 4096
+#define DP_MBUF_POOL_SIZE	((DP_NR_STD_RX_QUEUES * DP_RX_QUEUE_SIZE) * DP_MAX_PORTS + DP_MBUF_POOL_HEADROOM)
 #endif
+
 // max Ether MTU 1500 + frame header 14 + frame footer 4 + IPv6 tunnel header 40
 #define DP_MBUF_BUF_SIZE	(1558 + RTE_PKTMBUF_HEADROOM)
 
