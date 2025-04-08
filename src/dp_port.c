@@ -99,6 +99,8 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 
 	/* Default config */
 	port_conf.txmode.offloads &= dev_info->tx_offload_capa;
+	if (dev_info->rx_offload_capa & RTE_ETH_RX_OFFLOAD_TIMESTAMP)
+		port_conf.rxmode.offloads |= RTE_ETH_RX_OFFLOAD_TIMESTAMP;
 
 	if (dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP || dp_conf_is_multiport_eswitch())
 		nr_hairpin_queues = 0;
