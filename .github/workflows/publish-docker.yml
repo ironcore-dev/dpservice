@@ -1,7 +1,7 @@
 name: Build and Publish Docker Image
 
 env:
-  platforms: ${{ 'linux/amd64,linux/arm64' }}
+  platforms: linux/amd64,linux/arm64
 
 on:
   push:
@@ -12,21 +12,22 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
-  workflow_dispatch:
-    inputs:
-      platforms:
-        description: 'Manual build trigger for arm64 architecture'
-        required: false
-        default: 'linux/arm64'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+    types: [labeled]
 
 jobs:
   buildAndPush:
+    if: |
+      (github.event_name == 'push') ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'ok-to-image')
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref }}
+
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -41,6 +42,7 @@ jobs:
             type=sha
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -54,6 +56,7 @@ jobs:
           CONTEXT_NAME="builders-${GITHUB_RUN_ID}"
           docker context create $CONTEXT_NAME
           echo "CONTEXT_NAME=$CONTEXT_NAME" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         timeout-minutes: 5
         uses: docker/setup-buildx-action@v3
@@ -66,13 +69,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push
         timeout-minutes: 60
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{env.platforms}}
-          push: ${{ github.event_name != 'workflow_dispatch' }}
+          platforms: ${{ env.platforms }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: production
