@@ -59,7 +59,7 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 {
 	struct dp_icmp_err_ip_info icmp_err_ip_info = {0};
 
-	if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY || df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+	if (df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REPLY || df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REQUEST) {
 		key->port_dst = ntohs(df->l4_info.icmp_field.icmp_identifier);
 		key->src.type_src = df->l4_info.icmp_field.icmp_type;
 		return DP_OK;
@@ -194,10 +194,10 @@ void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *in
 		inv_key->port_dst = key->src.port_src;
 	} else if (key->proto == IPPROTO_ICMP) {
 		inv_key->port_dst = key->port_dst;
-		if (key->src.type_src == RTE_IP_ICMP_ECHO_REPLY)
-			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REQUEST;
-		else if (key->src.type_src == RTE_IP_ICMP_ECHO_REQUEST)
-			inv_key->src.type_src = RTE_IP_ICMP_ECHO_REPLY;
+		if (key->src.type_src == RTE_ICMP_TYPE_ECHO_REPLY)
+			inv_key->src.type_src = RTE_ICMP_TYPE_ECHO_REQUEST;
+		else if (key->src.type_src == RTE_ICMP_TYPE_ECHO_REQUEST)
+			inv_key->src.type_src = RTE_ICMP_TYPE_ECHO_REPLY;
 		else
 			inv_key->src.type_src = 0;
 	} else if (key->proto == IPPROTO_ICMPV6) {

@@ -53,7 +53,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	) {
 		if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6) {
 			/* Directly answer echo replies of loadbalanced IP, do not forward */
-			if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST
+			if (df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REQUEST
 			    || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST
 			) {
 				df->nat_type = DP_CHG_UL_DST_IP;
