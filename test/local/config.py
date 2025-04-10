@@ -132,13 +132,17 @@ class VMSpec:
 		vm.ip = f"{ov_ip_prefix}{vni}.1.{VMSpec._idx+1}"
 		vm.ipv6 = f"{ov_ipv6_prefix}{vni}:1::{VMSpec._idx+1}"
 		vm.ul_ipv6 = None  # will be assigned dynamically
+		vm.hostname = None
 		VMSpec._idx += 1
 		return vm
+	def set_hostname(self, hostname):
+		self.hostname = hostname
 
 PF0 = PFSpec.create()
 PF1 = PFSpec.create()
 # VM1 and VM2 are on the same VNI
 VM1 = VMSpec.create(vni1)
+VM1.set_hostname("vm1-host")
 VM2 = VMSpec.create(vni1)
 # VM3 is on the second VNI
 VM3 = VMSpec.create(vni2)

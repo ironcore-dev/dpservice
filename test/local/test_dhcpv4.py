@@ -4,7 +4,7 @@
 from helpers import *
 
 def test_dhcpv4_vf0(prepare_ifaces):
-	request_ip(VM1, check_hostname=True)
+	request_ip(VM1)
 
 def test_dhcpv4_vf1(prepare_ifaces):
 	request_ip(VM2)

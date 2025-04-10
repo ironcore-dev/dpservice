@@ -48,6 +48,7 @@ struct dp_port_iface {
 	bool					arp_done;
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
+	uint32_t				hostname_len;
 };
 
 struct dp_port_async_template {

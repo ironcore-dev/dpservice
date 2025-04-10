@@ -461,9 +461,8 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
 	dp_copy_ipaddr(&port->iface.cfg.pxe_ip, &request->pxe_addr);
-	// Ensure null termination even if source is exactly max length
-	rte_memcpy(port->iface.cfg.hostname, request->hostname, sizeof(port->iface.cfg.hostname) - 1);
-	port->iface.cfg.hostname[sizeof(port->iface.cfg.hostname) - 1] = '\0';
+	rte_memcpy(port->iface.cfg.hostname, request->hostname, sizeof(port->iface.cfg.hostname));
+	port->iface.hostname_len = (uint32_t)strnlen(port->iface.cfg.hostname, DP_IFACE_HOSTNAME_MAX_LEN - 1);
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {
