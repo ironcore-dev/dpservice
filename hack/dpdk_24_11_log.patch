@@ -1,22 +1,7 @@
 diff --color -ruN dpdk-23.11/lib/log/log.c dpdk-23.11-patch/lib/log/log.c
 --- dpdk-23.11/lib/log/log.c	2023-11-28 14:35:41.000000000 +0000
 +++ dpdk-23.11-patch/lib/log/log.c	2024-03-04 15:01:39.318300347 +0000
-@@ -31,11 +31,14 @@
- 	uint32_t type;  /**< Bitfield with enabled logs. */
- 	uint32_t level; /**< Log level. */
- 	FILE *file;     /**< Output file set by rte_openlog_stream, or NULL. */
-+	/** Print function set by rte_log_set_print_func, or vfprintf. */
-+	int (*func)(FILE *stream, const char *format, va_list ap);
- 	size_t dynamic_types_len;
- 	struct rte_log_dynamic_type *dynamic_types;
- } rte_logs = {
- 	.type = UINT32_MAX,
- 	.level = RTE_LOG_DEBUG,
-+	.func = vfprintf,
- };
- 
- struct rte_eal_opt_loglevel {
-@@ -80,6 +83,13 @@
+@@ -85,6 +88,13 @@
  	return 0;
  }
  
@@ -24,25 +9,16 @@ diff --color -ruN dpdk-23.11/lib/log/log.c dpdk-23.11-patch/lib/log/log.c
 +void
 +rte_log_set_print_func(int (*func)(FILE *stream, const char *format, va_list ap))
 +{
-+	rte_logs.func = func;
++	rte_logs.print_func = func;
 +}
 +
  FILE *
  rte_log_get_stream(void)
  {
-@@ -501,7 +511,7 @@
- 	RTE_PER_LCORE(log_cur_msg).loglevel = level;
- 	RTE_PER_LCORE(log_cur_msg).logtype = logtype;
- 
--	ret = vfprintf(f, format, ap);
-+	ret = rte_logs.func(f, format, ap);
- 	fflush(f);
- 	return ret;
- }
 diff --color -ruN dpdk-23.11/lib/log/rte_log.h dpdk-23.11-patch/lib/log/rte_log.h
 --- dpdk-23.11/lib/log/rte_log.h	2023-11-28 14:35:41.000000000 +0000
 +++ dpdk-23.11-patch/lib/log/rte_log.h	2024-03-04 15:03:08.442486094 +0000
-@@ -88,6 +88,18 @@
+@@ -89,6 +89,18 @@
  int rte_openlog_stream(FILE *f);
  
  /**
