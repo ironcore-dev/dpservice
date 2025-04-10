@@ -55,17 +55,17 @@ static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_mask = {
 	.hdr.proto = 0xff,
 };
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_src_mask = {
-	.hdr.src_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.src_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 	.hdr.proto = 0xff,
 };
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_mask = {
-	.hdr.dst_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 	.hdr.proto = 0xff,
 };
 #ifdef ENABLE_VIRTSVC
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_src_dst_mask = {
-	.hdr.src_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
-	.hdr.dst_addr = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.src_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 	.hdr.proto = 0xff,
 };
 #endif
@@ -473,7 +473,7 @@ void dp_set_ipv6_set_src_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
 								const union dp_ipv6 *ipv6)
 {
-	DP_ARRAY_FROM_IPV6(ipv6_action->ipv6_addr, ipv6);
+	dp_ipv6_to_rte(ipv6, &ipv6_action->ipv6_addr);
 	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_SRC;
 	action->conf = ipv6_action;
 }
@@ -483,7 +483,7 @@ void dp_set_ipv6_set_dst_action(struct rte_flow_action *action,
 								struct rte_flow_action_set_ipv6 *ipv6_action,
 								const union dp_ipv6 *ipv6)
 {
-	DP_ARRAY_FROM_IPV6(ipv6_action->ipv6_addr, ipv6);
+	dp_ipv6_to_rte(ipv6, &ipv6_action->ipv6_addr);
 	action->type = RTE_FLOW_ACTION_TYPE_SET_IPV6_DST;
 	action->conf = ipv6_action;
 }
