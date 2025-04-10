@@ -19,6 +19,7 @@ extern "C" {
 #define DP_IPV6_ADDR_SIZE 16
 static_assert(sizeof(rte_be64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is invalid");
 
+// TODO see below
 #define DP_INIT_FROM_IPV6(IPV6) { \
 	(IPV6)->bytes[0], (IPV6)->bytes[1], (IPV6)->bytes[2], (IPV6)->bytes[3], \
 	(IPV6)->bytes[4], (IPV6)->bytes[5], (IPV6)->bytes[6], (IPV6)->bytes[7], \
@@ -35,7 +36,10 @@ union dp_ipv6 {
 		rte_be64_t	_prefix;
 		rte_be64_t	_suffix;
 	};
-	const uint8_t	bytes[DP_IPV6_ADDR_SIZE];
+	union {
+		const uint8_t				bytes[DP_IPV6_ADDR_SIZE];
+		const struct rte_ipv6_addr	addr;  // TODO actually remove bytes!
+	};
 	struct __rte_packed {
 		uint8_t		prefix[DP_IPV6_ADDR_SIZE - sizeof(rte_be32_t)];
 		rte_be32_t	ipv4;
@@ -49,6 +53,7 @@ union dp_ipv6 {
 	} _ul;
 };
 static_assert(sizeof(union dp_ipv6) == DP_IPV6_ADDR_SIZE, "union dp_ipv6 has padding");
+static_assert(sizeof(struct rte_ipv6_addr) == DP_IPV6_ADDR_SIZE, "rte_ipv6_addr does not match dp_ipv6");
 
 extern const union dp_ipv6 dp_empty_ipv6;
 extern const union dp_ipv6 dp_multicast_ipv6;
@@ -89,13 +94,13 @@ static __rte_always_inline
 void dp_set_src_ipv6(struct rte_ipv6_hdr *ipv6_hdr, const union dp_ipv6 *ipv6)
 {
 	static_assert(sizeof(ipv6_hdr->src_addr) == sizeof(union dp_ipv6), "Structure dp_ipv6 is not compatible with IPv6 source address");
-	dp_copy_ipv6((union dp_ipv6 *)ipv6_hdr->src_addr, ipv6);
+	dp_copy_ipv6((union dp_ipv6 *)ipv6_hdr->src_addr.a, ipv6);
 }
 static __rte_always_inline
 void dp_set_dst_ipv6(struct rte_ipv6_hdr *ipv6_hdr, const union dp_ipv6 *ipv6)
 {
 	static_assert(sizeof(ipv6_hdr->dst_addr) == sizeof(union dp_ipv6), "Structure dp_ipv6 is not compatible with IPv6 destination address");
-	dp_copy_ipv6((union dp_ipv6 *)ipv6_hdr->dst_addr, ipv6);
+	dp_copy_ipv6((union dp_ipv6 *)ipv6_hdr->dst_addr.a, ipv6);
 }
 
 static __rte_always_inline
