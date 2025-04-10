@@ -12,7 +12,7 @@ from scapy.layers.inet6 import IPv6, ICMPv6EchoRequest, ICMPv6EchoReply, _ICMPv6
 from config import *
 
 
-def request_ip(vm, check_hostname=False):
+def request_ip(vm):
 	scapy.config.conf.checkIPaddr = False
 	answer = dhcp_request(iface=vm.tap, timeout=sniff_timeout)
 	validate_checksums(answer)
@@ -27,11 +27,10 @@ def request_ip(vm, check_hostname=False):
 	if not dns_servers or dhcp_dns1 not in dns_servers or dhcp_dns2 not in dns_servers:
 		raise AssertionError(f"DHCP message does not specify the right DNS servers: {dns_servers} instead of {dhcp_dns1} and {dhcp_dns2}")
 
-	# Check for hostname option
-	if check_hostname:
+	if vm.hostname != None:
 		hostname_option = next((opt[1] for opt in options if opt[0] == 'hostname'), None)
 		assert hostname_option is not None, "Hostname option not in DHCP reply"
-		expected_hostname = vm.name
+		expected_hostname = vm.hostname
 		assert hostname_option.decode('utf-8') == expected_hostname, \
 			f"DHCP reply does not specify the correct hostname: {hostname_option.decode('utf-8')} instead of {expected_hostname}"
 

@@ -49,8 +49,6 @@ static uint8_t classless_route[sizeof(classless_route_prefix) + sizeof(server_ip
 static_assert(DP_VIRTSVC_MAX <= UINT8_MAX+1, "Number of virtual services can be higher than supported link-local subnet size");
 #endif
 
-#define DHCP_OPT_HOSTNAME 12
-
 static int dhcp_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 	server_ip = htonl(dp_get_gw_ip4());
@@ -89,11 +87,10 @@ static __rte_always_inline int add_dhcp_option(uint8_t **pos_ptr, uint8_t *end, 
 static __rte_always_inline int add_dhcp_options(struct dp_dhcp_header *dhcp_hdr,
 												 uint8_t msg_type,
 												 enum dp_pxe_mode pxe_mode,
-												 const char *hostname)
+												 const struct dp_port *port)
 {
 	uint8_t *pos = dhcp_hdr->options;
 	uint8_t *end = pos + DHCP_MAX_OPTIONS_LEN;
-	uint8_t hostname_len;
 	const struct dp_conf_dhcp_dns *dhcp_dns = dp_conf_get_dhcp_dns();
 
 	if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_MESSAGE_TYPE, &msg_type, sizeof(msg_type)))
@@ -113,12 +110,9 @@ static __rte_always_inline int add_dhcp_options(struct dp_dhcp_header *dhcp_hdr,
 		if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_DNS, dhcp_dns->array, dhcp_dns->len)))
 			return DP_ERROR;
 
-	if (hostname && hostname[0] != '\0') {
-		hostname_len = (uint8_t)strnlen(hostname, DP_IFACE_HOSTNAME_MAX_LEN - 1);
-
-		if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_HOSTNAME, hostname, hostname_len)))
+	if (port->iface.hostname_len > 0)
+		if (DP_FAILED(add_dhcp_option(&pos, end, DHCP_OPT_HOSTNAME, port->iface.cfg.hostname, (u_int8_t)port->iface.hostname_len)))
 			return DP_ERROR;
-	}
 
 	if (pos >= end)
 		return DP_ERROR;
@@ -190,7 +184,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	rte_be32_t pxe_srv_ip;
 	char pxe_srv_ip_str[INET6_ADDRSTRLEN];
 	uint8_t response_type;
-	const char *hostname;
 
 	incoming_eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	incoming_ipv4_hdr = (struct rte_ipv4_hdr *)(incoming_eth_hdr + 1);
@@ -274,8 +267,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		dhcp_hdr->siaddr = server_ip;
 	}
 
-	hostname = port->iface.cfg.hostname;
-	options_len = add_dhcp_options(dhcp_hdr, response_type, pxe_mode, hostname);
+	options_len = add_dhcp_options(dhcp_hdr, response_type, pxe_mode, port);
 	if (DP_FAILED(options_len)) {
 		DPNODE_LOG_WARNING(node, "DHCP response options too large for a packet");
 		return DHCP_NEXT_DROP;

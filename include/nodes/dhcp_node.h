@@ -21,6 +21,7 @@ extern "C" {
 #define DHCP_OPT_SUBNET_MASK     1
 #define DHCP_OPT_ROUTER          3
 #define DHCP_OPT_DNS             6
+#define DHCP_OPT_HOSTNAME        12
 #define DHCP_OPT_INTERFACE_MTU   26
 #define DHCP_OPT_IP_LEASE_TIME   51
 #define DHCP_OPT_MESSAGE_TYPE    53
