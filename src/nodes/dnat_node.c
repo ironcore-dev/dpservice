@@ -48,7 +48,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			// if it is a network nat pkt
 			if (dnat_data->dnat_ip == 0) {
 				// it is icmp request targeting scalable nat
-				if (df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST) {
+				if (df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REQUEST) {
 					cntrack->nf_info.nat_type = DP_FLOW_NAT_AS_TARGET;
 					return DNAT_NEXT_PACKET_RELAY;
 				}
@@ -97,7 +97,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (DP_FLOW_HAS_FLAG_DEFAULT(cntrack->flow_flags) && cntrack->nf_info.nat_type == DP_FLOW_NAT_AS_TARGET
 		&& (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
-		&& (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REQUEST || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST))
+		&& (df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REQUEST || df->l4_info.icmp_field.icmp_type == DP_ICMPV6_ECHO_REQUEST))
 		return DNAT_NEXT_PACKET_RELAY;
 
 	if (DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
@@ -119,7 +119,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ipv4);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == IPPROTO_ICMP) {
-				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY) {
+				if (df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REPLY) {
 					dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
 				} else if (df->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR) {
 					memset(&icmp_err_ip_info, 0, sizeof(icmp_err_ip_info));
@@ -147,7 +147,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		// the new dst_addr will be stored in dp_nat_chg_ipv4_to_ipv6_hdr()
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == IPPROTO_ICMP) {
-				if (df->l4_info.icmp_field.icmp_type == RTE_IP_ICMP_ECHO_REPLY)
+				if (df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REPLY)
 					dp_change_icmp_identifier(m, cntrack->flow_key[DP_FLOW_DIR_ORG].port_dst);
 			} else {
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
