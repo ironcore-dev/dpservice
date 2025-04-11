@@ -31,11 +31,11 @@ union dp_ipv6 {
 		rte_be64_t	_suffix;
 	};
 	const uint8_t	bytes[DP_IPV6_ADDR_SIZE];
-	struct __rte_packed {
+	struct __attribute__((__packed__)) {
 		uint8_t		prefix[DP_IPV6_ADDR_SIZE - sizeof(rte_be32_t)];
 		rte_be32_t	ipv4;
 	} _nat64;
-	struct __rte_packed {
+	struct __attribute__((__packed__)) {
 		rte_be64_t	prefix;
 		uint8_t		type;
 		uint8_t		subtype;
@@ -187,7 +187,7 @@ struct dp_ip_address {
 		bool				_is_v6;
 		const bool			is_v6;
 	};
-} __rte_packed;
+} __attribute__((__packed__));
 
 static __rte_always_inline
 int dp_ipv6_from_ipaddr(union dp_ipv6 *ipv6, const struct dp_ip_address *addr)
