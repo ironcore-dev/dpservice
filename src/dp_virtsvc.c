@@ -34,7 +34,7 @@ struct dp_virtsvc_conn_key {
 	uint16_t vf_port_id;
 	rte_be16_t vf_l4_port;
 	rte_be32_t vf_ip;
-} __rte_packed;
+} __attribute__((__packed__));
 
 static struct dp_virtsvc *dp_virtservices;
 static struct dp_virtsvc *dp_virtservices_end;
