@@ -2,7 +2,7 @@
 FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
 
 ARG TARGETARCH
-ARG DPDK_VER=24.11.1
+ARG DPDK_VER=25.03
 ARG DPDK_BUILDTYPE=release
 ARG DPSERVICE_BUILDTYPE=debug
 ARG DPSERVICE_FEATURES=""
@@ -52,7 +52,7 @@ ENV PATH="${PATH}:/usr/local/go/bin"
 ADD http://fast.dpdk.org/rel/dpdk-${DPDK_VER}.tar.xz dpdk.tar.xz
 RUN tar -xJf dpdk.tar.xz
 
-ENV DPDK_DIR=/workspace/dpdk-stable-${DPDK_VER}
+ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 
 # Copy DPDK patches
 COPY hack/*.patch hack/

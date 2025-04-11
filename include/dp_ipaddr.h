@@ -40,11 +40,11 @@ union dp_ipv6 {
 		const uint8_t				bytes[DP_IPV6_ADDR_SIZE];
 		const struct rte_ipv6_addr	addr;  // TODO actually remove bytes!
 	};
-	struct __rte_packed {
+	struct __attribute__((__packed__)) {
 		uint8_t		prefix[DP_IPV6_ADDR_SIZE - sizeof(rte_be32_t)];
 		rte_be32_t	ipv4;
 	} _nat64;
-	struct __rte_packed {
+	struct __attribute__((__packed__)) {
 		rte_be64_t	prefix;
 		rte_be16_t	kernel;
 		uint8_t		flags;
@@ -180,7 +180,7 @@ struct dp_ip_address {
 		bool				_is_v6;
 		const bool			is_v6;
 	};
-} __rte_packed;
+} __attribute__((__packed__));
 
 static __rte_always_inline
 int dp_ipv6_from_ipaddr(union dp_ipv6 *ipv6, const struct dp_ip_address *addr)
