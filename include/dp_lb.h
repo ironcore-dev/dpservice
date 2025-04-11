@@ -21,7 +21,7 @@ extern "C" {
 struct lb_key {
 	uint32_t				vni;
 	struct dp_ip_address	ip;
-} __rte_packed;
+} __attribute__((__packed__));
 
 struct lb_port {
 	uint8_t			protocol;

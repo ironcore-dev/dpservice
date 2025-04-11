@@ -26,7 +26,7 @@ extern "C" {
 struct nat_key {
 	uint32_t	ip;
 	uint32_t	vni;
-} __rte_packed;
+} __attribute__((__packed__));
 
 struct nat_entry {
 	uint32_t		nat_ip;
@@ -54,7 +54,7 @@ struct netnat_portmap_key {
 	uint32_t				vni;
 	struct dp_ip_address	src_ip;
 	uint16_t				iface_src_port;
-} __rte_packed;
+} __attribute__((__packed__));
 
 struct netnat_portmap_data {
 	uint32_t	nat_ip;
@@ -68,7 +68,7 @@ struct netnat_portoverload_tbl_key {
 	uint32_t dst_ip;
 	uint16_t dst_port;
 	uint8_t	l4_type;
-} __rte_packed;
+} __attribute__((__packed__));
 
 struct nat_check_result {
 	bool	is_vip_natted;

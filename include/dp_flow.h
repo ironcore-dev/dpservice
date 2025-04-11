@@ -62,7 +62,7 @@ enum dp_flow_nat_type {
 	DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC,
 	DP_FLOW_LB_TYPE_RECIRC,
 	DP_FLOW_LB_TYPE_FORWARD,
-} __rte_packed;
+} __attribute__((__packed__));
 
 enum dp_flow_tcp_state {
 	DP_FLOW_TCP_STATE_NONE,
@@ -84,7 +84,7 @@ struct flow_key {
 		uint16_t type_src; /* ICMP */
 	} src;
 	uint32_t vni;
-} __rte_packed;
+} __attribute__((__packed__));
 static_assert(sizeof(((struct flow_key *)0)->vnf_type) == 1,
 			  "enum dp_vnf_type is unnecessarily big");
 

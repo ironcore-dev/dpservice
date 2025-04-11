@@ -30,7 +30,7 @@ extern struct rte_hash *vni_handle_tbl;
 
 struct dp_vni_key {
 	uint32_t vni;
-} __rte_packed;
+} __attribute__((__packed__));
 
 struct dp_vni_data {
 	struct rte_rib	*ipv4[DP_NB_SOCKETS];
