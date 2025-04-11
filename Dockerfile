@@ -2,7 +2,7 @@
 FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
 
 ARG TARGETARCH
-ARG DPDK_VER=23.11.3
+ARG DPDK_VER=24.11.1
 ARG DPDK_BUILDTYPE=release
 ARG DPSERVICE_BUILDTYPE=debug
 ARG DPSERVICE_FEATURES=""
@@ -57,11 +57,11 @@ ENV DPDK_DIR=/workspace/dpdk-stable-${DPDK_VER}
 # Copy DPDK patches
 COPY hack/*.patch hack/
 RUN cd $DPDK_DIR \
-&& patch -p1 -R < ../hack/dpdk_23_11_3_mtu.patch \
-&& patch -p1 < ../hack/dpdk_23_11_3_fdb_def_rule.patch \
-&& patch -p1 < ../hack/dpdk_23_11_log.patch \
-&& patch -p1 < ../hack/dpdk_23_11_telemetry_key.patch \
-&& patch -p1 < ../hack/dpdk_23_11_ethdev_conversion.patch
+&& patch -p1 -R < ../hack/dpdk_24_11_mtu.patch \
+&& patch -p1 < ../hack/dpdk_24_11_fdb_def_rule.patch \
+&& patch -p1 < ../hack/dpdk_24_11_log.patch \
+&& patch -p1 < ../hack/dpdk_24_11_telemetry_key.patch \
+&& patch -p1 < ../hack/dpdk_24_11_ethdev_conversion.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson setup -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
