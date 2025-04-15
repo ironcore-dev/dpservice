@@ -307,6 +307,7 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df)
 		return DP_ERROR;
 
 	df->conntrack = flow_val;
+	dp_ref_inc(&flow_val->ref_count);
 	dp_cntrack_set_pkt_offload_decision(df);
 
 	return DP_OK;

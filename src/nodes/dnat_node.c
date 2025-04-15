@@ -68,7 +68,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				// then it is a premature dnat pkt for network nat (sent before any outgoing traffic from VM,
 				// and it cannot be a standalone new incoming flow for network NAT),
 				// silently drop it now.
-				return DNAT_NEXT_DROP;
+				DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 			}
 
 			ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -84,7 +84,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 			dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));
 			if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack)))
-				return DNAT_NEXT_DROP;
+				DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 			dp_ref_inc(&cntrack->ref_count);
 		}
 		return DNAT_NEXT_IPV4_LOOKUP;
@@ -102,7 +102,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	if (DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.is_v6)
-			return DNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ipv4);
 		df->nat_type = DP_NAT_CHG_DST_IP;
@@ -114,7 +114,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_REPLY) {
 		if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.is_v6)
-			return DNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ipv4);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
@@ -125,7 +125,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 					memset(&icmp_err_ip_info, 0, sizeof(icmp_err_ip_info));
 					dp_get_icmp_err_ip_hdr(m, &icmp_err_ip_info);
 					if (!icmp_err_ip_info.err_ipv4_hdr || !icmp_err_ip_info.l4_src_port || !icmp_err_ip_info.l4_dst_port)
-						return DNAT_NEXT_DROP;
+						DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 					icmp_err_ip_info.err_ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ipv4);
 					icmp_err_ip_info.err_ipv4_hdr->hdr_checksum = cntrack->nf_info.icmp_err_ip_cksum;
 					dp_change_icmp_err_l4_src_port(m, &icmp_err_ip_info, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
@@ -155,7 +155,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		}
 		if (DP_FAILED(dp_ipv6_from_ipaddr(&nat_ipv6, &cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src))
 			|| DP_FAILED(dp_nat_chg_ipv4_to_ipv6_hdr(df, m, &nat_ipv6)))
-			return DNAT_NEXT_DROP;
+			DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 
 		return DNAT_NEXT_IPV6_LOOKUP;
 	}
@@ -166,7 +166,7 @@ out:
 	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
 		return DNAT_NEXT_IPV6_LOOKUP;
 	else
-		return DNAT_NEXT_DROP;
+		DP_RETURN_REF_COUNT_REDUCE_DROP(cntrack, DNAT_NEXT_DROP);
 }
 
 static uint16_t dnat_node_process(struct rte_graph *graph,
