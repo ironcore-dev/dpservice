@@ -107,8 +107,7 @@ size_t dp_virtsvc_get_count(void);
 
 int dp_install_virtsvc_sync_isolation_rules(uint16_t port_id);
 uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
-												 struct rte_flow_template_table *tcp_template_table,
-												 struct rte_flow_template_table *udp_template_table);
+												 struct rte_flow_template_table *template_table);
 void dp_destroy_virtsvc_async_isolation_rules(uint16_t port_id);
 
 int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,

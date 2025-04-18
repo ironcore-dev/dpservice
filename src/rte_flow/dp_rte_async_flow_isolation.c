@@ -77,7 +77,7 @@ int dp_create_pf_async_isolation_templates(struct dp_port *port)
 }
 
 #ifdef ENABLE_VIRTSVC
-int dp_create_virtsvc_async_isolation_templates(struct dp_port *port, uint8_t proto_id)
+int dp_create_virtsvc_async_isolation_templates(struct dp_port *port)
 {
 	struct dp_port_async_template *tmpl;
 
@@ -85,20 +85,14 @@ int dp_create_virtsvc_async_isolation_templates(struct dp_port *port, uint8_t pr
 	if (!tmpl)
 		return DP_ERROR;
 
-	if (proto_id == IPPROTO_TCP)
-		port->default_async_rules.default_templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION] = tmpl;
-	else
-		port->default_async_rules.default_templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION] = tmpl;
+	port->default_async_rules.default_templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_ISOLATION] = tmpl;
 
 	const struct rte_flow_item tcp_src_pattern[] = {
 		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
 			.mask = &dp_flow_item_eth_mask,
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
-			.mask = &dp_flow_item_ipv6_src_dst_mask,
-		},
-		{	.type = proto_id == IPPROTO_TCP ? RTE_FLOW_ITEM_TYPE_TCP : RTE_FLOW_ITEM_TYPE_UDP,
-			.mask = proto_id == IPPROTO_TCP ? (const void *)&dp_flow_item_tcp_src_mask : (const void *)&dp_flow_item_udp_src_mask,
+			.mask = &dp_flow_item_ipv6_dst_only_mask,
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_END },
 	};
@@ -153,8 +147,7 @@ static struct rte_flow *dp_create_pf_async_isolation_rule(uint16_t port_id, uint
 }
 
 #ifdef ENABLE_VIRTSVC
-struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_t proto_id,
-														const union dp_ipv6 *svc_ipv6, rte_be16_t svc_port,
+struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id,
 														struct rte_flow_template_table *template_table,
 														const union dp_ipv6 *ul_addr)
 {
@@ -162,15 +155,7 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 		.hdr.ether_type = htons(RTE_ETHER_TYPE_IPV6),
 	};
 	const struct rte_flow_item_ipv6 ipv6_spec = {
-		.hdr.proto = proto_id,
-		.hdr.src_addr = svc_ipv6->addr,
 		.hdr.dst_addr = ul_addr->addr,
-	};
-	const struct rte_flow_item_tcp tcp_spec = {
-		.hdr.src_port = svc_port,
-	};
-	const struct rte_flow_item_udp udp_spec = {
-		.hdr.src_port = svc_port,
 	};
 	const struct rte_flow_item pattern[] = {
 		{	.type = RTE_FLOW_ITEM_TYPE_ETH,
@@ -178,9 +163,6 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_IPV6,
 			.spec = &ipv6_spec,
-		},
-		{	.type = proto_id == IPPROTO_TCP ? RTE_FLOW_ITEM_TYPE_TCP : RTE_FLOW_ITEM_TYPE_UDP,
-			.spec = proto_id == IPPROTO_TCP ? (const void *)&tcp_spec : (const void *)&udp_spec,
 		},
 		{	.type = RTE_FLOW_ITEM_TYPE_END },
 	};
@@ -231,8 +213,7 @@ int dp_create_pf_async_isolation_rules(struct dp_port *port)
 #ifdef ENABLE_VIRTSVC
 	rules_required += dp_virtsvc_get_count();
 	rule_count += dp_create_virtsvc_async_isolation_rules(port->port_id,
-											templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_TCP_ISOLATION]->template_table,
-											templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_UDP_ISOLATION]->template_table);
+											templates[DP_PORT_ASYNC_TEMPLATE_VIRTSVC_ISOLATION]->template_table);
 	// cannot return, need to push all previous rules and then return error
 #endif
 
