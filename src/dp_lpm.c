@@ -231,11 +231,11 @@ int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, cons
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
-	node = rte_rib6_lookup_exact(root, ipv6->bytes, depth);
+	node = rte_rib6_lookup_exact(root, &ipv6->addr, depth);
 	if (node)
 		return DP_GRPC_ERR_ROUTE_EXISTS;
 
-	node = rte_rib6_insert(root, ipv6->bytes, depth);
+	node = rte_rib6_insert(root, &ipv6->addr, depth);
 	if (!node)
 		return DP_GRPC_ERR_ROUTE_INSERT;
 
@@ -261,7 +261,7 @@ int dp_del_route6(const struct dp_port *port, uint32_t vni, const union dp_ipv6 
 	if (!root)
 		return DP_GRPC_ERR_NO_VNI;
 
-	node = rte_rib6_lookup_exact(root, ipv6->bytes, depth);
+	node = rte_rib6_lookup_exact(root, &ipv6->addr, depth);
 	if (!node)
 		return DP_GRPC_ERR_ROUTE_NOT_FOUND;
 
@@ -270,7 +270,7 @@ int dp_del_route6(const struct dp_port *port, uint32_t vni, const union dp_ipv6 
 	if (next_hop != port->port_id)
 		return DP_GRPC_ERR_ROUTE_BAD_PORT;
 
-	rte_rib6_remove(root, ipv6->bytes, depth);
+	rte_rib6_remove(root, &ipv6->addr, depth);
 	return DP_GRPC_OK;
 }
 
@@ -323,7 +323,7 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	struct rte_rib6 *root;
 	uint64_t next_hop;
 	struct dp_port *dst_port;
-	uint8_t ip[RTE_RIB6_IPV6_ADDR_SIZE];
+	struct rte_ipv6_addr ip;
 
 	if (t_vni == 0)
 		t_vni = in_port->iface.vni;
@@ -332,7 +332,7 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	if (!root)
 		return NULL;
 
-	node = rte_rib6_lookup(root, df->dst.dst_addr6.bytes);
+	node = rte_rib6_lookup(root, &df->dst.dst_addr6.addr);
 	if (!node)
 		return NULL;
 
@@ -346,9 +346,9 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	if (dst_port->is_pf)
 		rte_memcpy(route, rte_rib6_get_ext(node), sizeof(*route));
 
-	if (DP_FAILED(rte_rib6_get_ip(node, ip)))
+	if (DP_FAILED(rte_rib6_get_ip(node, &ip)))
 		return NULL;
 
-	DP_IPV6_FROM_ARRAY(p_ipv6, ip);
+	dp_ipv6_from_rte(p_ipv6, &ip);
 	return dst_port;
 }

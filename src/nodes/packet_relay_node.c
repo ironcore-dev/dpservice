@@ -23,15 +23,15 @@ static __rte_always_inline rte_edge_t lb_nnat_icmp_reply(struct dp_flow *df, str
 	uint32_t temp_ip;
 	uint32_t cksum;
 
-	if (icmp_hdr->icmp_type != RTE_IP_ICMP_ECHO_REQUEST)
+	if (icmp_hdr->icmp_type != RTE_ICMP_TYPE_ECHO_REQUEST)
 		return PACKET_RELAY_NEXT_DROP;
 
 	// rewrite the packet and send it back
-	icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
+	icmp_hdr->icmp_type = RTE_ICMP_TYPE_ECHO_REPLY;
 
 	cksum = ~icmp_hdr->icmp_cksum & 0xffff;
-	cksum += ~RTE_BE16(RTE_IP_ICMP_ECHO_REQUEST << 8) & 0xffff;
-	cksum += RTE_BE16(RTE_IP_ICMP_ECHO_REPLY << 8);
+	cksum += ~RTE_BE16(RTE_ICMP_TYPE_ECHO_REQUEST << 8) & 0xffff;
+	cksum += RTE_BE16(RTE_ICMP_TYPE_ECHO_REPLY << 8);
 	cksum = (cksum & 0xffff) + (cksum >> 16);
 	cksum = (cksum & 0xffff) + (cksum >> 16);
 	icmp_hdr->icmp_cksum = (uint16_t)~cksum;
