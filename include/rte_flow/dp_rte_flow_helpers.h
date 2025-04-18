@@ -63,10 +63,8 @@ static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_mask = {
 	.hdr.proto = 0xff,
 };
 #ifdef ENABLE_VIRTSVC
-static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_src_dst_mask = {
-	.hdr.src_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_only_mask = {
 	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
-	.hdr.proto = 0xff,
 };
 #endif
 
