@@ -163,8 +163,8 @@ struct rte_flow *dp_create_virtsvc_async_isolation_rule(uint16_t port_id, uint8_
 	};
 	const struct rte_flow_item_ipv6 ipv6_spec = {
 		.hdr.proto = proto_id,
-		.hdr.src_addr = DP_INIT_FROM_IPV6(svc_ipv6),
-		.hdr.dst_addr = DP_INIT_FROM_IPV6(ul_addr),
+		.hdr.src_addr = svc_ipv6->addr,
+		.hdr.dst_addr = ul_addr->addr,
 	};
 	const struct rte_flow_item_tcp tcp_spec = {
 		.hdr.src_port = svc_port,

@@ -396,9 +396,9 @@ int dp_nat_chg_ipv6_to_ipv4_hdr(struct dp_flow *df, struct rte_mbuf *m, uint32_t
 		icmp_hdr = (struct rte_icmp_hdr *)(ipv4_hdr + 1);
 		icmp_hdr->icmp_code = 0;
 		if (icmp_hdr->icmp_type == DP_ICMPV6_ECHO_REQUEST)
-			icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REQUEST;
+			icmp_hdr->icmp_type = RTE_ICMP_TYPE_ECHO_REQUEST;
 		else if (icmp_hdr->icmp_type == DP_ICMPV6_ECHO_REPLY)
-			icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
+			icmp_hdr->icmp_type = RTE_ICMP_TYPE_ECHO_REPLY;
 		else
 			return DP_ERROR; //Drop unsupported ICMP Types for the time being
 		dp_calculate_icmp_checksum(icmp_hdr, rte_be_to_cpu_16(ipv4_hdr->total_length) - ((ipv4_hdr->version_ihl & 0x0F) * 4));
@@ -476,9 +476,9 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const un
 		icmp_hdr->icmp_code = 0;
 		icmp_hdr->icmp_cksum = 0;
 
-		if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REQUEST)
+		if (icmp_hdr->icmp_type == RTE_ICMP_TYPE_ECHO_REQUEST)
 			icmp_hdr->icmp_type = DP_ICMPV6_ECHO_REQUEST;
-		else if (icmp_hdr->icmp_type == RTE_IP_ICMP_ECHO_REPLY)
+		else if (icmp_hdr->icmp_type == RTE_ICMP_TYPE_ECHO_REPLY)
 			icmp_hdr->icmp_type = DP_ICMPV6_ECHO_REPLY;
 		else
 			return DP_ERROR; //Drop unsupported ICMP Types for the time being

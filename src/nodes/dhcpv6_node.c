@@ -148,9 +148,10 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 			reply_options->opt_iana = opt_iana_template;
 			reply_options->opt_iana.ia_na.iaid = ((const struct dhcpv6_ia_na *)&opt->data)->iaid;
 			// cannot use optimized function here due to the destination being packed (can cause alignment problems)
-			static_assert(sizeof(reply_options->opt_iana.ia_na.options[0].addr.ipv6) == sizeof(dp_get_in_port(m)->iface.cfg.dhcp_ipv6),
+			static_assert(sizeof(reply_options->opt_iana.ia_na.options[0].addr.ipv6) == sizeof(dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes),
 						  "Incompatible IPv6 array for IA_NA options");
-			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6, dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes, DP_IPV6_ADDR_SIZE);
+			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6,
+					   dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes, sizeof(dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes));
 			reply_options->opt_iana_len = sizeof(opt_iana_template);
 			break;
 		case DHCPV6_OPT_RAPID_COMMIT:

@@ -77,7 +77,7 @@ static int dp_graphtrace_sprint_ipv6(void **p_pkt_data, size_t *p_pos, char *buf
 
 	PRINT_LAYER(p_pos, buf, bufsize,
 		DP_IPV6_PRINT_FMT " -> " DP_IPV6_PRINT_FMT,
-		DP_IPV6_PRINT_BYTES(ipv6_hdr->src_addr), DP_IPV6_PRINT_BYTES(ipv6_hdr->dst_addr));
+		DP_IPV6_PRINT_BYTES(ipv6_hdr->src_addr.a), DP_IPV6_PRINT_BYTES(ipv6_hdr->dst_addr.a));
 
 	*p_pkt_data = ipv6_hdr + 1;
 	return ipv6_hdr->proto;
