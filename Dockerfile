@@ -61,6 +61,7 @@ RUN cd $DPDK_DIR \
 && patch -p1 < ../hack/dpdk_24_11_fdb_def_rule.patch \
 && patch -p1 < ../hack/dpdk_24_11_log.patch \
 && patch -p1 < ../hack/dpdk_24_11_telemetry_key.patch \
+&& patch -p1 < ../hack/dpdk_24_11_no_pattern_template_validation.patch \
 && patch -p1 < ../hack/dpdk_24_11_ethdev_conversion.patch
 
 # Compile DPDK
