@@ -98,6 +98,7 @@ static uint16_t tx_node_process(struct rte_graph *graph,
 			if (df->offload_state == DP_FLOW_OFFLOAD_INSTALL)
 				if (DP_FAILED(dp_offload_handler(m, df)))
 					DPNODE_LOG_WARNING(node, "Offloading handler failed");
+			dp_ref_dec(&df->conntrack->ref_count);
 		}
 	}
 
