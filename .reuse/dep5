@@ -18,6 +18,7 @@ Files:
   *.json
   *meson.build
   proto/dpdk.proto
+  proto/health.proto
   meson_options.txt
   include/dp_version.h.in
   cli/dpservice-cli/.gitignore
