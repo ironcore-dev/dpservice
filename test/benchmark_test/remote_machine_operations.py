@@ -8,6 +8,9 @@ import sys
 
 from remote_machine_management import get_remote_machine, add_vm_config_info, add_vm_nat_config
 
+def generate_dpservice_cli_base_cmd(machine_name):
+	dpservice_container_name = f"dpservice_{machine_name}"
+	return f"docker exec {dpservice_container_name} dpservice-cli "
 
 def remote_machine_op_upload(machine_name, local_path, remote_path):
 	machine = None
@@ -75,9 +78,9 @@ def remote_machine_op_docker_load_image(machine_name, image_file):
 			machine.logger.error(f"Failed to load docker image {image_file}: {e}")
 
 
-def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_image_url='', path_to_bin="/tmp/dpservice-bin"):
+def remote_machine_op_dpservice_start(machine_name, offload, docker_image_url='', path_to_bin="/tmp/dpservice-bin"):
 
-	if is_docker and docker_image_url == '':
+	if docker_image_url == '':
 		raise ValueError(
 			f"docker image url is required if dpservice is running in docker env")
 	machine = None
@@ -92,33 +95,16 @@ def remote_machine_op_dpservice_start(machine_name, offload, is_docker, docker_i
 		flag += '--enable-ipv6-overlay '
 		parameters = f"-l 0,1 {flag}"
 
-		if is_docker:
-			docker_run_command = f"docker run"
-			docker_run_parameters = f"-d --privileged --network host --name {docker_container_name} " \
-				f"--mount type=bind,source=/dev/hugepages,target=/dev/hugepages " \
-				f"--mount type=bind,source=/tmp,target=/tmp {docker_image_url}  {parameters} "
-			docker_run_task = [
-				{"command": docker_run_command, "parameters": docker_run_parameters,
-					"background": False, "sudo": True}
-			]
-			machine.exec_task(docker_run_task)
-		else:
-			# Check if dpservice is already running
-			check_command = f"pgrep -f {path_to_bin}"
-			running_pid = machine.ssh_manager.run_command(check_command)
-			if running_pid:
-				# If running, kill the existing process
-				kill_command = f"kill {running_pid.strip()}"
-				machine.ssh_manager.run_command(kill_command, sudo=True)
-				time.sleep(1)
-				machine.logger.info(
-					f"Existing dpservice process killed: PID {running_pid.strip()}")
-
-			dpservice_task = [
-				{"command": path_to_bin, "parameters": parameters,
-					"background": True, "sudo": True, "cmd_output_name": "dpservice"},
-			]
-			machine.exec_task(dpservice_task)
+		docker_run_command = f"docker run"
+		docker_run_parameters = f"-d --privileged --network host --name {docker_container_name} " \
+			f"--mount type=bind,source=/dev/hugepages,target=/dev/hugepages " \
+			f"--mount type=bind,source=/tmp,target=/tmp {docker_image_url}  {parameters} "
+		docker_run_task = [
+			{"command": docker_run_command, "parameters": docker_run_parameters,
+				"background": False, "sudo": True}
+		]
+		machine.exec_task(docker_run_task)
+		
 	except Exception as e:
 		if machine:
 			machine.logger.error(f"Failed to start dpservice on hypervisor: {e}")
@@ -152,7 +138,7 @@ def remote_machine_op_dpservice_init(machine_name):
 			raise NotImplementedError(
 				f"Cannot configure dpservice on a vm machine {machine_name}")
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": "init", "delay": 5},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": "init", "delay": 5},
 		]
 		machine.exec_task(cli_task)
 		time.sleep(1)
@@ -170,7 +156,7 @@ def remote_machine_op_dpservice_create_interface(machine_name, if_id, vni, ipv4,
 				f"Cannot configure dpservice on a vm machine {machine_name}")
 		parameters = f"create interface --id={if_id} --vni={vni} --ipv4={ipv4} --ipv6={ipv6} --device={pci_dev}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -187,7 +173,7 @@ def remote_machine_op_dpservice_create_nat(machine_name, if_id, ip, ports):
 				f"Cannot configure dpservice and create nat on a vm machine {machine_name}")
 		parameters = f"create nat --interface-id={if_id} --nat-ip={ip} --minport={ports[0]} --maxport={ports[1]}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -204,7 +190,7 @@ def remote_machine_op_dpservice_delete_nat(machine_name, if_id):
 				f"Cannot configure dpservice and delete nat on a vm machine {machine_name}")
 		parameters = f"delete nat --interface-id={if_id} "
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -221,7 +207,7 @@ def remote_machine_op_dpservice_create_lb(machine_name, lb_name, lb_vni, lb_ip, 
 				f"Cannot configure dpservice and create lb on a vm machine {machine_name}")
 		parameters = f"create loadbalancer --id={lb_name} --vni={lb_vni} --vip={lb_ip} --lbports={lb_ports}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -238,7 +224,7 @@ def remote_machine_op_dpservice_delete_lb(machine_name, lb_name):
 				f"Cannot configure dpservice and delete lb on a vm machine {machine_name}")
 		parameters = f"delete loadbalancer --id={lb_name}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -255,7 +241,7 @@ def remote_machine_op_dpservice_create_lbpfx(machine_name, prefix, if_id):
 				f"Cannot configure dpservice and create lbpfx on a vm machine {machine_name}")
 		parameters = f"create lbprefix --interface-id={if_id} --prefix={prefix}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -272,7 +258,7 @@ def remote_machine_op_dpservice_delete_lbpfx(machine_name, prefix, if_id):
 				f"Cannot configure dpservice and delete lbpfx on a vm machine {machine_name}")
 		parameters = f"delete lbprefix --interface-id={if_id} --prefix={prefix}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -289,7 +275,7 @@ def remote_machine_op_dpservice_create_lbtarget(machine_name, target_ip, lb_name
 				f"Cannot configure dpservice and create lbtarget on a vm machine {machine_name}")
 		parameters = f"create lbtarget --target-ip={target_ip} --lb-id={lb_name}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -306,7 +292,7 @@ def remote_machine_op_dpservice_delete_lbtarget(machine_name, target_ip, lb_name
 				f"Cannot configure dpservice and delete lbtarget on a vm machine {machine_name}")
 		parameters = f"delete lbtarget --target-ip={target_ip} --lb-id={lb_name}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		return machine.exec_task(cli_task)
 	except Exception as e:
@@ -342,7 +328,7 @@ def remote_machine_op_dpservice_create_route(machine_name, prefix, nxt_hop_vni, 
 				f"Cannot configure dpservice on a vm machine {machine_name}")
 		parameters = f"create route --prefix={prefix} --next-hop-vni={nxt_hop_vni} --next-hop-ip={nxt_hop_underly_ip} --vni={vni}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		machine.exec_task(cli_task)
 	except Exception as e:
@@ -359,7 +345,7 @@ def remote_machine_op_dpservice_delete_route(machine_name, prefix, vni):
 				f"Cannot configure dpservice on a vm machine {machine_name}")
 		parameters = f"delete route --prefix={prefix} --vni={vni}"
 		cli_task = [
-			{"command": "/tmp/dpservice-cli", "parameters": parameters},
+			{"command": generate_dpservice_cli_base_cmd(machine_name), "sudo": True, "parameters": parameters},
 		]
 		machine.exec_task(cli_task)
 	except Exception as e:

@@ -48,8 +48,6 @@ def init_dpservice(
 ):
 	try:
 		for hypervisor_info in env_config["hypervisors"]:
-			check_dpservice_cli(hypervisor_info["machine_name"], build_path)
-
 			if stage == "dev":
 				upload_and_import_docker_image(
 					hypervisor_info["machine_name"],
@@ -62,7 +60,6 @@ def init_dpservice(
 			remote_machine_op_dpservice_start(
 				hypervisor_info["machine_name"],
 				offload=is_offload,
-				is_docker=True,
 				docker_image_url=docker_image,
 			)
 			machine_name = hypervisor_info["machine_name"]
@@ -156,20 +153,6 @@ def tear_down_lb(lb_config):
 
 	for node in lb_config.get_nodes():
 		remote_machine_op_dpservice_delete_lb(node, lb_config.get_id())
-
-
-def check_dpservice_cli(machine_name, build_dir):
-	downloaded_cli_path = f"{build_dir}/cli/dpservice-cli/dpservice-cli"
-	target_cli_path = "/tmp/dpservice-cli"
-	try:
-		if not remote_machine_op_file_exists(machine_name, target_cli_path):
-			test_logger.info(f"Uploading dpservice-cli to {machine_name}")
-			remote_machine_op_upload(
-				machine_name, downloaded_cli_path, target_cli_path)
-			remote_machine_op_make_runnable(machine_name, target_cli_path)
-			test_logger.info(f"Uploaded dpservice-cli to {machine_name}")
-	except Exception as e:
-		test_logger.error(f"Failed to prepare dpservice cli on hypervisors due to {e}")
 
 
 def prepare_test_environment(
