@@ -22,8 +22,6 @@ If the two Servers, that host VMs in tests, run Gardenlinux, and they require ex
 sudo nft add chain inet filter input '{ policy accept; }'
 ```
 
-Additionally, if the used hypervisors are running Gardenlinux, it is needed to remount `/tmp` to allow execute binary files being uploaded to it, due to the strict security policy. Simply execute `sudo mount -o remount,exec /tmp`.
-
 
 ## Enable QEMU's default networking
 To ssh into VMs, QEMU's default networking needs to be activated and configured to support IP address assignment via DHCP. Enter the libvirt's default network editing mode by running `sudo virsh net-edit default`, copy the configureation and restart libvirt service by running `sudo systemctl restart libvirtd`.
@@ -79,6 +77,7 @@ The most commonly used commands to run the provision script are as follows.
 
 2. `./provision.py --clean-up`. It is expected that the provisioned VMs are destroyed and undefined.
 
+It is possible to login into the provisioned VMs with the user name `root` and password `test123`, using the libvirt's console.
 
 # Execution of test script
 This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`. In oder to run dpservice either natively or via container, please make sure that a valid dp_service.conf file is created under `/tmp`.
@@ -91,7 +90,7 @@ The testing script assumes that dpservice-cli exists under '/tmp' on hypervisors
 This script accepts several parameters, which are explained as follows.
 1. `--mode`. This option specifies which operation mode of dpservice needs to be tested. Select from 'offload', 'non-offload' and 'both'. It must be specified.
 
-2. `--stage`. This option specifies which testing stage needs to be used. Choose its value from 'dev' and 'cicd'. The stage of 'dev' is intended for carrying out tests during the development. If this option is set to 'dev', a docker image will be generated from the local repository of dpservice, and this image will be transferred to the hypervisors and executed. For example, a command like `./runtest.py --mode non-offloading --stage deploy -v` will achieve this purpose.
+2. `--stage`. This option specifies which testing stage needs to be used. Choose its value from 'dev' and 'cicd'. The stage of 'dev' is intended for carrying out tests during the development. If this option is set to 'dev', a docker image will be generated from the local repository of dpservice, and this image will be transferred to the hypervisors and executed. For example, a command like `./runtest.py --mode non-offloading --stage dev -v` will achieve this purpose.
 Alternatively, if this option is set as 'cicd', the above described docker image generating process will not happen. Instead, a docker image specified by the option "--docker-image" will be used on hypervisors. This is a required option.
 
 3. `--docker-image`. This option specifies the container image to be deployed to hypervisors. It is optional but required for the 'cicd' stage.
