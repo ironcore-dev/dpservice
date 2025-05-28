@@ -17,13 +17,19 @@ class DpService:
 
 	DP_SERVICE_CONF = "/tmp/dp_service.conf"
 
-	def __init__(self, build_path, port_redundancy, fast_flow_timeout,
+	def _get_tap(self, spec):
+		return spec.tap_b if self.secondary else spec.tap
+
+	def __init__(self, build_path, port_redundancy, fast_flow_timeout, secondary=False,
 				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
+		self.secondary = secondary
 
 		if self.hardware:
+			if secondary:
+				raise ValueError("Hardware tests not available for HA configuration")
 			self.reconfigure_tests(DpService.DP_SERVICE_CONF)
 		else:
 			if offloading:
@@ -34,23 +40,28 @@ class DpService:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8 --huge-unlink '
+		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8 --huge-unlink'
+		if self.secondary:
+			self.cmd += ' --file-prefix=hatest'
 		if not self.hardware:
 			self.cmd += (f' --no-pci'
-						 f' --vdev={PF0.pci},iface={PF0.tap},mac="{PF0.mac}"'
-						 f' --vdev={PF1.pci},iface={PF1.tap},mac="{PF1.mac}"'
-						 f' --vdev={VM1.pci},iface={VM1.tap},mac="{VM1.mac}"'
-						 f' --vdev={VM2.pci},iface={VM2.tap},mac="{VM2.mac}"'
-						 f' --vdev={VM3.pci},iface={VM3.tap},mac="{VM3.mac}"'
-						 f' --vdev={VM4.pci},iface={VM4.tap},mac="{VM4.mac}"')
+						 f' --vdev={PF0.pci},iface={self._get_tap(PF0)},mac="{PF0.mac}"'
+						 f' --vdev={PF1.pci},iface={self._get_tap(PF1)},mac="{PF1.mac}"'
+						 f' --vdev={VM1.pci},iface={self._get_tap(VM1)},mac="{VM1.mac}"'
+						 f' --vdev={VM2.pci},iface={self._get_tap(VM2)},mac="{VM2.mac}"'
+						 f' --vdev={VM3.pci},iface={self._get_tap(VM3)},mac="{VM3.mac}"'
+						 f' --vdev={VM4.pci},iface={self._get_tap(VM4)},mac="{VM4.mac}"')
 		self.cmd += ' --'
 		if not self.hardware:
-			self.cmd +=  f' --pf0={PF0.tap} --pf1={PF1.tap} --vf-pattern={vf_tap_pattern} --nic-type=tap'
+			self.cmd += (f' --pf0={self._get_tap(PF0)}'
+						 f' --pf1={self._get_tap(PF1)}'
+						 f' --vf-pattern={vf_tap_pattern_b if self.secondary else vf_tap_pattern}'
+						 f' --nic-type=tap')
 		self.cmd +=	(f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
 					 f' --dhcp-mtu={dhcp_mtu}'
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
 					 f' --dhcpv6-dns="{dhcpv6_dns1}" --dhcpv6-dns="{dhcpv6_dns2}"'
-					 f' --grpc-port={grpc_port}'
+					 f' --grpc-port={grpc_port_b if self.secondary else grpc_port}'
 					  ' --no-stats'
 					  ' --color=auto')
 		if graphtrace:
@@ -79,12 +90,12 @@ class DpService:
 			stop_process(self.process)
 
 	def init_ifaces(self, grpc_client):
-		interface_init(VM1.tap)
-		interface_init(VM2.tap)
-		interface_init(VM3.tap)
-		interface_init(PF0.tap)
+		interface_init(self._get_tap(VM1))
+		interface_init(self._get_tap(VM2))
+		interface_init(self._get_tap(VM3))
+		interface_init(self._get_tap(PF0))
 		if not self.hardware:  # see above
-			interface_init(PF1.tap, self.port_redundancy)
+			interface_init(self._get_tap(PF1), self.port_redundancy)
 		grpc_client.init()
 		VM1.ul_ipv6 = grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name, hostname=VM1.hostname)
 		VM2.ul_ipv6 = grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name)

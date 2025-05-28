@@ -41,6 +41,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--graphtrace", action="store_true", help="Log graph tracing messages"
 	)
+	parser.addoption(
+		"--ha", action="store_true", help="Run two dpservice instances"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -55,17 +58,27 @@ def fast_flow_timeout(request):
 	return request.config.getoption("--fast-flow-timeout")
 
 @pytest.fixture(scope="package")
+def ha_mode(request):
+	return request.config.getoption("--ha")
+
+@pytest.fixture(scope="package")
 def grpc_client(request, build_path):
 	if request.config.getoption("--dpgrpc"):
 		return DpGrpcClient(build_path)
-	return GrpcClient(build_path)
+	return GrpcClient(build_path, grpc_port)
+
+@pytest.fixture(scope="package")
+def grpc_client_b(build_path):
+	return GrpcClient(build_path, grpc_port_b)
 
 
 # All tests require dp_service to be running
-@pytest.fixture(scope="package")
-def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
+def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary):
+
+	port = grpc_port_b if secondary else grpc_port
 
 	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout,
+						   secondary = secondary,
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
 						   offloading = request.config.getoption("--offloading"),
@@ -73,10 +86,10 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
-		wait_for_port(grpc_port)
+		wait_for_port(port)
 		return dp_service
 
-	if is_port_open(grpc_port):
+	if is_port_open(port):
 		raise AssertionError("Another service already running")
 
 	def tear_down():
@@ -86,10 +99,20 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 	print("------ Service init ------")
 	print(dp_service.get_cmd())
 	dp_service.start()
-	wait_for_port(grpc_port, 10)
+	wait_for_port(port, 10)
 	print("--------------------------")
 
 	return dp_service
+
+@pytest.fixture(scope="package")
+def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
+	return _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary=False)
+
+@pytest.fixture(scope="package")
+def dp_service_b(request, build_path, port_redundancy, fast_flow_timeout, ha_mode):
+	if not ha_mode:
+		raise ValueError("Secondary dpservice only available for --ha")
+	return _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary=True)
 
 
 # Most tests require interfaces to be up and routing established
@@ -100,6 +123,12 @@ def prepare_ifaces(request, dp_service, grpc_client):
 		return
 	print("---- Interfaces init -----")
 	dp_service.init_ifaces(grpc_client)
+	print("--------------------------")
+
+@pytest.fixture(scope="package")
+def prepare_ifaces_b(dp_service_b, grpc_client_b):
+	print("--- B Interfaces init ----")
+	dp_service_b.init_ifaces(grpc_client_b)
 	print("--------------------------")
 
 

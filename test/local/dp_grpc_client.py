@@ -6,7 +6,6 @@ import socket
 import subprocess
 import time
 import re
-from config import grpc_port
 
 
 class DpGrpcError(Exception):
