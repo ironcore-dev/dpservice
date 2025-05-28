@@ -9,7 +9,7 @@ from dp_grpc_client import DpGrpcClient
 from dp_service import DpService
 from exporter import Exporter
 from grpc_client import GrpcClient
-from helpers import request_ip, wait_for_port, is_port_open
+from helpers import request_ip, wait_for_port, is_port_open, run_command
 
 
 def pytest_addoption(parser):
@@ -41,6 +41,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--graphtrace", action="store_true", help="Log graph tracing messages"
 	)
+	parser.addoption(
+		"--ha", action="store_true", help="Run two dpservice instances"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -55,17 +58,28 @@ def fast_flow_timeout(request):
 	return request.config.getoption("--fast-flow-timeout")
 
 @pytest.fixture(scope="package")
+def ha_mode(request):
+	return request.config.getoption("--ha")
+
+@pytest.fixture(scope="package")
 def grpc_client(request, build_path):
 	if request.config.getoption("--dpgrpc"):
 		return DpGrpcClient(build_path)
-	return GrpcClient(build_path)
+	return GrpcClient(build_path, grpc_port)
+
+@pytest.fixture(scope="package")
+def grpc_client_b(build_path):
+	return GrpcClient(build_path, grpc_port_b)
 
 
 # All tests require dp_service to be running
-@pytest.fixture(scope="package")
-def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
+def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary, ha):
+
+	port = grpc_port_b if secondary else grpc_port
 
 	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout,
+						   secondary = secondary,
+						   ha = ha,
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
 						   offloading = request.config.getoption("--offloading"),
@@ -73,10 +87,10 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")
-		wait_for_port(grpc_port)
+		wait_for_port(port)
 		return dp_service
 
-	if is_port_open(grpc_port):
+	if is_port_open(port):
 		raise AssertionError("Another service already running")
 
 	def tear_down():
@@ -86,10 +100,45 @@ def dp_service(request, build_path, port_redundancy, fast_flow_timeout):
 	print("------ Service init ------")
 	print(dp_service.get_cmd())
 	dp_service.start()
-	wait_for_port(grpc_port, 10)
-	print("--------------------------")
+	wait_for_port(port, 10)
 
+	print("--------------------------")
 	return dp_service
+
+@pytest.fixture(scope="package")
+def sync_setup(request, ha_mode):
+	if not ha_mode:
+		return
+
+	def tear_down():
+		print("------ Sync cleanup ------")
+		for iface in (sync_tap_b, sync_tap_a, sync_bridge):
+			#print(run_command(f"ip -s link show {iface}").decode())
+			run_command(f"sh -c 'ip link show {iface} && ip link del {iface} || true'")
+	request.addfinalizer(tear_down)
+
+	print("------- Sync init --------")
+	run_command(f"sh -c 'ip link show {sync_bridge} || ip link add {sync_bridge} type bridge'")
+	run_command(f"sh -c 'echo 0 > /sys/class/net/{sync_bridge}/bridge/multicast_snooping'")
+	for sync_tap in (sync_tap_a, sync_tap_b):
+		run_command(f"sh -c 'ip link show {sync_tap} || ip tuntap add dev {sync_tap} mode tap multi_queue'")
+		# the default is fine for this test suite
+		#run_command(f"ip link set {sync_tap} txqueuelen 500000")
+		run_command(f"ip link set {sync_tap} master {sync_bridge}")
+	for iface in (sync_bridge, sync_tap_a, sync_tap_b):
+		run_command(f"sysctl net.ipv6.conf.{iface}.disable_ipv6=1")
+		run_command(f"ip link set {iface} up")
+
+@pytest.fixture(scope="package")
+def dp_service(request, build_path, port_redundancy, fast_flow_timeout, ha_mode, sync_setup):
+	return _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary=False, ha=ha_mode)
+
+# This one needs to be "activated" during tests, so the scope is set to function
+@pytest.fixture(scope="function")
+def dp_service_b(request, build_path, port_redundancy, fast_flow_timeout, ha_mode):
+	if not ha_mode:
+		raise ValueError("Secondary dpservice only available for --ha")
+	return _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary=True, ha=ha_mode)
 
 
 # Most tests require interfaces to be up and routing established
@@ -100,6 +149,13 @@ def prepare_ifaces(request, dp_service, grpc_client):
 		return
 	print("---- Interfaces init -----")
 	dp_service.init_ifaces(grpc_client)
+	print("--------------------------")
+
+# This one uses function-scoped dpservice, must also be function-scoped
+@pytest.fixture(scope="function")
+def prepare_ifaces_b(dp_service_b, grpc_client_b):
+	print("--- B Interfaces init ----")
+	dp_service_b.init_ifaces(grpc_client_b)
 	print("--------------------------")
 
 
