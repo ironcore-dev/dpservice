@@ -56,6 +56,9 @@ def testDpService(build_path, print_header):
 		TestSuite("wcmp", "Port-redundancy tests with WCMP enabled",
 			test_args + ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py']),
 	]
+	if not args.hw:
+		suites.append(TestSuite("ha", "High-avaliability tests",
+			test_args + ['--ha'], ['xtratest_ha.py']))
 	if '--flow-timeout' in dpservice_help:
 		suites.append(TestSuite("flow", "Flow timeout tests with extremely fast flow timeout",
 			test_args + ['--fast-flow-timeout'], ['xtratest_flow_timeout.py']))
