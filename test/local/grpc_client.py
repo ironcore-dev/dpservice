@@ -12,7 +12,6 @@ import sys
 import tarfile
 import time
 import urllib.request
-from config import grpc_port
 
 
 class GrpcClientError(Exception):
@@ -37,7 +36,8 @@ class ClientError(GrpcClientError):
 
 class GrpcClient:
 
-	def __init__(self, build_path):
+	def __init__(self, build_path, port):
+		self.port = port
 		self.uuid = None
 		self.expectedError = 0
 		self.expectFailure = False
@@ -77,7 +77,7 @@ class GrpcClient:
 		self.expectFailure = False
 
 		print("dpservice-cli", args)
-		p = subprocess.run([self.cmd, f"--address=localhost:{grpc_port}", '-o', 'json'] + shlex.split(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		p = subprocess.run([self.cmd, f"--address=localhost:{self.port}", '-o', 'json'] + shlex.split(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = p.stdout.decode('utf8').strip()
 		if len(output) == 0:
 			raise RuntimeError("Grpc client failed to deliver response")
