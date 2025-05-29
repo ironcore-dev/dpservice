@@ -50,7 +50,18 @@ def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b):
 	sniff_packet(VM1.tap_b, is_udp_pkt)
 
 
-# TODO test vm->public (this will fail without vip or nat, so just for understanding)
+# This is essentially the same as cross-VM-VM communication
+# (in reality this packet gets dropped on the way out to the internet)
+def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b):
+	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1)).start()
+
+	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+			IP(dst=public_ip, src=VM1.ip) /
+			UDP(dport=1234))
+	delayed_sendp(pkt, VM1.tap)
+
+	# Sniff the other dpservice
+	sniff_packet(VM1.tap_b, is_udp_pkt)
 
 # TODO test vip? maybe it will work?
 
