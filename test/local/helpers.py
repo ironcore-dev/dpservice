@@ -88,9 +88,10 @@ def run_command(cmd):
 	subprocess.check_output(shlex.split(cmd))
 
 def interface_init(interface, enabled=True):
+	if interface.startswith(pf_tap_pattern) or interface.startswith(vf_tap_pattern):
+		run_command(f"sysctl net.ipv6.conf.{interface}.disable_ipv6=1")
 	if enabled:
 		run_command(f"ip link set dev {interface} up")
-	run_command(f"ip addr flush dev {interface}")
 
 
 def _validate_length(pkt, original_packet):
