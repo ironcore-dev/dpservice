@@ -109,6 +109,28 @@ def test_ha_vip(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
 	grpc_client_b.delvip(VM1.name)
 	grpc_client.delvip(VM1.name)
 
+
+#
+# public-LB traffic
+# should work even without connection tracking due to the nature of LB
+# (this is basically another VIP)
+#
+def test_ha_lb(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+	lb_ul = grpc_client.createlb(lb_name, vni1, lb_ip, "udp/1234")
+	lb_ul_b = grpc_client_b.createlb(lb_name, vni1, lb_ip, "udp/1234")
+	lbpfx_ul = grpc_client.addlbprefix(VM1.name, lb_pfx)
+	lbpfx_ul_b = grpc_client_b.addlbprefix(VM1.name, lb_pfx)
+	grpc_client.addlbtarget(lb_name, lbpfx_ul)
+	grpc_client_b.addlbtarget(lb_name, lbpfx_ul_b)
+	vip_traffic(lb_ul, lb_ip, PF0.tap, VM1.tap, PF0.tap_b, VM1.tap_b, VM1.ul_ipv6_b)
+	grpc_client_b.dellbtarget(lb_name, lbpfx_ul_b)
+	grpc_client_b.dellbprefix(VM1.name, lb_pfx)
+	grpc_client_b.dellb(lb_name)
+	grpc_client.dellbtarget(lb_name, lbpfx_ul)
+	grpc_client.dellbprefix(VM1.name, lb_pfx)
+	grpc_client.dellb(lb_name)
+
+
 #
 # Incoming traffic to a loadbalancer
 # should select the same target VM if addresses/ports are the same
@@ -140,10 +162,10 @@ def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 
 	for vm in target_vms:
 		# Both dpservices need to have the same address for Maglev to work the same
+		#  -> needs metalnet-generated underlays
 		preferred_ul = "fc00:1::8000:1234:"+vm.name[-1]
 		vm._lbpfx_ul = grpc_client.addlbprefix(vm.name, lb_pfx, preferred_underlay=preferred_ul)
 		grpc_client.addlbtarget(lb_name, vm._lbpfx_ul)
-		# TODO currently only works if both addresses are the same - this does not reflect current state of OSC!
 		vm._lbpfx_ul_b = grpc_client_b.addlbprefix(vm.name, lb_pfx, preferred_underlay=preferred_ul)
 		grpc_client_b.addlbtarget(lb_name, vm._lbpfx_ul_b)
 
