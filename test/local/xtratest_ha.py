@@ -75,8 +75,39 @@ def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b):
 	sniff_packet(VM1.tap_b, is_udp_pkt)
 
 
-# TODO test vip? maybe it will work?
+#
+# public-VIP traffic
+# should work even without connection tracking due to the nature of VIP
+#
+def vip_responder(src_tap, dst_tap):
+	pkt = sniff_packet(src_tap, is_udp_pkt)
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
+	# Send it out through the other dpservice
+	delayed_sendp(reply_pkt, dst_tap)
 
+def vip_traffic(ul, ip, req_pf_tap, req_vm_tap, rep_pf_tap, rep_vm_tap, rep_vm_ul):
+	threading.Thread(target=vip_responder, args=(req_vm_tap, rep_vm_tap)).start()
+
+	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
+		   IPv6(dst=ul, src=router_ul_ipv6, nh=4) /
+		   IP(dst=ip, src=public_ip) /
+		   UDP(dport=1234))
+	delayed_sendp(pkt, req_pf_tap)
+
+	# Sniff the other dpservice
+	reply = sniff_packet(rep_pf_tap, is_udp_pkt)
+	assert reply[IPv6].src == rep_vm_ul, \
+		"Invalid reply VNF"
+
+def test_ha_vip(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+	vip_ul = grpc_client.addvip(VM1.name, vip_vip)
+	vip_ul_b = grpc_client_b.addvip(VM1.name, vip_vip)
+	vip_traffic(vip_ul, vip_vip, PF0.tap, VM1.tap, PF0.tap_b, VM1.tap_b, VM1.ul_ipv6_b)
+	vip_traffic(vip_ul_b, vip_vip, PF0.tap_b, VM1.tap_b, PF0.tap, VM1.tap, VM1.ul_ipv6)
+	grpc_client_b.delvip(VM1.name)
+	grpc_client.delvip(VM1.name)
 
 #
 # Incoming traffic to a loadbalancer
@@ -124,16 +155,14 @@ def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 	send_lb_udp(lb_ul_b, PF0.tap_b, VM3.tap_b, public_ip2, 1234)
 
 	for vm in target_vms:
-		grpc_client.dellbprefix(vm.name, lb_pfx)
-		grpc_client.dellbtarget(lb_name, vm._lbpfx_ul)
-		grpc_client_b.dellbprefix(vm.name, lb_pfx)
 		grpc_client_b.dellbtarget(lb_name, vm._lbpfx_ul_b)
+		grpc_client_b.dellbprefix(vm.name, lb_pfx)
+		grpc_client.dellbtarget(lb_name, vm._lbpfx_ul)
+		grpc_client.dellbprefix(vm.name, lb_pfx)
 
 	grpc_client_b.dellb(lb_name)
 	grpc_client.dellb(lb_name)
 
-
-# TODO test LB using the other one - should fail?
 
 # TODO test NAT reply to the other one - should fail
 
