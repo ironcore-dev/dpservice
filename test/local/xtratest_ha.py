@@ -7,6 +7,10 @@ from config import *
 from helpers import *
 
 
+#
+# VM-VM traffic on the same host
+# should work even without connection tracking as both VMs are local
+#
 def local_vf_to_vf_responder(vm):
 	pkt = sniff_packet(vm.tap, is_udp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
@@ -19,14 +23,18 @@ def test_ha_vm_vm_local(prepare_ifaces, prepare_ifaces_b):
 	threading.Thread(target=local_vf_to_vf_responder, args=(VM2,)).start()
 
 	pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
-			IP(dst=VM2.ip, src=VM1.ip) /
-			UDP(dport=1234))
+		   IP(dst=VM2.ip, src=VM1.ip) /
+		   UDP(dport=1234))
 	delayed_sendp(pkt, VM1.tap)
 
 	# Sniff the other dpservice
 	sniff_packet(VM1.tap_b, is_udp_pkt)
 
 
+#
+# VM-VM traffic across hosts (dpservices)
+# should work even without connection tracking due to routes being there
+#
 def cross_vf_to_vf_responder(pf, dst_vm):
 	pkt = sniff_packet(pf.tap, is_udp_pkt)
 	assert pkt[IPv6].src == dst_vm.ul_ipv6, \
@@ -42,30 +50,88 @@ def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b):
 	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-			IP(dst=f"{neigh_vni1_ov_ip_prefix}.1", src=VM1.ip) /
-			UDP(dport=1234))
+		   IP(dst=f"{neigh_vni1_ov_ip_prefix}.1", src=VM1.ip) /
+		   UDP(dport=1234))
 	delayed_sendp(pkt, VM1.tap)
 
 	# Sniff the other dpservice
 	sniff_packet(VM1.tap_b, is_udp_pkt)
 
 
-# This is essentially the same as cross-VM-VM communication
+#
+# VM-public traffic
+# should work even without connection tracking due to default route to router
 # (in reality this packet gets dropped on the way out to the internet)
+#
 def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b):
 	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-			IP(dst=public_ip, src=VM1.ip) /
-			UDP(dport=1234))
+		   IP(dst=public_ip, src=VM1.ip) /
+		   UDP(dport=1234))
 	delayed_sendp(pkt, VM1.tap)
 
 	# Sniff the other dpservice
 	sniff_packet(VM1.tap_b, is_udp_pkt)
 
+
 # TODO test vip? maybe it will work?
 
-# TODO test LB maglev - should still work
+
+#
+# Incoming traffic to a loadbalancer
+# should select the same target VM if addresses/ports are the same
+#
+def maglev_checker(dst_tap):
+	pkt = sniff_packet(dst_tap, is_udp_pkt)
+	assert pkt[IP].dst == lb_ip and pkt[UDP].dport == 1234, \
+		"Invalid packet routed to target"
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
+	delayed_sendp(reply_pkt, dst_tap)
+
+def send_lb_udp(lb_ul, tap, target_tap, ip, port):
+	threading.Thread(target=maglev_checker, args=(target_tap,)).start()
+	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
+		   IPv6(dst=lb_ul, src=router_ul_ipv6, nh=4) /
+		   IP(dst=lb_ip, src=ip) /
+		   UDP(dport=port))
+	delayed_sendp(pkt, tap)
+	reply = sniff_packet(tap, is_udp_pkt)
+	assert reply[IP].dst == ip and reply[UDP].sport == port, \
+		"Invalid reply from target"
+
+def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+	lb_ul = grpc_client.createlb(lb_name, vni1, lb_ip, "udp/1234")
+	lb_ul_b = grpc_client_b.createlb(lb_name, vni1, lb_ip, "udp/1234")
+	target_vms = (VM1, VM2, VM3)
+
+	for vm in target_vms:
+		# Both dpservices need to have the same address for Maglev to work the same
+		preferred_ul = "fc00:1::8000:1234:"+vm.name[-1]
+		vm._lbpfx_ul = grpc_client.addlbprefix(vm.name, lb_pfx, preferred_underlay=preferred_ul)
+		grpc_client.addlbtarget(lb_name, vm._lbpfx_ul)
+		# TODO currently only works if both addresses are the same - this does not reflect current state of OSC!
+		vm._lbpfx_ul_b = grpc_client_b.addlbprefix(vm.name, lb_pfx, preferred_underlay=preferred_ul)
+		grpc_client_b.addlbtarget(lb_name, vm._lbpfx_ul_b)
+
+	# for the underlay above, public_ip:1234 should go to VM2
+	send_lb_udp(lb_ul, PF0.tap, VM2.tap, public_ip, 1234)
+	send_lb_udp(lb_ul_b, PF0.tap_b, VM2.tap_b, public_ip, 1234)
+	# for the underlay above, public_ip2:1235 should go to VM3
+	send_lb_udp(lb_ul, PF0.tap, VM3.tap, public_ip2, 1234)
+	send_lb_udp(lb_ul_b, PF0.tap_b, VM3.tap_b, public_ip2, 1234)
+
+	for vm in target_vms:
+		grpc_client.dellbprefix(vm.name, lb_pfx)
+		grpc_client.dellbtarget(lb_name, vm._lbpfx_ul)
+		grpc_client_b.dellbprefix(vm.name, lb_pfx)
+		grpc_client_b.dellbtarget(lb_name, vm._lbpfx_ul_b)
+
+	grpc_client_b.dellb(lb_name)
+	grpc_client.dellb(lb_name)
+
 
 # TODO test LB using the other one - should fail?
 
