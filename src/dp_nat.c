@@ -690,7 +690,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 
 	}
 
-	ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, (const void *)&portoverload_tbl_key);
+	ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
 		return ret;
@@ -698,12 +698,18 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 
 	if (need_to_find_new_port) {
 		portmap_data = rte_zmalloc("netnat_portmap_val", sizeof(struct netnat_portmap_data), RTE_CACHE_LINE_SIZE);
+		if (!portmap_data) {
+			rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
+			DPS_LOG_ERR("Failed to allocate ipv4 network nat portmap data");
+			return DP_ERROR;
+		}
 		portmap_data->nat_ip = snat_data->nat_ip;
 		portmap_data->nat_port = allocated_port;
-		portmap_data->flow_cnt++;
+		portmap_data->flow_cnt = 1;
 
-		ret = rte_hash_add_key_data(ipv4_netnat_portmap_tbl, (const void *)&portmap_key, (void *)portmap_data);
+		ret = rte_hash_add_key_data(ipv4_netnat_portmap_tbl, &portmap_key, portmap_data);
 		if (DP_FAILED(ret)) {
+			rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 			rte_free(portmap_data);
 			DPS_LOG_ERR("Failed to add ipv4 network nat portmap data", DP_LOG_RET(ret));
 			return ret;
