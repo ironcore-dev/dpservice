@@ -34,6 +34,13 @@ static char **dp_argv;
 static int dp_argc;
 static char *dp_mlx_args[4];
 
+static void dp_args_free_mellanox(void)
+{
+	for (int i = 0; i < 4; ++i)
+		free(dp_mlx_args[i]);
+	free(dp_argv);
+}
+
 static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 {
 	int curarg;
@@ -69,6 +76,7 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	}
 	if (!dp_mlx_args[0] || !dp_mlx_args[1] || !dp_mlx_args[2] || !dp_mlx_args[3]) {
 		DP_EARLY_ERR("Cannot allocate Mellanox arguments");
+		dp_args_free_mellanox();
 		return DP_ERROR;
 	}
 
@@ -83,13 +91,6 @@ static int dp_args_add_mellanox(int *orig_argc, char ***orig_argv)
 	*orig_argc = dp_argc;
 	*orig_argv = dp_argv;
 	return DP_OK;
-}
-
-static void dp_args_free_mellanox(void)
-{
-	for (int i = 0; i < 4; ++i)
-		free(dp_mlx_args[i]);
-	free(dp_argv);
 }
 
 static bool dp_is_mellanox_opt_set(void)
@@ -268,6 +269,7 @@ int main(int argc, char **argv)
 	eal_argcount = dp_eal_init(&argc, &argv);
 	if (DP_FAILED(eal_argcount)) {
 		DP_EARLY_ERR("Failed to initialize EAL");
+		dp_conf_free();
 		return EXIT_FAILURE;
 	}
 

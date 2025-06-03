@@ -327,6 +327,7 @@ int dp_conf_parse_file(const char *env_filename)
 void dp_conf_free(void)
 {
 	free(dhcp_dns.array);
+	free(dhcpv6_dns.array);
 #ifdef ENABLE_VIRTSVC
 	free(virtual_services.entries);
 #endif
