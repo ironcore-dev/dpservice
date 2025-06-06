@@ -186,7 +186,41 @@ def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 	grpc_client.dellb(lb_name)
 
 
-# TODO test NAT reply to the other one - should fail
+#
+# VM-NAT-public traffic
+# this needs synchronization:
+#  - packet leaves VM though NAT -> creates NAT table entries in dpservice
+#  - packet comes back to the second dpservice that lacks these entries -> DROP
+# (basically the same as VIP, but does not work out of the box)
+#
+def nat_responder(nat_ul):
+	pkt = sniff_packet(PF0.tap, is_udp_pkt)
+	assert pkt[IP].src == nat_vip, \
+		"Packet not from NAT"
+	# Send it to the other dpservice
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=nat_ul, src=pkt[IPv6].dst) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
+	delayed_sendp(reply_pkt, PF0.tap_b)
+
+def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+
+	threading.Thread(target=nat_responder, args=(nat_ul_b,)).start()
+
+	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+		   IP(dst=public_ip, src=VM1.ip) /
+		   UDP(dport=1234))
+	delayed_sendp(pkt, VM1.tap)
+
+	# Sniff the other dpservice
+	sniff_packet(VM1.tap_b, is_udp_pkt)
+
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
+
 
 # TODO others? like private LB, LB-NAT, LB-VIP, etc?
 
