@@ -19,6 +19,7 @@ IS_X86_WITH_BLUEFIELD=false
 IS_ARM_WITH_BLUEFIELD=false
 IS_X86_WITH_MLX=false
 CONFIG_ONLY=false
+OPT_VFIO_BIND=false
 
 function log() {
 	echo "$(date +"%Y-%m-%d_%H-%M-%S-%3N") $1"
@@ -139,6 +140,43 @@ process_multiport_eswitch_mode() {
 	udevadm settle
 }
 
+function vfio_bind() {
+	local pf0="${devs[0]}"
+
+	lsmod | grep -q '^vfio_pci' || {
+		log "vfio-pci module not loaded, loading it"	
+		modprobe vfio-pci
+	}
+
+	numvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_numvfs)
+	vf_offset=$(cat /sys/bus/pci/devices/$pf0/sriov_offset)
+
+	vf_in_batch_count=0
+	vf_batch_count=0
+	vf_batch_hex_index=0
+
+	modified_pci=${pf0::-3}
+
+	for ((i=$vf_offset;i<=1+$numvfs;i+=1)); do
+		vf_in_batch_count=$(($i%8))
+		if [ $vf_in_batch_count -eq 0 ]; then
+			vf_batch_count=$[$vf_batch_count + 1]
+			vf_batch_hex_index=$(printf '%x' $vf_batch_count)
+		fi
+		digits=${#vf_batch_hex_index}
+		if [ $digits -eq 2 ]; then
+			modified_pci=${pf0::-4}
+		fi
+
+		vf_pci_addr=$modified_pci$vf_batch_hex_index"."$vf_in_batch_count
+
+		echo 'vfio-pci' | tee /sys/bus/pci/devices/$vf_pci_addr/driver_override > /dev/null
+		echo $vf_pci_addr > tee /sys/bus/pci/drivers/vfio-pci/bind
+		log "Bound VF $vf_pci_addr to vfio-pci driver"
+		sleep 0.5
+	done
+}
+
 function create_vf() {
 	local pf0="${devs[0]}"
 	local pf1="${devs[1]}"
@@ -188,7 +226,15 @@ function create_vf() {
 	actualvfs=$((NUMVFS_DESIRED<totalvfs ? NUMVFS_DESIRED : totalvfs))
 	log "creating $actualvfs virtual functions"
 	echo $actualvfs > /sys/bus/pci/devices/$pf0/sriov_numvfs
+
+	if [[ "$OPT_VFIO_BIND" == "true" ]]; then
+		log "Binding VFs to vfio-pci driver"
+		vfio_bind
+	else
+		log "Skipping VF binding to vfio-pci driver"
+	fi
 }
+
 
 function get_pattern() {
 	local dev=$1
@@ -258,6 +304,9 @@ fi
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
+		--vfio-bind)
+			OPT_VFIO_BIND=true
+			;;
 		--multiport-eswitch)
 			OPT_MULTIPORT=true
 			;;
