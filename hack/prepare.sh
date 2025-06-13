@@ -19,6 +19,8 @@ IS_X86_WITH_BLUEFIELD=false
 IS_ARM_WITH_BLUEFIELD=false
 IS_X86_WITH_MLX=false
 CONFIG_ONLY=false
+OPT_VFIO_AUTO_BIND=false
+VFIO_BIND_ONLY=false
 
 function log() {
 	echo "$(date +"%Y-%m-%d_%H-%M-%S-%3N") $1"
@@ -139,6 +141,46 @@ process_multiport_eswitch_mode() {
 	udevadm settle
 }
 
+function vfio_bind() {
+	local pf0="${devs[0]}"
+
+	lsmod | grep -q '^vfio_pci' || {
+		log "vfio-pci module not loaded, loading it"	
+		modprobe vfio-pci
+	}
+
+	numvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_numvfs)
+	vf_offset=$(cat /sys/bus/pci/devices/$pf0/sriov_offset)
+
+	vf_in_block_count=0
+	vf_block_count=0
+	vf_block_hex_index=0
+
+	modified_pci=${pf0::-3}
+
+	# pci address of vfs are organized in a block of 8
+	# e.g., 3b:00.0 ... 3b:00.7, 3b:01.0 ... 3b:01.7, etc.
+	for i in $(seq $vf_offset $((vf_offset + numvfs - 1))); do
+		vf_in_block_count=$(($i%8))
+		if [ $vf_in_block_count -eq 0 ]; then
+			vf_block_count=$[$vf_block_count + 1]
+			vf_block_hex_index=$(printf '%x' $vf_block_count)
+		fi
+		digits=${#vf_block_hex_index}
+		if [ $digits -eq 2 ]; then
+			modified_pci=${pf0::-4}
+		fi
+
+		vf_pci_addr=$modified_pci$vf_block_hex_index"."$vf_in_block_count
+
+		echo 'vfio-pci' > /sys/bus/pci/devices/$vf_pci_addr/driver_override
+		echo $vf_pci_addr > /sys/bus/pci/drivers/vfio-pci/bind
+		log "VFs bound to vfio-pci driver"
+	done
+
+	sleep 1
+}
+
 function create_vf() {
 	local pf0="${devs[0]}"
 	local pf1="${devs[1]}"
@@ -158,6 +200,13 @@ function create_vf() {
 	if [[ "$CONFIG_ONLY" == "true" ]]; then
 		actualvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_numvfs)
 		log "Skipping VF creation as requested"
+		return
+	fi
+
+	if [[ "$VFIO_BIND_ONLY" == "true" ]]; then
+		log "Skipping VF creation as requested, binding VFs to vfio-pci driver"
+		vfio_bind
+		actualvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_numvfs)
 		return
 	fi
 
@@ -188,7 +237,15 @@ function create_vf() {
 	actualvfs=$((NUMVFS_DESIRED<totalvfs ? NUMVFS_DESIRED : totalvfs))
 	log "creating $actualvfs virtual functions"
 	echo $actualvfs > /sys/bus/pci/devices/$pf0/sriov_numvfs
+
+	if [[ "$OPT_VFIO_AUTO_BIND" == "true" ]]; then
+		log "Binding VFs to vfio-pci driver"
+		vfio_bind
+	else
+		log "Skipping VF binding to vfio-pci driver"
+	fi
 }
+
 
 function get_pattern() {
 	local dev=$1
@@ -258,6 +315,9 @@ fi
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
+		--vfio-auto-bind)
+			OPT_VFIO_AUTO_BIND=true
+			;;
 		--multiport-eswitch)
 			OPT_MULTIPORT=true
 			;;
@@ -266,6 +326,9 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--config-only)
 			CONFIG_ONLY=true
+			;;
+		--vfio-bind-only)
+			VFIO_BIND_ONLY=true
 			;;
 		*)
 			err "Invalid argument $1"
