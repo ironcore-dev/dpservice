@@ -1,0 +1,67 @@
+version = 1
+SPDX-PackageName = "dpservice"
+SPDX-PackageSupplier = "IronCore authors <ospo@sap.com>"
+SPDX-PackageDownloadLocation = "https://github.com/ironcore-dev/dpservice"
+
+[[annotations]]
+path = [
+    ".github/**",
+    ".gitignore",
+    ".editorconfig",
+    "CODEOWNERS",
+    "Dockerfile",
+    "config/**",
+    "hack/**",
+    "test/benchmark_test/config_templates/**",
+    "*.json",
+    "*meson.build",
+    "proto/dpdk.proto",
+    "proto/health.proto",
+    "meson_options.txt",
+    "include/dp_version.h.in",
+    "cli/dpservice-cli/.gitignore",
+    "cli/dpservice-cli/.golangci.yaml",
+    "cli/dpservice-cli/.goreleaser.yaml",
+    "cli/dpservice-cli/Makefile",
+    "cli/dpservice-cli/config/**",
+    "cli/dpservice-cli/gen/**",
+    "cli/dpservice-cli/go.mod",
+    "cli/dpservice-cli/go.sum",
+    "cli/dpservice-cli/hack/**",
+    "go/dpservice-go/.gitignore",
+    "go/dpservice-go/.golangci.yaml",
+    "go/dpservice-go/.goreleaser.yaml",
+    "go/dpservice-go/Makefile",
+    "go/dpservice-go/config/**",
+    "go/dpservice-go/gen/**",
+    "go/dpservice-go/go.mod",
+    "go/dpservice-go/go.sum",
+    "go/dpservice-go/hack/**",
+    "go/dpservice-go/proto/**",
+    "cli/dpservice-exporter/.gitignore",
+    "cli/dpservice-exporter/.golangci.yaml",
+    "cli/dpservice-exporter/Makefile",
+    "cli/dpservice-exporter/CODE_OF_CONDUCT.md",
+    "cli/dpservice-exporter/CONTRIBUTING.md",
+    "cli/dpservice-exporter/Dockerfile",
+    "cli/dpservice-exporter/go.mod",
+    "cli/dpservice-exporter/go.sum",
+    "cli/dpservice-exporter/hack/**"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2023 SAP SE or an SAP affiliate company and IronCore contributors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+    "docs/**",
+    "*README.md",
+    "cli/dpservice-cli/docs/**",
+    "cli/dpservice-cli/README.md",
+    "go/dpservice-go/docs/**",
+    "go/dpservice-go/README.md",
+    "cli/dpservice-exporter/README.md"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2023 SAP SE or an SAP affiliate company and IronCore contributors"
+SPDX-License-Identifier = "Apache-2.0"
