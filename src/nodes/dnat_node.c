@@ -54,7 +54,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				}
 
 				// only perform this lookup on unknown dnat (Distributed NAted) traffic flows
-				underlay_dst = dp_lookup_network_nat_underlay_ip(df);
+				underlay_dst = dp_lookup_neighnat_underlay_ip(df);
 				if (underlay_dst) {
 					cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_NEIGH;
 					df->nat_type = DP_CHG_UL_DST_IP;

@@ -33,7 +33,7 @@ static struct rte_hash *ipv4_snat_tbl = NULL;
 
 static struct rte_hash *ipv4_netnat_portmap_tbl = NULL;
 static struct rte_hash *ipv4_netnat_portoverload_tbl = NULL;
-static struct nat_head nat_headp;
+static struct nat_head neighnat_head;
 
 static uint64_t dp_nat_full_log_delay;
 
@@ -61,7 +61,7 @@ int dp_nat_init(int socket_id)
 	if (!ipv4_netnat_portoverload_tbl)
 		return DP_ERROR;
 
-	TAILQ_INIT(&nat_headp);
+	TAILQ_INIT(&neighnat_head);
 
 	dp_nat_full_log_delay = rte_get_timer_hz() * DP_NAT_FULL_LOG_DELAY;
 
@@ -521,20 +521,20 @@ void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni)
 	struct nat_entry *entry;
 
 	// only delete the DNAT entry when this is the only range present for this IP
-	// (i.e. if there still is an entry in the list, do nothing!)
-	for (entry = TAILQ_FIRST(&nat_headp); entry != NULL; entry = TAILQ_NEXT(entry, entries))
+	// (i.e. if there still is a neighnat entry in the list, do nothing!)
+	for (entry = TAILQ_FIRST(&neighnat_head); entry != NULL; entry = TAILQ_NEXT(entry, entries))
 		if (entry->vni == vni && entry->nat_ip == d_ip)
 			return;
 
 	dp_del_dnat_ip(d_ip, vni);
 }
 
-int dp_add_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
-							 const union dp_ipv6 *ul_ipv6)
+int dp_add_neighnat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port,
+						  const union dp_ipv6 *ul_ipv6)
 {
 	struct nat_entry *next, *new_entry;
 
-	TAILQ_FOREACH(next, &nat_headp, entries) {
+	TAILQ_FOREACH(next, &neighnat_head, entries) {
 		if (dp_is_network_nat_entry_port_overlap(next, nat_ip, min_port, max_port)) {
 			DPS_LOG_WARNING("Cannot add a nat entry that has an overlapping port range with an existing one",
 							DP_LOG_IPV4(nat_ip), DP_LOG_VNI(vni), DP_LOG_MINPORT(min_port), DP_LOG_MAXPORT(max_port));
@@ -555,20 +555,20 @@ int dp_add_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, u
 	new_entry->port_range[1] = max_port;
 	dp_copy_ipv6(&new_entry->dst_ipv6, ul_ipv6);
 
-	TAILQ_INSERT_TAIL(&nat_headp, new_entry, entries);
+	TAILQ_INSERT_TAIL(&neighnat_head, new_entry, entries);
 
 	return DP_GRPC_OK;
 
 }
 
-int dp_del_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
+int dp_del_neighnat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port)
 {
 	struct nat_entry *item, *tmp_item;
 
-	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
+	for (item = TAILQ_FIRST(&neighnat_head); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
 		if (dp_is_same_network_nat_entry(item, nat_ip, vni, min_port, max_port)) {
-			TAILQ_REMOVE(&nat_headp, item, entries);
+			TAILQ_REMOVE(&neighnat_head, item, entries);
 			rte_free(item);
 			return DP_GRPC_OK;
 		}
@@ -576,7 +576,7 @@ int dp_del_network_nat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, u
 	return DP_GRPC_ERR_NOT_FOUND;
 }
 
-const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
+const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df)
 {
 	struct nat_entry *current;
 	uint16_t dst_port;
@@ -590,7 +590,7 @@ const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df)
 	else
 		dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
-	TAILQ_FOREACH(current, &nat_headp, entries) {
+	TAILQ_FOREACH(current, &neighnat_head, entries) {
 		if (dp_is_network_nat_port(current, dst_ip, dst_vni, dst_port))
 			return &current->dst_ipv6;
 	}
@@ -821,7 +821,7 @@ int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *respond
 
 	dp_grpc_set_multireply(responder, sizeof(*reply));
 
-	TAILQ_FOREACH(current, &nat_headp, entries) {
+	TAILQ_FOREACH(current, &neighnat_head, entries) {
 		if (nat_ip == 0 || current->nat_ip == nat_ip) {
 			reply = dp_grpc_add_reply(responder);
 			if (!reply)
@@ -862,10 +862,10 @@ void dp_del_all_neigh_nat_entries_in_vni(uint32_t vni)
 {
 	struct nat_entry *item, *tmp_item;
 
-	for (item = TAILQ_FIRST(&nat_headp); item != NULL; item = tmp_item) {
+	for (item = TAILQ_FIRST(&neighnat_head); item != NULL; item = tmp_item) {
 		tmp_item = TAILQ_NEXT(item, entries);
 		if ((item->vni == vni) || (vni == DP_NETWORK_NAT_ALL_VNI)) {
-			TAILQ_REMOVE(&nat_headp, item, entries);
+			TAILQ_REMOVE(&neighnat_head, item, entries);
 			rte_free(item);
 		}
 	}

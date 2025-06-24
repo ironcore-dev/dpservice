@@ -99,15 +99,13 @@ int dp_nat_chg_ipv4_to_ipv6_hdr(struct dp_flow *df, struct rte_mbuf *m, const un
 
 void dp_del_vip_from_dnat(uint32_t d_ip, uint32_t vni);
 
-int dp_add_network_nat_entry(uint32_t nat_ipv4,
-							 uint32_t vni, uint16_t min_port, uint16_t max_port,
-							 const union dp_ipv6 *ul_ipv6);
+int dp_add_neighnat_entry(uint32_t nat_ip,  uint32_t vni, uint16_t min_port, uint16_t max_port,
+						  const union dp_ipv6 *ul_ipv6);
 
-int dp_del_network_nat_entry(uint32_t nat_ipv4,
-							 uint32_t vni, uint16_t min_port, uint16_t max_port);
+int dp_del_neighnat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
 
 int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni);
-const union dp_ipv6 *dp_lookup_network_nat_underlay_ip(struct dp_flow *df);
+const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
 
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);

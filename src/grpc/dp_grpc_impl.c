@@ -703,20 +703,14 @@ static int dp_process_create_neighnat(struct dp_grpc_responder *responder)
 	if (request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	ret = dp_add_network_nat_entry(request->addr.ipv4,
-								   request->vni,
-								   request->min_port,
-								   request->max_port,
-								   &request->neigh_addr6);
+	ret = dp_add_neighnat_entry(request->addr.ipv4, request->vni, request->min_port, request->max_port,
+								&request->neigh_addr6);
 	if (DP_FAILED(ret))
 		return ret;
 
 	ret = dp_set_dnat_ip(request->addr.ipv4, 0, request->vni);
 	if (DP_FAILED(ret) && ret != DP_GRPC_ERR_DNAT_EXISTS) {
-		dp_del_network_nat_entry(request->addr.ipv4,
-								 request->vni,
-								 request->min_port,
-								 request->max_port);
+		dp_del_neighnat_entry(request->addr.ipv4, request->vni, request->min_port, request->max_port);
 		return ret;
 	}
 
@@ -731,10 +725,7 @@ static int dp_process_delete_neighnat(struct dp_grpc_responder *responder)
 	if (request->addr.is_v6)
 		return DP_GRPC_ERR_BAD_IPVER;
 
-	ret = dp_del_network_nat_entry(request->addr.ipv4,
-								   request->vni,
-								   request->min_port,
-								   request->max_port);
+	ret = dp_del_neighnat_entry(request->addr.ipv4, request->vni, request->min_port, request->max_port);
 	if (ret == DP_GRPC_ERR_NOT_FOUND)
 		return ret;
 
