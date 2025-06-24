@@ -756,8 +756,62 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			return ret;
 	}
 
+	// DEBUG code to test how this will work:
+	printf("allocated port %u\n", portoverload_tbl_key.nat_port);
+	// TODO call the new lookup function and assert its outputs
+	// TODO remember NAT64 (see above) for dst_ip!
+	// TODO remember ICMP (see above) for dst_port!
+	// TODO or just pass portoverload_tbl_key ;)
+	dp_lookup_network_nat(port->iface.vni, snat_data->nat_ip, portoverload_tbl_key.nat_port, ntohl(df->dst.dst_addr), df->l4_type, ntohs(df->l4_info.trans_port.dst_port));
+	// -----
+	// TODO SEND TO THE OTHER DPSERVICE HERE
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
+}
+
+int dp_lookup_network_nat(uint32_t vni, uint32_t nat_ip, uint16_t nat_port, uint32_t dst_ip, uint8_t dst_l4_type, uint16_t dst_port)
+{
+	printf("nat vni : %u\n", vni);
+	printf("nat ip  : %x\n", nat_ip);
+	printf("nat port: %u\n", nat_port);
+	printf("dst ip  : %x\n", dst_ip);
+	printf("dst type: %u\n", dst_l4_type);
+	printf("dst port: %u\n", dst_port);
+	// TODO vni?? (well NAT is on public IPs anyway, makes sense
+	// TODO lookup the local address:port!
+	struct netnat_portoverload_tbl_key portoverload_tbl_key = {
+		.nat_ip = nat_ip,
+		.nat_port = nat_port,
+		.dst_ip = dst_ip,
+		.l4_type = dst_l4_type,
+		.dst_port = dst_port,
+	};
+	int ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("NAT lookup failed", DP_LOG_RET(ret));  // TODO better log (log the key?)
+		return ret;
+	}
+	// TODO ^^^ this part is actually not needed now, but it's the way forward
+	// TODO ah, we need to put the data inside portoverload, but should be OK...
+	// iterate in the meantime
+	const struct netnat_portmap_key *portmap_key;
+	struct netnat_portmap_data *portmap_data;
+	uint32_t index = 0;
+
+	while ((ret = rte_hash_iterate(ipv4_netnat_portmap_tbl, (const void **)&portmap_key, (void **)&portmap_data, &index)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("portmap iterate error", DP_LOG_RET(ret));  // TODO better message
+			return DP_ERROR;
+		}
+		if (portmap_data->nat_ip == nat_ip && portmap_data->nat_port == nat_port) {
+			// TODO ah here is the VNI!
+			// TODO sure dp_ip_address instead of ipv4 directly, but that's fine
+			printf("GOT HIM: %u %x %u\n", portmap_key->vni, portmap_key->src_ip.ipv4, portmap_key->iface_src_port);
+			return DP_OK;
+		}
+	}
+	DPS_LOG_ERR("portmap not found");  // TODO better message
+	return DP_ERROR;
 }
 
 int dp_remove_network_snat_port(const struct flow_value *cntrack)
@@ -770,6 +824,8 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	struct dp_port *created_port;
 	union dp_ipv6 dst_nat64;
 	int ret;
+
+	// TODO IS THIS THE RIGHT PLACE TO REMOVE FROM OTHER DPSERVICE??
 
 	if (unlikely(flow_key_reply->l3_dst.is_v6)) {
 		DPS_LOG_ERR("NAT reply flow key with IPv6 address", DP_LOG_IPV6(flow_key_reply->l3_dst.ipv6));
