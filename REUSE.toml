@@ -46,7 +46,12 @@ path = [
     "cli/dpservice-exporter/Dockerfile",
     "cli/dpservice-exporter/go.mod",
     "cli/dpservice-exporter/go.sum",
-    "cli/dpservice-exporter/hack/**"
+    "cli/dpservice-exporter/hack/**",
+    "cli/dpservice-exporter/dashboard/grafana.json",
+    "**dp_conf.json",
+    "**/dp_conf.json",
+    "**meson.build",
+    "**/meson.build"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2023 SAP SE or an SAP affiliate company and IronCore contributors"
@@ -55,7 +60,8 @@ SPDX-License-Identifier = "Apache-2.0"
 [[annotations]]
 path = [
     "docs/**",
-    "*README.md",
+    "**/README.md",
+    "**README.md",
     "cli/dpservice-cli/docs/**",
     "cli/dpservice-cli/README.md",
     "go/dpservice-go/docs/**",
