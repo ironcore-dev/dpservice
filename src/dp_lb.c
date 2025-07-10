@@ -71,7 +71,7 @@ int dp_create_lb(struct dpgrpc_lb *lb, const union dp_ipv6 *ul_ip)
 	lb_key.vni = lb->vni;
 	dp_copy_ipaddr(&lb_key.ip, &lb->addr);
 
-	if (!DP_FAILED(rte_hash_lookup(lb_table, &lb_key)))
+	if (DP_SUCCESS(rte_hash_lookup(lb_table, &lb_key)))
 		return DP_GRPC_ERR_ALREADY_EXISTS;
 
 	lb_val = rte_zmalloc("lb_val", sizeof(struct lb_value), RTE_CACHE_LINE_SIZE);
@@ -203,7 +203,7 @@ bool dp_is_ip_lb(struct dp_flow *df, uint32_t vni)
 	else
 		return false;
 
-	return !DP_FAILED(rte_hash_lookup(lb_table, &lb_key));
+	return DP_SUCCESS(rte_hash_lookup(lb_table, &lb_key));
 }
 
 static bool dp_lb_is_back_ip_inserted(struct lb_value *val, const union dp_ipv6 *b_ip)

@@ -18,6 +18,8 @@ extern "C" {
 // NOTICE: these can be used directly with a function call, do not use RET multiple times
 #define DP_FAILED(RET) \
 	((RET) < 0)
+#define DP_SUCCESS(RET) \
+	(!DP_FAILED(RET))
 #define DP_FAILED_LOG(RET, LOGGER, ...) \
 	(DP_FAILED(RET) ? LOGGER(__VA_ARGS__), true : false)
 

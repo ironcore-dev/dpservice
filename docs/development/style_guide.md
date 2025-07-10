@@ -85,6 +85,7 @@ int caller()
   return DP_OK;
 }
 ```
+> There is also a `DP_SUCCESS(ret)` for the unlikely inverse test, e.g. `if (DP_SUCCESS(rte_hash_lookup(...)))`.
 
 ### Boolean-like calls
 If a function returns `0` for failure and a non-zero for success, use this pattern:

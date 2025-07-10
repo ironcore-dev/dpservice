@@ -142,7 +142,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = dp_inspect_init(dp_conf_get_table(), get_format(dp_conf_get_output_format()), &spec);
-	if (!DP_FAILED(ret)) {
+	if (DP_SUCCESS(ret)) {
 		if (!spec.table_name)
 			list_tables(dp_conf_get_output_format());
 		else

@@ -130,11 +130,11 @@ int dp_add_vnf(const union dp_ipv6 *ul_addr6, enum dp_vnf_type type,
 	int ret;
 
 	ret = rte_hash_lookup_with_hash(vnf_handle_tbl, ul_addr6, hash);
-	if (ret != -ENOENT) {
-		if (!DP_FAILED(ret))
-			DPS_LOG_WARNING("Underlay address already registered", DP_LOG_IPV6(*ul_addr6));
-		else
-			DPS_LOG_ERR("VNF hash table lookup failed", DP_LOG_RET(ret));
+	if (DP_SUCCESS(ret)) {
+		DPS_LOG_WARNING("Underlay address already registered", DP_LOG_IPV6(*ul_addr6));
+		return DP_ERROR;
+	} else if (ret != -ENOENT) {
+		DPS_LOG_ERR("VNF hash table lookup failed", DP_LOG_RET(ret));
 		return DP_ERROR;
 	}
 

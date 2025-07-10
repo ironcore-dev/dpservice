@@ -53,7 +53,7 @@ static uint64_t get_current_timestamp(void)
 		if (!port->allocated)
 			continue;
 		ret = rte_eth_read_clock(port->port_id, &timestamp);
-		if (!DP_FAILED(ret))
+		if (DP_SUCCESS(ret))
 			break;
 	}
 	return timestamp;
