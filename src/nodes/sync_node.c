@@ -3,6 +3,7 @@
 
 #include "nodes/sync_node.h"
 #include "dp_error.h"
+#include "dp_sync.h"
 #include "nodes/common_node.h"
 
 DP_NODE_REGISTER_SOURCE(SYNC, sync, DP_NODE_DEFAULT_NEXT_ONLY);
@@ -26,16 +27,44 @@ void sync_node_switch_mode(void)
 
 static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 {
-	DPS_LOG_WARNING("SYNC - ", _DP_LOG_INT("len", pkt->data_len));
 	struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
-	DPS_LOG_WARNING("     - ", _DP_LOG_INT("ethertype", eth_hdr->ether_type));
-	// TODO move to function handlers I think
-	// BACKUP MODE - listen for NAT table updates
-	// ACTIVE MODE - listen for NAT table dump requests
-	if (!backup_mode) {
-		DPS_LOG_DEBUG("Ignoring sync traffic packet");
+	struct dp_sync_hdr *sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);
+	struct dp_sync_msg_nat_keys *nat_keys;
+
+	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
+		DPS_LOG_WARNING("Invalid sync ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
 		return;
-	} // TODO else of course
+	}
+
+	switch (sync_hdr->msg_type) {
+	case DP_SYNC_MSG_REQUEST_DUMP:
+		DPS_LOG_INFO("Received request for sync table dumps");
+		if (backup_mode) {
+			DPS_LOG_WARNING("Invalid sync request for backup dpservice");
+			break;
+		}
+		break;
+	case DP_SYNC_MSG_NAT_CREATE:
+		if (!backup_mode) {
+			DPS_LOG_WARNING("Invalid sync NAT create message for active dpservice");
+			break;
+		}
+		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
+		// errors ignored, keep processing messages
+		dp_allocate_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
+		break;
+	case DP_SYNC_MSG_NAT_DELETE:
+		if (!backup_mode) {
+			DPS_LOG_WARNING("Invalid sync NAT delete message for active dpservice");
+			break;
+		}
+		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
+		// errors ignored, keep processing messages
+		dp_remove_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
+		break;
+	default:
+		DPS_LOG_ERR("Unknown sync message type", DP_LOG_VALUE(sync_hdr->msg_type));
+	}
 }
 
 static uint16_t sync_node_process(struct rte_graph *graph,
