@@ -244,6 +244,10 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 	assert reply[UDP].dport == pkt[UDP].sport, \
 		"Reply not to the right port"
 
+	# TODO need a special test for this?
+	# TODO test NAT entry removal
+	# age_out_flows()
+
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
 
