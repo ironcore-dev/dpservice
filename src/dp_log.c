@@ -26,7 +26,7 @@
 #define FORMAT_IPV4 log_formatter[6]
 #define FORMAT_PTR log_formatter[7]
 static const char *const log_formatter_text[] = {
-	/* header  */ "%s %u(%s) %.1s %s: %s",
+	/* header  */ "%s %u %u(%s) %.1s %s: %s",
 	/* caller  */ " [%s:%u:%s()]",
 	/* endline */ "\n",
 	/* str     */ ", %s: %s",
@@ -36,7 +36,7 @@ static const char *const log_formatter_text[] = {
 	/* ptr     */ ", %s: %p",
 };
 static const char *const log_formatter_json[] = {
-	/* header  */ "{ \"ts\": \"%s\", \"thread_id\": %u, \"thread_name\": \"%s\", \"level\": \"%s\", \"logger\": \"%s\", \"msg\": \"%s\"",
+	/* header  */ "{ \"ts\": \"%s\", \"pid\": %u, \"thread_id\": %u, \"thread_name\": \"%s\", \"level\": \"%s\", \"logger\": \"%s\", \"msg\": \"%s\"",
 	/* caller  */ ", \"caller\": \"%s:%u:%s()\"",
 	/* endline */ " }\n",
 	/* str     */ ", \"%s\": \"%s\"",
@@ -66,6 +66,8 @@ static const char *const *log_types = log_types_text;
 static uint16_t thread_id_generator = 0;
 static __thread uint16_t thread_id = 0;
 static __thread char thread_name[16] = "thread";
+// TODO TEMPORARY FOR DEBUGGING! DO NOT COMMIT TO MAIN
+static pid_t pid = 0;
 
 void dp_log_set_thread_name(const char *name)
 {
@@ -116,6 +118,8 @@ int dp_log_init(void)
 		log_colors = color_mode == DP_CONF_COLOR_ALWAYS
 				 || (color_mode == DP_CONF_COLOR_AUTO && isatty(1));
 	}
+
+	pid = getpid();
 
 	return DP_OK;
 }
@@ -246,7 +250,7 @@ void _dp_log(unsigned int level, unsigned int logtype,
 	// everything except the message value is JSON-safe
 	assert(level > 0 && level < RTE_DIM(log_levels));
 	assert(logtype >= RTE_LOGTYPE_USER1 && logtype <= RTE_LOGTYPE_USER1 + RTE_DIM(log_types_text));
-	fprintf(f, FORMAT_HEADER, timestamp, thread_id, thread_name,
+	fprintf(f, FORMAT_HEADER, timestamp, pid, thread_id, thread_name,
 			log_levels[level], log_types[logtype-RTE_LOGTYPE_USER1],
 			escape_message(message, escaped, sizeof(escaped)));
 
