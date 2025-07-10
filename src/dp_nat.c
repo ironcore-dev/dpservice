@@ -764,7 +764,13 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	// TODO or just pass portoverload_tbl_key ;)
 	dp_lookup_network_nat(port->iface.vni, snat_data->nat_ip, portoverload_tbl_key.nat_port, ntohl(df->dst.dst_addr), df->l4_type, ntohs(df->l4_info.trans_port.dst_port));
 	// -----
-	// TODO SEND TO THE OTHER DPSERVICE HERE
+	// TODO SEND TO THE OTHER DPSERVICE HERE TODO wait only when new? nah let the other one take care of it
+	DPS_LOG_ERR("CREATE NAT",
+				_DP_LOG_IPV4("nat_ip", snat_data->nat_ip),
+				_DP_LOG_INT("nat_port", portmap_data->nat_port),
+				_DP_LOG_IPV4("vm_ip", ntohl(df->dst.dst_addr)), // TODO sure sure, NAT64
+				_DP_LOG_INT("vm_port", ntohs(df->l4_info.trans_port.dst_port)),
+				_DP_LOG_INT("proto", df->l4_type));
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
 }
@@ -825,12 +831,20 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	union dp_ipv6 dst_nat64;
 	int ret;
 
-	// TODO IS THIS THE RIGHT PLACE TO REMOVE FROM OTHER DPSERVICE??
 
 	if (unlikely(flow_key_reply->l3_dst.is_v6)) {
 		DPS_LOG_ERR("NAT reply flow key with IPv6 address", DP_LOG_IPV6(flow_key_reply->l3_dst.ipv6));
 		return DP_ERROR;
 	}
+
+	// TODO IS THIS THE RIGHT PLACE TO REMOVE FROM OTHER DPSERVICE?? (well yes and no, but it's fine, we can have it not in sync)
+	DPS_LOG_ERR("REMOVE NAT",
+				_DP_LOG_IPV4("nat_ip", flow_key_reply->l3_dst.ipv4),
+				_DP_LOG_INT("nat_port", flow_key_reply->port_dst),
+				_DP_LOG_IPV4("vm_ip", flow_key_org->l3_dst.ipv4), // TODO sure sure, NAT64
+				_DP_LOG_INT("vm_port", flow_key_org->port_dst),
+				_DP_LOG_INT("proto", flow_key_org->proto));
+
 
 	if (DP_FAILED(dp_ipv6_from_ipaddr(&dst_nat64, &flow_key_org->l3_dst)))
 		portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ipv4;
