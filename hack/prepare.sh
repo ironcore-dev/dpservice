@@ -146,7 +146,7 @@ function vfio_bind() {
 	local pf0="${devs[0]}"
 
 	lsmod | grep -q '^vfio_pci' || {
-		log "vfio-pci module not loaded, loading it"	
+		log "vfio-pci module not loaded, loading it"
 		modprobe vfio-pci
 	}
 
