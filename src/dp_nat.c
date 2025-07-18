@@ -597,7 +597,7 @@ const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df)
 	return NULL;
 }
 
-int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, uint32_t vni)
+int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port)
 {
 	struct netnat_portoverload_tbl_key portoverload_tbl_key;
 	struct netnat_portmap_key portmap_key;
@@ -626,7 +626,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		iface_src_port = ntohs(df->l4_info.trans_port.src_port);
 
 	portmap_key.iface_src_port = iface_src_port;
-	portmap_key.vni = vni;
+	portmap_key.vni = port->iface.vni;
 
 	portoverload_tbl_key.nat_ip = snat_data->nat_ip;
 	portoverload_tbl_key.l4_type = df->l4_type;
@@ -682,7 +682,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 				snat_data->log_timestamp = timestamp;
 				DPS_LOG_WARNING("NAT portmap range is full",
 								DP_LOG_IPV4(snat_data->nat_ip),
-								DP_LOG_VNI(vni), DP_LOG_SRC_IPV4(iface_src_ip),
+								DP_LOG_VNI(port->iface.vni), DP_LOG_SRC_IPV4(iface_src_ip),
 								DP_LOG_SRC_PORT(iface_src_port));
 			}
 			return DP_ERROR;
@@ -715,6 +715,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			return ret;
 		}
 	}
+
+	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 
 	return allocated_port;
 }

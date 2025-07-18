@@ -35,13 +35,11 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 		cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 	}
 	if (snat_data->nat_ip != 0) {
-		ret = dp_allocate_network_snat_port(snat_data, df, port->iface.vni);
+		ret = dp_allocate_network_snat_port(snat_data, df, port);
 		if (DP_FAILED(ret))
 			return DP_ERROR;
 		nat_port = (uint16_t)ret;
 		ipv4_hdr->src_addr = htonl(snat_data->nat_ip);
-
-		DP_STATS_NAT_INC_USED_PORT_CNT(port);
 
 		if (df->l4_type == IPPROTO_ICMP) {
 			dp_change_icmp_identifier(m, nat_port);
@@ -91,12 +89,10 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	snat64_data.nat_ip = port->iface.nat_ip;
 	snat64_data.nat_port_range[0] = port->iface.nat_port_range[0];
 	snat64_data.nat_port_range[1] = port->iface.nat_port_range[1];
-	ret = dp_allocate_network_snat_port(&snat64_data, df, port->iface.vni);
+	ret = dp_allocate_network_snat_port(&snat64_data, df, port);
 	if (DP_FAILED(ret))
 		return DP_ERROR;
 	nat_port = (uint16_t)ret;
-
-	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 
 	df->nat_port = nat_port;
 	df->nat_type = DP_NAT_64_CHG_SRC_IP;
