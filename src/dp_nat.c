@@ -616,9 +616,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		dp_set_ipaddr6(&portmap_key.src_ip, &df->src.src_addr6);
 		portoverload_tbl_key.dst_ip = ntohl(dp_get_ipv6_nat64(&df->dst.dst_addr6));
-	} else {
-		return DP_GRPC_ERR_BAD_IPVER;
-	}
+	} else
+		return DP_ERROR;
 
 	if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
 		iface_src_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
