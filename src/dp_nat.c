@@ -634,15 +634,9 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
-	if (ret != -ENOENT) {
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot lookup ipv4 portmap key", DP_LOG_RET(ret));
-			return ret;
-		}
-
+	if (DP_SUCCESS(ret)) {
 		portoverload_tbl_key.nat_port = portmap_data->nat_port;
 		ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
-
 		if (likely(ret == -ENOENT)) {
 			ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 			if (DP_FAILED(ret)) {
@@ -655,7 +649,12 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port", DP_LOG_RET(ret));
 			return ret;
 		}
+		// already present is fine, will be reused
+	} else if (ret != -ENOENT) {
+		DPS_LOG_ERR("Cannot lookup ipv4 portmap key", DP_LOG_RET(ret));
+		return ret;
 	}
+	// ENOENT is fine, will be created
 
 	min_port = snat_data->nat_port_range[0];
 	max_port = snat_data->nat_port_range[1];
