@@ -671,7 +671,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			}
 			// port already assigned, overload freshly created, no more work to do
 			portmap_data->flow_cnt++;
-			return portmap_data->nat_port;
+			goto done;  // better jump to common return code than to have a nested return of positive result
 		} else if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port", DP_LOG_RET(ret));
 			return ret;
@@ -724,8 +724,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		return ret;
 	}
 
+done:
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
-
 	return portmap_data->nat_port;
 }
 
