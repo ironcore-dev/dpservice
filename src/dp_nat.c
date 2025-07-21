@@ -748,8 +748,10 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 
 	// forcefully delete, if it was never there, it's fine
 	ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
-	if (DP_FAILED(ret) && ret != -ENOENT)
+	if (DP_FAILED(ret) && ret != -ENOENT) {
+		DPS_LOG_ERR("Cannot delete portoverload key", DP_LOG_RET(ret));
 		return ret;
+	}
 
 	dp_copy_ipaddr(&portmap_key.src_ip, &flow_key_org->l3_src);
 	portmap_key.iface_src_port = flow_key_org->src.port_src;
@@ -761,19 +763,22 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 		portmap_key.iface_src_port = flow_key_org->src.port_src;
 
 	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
-	if (DP_FAILED(ret))
-		return ret == -ENOENT ? DP_OK : ret;
-
-	portmap_data->flow_cnt--;
-	if (portmap_data->flow_cnt == 0) {
-		ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key);
-		if (DP_FAILED(ret)) {
-			portmap_data->flow_cnt++;
-			DPS_LOG_ERR("Cannot delete portmap key", DP_LOG_RET(ret));
-			return DP_ERROR;
+	if (DP_SUCCESS(ret)) {
+		portmap_data->flow_cnt--;
+		if (portmap_data->flow_cnt == 0) {
+			ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, &portmap_key);
+			if (DP_FAILED(ret)) {
+				portmap_data->flow_cnt++;
+				DPS_LOG_ERR("Cannot delete portmap key", DP_LOG_RET(ret));
+				return DP_ERROR;
+			}
+			rte_free(portmap_data);
 		}
-		rte_free(portmap_data);
+	} else if (ret != -ENOENT) {
+		DPS_LOG_ERR("Cannot lookup portoverload key", DP_LOG_RET(ret));
+		return ret;
 	}
+	// otherwise already deleted, finish
 
 	created_port = dp_get_port_by_id(cntrack->created_port_id);
 	if (!created_port)
