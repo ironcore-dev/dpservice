@@ -631,12 +631,10 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portmap_data *portmap_data;
 	int ret;
-	uint32_t iface_src_ip = ntohl(df->src.src_addr);
-	uint16_t iface_src_port;
 	uint64_t timestamp;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-		dp_set_ipaddr4(&portmap_key.src_ip, iface_src_ip);
+		dp_set_ipaddr4(&portmap_key.src_ip, ntohl(df->src.src_addr));
 		portoverload_tbl_key.dst_ip = ntohl(df->dst.dst_addr);
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		dp_set_ipaddr6(&portmap_key.src_ip, &df->src.src_addr6);
@@ -645,11 +643,10 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		return DP_ERROR;
 
 	if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
-		iface_src_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
+		portmap_key.iface_src_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
 	else
-		iface_src_port = ntohs(df->l4_info.trans_port.src_port);
+		portmap_key.iface_src_port = ntohs(df->l4_info.trans_port.src_port);
 
-	portmap_key.iface_src_port = iface_src_port;
 	portmap_key.vni = port->iface.vni;
 
 	portoverload_tbl_key.nat_ip = snat_data->nat_ip;
@@ -691,10 +688,13 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			timestamp = rte_rdtsc();
 			if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
 				snat_data->log_timestamp = timestamp;
-				DPS_LOG_WARNING("NAT portmap range is full",
-								DP_LOG_IPV4(snat_data->nat_ip),
-								DP_LOG_VNI(port->iface.vni), DP_LOG_SRC_IPV4(iface_src_ip),
-								DP_LOG_SRC_PORT(iface_src_port));
+				if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+					DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
+									DP_LOG_SRC_IPV4(portmap_key.src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
+				} else {
+					DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
+									DP_LOG_SRC_IPV6(portmap_key.src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
+				}
 			}
 		}
 		return ret;
