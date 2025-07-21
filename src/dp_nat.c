@@ -15,6 +15,7 @@
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_port.h"
+#include "dp_sync.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_responder.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -756,21 +757,10 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			return ret;
 	}
 
-	// DEBUG code to test how this will work:
-	printf("allocated port %u\n", portoverload_tbl_key.nat_port);
-	// TODO call the new lookup function and assert its outputs
-	// TODO remember NAT64 (see above) for dst_ip!
-	// TODO remember ICMP (see above) for dst_port!
-	// TODO or just pass portoverload_tbl_key ;)
-	dp_lookup_network_nat(port->iface.vni, snat_data->nat_ip, portoverload_tbl_key.nat_port, ntohl(df->dst.dst_addr), df->l4_type, ntohs(df->l4_info.trans_port.dst_port));
-	// -----
-	// TODO SEND TO THE OTHER DPSERVICE HERE TODO wait only when new? nah let the other one take care of it
-	DPS_LOG_ERR("CREATE NAT",
-				_DP_LOG_IPV4("nat_ip", snat_data->nat_ip),
-				_DP_LOG_INT("nat_port", portmap_data->nat_port),
-				_DP_LOG_IPV4("vm_ip", ntohl(df->dst.dst_addr)), // TODO sure sure, NAT64
-				_DP_LOG_INT("vm_port", ntohs(df->l4_info.trans_port.dst_port)),
-				_DP_LOG_INT("proto", df->l4_type));
+	// TODO condition on when to run? (need the other dpservice and a valid request?)
+	// TODO add warning? or put a comment about ignoring the error
+	dp_sync_create_nat(&portmap_key, &portoverload_tbl_key);
+
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
 }
@@ -831,20 +821,10 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	union dp_ipv6 dst_nat64;
 	int ret;
 
-
 	if (unlikely(flow_key_reply->l3_dst.is_v6)) {
 		DPS_LOG_ERR("NAT reply flow key with IPv6 address", DP_LOG_IPV6(flow_key_reply->l3_dst.ipv6));
 		return DP_ERROR;
 	}
-
-	// TODO IS THIS THE RIGHT PLACE TO REMOVE FROM OTHER DPSERVICE?? (well yes and no, but it's fine, we can have it not in sync)
-	DPS_LOG_ERR("REMOVE NAT",
-				_DP_LOG_IPV4("nat_ip", flow_key_reply->l3_dst.ipv4),
-				_DP_LOG_INT("nat_port", flow_key_reply->port_dst),
-				_DP_LOG_IPV4("vm_ip", flow_key_org->l3_dst.ipv4), // TODO sure sure, NAT64
-				_DP_LOG_INT("vm_port", flow_key_org->port_dst),
-				_DP_LOG_INT("proto", flow_key_org->proto));
-
 
 	if (DP_FAILED(dp_ipv6_from_ipaddr(&dst_nat64, &flow_key_org->l3_dst)))
 		portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ipv4;
@@ -863,7 +843,6 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	}
 
 	dp_copy_ipaddr(&portmap_key.src_ip, &flow_key_org->l3_src);
-	portmap_key.iface_src_port = flow_key_org->src.port_src;
 	portmap_key.vni = cntrack->nf_info.vni;
 	if (flow_key_org->proto == IPPROTO_ICMP || flow_key_org->proto == IPPROTO_ICMPV6)
 		//flow_key[DP_FLOW_DIR_ORG].port_dst is already a converted icmp identifier
@@ -889,6 +868,10 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 			return ret;
 		// otherwise already deleted, finish
 	}
+
+	// TODO condition on when to run? (need the other dpservice and a valid request?)
+	// TODO add warning? or put a comment about ignoring the error
+	dp_sync_delete_nat(&portmap_key, &portoverload_tbl_key);
 
 	created_port = dp_get_port_by_id(cntrack->created_port_id);
 	if (!created_port)
