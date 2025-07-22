@@ -661,6 +661,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		portoverload_tbl_key.nat_port = portmap_data->nat_port;
 		ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 		if (likely(ret == -ENOENT)) {
+			// this is ok, even though the nat_port is the same, the protocol can still differ
 			ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
 			if (DP_FAILED(ret)) {
 				DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
