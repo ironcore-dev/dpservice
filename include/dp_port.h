@@ -112,6 +112,7 @@ struct dp_ports {
 extern struct dp_port *_dp_port_table[DP_MAX_PORTS];
 extern struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 extern struct dp_ports _dp_ports;
+extern struct dp_port _dp_sync_port;
 
 
 struct dp_port *dp_get_port_by_name(const char *pci_name);
@@ -122,6 +123,7 @@ void dp_ports_free(void);
 
 int dp_start_port(struct dp_port *port);
 int dp_start_pf_port(uint16_t index);
+int dp_start_sync_port(void);
 int dp_stop_port(struct dp_port *port);
 
 void dp_start_acquiring_neigh_mac(struct dp_port *port);
@@ -196,9 +198,9 @@ struct dp_port *dp_get_port_by_pf_index(uint16_t index)
 }
 
 static __rte_always_inline
-bool dp_conf_is_tap_mode(void)
+const struct dp_port *dp_get_sync_port(void)
 {
-	return dp_conf_get_nic_type() == DP_CONF_NIC_TYPE_TAP;
+	return &_dp_sync_port;
 }
 
 #ifdef __cplusplus

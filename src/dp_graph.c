@@ -22,6 +22,7 @@
 #	include "nodes/virtsvc_node.h"
 #endif
 
+
 static struct rte_graph *dp_graph;
 static rte_graph_t dp_graph_id = RTE_GRAPH_ID_INVALID;
 static struct rte_graph_cluster_stats *dp_graph_stats;
@@ -94,10 +95,11 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 	rte_graph_t graph_id;
 	char graph_name[RTE_GRAPH_NAMESIZE];
 	// seems that we only need to provide the source-nodes, the rest is added via connected edges
-	static const char *source_node_patterns[] = { "rx-*", "rx_periodic" };
+	static const char *source_nodes[] = { "rx-*", "rx_periodic" };
+	static const char *source_nodes_sync[] = { "rx-*", "rx_periodic", "sync" };
 	struct rte_graph_param graph_conf = {
-		.node_patterns = source_node_patterns,
-		.nb_node_patterns = RTE_DIM(source_node_patterns),
+		.node_patterns = dp_conf_is_sync_enabled() ? source_nodes_sync : source_nodes,
+		.nb_node_patterns = dp_conf_is_sync_enabled() ? RTE_DIM(source_nodes_sync) : RTE_DIM(source_nodes),
 		.socket_id = rte_lcore_to_socket_id(lcore_id),
 	};
 
