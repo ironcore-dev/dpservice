@@ -6,6 +6,8 @@
 
 #include "dp_nat.h"
 
+// TODO rename to dp_sync_send_*?
+
 int dp_sync_create_nat(const struct netnat_portmap_key *portmap_key,
 					   const struct netnat_portoverload_tbl_key *portoverload_key);
 
