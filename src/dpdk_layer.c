@@ -14,6 +14,7 @@
 #include "grpc/dp_grpc_service.hpp"
 #include "grpc/dp_grpc_thread.h"
 #include "nodes/rx_node.h"
+#include "nodes/sync_node.h"
 
 static volatile bool force_quit;
 static volatile bool standing_by = true;
@@ -147,6 +148,7 @@ static int graph_main_loop(__rte_unused void *arg)
 	}
 
 	if (!force_quit) {
+		sync_node_switch_mode();
 		DPS_LOG_INFO("Starting packet processing");
 		rx_node_start_processing();
 	}

@@ -41,12 +41,14 @@ void dp_conf_free(void);
 #include "dp_conf_opts.h"
 
 // Custom getters
-int dp_conf_is_wcmp_enabled(void);
+bool dp_conf_is_wcmp_enabled(void);
 const char *dp_conf_get_eal_a_pf0(void);
 const char *dp_conf_get_eal_a_pf1(void);
 const union dp_ipv6 *dp_conf_get_underlay_ip(void);
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void);
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcpv6_dns(void);
+bool dp_conf_is_tap_mode(void);
+bool dp_conf_is_sync_enabled(void);
 
 #ifdef ENABLE_VIRTSVC
 const struct dp_conf_virtual_services *dp_conf_get_virtual_services(void);

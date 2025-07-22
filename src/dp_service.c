@@ -167,6 +167,10 @@ static int init_interfaces(void)
 	if (DP_FAILED(dp_start_pf_port(1)))
 		return DP_ERROR;
 
+	if (dp_conf_is_sync_enabled())
+		if (DP_FAILED(dp_start_sync_port()))
+			return DP_ERROR;
+
 	// VFs are started by GRPC later
 
 	if (DP_FAILED(dp_flow_init(pf0_socket_id))
