@@ -625,7 +625,7 @@ int dp_find_new_port(const struct snat_data *snat_data,
 	return -ENOENT;  // no free port found
 }
 
-static int dp_commit_snat_port(const struct netnat_portmap_key *portmap_key, const struct netnat_portoverload_tbl_key *portoverload_key)
+static int dp_create_new_portmap(const struct netnat_portmap_key *portmap_key, const struct netnat_portoverload_tbl_key *portoverload_key)
 {
 	struct netnat_portmap_data *portmap_data;
 	int ret;
@@ -657,11 +657,46 @@ static int dp_commit_snat_port(const struct netnat_portmap_key *portmap_key, con
 	return DP_OK;
 }
 
+static int dp_add_to_existing_portmap(const struct netnat_portmap_key *portmap_key,
+									  struct netnat_portoverload_tbl_key *portoverload_key)
+{
+	struct netnat_portmap_data *portmap_data;
+	int ret;
+
+	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, portmap_key, (void **)&portmap_data);
+	if (DP_FAILED(ret)) {
+		if (ret != -ENOENT)
+			DPS_LOG_ERR("Cannot lookup ipv4 portmap key", DP_LOG_RET(ret));
+		return ret;
+	}
+
+	portoverload_key->nat_port = portmap_data->nat_port;
+
+	ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, portoverload_key);
+	if (DP_SUCCESS(ret)) {
+		// already present, need to find new port, so force new portmap entry creation
+		return -ENOENT;
+	} else if (ret != -ENOENT) {
+		DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port", DP_LOG_RET(ret));
+		return ret;
+	}
+
+	// ENOENT: nat_port is the same, but the protocol is different -> just create a portoverload entry
+	ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, portoverload_key);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
+		return ret;
+	}
+
+	portmap_data->flow_cnt++;
+
+	return DP_OK;
+}
+
 int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port)
 {
 	struct netnat_portoverload_tbl_key portoverload_tbl_key;
 	struct netnat_portmap_key portmap_key;
-	struct netnat_portmap_data *portmap_data;
 	int ret;
 	uint64_t timestamp;
 
@@ -688,56 +723,37 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	else
 		portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
-	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, &portmap_key, (void **)&portmap_data);
-	if (DP_SUCCESS(ret)) {
-		portoverload_tbl_key.nat_port = portmap_data->nat_port;
-		ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
-		if (likely(ret == -ENOENT)) {
-			// this is ok, even though the nat_port is the same, the protocol can still differ
-			ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, &portoverload_tbl_key);
-			if (DP_FAILED(ret)) {
-				DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
-				return ret;
-			}
-			// port already assigned, overload freshly created, no more work to do
-			portmap_data->flow_cnt++;
-			goto done;  // better jump to common return code than to have a nested return of positive result
-		} else if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port", DP_LOG_RET(ret));
-			return ret;
-		}
-		// already present is fine, will be reused
-	} else if (ret != -ENOENT) {
-		DPS_LOG_ERR("Cannot lookup ipv4 portmap key", DP_LOG_RET(ret));
-		return ret;
-	}
-	// ENOENT is fine, will be created
-
-	ret = dp_find_new_port(snat_data, &portmap_key, &portoverload_tbl_key);
+	ret = dp_add_to_existing_portmap(&portmap_key, &portoverload_tbl_key);
 	if (DP_FAILED(ret)) {
-		if (ret == -ENOENT) {
-			// This is normal once the port range gets saturated, but still helpful in logs.
-			// Therefore the log must be present, just rate-limited (per interface).
-			timestamp = rte_rdtsc();
-			if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
-				snat_data->log_timestamp = timestamp;
-				if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-					DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
-									DP_LOG_SRC_IPV4(portmap_key.src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
-				} else {
-					DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
-									DP_LOG_SRC_IPV6(portmap_key.src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
+		if (ret != -ENOENT)
+			return ret;
+
+		// ENOENT: need to create a new entry
+		ret = dp_find_new_port(snat_data, &portmap_key, &portoverload_tbl_key);
+		if (DP_FAILED(ret)) {
+			if (ret == -ENOENT) {
+				// This is normal once the port range gets saturated, but still helpful in logs.
+				// Therefore the log must be present, just rate-limited (per interface).
+				timestamp = rte_rdtsc();
+				if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
+					snat_data->log_timestamp = timestamp;
+					if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
+						DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
+										DP_LOG_SRC_IPV4(portmap_key.src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
+					} else {
+						DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
+										DP_LOG_SRC_IPV6(portmap_key.src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
+					}
 				}
 			}
+			return ret;
 		}
-		return ret;
+
+		ret = dp_create_new_portmap(&portmap_key, &portoverload_tbl_key);
+		if (DP_FAILED(ret))
+			return ret;
 	}
 
-	ret = dp_commit_snat_port(&portmap_key, &portoverload_tbl_key);
-	if (DP_FAILED(ret))
-		return ret;
-
-done:
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
 }
