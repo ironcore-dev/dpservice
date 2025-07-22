@@ -774,11 +774,12 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 			}
 			rte_free(portmap_data);
 		}
-	} else if (ret != -ENOENT) {
-		DPS_LOG_ERR("Cannot lookup portoverload key", DP_LOG_RET(ret));
-		return ret;
+	} else {
+		DPS_LOG_ERR("Cannot lookup portmap key", DP_LOG_RET(ret));
+		if (ret != -ENOENT)
+			return ret;
+		// otherwise already deleted, finish
 	}
-	// otherwise already deleted, finish
 
 	created_port = dp_get_port_by_id(cntrack->created_port_id);
 	if (!created_port)
