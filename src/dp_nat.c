@@ -598,7 +598,7 @@ const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df)
 }
 
 static __rte_always_inline
-int dp_find_new_port(const struct snat_data *snat_data,
+int dp_find_new_port(struct snat_data *snat_data,
 					 const struct netnat_portmap_key *portmap_key,
 					 struct netnat_portoverload_tbl_key *portoverload_tbl_key)
 {
@@ -606,6 +606,7 @@ int dp_find_new_port(const struct snat_data *snat_data,
 	uint16_t min_port = snat_data->nat_port_range[0];
 	uint16_t max_port = snat_data->nat_port_range[1];
 	uint16_t tmp_port;
+	uint64_t timestamp;
 	int ret;
 
 	iface_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, portmap_key);
@@ -622,7 +623,23 @@ int dp_find_new_port(const struct snat_data *snat_data,
 		}
 		// on success continue the search (this port is already in use)
 	}
-	return -ENOENT;  // no free port found
+
+	// No free port found
+	// This is normal once the port range gets saturated, but still helpful in logs.
+	// Therefore the log must be present, just rate-limited (per interface).
+	timestamp = rte_rdtsc();
+	if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
+		snat_data->log_timestamp = timestamp;
+		if (portmap_key->src_ip.is_v6) {
+			DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
+							DP_LOG_SRC_IPV6(portmap_key->src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key->iface_src_port));
+		} else {
+			DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
+							DP_LOG_SRC_IPV4(portmap_key->src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key->iface_src_port));
+		}
+	}
+
+	return -ENOENT;
 }
 
 static int dp_create_new_portmap(const struct netnat_portmap_key *portmap_key, const struct netnat_portoverload_tbl_key *portoverload_key)
@@ -698,7 +715,6 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	struct netnat_portoverload_tbl_key portoverload_tbl_key;
 	struct netnat_portmap_key portmap_key;
 	int ret;
-	uint64_t timestamp;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		dp_set_ipaddr4(&portmap_key.src_ip, ntohl(df->src.src_addr));
@@ -730,24 +746,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 
 		// ENOENT: need to create a new entry
 		ret = dp_find_new_port(snat_data, &portmap_key, &portoverload_tbl_key);
-		if (DP_FAILED(ret)) {
-			if (ret == -ENOENT) {
-				// This is normal once the port range gets saturated, but still helpful in logs.
-				// Therefore the log must be present, just rate-limited (per interface).
-				timestamp = rte_rdtsc();
-				if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
-					snat_data->log_timestamp = timestamp;
-					if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
-						DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
-										DP_LOG_SRC_IPV4(portmap_key.src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
-					} else {
-						DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key.vni),
-										DP_LOG_SRC_IPV6(portmap_key.src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key.iface_src_port));
-					}
-				}
-			}
+		if (DP_FAILED(ret))
 			return ret;
-		}
 
 		ret = dp_create_new_portmap(&portmap_key, &portoverload_tbl_key);
 		if (DP_FAILED(ret))
