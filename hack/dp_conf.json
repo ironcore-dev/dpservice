@@ -175,6 +175,14 @@
       "var": "active_lockfile",
       "type": "char",
       "array_size": 256
+    },
+    {
+      "lgopt": "sync-tap",
+      "arg": "IFNAME",
+      "help": "TAP device to use for dpservice-ha synchronization",
+      "var": "sync_tap",
+      "type": "char",
+      "array_size": "IF_NAMESIZE"
     }
   ]
 }
