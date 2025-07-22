@@ -48,6 +48,7 @@ _OPT_SHOPT_MAX = 255,
 #endif
 	OPT_MULTIPORT_ESWITCH,
 	OPT_ACTIVE_LOCKFILE,
+	OPT_SYNC_TAP,
 };
 
 #define OPTSTRING ":hv" \
@@ -85,6 +86,7 @@ static const struct option dp_conf_longopts[] = {
 #endif
 	{ "multiport-eswitch", 0, 0, OPT_MULTIPORT_ESWITCH },
 	{ "active-lockfile", 1, 0, OPT_ACTIVE_LOCKFILE },
+	{ "sync-tap", 1, 0, OPT_SYNC_TAP },
 	{ NULL, 0, 0, 0 }
 };
 
@@ -126,6 +128,7 @@ static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
 #endif
 static bool multiport_eswitch = false;
 static char active_lockfile[256];
+static char sync_tap[IF_NAMESIZE];
 
 const char *dp_conf_get_pf0_name(void)
 {
@@ -216,6 +219,11 @@ const char *dp_conf_get_active_lockfile(void)
 	return active_lockfile;
 }
 
+const char *dp_conf_get_sync_tap(void)
+{
+	return sync_tap;
+}
+
 
 
 /* These functions need to be implemented by the user of this generated code */
@@ -266,6 +274,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 #endif
 		"     --multiport-eswitch                run on NIC configured in multiport e-switch mode\n"
 		"     --active-lockfile=PATH             file to be locked before starting packet processing\n"
+		"     --sync-tap=IFNAME                  TAP device to use for dpservice-ha synchronization\n"
 	, progname);
 }
 
@@ -325,6 +334,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_store_true(&multiport_eswitch);
 	case OPT_ACTIVE_LOCKFILE:
 		return dp_argparse_string(arg, active_lockfile, ARRAY_SIZE(active_lockfile));
+	case OPT_SYNC_TAP:
+		return dp_argparse_string(arg, sync_tap, ARRAY_SIZE(sync_tap));
 	default:
 		fprintf(stderr, "Unimplemented option %d\n", opt);
 		return DP_ERROR;
