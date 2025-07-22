@@ -757,13 +757,50 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			return ret;
 	}
 
-	if (dp_conf_is_sync_enabled())
+	// TODO this is intentionally sending ADD+DEL+ADD for TESTING! remove this!!
+	if (dp_conf_is_sync_enabled()) {
 		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
+		// TODO test by calling delete and create again, just to test the interface and worker on the other side!
+		// TODO ooh and monitor the acutal table sizes on the other side, to make sure deletion happened, etc
+		// TODO also try double-sending it what happens, etc.
+		dp_sync_send_nat_delete(&portmap_key, &portoverload_tbl_key);  // ignore failures
+		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
+		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
+	}
 
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
 }
 
+int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
+							   struct netnat_portoverload_tbl_key *portoverload_key)
+{
+	int ret;
+
+	ret = dp_use_existing_portmap_entry(portmap_key, portoverload_key);
+	if (DP_FAILED(ret)) {
+		if (ret == -EEXIST) {
+			// TODO debug log, remove
+			DPS_LOG_DEBUG("Duplicate sync add", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+			return DP_OK;  // ignore duplicates, trust the primary dpservice
+		}
+		else if (ret != -ENOENT)
+			return ret;
+
+		// no finding of new port here, trust the primary dpservice
+		ret = dp_create_new_portmap_entry(portmap_key, portoverload_key);
+		if (DP_FAILED(ret))
+			return ret;
+	}
+
+	// there is no DP_STATS_NAT_INC_USED_PORT_CNT()
+	// this will be done once this backup dpservice becomes active
+			// TODO debug log, remove
+			DPS_LOG_DEBUG("sync add", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+	return DP_OK;
+}
+
+// TODO this is obsolete, there is a better way of creating flows for synced NAT entries
 int dp_lookup_network_nat(uint32_t vni, uint32_t nat_ip, uint16_t nat_port, uint32_t dst_ip, uint8_t dst_l4_type, uint16_t dst_port)
 {
 	printf("nat vni : %u\n", vni);
@@ -892,6 +929,26 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 
 	DP_STATS_NAT_DEC_USED_PORT_CNT(created_port);
 
+	return DP_OK;
+}
+
+int dp_remove_sync_snat_port(const struct netnat_portmap_key *portmap_key,
+							 const struct netnat_portoverload_tbl_key *portoverload_key)
+{
+	int ret;
+
+	ret = dp_delete_snat_entries(portmap_key, portoverload_key);
+	if (DP_FAILED(ret)) {
+		// TODO debug log, remove
+		DPS_LOG_DEBUG("sync deli FAIL", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+		return ret;
+	}
+
+	// TODO debug log, remove
+	DPS_LOG_DEBUG("sync del", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+
+	// there is no DP_STATS_NAT_INC_USED_PORT_CNT()
+	// this will be done once this backup dpservice becomes active
 	return DP_OK;
 }
 

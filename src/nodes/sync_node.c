@@ -46,6 +46,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
 				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
 		// TODO actually create it! :)
+		dp_allocate_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	case DP_SYNC_MSG_NAT_DELETE:
 		// TODO subfunc?
@@ -60,6 +61,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
 				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
 		// TODO actually delete it! :)
+		dp_remove_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	default:
 		DPS_LOG_ERR("Unknown SYNC message type", DP_LOG_VALUE(sync_hdr->msg_type));

@@ -83,6 +83,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				if (DP_FAILED(dp_lookup_network_nat(vni, dst_ip, dst_port, src_ip, df->l4_type, src_port))) {  // TODO reorder l4 type
 					DPS_LOG_ERR("Failed to lookup");
 					// TODO drop instead!
+					return DNAT_NEXT_DROP;  // THIS (lookup) IS NOW WORKING!
 				}
 
 				// TODO this should basically do some portmap/portoverload table lookup
