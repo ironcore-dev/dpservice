@@ -757,9 +757,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 			return ret;
 	}
 
-	// TODO condition on when to run? (need the other dpservice and a valid request?)
-	// TODO add warning? or put a comment about ignoring the error
-	dp_sync_create_nat(&portmap_key, &portoverload_tbl_key);
+	if (dp_conf_is_sync_enabled())
+		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
 
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
@@ -869,9 +868,8 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 		// otherwise already deleted, finish
 	}
 
-	// TODO condition on when to run? (need the other dpservice and a valid request?)
-	// TODO add warning? or put a comment about ignoring the error
-	dp_sync_delete_nat(&portmap_key, &portoverload_tbl_key);
+	if (dp_conf_is_sync_enabled())
+		dp_sync_send_nat_delete(&portmap_key, &portoverload_tbl_key);  // ignore filures
 
 	created_port = dp_get_port_by_id(cntrack->created_port_id);
 	if (!created_port)
