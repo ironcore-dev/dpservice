@@ -642,7 +642,8 @@ int dp_find_new_port(struct snat_data *snat_data,
 	return -ENOENT;
 }
 
-static int dp_create_new_portmap(const struct netnat_portmap_key *portmap_key, const struct netnat_portoverload_tbl_key *portoverload_key)
+static int dp_create_new_portmap_entry(const struct netnat_portmap_key *portmap_key,
+									   const struct netnat_portoverload_tbl_key *portoverload_key)
 {
 	struct netnat_portmap_data *portmap_data;
 	int ret;
@@ -674,8 +675,8 @@ static int dp_create_new_portmap(const struct netnat_portmap_key *portmap_key, c
 	return DP_OK;
 }
 
-static int dp_add_to_existing_portmap(const struct netnat_portmap_key *portmap_key,
-									  struct netnat_portoverload_tbl_key *portoverload_key)
+static int dp_use_existing_portmap_entry(const struct netnat_portmap_key *portmap_key,
+										 struct netnat_portoverload_tbl_key *portoverload_key)
 {
 	struct netnat_portmap_data *portmap_data;
 	int ret;
@@ -739,7 +740,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	else
 		portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
-	ret = dp_add_to_existing_portmap(&portmap_key, &portoverload_tbl_key);
+	ret = dp_use_existing_portmap_entry(&portmap_key, &portoverload_tbl_key);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
 			return ret;
@@ -749,7 +750,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		if (DP_FAILED(ret))
 			return ret;
 
-		ret = dp_create_new_portmap(&portmap_key, &portoverload_tbl_key);
+		ret = dp_create_new_portmap_entry(&portmap_key, &portoverload_tbl_key);
 		if (DP_FAILED(ret))
 			return ret;
 	}
