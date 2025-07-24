@@ -692,8 +692,9 @@ static int dp_use_existing_portmap_entry(const struct netnat_portmap_key *portma
 
 	ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, portoverload_key);
 	if (DP_SUCCESS(ret)) {
-		// already present, need to find new port, so force new portmap entry creation
-		return -ENOENT;
+		// we already have this one
+		// allocating port for the same flow should never happen (conntrack should prevent this)
+		return -EEXIST;
 	} else if (ret != -ENOENT) {
 		DPS_LOG_ERR("Cannot lookup ipv4 port overload key for an existing nat port", DP_LOG_RET(ret));
 		return ret;
