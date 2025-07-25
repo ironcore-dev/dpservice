@@ -9,6 +9,7 @@
 #include "dp_graph.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
 #include "dp_timers.h"
 #include "dp_util.h"
 #include "grpc/dp_grpc_service.hpp"
@@ -147,6 +148,9 @@ static int graph_main_loop(__rte_unused void *arg)
 	}
 
 	if (!force_quit) {
+		DPS_LOG_INFO("Preparing NAT flows");
+		if (DP_FAILED(dp_create_sync_snat_flows()))
+			DPS_LOG_WARNING("Some NAT flows failed to be created");
 		DPS_LOG_INFO("Starting packet processing");
 		rx_node_start_processing();
 	}
