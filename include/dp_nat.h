@@ -112,6 +112,7 @@ const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
 int dp_remove_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 							 const struct netnat_portoverload_tbl_key *portoverload_key);
+int dp_create_sync_snat_flows(void);
 
 int dp_list_nat_local_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);
 int dp_list_nat_neigh_entries(uint32_t nat_ip, struct dp_grpc_responder *responder);

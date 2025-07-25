@@ -205,6 +205,57 @@ error_add:
 error_alloc:
 	return NULL;
 }
+// TODO make this whole thing better!
+struct flow_value *flow_table_insert_sync_entry(const struct flow_key *key)
+{
+	struct flow_value *flow_val;
+	struct flow_key inverted_key;
+
+	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
+	if (!flow_val) {
+		DPS_LOG_ERR("Failed to allocate new sync flow value");
+		goto error_alloc;
+	}
+
+	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_ORG], key, sizeof(*key));
+	flow_val->flow_flags = DP_FLOW_FLAG_NONE;  // TODO something something NAT?
+	flow_val->timeout_value = flow_timeout;
+	flow_val->created_port_id = 6;// TODO !!!!! port->port_id;
+
+	// TODO there was totally different code previously, make sure it's ok
+	flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
+
+	// TODO this I think can be deleted: dp_cntrack_init_flow_offload_flags(flow_val, df);
+
+	// TODO l4_type is in key, but what is the right state?!?!
+	//if (df->l4_type == IPPROTO_TCP)
+	//	flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_NONE;
+
+	dp_ref_init(&flow_val->ref_count, dp_free_flow);
+	if (DP_FAILED(dp_add_flow(key, flow_val)))
+		goto error_add;
+
+	// Only the original flow (outgoing)'s hash value is recorded
+	// Implicit casting from hash_sig_t to uint32_t!
+	// TODO I guess not needed?? df->dp_flow_hash = dp_get_conntrack_flow_hash_value(key);
+
+	// TODO yes this makes sense, this is what we also need in the second dpservice
+	dp_invert_flow_key(key, &inverted_key);
+	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_REPLY], &inverted_key, sizeof(inverted_key));
+	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
+		goto error_add_inv;
+	dp_ref_inc(&flow_val->ref_count);
+
+	return flow_val;
+
+// TODO go over the gotos, but they do make sense at least
+error_add_inv:
+	dp_delete_flow(key, flow_val);
+error_add:
+	rte_free(flow_val);
+error_alloc:
+	return NULL;
+}
 
 
 static __rte_always_inline void dp_set_pkt_flow_direction(struct flow_key *key, struct flow_value *flow_val, struct dp_flow *df)
@@ -266,6 +317,10 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 			DPS_LOG_WARNING("Failed to create a new flow table entry");
 			return DP_ERROR;
 		}
+		printf("\nNEW CONNTRACK\n");
+		printf("vni: %u, proto: %u, port_src: %u, port_dst: %u, vnf_type: %u, src: %x, dst: %x\n",
+				curr_key->vni, curr_key->proto, curr_key->src.port_src, curr_key->port_dst,
+				curr_key->vnf_type, curr_key->l3_src.ipv4, curr_key->l3_dst.ipv4);
 		dp_cache_flow_val(*p_flow_val);
 		return DP_OK;
 	}
