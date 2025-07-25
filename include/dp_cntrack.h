@@ -6,6 +6,7 @@
 
 #include <rte_mbuf.h>
 
+#include "dp_flow.h"
 #include "dp_mbuf_dyn.h"
 
 #ifdef __cplusplus
@@ -17,6 +18,10 @@ void dp_cntrack_init(void);
 int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df);
 
 void dp_cntrack_flush_cache(void);
+
+// TODO comment that this is special for sync?
+// TODO no includes to support this!
+struct flow_value *flow_table_insert_sync_entry(const struct flow_key *key);
 
 #ifdef __cplusplus
 }
