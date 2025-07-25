@@ -252,6 +252,51 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 	grpc_client.delnat(VM1.name)
 
 
-# TODO others? like private LB, LB-NAT, LB-VIP, etc?
+#
+# Virtual Service traffic
+# this also needs synchronization:
+#  - packet leaves VM though virstvc-NAT -> creates virstvc-NAT table entries in dpservice
+#  - packet comes back to the second dpservice that lacks these entries -> DROP
+# (this is the exact same situation as NAT, just for virtual services - separate codepath)
+#
+def virtsvc_responder():
+	pkt = sniff_packet(PF0.tap, is_udp_pkt)
+	assert pkt[IPv6].dst == virtsvc_udp_svc_ipv6, \
+		"Request to wrong IPv6 address"
+	assert pkt[UDP].dport == virtsvc_udp_svc_port, \
+		"Request to wrong UDP port"
+	# TODO send to the other dpservice - THIS WILL FAIL!!
+	# TODO and it also has a different underlay address!
+	# Send it back to the other dpservice (different underlay address) # TODO <-- address this comment
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=17) /
+				 UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport))
+	delayed_sendp(reply_pkt, PF0.tap_b)
 
-# TODO packet relay!
+def test_virtsvc_udp(request, prepare_ifaces, prepare_ifaces_b):
+	if not request.config.getoption("--virtsvc"):
+		pytest.skip("Virtual services not enabled")
+
+	threading.Thread(target=virtsvc_responder).start()
+
+	pkt = (Ether(dst=VM1.mac, src=VM1.mac, type=0x0800) /
+		   IP(dst=virtsvc_udp_virtual_ip, src=VM1.ip) /
+		   UDP(dport=virtsvc_udp_virtual_port, sport=1234))
+	delayed_sendp(pkt, VM1.tap)
+
+	# Sniff the other dpservice
+	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
+	reply.show()
+	assert reply[IP].src == virtsvc_udp_virtual_ip, \
+		"Got answer from wrong UDP source port"
+	assert reply[UDP].sport == virtsvc_udp_virtual_port, \
+		"Got answer from wrong UDP source port"
+	assert reply[UDP].dport == 1234, \
+		"Got answer to wrong UDP destination port"
+
+
+#
+# There is no need to test packet_relay mechanism
+# because by design it accepts outside packets and relays them somewhere
+# there is nothing extra to keep track of, it is driven directly by LB/VNF tables
+#
