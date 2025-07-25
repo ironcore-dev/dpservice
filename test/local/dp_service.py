@@ -3,6 +3,7 @@
 # SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
+import fcntl
 import os
 import shlex
 import subprocess
@@ -26,6 +27,11 @@ class DpService:
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
 		self.secondary = secondary
+
+		# HACK lock the lockfile here, so pytest is in control, not the other dpservice
+		if secondary:
+			self.lockfd = os.open(active_lockfile, os.O_RDWR | os.O_CREAT)
+			fcntl.flock(self.lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 		if self.hardware:
 			if secondary:
@@ -62,6 +68,9 @@ class DpService:
 						 f' --nic-type=tap')
 		if ha:
 			self.cmd += f' --sync-tap={sync_tap}'
+		# HACK only tell the secondary dpservice about the lockfile and keep it locked by pytest
+		if secondary:
+			self.cmd += f' --active-lockfile={active_lockfile}'
 		self.cmd +=	(f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
 					 f' --dhcp-mtu={dhcp_mtu}'
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
@@ -93,6 +102,11 @@ class DpService:
 	def stop(self):
 		if self.process:
 			stop_process(self.process)
+
+	def become_active(self):
+		if self.secondary and self.lockfd is not None:
+			os.close(self.lockfd);
+			self.lockfd = None
 
 	def init_ifaces(self, grpc_client):
 		interface_init(self._get_tap(VM1))

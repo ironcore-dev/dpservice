@@ -11,16 +11,17 @@ from helpers import *
 # VM-VM traffic on the same host
 # should work even without connection tracking as both VMs are local
 #
-def local_vf_to_vf_responder(vm):
+def local_vf_to_vf_responder(vm, dp_service_b):
 	pkt = sniff_packet(vm.tap, is_udp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
-	# Send it back to the other dpservice
+	# "crash" the first dpservice and send reply to the other one
+	dp_service_b.become_active()
 	delayed_sendp(reply_pkt, vm.tap_b)
 
-def test_ha_vm_vm_local(prepare_ifaces, prepare_ifaces_b):
-	threading.Thread(target=local_vf_to_vf_responder, args=(VM2,)).start()
+def test_ha_vm_vm_local(prepare_ifaces, prepare_ifaces_b, dp_service_b):
+	threading.Thread(target=local_vf_to_vf_responder, args=(VM2, dp_service_b)).start()
 
 	pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
 		   IP(dst=VM2.ip, src=VM1.ip) /
@@ -35,19 +36,21 @@ def test_ha_vm_vm_local(prepare_ifaces, prepare_ifaces_b):
 # VM-VM traffic across hosts (dpservices)
 # should work even without connection tracking due to routes being there
 #
-def cross_vf_to_vf_responder(pf, dst_vm):
+def cross_vf_to_vf_responder(pf, dst_vm, dp_service_b):
 	pkt = sniff_packet(pf.tap, is_udp_pkt)
 	assert pkt[IPv6].src == dst_vm.ul_ipv6, \
 		"Packet not from the right VM"
-	# Send it back to the other dpservice (different underlay address)
+	# "crash" the first dpservice and send reply to the other one
+	dp_service_b.become_active()
+	# NOTE: in pytest the underlay address is different as it is easier, in reality it will be the same
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=dst_vm.ul_ipv6_b, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
 	delayed_sendp(reply_pkt, pf.tap_b)
 
-def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b):
-	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1)).start()
+def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b, dp_service_b):
+	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1, dp_service_b)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 		   IP(dst=f"{neigh_vni1_ov_ip_prefix}.1", src=VM1.ip) /
@@ -63,8 +66,8 @@ def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b):
 # should work even without connection tracking due to default route to router
 # (in reality this packet gets dropped on the way out to the internet)
 #
-def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b):
-	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1)).start()
+def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b, dp_service_b):
+	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1, dp_service_b)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 		   IP(dst=public_ip, src=VM1.ip) /
@@ -79,16 +82,17 @@ def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b):
 # public-VIP traffic
 # should work even without connection tracking due to the nature of VIP
 #
-def vip_responder(src_tap, dst_tap):
+def vip_responder(src_tap, dst_tap, dp_service_b):
 	pkt = sniff_packet(src_tap, is_udp_pkt)
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
-	# Send it out through the other dpservice
+	# "crash" the first dpservice and send reply to the other one
+	dp_service_b.become_active()
 	delayed_sendp(reply_pkt, dst_tap)
 
-def vip_traffic(ul, ip, req_pf_tap, req_vm_tap, rep_pf_tap, rep_vm_tap, rep_vm_ul):
-	threading.Thread(target=vip_responder, args=(req_vm_tap, rep_vm_tap)).start()
+def vip_traffic(ul, ip, req_pf_tap, req_vm_tap, rep_pf_tap, rep_vm_tap, rep_vm_ul, dp_service_b):
+	threading.Thread(target=vip_responder, args=(req_vm_tap, rep_vm_tap, dp_service_b)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
 		   IPv6(dst=ul, src=router_ul_ipv6, nh=4) /
@@ -101,11 +105,10 @@ def vip_traffic(ul, ip, req_pf_tap, req_vm_tap, rep_pf_tap, rep_vm_tap, rep_vm_u
 	assert reply[IPv6].src == rep_vm_ul, \
 		"Invalid reply VNF"
 
-def test_ha_vip(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+def test_ha_vip(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
 	vip_ul = grpc_client.addvip(VM1.name, vip_vip)
 	vip_ul_b = grpc_client_b.addvip(VM1.name, vip_vip)
-	vip_traffic(vip_ul, vip_vip, PF0.tap, VM1.tap, PF0.tap_b, VM1.tap_b, VM1.ul_ipv6_b)
-	vip_traffic(vip_ul_b, vip_vip, PF0.tap_b, VM1.tap_b, PF0.tap, VM1.tap, VM1.ul_ipv6)
+	vip_traffic(vip_ul, vip_vip, PF0.tap, VM1.tap, PF0.tap_b, VM1.tap_b, VM1.ul_ipv6_b, dp_service_b)
 	grpc_client_b.delvip(VM1.name)
 	grpc_client.delvip(VM1.name)
 
@@ -115,14 +118,14 @@ def test_ha_vip(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
 # should work even without connection tracking due to the nature of LB
 # (this is basically another VIP)
 #
-def test_ha_lb(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+def test_ha_lb(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
 	lb_ul = grpc_client.createlb(lb_name, vni1, lb_ip, "udp/1234")
 	lb_ul_b = grpc_client_b.createlb(lb_name, vni1, lb_ip, "udp/1234")
 	lbpfx_ul = grpc_client.addlbprefix(VM1.name, lb_pfx)
 	lbpfx_ul_b = grpc_client_b.addlbprefix(VM1.name, lb_pfx)
 	grpc_client.addlbtarget(lb_name, lbpfx_ul)
 	grpc_client_b.addlbtarget(lb_name, lbpfx_ul_b)
-	vip_traffic(lb_ul, lb_ip, PF0.tap, VM1.tap, PF0.tap_b, VM1.tap_b, VM1.ul_ipv6_b)
+	vip_traffic(lb_ul, lb_ip, PF0.tap, VM1.tap, PF0.tap_b, VM1.tap_b, VM1.ul_ipv6_b, dp_service_b)
 	grpc_client_b.dellbtarget(lb_name, lbpfx_ul_b)
 	grpc_client_b.dellbprefix(VM1.name, lb_pfx)
 	grpc_client_b.dellb(lb_name)
@@ -155,7 +158,7 @@ def send_lb_udp(lb_ul, tap, target_tap, ip, port):
 	assert reply[IP].dst == ip and reply[UDP].sport == port, \
 		"Invalid reply from target"
 
-def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
 	lb_ul = grpc_client.createlb(lb_name, vni1, lb_ip, "udp/1234")
 	lb_ul_b = grpc_client_b.createlb(lb_name, vni1, lb_ip, "udp/1234")
 	target_vms = (VM1, VM2, VM3)
@@ -168,6 +171,9 @@ def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 		grpc_client.addlbtarget(lb_name, vm._lbpfx_ul)
 		vm._lbpfx_ul_b = grpc_client_b.addlbprefix(vm.name, lb_pfx, preferred_underlay=preferred_ul)
 		grpc_client_b.addlbtarget(lb_name, vm._lbpfx_ul_b)
+
+	# In this test only LB targeting is tested, both dpservice can run as active at once
+	dp_service_b.become_active()
 
 	# for the underlay above, public_ip:1234 should go to VM2
 	send_lb_udp(lb_ul, PF0.tap, VM2.tap, public_ip, 1234)
@@ -193,24 +199,23 @@ def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 #  - packet comes back to the second dpservice that lacks these entries -> DROP
 # (basically the same as VIP, but does not work out of the box)
 #
-def nat_responder(nat_ul):
+def nat_responder(nat_ul, dp_service_b):
 	pkt = sniff_packet(PF0.tap, is_udp_pkt)
 	assert pkt[IP].src == nat_vip, \
 		"Packet not from NAT"
-	# Send it to the other dpservice
+	# "crash" the first dpservice and send reply to the other one
+	dp_service_b.become_active()
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=nat_ul, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
 	delayed_sendp(reply_pkt, PF0.tap_b)
-	# delayed_sendp(reply_pkt, PF0.tap)
 
-def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b):
+def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
 	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 
-	threading.Thread(target=nat_responder, args=(nat_ul_b,)).start()
-	# threading.Thread(target=nat_responder, args=(nat_ul,)).start()
+	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 		   IP(dst=public_ip, src=VM1.ip) /
@@ -219,17 +224,15 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 
 	# Sniff the other dpservice
 	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
-	# reply = sniff_packet(VM1.tap, is_udp_pkt)
 	assert reply[IP].dst == pkt[IP].src, \
 		"Reply not to the right address"
 	assert reply[UDP].dport == pkt[UDP].sport, \
 		"Reply not to the right port"
 
-	# TODO make it permanent?
-	# repeat for testing conntrack taking over!!
+	# TODO this should  not be needed when done properly (conntrack should already be there for the first packet)!
+	# repeat the test because now conntrack has taken over
 
-	threading.Thread(target=nat_responder, args=(nat_ul_b,)).start()
-	# threading.Thread(target=nat_responder, args=(nat_ul,)).start()
+	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b)).start()
 
 	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 		   IP(dst=public_ip, src=VM1.ip) /
@@ -238,7 +241,6 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 
 	# Sniff the other dpservice
 	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
-	# reply = sniff_packet(VM1.tap, is_udp_pkt)
 	assert reply[IP].dst == pkt[IP].src, \
 		"Reply not to the right address"
 	assert reply[UDP].dport == pkt[UDP].sport, \
@@ -247,6 +249,7 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 	# TODO need a special test for this?
 	# TODO test NAT entry removal
 	# age_out_flows()
+	# TODO when done proeprly this is a non-issue, jsut test it once
 
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
@@ -259,7 +262,7 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b)
 #  - packet comes back to the second dpservice that lacks these entries -> DROP
 # (this is the exact same situation as NAT, just for virtual services - separate codepath)
 #
-def virtsvc_responder():
+def virtsvc_responder(dp_service_b):
 	pkt = sniff_packet(PF0.tap, is_udp_pkt)
 	assert pkt[IPv6].dst == virtsvc_udp_svc_ipv6, \
 		"Request to wrong IPv6 address"
@@ -267,17 +270,18 @@ def virtsvc_responder():
 		"Request to wrong UDP port"
 	# TODO send to the other dpservice - THIS WILL FAIL!!
 	# TODO and it also has a different underlay address!
-	# Send it back to the other dpservice (different underlay address) # TODO <-- address this comment
+	# "crash" the first dpservice and send reply to the other one
+	dp_service_b.become_active()
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=17) /
 				 UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport))
 	delayed_sendp(reply_pkt, PF0.tap_b)
 
-def test_virtsvc_udp(request, prepare_ifaces, prepare_ifaces_b):
+def test_ha_virtsvc(request, prepare_ifaces, prepare_ifaces_b, dp_service_b):
 	if not request.config.getoption("--virtsvc"):
 		pytest.skip("Virtual services not enabled")
 
-	threading.Thread(target=virtsvc_responder).start()
+	threading.Thread(target=virtsvc_responder, args=(dp_service_b,)).start()
 
 	pkt = (Ether(dst=VM1.mac, src=VM1.mac, type=0x0800) /
 		   IP(dst=virtsvc_udp_virtual_ip, src=VM1.ip) /
