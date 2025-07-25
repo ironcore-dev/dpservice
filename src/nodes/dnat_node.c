@@ -71,7 +71,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				// then it is a premature dnat pkt for network nat (sent before any outgoing traffic from VM,
 				// and it cannot be a standalone new incoming flow for network NAT),
 				// silently drop it now.
-// 				return DNAT_NEXT_DROP;
+				// TODO this is now re-enabled because of the new approach!
+				return DNAT_NEXT_DROP;
 				// TODO the right way:
 				// TODO NAT64 and ICMP ignored now! (see dp_allocate_network_snat_port() ) for proper handling
 				uint16_t dst_port = ntohs(df->l4_info.trans_port.dst_port);  // TODO different for ICMP, see dp_lookup_network_nat_underlay_ip()
