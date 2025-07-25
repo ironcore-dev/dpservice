@@ -119,7 +119,8 @@ def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, seconda
 def dp_service(request, build_path, port_redundancy, fast_flow_timeout, ha_mode):
 	return _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary=False, ha=ha_mode)
 
-@pytest.fixture(scope="package")
+# This one needs to be "activated" during tests, so the scope is set to function
+@pytest.fixture(scope="function")
 def dp_service_b(request, build_path, port_redundancy, fast_flow_timeout, ha_mode):
 	if not ha_mode:
 		raise ValueError("Secondary dpservice only available for --ha")
@@ -136,7 +137,8 @@ def prepare_ifaces(request, dp_service, grpc_client):
 	dp_service.init_ifaces(grpc_client)
 	print("--------------------------")
 
-@pytest.fixture(scope="package")
+# This one uses function-scoped dpservice, must also be function-scoped
+@pytest.fixture(scope="function")
 def prepare_ifaces_b(dp_service_b, grpc_client_b):
 	print("--- B Interfaces init ----")
 	dp_service_b.init_ifaces(grpc_client_b)
