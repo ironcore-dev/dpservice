@@ -106,6 +106,9 @@ exporter_port = 9064
 grpc_port_b = grpc_port+1
 pf_tap_pattern_b = "b_dtap"
 vf_tap_pattern_b = "b_dtapvf_"
+sync_bridge = "dps_sync_br0"
+sync_tap_a = "dps_sync_a"
+sync_tap_b = "dps_sync_b"
 
 # Extra testing options
 flow_timeout = 1

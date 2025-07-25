@@ -20,7 +20,7 @@ class DpService:
 	def _get_tap(self, spec):
 		return spec.tap_b if self.secondary else spec.tap
 
-	def __init__(self, build_path, port_redundancy, fast_flow_timeout, secondary=False,
+	def __init__(self, build_path, port_redundancy, fast_flow_timeout, secondary=False, ha=False,
 				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
@@ -44,22 +44,24 @@ class DpService:
 		if self.secondary:
 			self.cmd += ' --file-prefix=hatest'
 		if not self.hardware:
-			xxx = f' --vdev=net_tap6,iface=dpstap1,persist' if self.secondary else f' --vdev=net_tap6,iface=dpstap0,persist'
 			self.cmd += (f' --no-pci'
 						 f' --vdev={PF0.pci},iface={self._get_tap(PF0)},mac="{PF0.mac}"'
 						 f' --vdev={PF1.pci},iface={self._get_tap(PF1)},mac="{PF1.mac}"'
 						 f' --vdev={VM1.pci},iface={self._get_tap(VM1)},mac="{VM1.mac}"'
 						 f' --vdev={VM2.pci},iface={self._get_tap(VM2)},mac="{VM2.mac}"'
 						 f' --vdev={VM3.pci},iface={self._get_tap(VM3)},mac="{VM3.mac}"'
-						 f' --vdev={VM4.pci},iface={self._get_tap(VM4)},mac="{VM4.mac}"'
-						 +xxx)
+						 f' --vdev={VM4.pci},iface={self._get_tap(VM4)},mac="{VM4.mac}"')
+		if ha:
+			sync_tap = sync_tap_b if secondary else sync_tap_a
+			self.cmd += f' --vdev=net_tap_sync,iface={sync_tap}'
 		self.cmd += ' --'
 		if not self.hardware:
 			self.cmd += (f' --pf0={self._get_tap(PF0)}'
 						 f' --pf1={self._get_tap(PF1)}'
 						 f' --vf-pattern={vf_tap_pattern_b if self.secondary else vf_tap_pattern}'
-						 f' --sync-tap={"dpstap1" if self.secondary else "dpstap0"}'
 						 f' --nic-type=tap')
+		if ha:
+			self.cmd += f' --sync-tap={sync_tap}'
 		self.cmd +=	(f' --ipv6={local_ul_ipv6} --enable-ipv6-overlay'
 					 f' --dhcp-mtu={dhcp_mtu}'
 					 f' --dhcp-dns="{dhcp_dns1}" --dhcp-dns="{dhcp_dns2}"'
