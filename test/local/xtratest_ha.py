@@ -254,6 +254,30 @@ def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b,
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
 
+# TODO reuse some code or something, this is just a copy of the IPv4 test?
+def test_ha_vm_nat64(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
+	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+
+	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b)).start()
+
+	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
+		   IPv6(dst=public_nat64_ipv6, src=VM1.ipv6) /
+		   UDP(dport=1234))
+	delayed_sendp(pkt, VM1.tap)
+
+	# Sniff the other dpservice
+	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
+	assert reply[IPv6].dst == pkt[IPv6].src, \
+		"Reply not to the right address"
+	assert reply[UDP].dport == pkt[UDP].sport, \
+		"Reply not to the right port"
+
+	# TODO there is no conntrack or aging test, but this will be removed fromt he other test as well I think, so OK?
+
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
+
 
 #
 # Virtual Service traffic
