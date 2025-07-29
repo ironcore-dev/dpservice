@@ -107,12 +107,6 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 		cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
 		cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
 		df->offload_state = DP_FLOW_NON_OFFLOAD;
-		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REQUEST)
-			cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = RTE_ICMP_TYPE_ECHO_REQUEST;
-		else if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REPLY)
-			cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = RTE_ICMP_TYPE_ECHO_REPLY;
-		else
-			cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = 0;
 	} else {
 		dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port);
 	}
@@ -126,6 +120,14 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT64;
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
+	if (df->l4_type == IPPROTO_ICMP) {
+		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REQUEST)
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = RTE_ICMP_TYPE_ECHO_REQUEST;
+		else if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REPLY)
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = RTE_ICMP_TYPE_ECHO_REPLY;
+		else
+			cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src = 0;
+	}
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(dest_ip4));
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, snat64_data.nat_ip);
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
