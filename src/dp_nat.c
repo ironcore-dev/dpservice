@@ -954,6 +954,7 @@ int dp_remove_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 	return DP_OK;
 }
 
+// TODO this should not be needed
 static int dp_find_portmap_entry(uint32_t nat_ip, uint16_t nat_port, struct netnat_portmap_key *dst_portmap_key)
 {
 	const struct netnat_portmap_key *portmap_key;
@@ -963,7 +964,7 @@ static int dp_find_portmap_entry(uint32_t nat_ip, uint16_t nat_port, struct netn
 
 	while ((ret = rte_hash_iterate(ipv4_netnat_portmap_tbl, (const void **)&portmap_key, (void **)&portmap_data, &index)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("portmap iterate error", DP_LOG_RET(ret));  // TODO better message
+			DPS_LOG_ERR("portmap iterate error", DP_LOG_RET(ret));  // TODO better message (if this func is even needed)
 			return DP_ERROR;
 		}
 		if (portmap_data->nat_ip == nat_ip && portmap_data->nat_port == nat_port) {
@@ -971,8 +972,22 @@ static int dp_find_portmap_entry(uint32_t nat_ip, uint16_t nat_port, struct netn
 			return DP_OK;
 		}
 	}
-	DPS_LOG_ERR("portmap not found");  // TODO better message
+	DPS_LOG_ERR("portmap not found");  // TODO better message (if this func is even needed)
 	return DP_ERROR;
+}
+
+static void dp_log_sync_flow_warning(const char *message,
+									 const struct netnat_portmap_key *portmap_key,
+									 const struct netnat_portoverload_tbl_key *portoverload_key)
+{
+	char src_ip[INET6_ADDRSTRLEN];
+
+	DP_IPADDR_TO_STR(&portmap_key->src_ip, src_ip);
+
+	DPS_LOG_WARNING(message, DP_LOG_VNI(portmap_key->vni), DP_LOG_PROTO(portoverload_key->l4_type),
+					DP_LOG_SRC_IPSTR(src_ip), DP_LOG_SRC_PORT(portmap_key->iface_src_port),
+					DP_LOG_DST_IPV4(portoverload_key->dst_ip), DP_LOG_DST_PORT(portoverload_key->dst_port),
+					DP_LOG_IPV4(portoverload_key->nat_ip), DP_LOG_L4PORT(portoverload_key->nat_port));
 }
 
 int dp_create_sync_snat_flows(void)
@@ -988,25 +1003,17 @@ int dp_create_sync_snat_flows(void)
 
 	while ((ret = rte_hash_iterate(ipv4_netnat_portoverload_tbl, (const void **)&portoverload_key, &portoverload_value, &index)) != -ENOENT) {
 		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("portoverload iterate error", DP_LOG_RET(ret));  // TODO better message
+			DPS_LOG_ERR("Sync cannot iterate NAT portoverload table", DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
 		// TODO this is awful, just like the lookup for the other way! need to somehow optimize this
 		ret = dp_find_portmap_entry(portoverload_key->nat_ip, portoverload_key->nat_port, &portmap_key);
 		if (DP_FAILED(ret)) {
-			DPS_LOG_WARNING("Cannot find portmap entry for this portoverload entry"); // TODO better log?
+			dp_log_sync_flow_warning("Cannot find portmap entry for this portoverload entry to synchronize flow", &portmap_key, portoverload_key);
 			continue;
 		}
 		// create origin flow key
-		DPS_LOG_ERR("PORTMAP/OVERLOAD KEY",
-				_DP_LOG_INT("src_vni", portmap_key.vni),
-				_DP_LOG_IPV4("src_ip", portmap_key.src_ip.ipv4),
-				_DP_LOG_INT("src_port", portmap_key.iface_src_port),
-				_DP_LOG_IPV4("nat_ip",  portoverload_key->nat_ip),
-				_DP_LOG_INT("nat_port", portoverload_key->nat_port),
-				_DP_LOG_IPV4("dst_ip", portoverload_key->dst_ip),
-				_DP_LOG_INT("dst_port", portoverload_key->dst_port),
-				_DP_LOG_INT("proto", portoverload_key->l4_type));
+		dp_log_sync_flow_warning("CREATING FLOW", &portmap_key, portoverload_key);  // TODO remove this
 		dp_set_ipaddr4(&fkey.l3_dst, portoverload_key->dst_ip);
 		fkey.port_dst = portoverload_key->dst_port;
 		fkey.proto = portoverload_key->l4_type;
@@ -1014,39 +1021,24 @@ int dp_create_sync_snat_flows(void)
 		dp_copy_ipaddr(&fkey.l3_src, &portmap_key.src_ip);
 		fkey.src.port_src = portmap_key.iface_src_port;
 		fkey.vnf_type = DP_VNF_TYPE_NAT;
+		// TODO this was just debugging
 		printf("\nSYNC CONNTRACK\n");
 		printf("vni: %u, proto: %u, port_src: %u, port_dst: %u, vnf_type: %u, src: %x, dst: %x\n",
 				fkey.vni, fkey.proto, fkey.src.port_src, fkey.port_dst,
 				fkey.vnf_type, fkey.l3_src.ipv4, fkey.l3_dst.ipv4);
-		// if such flow already exists, do nothing
+
 		ret = dp_get_flow(&fkey, &flow_val);
 		if (DP_SUCCESS(ret)) {
-			DPS_LOG_WARNING("Already present, skipping");
-			// TODO test this by calling this function twice
+			dp_log_sync_flow_warning("Synchonized flow already present, skipping", &portmap_key, portoverload_key);
 			continue;
 		}
+
 		// create flow value and insert then...
-		struct flow_value *fval = flow_table_insert_sync_entry(&fkey); // TODO then rename to _sync_nat_entry so the changes below are justified
-		if (!fval) {
-			DPS_LOG_ERR("Dunno what to do now...");  // TODO or just ignore and comment
-		} else {
-			// TODO move this inside and it will work without deletion!!
-			fval->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
-			dp_delete_flow(&fval->flow_key[DP_FLOW_DIR_REPLY], fval);
-			dp_set_ipaddr4(&fval->flow_key[DP_FLOW_DIR_REPLY].l3_dst, portoverload_key->nat_ip);
-			fval->flow_key[DP_FLOW_DIR_REPLY].port_dst = portoverload_key->nat_port;
-			if (DP_FAILED(dp_add_flow(&fval->flow_key[DP_FLOW_DIR_REPLY], fval))) {
-				DPS_LOG_ERR("AARGH");
-				continue;
-			}
-			dp_ref_inc(&fval->ref_count);
-			// TODO OK so move this inside I think, but also find the original code path tat does the equivalent fo this and re-check everything!!
-			// most of it seems to be snat_node (the bovve code is direct copy)
-			// but some details seem to be missing:
-			//  - for example nf_info is incomplete - will it even work for ICMP??
-			// --> copy even that from snat_node and comment about it being a copy?
-			// --> ICMP needs to be teted somehow?!?!
-		}
+		// TODO PORT ID!
+		if (!flow_table_insert_sync_nat_entry(&fkey, portoverload_key->nat_ip, portoverload_key->nat_port, 6))
+			dp_log_sync_flow_warning("Error creating syncronized flows", &portmap_key, portoverload_key);
+
+		// TODO if route taken - this is where freeup of custom portoveload data must happen
 	}
 	return DP_OK;
 }
