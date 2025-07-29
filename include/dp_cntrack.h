@@ -19,9 +19,7 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df);
 
 void dp_cntrack_flush_cache(void);
 
-// TODO comment that this is special for sync?
-// TODO no includes to support this!
-struct flow_value *flow_table_insert_sync_entry(const struct flow_key *key);
+struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, uint32_t nat_ip, uint16_t nat_port, uint16_t port_id);
 
 #ifdef __cplusplus
 }
