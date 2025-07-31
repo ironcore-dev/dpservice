@@ -221,6 +221,15 @@ void dp_set_ipaddr4(struct dp_ip_address *addr, uint32_t ipv4)
 	addr->_ipv4 = ipv4;
 }
 
+static __rte_always_inline
+void dp_set_ipaddr_nat64(struct dp_ip_address *dst, rte_be32_t ipv4)
+{
+	dst->_is_v6 = true;
+	dst->_ipv6._prefix = dp_nat64_prefix._prefix;
+	dst->_ipv6._suffix = dp_nat64_prefix._suffix;
+	dst->_ipv6._nat64.ipv4 = ipv4;
+}
+
 int dp_ipaddr_to_str(const struct dp_ip_address *addr, char *dest, int dest_len);
 #define DP_IPADDR_TO_STR(ADDR, DST) do { \
 	static_assert(sizeof(DST) >= INET6_ADDRSTRLEN, "Insufficient buffer size for DP_IPADDR_TO_STR()"); \
