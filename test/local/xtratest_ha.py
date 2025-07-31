@@ -199,12 +199,13 @@ def test_ha_maglev(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b,
 #  - packet comes back to the second dpservice that lacks these entries -> DROP
 # (basically the same as VIP, but does not work out of the box)
 #
-def nat_responder(nat_ul, dp_service_b, icmp=False):
-	pkt = sniff_packet(PF0.tap, is_icmp_pkt if icmp else is_udp_pkt)
+def nat_responder(pf_tap, nat_ul, dp_service_b, icmp=False):
+	pkt = sniff_packet(pf_tap, is_icmp_pkt if icmp else is_udp_pkt)
 	assert pkt[IP].src == nat_vip, \
 		"Packet not from NAT"
 	# "crash" the first dpservice and send reply to the other one
-	dp_service_b.become_active()
+	if dp_service_b:
+		dp_service_b.become_active()
 	if icmp:
 		payload = ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq)
 	else:
@@ -215,116 +216,68 @@ def nat_responder(nat_ul, dp_service_b, icmp=False):
 				 payload)
 	delayed_sendp(reply_pkt, PF0.tap_b)
 
+def nat_communicate(pf_tap, vm_tap, nat_ul, dp_service_b, icmp, ipv6):
+	threading.Thread(target=nat_responder, args=(pf_tap, nat_ul, dp_service_b, icmp)).start()
+
+	if ipv6:
+		l3 = IPv6(dst=public_nat64_ipv6, src=VM1.ipv6)
+		payload = ICMPv6EchoRequest(id=0x0040, seq=123) if icmp else UDP(dport=1234)
+	else:
+		l3 = IP(dst=public_ip, src=VM1.ip)
+		payload = ICMP(type=8, id=0x0040, seq=123) if icmp else UDP(dport=1234)
+	pkt = Ether(dst=PF0.mac, src=VM1.mac) / l3 / payload
+	delayed_sendp(pkt, vm_tap)
+
+	# Sniff the other dpservice
+	lfilter = (is_icmpv6echo_reply_pkt if ipv6 else is_icmp_pkt) if icmp else is_udp_pkt
+	reply = sniff_packet(VM1.tap_b, lfilter)
+	if ipv6:
+		assert reply[IPv6].dst == pkt[IPv6].src, \
+			"Reply not to the right address"
+	else:
+		assert reply[IP].dst == pkt[IP].src, \
+			"Reply not to the right address"
+	if icmp:
+		reply_id = reply[ICMPv6EchoReply].id if ipv6 else reply[ICMP].id
+		reply_seq = reply[ICMPv6EchoReply].seq if ipv6 else reply[ICMP].seq
+		assert reply_id == 0x0040, \
+			"Reply does not use the right id"
+		assert reply_seq == 123, \
+			"Reply does not use the right seq number"
+	else:
+		assert reply[UDP].dport == pkt[UDP].sport, \
+			"Reply not to the right port"
+
+def nat_test_handover(grpc_client, grpc_client_b, dp_service_b, icmp=False, ipv6=False):
+	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+
+	# First, send packet to primary, activate backup, sniff backup
+	nat_communicate(PF0.tap, VM1.tap, nat_ul_b, dp_service_b, icmp, ipv6)
+
+	# Second, send packet to backup and sniff it
+	nat_communicate(PF0.tap_b, VM1.tap_b, nat_ul_b, None, icmp, ipv6)
+
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
+
 def test_ha_vm_nat(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
-	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_test_handover(grpc_client, grpc_client_b, dp_service_b)
 
-	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b)).start()
-
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-		   IP(dst=public_ip, src=VM1.ip) /
-		   UDP(dport=1234))
-	delayed_sendp(pkt, VM1.tap)
-
-	# Sniff the other dpservice
-	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
-	assert reply[IP].dst == pkt[IP].src, \
-		"Reply not to the right address"
-	assert reply[UDP].dport == pkt[UDP].sport, \
-		"Reply not to the right port"
-
-	# TODO this should  not be needed when done properly (conntrack should already be there for the first packet)!
-	# repeat the test because now conntrack has taken over
-
-	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b)).start()
-
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-		   IP(dst=public_ip, src=VM1.ip) /
-		   UDP(dport=1234))
-	delayed_sendp(pkt, VM1.tap)
-
-	# Sniff the other dpservice
-	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
-	assert reply[IP].dst == pkt[IP].src, \
-		"Reply not to the right address"
-	assert reply[UDP].dport == pkt[UDP].sport, \
-		"Reply not to the right port"
-
-	# TODO need a special test for this?
-	# TODO test NAT entry removal
-	# age_out_flows()
-	# TODO when done proeprly this is a non-issue, jsut test it once
-
-	grpc_client_b.delnat(VM1.name)
-	grpc_client.delnat(VM1.name)
-
-# TODO reuse some code or something, this is just a copy of the UDP test?
 def test_ha_vm_nat_icmp(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
-	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, icmp=True)
 
-	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b, True)).start()
-
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
-		   IP(dst=public_ip, src=VM1.ip) /
-		   ICMP(type=8, id=0x0040))
-	delayed_sendp(pkt, VM1.tap)
-
-	# Sniff the other dpservice
-	reply = sniff_packet(VM1.tap_b, is_icmp_pkt)
-	assert reply[IP].dst == pkt[IP].src, \
-		"Reply not to the right address"
-
-	# TODO there is no conntrack or aging test, but this will be removed fromt he other test as well I think, so OK?
-
-	grpc_client_b.delnat(VM1.name)
-	grpc_client.delnat(VM1.name)
-
-# TODO reuse some code or something, this is just a copy of the IPv4 test?
 def test_ha_vm_nat64(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
-	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	# TODO this only works when code changes to use nat64 addr
+	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, ipv6=True)
 
-	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b)).start()
-
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
-		   IPv6(dst=public_nat64_ipv6, src=VM1.ipv6) /
-		   UDP(dport=1234))
-	delayed_sendp(pkt, VM1.tap)
-
-	# Sniff the other dpservice
-	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
-	assert reply[IPv6].dst == pkt[IPv6].src, \
-		"Reply not to the right address"
-	assert reply[UDP].dport == pkt[UDP].sport, \
-		"Reply not to the right port"
-
-	# TODO there is no conntrack or aging test, but this will be removed fromt he other test as well I think, so OK?
-
-	grpc_client_b.delnat(VM1.name)
-	grpc_client.delnat(VM1.name)
-
-# TODO reuse some code or something, this is just a copy of the IPv4 test?
 def test_ha_vm_nat64_icmp(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
-	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
-	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	# TODO this only works when code changes to use nat64 addr
+	# TODO there is a bug in flow itself, though test is working
+	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, ipv6=True, icmp=True)
 
-	threading.Thread(target=nat_responder, args=(nat_ul_b, dp_service_b, True)).start()
-
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
-		   IPv6(dst=public_nat64_ipv6, src=VM1.ipv6) /
-		   ICMPv6EchoRequest(seq=1))
-	delayed_sendp(pkt, VM1.tap)
-
-	# Sniff the other dpservice
-	reply = sniff_packet(VM1.tap_b, is_icmpv6echo_reply_pkt)
-	assert reply[IPv6].dst == pkt[IPv6].src, \
-		"Reply not to the right address"
-
-	# TODO there is no conntrack or aging test, but this will be removed fromt he other test as well I think, so OK?
-
-	grpc_client_b.delnat(VM1.name)
-	grpc_client.delnat(VM1.name)
+# TODO some test to utilize flow aging?
+	# age_out_flows()
 
 
 #
