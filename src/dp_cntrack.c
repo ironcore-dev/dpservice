@@ -211,6 +211,7 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 {
 	struct flow_value *flow_val;
 	struct flow_key inverted_key;
+	struct flow_key nat64_key;
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val) {
@@ -242,12 +243,9 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 		flow_val->offload_state.reply = DP_FLOW_OFFLOADED;
 	}
 
-	// Save the original conntrack flow
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
-	if (DP_FAILED(dp_add_flow(key, flow_val)))
-		goto error_add;
 
-	// Create the reply flow
+	// Create the reply key
 	dp_invert_flow_key(key, &inverted_key);
 	// like above, this is SNAT-specific taken from snat_node.c
 	dp_set_ipaddr4(&inverted_key.l3_dst, nat_ip);
@@ -264,6 +262,18 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 	}
 	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_REPLY], &inverted_key, sizeof(inverted_key));
 
+	// some adjustments are needed for NAT64 (but only for the original direction)
+	if (key->l3_src.is_v6) {
+		memcpy(&nat64_key, key, sizeof(nat64_key));
+		dp_set_ipaddr_nat64(&nat64_key.l3_dst, key->l3_dst.ipv4);
+		key = &nat64_key;
+	}
+
+	// Create the original conntrack flow
+	if (DP_FAILED(dp_add_flow(key, flow_val)))
+		goto error_add;
+
+	// Create the reply flow
 	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
 		goto error_add_inv;
 	dp_ref_inc(&flow_val->ref_count);
