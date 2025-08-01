@@ -976,6 +976,36 @@ static int dp_find_portmap_entry(uint32_t nat_ip, uint16_t nat_port, struct netn
 	return DP_ERROR;
 }
 
+// TODO this should not be needed
+static int dp_find_created_port_id(uint32_t vni, const struct dp_ip_address *src_ip)
+{
+	const struct dp_ports *ports = dp_get_ports();
+	union dp_ipv6 src_ipv6;
+
+	if (src_ip->is_v6)
+		dp_ipv6_from_ipaddr(&src_ipv6, src_ip);
+
+	DP_FOREACH_PORT(ports, port) {
+		if (!port->is_pf && port->allocated && port->iface.vni == vni) {
+			if (src_ip->is_v6) {
+				char dest[64];
+				dp_ipaddr_to_str(src_ip, dest, sizeof(dest));
+				printf("\n\nYES IPV6 %u %s\n", port->port_id, dest);
+				dp_ipv6_to_str(&port->iface.cfg.dhcp_ipv6, dest, sizeof(dest));
+				printf("YES IPV6 %u %s\n\n\n", port->port_id, dest);
+				if (dp_ipv6_match(&port->iface.cfg.dhcp_ipv6, &src_ipv6)) {
+					printf("got it %u\n", port->port_id);
+					return port->port_id;
+				}
+			} else {
+				if (port->iface.cfg.own_ip == src_ip->ipv4)
+					return port->port_id;
+			}
+		}
+	}
+	return DP_ERROR;
+}
+
 static void dp_log_sync_flow_warning(const char *message,
 									 const struct netnat_portmap_key *portmap_key,
 									 const struct netnat_portoverload_tbl_key *portoverload_key)
@@ -996,6 +1026,7 @@ int dp_create_sync_snat_flows(void)
 	const struct netnat_portoverload_tbl_key *portoverload_key;
 	void *portoverload_value;
 	struct netnat_portmap_key portmap_key;
+	uint16_t created_port_id;
 	uint32_t index = 0;
 	struct flow_key fkey;
 	struct flow_value *flow_val;
@@ -1012,6 +1043,13 @@ int dp_create_sync_snat_flows(void)
 			dp_log_sync_flow_warning("Cannot find portmap entry for this portoverload entry to synchronize flow", &portmap_key, portoverload_key);
 			continue;
 		}
+		// TODO this is awful, neet to get this in a better way
+		ret = dp_find_created_port_id(portmap_key.vni, &portmap_key.src_ip);
+		if (DP_FAILED(ret)) {
+			dp_log_sync_flow_warning("Cannot find port id for this portmap entry to synchronize flow", &portmap_key, portoverload_key);
+			continue;
+		}
+		created_port_id = (uint16_t)ret;
 		// create origin flow key
 		dp_log_sync_flow_warning("CREATING FLOW", &portmap_key, portoverload_key);  // TODO remove this
 		dp_set_ipaddr4(&fkey.l3_dst, portoverload_key->dst_ip);
@@ -1034,8 +1072,7 @@ int dp_create_sync_snat_flows(void)
 		}
 
 		// create flow value and insert then...
-		// TODO PORT ID!
-		if (!flow_table_insert_sync_nat_entry(&fkey, portoverload_key->nat_ip, portoverload_key->nat_port, 6))
+		if (!flow_table_insert_sync_nat_entry(&fkey, portoverload_key->nat_ip, portoverload_key->nat_port, created_port_id))
 			dp_log_sync_flow_warning("Error creating syncronized flows", &portmap_key, portoverload_key);
 
 		// TODO if route taken - this is where freeup of custom portoveload data must happen
