@@ -348,10 +348,11 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 			DPS_LOG_WARNING("Failed to create a new flow table entry");
 			return DP_ERROR;
 		}
-		printf("\nNEW CONNTRACK\n");
-		printf("vni: %u, proto: %u, port_src: %u, port_dst: %u, vnf_type: %u, src: %x, dst: %x\n",
-				curr_key->vni, curr_key->proto, curr_key->src.port_src, curr_key->port_dst,
-				curr_key->vnf_type, curr_key->l3_src.ipv4, curr_key->l3_dst.ipv4);
+		// TODO cleanup
+// 		printf("\nNEW CONNTRACK\n");
+// 		printf("vni: %u, proto: %u, port_src: %u, port_dst: %u, vnf_type: %u, src: %x, dst: %x\n",
+// 				curr_key->vni, curr_key->proto, curr_key->src.port_src, curr_key->port_dst,
+// 				curr_key->vnf_type, curr_key->l3_src.ipv4, curr_key->l3_dst.ipv4);
 		dp_cache_flow_val(*p_flow_val);
 		return DP_OK;
 	}

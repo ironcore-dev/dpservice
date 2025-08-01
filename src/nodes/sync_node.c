@@ -21,6 +21,7 @@ static int sync_node_init(__rte_unused const struct rte_graph *graph, __rte_unus
 void sync_node_switch_role(void)
 {
 	backup_mode = false;
+	// TODO but also request DUMP!!!
 }
 
 
@@ -33,6 +34,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
 		// TODO remove
 		// TODO look into ways of getting rid of these packets
+		// --> looks like this is only at the start, chich makes sense in pytest, devices are configure AFTER dpservice starts
 		DPS_LOG_ERR("Invalid ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
 		return;
 	}
@@ -52,30 +54,32 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 	case DP_SYNC_MSG_NAT_CREATE:
 		// TODO subfunc?
 		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
-		DPS_LOG_WARNING("CREATE NAT",
-				_DP_LOG_INT("src_vni", nat_keys->portmap_key.vni),
-				_DP_LOG_IPV4("src_ip", nat_keys->portmap_key.src_ip.ipv4),
-				_DP_LOG_INT("src_port", nat_keys->portmap_key.iface_src_port),
-				_DP_LOG_IPV4("nat_ip",  nat_keys->portoverload_key.nat_ip),
-				_DP_LOG_INT("nat_port", nat_keys->portoverload_key.nat_port),
-				_DP_LOG_IPV4("dst_ip", nat_keys->portoverload_key.dst_ip),
-				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
-				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
+		// TODO cleanup debug
+// 		DPS_LOG_WARNING("CREATE NAT",
+// 				_DP_LOG_INT("src_vni", nat_keys->portmap_key.vni),
+// 				_DP_LOG_IPV4("src_ip", nat_keys->portmap_key.src_ip.ipv4),
+// 				_DP_LOG_INT("src_port", nat_keys->portmap_key.iface_src_port),
+// 				_DP_LOG_IPV4("nat_ip",  nat_keys->portoverload_key.nat_ip),
+// 				_DP_LOG_INT("nat_port", nat_keys->portoverload_key.nat_port),
+// 				_DP_LOG_IPV4("dst_ip", nat_keys->portoverload_key.dst_ip),
+// 				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
+// 				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
 		// TODO actually create it! :)
 		dp_allocate_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	case DP_SYNC_MSG_NAT_DELETE:
 		// TODO subfunc?
 		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
-		DPS_LOG_WARNING("DELETE NAT",
-				_DP_LOG_INT("src_vni", nat_keys->portmap_key.vni),
-				_DP_LOG_IPV4("src_ip", nat_keys->portmap_key.src_ip.ipv4),
-				_DP_LOG_INT("src_port", nat_keys->portmap_key.iface_src_port),
-				_DP_LOG_IPV4("nat_ip",  nat_keys->portoverload_key.nat_ip),
-				_DP_LOG_INT("nat_port", nat_keys->portoverload_key.nat_port),
-				_DP_LOG_IPV4("dst_ip", nat_keys->portoverload_key.dst_ip),
-				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
-				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
+		// TODO cleanup debug
+// 		DPS_LOG_WARNING("DELETE NAT",
+// 				_DP_LOG_INT("src_vni", nat_keys->portmap_key.vni),
+// 				_DP_LOG_IPV4("src_ip", nat_keys->portmap_key.src_ip.ipv4),
+// 				_DP_LOG_INT("src_port", nat_keys->portmap_key.iface_src_port),
+// 				_DP_LOG_IPV4("nat_ip",  nat_keys->portoverload_key.nat_ip),
+// 				_DP_LOG_INT("nat_port", nat_keys->portoverload_key.nat_port),
+// 				_DP_LOG_IPV4("dst_ip", nat_keys->portoverload_key.dst_ip),
+// 				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
+// 				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
 		// TODO actually delete it! :)
 		dp_remove_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
