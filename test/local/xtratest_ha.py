@@ -357,3 +357,62 @@ def test_ha_packet_relay(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_cli
 	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
+
+
+#
+# Test requesting multiple NAT etries after the secondary dpservice restarts
+#
+def create_nat_entry(vm_tap, sport, dst_ip):
+	# this is just sending packets out to create entries, no threads, no delay, no sniffing
+	pkt = Ether(dst=PF0.mac, src=VM1.mac) / IP(dst=dst_ip, src=VM1.ip) / UDP(dport=1234, sport=sport)
+	sendp(pkt, iface=vm_tap)
+
+def bulk_responder(nat_ul, nat_port, dst_ip):
+	reply_pkt = (Ether(dst=PF0.mac, src=PF0.mac) /
+				 IPv6(dst=nat_ul, src=router_ul_ipv6) /
+				 IP(dst=nat_vip, src=dst_ip) /
+				 UDP(sport=1234, dport=nat_port))
+	delayed_sendp(reply_pkt, PF0.tap_b)
+
+def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
+	# Need to create many entries with overloading to properly test table dump
+	nat_port_range = 4
+	nat_port_from = nat_local_min_port
+	nat_port_to = nat_local_min_port + nat_port_range
+	# This tuple is reverse-engineered value from --graphtrace
+	nat_port_test = 103
+	src_port_test = 1027
+
+	grpc_client.addnat(VM1.name, nat_vip, nat_port_from, nat_port_to)
+
+	# TODO test doing 10/100/1000 maybe more if it's quick enough
+	# TODO ooh but we can only use one port to make this easy to test -> us multiple ip addresses I think
+	# TODO no that's bad, need to test actually min, min+128 to make it nicer!! then use 10x the range to properly test full saturation!
+	# for sport in range(1024, 1024+nat_port_range):
+		# create_nat_entry(VM1.tap, sport, public_ip)
+		# create_nat_entry(VM1.tap, sport, public_ip2)
+	# TODO so comment, but simply define the number, it should be deterministic (computed from nat entry hash)
+
+	# TODO currently we fillup the range, so need to adjust the ip!!
+
+	# Only now start the second dpservice, it should request a NAT table dump
+	dp_service_b = request.getfixturevalue('dp_service_b')
+	request.getfixturevalue('prepare_ifaces_b')
+	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_port_from, nat_port_to)
+	# TODO debug for testing before/after
+	for sport in range(1024, 1024+nat_port_range):
+		create_nat_entry(VM1.tap, sport, public_ip)
+		create_nat_entry(VM1.tap, sport, public_ip2)
+	dp_service_b.become_active()
+
+	# Test at least one packet from outside to second dpservice
+	threading.Thread(target=bulk_responder, args=(nat_ul_b, nat_port_test, public_ip)).start()
+	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
+	assert reply[IP].dst == VM1.ip, \
+		"Reply not to the right address"
+	# TODO choose some middle one, not the first one
+	assert reply[UDP].dport == src_port_test, \
+		"Reply not to the right port"
+
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
