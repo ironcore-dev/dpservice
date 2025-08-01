@@ -765,9 +765,9 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		// TODO test by calling delete and create again, just to test the interface and worker on the other side!
 		// TODO ooh and monitor the acutal table sizes on the other side, to make sure deletion happened, etc
 		// TODO also try double-sending it what happens, etc.
-		dp_sync_send_nat_delete(&portmap_key, &portoverload_tbl_key);  // ignore failures
-		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
-		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
+// 		dp_sync_send_nat_delete(&portmap_key, &portoverload_tbl_key);  // ignore failures
+// 		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
+// 		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key);  // ignore failures
 	}
 
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
@@ -797,8 +797,8 @@ int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 
 	// there is no DP_STATS_NAT_INC_USED_PORT_CNT()
 	// this will be done once this backup dpservice becomes active
-			// TODO debug log, remove
-			DPS_LOG_DEBUG("sync add", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+	// TODO debug log, remove
+// 	DPS_LOG_DEBUG("sync add", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
 	return DP_OK;
 }
 
@@ -947,7 +947,7 @@ int dp_remove_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 	}
 
 	// TODO debug log, remove
-	DPS_LOG_DEBUG("sync del", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+// 	DPS_LOG_DEBUG("sync del", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
 
 	// there is no DP_STATS_NAT_INC_USED_PORT_CNT()
 	// this will be done once this backup dpservice becomes active
@@ -1051,6 +1051,7 @@ int dp_create_sync_snat_flows(void)
 		}
 		created_port_id = (uint16_t)ret;
 		// create origin flow key
+		// TODO check the looks of this code, not sure if ideal
 		dp_log_sync_flow_warning("CREATING FLOW", &portmap_key, portoverload_key);  // TODO remove this
 		dp_set_ipaddr4(&fkey.l3_dst, portoverload_key->dst_ip);
 		fkey.port_dst = portoverload_key->dst_port;
@@ -1060,10 +1061,10 @@ int dp_create_sync_snat_flows(void)
 		fkey.src.port_src = portmap_key.iface_src_port;
 		fkey.vnf_type = DP_VNF_TYPE_NAT;
 		// TODO this was just debugging
-		printf("\nSYNC CONNTRACK\n");
-		printf("vni: %u, proto: %u, port_src: %u, port_dst: %u, vnf_type: %u, src: %x, dst: %x\n",
-				fkey.vni, fkey.proto, fkey.src.port_src, fkey.port_dst,
-				fkey.vnf_type, fkey.l3_src.ipv4, fkey.l3_dst.ipv4);
+// 		printf("\nSYNC CONNTRACK\n");
+// 		printf("vni: %u, proto: %u, port_src: %u, port_dst: %u, vnf_type: %u, src: %x, dst: %x\n",
+// 				fkey.vni, fkey.proto, fkey.src.port_src, fkey.port_dst,
+// 				fkey.vnf_type, fkey.l3_src.ipv4, fkey.l3_dst.ipv4);
 
 		ret = dp_get_flow(&fkey, &flow_val);
 		if (DP_SUCCESS(ret)) {
