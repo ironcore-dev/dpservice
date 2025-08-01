@@ -102,6 +102,7 @@ class DpService:
 	def stop(self):
 		if self.process:
 			stop_process(self.process)
+		self.become_active()
 
 	def become_active(self):
 		if self.secondary and self.lockfd is not None:
