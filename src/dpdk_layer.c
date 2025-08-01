@@ -15,6 +15,7 @@
 #include "grpc/dp_grpc_service.hpp"
 #include "grpc/dp_grpc_thread.h"
 #include "nodes/rx_node.h"
+#include "nodes/sync_node.h"
 
 static volatile bool force_quit;
 static volatile bool standing_by = true;
@@ -148,6 +149,7 @@ static int graph_main_loop(__rte_unused void *arg)
 	}
 
 	if (!force_quit) {
+		sync_node_switch_role();
 		DPS_LOG_INFO("Preparing NAT flows");
 		if (DP_FAILED(dp_create_sync_snat_flows()))
 			DPS_LOG_WARNING("Some NAT flows failed to be created");
