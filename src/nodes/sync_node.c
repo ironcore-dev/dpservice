@@ -1,19 +1,26 @@
 // SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and IronCore contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include "nodes/sync_node.h"
 #include "dp_error.h"
 #include "dp_sync.h"
 #include "nodes/common_node.h"
 
 DP_NODE_REGISTER_SOURCE(SYNC, sync, DP_NODE_DEFAULT_NEXT_ONLY);
 
-
+static volatile bool backup_mode = true;
 static uint16_t sync_port_id;
 
 static int sync_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 	sync_port_id = dp_get_sync_port()->port_id;
 	return DP_OK;
+}
+
+
+void sync_node_switch_role(void)
+{
+	backup_mode = false;
 }
 
 
@@ -25,9 +32,18 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
 		// TODO remove
+		// TODO look into ways of getting rid of these packets
 		DPS_LOG_ERR("Invalid ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
 		return;
 	}
+
+	// TODO move to function handlers I think
+	// BACKUP MODE - listen for NAT table updates
+	// ACTIVE MODE - listen for NAT table dump requests
+	if (!backup_mode) {
+		DPS_LOG_DEBUG("Ignoring sync traffic packet");
+		return;
+	} // TODO else of course
 
 	switch (sync_hdr->msg_type) {
 	case DP_SYNC_MSG_REQUEST_UPDATES:
