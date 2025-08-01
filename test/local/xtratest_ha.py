@@ -325,7 +325,42 @@ def test_ha_virtsvc(request, prepare_ifaces, prepare_ifaces_b, dp_service_b):
 
 
 #
-# There is no need to test packet_relay mechanism
-# because by design it accepts outside packets and relays them somewhere
-# there is nothing extra to keep track of, it is driven directly by LB/VNF tables
+# Packet-relay traffic (packet for neighboring NAT dpservice)
+# should work because there is nothing extra to keep track of
+# it is driven directly by LB/VNF tables which are kept the same by metalnet
 #
+def neighnat_sender(nat_ul, pf_tap):
+	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
+		   IPv6(dst=nat_ul, src=router_ul_ipv6, nh=4) /
+		   IP(dst=nat_vip, src=public_ip) /
+		   UDP(dport=nat_neigh_min_port))
+	delayed_sendp(pkt, pf_tap)
+
+def neighnat_communicate(nat_ul, pf_tap):
+	threading.Thread(target=neighnat_sender, args=(nat_ul, pf_tap)).start()
+	# PF receives both the incoming packet and the relayed one, skip the first
+	pkt = sniff_packet(pf_tap, is_udp_pkt, skip=1)
+	assert pkt[IPv6].dst == neigh_vni1_ul_ipv6 and pkt[UDP].dport == nat_neigh_min_port, \
+		f"Relayed packet not to the right neighbor destination"
+
+def test_ha_packet_relay(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
+	# The NAT address needs to be the same for both dpservices -> needs metalnet-generated underlays
+	nat_ul = "fc00:1::8000:1234:1"
+	grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port, preferred_underlay=nat_ul)
+	grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port, preferred_underlay=nat_ul)
+	grpc_client.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
+	grpc_client_b.addneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port, neigh_vni1_ul_ipv6)
+
+	neighnat_communicate(nat_ul, PF0.tap)
+
+	# "crash" the first dpservice and repeat the test on the other once
+	dp_service_b.become_active()
+
+	neighnat_communicate(nat_ul, PF0.tap_b)
+
+	grpc_client_b.delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
+	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
+
+# TODO do a cleanup commit that removes nh/type everywhre
