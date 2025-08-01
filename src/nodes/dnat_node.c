@@ -47,7 +47,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 		dnat_data = dp_get_dnat_data(dst_ip, vni);
 		if (dnat_data) {
-			printf("dnat_data\n");
+// 			printf("dnat_data\n");
 			// if it is a network nat pkt
 			if (dnat_data->dnat_ip == 0) {
 				// it is icmp request targeting scalable nat
@@ -72,6 +72,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				// and it cannot be a standalone new incoming flow for network NAT),
 				// silently drop it now.
 				// TODO this is now re-enabled because of the new approach!
+				printf("DROP as it should\n");
 				return DNAT_NEXT_DROP;
 				// TODO the right way:
 				// TODO NAT64 and ICMP ignored now! (see dp_allocate_network_snat_port() ) for proper handling
@@ -131,10 +132,11 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				return DNAT_NEXT_DROP;
 			dp_ref_inc(&cntrack->ref_count);
 		}
+// 		printf("no data\n");
 		return DNAT_NEXT_IPV4_LOOKUP;
 	}
-	else
-		printf("some flags %x\n", cntrack->flow_flags);
+// 	else
+// 		printf("some flags %x\n", cntrack->flow_flags);
 
 	if (DP_FLOW_HAS_FLAG_DST_NAT_FWD(cntrack->flow_flags)) {
 		df->nat_type = DP_CHG_UL_DST_IP;
@@ -151,12 +153,12 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			return DNAT_NEXT_DROP;
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src.ipv4);
-		printf("dst is now %x\n", ipv4_hdr->dst_addr);
+// 		printf("dst is now %x\n", ipv4_hdr->dst_addr);
 		df->nat_type = DP_NAT_CHG_DST_IP;
 		df->nat_addr = df->dst.dst_addr;
 		df->dst.dst_addr = ipv4_hdr->dst_addr;
 		dp_nat_chg_ip(df, ipv4_hdr, m);
-		printf("\nDST NAT\n\n");
+// 		printf("\nDST NAT\n\n");
 	}
 
 	/* We already know what to do */
@@ -165,7 +167,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			return DNAT_NEXT_DROP;
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->dst_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_ORG].l3_src.ipv4);
-		printf("%x\n", df->dst.dst_addr);
+// 		printf("%x\n", df->dst.dst_addr);
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			if (df->l4_type == IPPROTO_ICMP) {
 				if (df->l4_info.icmp_field.icmp_type == RTE_ICMP_TYPE_ECHO_REPLY) {
@@ -181,19 +183,20 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				}
 				df->offload_state = DP_FLOW_NON_OFFLOAD;
 			} else {
-				printf("port?\n");
+// 				printf("port?\n");
 				dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_DST, cntrack->flow_key[DP_FLOW_DIR_ORG].src.port_src);
 			}
 		}
 		df->nat_type = DP_NAT_CHG_DST_IP;
 		df->nat_addr = df->dst.dst_addr; // record nat IP
 		df->dst.dst_addr = ipv4_hdr->dst_addr; // store new dst_addr (which is VM's IP)
-		printf("%x %x\n", df->nat_addr, df->dst.dst_addr);
+// 		printf("%x %x\n", df->nat_addr, df->dst.dst_addr);
 		dp_nat_chg_ip(df, ipv4_hdr, m);
-		printf("\nSRC NAT\n\n");
+// 		printf("\nSRC NAT\n\n");
 	}
 
 	if (DP_FLOW_HAS_FLAG_SRC_NAT64(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_REPLY) {
+// 		printf("SRC NAT64\n");
 		df->nat_type = DP_NAT_64_CHG_DST_IP;
 		df->nat_addr = df->dst.dst_addr;
 		// the new dst_addr will be stored in dp_nat_chg_ipv4_to_ipv6_hdr()

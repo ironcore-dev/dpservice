@@ -41,8 +41,10 @@ static int dp_sync_send_nat_msg(uint8_t msg_type, const struct netnat_portmap_ke
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed", DP_LOG_RET(ret));
 		rte_pktmbuf_free(pkt);
-	} else
-		DPS_LOG_WARNING("Written", DP_LOG_VALUE(ret));
+	}
+	// TODO sleanup debug
+// 	else
+// 		DPS_LOG_WARNING("Written", DP_LOG_VALUE(ret));
 
 	// TODO: sysctl -w net.ipv6.conf.dpsbr0.disable_ipv6=1
 	// this suppresses noise
@@ -53,15 +55,16 @@ static int dp_sync_send_nat_msg(uint8_t msg_type, const struct netnat_portmap_ke
 int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key)
 {
-	DPS_LOG_ERR("CREATE NAT",
-				_DP_LOG_INT("src_vni", portmap_key->vni),
-				_DP_LOG_IPV4("src_ip", portmap_key->src_ip.ipv4),
-				_DP_LOG_INT("src_port", portmap_key->iface_src_port),
-				_DP_LOG_IPV4("nat_ip",  portoverload_key->nat_ip),
-				_DP_LOG_INT("nat_port", portoverload_key->nat_port),
-				_DP_LOG_IPV4("dst_ip", portoverload_key->dst_ip),
-				_DP_LOG_INT("dst_port", portoverload_key->dst_port),
-				_DP_LOG_INT("proto", portoverload_key->l4_type));
+	// TODO cleanup debug
+// 	DPS_LOG_ERR("CREATE NAT",
+// 				_DP_LOG_INT("src_vni", portmap_key->vni),
+// 				_DP_LOG_IPV4("src_ip", portmap_key->src_ip.ipv4),
+// 				_DP_LOG_INT("src_port", portmap_key->iface_src_port),
+// 				_DP_LOG_IPV4("nat_ip",  portoverload_key->nat_ip),
+// 				_DP_LOG_INT("nat_port", portoverload_key->nat_port),
+// 				_DP_LOG_IPV4("dst_ip", portoverload_key->dst_ip),
+// 				_DP_LOG_INT("dst_port", portoverload_key->dst_port),
+// 				_DP_LOG_INT("proto", portoverload_key->l4_type));
 
 	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_CREATE, portmap_key, portoverload_key);
 }
@@ -70,15 +73,16 @@ int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
 int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key)
 {
-	DPS_LOG_ERR("REMOVE NAT",
-				_DP_LOG_INT("src_vni", portmap_key->vni),
-				_DP_LOG_IPV4("src_ip", portmap_key->src_ip.ipv4),
-				_DP_LOG_INT("src_port", portmap_key->iface_src_port),
-				_DP_LOG_IPV4("nat_ip",  portoverload_key->nat_ip),
-				_DP_LOG_INT("nat_port", portoverload_key->nat_port),
-				_DP_LOG_IPV4("dst_ip", portoverload_key->dst_ip),
-				_DP_LOG_INT("dst_port", portoverload_key->dst_port),
-				_DP_LOG_INT("proto", portoverload_key->l4_type));
+	// TODO cleanup debug
+// 	DPS_LOG_ERR("REMOVE NAT",
+// 				_DP_LOG_INT("src_vni", portmap_key->vni),
+// 				_DP_LOG_IPV4("src_ip", portmap_key->src_ip.ipv4),
+// 				_DP_LOG_INT("src_port", portmap_key->iface_src_port),
+// 				_DP_LOG_IPV4("nat_ip",  portoverload_key->nat_ip),
+// 				_DP_LOG_INT("nat_port", portoverload_key->nat_port),
+// 				_DP_LOG_IPV4("dst_ip", portoverload_key->dst_ip),
+// 				_DP_LOG_INT("dst_port", portoverload_key->dst_port),
+// 				_DP_LOG_INT("proto", portoverload_key->l4_type));
 
 	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_DELETE, portmap_key, portoverload_key);
 }
