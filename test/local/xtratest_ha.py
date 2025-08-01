@@ -13,7 +13,7 @@ from helpers import *
 #
 def local_vf_to_vf_responder(vm, dp_service_b):
 	pkt = sniff_packet(vm.tap, is_udp_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
 	# "crash" the first dpservice and send reply to the other one
@@ -23,7 +23,7 @@ def local_vf_to_vf_responder(vm, dp_service_b):
 def test_ha_vm_vm_local(prepare_ifaces, prepare_ifaces_b, dp_service_b):
 	threading.Thread(target=local_vf_to_vf_responder, args=(VM2, dp_service_b)).start()
 
-	pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
+	pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
 		   IP(dst=VM2.ip, src=VM1.ip) /
 		   UDP(dport=1234))
 	delayed_sendp(pkt, VM1.tap)
@@ -43,7 +43,7 @@ def cross_vf_to_vf_responder(pf, dst_vm, dp_service_b):
 	# "crash" the first dpservice and send reply to the other one
 	dp_service_b.become_active()
 	# NOTE: in pytest the underlay address is different as it is easier, in reality it will be the same
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IPv6(dst=dst_vm.ul_ipv6_b, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
@@ -52,7 +52,7 @@ def cross_vf_to_vf_responder(pf, dst_vm, dp_service_b):
 def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b, dp_service_b):
 	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1, dp_service_b)).start()
 
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 		   IP(dst=f"{neigh_vni1_ov_ip_prefix}.1", src=VM1.ip) /
 		   UDP(dport=1234))
 	delayed_sendp(pkt, VM1.tap)
@@ -69,7 +69,7 @@ def test_ha_vm_vm_cross(prepare_ifaces, prepare_ifaces_b, dp_service_b):
 def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b, dp_service_b):
 	threading.Thread(target=cross_vf_to_vf_responder, args=(PF0, VM1, dp_service_b)).start()
 
-	pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 		   IP(dst=public_ip, src=VM1.ip) /
 		   UDP(dport=1234))
 	delayed_sendp(pkt, VM1.tap)
@@ -84,7 +84,7 @@ def test_ha_vm_public(prepare_ifaces, prepare_ifaces_b, dp_service_b):
 #
 def vip_responder(src_tap, dst_tap, dp_service_b):
 	pkt = sniff_packet(src_tap, is_udp_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
 	# "crash" the first dpservice and send reply to the other one
@@ -94,8 +94,8 @@ def vip_responder(src_tap, dst_tap, dp_service_b):
 def vip_traffic(ul, ip, req_pf_tap, req_vm_tap, rep_pf_tap, rep_vm_tap, rep_vm_ul, dp_service_b):
 	threading.Thread(target=vip_responder, args=(req_vm_tap, rep_vm_tap, dp_service_b)).start()
 
-	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
-		   IPv6(dst=ul, src=router_ul_ipv6, nh=4) /
+	pkt = (Ether(dst=PF0.mac, src=PF0.mac) /
+		   IPv6(dst=ul, src=router_ul_ipv6) /
 		   IP(dst=ip, src=public_ip) /
 		   UDP(dport=1234))
 	delayed_sendp(pkt, req_pf_tap)
@@ -142,15 +142,15 @@ def maglev_checker(dst_tap):
 	pkt = sniff_packet(dst_tap, is_udp_pkt)
 	assert pkt[IP].dst == lb_ip and pkt[UDP].dport == 1234, \
 		"Invalid packet routed to target"
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport))
 	delayed_sendp(reply_pkt, dst_tap)
 
 def send_lb_udp(lb_ul, tap, target_tap, ip, port):
 	threading.Thread(target=maglev_checker, args=(target_tap,)).start()
-	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
-		   IPv6(dst=lb_ul, src=router_ul_ipv6, nh=4) /
+	pkt = (Ether(dst=PF0.mac, src=PF0.mac) /
+		   IPv6(dst=lb_ul, src=router_ul_ipv6) /
 		   IP(dst=lb_ip, src=ip) /
 		   UDP(dport=port))
 	delayed_sendp(pkt, tap)
@@ -210,7 +210,7 @@ def nat_responder(pf_tap, nat_ul, dp_service_b, icmp=False):
 		payload = ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq)
 	else:
 		payload = UDP(sport=pkt[UDP].dport, dport=pkt[UDP].sport)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IPv6(dst=nat_ul, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 payload)
@@ -258,6 +258,9 @@ def nat_test_handover(grpc_client, grpc_client_b, dp_service_b, icmp=False, ipv6
 	# Second, send packet to backup and sniff it
 	nat_communicate(PF0.tap_b, VM1.tap_b, nat_ul_b, None, icmp, ipv6)
 
+	# This is just for manual test - flow aging is verified by another pytest unit already
+	# age_out_flows()
+
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
 
@@ -268,16 +271,10 @@ def test_ha_vm_nat_icmp(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_clie
 	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, icmp=True)
 
 def test_ha_vm_nat64(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
-	# TODO this only works when code changes to use nat64 addr
 	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, ipv6=True)
 
 def test_ha_vm_nat64_icmp(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
-	# TODO this only works when code changes to use nat64 addr
-	# TODO there is a bug in flow itself, though test is working
 	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, ipv6=True, icmp=True)
-
-# TODO some test to utilize flow aging?
-	# age_out_flows()
 
 
 #
@@ -293,12 +290,10 @@ def virtsvc_responder(dp_service_b):
 		"Request to wrong IPv6 address"
 	assert pkt[UDP].dport == virtsvc_udp_svc_port, \
 		"Request to wrong UDP port"
-	# TODO send to the other dpservice - THIS WILL FAIL!!
-	# TODO and it also has a different underlay address!
 	# "crash" the first dpservice and send reply to the other one
 	dp_service_b.become_active()
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=17) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst) /
 				 UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport))
 	delayed_sendp(reply_pkt, PF0.tap_b)
 
@@ -308,7 +303,7 @@ def test_ha_virtsvc(request, prepare_ifaces, prepare_ifaces_b, dp_service_b):
 
 	threading.Thread(target=virtsvc_responder, args=(dp_service_b,)).start()
 
-	pkt = (Ether(dst=VM1.mac, src=VM1.mac, type=0x0800) /
+	pkt = (Ether(dst=VM1.mac, src=VM1.mac) /
 		   IP(dst=virtsvc_udp_virtual_ip, src=VM1.ip) /
 		   UDP(dport=virtsvc_udp_virtual_port, sport=1234))
 	delayed_sendp(pkt, VM1.tap)
@@ -330,8 +325,8 @@ def test_ha_virtsvc(request, prepare_ifaces, prepare_ifaces_b, dp_service_b):
 # it is driven directly by LB/VNF tables which are kept the same by metalnet
 #
 def neighnat_sender(nat_ul, pf_tap):
-	pkt = (Ether(dst=PF0.mac, src=PF0.mac, type=0x86DD) /
-		   IPv6(dst=nat_ul, src=router_ul_ipv6, nh=4) /
+	pkt = (Ether(dst=PF0.mac, src=PF0.mac) /
+		   IPv6(dst=nat_ul, src=router_ul_ipv6) /
 		   IP(dst=nat_vip, src=public_ip) /
 		   UDP(dport=nat_neigh_min_port))
 	delayed_sendp(pkt, pf_tap)
@@ -362,5 +357,3 @@ def test_ha_packet_relay(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_cli
 	grpc_client.delneighnat(nat_vip, vni1, nat_neigh_min_port, nat_neigh_max_port)
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
-
-# TODO do a cleanup commit that removes nh/type everywhre
