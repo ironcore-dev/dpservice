@@ -265,7 +265,7 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 	// some adjustments are needed for NAT64 (but only for the original direction)
 	if (key->l3_src.is_v6) {
 		memcpy(&nat64_key, key, sizeof(nat64_key));
-		dp_set_ipaddr_nat64(&nat64_key.l3_dst, key->l3_dst.ipv4);
+		dp_set_ipaddr_nat64(&nat64_key.l3_dst, htonl(key->l3_dst.ipv4));
 		key = &nat64_key;
 	}
 
