@@ -95,24 +95,37 @@ def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, seconda
 
 	def tear_down():
 		dp_service.stop()
-		if ha and not secondary:
+		if ha and secondary:
+			print("--- Secondary sync free --")
 			run_command(f"sh -c 'ip link show {sync_bridge} && ip link del {sync_bridge} || true'")
+			run_command(f"sh -c 'ip link show {sync_tap_b} && ip link del {sync_tap_b} || true'")
 	request.addfinalizer(tear_down)
+
+	if ha and secondary:
+		print("--- Secondary sync init --")
+		# Secondary dpservice connects to primary via existing bridge
+		# also, secondary needs the connection to be working even before the process starts
+		run_command(f"sh -c 'ip link show {sync_tap_b} || ip tuntap add dev {sync_tap_b} mode tap multi_queue'")
+		run_command(f"sysctl net.ipv6.conf.{sync_tap_b}.disable_ipv6=1")
+		run_command(f"ip link set {sync_tap_b} master {sync_bridge}")
+		run_command(f"ip link set {sync_tap_b} up")
 
 	print("------ Service init ------")
 	print(dp_service.get_cmd())
 	dp_service.start()
 	wait_for_port(port, 10)
-	print("--------------------------")
 
-	if ha:
-		run_command(f"sh -c 'ip link show {sync_bridge} || ip link add {sync_bridge} type bridge && ip link set {sync_bridge} up'")
+	if ha and not secondary:
+		print("---- Primary sync init ---")
+		# Primary dpservice creates its own TAP, need to add a bridge
+		run_command(f"sh -c 'ip link show {sync_bridge} || ip link add {sync_bridge} type bridge'")
 		run_command(f"sysctl net.ipv6.conf.{sync_bridge}.disable_ipv6=1")
-		sync_tap = sync_tap_b if secondary else sync_tap_a
-		run_command(f"sysctl net.ipv6.conf.{sync_tap}.disable_ipv6=1")
-		run_command(f"ip link set {sync_tap} master {sync_bridge}")
-		run_command(f"ip link set {sync_tap} up")
+		run_command(f"ip link set {sync_bridge} up")
+		run_command(f"sysctl net.ipv6.conf.{sync_tap_a}.disable_ipv6=1")
+		run_command(f"ip link set {sync_tap_a} master {sync_bridge}")
+		run_command(f"ip link set {sync_tap_a} up")
 
+	print("--------------------------")
 	return dp_service
 
 @pytest.fixture(scope="package")

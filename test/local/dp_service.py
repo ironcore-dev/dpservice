@@ -60,6 +60,8 @@ class DpService:
 		if ha:
 			sync_tap = sync_tap_b if secondary else sync_tap_a
 			self.cmd += f' --vdev=net_tap_sync,iface={sync_tap}'
+			if secondary:
+				self.cmd += ',persist'
 		self.cmd += ' --'
 		if not self.hardware:
 			self.cmd += (f' --pf0={self._get_tap(PF0)}'
