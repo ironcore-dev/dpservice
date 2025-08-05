@@ -85,7 +85,7 @@ def delayed_sendp(packet, interface):
 
 def run_command(cmd):
 	print(cmd)
-	subprocess.check_output(shlex.split(cmd))
+	return subprocess.check_output(shlex.split(cmd))
 
 def interface_init(interface, enabled=True):
 	if interface.startswith((pf_tap_pattern, vf_tap_pattern, pf_tap_pattern_b, vf_tap_pattern_b)):
