@@ -95,41 +95,42 @@ def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, seconda
 
 	def tear_down():
 		dp_service.stop()
-		if ha and secondary:
-			print("--- Secondary sync free --")
-			run_command(f"sh -c 'ip link show {sync_bridge} && ip link del {sync_bridge} || true'")
-			run_command(f"sh -c 'ip link show {sync_tap_b} && ip link del {sync_tap_b} || true'")
 	request.addfinalizer(tear_down)
-
-	if ha and secondary:
-		print("--- Secondary sync init --")
-		# Secondary dpservice connects to primary via existing bridge
-		# also, secondary needs the connection to be working even before the process starts
-		run_command(f"sh -c 'ip link show {sync_tap_b} || ip tuntap add dev {sync_tap_b} mode tap multi_queue'")
-		run_command(f"sysctl net.ipv6.conf.{sync_tap_b}.disable_ipv6=1")
-		run_command(f"ip link set {sync_tap_b} master {sync_bridge}")
-		run_command(f"ip link set {sync_tap_b} up")
 
 	print("------ Service init ------")
 	print(dp_service.get_cmd())
 	dp_service.start()
 	wait_for_port(port, 10)
 
-	if ha and not secondary:
-		print("---- Primary sync init ---")
-		# Primary dpservice creates its own TAP, need to add a bridge
-		run_command(f"sh -c 'ip link show {sync_bridge} || ip link add {sync_bridge} type bridge'")
-		run_command(f"sysctl net.ipv6.conf.{sync_bridge}.disable_ipv6=1")
-		run_command(f"ip link set {sync_bridge} up")
-		run_command(f"sysctl net.ipv6.conf.{sync_tap_a}.disable_ipv6=1")
-		run_command(f"ip link set {sync_tap_a} master {sync_bridge}")
-		run_command(f"ip link set {sync_tap_a} up")
-
 	print("--------------------------")
 	return dp_service
 
 @pytest.fixture(scope="package")
-def dp_service(request, build_path, port_redundancy, fast_flow_timeout, ha_mode):
+def sync_setup(request, ha_mode):
+	if not ha_mode:
+		return
+
+	def tear_down():
+		print("------ Sync cleanup ------")
+		for iface in (sync_tap_b, sync_tap_a, sync_bridge):
+			# print(run_command(f"ip -s link show {iface}").decode())
+			run_command(f"sh -c 'ip link show {iface} && ip link del {iface} || true'")
+	request.addfinalizer(tear_down)
+
+	print("------- Sync init --------")
+	run_command(f"sh -c 'ip link show {sync_bridge} || ip link add {sync_bridge} type bridge'")
+	run_command(f"sh -c 'echo 0 > /sys/class/net/{sync_bridge}/bridge/multicast_snooping'")
+	for sync_tap in (sync_tap_a, sync_tap_b):
+		run_command(f"sh -c 'ip link show {sync_tap} || ip tuntap add dev {sync_tap} mode tap multi_queue'")
+		run_command(f"ip link set {sync_tap} master {sync_bridge}")
+	for iface in (sync_bridge, sync_tap_a, sync_tap_b):
+		run_command(f"sysctl net.ipv6.conf.{iface}.disable_ipv6=1")
+		# TODO use this to tune queues!
+		#run_command(f"ip link set {sync_tap_a} txqueuelen 10000")
+		run_command(f"ip link set {iface} up")
+
+@pytest.fixture(scope="package")
+def dp_service(request, build_path, port_redundancy, fast_flow_timeout, ha_mode, sync_setup):
 	return _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary=False, ha=ha_mode)
 
 # This one needs to be "activated" during tests, so the scope is set to function
