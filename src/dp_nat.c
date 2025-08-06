@@ -728,7 +728,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		return DP_ERROR;
 
 	if (df->l4_type == IPPROTO_ICMP || df->l4_type == IPPROTO_ICMPV6)
-		portmap_key.iface_src_port = df->l4_info.icmp_field.icmp_type;
+		portmap_key.iface_src_port = ntohs(df->l4_info.icmp_field.icmp_identifier);
 	else
 		portmap_key.iface_src_port = ntohs(df->l4_info.trans_port.src_port);
 

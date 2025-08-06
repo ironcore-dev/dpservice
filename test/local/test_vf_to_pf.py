@@ -25,6 +25,7 @@ def reply_icmp_pkt_from_vm1_identifier_check(nat_ul_ipv6):
 		f"Bad ICMP request (src ip: {src_ip})"
 
 	icmp_id_1 = pkt[ICMP].id
+	print(f"icmp_id_1: {icmp_id_1}")
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
@@ -38,8 +39,9 @@ def reply_icmp_pkt_from_vm1_identifier_check(nat_ul_ipv6):
 		f"Bad ICMP request (src ip: {src_ip})"
 
 	icmp_id_2 = pkt[ICMP].id
-	assert icmp_id_1 == icmp_id_2, \
-		f"Got different ICMP identifier (icmp id 1: {icmp_id_1}, icmp id 2: {icmp_id_2})"
+	print(f"icmp_id_2: {icmp_id_2}")
+	assert icmp_id_1 != icmp_id_2, \
+		f"Got the same ICMP identifier (icmp id 1: {icmp_id_1}, icmp id 2: {icmp_id_2})"
 	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
 				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
