@@ -71,8 +71,10 @@ struct netnat_portoverload_tbl_key {
 } __rte_packed;
 
 struct netnat_portoverload_sync_metadata {
-	uint16_t created_port_id;
 	struct netnat_portmap_key portmap_key;
+	uint16_t created_port_id;
+	uint16_t icmp_type_src;
+	rte_be16_t icmp_err_ip_cksum;
 };
 
 struct nat_check_result {
@@ -109,10 +111,11 @@ int dp_add_neighnat_entry(uint32_t nat_ip,  uint32_t vni, uint16_t min_port, uin
 
 int dp_del_neighnat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint16_t max_port);
 
-int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port);
+int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port, rte_be16_t icmp_err_ip_cksum);
 int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 							   struct netnat_portoverload_tbl_key *portoverload_key,
-							   uint16_t created_port_id);
+							   uint16_t created_port_id,
+							   uint16_t icmp_type_src, rte_be16_t icmp_err_ip_cksum);
 int dp_lookup_network_nat(uint32_t vni, uint32_t nat_ip, uint16_t nat_port, uint32_t dst_ip, uint8_t dst_l4_type, uint16_t dst_port);
 const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
