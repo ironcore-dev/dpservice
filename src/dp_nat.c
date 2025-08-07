@@ -717,7 +717,7 @@ static int dp_use_existing_portmap_entry(const struct netnat_portmap_key *portma
 	return DP_OK;
 }
 
-int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port)
+int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port, rte_be16_t icmp_err_ip_cksum)
 {
 	struct netnat_portoverload_tbl_key portoverload_tbl_key;
 	struct netnat_portmap_key portmap_key;
@@ -762,7 +762,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	}
 
 	if (dp_conf_is_sync_enabled())
-		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key, port->port_id);  // ignore failures
+		dp_sync_send_nat_create(&portmap_key, &portoverload_tbl_key, port->port_id, df->l4_info.icmp_field.icmp_type, icmp_err_ip_cksum);
+		// ignore failures
 
 	DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	return portoverload_tbl_key.nat_port;
@@ -770,7 +771,8 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 
 int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 							   struct netnat_portoverload_tbl_key *portoverload_key,
-							   uint16_t created_port_id)
+							   uint16_t created_port_id,
+							   uint16_t icmp_type_src, rte_be16_t icmp_err_ip_cksum)
 {
 	struct netnat_portoverload_sync_metadata *sync_metadata;
 	int ret;
@@ -780,9 +782,10 @@ int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 		DPS_LOG_ERR("Cannot allocate snat metadata for syncing");
 		return DP_ERROR;
 	}
-	sync_metadata->created_port_id = created_port_id;
 	memcpy(&sync_metadata->portmap_key, portmap_key, sizeof(*portmap_key));
-	// TODO icmp error AND icmp fix by sending type!
+	sync_metadata->created_port_id = created_port_id;
+	sync_metadata->icmp_type_src = icmp_type_src;
+	sync_metadata->icmp_err_ip_cksum = icmp_err_ip_cksum;
 
 	ret = dp_use_existing_portmap_entry(portmap_key, portoverload_key, sync_metadata);
 	if (DP_FAILED(ret)) {
@@ -1010,7 +1013,8 @@ int dp_sync_snat_flow(const struct flow_value *flow_val)
 	if (DP_FAILED(dp_flow_to_snat_keys(flow_val, &portmap_key, &portoverload_key)))
 		return DP_ERROR;
 
-	return dp_sync_send_nat_create(&portmap_key, &portoverload_key, flow_val->created_port_id);
+	return dp_sync_send_nat_create(&portmap_key, &portoverload_key, flow_val->created_port_id,
+								   flow_val->flow_key[DP_FLOW_DIR_ORG].src.type_src, flow_val->nf_info.icmp_err_ip_cksum);
 }
 
 
