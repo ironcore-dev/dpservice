@@ -784,6 +784,7 @@ int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 		if (ret == -EEXIST) {
 			// TODO debug log, remove
 			DPS_LOG_DEBUG("Duplicate sync add", _DP_LOG_INT("portmap", rte_hash_count(ipv4_netnat_portmap_tbl)), _DP_LOG_INT("portoverload", rte_hash_count(ipv4_netnat_portoverload_tbl)));
+			// TODO also comment about current these duiplicates will always happen when dumping tables!
 			return DP_OK;  // ignore duplicates, trust the primary dpservice
 		}
 		else if (ret != -ENOENT)
@@ -886,15 +887,13 @@ static int dp_delete_snat_entries(const struct netnat_portmap_key *portmap_key,
 	return DP_OK;
 }
 
-int dp_remove_network_snat_port(const struct flow_value *cntrack)
+static int dp_flow_to_snat_keys(const struct flow_value *flow_val,
+								struct netnat_portmap_key *portmap_key,
+								struct netnat_portoverload_tbl_key *portoverload_key)
 {
-	struct netnat_portmap_key portmap_key = {0};
-	struct netnat_portoverload_tbl_key portoverload_tbl_key = {0};
-	const struct flow_key *flow_key_org = &cntrack->flow_key[DP_FLOW_DIR_ORG];
-	const struct flow_key *flow_key_reply = &cntrack->flow_key[DP_FLOW_DIR_REPLY];
-	struct dp_port *created_port;
+	const struct flow_key *flow_key_org = &flow_val->flow_key[DP_FLOW_DIR_ORG];
+	const struct flow_key *flow_key_reply = &flow_val->flow_key[DP_FLOW_DIR_REPLY];
 	union dp_ipv6 dst_nat64;
-	int ret;
 
 	if (unlikely(flow_key_reply->l3_dst.is_v6)) {
 		DPS_LOG_ERR("NAT reply flow key with IPv6 address", DP_LOG_IPV6(flow_key_reply->l3_dst.ipv6));
@@ -902,25 +901,36 @@ int dp_remove_network_snat_port(const struct flow_value *cntrack)
 	}
 
 	if (DP_FAILED(dp_ipv6_from_ipaddr(&dst_nat64, &flow_key_org->l3_dst)))
-		portoverload_tbl_key.dst_ip = flow_key_org->l3_dst.ipv4;
+		portoverload_key->dst_ip = flow_key_org->l3_dst.ipv4;
 	else
-		portoverload_tbl_key.dst_ip = ntohl(dp_get_ipv6_nat64(&dst_nat64));
-	portoverload_tbl_key.nat_ip = flow_key_reply->l3_dst.ipv4;
-	portoverload_tbl_key.nat_port = flow_key_reply->port_dst;
-	portoverload_tbl_key.dst_port = flow_key_org->port_dst;
-	portoverload_tbl_key.l4_type = flow_key_org->proto;
+		portoverload_key->dst_ip = ntohl(dp_get_ipv6_nat64(&dst_nat64));
+	portoverload_key->nat_ip = flow_key_reply->l3_dst.ipv4;
+	portoverload_key->nat_port = flow_key_reply->port_dst;
+	portoverload_key->dst_port = flow_key_org->port_dst;
+	portoverload_key->l4_type = flow_key_org->proto;
 
-	dp_copy_ipaddr(&portmap_key.src_ip, &flow_key_org->l3_src);
-	portmap_key.vni = cntrack->nf_info.vni;
+	dp_copy_ipaddr(&portmap_key->src_ip, &flow_key_org->l3_src);
+	portmap_key->vni = flow_val->nf_info.vni;
 	if (flow_key_org->proto == IPPROTO_ICMP || flow_key_org->proto == IPPROTO_ICMPV6)
 		//flow_key[DP_FLOW_DIR_ORG].port_dst is already a converted icmp identifier
-		portmap_key.iface_src_port = flow_key_org->port_dst;
+		portmap_key->iface_src_port = flow_key_org->port_dst;
 	else
-		portmap_key.iface_src_port = flow_key_org->src.port_src;
+		portmap_key->iface_src_port = flow_key_org->src.port_src;
 
-	ret = dp_delete_snat_entries(&portmap_key, &portoverload_tbl_key);
-	if (DP_FAILED(ret))
-		return ret;
+	return DP_OK;
+}
+
+int dp_remove_network_snat_port(const struct flow_value *cntrack)
+{
+	struct netnat_portmap_key portmap_key;
+	struct netnat_portoverload_tbl_key portoverload_tbl_key;
+	struct dp_port *created_port;
+
+	if (DP_FAILED(dp_flow_to_snat_keys(cntrack, &portmap_key, &portoverload_tbl_key)))
+		return DP_ERROR;
+
+	if (DP_FAILED(dp_delete_snat_entries(&portmap_key, &portoverload_tbl_key)))
+		return DP_ERROR;
 
 	if (dp_conf_is_sync_enabled())
 		dp_sync_send_nat_delete(&portmap_key, &portoverload_tbl_key);  // ignore failures
@@ -1079,6 +1089,17 @@ int dp_create_sync_snat_flows(void)
 		// TODO if route taken - this is where freeup of custom portoveload data must happen
 	}
 	return DP_OK;
+}
+
+int dp_sync_snat_flow(const struct flow_value *flow_val)
+{
+	struct netnat_portmap_key portmap_key;
+	struct netnat_portoverload_tbl_key portoverload_key;
+
+	if (DP_FAILED(dp_flow_to_snat_keys(flow_val, &portmap_key, &portoverload_key)))
+		return DP_ERROR;
+
+	return dp_sync_send_nat_create(&portmap_key, &portoverload_key);
 }
 
 

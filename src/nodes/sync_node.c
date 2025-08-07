@@ -18,10 +18,9 @@ static int sync_node_init(__rte_unused const struct rte_graph *graph, __rte_unus
 }
 
 
-void sync_node_switch_role(void)
+void sync_node_switch_mode(void)
 {
 	backup_mode = false;
-	// TODO but also request DUMP!!!
 }
 
 
@@ -29,62 +28,46 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 {
 	struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	struct dp_sync_hdr *sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);
-	struct dp_sync_msg_nat_keys *nat_keys;  // TODO subfunc?
+	struct dp_sync_msg_nat_keys *nat_keys;
 
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
-		// TODO remove
-		// TODO look into ways of getting rid of these packets
-		// --> looks like this is only at the start, chich makes sense in pytest, devices are configure AFTER dpservice starts
-		DPS_LOG_ERR("Invalid ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
+		DPS_LOG_WARNING("Invalid sync ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
 		return;
 	}
 
-	// TODO move to function handlers I think
-	// BACKUP MODE - listen for NAT table updates
-	// ACTIVE MODE - listen for NAT table dump requests
-	if (!backup_mode) {
-		DPS_LOG_DEBUG("Ignoring sync traffic packet");
-		return;
-	} // TODO else of course
-
 	switch (sync_hdr->msg_type) {
-	case DP_SYNC_MSG_REQUEST_UPDATES:
-		DPS_LOG_ERR("TODO request updates");
+	case DP_SYNC_MSG_REQUEST_DUMP:
+		DPS_LOG_INFO("Received request for sync table dumps");
+		if (backup_mode) {
+			DPS_LOG_ERR("Invalid sync request for backup dpservice");
+			break;
+		}
+		dp_sync_local_nat_flows();
 		break;
 	case DP_SYNC_MSG_NAT_CREATE:
-		// TODO subfunc?
+		// TODO mute one or both! (otherwise move to info and maybe better texts)
+		DPS_LOG_DEBUG("Received NAT create message");
+		if (!backup_mode) {
+			DPS_LOG_ERR("Invalid sync NAT create message for active dpservice");
+			break;
+		}
 		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
-		// TODO cleanup debug
-// 		DPS_LOG_WARNING("CREATE NAT",
-// 				_DP_LOG_INT("src_vni", nat_keys->portmap_key.vni),
-// 				_DP_LOG_IPV4("src_ip", nat_keys->portmap_key.src_ip.ipv4),
-// 				_DP_LOG_INT("src_port", nat_keys->portmap_key.iface_src_port),
-// 				_DP_LOG_IPV4("nat_ip",  nat_keys->portoverload_key.nat_ip),
-// 				_DP_LOG_INT("nat_port", nat_keys->portoverload_key.nat_port),
-// 				_DP_LOG_IPV4("dst_ip", nat_keys->portoverload_key.dst_ip),
-// 				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
-// 				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
-		// TODO actually create it! :)
+		// errors ignored, keep processing messages
 		dp_allocate_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	case DP_SYNC_MSG_NAT_DELETE:
-		// TODO subfunc?
+		// TODO mute one or both! (otherwise move to info and maybe better texts)
+		DPS_LOG_DEBUG("Received NAT delete message");
+		if (!backup_mode) {
+			DPS_LOG_ERR("Invalid sync NAT delete message for active dpservice");
+			break;
+		}
 		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
-		// TODO cleanup debug
-// 		DPS_LOG_WARNING("DELETE NAT",
-// 				_DP_LOG_INT("src_vni", nat_keys->portmap_key.vni),
-// 				_DP_LOG_IPV4("src_ip", nat_keys->portmap_key.src_ip.ipv4),
-// 				_DP_LOG_INT("src_port", nat_keys->portmap_key.iface_src_port),
-// 				_DP_LOG_IPV4("nat_ip",  nat_keys->portoverload_key.nat_ip),
-// 				_DP_LOG_INT("nat_port", nat_keys->portoverload_key.nat_port),
-// 				_DP_LOG_IPV4("dst_ip", nat_keys->portoverload_key.dst_ip),
-// 				_DP_LOG_INT("dst_port", nat_keys->portoverload_key.dst_port),
-// 				_DP_LOG_INT("proto", nat_keys->portoverload_key.l4_type));
-		// TODO actually delete it! :)
+		// errors ignored, keep processing messages
 		dp_remove_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	default:
-		DPS_LOG_ERR("Unknown SYNC message type", DP_LOG_VALUE(sync_hdr->msg_type));
+		DPS_LOG_ERR("Unknown sync message type", DP_LOG_VALUE(sync_hdr->msg_type));
 	}
 }
 
