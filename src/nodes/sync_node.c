@@ -28,7 +28,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 {
 	struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	struct dp_sync_hdr *sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);
-	struct dp_sync_msg_nat_keys *nat_keys;
+	struct dp_sync_msg_nat_data *nat_data;
 
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
 		DPS_LOG_WARNING("Invalid sync ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
@@ -51,9 +51,9 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			DPS_LOG_ERR("Invalid sync NAT create message for active dpservice");
 			break;
 		}
-		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
+		nat_data = (struct dp_sync_msg_nat_data *)(sync_hdr + 1);
 		// errors ignored, keep processing messages
-		dp_allocate_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
+		dp_allocate_sync_snat_port(&nat_data->portmap_key, &nat_data->portoverload_key, nat_data->created_port_id);
 		break;
 	case DP_SYNC_MSG_NAT_DELETE:
 		// TODO mute one or both! (otherwise move to info and maybe better texts)
@@ -62,9 +62,9 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			DPS_LOG_ERR("Invalid sync NAT delete message for active dpservice");
 			break;
 		}
-		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
+		nat_data = (struct dp_sync_msg_nat_data *)(sync_hdr + 1);
 		// errors ignored, keep processing messages
-		dp_remove_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
+		dp_remove_sync_snat_port(&nat_data->portmap_key, &nat_data->portoverload_key);
 		break;
 	default:
 		DPS_LOG_ERR("Unknown sync message type", DP_LOG_VALUE(sync_hdr->msg_type));

@@ -70,6 +70,11 @@ struct netnat_portoverload_tbl_key {
 	uint8_t	l4_type;
 } __rte_packed;
 
+struct netnat_portoverload_sync_metadata {
+	uint16_t created_port_id;
+	struct netnat_portmap_key portmap_key;
+};
+
 struct nat_check_result {
 	bool	is_vip_natted;
 	bool	is_network_natted;
@@ -106,7 +111,8 @@ int dp_del_neighnat_entry(uint32_t nat_ip, uint32_t vni, uint16_t min_port, uint
 
 int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *df, struct dp_port *port);
 int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
-							   struct netnat_portoverload_tbl_key *portoverload_key);
+							   struct netnat_portoverload_tbl_key *portoverload_key,
+							   uint16_t created_port_id);
 int dp_lookup_network_nat(uint32_t vni, uint32_t nat_ip, uint16_t nat_port, uint32_t dst_ip, uint8_t dst_l4_type, uint16_t dst_port);
 const union dp_ipv6 *dp_lookup_neighnat_underlay_ip(struct dp_flow *df);
 int dp_remove_network_snat_port(const struct flow_value *cntrack);
