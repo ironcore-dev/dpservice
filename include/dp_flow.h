@@ -158,6 +158,7 @@ void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type);
 void dp_remove_neighnat_flows(uint32_t ipv4, uint32_t vni, uint16_t min_port, uint16_t max_port);
 void dp_remove_iface_flows(uint16_t port_id, uint32_t ipv4, uint32_t vni);
 void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr);
+void dp_sync_local_nat_flows(void);
 
 hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key);
 

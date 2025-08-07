@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void sync_node_switch_role(void);
+void sync_node_switch_mode(void);
 
 #ifdef __cplusplus
 }
