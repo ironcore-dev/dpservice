@@ -11,27 +11,22 @@
 
 // NOTE: there will be no endianness protection; both ends should be running on the same machine
 
-// no versioning, version is only needed to be sent one at the start of communication
+// no versioning, if really needed, just create another message type
 struct dp_sync_hdr {
 	uint8_t msg_type;
 } __rte_packed;
 
-#define DP_SYNC_MSG_REQUEST_UPDATES 0
-// standby dpservice sends this to the active one and requests updates to NAT tables
-// the active dpservice must send them in requested version of the protocol
-// to do a rolling update, do two updates:
-//  - first add support for new protocol, but do not request it
-//  - after both dpservices support the new protocol, update again and request it
-struct dp_sync_msg_request_updates {
-	uint8_t version;
-} __rte_packed;
-
-#define DP_SYNC_MSG_NAT_CREATE 10
-#define DP_SYNC_MSG_NAT_DELETE 11
+// active -> backup: incremental change to NAT tables
+#define DP_SYNC_MSG_NAT_CREATE		1
+#define DP_SYNC_MSG_NAT_DELETE		2
 struct dp_sync_msg_nat_keys {
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portoverload_tbl_key portoverload_key;
 } __rte_packed;
+// TODO virtsvc create+delete
+// backup -> active: please re-send all tables
+#define DP_SYNC_MSG_REQUEST_DUMP	5
+// TODO multi-entry structure for performance?
 
 
 int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
@@ -39,5 +34,7 @@ int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
 
 int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key);
+
+int dp_sync_send_request_dump(void);
 
 #endif

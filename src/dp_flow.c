@@ -10,15 +10,13 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
-#include "dp_nat.h"
-#include "dp_vnf.h"
-#include "dp_refcount.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
+#include "dp_refcount.h"
+#include "dp_timers.h"
+#include "dp_vnf.h"
 #include "protocols/dp_icmpv6.h"
 #include "rte_flow/dp_rte_flow.h"
-#include "dp_timers.h"
-#include "dp_error.h"
-
 #include "rte_flow/dp_rte_flow_traffic_forward.h"
 
 static struct rte_hash *flow_table = NULL;
@@ -243,6 +241,9 @@ int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val)
 		DPS_LOG_ERR("Cannot add data to flow table", DP_LOG_RET(ret));
 		return ret;
 	}
+#ifdef ENABLE_PYTEST
+	dp_flow_log_key(key, "Successfully added flow key");
+#endif
 	return DP_OK;
 }
 
@@ -502,6 +503,28 @@ void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr)
 		}
 		if (dp_ipv6_match(&flow_val->nf_info.underlay_dst, ul_addr))
 			dp_remove_flow(flow_val, next_key);
+	}
+}
+
+
+void dp_sync_local_nat_flows(void)
+{
+	struct flow_value *flow_val;
+	const void *next_key;
+	uint32_t iter = 0;
+	int ret;
+
+	while ((ret = rte_hash_iterate(flow_table, &next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Iterating flow table failed while syncing local NAT flows", DP_LOG_RET(ret));
+			return;
+		}
+		if (flow_val->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
+			// each flow is inserted twice (based on the direction of the key)
+			// so only synchronize one of them
+			if (memcmp(next_key, &flow_val->flow_key[DP_FLOW_DIR_ORG], sizeof(struct flow_key)) == 0)
+				dp_sync_snat_flow(flow_val);  // errors ignored
+		}
 	}
 }
 
