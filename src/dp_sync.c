@@ -55,33 +55,37 @@ static int dp_sync_send_message(struct rte_mbuf *pkt)
 }
 
 
-static int dp_sync_send_nat_msg(uint8_t msg_type, const struct netnat_portmap_key *portmap_key,
-								const struct netnat_portoverload_tbl_key *portoverload_key)
+static int dp_sync_send_nat_msg(uint8_t msg_type,
+								const struct netnat_portmap_key *portmap_key,
+								const struct netnat_portoverload_tbl_key *portoverload_key,
+								uint16_t created_port_id)
 {
 	struct rte_mbuf *pkt;
-	struct dp_sync_msg_nat_keys *nat_keys;
+	struct dp_sync_msg_nat_data *data;
 
-	pkt = dp_sync_alloc_message(msg_type, sizeof(*nat_keys));
+	pkt = dp_sync_alloc_message(msg_type, sizeof(*data));
 	if (!pkt)
 		return DP_ERROR;
 
-	nat_keys = rte_pktmbuf_mtod_offset(pkt, struct dp_sync_msg_nat_keys *, DP_SYNC_HEADERS_LEN);
-	memcpy(&nat_keys->portmap_key, portmap_key, sizeof(*portmap_key));
-	memcpy(&nat_keys->portoverload_key, portoverload_key, sizeof(*portoverload_key));
+	data = rte_pktmbuf_mtod_offset(pkt, struct dp_sync_msg_nat_data *, DP_SYNC_HEADERS_LEN);
+	memcpy(&data->portmap_key, portmap_key, sizeof(*portmap_key));
+	memcpy(&data->portoverload_key, portoverload_key, sizeof(*portoverload_key));
+	data->created_port_id = created_port_id;
 
 	return dp_sync_send_message(pkt);
 }
 
 int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
-							const struct netnat_portoverload_tbl_key *portoverload_key)
+							const struct netnat_portoverload_tbl_key *portoverload_key,
+							uint16_t created_port_id)
 {
-	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_CREATE, portmap_key, portoverload_key);
+	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_CREATE, portmap_key, portoverload_key, created_port_id);
 }
 
 int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key)
 {
-	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_DELETE, portmap_key, portoverload_key);
+	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_DELETE, portmap_key, portoverload_key, 0);
 }
 
 
