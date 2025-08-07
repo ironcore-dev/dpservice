@@ -55,39 +55,44 @@ static int dp_sync_send_message(struct rte_mbuf *pkt)
 }
 
 
-static int dp_sync_send_nat_msg(uint8_t msg_type,
-								const struct netnat_portmap_key *portmap_key,
-								const struct netnat_portoverload_tbl_key *portoverload_key,
-								uint16_t created_port_id)
+int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
+							const struct netnat_portoverload_tbl_key *portoverload_key,
+							uint16_t created_port_id,
+							uint16_t icmp_type_src, rte_be16_t icmp_err_ip_cksum)
 {
 	struct rte_mbuf *pkt;
-	struct dp_sync_msg_nat_data *data;
+	struct dp_sync_msg_nat_create *pkt_data;
 
-	pkt = dp_sync_alloc_message(msg_type, sizeof(*data));
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_NAT_CREATE, sizeof(*pkt_data));
 	if (!pkt)
 		return DP_ERROR;
 
-	data = rte_pktmbuf_mtod_offset(pkt, struct dp_sync_msg_nat_data *, DP_SYNC_HEADERS_LEN);
-	memcpy(&data->portmap_key, portmap_key, sizeof(*portmap_key));
-	memcpy(&data->portoverload_key, portoverload_key, sizeof(*portoverload_key));
-	data->created_port_id = created_port_id;
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	memcpy(&pkt_data->portmap_key, portmap_key, sizeof(*portmap_key));
+	memcpy(&pkt_data->portoverload_key, portoverload_key, sizeof(*portoverload_key));
+	pkt_data->created_port_id = created_port_id;
+	pkt_data->icmp_type_src = icmp_type_src;
+	pkt_data->icmp_err_ip_cksum = icmp_err_ip_cksum;
 
 	return dp_sync_send_message(pkt);
-}
-
-int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
-							const struct netnat_portoverload_tbl_key *portoverload_key,
-							uint16_t created_port_id)
-{
-	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_CREATE, portmap_key, portoverload_key, created_port_id);
 }
 
 int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key)
 {
-	return dp_sync_send_nat_msg(DP_SYNC_MSG_NAT_DELETE, portmap_key, portoverload_key, 0);
-}
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_nat_delete *pkt_data;
 
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_NAT_DELETE, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	memcpy(&pkt_data->portmap_key, portmap_key, sizeof(*portmap_key));
+	memcpy(&pkt_data->portoverload_key, portoverload_key, sizeof(*portoverload_key));
+
+	return dp_sync_send_message(pkt);
+}
 
 int dp_sync_send_request_dump(void)
 {

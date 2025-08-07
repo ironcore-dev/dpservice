@@ -18,12 +18,20 @@ struct dp_sync_hdr {
 
 // active -> backup: incremental change to NAT tables
 #define DP_SYNC_MSG_NAT_CREATE		1
-#define DP_SYNC_MSG_NAT_DELETE		2
-struct dp_sync_msg_nat_data {
+struct dp_sync_msg_nat_create {
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portoverload_tbl_key portoverload_key;
-	uint16_t created_port_id;  // TODO unused in delete, so maybe create two messages!
+	uint16_t created_port_id;
+	uint16_t icmp_type_src;
+	rte_be16_t icmp_err_ip_cksum;
 } __rte_packed;
+
+#define DP_SYNC_MSG_NAT_DELETE		2
+struct dp_sync_msg_nat_delete {
+	struct netnat_portmap_key portmap_key;
+	struct netnat_portoverload_tbl_key portoverload_key;
+} __rte_packed;
+
 // TODO virtsvc create+delete
 // backup -> active: please re-send all tables
 #define DP_SYNC_MSG_REQUEST_DUMP	5
@@ -32,7 +40,8 @@ struct dp_sync_msg_nat_data {
 
 int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key,
-							uint16_t created_port_id);
+							uint16_t created_port_id,
+							uint16_t icmp_type_src, rte_be16_t icmp_err_ip_cksum);
 
 int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key);
