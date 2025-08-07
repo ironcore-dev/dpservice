@@ -856,12 +856,13 @@ static int dp_delete_snat_entries(const struct netnat_portmap_key *portmap_key,
 {
 	struct netnat_portmap_data *portmap_data;
 	void *portoverload_data;
+	hash_sig_t portmap_hash, portoverload_hash;
 	int ret;
-	// TODO pre-hash both!
 
-	ret = rte_hash_lookup_data(ipv4_netnat_portoverload_tbl, portoverload_key, &portoverload_data);
+	portoverload_hash = rte_hash_hash(ipv4_netnat_portoverload_tbl, portoverload_key);
+	ret = rte_hash_lookup_with_hash_data(ipv4_netnat_portoverload_tbl, portoverload_key, portoverload_hash, &portoverload_data);
 	if (DP_SUCCESS(ret)) {
-		ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, portoverload_key);
+		ret = rte_hash_del_key_with_hash(ipv4_netnat_portoverload_tbl, portoverload_key, portoverload_hash);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Cannot delete portoverload key", DP_LOG_RET(ret));
 			return ret;
@@ -873,7 +874,8 @@ static int dp_delete_snat_entries(const struct netnat_portmap_key *portmap_key,
 		return ret;
 	}
 
-	ret = rte_hash_lookup_data(ipv4_netnat_portmap_tbl, portmap_key, (void **)&portmap_data);
+	portmap_hash = rte_hash_hash(ipv4_netnat_portmap_tbl, portmap_key);
+	ret = rte_hash_lookup_with_hash_data(ipv4_netnat_portmap_tbl, portmap_key, portmap_hash, (void **)&portmap_data);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			return DP_OK;  // already deleted, finish
@@ -886,7 +888,7 @@ static int dp_delete_snat_entries(const struct netnat_portmap_key *portmap_key,
 
 	// last flow, delete the whole entry
 	if (portmap_data->flow_cnt == 0) {
-		ret = rte_hash_del_key(ipv4_netnat_portmap_tbl, portmap_key);
+		ret = rte_hash_del_key_with_hash(ipv4_netnat_portmap_tbl, portmap_key, portmap_hash);
 		if (DP_FAILED(ret)) {
 			portmap_data->flow_cnt++;
 			DPS_LOG_ERR("Cannot delete portmap key", DP_LOG_RET(ret));
