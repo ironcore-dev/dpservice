@@ -8,6 +8,7 @@
 
 #include "dp_flow.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_nat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,7 +20,8 @@ int dp_cntrack_handle(struct rte_mbuf *m, struct dp_flow *df);
 
 void dp_cntrack_flush_cache(void);
 
-struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, uint32_t nat_ip, uint16_t nat_port, uint16_t port_id);
+int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverload_key,
+							 const struct netnat_portoverload_sync_metadata *sync_metadata);
 
 #ifdef __cplusplus
 }
