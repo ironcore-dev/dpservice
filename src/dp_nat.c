@@ -647,12 +647,13 @@ int dp_find_new_port(struct snat_data *snat_data,
 }
 
 static int dp_create_new_portmap_entry(const struct netnat_portmap_key *portmap_key,
-									   const struct netnat_portoverload_tbl_key *portoverload_key)
+									   const struct netnat_portoverload_tbl_key *portoverload_key,
+									   void *portoverload_data)
 {
 	struct netnat_portmap_data *portmap_data;
 	int ret;
 
-	ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, portoverload_key);
+	ret = rte_hash_add_key_data(ipv4_netnat_portoverload_tbl, portoverload_key, portoverload_data);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
 		return ret;
@@ -680,7 +681,8 @@ static int dp_create_new_portmap_entry(const struct netnat_portmap_key *portmap_
 }
 
 static int dp_use_existing_portmap_entry(const struct netnat_portmap_key *portmap_key,
-										 struct netnat_portoverload_tbl_key *portoverload_key)
+										 struct netnat_portoverload_tbl_key *portoverload_key,
+										 void *portoverload_data)
 {
 	struct netnat_portmap_data *portmap_data;
 	int ret;
@@ -705,7 +707,7 @@ static int dp_use_existing_portmap_entry(const struct netnat_portmap_key *portma
 	}
 
 	// ENOENT: nat_port is the same, but the protocol is different -> just create a portoverload entry
-	ret = rte_hash_add_key(ipv4_netnat_portoverload_tbl, portoverload_key);
+	ret = rte_hash_add_key_data(ipv4_netnat_portoverload_tbl, portoverload_key, portoverload_data);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
 		return ret;
@@ -745,7 +747,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 	else
 		portoverload_tbl_key.dst_port = ntohs(df->l4_info.trans_port.dst_port);
 
-	ret = dp_use_existing_portmap_entry(&portmap_key, &portoverload_tbl_key);
+	ret = dp_use_existing_portmap_entry(&portmap_key, &portoverload_tbl_key, NULL);
 	if (DP_FAILED(ret)) {
 		if (ret != -ENOENT)
 			return ret;
@@ -755,7 +757,7 @@ int dp_allocate_network_snat_port(struct snat_data *snat_data, struct dp_flow *d
 		if (DP_FAILED(ret))
 			return ret;
 
-		ret = dp_create_new_portmap_entry(&portmap_key, &portoverload_tbl_key);
+		ret = dp_create_new_portmap_entry(&portmap_key, &portoverload_tbl_key, NULL);
 		if (DP_FAILED(ret))
 			return ret;
 	}
@@ -772,7 +774,7 @@ int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 {
 	int ret;
 
-	ret = dp_use_existing_portmap_entry(portmap_key, portoverload_key);
+	ret = dp_use_existing_portmap_entry(portmap_key, portoverload_key, NULL);
 	if (DP_FAILED(ret)) {
 		if (ret == -EEXIST)
 			return DP_OK;  // ignore duplicates, trust the primary dpservice
@@ -780,7 +782,7 @@ int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 			return ret;
 
 		// no finding of new port here, trust the primary dpservice
-		ret = dp_create_new_portmap_entry(portmap_key, portoverload_key);
+		ret = dp_create_new_portmap_entry(portmap_key, portoverload_key, NULL);
 		if (DP_FAILED(ret))
 			return ret;
 	}
@@ -794,12 +796,21 @@ static int dp_delete_snat_entries(const struct netnat_portmap_key *portmap_key,
 								  const struct netnat_portoverload_tbl_key *portoverload_key)
 {
 	struct netnat_portmap_data *portmap_data;
+	void *portoverload_data;
 	int ret;
+	// TODO pre-hash both!
 
-	// forcefully delete, if it was never there, it's fine
-	ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, portoverload_key);
-	if (DP_FAILED(ret) && ret != -ENOENT) {
-		DPS_LOG_ERR("Cannot delete portoverload key", DP_LOG_RET(ret));
+	ret = rte_hash_lookup_data(ipv4_netnat_portoverload_tbl, portoverload_key, &portoverload_data);
+	if (DP_SUCCESS(ret)) {
+		ret = rte_hash_del_key(ipv4_netnat_portoverload_tbl, portoverload_key);
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot delete portoverload key", DP_LOG_RET(ret));
+			return ret;
+		}
+		if (portoverload_data)
+			rte_free(portoverload_data);
+	} else if (ret != -ENOENT) {
+		DPS_LOG_ERR("Cannot lookup portoverload key", DP_LOG_RET(ret));
 		return ret;
 	}
 
