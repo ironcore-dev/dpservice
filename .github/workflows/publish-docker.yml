@@ -20,9 +20,14 @@ on:
 
 jobs:
   buildAndPush:
+    permissions:
+      contents: read
+      packages: write
+    # Condition: Run on push to main, published release, OR PR with 'ok-to-image' label
     if: |
-      (github.event_name == 'push') ||
-      (github.event_name == 'pull_request' && github.event.label.name == 'ok-to-image')
+      github.event_name == 'push' || 
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ok-to-image')) ||
+      (github.event_name == 'release' && github.event.action == 'published')
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
