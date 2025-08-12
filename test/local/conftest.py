@@ -113,7 +113,7 @@ def sync_setup(request, ha_mode):
 	def tear_down():
 		print("------ Sync cleanup ------")
 		for iface in (sync_tap_b, sync_tap_a, sync_bridge):
-			# print(run_command(f"ip -s link show {iface}").decode())
+			#print(run_command(f"ip -s link show {iface}").decode())
 			run_command(f"sh -c 'ip link show {iface} && ip link del {iface} || true'")
 	request.addfinalizer(tear_down)
 
@@ -122,11 +122,11 @@ def sync_setup(request, ha_mode):
 	run_command(f"sh -c 'echo 0 > /sys/class/net/{sync_bridge}/bridge/multicast_snooping'")
 	for sync_tap in (sync_tap_a, sync_tap_b):
 		run_command(f"sh -c 'ip link show {sync_tap} || ip tuntap add dev {sync_tap} mode tap multi_queue'")
+		# the default is fine for this test suite
+		#run_command(f"ip link set {sync_tap} txqueuelen 500000")
 		run_command(f"ip link set {sync_tap} master {sync_bridge}")
 	for iface in (sync_bridge, sync_tap_a, sync_tap_b):
 		run_command(f"sysctl net.ipv6.conf.{iface}.disable_ipv6=1")
-		# TODO use this to tune queues!
-		#run_command(f"ip link set {sync_tap_a} txqueuelen 10000")
 		run_command(f"ip link set {iface} up")
 
 @pytest.fixture(scope="package")
