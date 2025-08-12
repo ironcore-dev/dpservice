@@ -405,6 +405,8 @@ def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
 	dp_service_b = request.getfixturevalue('dp_service_b')
 	request.getfixturevalue('prepare_ifaces_b')
 	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_port_from, nat_port_to)
+	# give backup dpservice time to actually receive the table dump before switching to it
+	time.sleep(0.5)
 	dp_service_b.become_active()
 
 	# Test some packets from outside to second dpservice
@@ -414,9 +416,3 @@ def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
 
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
-
-
-# TODO need performance tests
-#  - what happens when bridge queues get full?
-#  - should the active dpservice be a bit slower to prevent this?
-#  - what happens it the bridge is down, etc.
