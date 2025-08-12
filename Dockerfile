@@ -1,5 +1,5 @@
 # Build image with DPDK, etc.
-FROM --platform=${TARGETPLATFORM} debian:12-slim AS builder
+FROM --platform=${TARGETPLATFORM} debian:13-slim AS builder
 
 ARG TARGETARCH
 ARG DPDK_VER=24.11.1
@@ -108,7 +108,7 @@ RUN meson setup xtratest_build $DPSERVICE_FEATURES -Denable_tests=true && ninja 
 
 
 # Test-image to run pytest
-FROM debian:12-slim AS tester
+FROM debian:13-slim AS tester
 
 RUN apt-get update && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
@@ -149,7 +149,7 @@ ENTRYPOINT ["./runtest.py", "../build", "../xtratest_build"]
 
 
 # Deployed pod image itself
-FROM debian:12-slim AS production
+FROM debian:13-slim AS production
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ON \
 libibverbs-dev \
