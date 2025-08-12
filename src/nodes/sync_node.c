@@ -83,14 +83,19 @@ static uint16_t sync_node_process(struct rte_graph *graph,
 	RTE_SET_USED(graph);
 	RTE_SET_USED(nb_objs);  // this is a source node, input data is not present yet
 
-	n_pkts = rte_eth_rx_burst(sync_port_id, 0, (struct rte_mbuf **)objs, RTE_GRAPH_BURST_SIZE);
-	if (likely(!n_pkts))
-		return 0;
+	do {
+		n_pkts = rte_eth_rx_burst(sync_port_id, 0, (struct rte_mbuf **)objs, RTE_GRAPH_BURST_SIZE);
+		if (likely(!n_pkts))
+			return 0;
 
-	for (uint16_t i = 0; i < n_pkts; ++i)
-		process_packet(((struct rte_mbuf **)objs)[i]);
+		for (uint16_t i = 0; i < n_pkts; ++i)
+			process_packet(((struct rte_mbuf **)objs)[i]);
 
-	rte_pktmbuf_free_bulk((struct rte_mbuf **)objs, n_pkts);
+		rte_pktmbuf_free_bulk((struct rte_mbuf **)objs, n_pkts);
+	// HACK:
+	// in backup mode, graph worker is slowed down intentionally
+	// so always read the whole burst coming from active dpservice
+	} while (backup_mode);
 
 	node->idx = n_pkts;
 	return n_pkts;
