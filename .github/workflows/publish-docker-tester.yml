@@ -24,7 +24,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'release' && github.ref || github.event_name == 'push' && github.ref || github.event_name == 'pull_request' && github.event.pull_request.head.ref }}
           fetch-depth: 0
@@ -111,7 +111,7 @@ jobs:
           for i in $(docker ps -q); do docker stop $i; done
       # dpservice-go tests
       - name: Run checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ env.DOCKER_IMAGE_SHA }}
       - name: Run dpservice
