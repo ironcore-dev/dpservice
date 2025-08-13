@@ -62,6 +62,10 @@ static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_mask = {
 	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
 	.hdr.proto = 0xff,
 };
+static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_pfx80_mask = {
+	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00",
+	.hdr.proto = 0xff,
+};
 #ifdef ENABLE_VIRTSVC
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_only_mask = {
 	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
@@ -198,6 +202,20 @@ void dp_set_ipv6_dst_flow_item(struct rte_flow_item *item,
 	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
 	item->spec = ipv6_spec;
 	item->mask = &dp_flow_item_ipv6_dst_mask;
+	item->last = NULL;
+}
+
+static __rte_always_inline
+void dp_set_ipv6_dst_pfx80_flow_item(struct rte_flow_item *item,
+									 struct rte_flow_item_ipv6 *ipv6_spec,
+									 const union dp_ipv6 *dst,
+									 uint8_t proto)
+{
+	dp_set_dst_ipv6(&ipv6_spec->hdr, dst);
+	ipv6_spec->hdr.proto = proto;
+	item->type = RTE_FLOW_ITEM_TYPE_IPV6;
+	item->spec = ipv6_spec;
+	item->mask = &dp_flow_item_ipv6_dst_pfx80_mask;
 	item->last = NULL;
 }
 
