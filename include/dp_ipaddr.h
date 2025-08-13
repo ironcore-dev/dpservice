@@ -21,6 +21,7 @@ static_assert(sizeof(rte_be64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is
 
 #define DP_UNDERLAY_FLAG_EXTERNALLY_GENERATED 0x80
 #define DP_UNDERLAY_FLAG_SECONDARY_POOL 0x40
+#define DP_UNDERLAY_KERNEL_BYTES 0xabcd
 
 // structure for holding IPv6 addresses
 // this way sizeof(dp_ipv6 *) is a meaningful value and passing the pointer only is safe
