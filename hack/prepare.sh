@@ -241,17 +241,44 @@ function create_vf() {
 }
 
 
+get_raw_vf_pattern() {
+	local dev=$1
+	devlink -js port | \
+		jq -r --arg dev "$dev" '.port | to_entries[] | select(.key | startswith("pci/" + $dev)) | select(.value.flavour=="pcivf") | .value.netdev' | \
+		sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | \
+		uniq
+}
+
 function get_pattern() {
 	local dev=$1
-	pattern=$(devlink -js port | \
-		jq -r --arg dev "$dev" '.port | to_entries[] | select(.key | startswith("pci/" + $dev)) | select(.value.flavour=="pcivf") | .value.netdev' | \
-		sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | uniq)
-	if [ -z "$pattern" ]; then
-		err "can't determine the vf pattern for $dev"
-	elif [ $(wc -l <<< "$pattern") -ne 1 ]; then
-		err "multiple vf patterns found for $dev"
+	local pattern
+
+	if [[ "$IS_ARM_WITH_BLUEFIELD" == "true" ]]; then
+		local timeout_seconds=120
+		local interval_seconds=2
+		local end_time=$(( $(date +%s) + timeout_seconds ))
+
+		while [ $(date +%s) -lt $end_time ]; do
+			pattern=$(get_raw_vf_pattern "$dev")
+			if [ -n "$pattern" ]; then
+				if [ $(wc -l <<< "$pattern") -eq 1 ]; then
+					sleep $interval_seconds
+					echo "$pattern"
+					return
+				fi
+			fi
+			sleep $interval_seconds
+		done
+		err "timed out after ${timeout_seconds}s waiting for the vf pattern for $dev"
+	else
+		pattern=$(get_raw_vf_pattern "$dev")
+		if [ -z "$pattern" ]; then
+			err "can't determine the vf pattern for $dev"
+		elif [ $(wc -l <<< "$pattern") -ne 1 ]; then
+			err "multiple vf patterns found for $dev"
+		fi
+		echo "$pattern"
 	fi
-	echo "$pattern"
 }
 
 function get_ifname() {
@@ -354,5 +381,9 @@ validate
 get_pfs
 detect_card_and_arch_type
 validate_pf
+# Bluefield relies on host side creating VFs, so wait here for systemd to settle and dont rush with the next steps
+if [[ "$IS_ARM_WITH_BLUEFIELD" == "true" ]]; then
+	udevadm settle
+fi
 create_vf
 make_config
