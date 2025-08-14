@@ -27,17 +27,23 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
+	struct rte_ipv4_hdr *ipv4_hdr;
 	struct rte_ipv6_hdr *ipv6_hdr;
 	rte_be16_t payload_len;
 	uint32_t packet_type;
+	uint8_t hop_limits;
 
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 		df->tun_info.proto_id = IPPROTO_IPIP;
-		payload_len = dp_get_ipv4_hdr(m)->total_length;
+		ipv4_hdr = dp_get_ipv4_hdr(m);
+		hop_limits = ipv4_hdr->time_to_live;
+		payload_len = ipv4_hdr->total_length;
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV4 | RTE_PTYPE_L2_ETHER;
 	} else if (df->l3_type == RTE_ETHER_TYPE_IPV6) {
 		df->tun_info.proto_id = IPPROTO_IPV6;
-		payload_len = htons(ntohs(dp_get_ipv6_hdr(m)->payload_len) + sizeof(struct rte_ipv6_hdr));
+		ipv6_hdr = dp_get_ipv6_hdr(m);
+		hop_limits = ipv6_hdr->hop_limits;
+		payload_len = htons(ntohs(ipv6_hdr->payload_len) + sizeof(struct rte_ipv6_hdr));
 		packet_type = RTE_PTYPE_L3_IPV6 | RTE_PTYPE_TUNNEL_IP | RTE_PTYPE_INNER_L3_IPV6 | RTE_PTYPE_L2_ETHER;
 	} else {
 		DPNODE_LOG_WARNING(node, "Invalid tunnel type", DP_LOG_VALUE(df->l3_type));
@@ -58,7 +64,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	dp_fill_ether_hdr(ether_hdr, dp_get_out_port(df), RTE_ETHER_TYPE_IPV6);
 
 	ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
-	ipv6_hdr->hop_limits = DP_IP6_HOP_LIMIT;
+	ipv6_hdr->hop_limits = hop_limits;
 	ipv6_hdr->payload_len = payload_len;
 	ipv6_hdr->vtc_flow = htonl(DP_IP6_VTC_FLOW);
 
