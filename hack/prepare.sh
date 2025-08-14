@@ -259,14 +259,34 @@ function get_ifname() {
 	devlink -js port | jq -r --argjson idx "$port_idx" '.port | .[] | select(.flavour=="physical" and .port==$idx) | .netdev'
 }
 
-function get_ipv6() {
-	while read -r l1; do
-		if [ "$l1" != "::1/128" ]; then
-			echo ${l1%/*}
-			return
-		fi
-	done < <(ip -6 -o addr show lo | awk '{print $4}')
-	err "no ipv6 found"
+function get_ipv6() {	
+	local ip_json
+	ip_json=$(ip -js -6 addr show lo)
+
+	if [ -z "$ip_json" ]; then
+		err "Could not retrieve address information for interface 'lo'."
+		return 1
+	fi
+
+	#   1. Have a "global" scope.
+	#   2. Have a prefix length of 64 or more.
+	#   3. Must be in Globally Unique Address (GUA) range (2 or 3).
+	local global_address
+	global_address=$(echo "$ip_json" | jq -r '
+		.[0].addr_info[]
+		| select(
+			.scope == "global" and
+			.prefixlen >= 64 and
+			(.local | test("^(2|3)"))
+		)
+		| .local' | head -n 1)
+
+	if [ -n "$global_address" ]; then
+		echo "$global_address"
+		return
+	fi
+
+	err "No Global Unicast IPv6 address with prefix >= 64 found on 'lo'."
 }
 
 function make_config() {
