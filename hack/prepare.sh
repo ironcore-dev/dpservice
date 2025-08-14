@@ -11,7 +11,7 @@ set -Eeuo pipefail
 
 OPT_MULTIPORT=false
 
-BLUEFIELD_IDENTIFIERS=("MT_0000000543", "MT_0000000541")
+BLUEFIELD_IDENTIFIERS=("MT_0000000543" "MT_0000000541")
 MAX_NUMVFS_POSSIBLE=126
 NUMVFS_DESIRED=126
 CONFIG="/tmp/dp_service.conf"
@@ -32,18 +32,17 @@ function err() {
 }
 
 function get_pfs() {
-	if [[ "$OPT_MULTIPORT" == "true" ]]; then
-		readarray -t devs < <(devlink dev | grep '^pci/' | awk -F/ '{print $2}')
-	else
-		readarray -t devs < <(devlink dev | awk -F/ '{print $2}')
-	fi
+	readarray -t devs < <(devlink -js dev | jq -r '.dev | keys[] | select(startswith("pci/")) | sub("pci/"; "")')
 }
 
 function detect_card_and_arch_type() {
 	local pf="${devs[0]}"
 	local is_bluefield=false
+	local devlink_info
+	devlink_info=$(devlink -js dev info "pci/$pf")
+
 	for id in "${BLUEFIELD_IDENTIFIERS[@]}"; do
-		if devlink dev info pci/$pf | grep -q "$id"; then
+		if echo "$devlink_info" | jq -e '.. | strings | select(. == "'"$id"'")' > /dev/null; then
 			is_bluefield=true
 			log "Detected BlueField card with identifier $id on pf: $pf"
 			break
@@ -84,9 +83,11 @@ function detect_card_and_arch_type() {
 }
 
 function validate() {
-	# we check if we have devlink available
-	if ! command -v devlink 2> /dev/null; then
+	if ! command -v devlink &> /dev/null; then
 		err "devlink not available, exiting"
+	fi
+	if ! command -v jq &> /dev/null; then
+		err "jq not available, exiting"
 	fi
 }
 
@@ -101,7 +102,6 @@ function validate_pf() {
 		return
 	fi
 
-	# we check if sr-iov is enabled and the dev is using the mlx5 driver
 	unset valid_devs
 	for pf in "${devs[@]}"; do
 	    log "check pf $pf"
@@ -123,7 +123,7 @@ process_switchdev_mode() {
 	local pf=$1
 
 	log "enabling switchdev for $pf"
-	if ! devlink dev eswitch set pci/$pf mode switchdev; then
+	if ! devlink dev eswitch set "pci/$pf" mode switchdev; then
 		err "can't set eswitch mode"
 	fi
 	log "now waiting for everything to settle"
@@ -134,7 +134,7 @@ process_multiport_eswitch_mode() {
 	local pf=$1
 
 	log "enabling multiport eswitch mode for $pf"
-	if ! devlink dev param set pci/$pf name esw_multiport value true cmode runtime; then
+	if ! devlink dev param set "pci/$pf" name esw_multiport value true cmode runtime; then
 		err "can't enable multiport eswitch mode"
 	fi
 	log "now waiting for everything to settle"
@@ -158,8 +158,6 @@ function vfio_bind() {
 
 	modified_pci=${pf0::-3}
 
-	# pci address of vfs are organized in a block of 8
-	# e.g., 3b:00.0 ... 3b:00.7, 3b:01.0 ... 3b:01.7, etc.
 	for i in $(seq $vf_offset $((vf_offset + numvfs - 1))); do
 		vf_in_block_count=$(($i%8))
 		if [ $vf_in_block_count -eq 0 ]; then
@@ -192,7 +190,6 @@ function create_vf() {
 	if [[ "$IS_ARM_WITH_BLUEFIELD" == "true" ]]; then
 		actualvfs=$NUMVFS_DESIRED
 		log "Skipping VF creation for BlueField card on ARM"
-		# enable switchdev mode, this operation takes most time
 		process_switchdev_mode "$pf0"
 		return
 	fi
@@ -210,13 +207,11 @@ function create_vf() {
 		return
 	fi
 
-	# we disable automatic binding so that VFs don't get created, saves a lot of time
-	# plus we don't need to unbind them before enabling switchdev mode
 	log "disabling automatic binding of VFs on pf0 '$pf0'"
 	echo 0 > /sys/bus/pci/devices/$pf0/sriov_drivers_autoprobe
 
-	if [[ "$IS_X86_WITH_MLX" == "true" ]]; then
-		# enable switchdev mode, this operation takes most time
+	if [[ "$IS_X86_WITH_MLX" == "true" || "$IS_X86_WITH_BLUEFIELD" == "true" ]]; then
+		log "Enabling switchdev mode for MLX or BlueField card on x86"
 		if [[ "$OPT_MULTIPORT" == "true" ]]; then
 			for pf in "${devs[@]}"; do
 				process_switchdev_mode "$pf"
@@ -232,7 +227,6 @@ function create_vf() {
 		done
 	fi
 
-	# calculating amount of VFs to create, 126 if more are available, or maximum available
 	totalvfs=$(cat /sys/bus/pci/devices/$pf0/sriov_totalvfs)
 	actualvfs=$((NUMVFS_DESIRED<totalvfs ? NUMVFS_DESIRED : totalvfs))
 	log "creating $actualvfs virtual functions"
@@ -249,7 +243,9 @@ function create_vf() {
 
 function get_pattern() {
 	local dev=$1
-	pattern=$(devlink port | grep pci/$dev/ | grep "virtual\|pcivf" | awk '{print $5}' | sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | uniq)
+	pattern=$(devlink -js port | \
+		jq -r --arg dev "$dev" '.port | to_entries[] | select(.key | startswith("pci/" + $dev)) | select(.value.flavour=="pcivf") | .value.netdev' | \
+		sed -rn 's/(.*[a-z_])[0-9]{1,3}$/\1/p' | uniq)
 	if [ -z "$pattern" ]; then
 		err "can't determine the vf pattern for $dev"
 	elif [ $(wc -l <<< "$pattern") -ne 1 ]; then
@@ -259,12 +255,11 @@ function get_pattern() {
 }
 
 function get_ifname() {
-	local port=$1
-	devlink port | grep "physical port $port" | awk '{ print $5}'
+	local port_idx=$1
+	devlink -js port | jq -r --argjson idx "$port_idx" '.port | .[] | select(.flavour=="physical" and .port==$idx) | .netdev'
 }
 
 function get_ipv6() {
-	# TODO: this needs to be done in a better way
 	while read -r l1; do
 		if [ "$l1" != "::1/128" ]; then
 			echo ${l1%/*}
@@ -275,15 +270,9 @@ function get_ipv6() {
 }
 
 function make_config() {
-	if [[ "$IS_X86_WITH_BLUEFIELD" == "true" ]]; then
-		log "Skipping config file creation on AMD/Intel 64-bit host with Bluefield"
-		return
-	fi
-
-	# To make error propagation work, need to assign separately
 	conf_pf0="$(get_ifname 0)"
 	conf_pf1="$(get_ifname 1)"
-	conf_vf_pattern="$(get_pattern ${devs[0]})"
+	conf_vf_pattern="$(get_pattern "${devs[0]}")"
 	conf_ipv6="$(get_ipv6)"
 
 	{ echo "# This has been generated by prepare.sh"
