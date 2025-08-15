@@ -167,6 +167,9 @@ int dp_str_to_ipv4(const char *src, uint32_t *dest);
 int dp_str_to_ipv6(const char *src, union dp_ipv6 *dest);
 
 void dp_generate_ul_ipv6(union dp_ipv6 *dest);
+#ifdef ENABLE_VIRTSVC
+void dp_generate_virtsvc_ul_ipv6(union dp_ipv6 *dest, uint32_t index);
+#endif
 
 
 // structure for holding dual IP addresses
