@@ -27,10 +27,14 @@ int dp_install_isolated_mode_ipip(uint16_t port_id, uint8_t proto_id)
 	struct rte_flow_action_queue queue_action; // #1
 	struct rte_flow_action action[2];          // + end
 	int action_cnt = 0;
+	union dp_ipv6 ul_addr6;
+
+	ul_addr6._ul.prefix = dp_conf_get_underlay_ip()->_prefix;
+	ul_addr6._ul.kernel = htons(DP_UNDERLAY_KERNEL_BYTES);
 
 	// create match pattern: IP in IPv6 tunnel packets
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6));
-	dp_set_ipv6_flow_item(&pattern[pattern_cnt++], &ipv6_spec, proto_id);
+	dp_set_ipv6_dst_pfx80_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &ul_addr6, proto_id);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// create flow action: allow packets to enter dp-service packet queue
