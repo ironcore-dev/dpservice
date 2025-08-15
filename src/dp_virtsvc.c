@@ -166,8 +166,7 @@ int dp_virtsvc_init(int socket_id)
 		dp_virtservices_end->virtual_port = rule->virtual_port;
 		dp_virtservices_end->service_port = rule->service_port;
 		dp_copy_ipv6(&dp_virtservices_end->service_addr, &rule->service_addr);
-		// TODO temporary, already made better in a branch (including ifdef ENABLE_UNDERLAY_TYPE)
-		dp_generate_ul_ipv6(&dp_virtservices_end->ul_addr, 0xff);
+		dp_generate_virtsvc_ul_ipv6(&dp_virtservices_end->ul_addr, i);
 		// last_assigned_port is 0 due to zmalloc()
 		snprintf(hashtable_name, sizeof(hashtable_name), "virtsvc_table_%u", i);
 		dp_virtservices_end->open_ports = dp_create_jhash_table(DP_VIRTSVC_PORTCOUNT,

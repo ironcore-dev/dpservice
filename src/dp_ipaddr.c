@@ -94,3 +94,14 @@ void dp_generate_ul_ipv6(union dp_ipv6 *dest, uint8_t addr_type)
 #endif
 	dest->_ul.local = htonl(++ul_counter);
 }
+
+#ifdef ENABLE_VIRTSVC
+void dp_generate_virtsvc_ul_ipv6(union dp_ipv6 *dest, uint32_t index)
+{
+	dest->_ul.prefix = dp_conf_get_underlay_ip()->_prefix;  // Use the same prefix as the host
+	dest->_ul.type = DP_UNDERLAY_ADDRESS_TYPE;
+	dest->_ul.subtype = 0xff;  // max(uint8_t) to make sure this does not clash
+	dest->_ul.flags = DP_UNDERLAY_FLAG_SECONDARY_POOL;
+	dest->_ul.local = index;
+}
+#endif
