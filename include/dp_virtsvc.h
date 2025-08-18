@@ -115,6 +115,12 @@ void dp_virtsvc_del_iface(uint16_t port_id);
 
 int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict);
 
+int dp_virtsvc_open_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_port, uint8_t proto,
+									rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id,
+									uint16_t conn_port);
+
+void dp_synchronize_virtsvc_connections(void);
+
 #ifdef __cplusplus
 }
 #endif
