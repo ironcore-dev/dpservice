@@ -143,11 +143,12 @@ static int graph_main_loop(__rte_unused void *arg)
 
 	dp_log_set_thread_name("worker");
 
-	// TODO conditional when sync tap?
-	// send this always, if there is no active dpservice, this will be ignored
-	DPS_LOG_INFO("Sending NAT tables dump request");
-	if (DP_FAILED(dp_sync_send_request_dump()))
-		DPS_LOG_ERR("Failed to send NAT tables dump request");
+	if (dp_conf_is_sync_enabled()) {
+		// if there is no active dpservice, this will be ignored
+		DPS_LOG_INFO("Sending NAT tables dump request");
+		if (DP_FAILED(dp_sync_send_request_dump()))
+			DPS_LOG_ERR("Failed to send NAT tables dump request");
+	}
 
 	// In standby mode (no packet processing), gRPC requests still need processing
 	while (!force_quit && standing_by) {
@@ -156,11 +157,12 @@ static int graph_main_loop(__rte_unused void *arg)
 	}
 
 	if (!force_quit) {
-		// TODO conditional when sync tap?
-		sync_node_switch_mode();
-		DPS_LOG_INFO("Preparing NAT flows");
-		if (DP_FAILED(dp_create_sync_snat_flows()))
-			DPS_LOG_WARNING("Some NAT flows failed to be created");
+		if (dp_conf_is_sync_enabled()) {
+			sync_node_switch_mode();
+			DPS_LOG_INFO("Preparing NAT flows");
+			if (DP_FAILED(dp_create_sync_snat_flows()))
+				DPS_LOG_WARNING("Some NAT flows failed to be created");
+		}
 		DPS_LOG_INFO("Starting packet processing");
 		rx_node_start_processing();
 	}
