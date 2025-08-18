@@ -165,17 +165,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	port = dp_get_in_port(m);
 	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
-// printf("NO FLAGS SNAT\n");
+
 		if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 			src_ip = ntohl(df->src.src_addr);
-// 			printf("src_ip: %x\n", src_ip);
 			snat_data = dp_get_iface_snat_data(src_ip, port->iface.vni);
-// 			printf("port_id: %u\n", port->port_id);
 		}
 
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->nat_ip != 0)
 			&& df->flow_type == DP_FLOW_SOUTH_NORTH) {
-// 			printf("south north\n");
 			if (DP_FAILED(dp_process_ipv4_snat(m, df, cntrack, port, snat_data)))
 				return SNAT_NEXT_DROP;
 		}
@@ -194,7 +191,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
-// 		printf("KNOW SNAT\n");
 		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.is_v6)
 			return SNAT_NEXT_DROP;
 		ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -216,7 +212,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if ((DP_FLOW_HAS_FLAG_DST_NAT(cntrack->flow_flags) || DP_FLOW_HAS_FLAG_DST_LB(cntrack->flow_flags))
 		&& (df->flow_dir == DP_FLOW_DIR_REPLY)
 	) {
-// 		printf("LB SNAT\n");
 		if (cntrack->flow_key[DP_FLOW_DIR_ORG].l3_dst.is_v6)
 			return SNAT_NEXT_DROP;
 		ipv4_hdr = dp_get_ipv4_hdr(m);
@@ -228,7 +223,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	}
 
 	if (DP_FLOW_HAS_FLAG_SRC_NAT64(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
-// 		printf("NAT64 SNAT\n");
 		if (DP_FAILED(dp_nat_chg_ipv6_to_ipv4_hdr(df, m, port->iface.nat_ip, &dest_ip4)))
 			return SNAT_NEXT_DROP;
 
@@ -244,7 +238,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		df->nat_addr = port->iface.nat_ip;
 	}
 
-// 	printf("SNAT\n");
 	return SNAT_NEXT_FIREWALL;
 }
 
