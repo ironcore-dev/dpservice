@@ -310,9 +310,8 @@ def test_ha_virtsvc(request, prepare_ifaces, prepare_ifaces_b, dp_service_b):
 
 	# Sniff the other dpservice
 	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
-	reply.show()
 	assert reply[IP].src == virtsvc_udp_virtual_ip, \
-		"Got answer from wrong UDP source port"
+		"Got answer from wrong UDP source ip"
 	assert reply[UDP].sport == virtsvc_udp_virtual_port, \
 		"Got answer from wrong UDP source port"
 	assert reply[UDP].dport == 1234, \
@@ -388,6 +387,23 @@ def verify_bulk_sync(nat_ul, external_src_ip, nat_port, vm_port, ipv6=False):
 	assert reply[UDP].dport == vm_port, \
 		"Reply not to the right port"
 
+def bulk_virtsvc_responder():
+	# Hardcoded virtsvc IP and port, obtained by looking at --graphtrace output
+	reply_pkt = (Ether(dst=PF0.mac, src=PF0.mac) /
+				 IPv6(dst="fc00:1:0:0:0:4000:0:0", src=virtsvc_udp_svc_ipv6) /
+				 UDP(dport=1025, sport=virtsvc_udp_svc_port))
+	delayed_sendp(reply_pkt, PF0.tap_b)
+
+def verify_virtsvc_bulk_sync():
+	threading.Thread(target=bulk_virtsvc_responder).start()
+	reply = sniff_packet(VM1.tap_b, is_udp_pkt)
+	assert reply[IP].src == virtsvc_udp_virtual_ip, \
+		"Got answer from wrong UDP source ip"
+	assert reply[UDP].sport == virtsvc_udp_virtual_port, \
+		"Got answer from wrong UDP source port"
+	assert reply[UDP].dport == 1234, \
+		"Got answer to wrong UDP destination port"
+
 def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
 	# Need to create many entries with overloading to properly test table dump
 	nat_port_range = 4
@@ -401,6 +417,12 @@ def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
 		create_nat_entry(VM1.tap, sport, public_ip2)  # Cannot use public_ip as that is already used by the NAT64 address
 		create_nat_entry6(VM1.tap, sport, public_nat64_ipv6)
 
+	if request.config.getoption("--virtsvc"):
+		pkt = (Ether(dst=VM1.mac, src=VM1.mac) /
+			   IP(dst=virtsvc_udp_virtual_ip, src=VM1.ip) /
+			   UDP(dport=virtsvc_udp_virtual_port, sport=1234))
+		sendp(pkt, iface=VM1.tap)
+
 	# Only now start the second dpservice, it should request a NAT table dump
 	dp_service_b = request.getfixturevalue('dp_service_b')
 	request.getfixturevalue('prepare_ifaces_b')
@@ -413,6 +435,8 @@ def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
 	# NOTE: the port values are hardcoded and were obtained by looking at --graphtrace output
 	verify_bulk_sync(nat_ul_b, public_ip2, 102, 1025)
 	verify_bulk_sync(nat_ul_b, public_ip, 100, 1026, ipv6=True)
+	if request.config.getoption("--virtsvc"):
+		verify_virtsvc_bulk_sync()
 
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
