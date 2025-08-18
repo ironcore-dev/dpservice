@@ -31,12 +31,16 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 	struct dp_sync_hdr *sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);
 	struct dp_sync_msg_nat_create *nat_create;
 	struct dp_sync_msg_nat_delete *nat_delete;
+#ifdef ENABLE_VIRTSVC
+	struct dp_sync_msg_virtsvc_conn *virtsvc_conn;
+#endif
 
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
 		DPS_LOG_WARNING("Invalid sync ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
 		return;
 	}
 
+	// TODO all errors here are actually warnings!
 	switch (sync_hdr->msg_type) {
 	case DP_SYNC_MSG_REQUEST_DUMP:
 		DPS_LOG_INFO("Received request for sync table dumps");
@@ -45,6 +49,9 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			break;
 		}
 		dp_sync_local_nat_flows();
+#ifdef ENABLE_VIRTSVC
+		dp_virtsvc_sync_open_connections();
+#endif
 		break;
 	case DP_SYNC_MSG_NAT_CREATE:
 		// TODO mute one or both! (otherwise move to info and maybe better texts)
@@ -72,6 +79,21 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 		dp_remove_sync_snat_port(&nat_delete->portmap_key, &nat_delete->portoverload_key);
 		// errors ignored, keep processing messages
 		break;
+	case DP_SYNC_MSG_VIRTSVC_CONN:
+#ifdef ENABLE_VIRTSVC
+		// TODO mute one or both! (otherwise move to info and maybe better texts)
+		DPS_LOG_DEBUG("Received VIRTSVC message");
+		if (!backup_mode) {
+			DPS_LOG_ERR("Invalid sync VIRTSVC message for active dpservice");
+			break;
+		}
+		virtsvc_conn = (struct dp_sync_msg_virtsvc_conn *)(sync_hdr + 1);
+		dp_virtsvc_sync_connection(virtsvc_conn->virtual_addr, virtsvc_conn->virtual_port, virtsvc_conn->proto,
+								   virtsvc_conn->vf_ip, virtsvc_conn->vf_l4_port, virtsvc_conn->vf_port_id,
+								   virtsvc_conn->conn_port);
+		// errors ignored, keep processing messages
+		break;
+#endif
 	default:
 		DPS_LOG_ERR("Unknown sync message type", DP_LOG_VALUE(sync_hdr->msg_type));
 	}

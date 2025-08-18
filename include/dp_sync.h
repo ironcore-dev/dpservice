@@ -32,10 +32,19 @@ struct dp_sync_msg_nat_delete {
 	struct netnat_portoverload_tbl_key portoverload_key;
 } __rte_packed;
 
-// TODO virtsvc create+delete
+#define DP_SYNC_MSG_VIRTSVC_CONN	3
+struct dp_sync_msg_virtsvc_conn {
+	rte_be32_t virtual_addr;
+	rte_be16_t virtual_port;
+	uint16_t conn_port;
+	rte_be32_t vf_ip;
+	rte_be16_t vf_l4_port;
+	uint16_t vf_port_id;
+	uint8_t proto;
+} __rte_packed;
+
 // backup -> active: please re-send all tables
 #define DP_SYNC_MSG_REQUEST_DUMP	5
-// TODO multi-entry structure for performance?
 
 
 int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
@@ -45,6 +54,11 @@ int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
 
 int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 							const struct netnat_portoverload_tbl_key *portoverload_key);
+
+#ifdef ENABLE_VIRTSVC
+int dp_sync_send_virtsvc_conn(const struct dp_virtsvc *virtsvc, uint16_t conn_port,
+							  rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id);
+#endif
 
 int dp_sync_send_request_dump(void);
 
