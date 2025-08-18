@@ -94,6 +94,30 @@ int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 	return dp_sync_send_message(pkt);
 }
 
+#ifdef ENABLE_VIRTSVC
+int dp_sync_send_virtsvc_conn(const struct dp_virtsvc *virtsvc, uint16_t conn_port,
+							  rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id)
+{
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_virtsvc_conn *pkt_data;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_VIRTSVC_CONN, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	pkt_data->virtual_addr = virtsvc->virtual_addr;
+	pkt_data->virtual_port = virtsvc->virtual_port;
+	pkt_data->proto = virtsvc->proto;
+	pkt_data->conn_port = conn_port;
+	pkt_data->vf_ip = vf_ip;
+	pkt_data->vf_l4_port = vf_l4_port;
+	pkt_data->vf_port_id = vf_port_id;
+
+	return dp_sync_send_message(pkt);
+}
+#endif
+
 int dp_sync_send_request_dump(void)
 {
 	struct rte_mbuf *pkt;

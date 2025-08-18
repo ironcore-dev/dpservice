@@ -12,6 +12,7 @@
 #include "dp_flow.h"
 #include "dp_log.h"
 #include "dp_multi_path.h"
+#include "dp_sync.h"
 #include "dp_util.h"
 
 // WARNING: This module is not designed to be thread-safe (even though it could work)
@@ -252,21 +253,14 @@ static __rte_always_inline int dp_virtsvc_get_free_port(struct dp_virtsvc *virts
 	return DP_ERROR;
 }
 
-static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *virtsvc,
-															struct dp_virtsvc_conn_key *key,
-															hash_sig_t sig)
+static __rte_always_inline int dp_virtsvc_use_port(struct dp_virtsvc *virtsvc,
+												   struct dp_virtsvc_conn_key *key,
+												   hash_sig_t sig,
+												   uint16_t conn_port)
 {
+	struct dp_virtsvc_conn *conn = &virtsvc->connections[conn_port];
 	struct dp_virtsvc_conn_key delete_key;
-	struct dp_virtsvc_conn *conn;
-	uint16_t free_port;
 	int ret;
-
-	ret = dp_virtsvc_get_free_port(virtsvc);
-	if (DP_FAILED(ret))
-		return ret;
-
-	free_port = (uint16_t)ret;
-	conn = &virtsvc->connections[free_port];
 
 	if (conn->last_pkt_timestamp) {
 		delete_key.vf_port_id = conn->vf_port_id;
@@ -278,7 +272,7 @@ static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *v
 							DP_LOG_PORTID(conn->vf_port_id), DP_LOG_L4PORT(conn->vf_l4_port));
 	}
 
-	ret = rte_hash_add_key_with_hash_data(virtsvc->open_ports, key, sig, (void *)(intptr_t)free_port);
+	ret = rte_hash_add_key_with_hash_data(virtsvc->open_ports, key, sig, (void *)(intptr_t)conn_port);
 	if (DP_FAILED(ret))
 		return ret;
 
@@ -286,6 +280,30 @@ static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *v
 	conn->vf_l4_port = key->vf_l4_port;
 	conn->vf_port_id = key->vf_port_id;
 	conn->state = DP_VIRTSVC_CONN_TRANSIENT;
+
+	return DP_OK;
+}
+
+static __rte_always_inline int dp_virtsvc_create_connection(struct dp_virtsvc *virtsvc,
+															struct dp_virtsvc_conn_key *key,
+															hash_sig_t sig)
+{
+	uint16_t free_port;
+	int ret;
+
+	ret = dp_virtsvc_get_free_port(virtsvc);
+	if (DP_FAILED(ret))
+		return ret;
+
+	free_port = (uint16_t)ret;
+
+	ret = dp_virtsvc_use_port(virtsvc, key, sig, free_port);
+	if (DP_FAILED(ret))
+		return ret;
+
+	if (dp_conf_is_sync_enabled())
+		dp_sync_send_virtsvc_conn(virtsvc, free_port, key->vf_ip, key->vf_l4_port, key->vf_port_id);
+		// errors ignored
 
 	return free_port;
 }
@@ -394,4 +412,65 @@ int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict)
 		}
 	}
 	return DP_OK;
+}
+
+
+static struct dp_virtsvc *get_virtsvc_by_ipv4(rte_be32_t virtual_addr, rte_be16_t virtual_port, uint8_t proto)
+{
+	const struct dp_virtsvc_lookup_entry *entry = dp_virtsvc_ipv4_tree;
+	int diff;
+
+	while (entry) {
+		diff = dp_virtsvc_ipv4_cmp(proto, virtual_addr, virtual_port,
+								   entry->virtsvc->proto, entry->virtsvc->virtual_addr, entry->virtsvc->virtual_port);
+		if (!diff)
+			return entry->virtsvc;
+		entry = diff < 0 ? entry->left : entry->right;
+	}
+	return NULL;
+}
+
+int dp_virtsvc_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_port, uint8_t proto,
+							   rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id,
+							   uint16_t conn_port)
+{
+	struct dp_virtsvc_conn_key key = {
+		.vf_port_id = vf_port_id,
+		.vf_l4_port = vf_l4_port,
+		.vf_ip = vf_ip,
+	};
+	struct dp_virtsvc *virtsvc;
+	int ret;
+
+	virtsvc = get_virtsvc_by_ipv4(virtual_addr, virtual_port, proto);
+	if (!virtsvc) {
+		DPS_LOG_ERR("Virtual service not found", DP_LOG_VIRTSVC(virtsvc));
+		return DP_ERROR;
+	}
+
+	ret = dp_virtsvc_use_port(virtsvc, &key, rte_hash_hash(virtsvc->open_ports, &key), conn_port);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_WARNING("Failed to sync virtual service connection", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	virtsvc->connections[conn_port].last_pkt_timestamp = rte_get_timer_cycles();
+	virtsvc->last_assigned_port = conn_port;
+
+	return DP_OK;
+}
+
+void dp_virtsvc_sync_open_connections(void)
+{
+	struct dp_virtsvc_conn *conn;
+
+	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
+		for (uint16_t conn_port = 0; conn_port < RTE_DIM(service->connections); ++conn_port) {
+			conn = &service->connections[conn_port];
+			if (conn->last_pkt_timestamp) {
+				dp_sync_send_virtsvc_conn(service, conn_port, conn->vf_ip, conn->vf_l4_port, conn->vf_port_id);
+				// errors ignored
+			}
+		}
+	}
 }
