@@ -991,6 +991,7 @@ int dp_create_sync_snat_flows(void)
 {
 	const struct netnat_portoverload_tbl_key *portoverload_key;
 	struct netnat_portoverload_sync_metadata *sync_metadata;
+	uint64_t timestamp = rte_rdtsc();  // NOTE: synced flows will have full default timeout
 	uint32_t index = 0;
 	int ret;
 
@@ -999,7 +1000,7 @@ int dp_create_sync_snat_flows(void)
 			DPS_LOG_ERR("Cannot iterate NAT portoverload table for sync", DP_LOG_RET(ret));
 			return DP_ERROR;
 		}
-		if (DP_FAILED(dp_cntrack_from_sync_nat(portoverload_key, sync_metadata)))
+		if (DP_FAILED(dp_cntrack_from_sync_nat(portoverload_key, sync_metadata, timestamp)))
 			DPS_LOG_WARNING("Cannot create conntrack flow from sync NAT entry");
 	}
 	return DP_OK;

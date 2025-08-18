@@ -209,7 +209,8 @@ error_alloc:
 
 
 int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverload_key,
-							 const struct netnat_portoverload_sync_metadata *sync_metadata)
+							 const struct netnat_portoverload_sync_metadata *sync_metadata,
+							 uint64_t timestamp)
 {
 	struct flow_key key;
 	struct flow_value *flow_val;
@@ -249,6 +250,7 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 
 	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_ORG], &key, sizeof(key));
 	flow_val->flow_flags |= key.l3_src.is_v6 ? DP_FLOW_FLAG_SRC_NAT64 : DP_FLOW_FLAG_SRC_NAT;
+	flow_val->timestamp = timestamp;
 	flow_val->timeout_value = flow_timeout;
 	flow_val->created_port_id = sync_metadata->created_port_id;
 
