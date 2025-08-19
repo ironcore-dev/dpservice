@@ -172,9 +172,6 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
 	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
 
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return DP_ERROR;
-
 	return DP_OK;
 }
 
@@ -245,6 +242,9 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 		return NULL;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
+		return NULL;
+
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return NULL;
 
 	if (is_pf) {
