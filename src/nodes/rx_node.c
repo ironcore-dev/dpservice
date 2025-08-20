@@ -174,12 +174,12 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 		old = rx_find_old_packets(objs, n_pkts, flush_timestamp);
 		if (old > 0) {
 			rte_pktmbuf_free_bulk((struct rte_mbuf **)objs, old);
-			objs += old;
-			n_pkts -= old;
 			DPS_LOG_INFO("Flushed old packets", DP_LOG_VALUE(old), DP_LOG_PORT(ctx->port));
 			// if all packets were old, continue flushing
 			if (old == n_pkts)
 				return 0;
+			objs += old;
+			n_pkts -= old;
 		}
 		ctx->flush_old_packets = false;
 	}
