@@ -18,7 +18,7 @@ static const struct rte_flow_attr dp_flow_attr_prio_ingress = {
 };
 
 
-int dp_install_isolated_mode_ipip(uint16_t port_id, uint8_t proto_id)
+int dp_install_isolated_mode_ipip(uint16_t port_id)
 {
 	struct rte_flow_item_eth eth_spec;   // #1
 	struct rte_flow_item_ipv6 ipv6_spec; // #2
@@ -34,7 +34,7 @@ int dp_install_isolated_mode_ipip(uint16_t port_id, uint8_t proto_id)
 
 	// create match pattern: IP in IPv6 tunnel packets
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6));
-	dp_set_ipv6_dst_pfx80_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &ul_addr6, proto_id);
+	dp_set_ipv6_dst_pfx80_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &ul_addr6);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// create flow action: allow packets to enter dp-service packet queue
