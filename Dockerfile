@@ -163,6 +163,7 @@ libpcap0.8-dev \
 iproute2 \
 udev \
 gawk \
+jq \
 bash-completion \
 && rm -rf /var/lib/apt/lists/*
 
