@@ -34,7 +34,7 @@ int dp_install_isolated_mode_ipip(uint16_t port_id)
 
 	// create match pattern: IP in IPv6 tunnel packets
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6));
-	dp_set_ipv6_dst_pfx80_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &ul_addr6);
+	dp_set_ipv6_dst_pfx68_flow_item(&pattern[pattern_cnt++], &ipv6_spec, &ul_addr6);
 	dp_set_end_flow_item(&pattern[pattern_cnt++]);
 
 	// create flow action: allow packets to enter dp-service packet queue
