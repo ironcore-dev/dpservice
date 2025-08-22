@@ -12,7 +12,6 @@
 #include "dpdk_layer.h"
 #include "monitoring/dp_graphtrace_shared.h"
 #include "monitoring/dp_pcap.h"
-#include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "monitoring/dp_event.h"
 
