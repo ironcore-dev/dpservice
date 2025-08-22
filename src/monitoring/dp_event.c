@@ -8,7 +8,6 @@
 #include "dp_log.h"
 #include "dp_port.h"
 #include "monitoring/dp_monitoring.h"
-#include "rte_flow/dp_rte_flow_init.h"
 
 
 static int dp_send_event_msg(const struct dp_event_msg *msg)

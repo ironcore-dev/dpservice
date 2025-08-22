@@ -20,7 +20,7 @@
 #include "rte_flow/dp_rte_async_flow_template.h"
 #include "rte_flow/dp_rte_flow.h"
 #include "rte_flow/dp_rte_flow_capture.h"
-#include "rte_flow/dp_rte_flow_init.h"
+#include "rte_flow/dp_rte_flow_isolation.h"
 
 #define DP_PORT_INIT_PF true
 #define DP_PORT_INIT_VF false
@@ -425,18 +425,6 @@ void dp_ports_free(void)
 }
 
 
-static int dp_port_install_sync_isolated_mode(uint16_t port_id)
-{
-	DPS_LOG_INFO("Init isolation flow rules");
-	if (DP_FAILED(dp_install_isolated_mode_ipip(port_id)))
-		return DP_ERROR;
-#ifdef ENABLE_VIRTSVC
-	return dp_install_virtsvc_sync_isolation_rules(port_id);
-#else
-	return DP_OK;
-#endif
-}
-
 static int dp_port_bind_port_hairpins(const struct dp_port *port)
 {
 	// two pf port's hairpins are bound when processing the second port
@@ -562,9 +550,11 @@ static int dp_init_port(struct dp_port *port)
 			if (DP_FAILED(dp_port_create_default_pf_async_templates(port))
 				|| DP_FAILED(dp_port_install_async_isolated_mode(port)))
 				return DP_ERROR;
-		} else
-			if (DP_FAILED(dp_port_install_sync_isolated_mode(port->port_id)))
+		} else {
+			DPS_LOG_INFO("Init isolation flow rules");
+			if (DP_FAILED(dp_install_isolated_mode(port->port_id)))
 				return DP_ERROR;
+		}
 	}
 
 	if (dp_conf_is_offload_enabled()) {

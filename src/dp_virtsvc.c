@@ -13,7 +13,6 @@
 #include "dp_log.h"
 #include "dp_multi_path.h"
 #include "dp_util.h"
-#include "rte_flow/dp_rte_flow_init.h"
 #include "rte_flow/dp_rte_async_flow.h"
 #include "rte_flow/dp_rte_async_flow_isolation.h"
 
@@ -223,23 +222,6 @@ size_t dp_virtsvc_get_count(void)
 	return dp_virtservices_end - dp_virtservices;
 }
 
-
-int dp_install_virtsvc_sync_isolation_rules(uint16_t port_id)
-{
-	int ret;
-
-	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
-		ret = dp_install_isolated_mode_virtsvc(port_id,
-											   service->proto,
-											   &service->service_addr,
-											   service->service_port);
-		if (DP_FAILED(ret)) {
-			DPS_LOG_ERR("Cannot create isolation rule", DP_LOG_VIRTSVC(service), DP_LOG_RET(ret));
-			return DP_ERROR;
-		}
-	}
-	return DP_OK;
-}
 
 uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
 												 struct rte_flow_template_table *template_table)

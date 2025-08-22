@@ -105,7 +105,6 @@ void dp_virtsvc_free(void);
 
 size_t dp_virtsvc_get_count(void);
 
-int dp_install_virtsvc_sync_isolation_rules(uint16_t port_id);
 uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
 												 struct rte_flow_template_table *template_table);
 void dp_destroy_virtsvc_async_isolation_rules(uint16_t port_id);
