@@ -5,6 +5,15 @@ All command-line arguments and configuration files are already handled by the Do
 
 For development, direct use of dp-service is covered by the [development section](../development/).
 
+## Host machine setup
+For dpservice to work properly, host IPv6 address needs to set up on `lo` instead of separately on the NIC ports, this way the address is shared.
+
+This address must be in the form of a network prefix `/64`, i.e. the last 64 bits of the host address must be zero. This way the 64 bit suffix can be used for containers or VMs running on the host.
+
+Dpservice will generate addresses in the range from `<host-prefix>:d000::` to `<host-prefix>:dfff::`.
+
+It is suggested that `<host-prefix>:0000::/65` is used for host itself and `<host-prefix>:8000::/65` is then assigned special role, e.g. `<host-prefix>:f000::/68` for PodIPs, `<host-prefix>:d000::/68` for dpservice, etc.
+
 ## Command-line tools
 All tool binaries are designed to be prefixed with `dpservice-` to enable the operator to simply type `dps<TAB>` for list of possible tools.
 
