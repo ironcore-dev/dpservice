@@ -13,8 +13,6 @@
 #include "dp_log.h"
 #include "dp_multi_path.h"
 #include "dp_util.h"
-#include "rte_flow/dp_rte_async_flow.h"
-#include "rte_flow/dp_rte_async_flow_isolation.h"
 
 // WARNING: This module is not designed to be thread-safe (even though it could work)
 // It is assumed that thread-unsafe code will only ever be called from one node
@@ -220,55 +218,6 @@ void dp_virtsvc_free(void)
 size_t dp_virtsvc_get_count(void)
 {
 	return dp_virtservices_end - dp_virtservices;
-}
-
-
-uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
-												 struct rte_flow_template_table *template_table)
-{
-	struct rte_flow *flow;
-	uint16_t rule_count = 0;
-	uint16_t pf_idx;
-
-	if (port_id == dp_get_pf0()->port_id)
-		pf_idx = 0;
-	else if (port_id == dp_get_pf1()->port_id)
-		pf_idx = 1;
-	else {
-		DPS_LOG_ERR("Invalid port for virtual service isolation", DP_LOG_PORTID(port_id));
-		return 0;
-	}
-
-	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
-		flow = dp_create_virtsvc_async_isolation_rule(port_id, template_table, &service->ul_addr);
-		if (!flow) {
-			DPS_LOG_ERR("Cannot create async virtsvc isolation rule", DP_LOG_VIRTSVC(service));
-			break;
-		}
-		service->isolation_rules[pf_idx] = flow;
-		rule_count++;
-	}
-
-	return rule_count;
-}
-
-void dp_destroy_virtsvc_async_isolation_rules(uint16_t port_id)
-{
-	uint16_t pf_idx;
-
-	if (port_id == dp_get_pf0()->port_id)
-		pf_idx = 0;
-	else if (port_id == dp_get_pf1()->port_id)
-		pf_idx = 1;
-	else {
-		DPS_LOG_ERR("Invalid port for virtual service isolation", DP_LOG_PORTID(port_id));
-		return;
-	}
-
-	DP_FOREACH_VIRTSVC(&dp_virtservices, service) {
-		if (DP_FAILED(dp_destroy_async_rules(port_id, &service->isolation_rules[pf_idx], 1)))
-			DPS_LOG_ERR("Cannot destroy async virtual service isolation rule", DP_LOG_VIRTSVC(service));
-	}
 }
 
 
