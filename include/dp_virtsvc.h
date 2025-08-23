@@ -49,7 +49,6 @@ struct dp_virtsvc {
 	union dp_ipv6	ul_addr;
 	struct rte_hash	*open_ports;
 	struct dp_virtsvc_conn connections[DP_VIRTSVC_PORTCOUNT];
-	struct rte_flow	*isolation_rules[DP_MAX_PF_PORTS];
 };
 
 struct dp_virtsvc_lookup_entry {
@@ -104,10 +103,6 @@ int dp_virtsvc_init(int socket_id);
 void dp_virtsvc_free(void);
 
 size_t dp_virtsvc_get_count(void);
-
-uint16_t dp_create_virtsvc_async_isolation_rules(uint16_t port_id,
-												 struct rte_flow_template_table *template_table);
-void dp_destroy_virtsvc_async_isolation_rules(uint16_t port_id);
 
 int dp_virtsvc_get_pf_route(struct dp_virtsvc *virtsvc,
 							 uint16_t vf_port_id,
