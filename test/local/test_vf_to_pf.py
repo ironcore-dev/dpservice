@@ -57,7 +57,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client, port_redundancy):
 
 	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
 			    IP(dst=public_ip3, src=VM1.ip) /
-			    ICMP(type=8, id=0x0040))
+			    ICMP(type=8, id=0x0050))
 	delayed_sendp(icmp_pkt, VM1.tap)
 
 	pkt = sniff_packet(VM1.tap, is_icmp_pkt)

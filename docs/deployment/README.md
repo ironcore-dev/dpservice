@@ -10,9 +10,22 @@ For dpservice to work properly, host IPv6 address needs to set up on `lo` instea
 
 This address must be in the form of a network prefix `/64`, i.e. the last 64 bits of the host address must be zero. This way the 64 bit suffix can be used for containers or VMs running on the host.
 
+It is suggested that `<host-prefix>:0000::/65` is used for host itself and `<host-prefix>:8000::/65` is then assigned special role, e.g. `<host-prefix>:f000::/68` for PodIPs, `<host-prefix>:d000::/68` for dpservice, etc.
+
 Dpservice will generate addresses in the range from `<host-prefix>:d000::` to `<host-prefix>:dfff::`.
 
-It is suggested that `<host-prefix>:0000::/65` is used for host itself and `<host-prefix>:8000::/65` is then assigned special role, e.g. `<host-prefix>:f000::/68` for PodIPs, `<host-prefix>:d000::/68` for dpservice, etc.
+If meson option `-Denable_address_type=true` is used, addresses are generated based on the usage type:
+
+| Use | Range |
+|-|-|
+| `<host-prefix>:d000::/80` | unused |
+| `<host-prefix>:d001::/80` | NICs |
+| `<host-prefix>:d002::/80` | VIPs |
+| `<host-prefix>:d003::/80` | NATGateways |
+| `<host-prefix>:d004::/80` | LoadBalancers |
+| `<host-prefix>:d005::/80` | LoadBalancer targets |
+| `<host-prefix>:d006::/80` | Prefixes |
+| `<host-prefix>:d0ff::/80` | Virtual services |
 
 ## Command-line tools
 All tool binaries are designed to be prefixed with `dpservice-` to enable the operator to simply type `dps<TAB>` for list of possible tools.

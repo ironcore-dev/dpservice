@@ -30,7 +30,7 @@ static int dp_create_vnf_route(union dp_ipv6 *ul_addr6 /* out */,
 {
 	// if ul_addr6 already provided, try to use that one, otherwise generate it here
 	if (dp_ipv6_match(ul_addr6, &dp_empty_ipv6))
-		dp_generate_ul_ipv6(ul_addr6);
+		dp_generate_ul_ipv6(ul_addr6, type);
 	return dp_add_vnf(ul_addr6, type, port->port_id, vni, pfx_ip, prefix_len);
 }
 

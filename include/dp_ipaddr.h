@@ -21,7 +21,7 @@ static_assert(sizeof(rte_be64_t) * 2 == DP_IPV6_ADDR_SIZE, "DP_IPV6_ADDR_SIZE is
 
 #define DP_UNDERLAY_FLAG_EXTERNALLY_GENERATED 0x80
 #define DP_UNDERLAY_FLAG_SECONDARY_POOL 0x40
-#define DP_UNDERLAY_KERNEL_BYTES 0xd000
+#define DP_UNDERLAY_ADDRESS_TYPE 0xd0
 
 // structure for holding IPv6 addresses
 // this way sizeof(dp_ipv6 *) is a meaningful value and passing the pointer only is safe
@@ -37,7 +37,8 @@ union dp_ipv6 {
 	} _nat64;
 	struct __rte_packed {
 		rte_be64_t	prefix;
-		rte_be16_t	kernel;
+		uint8_t		type;
+		uint8_t		subtype;
 		uint8_t		flags;
 		uint8_t		random;
 		rte_be32_t	local;
@@ -167,7 +168,7 @@ int dp_ipv4_to_str(uint32_t ipv4, char *dest, int dest_len);
 int dp_str_to_ipv4(const char *src, uint32_t *dest);
 int dp_str_to_ipv6(const char *src, union dp_ipv6 *dest);
 
-void dp_generate_ul_ipv6(union dp_ipv6 *dest);
+void dp_generate_ul_ipv6(union dp_ipv6 *dest, uint8_t addr_type);
 
 
 // structure for holding dual IP addresses

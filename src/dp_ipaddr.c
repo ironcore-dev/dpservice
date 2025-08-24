@@ -70,12 +70,18 @@ int dp_ipaddr_to_str(const struct dp_ip_address *addr, char *dest, int dest_len)
 }
 
 
-void dp_generate_ul_ipv6(union dp_ipv6 *dest)
+void dp_generate_ul_ipv6(union dp_ipv6 *dest, uint8_t addr_type)
 {
 	static uint32_t ul_counter = 0;
 
 	dest->_ul.prefix = dp_conf_get_underlay_ip()->_prefix;  // Use the same prefix as the host
-	dest->_ul.kernel = htons(DP_UNDERLAY_KERNEL_BYTES);  // Use hardcoded 2-byte kernel value
+	dest->_ul.type = DP_UNDERLAY_ADDRESS_TYPE;
+#ifdef ENABLE_UNDERLAY_TYPE
+	dest->_ul.subtype = addr_type;
+#else
+	(void)addr_type;
+	dest->_ul.subtype = 0;
+#endif
 	dest->_ul.flags = 0;
 #ifdef ENABLE_STATIC_UNDERLAY_IP
 	dest->_ul.random = 1;
