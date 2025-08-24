@@ -10,3 +10,5 @@ option('compiler_suggestions', type: 'boolean', value: false, description:
        'Show various compiler suggestions (warnings)')
 option('build_dpservice_cli', type: 'boolean', value: false, description:
        'Enable building of dpservice-cli golang gRPC client')
+option('enable_underlay_type', type: 'boolean', value: false, description:
+       'Generate underlay address with vnf_type field')

@@ -56,6 +56,9 @@ endif
 if get_option('enable_tests')
   add_global_arguments('-DENABLE_PYTEST', language: ['c', 'cpp'])
 endif
+if get_option('enable_underlay_type')
+  add_global_arguments('-DENABLE_UNDERLAY_TYPE', language: ['c', 'cpp'])
+endif
 
 dpdk_dep = dependency('libdpdk', version: '>=21.11.0')
 proto_dep = dependency('protobuf')

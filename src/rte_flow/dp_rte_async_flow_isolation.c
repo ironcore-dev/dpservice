@@ -105,7 +105,7 @@ static struct rte_flow *dp_create_pf_async_isolation_rule(uint16_t port_id, stru
 	// Only allow the right IPv6 underlay prefix
 	const union dp_ipv6 ul_addr6 = {
 		._ul.prefix = dp_conf_get_underlay_ip()->_prefix,
-		._ul.kernel = htons(DP_UNDERLAY_KERNEL_BYTES),
+		._ul.type = DP_UNDERLAY_ADDRESS_TYPE,
 	};
 
 	dp_set_dst_ipv6(&ipv6_spec.hdr, &ul_addr6);

@@ -30,7 +30,7 @@ int dp_install_isolated_mode(uint16_t port_id)
 	union dp_ipv6 ul_addr6;
 
 	ul_addr6._ul.prefix = dp_conf_get_underlay_ip()->_prefix;
-	ul_addr6._ul.kernel = htons(DP_UNDERLAY_KERNEL_BYTES);
+	ul_addr6._ul.type = DP_UNDERLAY_ADDRESS_TYPE;
 
 	// create match pattern: IP in IPv6 tunnel packets
 	dp_set_eth_flow_item(&pattern[pattern_cnt++], &eth_spec, htons(RTE_ETHER_TYPE_IPV6));
