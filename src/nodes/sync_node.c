@@ -34,6 +34,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 #ifdef ENABLE_VIRTSVC
 	struct dp_sync_msg_virtsvc_conn *virtsvc_conn;
 #endif
+	struct dp_sync_msg_port_mac *port_mac;
 
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
 		DPS_LOG_WARNING("Invalid sync ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
@@ -51,6 +52,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 #ifdef ENABLE_VIRTSVC
 		dp_synchronize_virtsvc_connections();
 #endif
+		dp_synchronize_port_neigh_macs();
 		break;
 	case DP_SYNC_MSG_NAT_CREATE:
 		if (!backup_mode) {
@@ -87,6 +89,15 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 		// errors ignored, keep processing messages
 		break;
 #endif
+	case DP_SYNC_MSG_PORT_MAC:
+		if (!backup_mode) {
+			DPS_LOG_WARNING("Invalid sync MAC message for active dpservice");
+			break;
+		}
+		port_mac = (struct dp_sync_msg_port_mac *)(sync_hdr + 1);
+		dp_set_port_sync_neigh_mac(port_mac->port_id, &port_mac->mac);
+		// errors ignored, keep processing messages
+		break;
 	default:
 		DPS_LOG_ERR("Unknown sync message type", DP_LOG_VALUE(sync_hdr->msg_type));
 	}
