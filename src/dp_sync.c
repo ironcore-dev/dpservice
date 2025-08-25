@@ -118,6 +118,22 @@ int dp_sync_send_virtsvc_conn(const struct dp_virtsvc *virtsvc, uint16_t conn_po
 }
 #endif
 
+int dp_sync_send_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+{
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_port_mac *pkt_data;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_PORT_MAC, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	pkt_data->port_id = port_id;
+	rte_ether_addr_copy(mac, &pkt_data->mac);
+
+	return dp_sync_send_message(pkt);
+}
+
 int dp_sync_send_request_dump(void)
 {
 	struct rte_mbuf *pkt;
