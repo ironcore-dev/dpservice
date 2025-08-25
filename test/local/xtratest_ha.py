@@ -440,3 +440,62 @@ def test_ha_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
 
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
+
+
+#
+# Test MAC address synchronization
+#
+def vm_mac_sender():
+	pkt = (Ether(dst=PF0.mac, src=VM2.mac) /
+		   IP(dst=VM4.ip, src=VM2.ip) /
+		   UDP(dport=1234))
+	delayed_sendp(pkt, VM2.tap_b)
+
+def test_ha_mac(request, prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
+	if request.config.getoption("--hw"):
+		pytest.skip("Cannot test MAC address change with real hardware")
+
+	grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+	grpc_client_b.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+
+	# Make dpservice change MAC for VM4
+	request_ip(VM4, "12:34:56:78:9a:bc")
+
+	# The change should have been sent over to the other dpservice
+	dp_service_b.become_active()
+
+	threading.Thread(target=vm_mac_sender).start()
+
+	# sync should have changed the MAC, cannot be the one set by pytest
+	pkt = sniff_packet(VM4.tap_b, is_udp_pkt)
+	assert pkt[Ether].dst == "12:34:56:78:9a:bc", \
+		"Packet not using the right destination MAC"
+
+	grpc_client_b.delinterface(VM4.name)
+	grpc_client.delinterface(VM4.name)
+
+def test_ha_mac_bulk(request, prepare_ifaces, grpc_client, grpc_client_b):
+	if request.config.getoption("--hw"):
+		pytest.skip("Cannot test MAC address change with real hardware")
+
+	grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+
+	# Make dpservice change MAC for VM4
+	request_ip(VM4, "12:34:56:78:9a:bc")
+
+	dp_service_b = request.getfixturevalue('dp_service_b')
+	request.getfixturevalue('prepare_ifaces_b')
+	grpc_client_b.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+	# give backup dpservice time to actually receive the table dump before switching to it
+	time.sleep(0.5)
+	dp_service_b.become_active()
+
+	threading.Thread(target=vm_mac_sender).start()
+
+	# neighsol should have changed the MAC, cannot be the one set by pytest
+	pkt = sniff_packet(VM4.tap_b, is_udp_pkt)
+	assert pkt[Ether].dst == "12:34:56:78:9a:bc", \
+		"Packet not using the right destination MAC"
+
+	grpc_client_b.delinterface(VM4.name)
+	grpc_client.delinterface(VM4.name)
