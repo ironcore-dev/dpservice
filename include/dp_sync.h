@@ -43,6 +43,12 @@ struct dp_sync_msg_virtsvc_conn {
 	uint8_t proto;
 } __rte_packed;
 
+#define DP_SYNC_MSG_PORT_MAC		4
+struct dp_sync_msg_port_mac {
+	uint16_t port_id;
+	struct rte_ether_addr mac;
+}; // cannot use __rte_packed due to rte_ether_addr requirements (no big deal, this message is rarely sent)
+
 // backup -> active: please re-send all tables
 #define DP_SYNC_MSG_REQUEST_DUMP	5
 
@@ -59,6 +65,8 @@ int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
 int dp_sync_send_virtsvc_conn(const struct dp_virtsvc *virtsvc, uint16_t conn_port,
 							  rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id);
 #endif
+
+int dp_sync_send_mac(uint16_t port_id, const struct rte_ether_addr *mac);
 
 int dp_sync_send_request_dump(void);
 

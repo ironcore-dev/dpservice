@@ -9,6 +9,7 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_netlink.h"
+#include "dp_sync.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
@@ -759,4 +760,31 @@ void dp_l2_addr_set(struct dp_port *port, const struct rte_ether_addr *l2_addr)
 {
 	rte_ether_addr_copy(l2_addr, &port->neigh_mac);
 	port->iface.l2_addr_received = true;
+	dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
+}
+
+
+int dp_set_port_sync_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+{
+	struct dp_port *port = dp_get_port_by_id(port_id);
+
+	// while it is a bit strange to blindly use the port_id,
+	// both dpservices should be orchestrated the same way, so the ids should match
+	if (!port || port->is_pf) {
+		DPS_LOG_WARNING("Invalid port to sync mac address", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
+	}
+
+	if (!port->iface.l2_addr_received)
+		rte_ether_addr_copy(mac, &port->neigh_mac);
+
+	return DP_OK;
+}
+
+void dp_synchronize_port_neigh_macs(void)
+{
+	DP_FOREACH_PORT(&_dp_ports, port) {
+		if (!port->is_pf && port->allocated)
+			dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
+	}
 }
