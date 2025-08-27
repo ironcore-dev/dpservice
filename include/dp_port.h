@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <net/if.h>
+#include <rte_ether.h>
 #include <rte_meter.h>
 #include <rte_pci.h>
 #include <rte_timer.h>
@@ -45,7 +46,7 @@ struct dp_port_iface {
 	uint32_t				nat_ip;
 	uint16_t				nat_port_range[2];
 	bool					ready;
-	bool					arp_done;
+	bool					l2_addr_received;
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
 	uint32_t				hostname_len;
@@ -129,6 +130,14 @@ void dp_stop_acquiring_neigh_mac(struct dp_port *port);
 int dp_set_pf_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac);
 
 int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uint64_t public_flow_rate_cap);
+
+static __rte_always_inline
+bool dp_l2_addr_needed(const struct dp_port *port)
+{
+	return port->iface.ready && !port->iface.l2_addr_received;
+}
+
+void dp_l2_addr_set(struct dp_port *port, const struct rte_ether_addr *l2_addr);
 
 static __rte_always_inline
 int dp_load_mac(struct dp_port *port)

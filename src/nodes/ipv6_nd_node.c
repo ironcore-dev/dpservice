@@ -76,7 +76,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		static_assert(sizeof(nd_msg->target) == sizeof(*gw_ip), "Incompatible IPv6 format in ND message structure");
 		if (!dp_ipv6_match((const union dp_ipv6 *)nd_msg->target, gw_ip))
 			return IPV6_ND_NEXT_DROP;
-		rte_ether_addr_copy(&req_eth_hdr->dst_addr, &port->neigh_mac);
+		if (unlikely(dp_l2_addr_needed(port)))
+			dp_l2_addr_set(port, &req_eth_hdr->dst_addr);
 		dp_copy_ipv6(&port->iface.cfg.own_ipv6, dp_get_dst_ipv6(req_ipv6_hdr));
 		req_icmp6_hdr->icmp6_type = NDISC_NEIGHBOUR_ADVERTISEMENT;
 		req_icmp6_hdr->icmp6_solicited = 1;

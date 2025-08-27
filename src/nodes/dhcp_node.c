@@ -229,8 +229,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 
 	rte_ether_addr_copy(&incoming_eth_hdr->src_addr, &incoming_eth_hdr->dst_addr);
 	rte_ether_addr_copy(&port->own_mac, &incoming_eth_hdr->src_addr);
-	if (response_type == DHCPACK)
-		rte_ether_addr_copy(&incoming_eth_hdr->dst_addr, &port->neigh_mac);
+	if (unlikely(response_type == DHCPACK && dp_l2_addr_needed(port)))
+		dp_l2_addr_set(port, &incoming_eth_hdr->dst_addr);
 
 	incoming_ipv4_hdr->src_addr = server_ip;
 

@@ -4,6 +4,8 @@
 #ifndef __INCLUDE_DP_IFACE_H__
 #define __INCLUDE_DP_IFACE_H__
 
+#include <rte_ether.h>
+#include <stdint.h>
 #include "dp_port.h"
 
 #ifdef __cplusplus
@@ -22,12 +24,6 @@ struct dp_port *dp_get_port_with_iface_id(const char iface_id[DP_IFACE_ID_MAX_LE
 int dp_setup_iface(struct dp_port *port, uint32_t vni);
 void dp_delete_iface(struct dp_port *port);
 
-
-static __rte_always_inline
-bool dp_arp_cycle_needed(const struct dp_port *port)
-{
-	return port->iface.ready && !port->iface.arp_done;
-}
 
 static __rte_always_inline
 void dp_fill_ether_hdr(struct rte_ether_hdr *ether_hdr, const struct dp_port *port, uint16_t ether_type)

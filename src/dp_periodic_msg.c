@@ -57,7 +57,7 @@ void send_to_all_vfs(const struct rte_mbuf *pkt, uint16_t eth_type)
 		if (eth_type == RTE_ETHER_TYPE_ARP) {
 			arp_hdr = (struct rte_arp_hdr *)(eth_hdr + 1);
 			rte_ether_addr_copy(&port->own_mac, &arp_hdr->arp_data.arp_sha);
-			if (dp_arp_cycle_needed(port))
+			if (dp_l2_addr_needed(port))
 				arp_hdr->arp_data.arp_tip = htonl(port->iface.cfg.own_ip);
 		}
 
