@@ -492,13 +492,13 @@ void dp_stop_acquiring_neigh_mac(struct dp_port *port)
 	rte_timer_stop_sync(&port->neighmac_timer);
 }
 
-int dp_set_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+int dp_set_pf_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
 {
 	struct dp_port *port;
 	char strmac[18];
 
 	port = dp_get_port_by_id(port_id);
-	if (!port) {
+	if (!port || !port->is_pf) {
 		DPS_LOG_WARNING("Cannot set neighboring router, port invalid", DP_LOG_PORTID(port_id));
 		return DP_ERROR;
 	}

@@ -151,5 +151,5 @@ void dp_process_event_neighmac_msg(struct rte_mbuf *m)
 {
 	struct dp_event_msg *neighmac_msg = rte_pktmbuf_mtod(m, struct dp_event_msg *);
 
-	dp_set_neigh_mac(neighmac_msg->event_entry.neighmac.port_id, &neighmac_msg->event_entry.neighmac.mac);
+	dp_set_pf_neigh_mac(neighmac_msg->event_entry.neighmac.port_id, &neighmac_msg->event_entry.neighmac.mac);
 }
