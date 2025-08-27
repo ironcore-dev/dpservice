@@ -12,7 +12,7 @@ from scapy.layers.inet6 import IPv6, ICMPv6EchoRequest, ICMPv6EchoReply, _ICMPv6
 from config import *
 
 
-def request_ip(vm):
+def request_ip(vm, src_mac=None):
 	scapy.config.conf.checkIPaddr = False
 	answer = dhcp_request(iface=vm.tap, timeout=sniff_timeout)
 	validate_checksums(answer)
@@ -34,7 +34,7 @@ def request_ip(vm):
 		assert hostname_option.decode('utf-8') == expected_hostname, \
 			f"DHCP reply does not specify the correct hostname: {hostname_option.decode('utf-8')} instead of {expected_hostname}"
 
-	pkt = (Ether(dst=answer[Ether].src) /
+	pkt = (Ether(src=src_mac, dst=answer[Ether].src) /
 		   IP(src=vm.ip, dst=answer[IP].src) /
 		   UDP(sport=68, dport=67) /
 		   BOOTP(chaddr=vm.mac) /
