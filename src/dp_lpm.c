@@ -278,13 +278,14 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint32_t *p_ip)
+										  bool *is_default_route)
 {
 	uint32_t dst_ip = ntohl(df->dst.dst_addr);
 	struct rte_rib_node *node;
 	struct rte_rib *root;
 	uint64_t next_hop;
 	struct dp_port *dst_port;
+	uint8_t route_depth;
 
 	if (t_vni == 0)
 		t_vni = in_port->iface.vni;
@@ -307,8 +308,11 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 	if (dst_port->is_pf)
 		rte_memcpy(route, rte_rib_get_ext(node), sizeof(*route));
 
-	if (DP_FAILED(rte_rib_get_ip(node, p_ip)))
+	if (DP_FAILED(rte_rib_get_depth(node, &route_depth)))
 		return NULL;
+
+	// Normally we should match prefix/length, but for length 0 the ip is implied
+	*is_default_route = route_depth == 0;
 
 	return dst_port;
 }
@@ -317,13 +321,13 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  union dp_ipv6 *p_ipv6)
+										  bool *is_default_route)
 {
 	struct rte_rib6_node *node;
 	struct rte_rib6 *root;
 	uint64_t next_hop;
 	struct dp_port *dst_port;
-	struct rte_ipv6_addr ip;
+	uint8_t route_depth;
 
 	if (t_vni == 0)
 		t_vni = in_port->iface.vni;
@@ -346,9 +350,11 @@ const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 	if (dst_port->is_pf)
 		rte_memcpy(route, rte_rib6_get_ext(node), sizeof(*route));
 
-	if (DP_FAILED(rte_rib6_get_ip(node, &ip)))
+	if (DP_FAILED(rte_rib6_get_depth(node, &route_depth)))
 		return NULL;
 
-	dp_ipv6_from_rte(p_ipv6, &ip);
+	// Normally we should match prefix/length, but for length 0 the ip is implied
+	*is_default_route = route_depth == 0;
+
 	return dst_port;
 }

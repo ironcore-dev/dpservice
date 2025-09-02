@@ -27,7 +27,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct dp_iface_route route;
-	uint32_t ip = 0;
+	bool is_default_route;
 	const struct dp_port *in_port = dp_get_in_port(m);
 	const struct dp_port *out_port;
 
@@ -35,7 +35,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (df->l4_type == IPPROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
 		return IPV4_LOOKUP_NEXT_DHCP;
 
-	out_port = dp_get_ip4_out_port(in_port, df->tun_info.dst_vni, df, &route, &ip);
+	out_port = dp_get_ip4_out_port(in_port, df->tun_info.dst_vni, df, &route, &is_default_route);
 	if (!out_port)
 		return IPV4_LOOKUP_NEXT_DROP;
 
@@ -53,7 +53,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
-	df->flow_type = ip == 0 ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
+	df->flow_type = is_default_route ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 	df->nxt_hop = out_port->port_id;  // always valid since coming from struct dp_port
 
 	return IPV4_LOOKUP_NEXT_NAT;

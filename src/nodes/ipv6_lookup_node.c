@@ -23,14 +23,14 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	struct dp_iface_route route;
+	bool is_default_route;
 	const struct dp_port *in_port = dp_get_in_port(m);
 	const struct dp_port *out_port;
-	union dp_ipv6 ip;
 	int t_vni;
 
 	t_vni = in_port->is_pf ? df->tun_info.dst_vni : 0;
 
-	out_port = dp_get_ip6_out_port(in_port, t_vni, df, &route, &ip);
+	out_port = dp_get_ip6_out_port(in_port, t_vni, df, &route, &is_default_route);
 	if (!out_port)
 		return IPV6_LOOKUP_NEXT_DROP;
 
@@ -47,7 +47,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	if (!in_port->is_pf)
 		df->tun_info.dst_vni = route.vni;
 
-	df->flow_type = dp_is_ipv6_zero(&ip) ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
+	df->flow_type = is_default_route ? DP_FLOW_SOUTH_NORTH : DP_FLOW_WEST_EAST;
 	df->nxt_hop = out_port->port_id;  // always valid since coming from struct dp_port
 
 	return IPV6_LOOKUP_NEXT_SNAT;

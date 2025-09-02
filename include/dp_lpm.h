@@ -43,13 +43,13 @@ const struct dp_port *dp_get_ip4_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  uint32_t *p_ip);
+										  bool *is_default_route);
 
 const struct dp_port *dp_get_ip6_out_port(const struct dp_port *in_port,
 										  uint32_t t_vni,
 										  const struct dp_flow *df,
 										  struct dp_iface_route *route,
-										  union dp_ipv6 *p_ipv6);
+										  bool *is_default_route);
 uint32_t dp_get_gw_ip4(void);
 const union dp_ipv6 *dp_get_gw_ip6(void);
 
