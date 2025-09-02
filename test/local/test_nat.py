@@ -1,10 +1,49 @@
 # SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
+import ipaddress
 import pytest
 import threading
 
 from helpers import *
+
+
+def vm_sender(dst_ip):
+	pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
+		   IP(dst=dst_ip, src=VM1.ip) /
+		   UDP(dport=1234))
+	delayed_sendp(pkt, VM1.tap)
+
+def try_ip_range(grpc_client, iprange):
+	net = ipaddress.ip_network(iprange, strict=False)
+	route = str(net)
+	grpc_client.addroute(vni1, route, vni1, neigh_vni1_ul_ipv6)
+
+	if int(net.network_address) > 0:
+		threading.Thread(target=vm_sender, args=(str(net.network_address-1),)).start()
+		pkt = sniff_packet(PF0.tap, is_udp_pkt)
+		assert pkt[IP].src != VM1.ip, \
+			"IP not translated"
+
+	threading.Thread(target=vm_sender, args=(str(net.network_address),)).start()
+	pkt = sniff_packet(PF0.tap, is_udp_pkt)
+	assert pkt[IP].src == VM1.ip, \
+		"IP translated instead of staying local"
+
+	if int(net.broadcast_address) < 2**32 - 1:
+		# Need to use +2 to get around conntrack remembering it from another range
+		threading.Thread(target=vm_sender, args=(str(net.broadcast_address+2),)).start()
+		pkt = sniff_packet(PF0.tap, is_udp_pkt)
+		assert pkt[IP].src != VM1.ip, \
+			"IP not translated"
+
+	grpc_client.delroute(vni1, route)
+
+def test_nat_default_route(prepare_ifaces, grpc_client):
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	try_ip_range(grpc_client, "128.0.0.0/1")
+	try_ip_range(grpc_client, "0.0.0.0/1")
+	grpc_client.delnat(VM1.name)
 
 
 def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
