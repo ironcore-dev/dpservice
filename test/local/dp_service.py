@@ -15,7 +15,7 @@ from helpers import interface_init, stop_process
 
 class DpService:
 
-	DP_SERVICE_CONF = "/tmp/dp_service.conf"
+	DP_SERVICE_CONF = "/run/dpservice/dpservice.conf"
 
 	def __init__(self, build_path, port_redundancy, fast_flow_timeout,
 				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):

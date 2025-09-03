@@ -27,8 +27,8 @@ spec:
         volumeMounts:
         - mountPath: /dev
           name: hugepages
-        - mountPath: /tmp
-          name: temp
+        - mountPath: /run/dpservice
+          name: run
         securityContext:
           privileged: true
       containers:
@@ -52,8 +52,8 @@ spec:
         volumeMounts:
         - mountPath: /dev
           name: hugepages
-        - mountPath: /tmp
-          name: temp
+        - mountPath: /run/dpservice
+          name: run
         - mountPath: /var/run/dpdk/rte/
           name: socket-dir
         livenessProbe:
@@ -99,9 +99,9 @@ spec:
           type: ""
         name: hugepages
       - hostPath:
-          path: /tmp
-          type: ""
-        name: temp
+          path: /run/dpservice
+          type: DirectoryOrCreate
+        name: run
   updateStrategy:
     rollingUpdate:
       maxSurge: 0
