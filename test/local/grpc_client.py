@@ -91,6 +91,8 @@ class GrpcClient:
 				or (isinstance(error, GrpcError) and expectFailure)):
 				return None
 			raise error
+		elif expectedError:
+			raise AssertionError(f"Error {expectedError} expected, none received")
 		return response
 
 	def _getSpec(self, args):
