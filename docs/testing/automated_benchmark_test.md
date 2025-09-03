@@ -80,7 +80,7 @@ The most commonly used commands to run the provision script are as follows.
 It is possible to login into the provisioned VMs with the user name `root` and password `test123`, using the libvirt's console.
 
 # Execution of test script
-This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`. In oder to run dpservice either natively or via container, please make sure that a valid dp_service.conf file is created under `/tmp`.
+This test suite is invoked by executing the script `runtest.py` under the repository `/test/benchmark_test`. In oder to run dpservice either natively or via container, please make sure that a valid dpservice.conf file is created under `/run/dpservice`.
 
 ## dpservice-cli
 The testing script assumes that dpservice-cli exists under '/tmp' on hypervisors. If you have never run this test suite before, please first compile your local dpservice project by using `meson` and `ninja` commands. Because dpservice-cli is already included in the dpservice repository, the compiled dpservice-cli binary will be transferred to hypervisors automatically.

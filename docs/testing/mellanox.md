@@ -4,7 +4,7 @@ As dp-service is intended as a virtual router for hosting VMs, testing on real h
 It is also possible to run the whole set of tests that `runtest.py` runs using `pytest`. See below for details.
 
 ## Hardware setup
-To simplify starting `dpservice-bin`, it accepts a configuration file (currently hardcoded `/tmp/dp_service.conf`) so that most command-line arguments concerning hardware options are not needed.
+To simplify starting `dpservice-bin`, it accepts a configuration file (currently hardcoded `/run/dpservice/dpservice.conf`) so that most command-line arguments concerning hardware options are not needed.
 
 This file is generated for you by calling a shell script, `hack/prepare.sh`.
 
