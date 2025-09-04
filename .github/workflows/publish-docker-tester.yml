@@ -119,7 +119,7 @@ jobs:
       - name: Wait for gRPC port
         run: timeout 15 bash -c 'until echo > /dev/tcp/localhost/1337 2>/dev/null; do sleep 1; done' 2>/dev/null
       - name: Setup Go Environment
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go/dpservice-go/go.mod'
       - name: Run dpservice-go tests
