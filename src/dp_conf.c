@@ -18,7 +18,7 @@
 #include "nodes/common_node.h"  // graphtrace level limit
 #include "dpdk_layer.h"  // underlay conf struct
 
-#define DP_CONF_DEFAULT_CONF_FILE "/tmp/dp_service.conf"
+#define DP_CONF_DEFAULT_CONF_FILE "/run/dpservice/dpservice.conf"
 
 // magic number, hopefully large enough to hold the full '-a' EAL argument
 #define DP_EAL_A_MAXLEN 128

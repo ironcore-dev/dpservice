@@ -8,5 +8,5 @@ For more information on EAL options, please see [the official docs](https://doc.
 All options are described in `dpservice-bin --help`, see [the markdown version of it](help_dpservice-bin.md)
 
 ## Configuration file
-Unless an environment variable `DP_CONF` is set to override the path, `dpservice-bin` uses `/tmp/dp_service.conf` to read configuration before processing any arguments.
+Unless an environment variable `DP_CONF` is set to override the path, `dpservice-bin` uses `/run/dpservice/dpservice.conf` to read configuration before processing any arguments.
 This way you can provide any arguments via such file and simplify the commandline use. The helper script `prepare.sh` generates such a file for Mellanox users.
