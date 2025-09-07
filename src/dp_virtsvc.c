@@ -430,9 +430,9 @@ static struct dp_virtsvc *get_virtsvc_by_ipv4(rte_be32_t virtual_addr, rte_be16_
 	return NULL;
 }
 
-int dp_virtsvc_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_port, uint8_t proto,
-							   rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id,
-							   uint16_t conn_port)
+int dp_virtsvc_open_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_port, uint8_t proto,
+									rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id,
+									uint16_t conn_port)
 {
 	struct dp_virtsvc_conn_key key = {
 		.vf_port_id = vf_port_id,
@@ -460,7 +460,7 @@ int dp_virtsvc_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_port,
 	return DP_OK;
 }
 
-void dp_virtsvc_sync_open_connections(void)
+void dp_synchronize_virtsvc_connections(void)
 {
 	struct dp_virtsvc_conn *conn;
 

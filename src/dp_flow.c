@@ -507,7 +507,7 @@ void dp_remove_lbtarget_flows(const union dp_ipv6 *ul_addr)
 }
 
 
-void dp_sync_local_nat_flows(void)
+void dp_synchronize_local_nat_flows(void)
 {
 	struct flow_value *flow_val;
 	const void *next_key;

@@ -761,7 +761,7 @@ void dp_l2_addr_set(struct dp_port *port, const struct rte_ether_addr *l2_addr)
 }
 
 
-int dp_sync_port_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+int dp_set_port_sync_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
 {
 	struct dp_port *port = dp_get_port_by_id(port_id);
 
@@ -778,7 +778,7 @@ int dp_sync_port_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
 	return DP_OK;
 }
 
-void dp_sync_port_neigh_macs(void)
+void dp_synchronize_port_neigh_macs(void)
 {
 	DP_FOREACH_PORT(&_dp_ports, port) {
 		if (!port->is_pf && port->allocated)

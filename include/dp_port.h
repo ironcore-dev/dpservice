@@ -212,8 +212,8 @@ const struct dp_port *dp_get_sync_port(void)
 	return &_dp_sync_port;
 }
 
-int dp_sync_port_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac);
-void dp_sync_port_neigh_macs(void);
+int dp_set_port_sync_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac);
+void dp_synchronize_port_neigh_macs(void);
 
 #ifdef __cplusplus
 }

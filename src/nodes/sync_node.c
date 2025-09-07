@@ -49,11 +49,11 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			DPS_LOG_ERR("Invalid sync request for backup dpservice");
 			break;
 		}
-		dp_sync_local_nat_flows();
+		dp_synchronize_local_nat_flows();
 #ifdef ENABLE_VIRTSVC
-		dp_virtsvc_sync_open_connections();
+		dp_synchronize_virtsvc_connections();
 #endif
-		dp_sync_port_neigh_macs();
+		dp_synchronize_port_neigh_macs();
 		break;
 	case DP_SYNC_MSG_NAT_CREATE:
 		// TODO mute one or both! (otherwise move to info and maybe better texts)
@@ -90,9 +90,9 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			break;
 		}
 		virtsvc_conn = (struct dp_sync_msg_virtsvc_conn *)(sync_hdr + 1);
-		dp_virtsvc_sync_connection(virtsvc_conn->virtual_addr, virtsvc_conn->virtual_port, virtsvc_conn->proto,
-								   virtsvc_conn->vf_ip, virtsvc_conn->vf_l4_port, virtsvc_conn->vf_port_id,
-								   virtsvc_conn->conn_port);
+		dp_virtsvc_open_sync_connection(virtsvc_conn->virtual_addr, virtsvc_conn->virtual_port, virtsvc_conn->proto,
+										virtsvc_conn->vf_ip, virtsvc_conn->vf_l4_port, virtsvc_conn->vf_port_id,
+										virtsvc_conn->conn_port);
 		// errors ignored, keep processing messages
 		break;
 #endif
@@ -104,7 +104,7 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			break;
 		}
 		port_mac = (struct dp_sync_msg_port_mac *)(sync_hdr + 1);
-		dp_sync_port_neigh_mac(port_mac->port_id, &port_mac->mac);
+		dp_set_port_sync_neigh_mac(port_mac->port_id, &port_mac->mac);
 		// errors ignored, keep processing messages
 		break;
 	default:
