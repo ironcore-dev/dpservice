@@ -29,7 +29,8 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 {
 	struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 	struct dp_sync_hdr *sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);
-	struct dp_sync_msg_nat_keys *nat_keys;
+	struct dp_sync_msg_nat_create *nat_create;
+	struct dp_sync_msg_nat_delete *nat_delete;
 
 	if (eth_hdr->ether_type != htons(DP_SYNC_ETHERTYPE)) {
 		DPS_LOG_WARNING("Invalid sync ethertype", DP_LOG_VALUE(eth_hdr->ether_type));
@@ -43,24 +44,29 @@ static __rte_always_inline void process_packet(const struct rte_mbuf *pkt)
 			DPS_LOG_WARNING("Invalid sync request for backup dpservice");
 			break;
 		}
+		dp_synchronize_local_nat_flows();
 		break;
 	case DP_SYNC_MSG_NAT_CREATE:
 		if (!backup_mode) {
 			DPS_LOG_WARNING("Invalid sync NAT create message for active dpservice");
 			break;
 		}
-		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
+		nat_create = (struct dp_sync_msg_nat_create *)(sync_hdr + 1);
+		dp_allocate_sync_snat_port(&nat_create->portmap_key,
+								   &nat_create->portoverload_key,
+								   nat_create->created_port_id,
+								   nat_create->icmp_type_src,
+								   nat_create->icmp_err_ip_cksum);
 		// errors ignored, keep processing messages
-		dp_allocate_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	case DP_SYNC_MSG_NAT_DELETE:
 		if (!backup_mode) {
 			DPS_LOG_WARNING("Invalid sync NAT delete message for active dpservice");
 			break;
 		}
-		nat_keys = (struct dp_sync_msg_nat_keys *)(sync_hdr + 1);
+		nat_delete = (struct dp_sync_msg_nat_delete *)(sync_hdr + 1);
+		dp_remove_sync_snat_port(&nat_delete->portmap_key, &nat_delete->portoverload_key);
 		// errors ignored, keep processing messages
-		dp_remove_sync_snat_port(&nat_keys->portmap_key, &nat_keys->portoverload_key);
 		break;
 	default:
 		DPS_LOG_ERR("Unknown sync message type", DP_LOG_VALUE(sync_hdr->msg_type));

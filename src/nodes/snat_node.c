@@ -35,7 +35,7 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 		cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
 	}
 	if (snat_data->nat_ip != 0) {
-		ret = dp_allocate_network_snat_port(snat_data, df, port);
+		ret = dp_allocate_network_snat_port(snat_data, df, port, ipv4_hdr->hdr_checksum);
 		if (DP_FAILED(ret))
 			return DP_ERROR;
 		nat_port = (uint16_t)ret;
@@ -80,8 +80,8 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct dp_flow *df,
 													 struct flow_value *cntrack, struct dp_port *port)
 {
+	struct rte_ipv4_hdr *ipv4_hdr = dp_get_ipv4_hdr(m);
 	struct snat_data snat64_data = {0};
-	struct rte_ipv4_hdr *ipv4_hdr;
 	rte_be32_t dest_ip4;
 	uint16_t nat_port;
 	int ret;
@@ -89,7 +89,7 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	snat64_data.nat_ip = port->iface.nat_ip;
 	snat64_data.nat_port_range[0] = port->iface.nat_port_range[0];
 	snat64_data.nat_port_range[1] = port->iface.nat_port_range[1];
-	ret = dp_allocate_network_snat_port(&snat64_data, df, port);
+	ret = dp_allocate_network_snat_port(&snat64_data, df, port, ipv4_hdr->hdr_checksum);
 	if (DP_FAILED(ret))
 		return DP_ERROR;
 	nat_port = (uint16_t)ret;
@@ -111,7 +111,6 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 		dp_change_l4_hdr_port(m, DP_L4_PORT_DIR_SRC, nat_port);
 	}
 
-	ipv4_hdr = dp_get_ipv4_hdr(m);
 	cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
 	cntrack->nf_info.vni = port->iface.vni;
 	cntrack->nf_info.l4_type = df->l4_type;

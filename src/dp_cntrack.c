@@ -207,11 +207,36 @@ error_alloc:
 	return NULL;
 }
 
-struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, uint32_t nat_ip, uint16_t nat_port, uint16_t port_id)
+
+int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverload_key,
+							 const struct netnat_portoverload_sync_metadata *sync_metadata,
+							 uint64_t timestamp)
 {
+	struct flow_key key;
 	struct flow_value *flow_val;
 	struct flow_key inverted_key;
-	struct flow_key nat64_key;
+	int ret;
+
+	dp_set_ipaddr4(&key.l3_dst, portoverload_key->dst_ip);
+	key.port_dst = portoverload_key->dst_port;
+	key.proto = portoverload_key->l4_type;
+	key.vni = sync_metadata->portmap_key.vni;
+	dp_copy_ipaddr(&key.l3_src, &sync_metadata->portmap_key.src_ip);
+	key.src.port_src = sync_metadata->portmap_key.iface_src_port;
+	key.vnf_type = DP_VNF_TYPE_NAT;
+	// SNAT overwrites src icmp type to work properly, need to restore it here
+	if (key.proto == IPPROTO_ICMP || key.proto == IPPROTO_ICMPV6)
+		key.src.type_src = sync_metadata->icmp_type_src;
+
+	// TODO need to create dp_get_flow_with_hash()
+	// TODO separate PR, because it is needed in multiple places
+	ret = dp_get_flow(&key, &flow_val);
+	if (DP_SUCCESS(ret)) {
+		DPS_LOG_DEBUG("Flow already present, skipping");  // TODO remove
+		return ret;
+	}
+
+	// create flow value and insert then...
 
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val) {
@@ -223,35 +248,36 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 	// But since this is only used to create flows coming from SNAT,
 	// do all necessary changes immediately here (code it based on snat_node.c).
 
-	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_ORG], key, sizeof(*key));
-	flow_val->flow_flags |= key->l3_src.is_v6 ? DP_FLOW_FLAG_SRC_NAT64 : DP_FLOW_FLAG_SRC_NAT;
+	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_ORG], &key, sizeof(key));
+	flow_val->flow_flags |= key.l3_src.is_v6 ? DP_FLOW_FLAG_SRC_NAT64 : DP_FLOW_FLAG_SRC_NAT;
+	flow_val->timestamp = timestamp;
 	flow_val->timeout_value = flow_timeout;
-	flow_val->created_port_id = port_id;
+	flow_val->created_port_id = sync_metadata->created_port_id;
 
 	flow_val->nf_info.nat_type = DP_FLOW_NAT_TYPE_NETWORK_LOCAL;
-	flow_val->nf_info.vni = key->vni;
-	flow_val->nf_info.l4_type = key->proto;
-	// NOTE this is currently ommitted: flow_val->nf_info.icmp_err_ip_cksum =
+	flow_val->nf_info.vni = key.vni;
+	flow_val->nf_info.l4_type = key.proto;
 
-	dp_cntrack_init_flow_offload_flags(flow_val, key->proto);
-	if (key->proto == IPPROTO_TCP) {
+	dp_cntrack_init_flow_offload_flags(flow_val, key.proto);
+	if (key.proto == IPPROTO_TCP) {
 		// NOTE sync flows will always be in this state,
 		// more synchronization is needed for TCP state is required
 		flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_NONE;
-	} else if (key->proto == IPPROTO_ICMP || key->proto == IPPROTO_ICMPV6) {
+	} else if (key.proto == IPPROTO_ICMP || key.proto == IPPROTO_ICMPV6) {
 		flow_val->offload_state.orig = DP_FLOW_OFFLOADED;
 		flow_val->offload_state.reply = DP_FLOW_OFFLOADED;
+		flow_val->nf_info.icmp_err_ip_cksum = sync_metadata->icmp_err_ip_cksum;
 	}
 
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
 
 	// Create the reply key
-	dp_invert_flow_key(key, &inverted_key);
+	dp_invert_flow_key(&key, &inverted_key);
 	// like above, this is SNAT-specific taken from snat_node.c
-	dp_set_ipaddr4(&inverted_key.l3_dst, nat_ip);
-	inverted_key.port_dst = nat_port;
+	dp_set_ipaddr4(&inverted_key.l3_dst, portoverload_key->nat_ip);
+	inverted_key.port_dst = portoverload_key->nat_port;
 	// in NAT64 the reply to ICMPv6 is ICMP (v4)
-	if (key->proto == IPPROTO_ICMPV6) {
+	if (key.proto == IPPROTO_ICMPV6) {
 		inverted_key.proto = IPPROTO_ICMP;
 		if (inverted_key.src.type_src == DP_ICMPV6_ECHO_REQUEST)
 			inverted_key.src.type_src = RTE_ICMP_TYPE_ECHO_REQUEST;
@@ -263,14 +289,11 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_REPLY], &inverted_key, sizeof(inverted_key));
 
 	// some adjustments are needed for NAT64 (but only for the original direction)
-	if (key->l3_src.is_v6) {
-		memcpy(&nat64_key, key, sizeof(nat64_key));
-		dp_set_ipaddr_nat64(&nat64_key.l3_dst, htonl(key->l3_dst.ipv4));
-		key = &nat64_key;
-	}
+	if (key.l3_src.is_v6)
+		dp_set_ipaddr_nat64(&key.l3_dst, htonl(key.l3_dst.ipv4));
 
 	// Create the original conntrack flow
-	if (DP_FAILED(dp_add_flow(key, flow_val)))
+	if (DP_FAILED(dp_add_flow(&key, flow_val)))
 		goto error_add;
 
 	// Create the reply flow
@@ -278,14 +301,14 @@ struct flow_value *flow_table_insert_sync_nat_entry(const struct flow_key *key, 
 		goto error_add_inv;
 	dp_ref_inc(&flow_val->ref_count);
 
-	return flow_val;
+	return DP_OK;
 
 error_add_inv:
-	dp_delete_flow(key, flow_val);
+	dp_delete_flow(&key, flow_val);
 error_add:
 	rte_free(flow_val);
 error_alloc:
-	return NULL;
+	return DP_ERROR;
 }
 
 
