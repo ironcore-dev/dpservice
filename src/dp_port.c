@@ -465,7 +465,7 @@ static void dp_acquire_neigh_mac(struct dp_port *port)
 	struct rte_ether_addr pf_neigh_mac = {0};
 	int ret;
 
-	if (DP_FAILED(dp_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac))) {
+	if (DP_FAILED(dp_nl_get_pf_neigh_mac(port->if_index, &pf_neigh_mac, &port->own_mac))) {
 		DPS_LOG_WARNING("No neighboring router, setting timer", DP_LOG_VALUE(port->neighmac_period), DP_LOG_PORT(port));
 
 		// need to use the same lcore each time, thus staying on main one even when called from the worker
@@ -609,12 +609,12 @@ int dp_stop_port(struct dp_port *port)
 }
 
 
-static int dp_port_total_flow_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap)
+static int dp_port_total_flow_meter_config(struct dp_port *port, uint32_t total_flow_rate_cap)
 {
 	return dp_set_vf_rate_limit(port->port_id, total_flow_rate_cap);
 }
 
-static int dp_port_public_flow_meter_config(struct dp_port *port, uint64_t public_flow_rate_cap)
+static int dp_port_public_flow_meter_config(struct dp_port *port, uint32_t public_flow_rate_cap)
 {
 	struct rte_meter_srtcm_params srtcm_params = dp_srtcm_params_base;
 	int ret;
@@ -655,15 +655,19 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 		return DP_OK;
 	}
 
+	if (total_flow_rate_cap > UINT32_MAX) {
+		DPS_LOG_ERR("Total flow rate cap exceeds maximum value",
+					DP_LOG_PORT(port), DP_LOG_METER_TOTAL(total_flow_rate_cap));
+		return DP_ERROR;
+	}
+
 	if (public_flow_rate_cap > total_flow_rate_cap) {
 		DPS_LOG_ERR("Public flow rate cap cannot be greater than total flow rate cap",
 					DP_LOG_PORT(port), DP_LOG_METER_TOTAL(total_flow_rate_cap), DP_LOG_METER_PUBLIC(public_flow_rate_cap));
 		return DP_ERROR;
 	}
 
-// disabled - not supported by DPDK/Mellanox anymore
-#if 0
-	ret = dp_port_total_flow_meter_config(port, total_flow_rate_cap);
+	ret = dp_port_total_flow_meter_config(port, (uint32_t)total_flow_rate_cap);
 	if (DP_FAILED(ret)) {
 		if (ret == -ENOENT)
 			DPS_LOG_WARNING("Cannot find sysfs path or file to regulate traffic rate, thus total flow rate metering is ignored", DP_LOG_PORT(port));
@@ -674,9 +678,8 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 	} else {
 		port->iface.total_flow_rate_cap = total_flow_rate_cap;
 	}
-#endif
 
-	ret = dp_port_public_flow_meter_config(port, public_flow_rate_cap);
+	ret = dp_port_public_flow_meter_config(port, (uint32_t)public_flow_rate_cap);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot set public flow meter", DP_LOG_PORT(port), DP_LOG_RET(ret));
 		ret = dp_port_total_flow_meter_config(port, 0);
