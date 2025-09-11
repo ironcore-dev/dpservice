@@ -11,6 +11,7 @@
 #include "dp_port.h"
 #include "dp_telemetry.h"
 #include "rte_flow/dp_rte_flow.h"
+#include "dp_netlink.h"
 
 #define DP_SYSFS_PREFIX_MLX_DEVICE		"/sys/class/net/"
 
@@ -177,46 +178,36 @@ void dp_free_jhash_table(struct rte_hash *table)
 	rte_hash_free(table);
 }
 
-int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate)
+int dp_set_vf_rate_limit(uint16_t port_id, uint32_t rate)
 {
-	char filename[DP_SYSFS_MAX_PATH];
 	uint16_t vf_pattern_len = 0;
 	const char *pattern = dp_conf_get_vf_pattern();
-	FILE *fp;
 	struct dp_port *port = dp_get_port_by_id(port_id);
-	uint64_t rate_in_mbits = rate;
+	const struct dp_port *pf_port = dp_get_pf0();
+	uint32_t rate_in_mbits = rate;
 	int res;
+	uint32_t vf_index; // store which order VF this is (e.g., 0 for enp59s0f0v0, 1 for enp59s0f0v1, etc.)
+	const char *vf_num_str;
+	char *endptr;
 
 	if (!port)
 		return DP_ERROR;
 
-	while (*(pattern + vf_pattern_len) != '\0')
-		vf_pattern_len++;
+	vf_pattern_len = (uint16_t)strlen(pattern);
+	vf_num_str = port->vf_name + vf_pattern_len;
+	vf_index = (uint32_t)strtoul(vf_num_str, &endptr, 10);
 
-	res = snprintf(filename, sizeof(filename),
-				"%s%s%s%s%s",
-				DP_SYSFS_PREFIX_MLX_DEVICE,
-				dp_conf_get_pf0_name(),
-				DP_SYSFS_PREFIX_MLX_MAX_TX_RATE,
-				port->vf_name + vf_pattern_len,
-				DP_SYSFS_SUFFIX_MLX_MAX_TX_RATE);
-
-	if (res < 0 || (unsigned)res >= (int)sizeof(filename)) {
-		DPS_LOG_ERR("Failed to generate SR-IOV sysfs path or SR-IOV sysfs path to vf's max tx rate is too long");
+	// Check if conversion was successful
+	if (endptr == vf_num_str || *endptr != '\0') {
+		DPS_LOG_ERR("Failed to parse VF number from name", DP_LOG_VALUE(port->vf_name));
 		return DP_ERROR;
 	}
 
-	if (access(filename, F_OK) == -1)
-		return -ENOENT; // Log as warning is done in the caller
-
-	fp = fopen(filename, "w+");
-	if (!fp) {
-		DPS_LOG_ERR("Cannot open SR-IOV sysfs path to vf's max tx rate", DP_LOG_RET(errno));
+	res = dp_nl_set_vf_rate(pf_port->if_index, vf_index, 0, rate_in_mbits);
+	if (DP_FAILED(res)) {
+		DPS_LOG_ERR("Failed to set VF rate via netlink", DP_LOG_PORT(port), DP_LOG_RET(res));
 		return DP_ERROR;
 	}
-
-	fprintf(fp, "%lu\n", rate_in_mbits);
-	fclose(fp);
 
 	return DP_OK;
 }

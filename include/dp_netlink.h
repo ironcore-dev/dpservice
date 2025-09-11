@@ -26,7 +26,14 @@ struct dp_nlnk_req {
 	struct dp_nl_tlv if_tlv;
 };
 
-int dp_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac);
+struct dp_nl_vf_rate_req {
+	struct nlmsghdr nl;
+	struct ifinfomsg ifi;
+	char attrbuf[512];
+};
+
+int dp_nl_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const struct rte_ether_addr *own_mac);
+int dp_nl_set_vf_rate(uint32_t pf_if_idx, uint32_t vf_index, uint32_t min_tx_rate, uint32_t max_tx_rate);
 
 #ifdef __cplusplus
 }

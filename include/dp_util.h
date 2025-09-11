@@ -63,7 +63,7 @@ struct rte_hash *dp_create_jhash_table(int capacity, size_t key_len, const char 
 
 void dp_free_jhash_table(struct rte_hash *table);
 
-int dp_set_vf_rate_limit(uint16_t port_id, uint64_t rate);
+int dp_set_vf_rate_limit(uint16_t port_id, uint32_t rate);
 
 
 #ifdef __cplusplus
