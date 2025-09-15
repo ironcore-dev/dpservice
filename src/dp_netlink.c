@@ -131,21 +131,57 @@ cleanup:
 }
 
 
+static int dp_nl_send_recv_vf_rate_msg(int sock, struct dp_nl_vf_rate_req *req)
+{
+	ssize_t reply_len, sent_len;
+	char reply[4096];
+	struct nlmsghdr *nh;
+	struct nlmsgerr *err;
+
+	struct sockaddr_nl sa = {
+		.nl_family = AF_NETLINK,
+	};
+
+	if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		DPS_LOG_ERR("Cannot bind to netlink", DP_LOG_NETLINK(strerror(errno)));
+		return DP_ERROR;
+	}
+
+	sent_len = send(sock, req, req->nl.nlmsg_len, 0);
+	if (sent_len < 0 || sent_len != req->nl.nlmsg_len) {
+		DPS_LOG_ERR("Failed to send VF rate message", DP_LOG_NETLINK(strerror(errno)));
+		return DP_ERROR;
+	}
+
+	// Wait for ACK
+	reply_len = recv(sock, reply, sizeof(reply), 0);
+	if (reply_len < (ssize_t)NLMSG_LENGTH(sizeof(struct nlmsgerr))) {
+		DPS_LOG_ERR("Cannot receive ACK from netlink", DP_LOG_NETLINK(strerror(errno)));
+		return DP_ERROR;
+	}
+
+	nh = (struct nlmsghdr *)reply;
+	if (nh->nlmsg_type == NLMSG_ERROR) {
+		err = (struct nlmsgerr *)NLMSG_DATA(nh);
+		if (err->error != 0) {
+			DPS_LOG_ERR("Netlink error setting VF rate", DP_LOG_NETLINK(strerror(-err->error)));
+			return DP_ERROR;
+		}
+	} else {
+		DPS_LOG_ERR("Unexpected netlink response type", DP_LOG_NETLINK(nh->nlmsg_type));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
 int dp_nl_set_vf_rate(uint32_t pf_if_idx, uint32_t vf_index, uint32_t min_tx_rate, uint32_t max_tx_rate)
 {
 	struct dp_nl_vf_rate_req req = {0};
 	struct rtattr *linkinfo, *vfinfo, *vfrate;
 	struct ifla_vf_rate *rate;
-	ssize_t reply_len, sent_len;
-	struct nlmsghdr *nh;
-	struct nlmsgerr *err;
 	int sock;
-	int ret = DP_ERROR;
-	char reply[4096];
-
-	struct sockaddr_nl sa = {
-		.nl_family = AF_NETLINK,
-	};
+	int ret;
 
 	req.nl.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
 	req.nl.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
@@ -182,36 +218,8 @@ int dp_nl_set_vf_rate(uint32_t pf_if_idx, uint32_t vf_index, uint32_t min_tx_rat
 		return DP_ERROR;
 	}
 
-	if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-		DPS_LOG_ERR("Cannot bind to netlink", DP_LOG_NETLINK(strerror(errno)));
-		goto cleanup;
-	}
-
-	sent_len = send(sock, &req, req.nl.nlmsg_len, 0);
-	if (sent_len < 0 || sent_len != req.nl.nlmsg_len) {
-		DPS_LOG_ERR("Failed to send VF rate message", DP_LOG_NETLINK(strerror(errno)));
-		goto cleanup;
-	}
-
-	// Wait for ACK, ensure it gets at least NLMSG_LENGTH(0) bytes
-	reply_len = recv(sock, reply, sizeof(reply), 0);
-	if (reply_len < (ssize_t)NLMSG_LENGTH(0)) {
-		DPS_LOG_ERR("Cannot receive ACK from netlink", DP_LOG_NETLINK(strerror(errno)));
-		goto cleanup;
-	}
-
-	nh = (struct nlmsghdr *)reply;
-	if (nh->nlmsg_type == NLMSG_ERROR) {
-		err = (struct nlmsgerr *)NLMSG_DATA(nh);
-		if (err->error != 0) {
-			DPS_LOG_ERR("Netlink error setting VF rate", DP_LOG_NETLINK(strerror(-err->error)));
-			goto cleanup;
-		}
-	}
-
-	ret = DP_OK;
-
-cleanup:
+	ret = dp_nl_send_recv_vf_rate_msg(sock, &req);
 	close(sock);
+
 	return ret;
 }
