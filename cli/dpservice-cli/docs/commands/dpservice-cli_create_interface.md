@@ -20,10 +20,10 @@ dpservice-cli create interface --id=vm4 --ipv4=10.200.1.4 --ipv6=2000:200:1::4 -
       --id string                ID of the interface.
       --ipv4 ip                  IPv4 address to assign to the interface. (default invalid IP)
       --ipv6 ip                  IPv6 address to assign to the interface. (default ::)
-      --public-meter-rate uint   Public meter rate.
+      --public-meter-rate uint   Metering rate used to limit VM's internet outgoing (TX) traffic rate (South-North).
       --pxe-file-name string     PXE boot file name.
       --pxe-server string        PXE next server.
-      --total-meter-rate uint    Total meter rate.
+      --total-meter-rate uint    Metering rate used to limit VM's total outgoing (TX) traffic rate (South-North + West-East).
       --vni uint32               VNI to add the interface to.
 ```
 
