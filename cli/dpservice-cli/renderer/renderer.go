@@ -249,7 +249,7 @@ func (t defaultTableConverter) loadBalancerTargetTable(lbtargets []api.LoadBalan
 }
 
 func (t defaultTableConverter) interfaceTable(ifaces []api.Interface) (*TableData, error) {
-	headers := []any{"ID", "VNI", "Device", "IPv4", "IPv6", "UnderlayRoute", "TotalMeterRate", "PublicMeterRate", "Hostname"}
+	headers := []any{"ID", "VNI", "Device", "IPv4", "IPv6", "UnderlayRoute", "TotalTx", "PublicTx", "Hostname"}
 	vfNeeded := isColumnNeeded(ifaces, "Spec.VirtualFunction")
 	if vfNeeded {
 		headers = append(headers, "VirtualFunction")
