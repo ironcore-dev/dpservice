@@ -185,10 +185,10 @@ int dp_set_vf_rate_limit(uint16_t port_id, uint32_t rate)
 	struct dp_port *port = dp_get_port_by_id(port_id);
 	const struct dp_port *pf_port = dp_get_pf0();
 	uint32_t rate_in_mbits = rate;
-	int res;
-	uint32_t vf_index; // store which order VF this is (e.g., 0 for enp59s0f0v0, 1 for enp59s0f0v1, etc.)
 	const char *vf_num_str;
+	uint32_t vf_index; // store which order VF this is (e.g., 0 for enp59s0f0v0, 1 for enp59s0f0v1, etc.)
 	char *endptr;
+	int res;
 
 	if (!port)
 		return DP_ERROR;

@@ -15,7 +15,7 @@
 #include "dp_util.h"
 #include "dp_port.h"
 
-static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *neigh,
+static int dp_nl_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *neigh,
 						 const struct rte_ether_addr *own_mac)
 {
 	struct rtattr *rt_attr;
@@ -44,7 +44,7 @@ static int dp_read_neigh(struct nlmsghdr *nh, __u32 nll, struct rte_ether_addr *
 	return DP_ERROR;
 }
 
-static int dp_recv_nl_neigh_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bufsize)
+static int dp_nl_recv_neigh_msg(struct sockaddr_nl sock_addr, int sock, char *buf, int bufsize)
 {
 	struct nlmsghdr *nh;
 	ssize_t recv_len;
@@ -117,13 +117,13 @@ int dp_nl_get_pf_neigh_mac(uint32_t if_idx, struct rte_ether_addr *neigh, const 
 		goto cleanup;
 	}
 
-	reply_len = dp_recv_nl_neigh_msg(sa, sock, reply, sizeof(reply));
+	reply_len = dp_nl_recv_neigh_msg(sa, sock, reply, sizeof(reply));
 	if (reply_len < 0) {
 		DPS_LOG_ERR("Cannot receive message from netlink", DP_LOG_NETLINK(strerror(reply_len)));
 		goto cleanup;
 	}
 
-	ret = dp_read_neigh((struct nlmsghdr *)reply, reply_len, neigh, own_mac);
+	ret = dp_nl_read_neigh((struct nlmsghdr *)reply, reply_len, neigh, own_mac);
 
 cleanup:
 	close(sock);
