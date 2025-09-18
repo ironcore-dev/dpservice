@@ -713,6 +713,8 @@ const char* CreateLoadBalancerCall::FillRequest(struct dpgrpc_request* request)
 					DP_LOG_UNDERLAY(request_.preferred_underlay_route().c_str()));
 	if (SNPRINTF_FAILED(request->add_lb.lb_id, request_.loadbalancer_id()))
 		return "Invalid loadbalancer_id";
+	if (request_.vni() > DP_VNI_MAX_SIZE)
+		return "VNI exceeds 24-bit range";
 	request->add_lb.vni = request_.vni();
 	if (!GrpcConv::GrpcToDpAddress(request_.loadbalanced_ip(), &request->add_lb.addr))
 		return "Invalid loadbalanced_ip";

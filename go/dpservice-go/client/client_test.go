@@ -1464,7 +1464,6 @@ var _ = Describe("negative loadbalancer related tests", Label("negative"), func(
 
 	Context("When using loadbalancer functions", Label("loadbalancer"), Ordered, func() {
 		var lb *api.LoadBalancer
-		var res *api.LoadBalancer
 		var err error
 
 		It("should not create", func() {
@@ -1492,48 +1491,48 @@ var _ = Describe("negative loadbalancer related tests", Label("negative"), func(
 
 			By("not defining loadbalancer virtual ip")
 			lb.Spec.LbVipIP = nil
-			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			_, err = dpdkClient.CreateLoadBalancer(ctx, lb)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalanced_ip"))
 
 			By("not defining ID")
 			lb.Spec.LbVipIP = &lbVipIp
 			lb.ID = ""
-			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			_, err = dpdkClient.CreateLoadBalancer(ctx, lb)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
 
 			By("defining lbport with incorrect protocol")
 			lb.ID = "lb1"
 			lb.Spec.Lbports = []api.LBPort{{Protocol: 999, Port: 443}}
-			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			_, err = dpdkClient.CreateLoadBalancer(ctx, lb)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalanced_ports.protocol"))
 
 			By("defining lbport with incorrect port")
 			lb.Spec.Lbports = []api.LBPort{{Protocol: 6, Port: 90000}}
-			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			_, err = dpdkClient.CreateLoadBalancer(ctx, lb)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalanced_ports.port"))
 
 			By("defining incorrect vni")
 			lb.Spec.Lbports = []api.LBPort{{Protocol: 6, Port: 443}}
 			lb.Spec.VNI = 999999999
-			res, err = dpdkClient.CreateLoadBalancer(ctx, lb)
+			_, err = dpdkClient.CreateLoadBalancer(ctx, lb)
 			Expect(err).To(HaveOccurred())
-			Expect(res.GetStatus().Code).To(Equal(uint32(errors.VNI_INIT4)))
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = VNI exceeds 24-bit range"))
 		})
 
 		It("should not get", func() {
 			By("not defining loadbalancer ID")
-			res, err = dpdkClient.GetLoadBalancer(ctx, "")
+			_, err = dpdkClient.GetLoadBalancer(ctx, "")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
 		})
 
 		It("should not delete", func() {
 			By("not defining loadbalancer ID")
-			res, err = dpdkClient.DeleteLoadBalancer(ctx, "")
+			_, err = dpdkClient.DeleteLoadBalancer(ctx, "")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
 		})
