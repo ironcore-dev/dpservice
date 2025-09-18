@@ -68,12 +68,12 @@ static __rte_always_inline int dp_create_rib6(uint32_t vni, int socket_id, struc
 {
 	struct rte_rib6_conf config_ipv6;
 	struct rte_rib6 *new_rib6;
-	char s[64];
+	char s[32];
 
 	config_ipv6.max_nodes = IPV6_DP_RIB_MAX_RULES;
 	config_ipv6.ext_sz = sizeof(struct dp_iface_route);
 
-	snprintf(s, sizeof(s), "IPV6_DP_RIB_%d_%d", vni, socket_id);
+	snprintf(s, sizeof(s), "RIB6_DP_%d_%d", vni, socket_id);
 	new_rib6 = rte_rib6_create(s, socket_id, &config_ipv6);
 	if (!new_rib6) {
 		DPS_LOG_ERR("Unable to create DP RIB6 table", DP_LOG_SOCKID(socket_id));
@@ -90,12 +90,12 @@ static __rte_always_inline int dp_create_rib(uint32_t vni, int socket_id, struct
 {
 	struct rte_rib_conf config_ipv4;
 	struct rte_rib *new_rib;
-	char s[64];
+	char s[32];
 
 	config_ipv4.max_nodes = IPV4_DP_RIB_MAX_RULES;
 	config_ipv4.ext_sz = sizeof(struct dp_iface_route);
 
-	snprintf(s, sizeof(s), "IPV4_DP_RIB_%d_%d", vni, socket_id);
+	snprintf(s, sizeof(s), "RIB4_DP_%d_%d", vni, socket_id);
 	new_rib = rte_rib_create(s, socket_id, &config_ipv4);
 	if (!new_rib) {
 		DPS_LOG_ERR("Unable to create DP RIB table", DP_LOG_SOCKID(socket_id));
