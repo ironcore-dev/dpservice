@@ -18,8 +18,6 @@
 #define DP_SYSFS_PREFIX_MLX_VF_COUNT	DP_SYSFS_PREFIX_MLX_DEVICE
 #define DP_SYSFS_SUFFIX_MLX_VF_COUNT	"/device/sriov_numvfs"
 
-#define DP_SYSFS_PREFIX_MLX_MAX_TX_RATE "/device/sriov/"
-#define DP_SYSFS_SUFFIX_MLX_MAX_TX_RATE "/max_tx_rate"
 #define DP_SYSFS_MAX_PATH 256
 
 // makes sure there is enough space to prevent collisions
