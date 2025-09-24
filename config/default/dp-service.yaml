@@ -6,21 +6,21 @@ metadata:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: dp-service
+  name: dpservice
   namespace: system
 spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      name: dp-service
+      name: dpservice
   template:
     metadata:
       labels:
-        name: dp-service
+        name: dpservice
     spec:
       initContainers:
-      - name: init-dp-service
-        image: dp-service
+      - name: init-dpservice
+        image: dpservice
         imagePullPolicy: IfNotPresent
         command:
         - prepare.sh
@@ -36,9 +36,9 @@ spec:
         - -l 0,1
         - --
         - --no-offload
-        image: dp-service
+        image: dpservice
         imagePullPolicy: IfNotPresent
-        name: dp-service
+        name: dpservice
         resources:
           limits:
             hugepages-1Gi: 4Gi
@@ -63,7 +63,7 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 10
       - name: prometheus-agent
-        image: dp-service
+        image: dpservice
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
