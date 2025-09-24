@@ -4,4 +4,4 @@ kind: Kustomization
 namespace: dpservice-system
 
 resources:
-  - dp-service.yaml
+  - dpservice.yaml
