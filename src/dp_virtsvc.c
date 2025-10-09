@@ -440,6 +440,7 @@ int dp_virtsvc_open_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_
 		.vf_ip = vf_ip,
 	};
 	struct dp_virtsvc *virtsvc;
+	hash_sig_t sig;
 	int ret;
 
 	virtsvc = get_virtsvc_by_ipv4(virtual_addr, virtual_port, proto);
@@ -448,7 +449,25 @@ int dp_virtsvc_open_sync_connection(rte_be32_t virtual_addr, rte_be16_t virtual_
 		return DP_ERROR;
 	}
 
-	ret = dp_virtsvc_use_port(virtsvc, &key, rte_hash_hash(virtsvc->open_ports, &key), conn_port);
+	sig = rte_hash_hash(virtsvc->open_ports, &key);
+
+	// some sync packet may have gotten lost
+	// in that case there would be a "forgotten" entry here
+	// this would be really bad because two connections could be able to share a hash-table entry
+	// -> delete from the hash-table first (active dpservice should not send this message if the entry was still in use)
+	ret = dp_virstvc_get_connection(virtsvc, &key, sig);
+	if (DP_SUCCESS(ret)) {
+		virtsvc->connections[ret].last_pkt_timestamp = 0;
+		ret = rte_hash_del_key(virtsvc->open_ports, &key);
+		if (DP_FAILED(ret))
+			DPS_LOG_WARNING("Cannot delete virtual service NAT entry", DP_LOG_RET(ret),
+							DP_LOG_PORTID(key.vf_port_id), DP_LOG_L4PORT(key.vf_l4_port));
+	} else if (ret != -ENOENT)
+		DPS_LOG_WARNING("Cannot lookup virtual service NAT entry", DP_LOG_RET(ret),
+						DP_LOG_PORTID(key.vf_port_id), DP_LOG_L4PORT(key.vf_l4_port));
+
+	// use given entry without question, active dpservice should know what it is doing
+	ret = dp_virtsvc_use_port(virtsvc, &key, sig, conn_port);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_WARNING("Failed to sync virtual service connection", DP_LOG_VIRTSVC(virtsvc), DP_LOG_RET(ret));
 		return ret;
