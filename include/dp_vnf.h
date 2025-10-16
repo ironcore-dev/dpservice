@@ -23,12 +23,12 @@ struct dp_grpc_responder;
 
 enum dp_vnf_type {
 	DP_VNF_TYPE_UNDEFINED,
+	DP_VNF_TYPE_INTERFACE_IP,
 	DP_VNF_TYPE_VIP,
 	DP_VNF_TYPE_NAT,
 	DP_VNF_TYPE_LB,
 	DP_VNF_TYPE_LB_ALIAS_PFX,
 	DP_VNF_TYPE_ALIAS_PFX,
-	DP_VNF_TYPE_INTERFACE_IP,
 } __attribute__((__packed__));  // for 'struct dp_flow' and 'struct flow_key'
 
 struct dp_vnf_prefix {

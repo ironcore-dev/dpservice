@@ -1,0 +1,42 @@
+diff --git a/lib/log/log.c b/lib/log/log.c
+index 8ad5250..30a893e 100644
+--- a/lib/log/log.c
++++ b/lib/log/log.c
+@@ -91,6 +91,14 @@ rte_openlog_stream(FILE *f)
+ 	return 0;
+ }
+ 
++/* Change the print function that will be used by the logging system. */
++RTE_EXPORT_SYMBOL(rte_log_set_print_func)
++void
++rte_log_set_print_func(int (*func)(FILE *stream, const char *format, va_list ap))
++{
++	rte_logs.print_func = func;
++}
++
+ RTE_EXPORT_SYMBOL(rte_log_get_stream)
+ FILE *
+ rte_log_get_stream(void)
+diff --git a/lib/log/rte_log.h b/lib/log/rte_log.h
+index 3735137..f75cb06 100644
+--- a/lib/log/rte_log.h
++++ b/lib/log/rte_log.h
+@@ -88,6 +88,18 @@ extern "C" {
+  */
+ int rte_openlog_stream(FILE *f);
+ 
++ /**
++ * Change the print function that will be used by the logging system.
++ *
++ * This can be done at any time. The func argument represents
++ * the vfprintf-like function to be used to print the logs.
++ * Without calling this function, the default (vfprintf) is used.
++ *
++ * @param func
++ *   Pointer to the print function.
++ */
++void rte_log_set_print_func(int (*func)(FILE *stream, const char *format, va_list ap));
++
+ /**
+  * Retrieve the stream used by the logging system (see rte_openlog_stream()
+  * to change it).

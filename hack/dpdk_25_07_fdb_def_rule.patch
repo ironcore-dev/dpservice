@@ -1,17 +1,8 @@
-This a patch to revert the effect of commit cf9a91c67b88071a03beb32a3ea9970e6ee00391.
-(https://github.com/DPDK/dpdk/commit/cf9a91c67b88071a03beb32a3ea9970e6ee00391)
-Before this commit, HA dpservice was able to run fine with fdb_def_rule_en=0.
-After this commit, it would require manually setting up complex rte_flow rules
-to achieve the same effect.
-This patch simply immitates the old behavior by skipping over one call.
-More details are to be found in the commit message.
-
-
 diff --git a/drivers/net/mlx5/mlx5.c b/drivers/net/mlx5/mlx5.c
-index 584a51b393..575ff03e8d 100644
+index 1321be7..8f3141d 100644
 --- a/drivers/net/mlx5/mlx5.c
 +++ b/drivers/net/mlx5/mlx5.c
-@@ -1439,7 +1439,12 @@ mlx5_dev_args_check_handler(const char *key, const char *val, void *opaque)
+@@ -1448,7 +1448,12 @@ mlx5_dev_args_check_handler(const char *key, const char *val, void *opaque)
  	} else if (strcmp(MLX5_ALLOW_DUPLICATE_PATTERN, key) == 0) {
  		config->allow_duplicate_pattern = !!tmp;
  	} else if (strcmp(MLX5_FDB_DEFAULT_RULE_EN, key) == 0) {
@@ -26,23 +17,23 @@ index 584a51b393..575ff03e8d 100644
  		config->cnt_svc.service_core = tmp;
  	} else if (strcmp(MLX5_HWS_CNT_CYCLE_TIME, key) == 0) {
 diff --git a/drivers/net/mlx5/mlx5.h b/drivers/net/mlx5/mlx5.h
-index 55c29e31a2..382debdbfb 100644
+index c08894c..7913e5e 100644
 --- a/drivers/net/mlx5/mlx5.h
 +++ b/drivers/net/mlx5/mlx5.h
-@@ -377,7 +377,7 @@ struct mlx5_sh_config {
- 		uint32_t cycle_time; /* query cycle time in milli-second. */
- 	} cnt_svc; /* configure for HW steering's counter's service. */
+@@ -387,7 +387,7 @@ struct mlx5_sh_config {
+ 	uint32_t allow_duplicate_pattern:1;
+ 	uint32_t lro_allowed:1; /* Whether LRO is allowed. */
  	/* Allow/Prevent the duplicate rules pattern. */
 -	uint32_t fdb_def_rule:1; /* Create FDB default jump rule */
 +	uint32_t fdb_def_rule:2; /* Create FDB default jump rule */
  	uint32_t repr_matching:1; /* Enable implicit vport matching in HWS FDB. */
- };
- 
+ 	uint32_t txq_mem_algn; /* logarithm value of the TxQ address alignment. */
+ 	struct {
 diff --git a/drivers/net/mlx5/mlx5_trigger.c b/drivers/net/mlx5/mlx5_trigger.c
-index fe2c512c5c..0289efe3f1 100644
+index 6c6f228..d637fa2 100644
 --- a/drivers/net/mlx5/mlx5_trigger.c
 +++ b/drivers/net/mlx5/mlx5_trigger.c
-@@ -1523,7 +1523,7 @@ mlx5_traffic_enable_hws(struct rte_eth_dev *dev)
+@@ -1622,7 +1622,7 @@ mlx5_traffic_enable_hws(struct rte_eth_dev *dev)
  		}
  		mlx5_txq_release(dev, i);
  	}
