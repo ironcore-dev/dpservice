@@ -26,7 +26,7 @@ struct dp_telemetry_htable {
 static struct dp_telemetry_htable *tel_htables = NULL;
 static int tel_htable_count = 0;
 
-static struct rte_graph_cluster_stats *tel_stats;
+static struct rte_graph_cluster_stats *tel_stats = NULL;
 static int32_t tel_graph_node_index = 0;
 static struct rte_tel_data *tel_data = NULL;
 static struct rte_tel_data *tel_curr_block =  NULL;
@@ -125,7 +125,9 @@ static int dp_telemetry_graph_stats_create(void)
 
 static void dp_telemetry_graph_stats_destroy(void)
 {
-	rte_graph_cluster_stats_destroy(tel_stats);
+	if (tel_stats)
+		rte_graph_cluster_stats_destroy(tel_stats);
+	tel_stats = NULL;
 }
 
 //
