@@ -1,0 +1,13 @@
+diff --git a/lib/telemetry/telemetry_data.c b/lib/telemetry/telemetry_data.c
+index c120600..4734962 100644
+--- a/lib/telemetry/telemetry_data.c
++++ b/lib/telemetry/telemetry_data.c
+@@ -151,7 +151,7 @@ static bool
+ valid_name(const char *name)
+ {
+ 	/* non-alphanumeric characters allowed in names */
+-	static const char allowed[128] = { ['_'] = 1, ['/'] = 1 };
++	static const char allowed[128] = { ['_'] = 1, ['/'] = 1, ['.'] = 1, [':'] = 1, ['-'] = 1 };
+ 
+ 	for (; *name != '\0'; name++) {
+ 		if (isalnum(*name))

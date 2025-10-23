@@ -29,7 +29,7 @@ enum dp_vnf_type {
 	DP_VNF_TYPE_LB,
 	DP_VNF_TYPE_LB_ALIAS_PFX,
 	DP_VNF_TYPE_ALIAS_PFX,
-} __rte_packed;  // for 'struct dp_flow' and 'struct flow_key'
+} __attribute__((__packed__));  // for 'struct dp_flow' and 'struct flow_key'
 
 struct dp_vnf_prefix {
 	struct dp_ip_address	ol;
