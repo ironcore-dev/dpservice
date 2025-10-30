@@ -937,6 +937,7 @@ int dp_create_sync_snat_flows(void)
 	const struct netnat_portoverload_tbl_key *portoverload_key;
 	struct netnat_portoverload_sync_metadata *sync_metadata;
 	uint64_t timestamp = rte_rdtsc();  // NOTE: synced flows will have full default timeout
+	struct dp_port *port;
 	uint32_t index = 0;
 	int ret;
 
@@ -947,6 +948,10 @@ int dp_create_sync_snat_flows(void)
 		}
 		if (DP_FAILED(dp_cntrack_from_sync_nat(portoverload_key, sync_metadata, timestamp)))
 			DPS_LOG_WARNING("Cannot create conntrack flow from sync NAT entry");
+		// only now increase the counter (because DEC() is only ever called by flow timeout)
+		port = dp_get_port_by_id(sync_metadata->created_port_id);
+		if (port)
+			DP_STATS_NAT_INC_USED_PORT_CNT(port);
 	}
 	return DP_OK;
 }
