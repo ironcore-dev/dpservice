@@ -5,14 +5,13 @@
 
 #define DP_SYNC_HEADERS_LEN (sizeof(struct rte_ether_hdr) + sizeof(struct dp_sync_hdr))
 
-// TODO condition on when to run - only send packets after being asked? (need the other dpservice and a valid request?)
-// but maybe not, just spam anyway??
-// also this is already checked elsewhere I think - validate this
+static const struct rte_ether_addr sync_mac_src = { .addr_bytes = { 0x02, 'd', 'p', 's', 0, 1 } };
+static const struct rte_ether_addr sync_mac_dst = { .addr_bytes = { 0x02, 'd', 'p', 's', 0, 2 } };
+
 
 static struct rte_mbuf *dp_sync_alloc_message(uint8_t msg_type, uint16_t payload_len)
 {
 	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
-	const struct dp_port *port = dp_get_sync_port();
 	struct rte_mbuf *pkt;
 	struct rte_ether_hdr *eth_hdr;
 	struct dp_sync_hdr *sync_hdr;
@@ -29,8 +28,8 @@ static struct rte_mbuf *dp_sync_alloc_message(uint8_t msg_type, uint16_t payload
 		rte_pktmbuf_free(pkt);
 		return NULL;
 	}
-	rte_ether_addr_copy(&port->own_mac, &eth_hdr->src_addr);
-	rte_ether_addr_copy(&port->neigh_mac, &eth_hdr->src_addr);
+	rte_ether_addr_copy(&sync_mac_src, &eth_hdr->src_addr);
+	rte_ether_addr_copy(&sync_mac_dst, &eth_hdr->dst_addr);
 	eth_hdr->ether_type = htons(DP_SYNC_ETHERTYPE);
 
 	sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);

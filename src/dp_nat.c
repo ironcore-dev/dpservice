@@ -793,8 +793,7 @@ int dp_allocate_sync_snat_port(const struct netnat_portmap_key *portmap_key,
 		if (ret == -EEXIST) {
 			rte_free(sync_metadata);
 			return DP_OK;  // ignore duplicates, trust the primary dpservice
-		}
-		else if (ret != -ENOENT) {
+		} else if (ret != -ENOENT) {
 			rte_free(sync_metadata);
 			return ret;
 		}
