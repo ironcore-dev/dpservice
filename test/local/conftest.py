@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
 import os
+import pytest
+from scapy.all import conf
 
 from config import *
 from dp_grpc_client import DpGrpcClient
@@ -155,6 +156,7 @@ def prepare_ifaces(request, dp_service, grpc_client):
 @pytest.fixture(scope="function")
 def prepare_ifaces_b(dp_service_b, grpc_client_b):
 	print("--- B Interfaces init ----")
+	conf.ifaces.reload()  # Otherwise scapy remembers the old TAPs from previous test
 	dp_service_b.init_ifaces(grpc_client_b)
 	print("--------------------------")
 
