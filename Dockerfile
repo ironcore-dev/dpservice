@@ -179,7 +179,8 @@ COPY --from=builder \
 COPY --from=builder /usr/local/lib /usr/local/lib
 RUN ldconfig
 
-# Ensure bash-completion is working in operations
-RUN echo 'PATH=${PATH}:/\nsource /etc/bash_completion\nsource <(dpservice-cli completion bash)' >> /root/.bashrc
+# Ensure quality-of-life for operations
+COPY hack/tcpdump_helpers.inc hack/dpservice.bashrc /root/
+RUN echo 'source ~/dpservice.bashrc' >> /root/.bashrc
 
 ENTRYPOINT ["dpservice-bin"]
