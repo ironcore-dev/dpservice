@@ -605,14 +605,15 @@ int dp_find_new_port(struct snat_data *snat_data,
 	uint32_t iface_src_info_hash;
 	uint16_t min_port = snat_data->nat_port_range[0];
 	uint16_t max_port = snat_data->nat_port_range[1];
+	uint16_t port_range = max_port - min_port;
 	uint16_t tmp_port;
 	uint64_t timestamp;
 	int ret;
 
 	iface_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, portmap_key);
 
-	for (uint16_t p = 0; p < max_port - min_port; ++p) {
-		tmp_port = min_port + (uint16_t)((iface_src_info_hash + p) % (uint32_t)(max_port - min_port));
+	for (uint16_t p = 0; p < port_range; ++p) {
+		tmp_port = min_port + (uint16_t)((iface_src_info_hash + p) % port_range);
 		portoverload_tbl_key->nat_port = tmp_port;
 		ret = rte_hash_lookup(ipv4_netnat_portoverload_tbl, portoverload_tbl_key);
 		if (ret == -ENOENT) {
@@ -632,10 +633,10 @@ int dp_find_new_port(struct snat_data *snat_data,
 		snat_data->log_timestamp = timestamp;
 		if (portmap_key->src_ip.is_v6) {
 			DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
-							DP_LOG_SRC_IPV6(portmap_key->src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key->iface_src_port));
+							DP_LOG_SRC_IPV6(portmap_key->src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key->iface_src_port), DP_LOG_VALUE(port_range));
 		} else {
 			DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
-							DP_LOG_SRC_IPV4(portmap_key->src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key->iface_src_port));
+							DP_LOG_SRC_IPV4(portmap_key->src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key->iface_src_port), DP_LOG_VALUE(port_range));
 		}
 	}
 
