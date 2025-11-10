@@ -99,8 +99,8 @@ def test_virtsvc_tcp_timeout(request, prepare_ipv4, fast_flow_timeout):
 
 
 def send_bounce_pkt_to_pf(ipv6_lb):
-	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-				 IPv6(dst=ipv6_lb, src=local_ul_ipv6, nh=4) /
+	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+				 IPv6(dst=ipv6_lb, src=local_ul_ipv6) /
 				 IP(dst=lb_ip, src=public_ip) /
 				 TCP(sport=8989, dport=80))
 	delayed_sendp(bouce_pkt, PF0.tap)

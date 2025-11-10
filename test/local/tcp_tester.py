@@ -119,7 +119,7 @@ class _TCPTester:
 		server_thread = threading.Thread(target=self.reply_tcp, args=(syn_style,))
 		server_thread.start()
 
-		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac, type=0x0800) /
+		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac) /
 				   IP(dst=self.server_ip, src=self.client_ip) /
 				   TCP(dport=self.server_port, sport=self.client_port, seq=self.tcp_sender_seq, flags=flags, options=[("NOP", None)]))
 		if payload != None:
@@ -163,7 +163,7 @@ class _TCPTester:
 			return
 
 		# send ACK
-		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac, type=0x0800) /
+		tcp_pkt = (Ether(dst=self.server_mac, src=self.client_mac) /
 				   IP(dst=self.server_ip, src=self.client_ip) /
 				   TCP(dport=self.server_port, sport=self.client_port, flags="A", seq=self.tcp_sender_seq, ack=reply_seq))
 		delayed_sendp(tcp_pkt, self.client_tap)
@@ -213,7 +213,7 @@ class TCPTesterLocal(_TCPTester):
 						 client_pkt_check=client_pkt_check, server_pkt_check=server_pkt_check)
 	# VM-VM local communication, stay in IPv4
 	def get_server_l3_reply(self, pkt):
-		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				IP(dst=pkt[IP].src, src=pkt[IP].dst))
 
 class TCPTesterVirtsvc(_TCPTester):
@@ -223,7 +223,7 @@ class TCPTesterVirtsvc(_TCPTester):
 						 client_pkt_check=client_pkt_check, server_pkt_check=server_pkt_check)
 	# Virtual-service communication, no tunnel, replace header with IPv6
 	def get_server_l3_reply(self, pkt):
-		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=6))
 
 class TCPTesterPublic(_TCPTester):
@@ -234,6 +234,6 @@ class TCPTesterPublic(_TCPTester):
 		self.nat_ul_ipv6 = nat_ul_ipv6
 	# Underlay communication, use IP-IP tunnel
 	def get_server_l3_reply(self, pkt):
-		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				IPv6(dst=self.nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+		return (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				IPv6(dst=self.nat_ul_ipv6, src=pkt[IPv6].dst) /
 				IP(dst=pkt[IP].src, src=pkt[IP].dst))

@@ -12,15 +12,15 @@ def ipv4_in_ipv6_icmp_responder(pf_name, vm_ipv6):
 	pkt = sniff_packet(pf_name, is_encaped_icmp_pkt)
 	assert pkt[IPv6].dst == neigh_vni1_ul_ipv6, \
 		"Invalid destination in encaped request"
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=vm_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=vm_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0))
 	delayed_sendp(reply_pkt, pf_name)
 
 def send_ipv4_icmp(dst_ip, pf_name, responder, vm_ipv6):
 	threading.Thread(target=responder, args=(pf_name, vm_ipv6)).start()
-	icmp_echo_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	icmp_echo_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 					 IP(dst=dst_ip, src=VM1.ip) /
 					 ICMP(type=8))
 	delayed_sendp(icmp_echo_pkt, VM1.tap)
@@ -38,9 +38,9 @@ def ipv6_in_ipv6_icmp6_responder(pf_name, vm_ul_ipv6):
 	pkt = sniff_packet(pf_name, is_encaped_icmpv6_pkt)
 	assert pkt[IPv6].dst == neigh_vni1_ul_ipv6, \
 		"Invalid destination in encaped request"
-	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst, type=0x86DD) /
-				 IPv6(dst=vm_ul_ipv6, src=pkt.getlayer(IPv6,1).dst, nh=0x29) /
-				 IPv6(dst=pkt.getlayer(IPv6,2).src, src=pkt.getlayer(IPv6,2).dst, nh=58) /
+	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst) /
+				 IPv6(dst=vm_ul_ipv6, src=pkt.getlayer(IPv6,1).dst) /
+				 IPv6(dst=pkt.getlayer(IPv6,2).src, src=pkt.getlayer(IPv6,2).dst) /
 				 ICMPv6EchoReply(type=129))
 	delayed_sendp(reply_pkt, pf_name)
 
@@ -51,8 +51,8 @@ def test_ipv6_in_ipv6(prepare_ifaces, port_redundancy):
 
 	threading.Thread(target=ipv6_in_ipv6_icmp6_responder, args=(PF0.tap, VM1.ul_ipv6)).start()
 
-	icmp_echo_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
-					 IPv6(dst=f"{neigh_vni1_ov_ipv6_prefix}::123", src=VM1.ipv6, nh=58) /
+	icmp_echo_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
+					 IPv6(dst=f"{neigh_vni1_ov_ipv6_prefix}::123", src=VM1.ipv6) /
 					 ICMPv6EchoRequest())
 	delayed_sendp(icmp_echo_pkt, VM1.tap)
 

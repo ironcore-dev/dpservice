@@ -6,8 +6,8 @@ import threading
 from helpers import *
 
 def send_lb_pkt_to_pf(lb_ul_ipv6):
-	lb_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-			  IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6, nh=4) /
+	lb_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+			  IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6) /
 			  IP(dst=lb_ip, src=public_ip) /
 			  TCP(sport=1234, dport=80))
 	delayed_sendp(lb_pkt, PF0.tap)
@@ -34,8 +34,8 @@ def test_pf_to_vf_lb_tcp(prepare_ifaces, grpc_client):
 	# If TCP RST is implemented down the line, this can be overcome
 
 def send_lb_ipv6_pkt_to_pf(lb_ul_ipv6):
-	lb_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-			  IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6, nh=0x29) /
+	lb_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+			  IPv6(dst=lb_ul_ipv6, src=router_ul_ipv6) /
 			  IPv6(dst=lb_ip6, src=public_ipv6) /
 			  TCP(sport=1234, dport=8080))
 	delayed_sendp(lb_pkt, PF0.tap)

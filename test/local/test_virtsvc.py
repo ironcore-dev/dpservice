@@ -22,15 +22,15 @@ def reply_udp(pf_name):
 
 	udp_used_port = pkt[UDP].sport
 
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=17) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst) /
 				 UDP(dport=pkt[UDP].sport, sport=pkt[UDP].dport))
 	delayed_sendp(reply_pkt, pf_name)
 
 def request_udp(l4_port, pf_name):
 	threading.Thread(target=reply_udp, args=(pf_name,)).start()
 
-	udp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	udp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IP(dst=virtsvc_udp_virtual_ip, src=VM1.ip) /
 			   UDP(dport=virtsvc_udp_virtual_port, sport=l4_port))
 	delayed_sendp(udp_pkt, VM1.tap)

@@ -12,8 +12,8 @@ def reply_icmp_pkt_from_vm1(nat_ul_ipv6, pf_tap):
 	assert src_ip == nat_vip, \
 		f"Bad ICMP request (src ip: {src_ip})"
 
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
 	delayed_sendp(reply_pkt, pf_tap)
@@ -26,8 +26,8 @@ def reply_icmp_pkt_from_vm1_identifier_check(nat_ul_ipv6):
 
 	icmp_id_1 = pkt[ICMP].id
 	print(f"icmp_id_1: {icmp_id_1}")
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
 	delayed_sendp(reply_pkt, PF0.tap)
@@ -42,8 +42,8 @@ def reply_icmp_pkt_from_vm1_identifier_check(nat_ul_ipv6):
 	print(f"icmp_id_2: {icmp_id_2}")
 	assert icmp_id_1 != icmp_id_2, \
 		f"Got the same ICMP identifier (icmp id 1: {icmp_id_1}, icmp id 2: {icmp_id_2})"
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 ICMP(type=0, id=pkt[ICMP].id, seq=pkt[ICMP].seq))
 	delayed_sendp(reply_pkt, PF0.tap)
@@ -55,7 +55,7 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client, port_redundancy):
 
 	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6, pf_tap)).start()
 
-	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			    IP(dst=public_ip3, src=VM1.ip) /
 			    ICMP(type=8, id=0x0050))
 	delayed_sendp(icmp_pkt, VM1.tap)
@@ -74,7 +74,7 @@ def test_vf_to_pf_network_nat_icmp_identifier_check(prepare_ipv4, grpc_client, p
 	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	threading.Thread(target=reply_icmp_pkt_from_vm1_identifier_check, args=(nat_ul_ipv6,)).start()
 
-	icmp_pkt_1 = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	icmp_pkt_1 = (Ether(dst=PF0.mac, src=VM1.mac) /
 			    IP(dst=public_ip3, src=VM1.ip) /
 			    ICMP(type=8, id=0x0040))
 	delayed_sendp(icmp_pkt_1, VM1.tap)
@@ -84,7 +84,7 @@ def test_vf_to_pf_network_nat_icmp_identifier_check(prepare_ipv4, grpc_client, p
 	assert dst_ip == VM1.ip and pkt[ICMP].id == 0x0040, \
 		f"Bad ECHO reply (dst ip: {dst_ip})"
 
-	icmp_pkt_2 = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	icmp_pkt_2 = (Ether(dst=PF0.mac, src=VM1.mac) /
 			    IP(dst=public_ip2, src=VM1.ip) /
 			    ICMP(type=8, id=0x0050))
 	delayed_sendp(icmp_pkt_2, VM1.tap)
@@ -101,8 +101,8 @@ def test_vf_to_pf_network_nat_icmpv6(prepare_ipv4, grpc_client):
 
 	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6, PF0.tap)).start()
 
-	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
-					 IPv6(dst=public_nat64_ipv6, src=VM1.ipv6, nh=58) /
+	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
+					 IPv6(dst=public_nat64_ipv6, src=VM1.ipv6) /
 					 ICMPv6EchoRequest(seq=1))
 
 	delayed_sendp(icmp_pkt, VM1.tap)
@@ -123,8 +123,8 @@ def reply_tcp_if_port_not(forbidden_port, nat_ul_ipv6):
 		f"Bad TCP packet (ip: {src_ip}, sport: {sport})"
 
 	if forbidden_port is None or sport != forbidden_port:
-		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-					 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+		reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+					 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst) /
 					 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 					 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 		delayed_sendp(reply_pkt, PF0.tap)
@@ -139,7 +139,7 @@ def reply_tcp_pkt_from_vm1_max_port(nat_ul_ipv6):
 	reply_tcp_if_port_not(sport, nat_ul_ipv6)
 
 def send_tcp_through_port(port):
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IP(dst=public_ip3, src=VM1.ip) /
 			   TCP(sport=port))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -152,7 +152,7 @@ def send_tcp_through_port(port):
 
 def send_tcp_through_port_with_ipv6(port):
 
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IPv6(dst=public_nat64_ipv6, src=VM1.ipv6) /
 			   TCP(sport=port))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -190,8 +190,8 @@ def test_vf_to_pf_network_nat_tcp_with_ipv6(prepare_ipv4, grpc_client):
 
 def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ul_ipv6):
 	pkt = sniff_packet(pf_name, is_tcp_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=vip_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=vip_ul_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, pf_name)
@@ -199,7 +199,7 @@ def encaped_tcp_in_ipv6_vip_responder(pf_name, vip_ul_ipv6):
 def request_tcp(dport, pf_name, vip_ul_ipv6):
 	threading.Thread(target=encaped_tcp_in_ipv6_vip_responder, args=(pf_name, vip_ul_ipv6)).start()
 	# vm2 (vf1) -> PF0/PF1 (internet traffic), vm2 has VIP, check on PFs side, whether VIP is source (SNAT)
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM2.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM2.mac) /
 			   IP(dst=public_ip, src=VM2.ip) /
 			   TCP(sport=1240, dport=dport))
 	delayed_sendp(tcp_pkt, VM2.tap)
@@ -216,15 +216,15 @@ def test_vf_to_pf_vip_snat(prepare_ipv4, grpc_client, port_redundancy):
 def reply_with_icmp_err_fragment_needed(pf_name, nat_ul_ipv6):
 	pkt = sniff_packet(pf_name, is_tcp_pkt)
 	orig_ip_pkt = pkt[IP]
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=orig_ip_pkt.src, src=orig_ip_pkt.dst) /
 				 ICMP(type=3, code=4, unused=1280) /
 				 orig_ip_pkt)
 	# https://blog.cloudflare.com/path-mtu-discovery-in-practice/
 	"""
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=nat_ul_ipv6, src=pkt[IPv6].dst) /
 				 IP(dst=orig_ip_pkt.src, src=orig_ip_pkt.dst) /
 				 ICMP(type=3, code=4, unused=1280) /
 				 str(orig_ip_pkt)[:28])
@@ -234,7 +234,7 @@ def reply_with_icmp_err_fragment_needed(pf_name, nat_ul_ipv6):
 def request_icmperr(dport, pf_name, nat_ul_ipv6):
 	threading.Thread(target=reply_with_icmp_err_fragment_needed, args=(pf_name, nat_ul_ipv6)).start();
 
-	tcp_pkt = (Ether(dst=ipv6_multicast_mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=ipv6_multicast_mac, src=VM1.mac) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(sport=1256, dport=dport))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -259,7 +259,7 @@ def test_vf_to_pf_firewall_tcp_block(prepare_ipv4, grpc_client):
 	resp_thread.start()
 	# Allow only tcp packets leaving the VM with destination port 453
 	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=453, dst_port_max=453, direction="egress")
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(dport=1024))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -277,7 +277,7 @@ def test_vf_to_pf_firewall_tcp_allow(prepare_ipv4, grpc_client, port_redundancy)
 	resp_thread.start()
 	# Allow only tcp packets leaving the VM with destination port 453
 	grpc_client.addfwallrule(VM1.name, "fw1-vm1", proto="tcp", dst_port_min=453, dst_port_max=453, direction="egress")
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IP(dst=public_ip, src=VM1.ip) /
 			   TCP(dport=453))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -295,7 +295,7 @@ def test_vf_to_pf_firewall_ipv6_tcp_allow(prepare_ipv4, grpc_client, port_redund
 	resp_thread.start()
 	# Allow only tcp packets leaving the VM with destination port 456
 	grpc_client.addfwallrule(VM1.name, "fw1-vm16", src_prefix="::/0", dst_prefix="::/0", proto="tcp", dst_port_min=456, dst_port_max=456, direction="egress")
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x86DD) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IPv6(dst=public_ipv6, src=VM1.ipv6) /
 			   TCP(dport=456))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -307,8 +307,8 @@ def test_vf_to_pf_firewall_ipv6_tcp_allow(prepare_ipv4, grpc_client, port_redund
 
 def encaped_tcp_ipv6_in_ipv6_responder(pf_name):
 	pkt = sniff_packet(pf_name, is_ipv6_tcp_pkt)
-	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst, type=0x86DD) /
-				 IPv6(dst=pkt.getlayer(IPv6,1).src, src=pkt.getlayer(IPv6,1).dst, nh=0x29) /
+	reply_pkt = (Ether(dst=pkt.getlayer(Ether).src, src=pkt.getlayer(Ether).dst) /
+				 IPv6(dst=pkt.getlayer(IPv6,1).src, src=pkt.getlayer(IPv6,1).dst) /
 				 IPv6(dst=pkt.getlayer(IPv6,2).src, src=pkt.getlayer(IPv6,2).dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, pf_name)
@@ -316,7 +316,7 @@ def encaped_tcp_ipv6_in_ipv6_responder(pf_name):
 def test_vf_to_pf_tcp_in_ipv6(prepare_ipv4, grpc_client):
 	threading.Thread(target=encaped_tcp_ipv6_in_ipv6_responder, args=(PF0.tap,)).start()
 	# vm2 (vf1) -> PF0 (ipv6 internet traffic), PF0 replies back
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM2.mac, type=0x86DD) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM2.mac) /
 			   IPv6(dst=public_ipv6, src=VM2.ipv6) /
 			   TCP(sport=1240, dport=180))
 	delayed_sendp(tcp_pkt, VM2.tap)

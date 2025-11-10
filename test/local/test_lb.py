@@ -19,8 +19,8 @@ def router_loopback(dst_ipv6, check_ipv4_src, check_ipv4_dst):
 		f"Invalid LB->VM destination IP {pkt[IP].dst}"
 	assert pkt[IP].src == check_ipv4_src, \
 		f"Bad request (src ip: {pkt[IP].src})"
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=dst_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=dst_ipv6, src=pkt[IPv6].dst) /
 				 IP(src=pkt[IP].src, dst=pkt[IP].dst) /
 				 TCP(dport=pkt[TCP].dport, sport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, PF0.tap)
@@ -28,7 +28,7 @@ def router_loopback(dst_ipv6, check_ipv4_src, check_ipv4_dst):
 def communicate_vip_lb(vm, lb_ipv6, src_ipv6, src_ipv4, vf_tap, sport):
 	threading.Thread(target=router_loopback, args=(lb_ipv6, src_ipv4, lb_ip)).start()
 	# vm(VIP) HTTP request to LB(VM1,VM2) server
-	vm_pkt = (Ether(dst=PF0.mac, src=vm.mac, type=0x0800) /
+	vm_pkt = (Ether(dst=PF0.mac, src=vm.mac) /
 			   IP(dst=lb_ip, src=vm.ip) /
 			   TCP(sport=sport, dport=80))
 	delayed_sendp(vm_pkt, vm.tap)
@@ -41,7 +41,7 @@ def communicate_vip_lb(vm, lb_ipv6, src_ipv6, src_ipv4, vf_tap, sport):
 
 	threading.Thread(target=router_loopback, args=(src_ipv6, lb_ip, src_ipv4)).start()
 	# HTTP response back to VIP(vm)
-	srv_reply = (Ether(dst=srv_pkt[Ether].src, src=srv_pkt[Ether].dst, type=0x0800) /
+	srv_reply = (Ether(dst=srv_pkt[Ether].src, src=srv_pkt[Ether].dst) /
 				 IP(dst=srv_pkt[IP].src, src=srv_pkt[IP].dst) /
 				 TCP(sport=srv_pkt[TCP].dport, dport=srv_pkt[TCP].sport))
 	delayed_sendp(srv_reply, vf_tap)
@@ -78,8 +78,8 @@ def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 
 
 def send_bounce_pkt_to_pf(ipv6_lb):
-	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-				 IPv6(dst=ipv6_lb, src=local_ul_ipv6, nh=4) /
+	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac,) /
+				 IPv6(dst=ipv6_lb, src=local_ul_ipv6) /
 				 IP(dst=lb_ip, src=public_ip) /
 				 TCP(sport=8989, dport=80))
 	delayed_sendp(bouce_pkt, PF0.tap)
@@ -102,7 +102,7 @@ def test_external_lb_relay(prepare_ipv4, grpc_client):
 
 def send_bounce_icmp_pkt_to_pf(ipv6_lb):
 	bounce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
-				IPv6(dst=ipv6_lb, src=local_ul_ipv6, nh=4) /
+				IPv6(dst=ipv6_lb, src=local_ul_ipv6) /
 				IP(dst=lb_ip, src=public_ip) /
 				ICMP(type=3, code=4) /  # Type 3: Destination Unreachable, Code 4: fragmentation needed and DF set
 				IP(dst=public_ip, src=lb_ip) /
@@ -134,8 +134,8 @@ def test_network_lb_external_icmpv6_echo(prepare_ipv4, grpc_client):
 
 
 def send_bounce_ipv6_pkt_to_pf(ipv6_lb):
-	bounce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-				 IPv6(dst=ipv6_lb, src=local_ul_ipv6, nh=0x29) /
+	bounce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+				 IPv6(dst=ipv6_lb, src=local_ul_ipv6) /
 				 IPv6(dst=lb_ip6, src=public_ipv6) /
 				 TCP(sport=8989, dport=8080))
 	delayed_sendp(bounce_pkt, PF0.tap)

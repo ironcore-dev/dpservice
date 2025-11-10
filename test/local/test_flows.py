@@ -49,8 +49,8 @@ def test_nat_table_flush(prepare_ipv4, grpc_client, port_redundancy):
 
 
 def send_bounce_pkt_to_pf(ipv6_nat):
-	bounce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-				  IPv6(dst=ipv6_nat, src=router_ul_ipv6, nh=4) /
+	bounce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+				  IPv6(dst=ipv6_nat, src=router_ul_ipv6) /
 				  IP(dst=nat_vip, src=public_ip) /
 				  TCP(sport=8989, dport=510))
 	delayed_sendp(bounce_pkt, PF0.tap)

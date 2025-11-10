@@ -212,8 +212,8 @@ def stop_process(process):
 
 
 def _send_external_icmp_echo(dst_ipv4, ul_ipv6):
-	icmp_pkt = (Ether(dst=PF0.mac, src=ipv6_multicast_mac, type=0x86DD) /
-			    IPv6(dst=ul_ipv6, src=router_ul_ipv6, nh=4) /
+	icmp_pkt = (Ether(dst=PF0.mac, src=ipv6_multicast_mac) /
+			    IPv6(dst=ul_ipv6, src=router_ul_ipv6) /
 			    IP(dst=dst_ipv4, src=public_ip) /
 			    ICMP(type=8, id=0x0040))
 	delayed_sendp(icmp_pkt, PF0.tap)
@@ -226,9 +226,9 @@ def external_ping(dst_ipv4, ul_ipv6):
 
 
 def _send_external_icmp_echo6(dst_ipv6, ul_ipv6):
-	icmp_pkt = (Ether(dst=PF0.mac, src=ipv6_multicast_mac, type=0x86DD) /
-				IPv6(dst=ul_ipv6, src=router_ul_ipv6, nh=0x29) /
-				IPv6(dst=dst_ipv6, src=public_ipv6, nh=58) /
+	icmp_pkt = (Ether(dst=PF0.mac, src=ipv6_multicast_mac) /
+				IPv6(dst=ul_ipv6, src=router_ul_ipv6) /
+				IPv6(dst=dst_ipv6, src=public_ipv6) /
 				ICMPv6EchoRequest())
 	delayed_sendp(icmp_pkt, PF0.tap)
 

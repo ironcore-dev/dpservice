@@ -52,8 +52,8 @@ def test_network_nat_external_icmp_echo(prepare_ipv4, grpc_client):
 	grpc_client.delnat(VM1.name)
 
 def send_bounce_pkt_to_pf(ipv6_nat):
-	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-				 IPv6(dst=ipv6_nat, src=router_ul_ipv6, nh=4) /
+	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+				 IPv6(dst=ipv6_nat, src=router_ul_ipv6) /
 				 IP(dst=nat_vip, src=public_ip) /
 				 TCP(sport=8989, dport=510))
 	delayed_sendp(bouce_pkt, PF0.tap)
@@ -102,8 +102,8 @@ def test_network_nat_pkt_relay(prepare_ifaces, grpc_client):
 
 
 def send_foreign_ip_nat_pkt_to_pf(ipv6_nat):
-	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac, type=0x86DD) /
-				 IPv6(dst=ipv6_nat, src=router_ul_ipv6, nh=4) /
+	bouce_pkt = (Ether(dst=ipv6_multicast_mac, src=PF0.mac) /
+				 IPv6(dst=ipv6_nat, src=router_ul_ipv6) /
 				 IP(dst="1.2.3.4", src=public_ip) /
 				 TCP(sport=8989, dport=510))
 	delayed_sendp(bouce_pkt, PF0.tap)
@@ -146,8 +146,8 @@ def router_nat_vip(dst_ipv6, check_ipv4):
 	pkt = sniff_packet(PF0.tap, is_tcp_pkt)
 	assert pkt[IP].src == check_ipv4, \
 		f"Bad request (src ip: {pkt[IP].src})"
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
-				 IPv6(dst=dst_ipv6, src=pkt[IPv6].dst, nh=4) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IPv6(dst=dst_ipv6, src=pkt[IPv6].dst) /
 				 IP(src=pkt[IP].src, dst=pkt[IP].dst) /
 				 TCP(dport=pkt[TCP].dport, sport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, PF0.tap)
@@ -161,7 +161,7 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 
 	threading.Thread(target=router_nat_vip, args=(vip_ul_ipv6, nat_vip)).start()
 	grpc_client.addfwallrule(VM3.name, "fw0-vm3", proto="tcp", dst_port_min=1024, dst_port_max=1024)
-	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			   IP(dst=vip_vip, src=VM1.ip) /
 			   TCP(dport=1024))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -172,7 +172,7 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 
 	threading.Thread(target=router_nat_vip, args=(nat_ul_ipv6, vip_vip)).start()
 
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, VM3.tap)

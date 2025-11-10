@@ -8,7 +8,7 @@ from helpers import *
 
 def vf_to_vf_tcp_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_tcp_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, vf_tap)
@@ -17,7 +17,7 @@ def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
 
 	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=1234, dst_port_max=1234)
-	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
 			   IP(dst=VM2.ip, src=VM1.ip) /
 			   TCP(dport=1234))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -34,7 +34,7 @@ def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 
 	# vm1 (vf0) -> vm2 (vf2), vm2 has VIP, send packet to VIP from vm1 side, whether the packet is received
 	# and sent back by vm2 (DNAT)
-	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
 			   IP(dst=vip_vip, src=VM1.ip) /
 			   TCP(sport=1200, dport=1235))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -52,7 +52,7 @@ def test1_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 
 	#Accept only tcp packets from the source ip VM1.ip / 32, do not care about the rest
 	grpc_client.addfwallrule(VM2.name, "fw1-vm2", src_prefix=f"{VM1.ip}/32", proto="tcp")
-	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
 			   IP(dst=VM2.ip, src=VM1.ip) /
 			   TCP(sport=1001, dport=1234))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -71,7 +71,7 @@ def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 
 	#Accept only tcp packets from the source ip 1.2.3.4 / 16 range, do not care about the rest
 	grpc_client.addfwallrule(VM2.name, "fw0-vm2", src_prefix="1.2.3.4/16", proto="tcp")
-	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) /
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
 			   IP(dst=VM2.ip, src=VM1.ip) /
 			   TCP(sport=1002, dport=1234))
 	delayed_sendp(tcp_pkt, VM1.tap)
@@ -84,7 +84,7 @@ def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 
 def vf_to_vf_icmp_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_icmp_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x0800) / IP(dst=pkt[IP].src, src=pkt[IP].dst) / ICMP(type=0, id=pkt[ICMP].id))
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) / IP(dst=pkt[IP].src, src=pkt[IP].dst) / ICMP(type=0, id=pkt[ICMP].id))
 	delayed_sendp(reply_pkt, vf_tap)
 
 	pkt = sniff_packet(vf_tap, is_icmp_pkt)
@@ -95,7 +95,7 @@ def test_vf_to_vf_icmp(prepare_ipv4, grpc_client):
 	grpc_client.addfwallrule(VM2.name, "fw0-vm-icmp", proto="icmp")
 	grpc_client.addfwallrule(VM1.name, "fw0-vm-icmp", proto="icmp")
 	icmp_respond_thread = threading.Thread(target=vf_to_vf_icmp_responder, args=(VM2.tap,))
-	icmp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x0800) / IP(dst=VM2.ip, src=VM1.ip) / ICMP(type=8, id=0x0040))
+	icmp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) / IP(dst=VM2.ip, src=VM1.ip) / ICMP(type=8, id=0x0040))
 	icmp_respond_thread.start()
 	delayed_sendp(icmp_pkt, VM1.tap)
 	sniff_packet(VM1.tap, is_icmp_pkt)
@@ -107,7 +107,7 @@ def test_vf_to_vf_icmp(prepare_ipv4, grpc_client):
 
 def vf_to_vf_icmpv6_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_icmpv6_echo_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) / IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst, nh=58) / ICMPv6EchoReply(type=129))
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) / IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst) / ICMPv6EchoReply(type=129))
 	delayed_sendp(reply_pkt, vf_tap)
 	pkt = sniff_packet(vf_tap, is_icmpv6_echo_pkt)
 	delayed_sendp(reply_pkt, vf_tap)
@@ -117,7 +117,7 @@ def test_vf_to_vf_icmpv6(prepare_ipv4, grpc_client):
 	grpc_client.addfwallrule(VM2.name, "fw0-vm-icmp", src_prefix="::/0", dst_prefix="::/0", proto="icmp")
 	grpc_client.addfwallrule(VM1.name, "fw0-vm-icmp", src_prefix="::/0", dst_prefix="::/0", proto="icmp")
 	icmpv6_respond_thread = threading.Thread(target=vf_to_vf_icmpv6_responder, args=(VM2.tap,))
-	icmpv6_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x86DD) / IPv6(dst=VM2.ipv6, src=VM1.ipv6, nh=58) / ICMPv6EchoRequest())
+	icmpv6_pkt = (Ether(dst=VM2.mac, src=VM1.mac) / IPv6(dst=VM2.ipv6, src=VM1.ipv6) / ICMPv6EchoRequest())
 	icmpv6_respond_thread.start()
 	delayed_sendp(icmpv6_pkt, VM1.tap)
 	sniff_packet(VM1.tap, is_icmpv6echo_reply_pkt)
@@ -129,7 +129,7 @@ def test_vf_to_vf_icmpv6(prepare_ipv4, grpc_client):
 
 def vf_to_vf_ipv6_tcp_responder(vf_tap):
 	pkt = sniff_packet(vf_tap, is_ipv6_tcp_pkt)
-	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst, type=0x86DD) /
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
 				 IPv6(dst=pkt[IPv6].src, src=pkt[IPv6].dst) /
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, vf_tap)
@@ -140,7 +140,7 @@ def test_vf_to_vf_ipv6_tcp(prepare_ipv4, grpc_client):
 	threading.Thread(target=vf_to_vf_ipv6_tcp_responder, args=(VM2.tap,)).start()
 	grpc_client.addfwallrule(VM2.name, "fw0-vm6" , src_prefix="::/0", dst_prefix="::/0", proto="tcp", dst_port_min=1235, dst_port_max=1235)
 
-	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac, type=0x86DD) /
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
 			   IPv6(dst=VM2.ipv6, src=VM1.ipv6) /
 			   TCP(dport=1235))
 	delayed_sendp(tcp_pkt, VM1.tap)
