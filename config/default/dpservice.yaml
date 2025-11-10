@@ -25,8 +25,6 @@ spec:
         command:
         - prepare.sh
         volumeMounts:
-        - mountPath: /dev
-          name: hugepages
         - mountPath: /run/dpservice
           name: run
         securityContext:
