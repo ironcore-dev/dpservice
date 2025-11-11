@@ -10,6 +10,7 @@
 
 const char *dp_conf_get_eal_file_prefix(void);
 bool dp_conf_is_showing_drops(void);
+int dp_conf_get_count(void);
 bool dp_conf_is_stop_mode(void);
 
 enum dp_conf_runmode {

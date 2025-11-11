@@ -3,6 +3,7 @@
 
 #include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
 #include <regex.h>
 #include <signal.h>
 #include <stdio.h>
@@ -46,6 +47,8 @@ static char packet_filter[DP_GRAPHTRACE_FILTER_MAXLEN] = "";
 
 static bool interrupt = false;
 static bool primary_alive = false;
+
+static unsigned int packet_limit = UINT_MAX;
 
 // optimization to prevent 'if (pcap) pcap_dump(); else print_packet();' in a loop
 static void print_packet(struct dp_pcap *dp_pcap, struct rte_mbuf *m, struct timeval *timestamp);
@@ -128,9 +131,14 @@ static int dp_graphtrace_dump(struct dp_graphtrace *graphtrace)
 			// TODO timestamp should be sent by dpservice
 			// ignoring failure for speed
 			gettimeofday(&timestamp, NULL);
-			for (unsigned int i = 0; i < received; ++i)
+			for (unsigned int i = 0; i < received; ++i) {
 				dump_func(&dp_pcap, (struct rte_mbuf *)objs[i], &timestamp);
+				if (--packet_limit == 0)
+					break;
+			}
 			rte_mempool_put_bulk(graphtrace->mempool, objs, received);
+			if (packet_limit == 0)
+				break;
 		}
 		if (available == 0)
 			usleep(WAIT_INTERVAL);
@@ -292,6 +300,9 @@ static int do_graphtrace(void)
 			return ret;
 		}
 	}
+
+	if (dp_conf_get_count() > 0)
+		packet_limit = dp_conf_get_count();
 
 	ret = dp_graphtrace_main();
 

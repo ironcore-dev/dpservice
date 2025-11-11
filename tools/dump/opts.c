@@ -17,6 +17,7 @@
 enum {
 	OPT_HELP = 'h',
 	OPT_VERSION = 'v',
+	OPT_MAXCOUNT = 'c',
 _OPT_SHOPT_MAX = 255,
 	OPT_FILE_PREFIX,
 	OPT_DROPS,
@@ -27,6 +28,7 @@ _OPT_SHOPT_MAX = 255,
 };
 
 #define OPTSTRING ":hv" \
+	"c:" \
 
 static const struct option dp_conf_longopts[] = {
 	{ "help", 0, 0, OPT_HELP },
@@ -36,12 +38,14 @@ static const struct option dp_conf_longopts[] = {
 	{ "nodes", 1, 0, OPT_NODES },
 	{ "filter", 1, 0, OPT_FILTER },
 	{ "pcap", 1, 0, OPT_PCAP },
+	{ "maxcount", 1, 0, OPT_MAXCOUNT },
 	{ "stop", 0, 0, OPT_STOP },
 	{ NULL, 0, 0, 0 }
 };
 
 static char eal_file_prefix[32];
 static bool showing_drops = false;
+static int count = 0;
 static bool stop_mode = false;
 
 const char *dp_conf_get_eal_file_prefix(void)
@@ -52,6 +56,11 @@ const char *dp_conf_get_eal_file_prefix(void)
 bool dp_conf_is_showing_drops(void)
 {
 	return showing_drops;
+}
+
+int dp_conf_get_count(void)
+{
+	return count;
 }
 
 bool dp_conf_is_stop_mode(void)
@@ -78,6 +87,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --nodes=REGEX         show graph node traversal, limit to REGEX-matched nodes (empty string for all)\n"
 		"     --filter=FILTER       show only packets matching a pcap-style FILTER\n"
 		"     --pcap=FILE           write packets into a PCAP file\n"
+		" -c, --maxcount=COUNT      exit after receiving COUNT packets\n"
 		"     --stop                do nothing, only make sure tracing is disabled in dp-service\n"
 	, progname);
 }
@@ -96,6 +106,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_opt_filter(arg);
 	case OPT_PCAP:
 		return dp_argparse_opt_pcap(arg);
+	case OPT_MAXCOUNT:
+		return dp_argparse_int(arg, &count, 0, INT_MAX);
 	case OPT_STOP:
 		return dp_argparse_store_true(&stop_mode);
 	default:

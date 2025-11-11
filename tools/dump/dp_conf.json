@@ -34,6 +34,16 @@
       "arg": "FILE"
     },
     {
+      "shopt": "c",
+      "lgopt": "maxcount",
+      "help": "exit after receiving COUNT packets",
+      "arg": "COUNT",
+      "var": "count",
+      "type": "int",
+      "min": 0,
+      "default": 0
+    },
+    {
       "lgopt": "stop",
       "help": "do nothing, only make sure tracing is disabled in dp-service",
       "var": "stop_mode",
