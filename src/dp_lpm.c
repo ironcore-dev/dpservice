@@ -190,18 +190,11 @@ static int dp_list_route_entry(struct rte_rib_node *node,
 	return DP_GRPC_OK;
 }
 
-int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
-				   struct dp_grpc_responder *responder)
+static int dp_list_route_table(const struct dp_port *port, struct rte_rib *root, bool ext_routes,
+							   struct dp_grpc_responder *responder)
 {
 	struct rte_rib_node *node;
-	struct rte_rib *root;
 	int ret;
-
-	root = dp_get_vni_route4_table(vni);
-	if (!root)
-		return DP_GRPC_ERR_NO_VNI;
-
-	dp_grpc_set_multireply(responder, sizeof(struct dpgrpc_route));
 
 	node = rte_rib_lookup_exact(root, RTE_IPV4(0, 0, 0, 0), 0);
 	if (node) {
@@ -218,6 +211,51 @@ int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
 	}
 
 	return DP_GRPC_OK;
+}
+
+static int dp_list_single_route_table(const struct dp_port *port, uint32_t vni, bool ext_routes,
+									  struct dp_grpc_responder *responder)
+{
+	struct rte_rib *root;
+
+	root = dp_get_vni_route4_table(vni);
+	if (!root)
+		return DP_GRPC_ERR_NO_VNI;
+
+	return dp_list_route_table(port, root, ext_routes, responder);
+}
+
+static int dp_list_all_route_tables(const struct dp_port *port, bool ext_routes,
+									struct dp_grpc_responder *responder)
+{
+	struct dp_vni_data *vni_data;
+	const struct dp_vni_key *vni_key;
+	uint32_t iter = 0;
+	int32_t ret;
+
+	if (rte_hash_count(vni_handle_tbl) == 0)
+		return DP_GRPC_OK;
+
+	while ((ret = rte_hash_iterate(vni_handle_tbl, (const void **)&vni_key, (void **)&vni_data, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot iterate VNI table", DP_LOG_RET(ret));
+			return DP_GRPC_ERR_ITERATOR;
+		}
+		dp_list_single_route_table(port, vni_key->vni, ext_routes, responder);
+		// ignore errors, show as much as possible
+	}
+	return DP_GRPC_OK;
+}
+
+int dp_list_routes(const struct dp_port *port, uint32_t vni, bool ext_routes,
+				   struct dp_grpc_responder *responder)
+{
+	dp_grpc_set_multireply(responder, sizeof(struct dpgrpc_route));
+
+	if (vni == 0)
+		return dp_list_all_route_tables(port, ext_routes, responder);
+	else
+		return dp_list_single_route_table(port, vni, ext_routes, responder);
 }
 
 int dp_add_route6(const struct dp_port *port, uint32_t vni, uint32_t t_vni, const union dp_ipv6 *ipv6,
