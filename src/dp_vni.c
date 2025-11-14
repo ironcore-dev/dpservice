@@ -240,6 +240,10 @@ int dp_reset_all_vni_route_tables(void)
 		return DP_OK;
 
 	while ((ret = rte_hash_iterate(vni_handle_tbl, (const void **)&vni_key, (void **)&vni_data, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret)) {
+			DPS_LOG_ERR("Cannot iterate VNI table", DP_LOG_RET(ret));
+			return DP_ERROR;
+		}
 		if (DP_FAILED(dp_reset_vni_data(vni_key->vni, vni_data)))
 			return DP_ERROR;
 	}
