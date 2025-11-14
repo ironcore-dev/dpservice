@@ -62,7 +62,7 @@ public_ip = "45.86.6.6"
 public_ip2 = "45.86.6.106"
 public_ip3 = "45.86.6.206"
 public_ipv6 = "2001:4860:4860::8888"
-public_nat64_ipv6 = "64:ff9b::808:808"
+public_nat64_ipv6 = "64:ff9b::2d56:0606"
 
 # Virtual IP functionality
 vip_vip = "172.20.0.1"
@@ -102,6 +102,15 @@ sniff_short_timeout = 1
 grpc_port = 1337
 exporter_port = 9064
 
+# HA config
+grpc_port_b = grpc_port+1
+pf_tap_pattern_b = "b_dtap"
+vf_tap_pattern_b = "b_dtapvf_"
+sync_bridge = "dps_sync_br"
+sync_tap_a = "dps_sync_a"
+sync_tap_b = "dps_sync_b"
+active_lockfile = "/tmp/dpservice_pytest.lock"
+
 # Extra testing options
 flow_timeout = 1
 
@@ -114,6 +123,7 @@ class PFSpec:
 		pf.tap = f"{pf_tap_pattern}{PFSpec._idx}"
 		pf.pci = f"{pci_pattern}{PFSpec._idx}"
 		pf.mac = f"{pf_mac_pattern}{PFSpec._idx:02}"
+		pf.tap_b = f"{pf_tap_pattern_b}{PFSpec._idx}"
 		PFSpec._idx += 1
 		return pf
 	def get_count():
@@ -129,6 +139,7 @@ class VMSpec:
 		vm.tap = f"{vf_tap_pattern}{VMSpec._idx}"
 		vm.pci = f"{pci_pattern}{VMSpec._idx+PFSpec.get_count()}"
 		vm.mac = f"{vf_mac_pattern}{VMSpec._idx:02}"
+		vm.tap_b = f"{vf_tap_pattern_b}{VMSpec._idx}"
 		vm.ip = f"{ov_ip_prefix}{vni}.1.{VMSpec._idx+1}"
 		vm.ipv6 = f"{ov_ipv6_prefix}{vni}:1::{VMSpec._idx+1}"
 		vm.ul_ipv6 = None  # will be assigned dynamically

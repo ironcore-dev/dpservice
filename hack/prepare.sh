@@ -10,6 +10,7 @@ set -Eeuo pipefail
 #
 
 OPT_MULTIPORT=false
+OPT_SYNC_BRIDGE=false
 
 BLUEFIELD_IDENTIFIERS=("MT_0000000543" "MT_0000000541")
 MAX_NUMVFS_POSSIBLE=126
@@ -146,7 +147,7 @@ function vfio_bind() {
 	local pf0="${devs[0]}"
 
 	lsmod | grep -q '^vfio_pci' || {
-		log "vfio-pci module not loaded, loading it"	
+		log "vfio-pci module not loaded, loading it"
 		modprobe vfio-pci
 	}
 
@@ -351,6 +352,31 @@ function make_config() {
 	fi
 }
 
+function create_sync_bridge() {
+	local sync_bridge="dps_sync_br"
+	local sync_tap_a="dps_sync_a"
+	local sync_tap_b="dps_sync_b"
+
+	log "Creating shared bridge between dpservice-a and dpservice-b"
+
+	ip link show $sync_bridge || ip link add $sync_bridge type bridge
+	# Prevents unnecessary traffic on the bridge
+	echo 0 > /sys/class/net/$sync_bridge/bridge/multicast_snooping
+
+	for sync_tap in $sync_tap_a $sync_tap_b; do
+		ip link show $sync_tap || ip tuntap add dev $sync_tap mode tap multi_queue
+		# Large queue in case the new dpservice is slow in processing
+		ip link set $sync_tap txqueuelen 100000
+		ip link set $sync_tap master $sync_bridge
+	done
+
+	for iface in $sync_tap_a $sync_tap_b $sync_bridge; do
+		# Prevents unnecessary NA/ND traffic
+		sysctl net.ipv6.conf.$iface.disable_ipv6=1
+		ip link set $iface up
+	done
+}
+
 # main
 CONFIG_EXISTS=false
 if [[ -e $CONFIG ]]; then
@@ -374,6 +400,9 @@ while [[ $# -gt 0 ]]; do
 		--vfio-bind-only)
 			VFIO_BIND_ONLY=true
 			;;
+		--sync-bridge)
+			OPT_SYNC_BRIDGE=true
+			;;
 		*)
 			err "Invalid argument $1"
 	esac
@@ -395,3 +424,10 @@ if [[ "$IS_ARM_WITH_BLUEFIELD" == "true" ]]; then
 fi
 create_vf
 make_config
+
+# Create shared connection between dpservice-a and dpservice-b
+# This has the downside of being called twice (each dpservice will try to do it)
+# But the operation is idempotent, so it should not be a problem
+if [[ "$OPT_SYNC_BRIDGE" == "true" ]]; then
+	create_sync_bridge
+fi

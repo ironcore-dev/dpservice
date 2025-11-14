@@ -1,0 +1,145 @@
+#include "dp_sync.h"
+
+#include "dp_error.h"
+#include <rte_ether.h>
+
+#define DP_SYNC_HEADERS_LEN (sizeof(struct rte_ether_hdr) + sizeof(struct dp_sync_hdr))
+
+static const struct rte_ether_addr sync_mac_src = { .addr_bytes = { 0x02, 'd', 'p', 's', 0, 1 } };
+static const struct rte_ether_addr sync_mac_dst = { .addr_bytes = { 0x02, 'd', 'p', 's', 0, 2 } };
+
+
+static struct rte_mbuf *dp_sync_alloc_message(uint8_t msg_type, uint16_t payload_len)
+{
+	struct dp_dpdk_layer *dp_layer = get_dpdk_layer();
+	struct rte_mbuf *pkt;
+	struct rte_ether_hdr *eth_hdr;
+	struct dp_sync_hdr *sync_hdr;
+
+	pkt = rte_pktmbuf_alloc(dp_layer->rte_mempool);
+	if (!pkt) {
+		DPS_LOG_ERR("Failed to allocate sync packet");
+		return NULL;
+	}
+
+	eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_append(pkt, DP_SYNC_HEADERS_LEN + payload_len);
+	if (!eth_hdr) {
+		DPS_LOG_ERR("Failed to allocate sync packet payload");
+		rte_pktmbuf_free(pkt);
+		return NULL;
+	}
+	rte_ether_addr_copy(&sync_mac_src, &eth_hdr->src_addr);
+	rte_ether_addr_copy(&sync_mac_dst, &eth_hdr->dst_addr);
+	eth_hdr->ether_type = htons(DP_SYNC_ETHERTYPE);
+
+	sync_hdr = (struct dp_sync_hdr *)(eth_hdr + 1);
+	sync_hdr->msg_type = msg_type;
+
+	return pkt;
+}
+
+static int dp_sync_send_message(struct rte_mbuf *pkt)
+{
+	const struct dp_port *port = dp_get_sync_port();
+	struct rte_mbuf *pkts[1] = { pkt };
+	int sent;
+
+	sent = rte_eth_tx_burst(port->port_id, 0, pkts, 1);
+	if (sent != 1) {
+		DPS_LOG_WARNING("Failed to send sync packet");
+		rte_pktmbuf_free(pkt);
+	}
+
+	return DP_OK;
+}
+
+
+int dp_sync_send_nat_create(const struct netnat_portmap_key *portmap_key,
+							const struct netnat_portoverload_tbl_key *portoverload_key,
+							uint16_t created_port_id,
+							uint16_t icmp_type_src, rte_be16_t icmp_err_ip_cksum)
+{
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_nat_create *pkt_data;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_NAT_CREATE, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	memcpy(&pkt_data->portmap_key, portmap_key, sizeof(*portmap_key));
+	memcpy(&pkt_data->portoverload_key, portoverload_key, sizeof(*portoverload_key));
+	pkt_data->created_port_id = created_port_id;
+	pkt_data->icmp_type_src = icmp_type_src;
+	pkt_data->icmp_err_ip_cksum = icmp_err_ip_cksum;
+
+	return dp_sync_send_message(pkt);
+}
+
+int dp_sync_send_nat_delete(const struct netnat_portmap_key *portmap_key,
+							const struct netnat_portoverload_tbl_key *portoverload_key)
+{
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_nat_delete *pkt_data;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_NAT_DELETE, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	memcpy(&pkt_data->portmap_key, portmap_key, sizeof(*portmap_key));
+	memcpy(&pkt_data->portoverload_key, portoverload_key, sizeof(*portoverload_key));
+
+	return dp_sync_send_message(pkt);
+}
+
+#ifdef ENABLE_VIRTSVC
+int dp_sync_send_virtsvc_conn(const struct dp_virtsvc *virtsvc, uint16_t conn_port,
+							  rte_be32_t vf_ip, rte_be16_t vf_l4_port, uint16_t vf_port_id)
+{
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_virtsvc_conn *pkt_data;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_VIRTSVC_CONN, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	pkt_data->virtual_addr = virtsvc->virtual_addr;
+	pkt_data->virtual_port = virtsvc->virtual_port;
+	pkt_data->proto = virtsvc->proto;
+	pkt_data->conn_port = conn_port;
+	pkt_data->vf_ip = vf_ip;
+	pkt_data->vf_l4_port = vf_l4_port;
+	pkt_data->vf_port_id = vf_port_id;
+
+	return dp_sync_send_message(pkt);
+}
+#endif
+
+int dp_sync_send_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+{
+	struct rte_mbuf *pkt;
+	struct dp_sync_msg_port_mac *pkt_data;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_PORT_MAC, sizeof(*pkt_data));
+	if (!pkt)
+		return DP_ERROR;
+
+	pkt_data = rte_pktmbuf_mtod_offset(pkt, typeof(pkt_data), DP_SYNC_HEADERS_LEN);
+	pkt_data->port_id = port_id;
+	rte_ether_addr_copy(mac, &pkt_data->mac);
+
+	return dp_sync_send_message(pkt);
+}
+
+int dp_sync_send_request_dump(void)
+{
+	struct rte_mbuf *pkt;
+
+	pkt = dp_sync_alloc_message(DP_SYNC_MSG_REQUEST_DUMP, 0);
+	if (!pkt)
+		return DP_ERROR;
+
+	return dp_sync_send_message(pkt);
+}

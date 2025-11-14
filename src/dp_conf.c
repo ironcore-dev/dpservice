@@ -38,7 +38,7 @@ static struct dp_conf_dhcp_dns dhcpv6_dns = {0};
 static struct dp_conf_virtual_services virtual_services = {0};
 #endif
 
-int dp_conf_is_wcmp_enabled(void)
+bool dp_conf_is_wcmp_enabled(void)
 {
 	return wcmp_perc < 100;
 }
@@ -66,6 +66,16 @@ const struct dp_conf_dhcp_dns *dp_conf_get_dhcp_dns(void)
 const struct dp_conf_dhcp_dns *dp_conf_get_dhcpv6_dns(void)
 {
 	return &dhcpv6_dns;
+}
+
+bool dp_conf_is_tap_mode(void)
+{
+	return nic_type == DP_CONF_NIC_TYPE_TAP;
+}
+
+bool dp_conf_is_sync_enabled(void)
+{
+	return sync_tap[0] != '\0';
 }
 
 #ifdef ENABLE_VIRTSVC

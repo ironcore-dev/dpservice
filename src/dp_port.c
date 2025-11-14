@@ -9,6 +9,7 @@
 #include "dp_log.h"
 #include "dp_lpm.h"
 #include "dp_netlink.h"
+#include "dp_sync.h"
 #ifdef ENABLE_VIRTSVC
 #	include "dp_virtsvc.h"
 #endif
@@ -58,6 +59,8 @@ static const struct rte_meter_srtcm_params dp_srtcm_params_base = {
 struct dp_port *_dp_port_table[DP_MAX_PORTS];
 struct dp_port *_dp_pf_ports[DP_MAX_PF_PORTS];
 struct dp_ports _dp_ports;
+struct dp_port _dp_sync_port = {0};
+
 
 static int dp_port_register_pf(struct dp_port *port)
 {
@@ -170,9 +173,6 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
 	rte_eth_dev_get_name_by_port(port->port_id, port->dev_name);
 
-	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
-		return DP_ERROR;
-
 	return DP_OK;
 }
 
@@ -243,6 +243,9 @@ static struct dp_port *dp_port_init_interface(uint16_t port_id, struct rte_eth_d
 		return NULL;
 
 	if (DP_FAILED(dp_port_init_ethdev(port, dev_info)))
+		return NULL;
+
+	if (dp_conf_is_multiport_eswitch() && DP_FAILED(dp_configure_async_flows(port->port_id)))
 		return NULL;
 
 	if (is_pf) {
@@ -349,6 +352,42 @@ static int dp_port_init_vfs(const char *vf_pattern, int num_of_vfs)
 	return DP_OK;
 }
 
+static int dp_port_init_sync(void)
+{
+	const char *ifname;
+	uint16_t port_id;
+	struct rte_eth_dev_info dev_info;
+	struct dp_port *port = &_dp_sync_port;
+	int socket_id;
+
+	if (!dp_conf_is_sync_enabled()) {
+		DPS_LOG_INFO("INIT skipping SYNC interface (none specified)");
+		return DP_OK;
+	}
+
+	ifname = dp_conf_get_sync_tap();
+
+	if (DP_FAILED(dp_find_port(ifname, &port_id, &dev_info)))
+		return DP_ERROR;
+
+	DPS_LOG_INFO("INIT initializing SYNC port", DP_LOG_PORTID(port_id), DP_LOG_IFNAME(ifname));
+
+	socket_id = dp_get_port_socket_id(port_id);
+	if (DP_FAILED(socket_id) && socket_id != SOCKET_ID_ANY)
+		return DP_ERROR;
+
+	port->is_pf = false;
+	port->port_id = port_id;
+	port->socket_id = socket_id;
+	port->if_index = dev_info.if_index;
+
+	if (DP_FAILED(dp_port_init_ethdev(port, &dev_info)))
+		return DP_ERROR;
+
+	snprintf(port->port_name, sizeof(port->port_name), "%s", ifname);
+	return DP_OK;
+}
+
 int dp_ports_init(void)
 {
 	int num_of_vfs = get_dpdk_layer()->num_of_vfs;
@@ -364,7 +403,8 @@ int dp_ports_init(void)
 	// these need to be done in order
 	if (DP_FAILED(dp_port_init_pf(dp_conf_get_pf0_name()))
 		|| DP_FAILED(dp_port_init_pf(dp_conf_get_pf1_name()))
-		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs)))
+		|| DP_FAILED(dp_port_init_vfs(dp_conf_get_vf_pattern(), num_of_vfs))
+		|| DP_FAILED(dp_port_init_sync()))
 		return DP_ERROR;
 
 	if (dp_conf_is_offload_enabled()) {
@@ -405,6 +445,9 @@ void dp_ports_stop(void)
 {
 	// in multiport-mode, PF0 needs to be stopped last
 	struct dp_port *pf0 = dp_get_port_by_pf_index(0);
+
+	if (dp_conf_is_sync_enabled())
+		dp_stop_eth_port(&_dp_sync_port);
 
 	// without stopping started ports, DPDK complains
 	DP_FOREACH_PORT(&_dp_ports, port) {
@@ -576,6 +619,23 @@ int dp_start_port(struct dp_port *port)
 	return DP_OK;
 }
 
+int dp_start_sync_port(void)
+{
+	struct dp_port *port = &_dp_sync_port;
+	int ret;
+
+	DPS_LOG_INFO("Starting SYNC port", DP_LOG_PORT(port));
+
+	ret = rte_eth_dev_start(port->port_id);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot start SYNC port", DP_LOG_PORT(port), DP_LOG_RET(ret));
+		return ret;
+	}
+
+	port->allocated = true;
+	return DP_OK;
+}
+
 int dp_start_pf_port(uint16_t index)
 {
 	struct dp_port *port = dp_get_port_by_pf_index(index);
@@ -700,4 +760,31 @@ void dp_l2_addr_set(struct dp_port *port, const struct rte_ether_addr *l2_addr)
 {
 	rte_ether_addr_copy(l2_addr, &port->neigh_mac);
 	port->iface.l2_addr_received = true;
+	dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
+}
+
+
+int dp_set_port_sync_neigh_mac(uint16_t port_id, const struct rte_ether_addr *mac)
+{
+	struct dp_port *port = dp_get_port_by_id(port_id);
+
+	// while it is a bit strange to blindly use the port_id,
+	// both dpservices should be orchestrated the same way, so the ids should match
+	if (!port || port->is_pf) {
+		DPS_LOG_WARNING("Invalid port to sync mac address", DP_LOG_PORTID(port_id));
+		return DP_ERROR;
+	}
+
+	if (!port->iface.l2_addr_received)
+		rte_ether_addr_copy(mac, &port->neigh_mac);
+
+	return DP_OK;
+}
+
+void dp_synchronize_port_neigh_macs(void)
+{
+	DP_FOREACH_PORT(&_dp_ports, port) {
+		if (!port->is_pf && port->allocated)
+			dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
+	}
 }
