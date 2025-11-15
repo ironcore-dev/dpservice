@@ -54,11 +54,6 @@ func (o *ListLoadBalancerTargetOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *ListLoadBalancerTargetOptions) MarkRequiredFlags(cmd *cobra.Command) error {
-	for _, name := range []string{"lb-id"} {
-		if err := cmd.MarkFlagRequired(name); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

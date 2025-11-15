@@ -50,16 +50,11 @@ type ListRoutesOptions struct {
 }
 
 func (o *ListRoutesOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.Uint32Var(&o.VNI, "vni", o.VNI, "VNI to get the routes from.")
+	fs.Uint32Var(&o.VNI, "vni", 0, "VNI to get the routes from.")
 	fs.StringVar(&o.SortBy, "sort-by", "", "Column to sort by.")
 }
 
 func (o *ListRoutesOptions) MarkRequiredFlags(cmd *cobra.Command) error {
-	for _, name := range []string{"vni"} {
-		if err := cmd.MarkFlagRequired(name); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

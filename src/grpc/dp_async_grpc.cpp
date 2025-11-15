@@ -851,8 +851,11 @@ const char* ListLoadBalancerTargetsCall::FillRequest(struct dpgrpc_request* requ
 {
 	DPGRPC_LOG_INFO("Listing loadbalancer targets",
 					DP_LOG_LBID(request_.loadbalancer_id().c_str()));
-	if (SNPRINTF_FAILED(request->list_lbtrgt.lb_id, request_.loadbalancer_id()))
-		return "Invalid loadbalancer_id";
+	if (request_.loadbalancer_id().empty())
+		request->list_lbtrgt.lb_id[0] = 0;
+	else
+		if (SNPRINTF_FAILED(request->list_lbtrgt.lb_id, request_.loadbalancer_id()))
+			return "Invalid loadbalancer_id";
 	return NULL;
 }
 void ListLoadBalancerTargetsCall::ParseReply(struct dpgrpc_reply* reply)
