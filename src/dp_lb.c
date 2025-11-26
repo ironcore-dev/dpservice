@@ -249,19 +249,9 @@ const union dp_ipv6 *dp_lb_get_backend_ip(struct flow_key *flow_key, uint32_t vn
 	return &lb_val->back_end_ips[pos];
 }
 
-int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
+static int dp_get_single_lb_back_ips(const struct lb_value *lb_val, struct dp_grpc_responder *responder)
 {
-	struct lb_key *lb_k;
-	struct lb_value *lb_val;
 	struct dpgrpc_lb_target *reply;
-
-	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
-		return DP_GRPC_ERR_NO_LB;
-
-	if (DP_FAILED(rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val)))
-		return DP_GRPC_ERR_NO_BACKIP;
-
-	dp_grpc_set_multireply(responder, sizeof(*reply));
 
 	for (int i = 0; i < DP_LB_MAX_IPS_PER_VIP; ++i) {
 		if (!dp_is_ipv6_zero(&lb_val->back_end_ips[i])) {
@@ -271,8 +261,45 @@ int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
 			dp_set_ipaddr6(&reply->addr, &lb_val->back_end_ips[i]);
 		}
 	}
-
 	return DP_GRPC_OK;
+}
+
+static int dp_get_all_lb_back_ips(struct dp_grpc_responder *responder)
+{
+	uint32_t iter = 0;
+	const struct lb_key *lb_key;
+	struct lb_value *lb_val;
+	int ret;
+
+	if (rte_hash_count(id_map_lb_tbl) == 0)
+		return DP_GRPC_OK;
+
+	while ((ret = rte_hash_iterate(lb_table, (const void **)&lb_key, (void **)&lb_val, &iter)) != -ENOENT) {
+		if (DP_FAILED(ret))
+			return DP_GRPC_ERR_ITERATOR;
+		dp_get_single_lb_back_ips(lb_val, responder);
+		// ignore errors, try to send as much as possible
+	}
+	return DP_GRPC_OK;
+}
+
+int dp_get_lb_back_ips(const void *id_key, struct dp_grpc_responder *responder)
+{
+	struct lb_key *lb_k;
+	struct lb_value *lb_val;
+
+	dp_grpc_set_multireply(responder, sizeof(struct dpgrpc_lb_target));
+
+	if (!id_key || *(const char *)id_key == '\0')
+		return dp_get_all_lb_back_ips(responder);
+
+	if (DP_FAILED(rte_hash_lookup_data(id_map_lb_tbl, id_key, (void **)&lb_k)))
+		return DP_GRPC_ERR_NO_LB;
+
+	if (DP_FAILED(rte_hash_lookup_data(lb_table, lb_k, (void **)&lb_val)))
+		return DP_GRPC_ERR_NO_BACKIP;
+
+	return dp_get_single_lb_back_ips(lb_val, responder);
 }
 
 int dp_add_lb_back_ip(const void *id_key, const union dp_ipv6 *back_ip)
