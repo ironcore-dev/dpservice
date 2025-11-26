@@ -2,7 +2,7 @@
 
 
 ## Preparation
-`prepare.sh` only needs to be ran once, both dpservice instances will use the resulting config as they should both be stup up the same.
+`prepare.sh` only needs to be ran once, both dpservice instances will use the resulting config as they should both be set up the same.
 
 Special argument `--sync-bridge` has been created to facilitate the shared bridge and TAP devices creation. Currently, only `--multiport-eswitch` setup has been properly tested, so it is recommended too.
 
