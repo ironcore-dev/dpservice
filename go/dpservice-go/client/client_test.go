@@ -1603,13 +1603,6 @@ var _ = Describe("negative loadbalancer related tests", Label("negative"), func(
 			Expect(err.Error()).To(Equal("[error code 204] BAD_IPVER"))
 		})
 
-		It("should not list", func() {
-			By("not defining loadbalancer ID")
-			_, err = dpdkClient.ListLoadBalancerTargets(ctx, "")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid loadbalancer_id"))
-		})
-
 		It("should not delete", func() {
 			By("not defining loadbalancer ID")
 			targetIp := netip.MustParseAddr("ff80::5")

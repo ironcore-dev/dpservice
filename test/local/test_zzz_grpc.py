@@ -512,6 +512,71 @@ def test_grpc_vni_reset(prepare_ifaces, grpc_client):
 		"Resetting VNI 999 did not work"
 	grpc_client.delinterface(VM4.name)
 
+#
+# Test special "null values" for some lists
+#
+def canonical(l):
+	return sorted(l, key=lambda d: str(d))
+
+def test_grpc_global_list_nats(prepare_ifaces, grpc_client):
+	grpc_client.addnat(VM1.name, "1.2.3.4", nat_local_min_port, nat_local_max_port)
+	grpc_client.addnat(VM2.name, "1.2.3.5", nat_local_min_port, nat_local_max_port)
+	specs1 = grpc_client.listlocalnats("1.2.3.4")
+	specs2 = grpc_client.listlocalnats("1.2.3.5")
+	specs = grpc_client.listlocalnats("0.0.0.0")
+	assert canonical(specs) == canonical(specs1 + specs2), \
+		"Global NAT list not the same as union of NAT lists"
+	grpc_client.delnat(VM2.name)
+	grpc_client.delnat(VM1.name)
+
+def test_grpc_global_list_prefixes(prepare_ifaces, grpc_client):
+	grpc_client.addprefix(VM1.name, "1.2.3.4/32")
+	grpc_client.addprefix(VM2.name, "1.2.3.5/32")
+	specs1 = grpc_client.listprefixes(VM1.name)
+	specs2 = grpc_client.listprefixes(VM2.name)
+	specs = grpc_client.listprefixes("")
+	assert canonical(specs) == canonical(specs1 + specs2), \
+		"Global Prefix list not the same as union of Prefix lists"
+	grpc_client.delprefix(VM2.name, "1.2.3.5/32")
+	grpc_client.delprefix(VM1.name, "1.2.3.4/32")
+
+def test_grpc_global_list_lbprefixes(prepare_ifaces, grpc_client):
+	grpc_client.addlbprefix(VM1.name, "1.2.3.4/32")
+	grpc_client.addlbprefix(VM2.name, "1.2.3.5/32")
+	specs1 = grpc_client.listlbprefixes(VM1.name)
+	specs2 = grpc_client.listlbprefixes(VM2.name)
+	specs = grpc_client.listlbprefixes("")
+	assert canonical(specs) == canonical(specs1 + specs2), \
+		"Global LbPrefix list not the same as union of LbPrefix lists"
+	grpc_client.dellbprefix(VM2.name, "1.2.3.5/32")
+	grpc_client.dellbprefix(VM1.name, "1.2.3.4/32")
+
+def test_grpc_global_list_lbtargets(prepare_ifaces, grpc_client):
+	grpc_client.createlb("lb1", vni1, "1.2.3.4", "tcp/80")
+	grpc_client.addlbtarget("lb1", "1234::1")
+	grpc_client.addlbtarget("lb1", "1234::2")
+	grpc_client.createlb("lb2", vni1, "1.2.3.5", "tcp/80")
+	grpc_client.addlbtarget("lb2", "1235::1")
+	grpc_client.addlbtarget("lb2", "1235::2")
+	specs1 = grpc_client.listlbtargets("lb1")
+	specs2 = grpc_client.listlbtargets("lb2")
+	specs = grpc_client.listlbtargets("")
+	assert canonical(specs) == canonical(specs1 + specs2), \
+		"Global LbTarget list not the same as union of LbTarget lists"
+	grpc_client.dellbtarget("lb2", "1235::2")
+	grpc_client.dellbtarget("lb2", "1235::1")
+	grpc_client.dellb("lb2")
+	grpc_client.dellbtarget("lb1", "1234::2")
+	grpc_client.dellbtarget("lb1", "1234::1")
+	grpc_client.dellb("lb1")
+
+def test_grpc_global_list_routes(prepare_ifaces, grpc_client):
+	# There already are enough routes set-up
+	specs1 = grpc_client.listroutes(vni1)
+	specs2 = grpc_client.listroutes(vni2)
+	specs = grpc_client.listroutes(0)
+	assert canonical(specs) == canonical(specs1 + specs2), \
+		"Global Route list not the same as union of Route lists"
 
 #
 # Testing offloaded packet capturing is not doable using TUN/TAP devices
