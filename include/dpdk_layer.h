@@ -37,8 +37,9 @@ extern "C" {
 // Seen recommendations to keep this at 2*RTE_GRAPH_BURST_SIZE or 4*RTE_GRAPH_BURST_SIZE
 #define DP_RX_QUEUE_SIZE (4 * RTE_GRAPH_BURST_SIZE)
 // Seen this recommended to be bigger than Rx because multiple Rx streams share the same Tx
-// but in our case we are only using one worker thread, so there is no concurrent Tx
-#define DP_TX_QUEUE_SIZE DP_RX_QUEUE_SIZE
+// in our case we are only using one worker thread, so the original thought was that there is no concurrent Tx
+// however in practice, having this less than 8xRx leads to tx_node transmission errors
+#define DP_TX_QUEUE_SIZE (8 * DP_RX_QUEUE_SIZE)
 
 #ifdef ENABLE_PYTEST
 #define DP_MBUF_POOL_SIZE	(50*1024)
