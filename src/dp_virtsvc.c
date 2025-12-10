@@ -405,7 +405,7 @@ int dp_virtsvc_get_used_ports_telemetry(struct rte_tel_data *dict)
 				 service->proto == IPPROTO_TCP ? "TCP" : "UDP",
 				 DP_IPV4_PRINT_BYTES(service->virtual_addr),
 				 ntohs(service->virtual_port));
-		ret = rte_tel_data_add_dict_u64(dict, virtsvc_name, dp_virtsvc_get_used_port_count(service));
+		ret = rte_tel_data_add_dict_uint(dict, virtsvc_name, dp_virtsvc_get_used_port_count(service));
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to add virtsvc telemetry data", DP_LOG_RET(ret));
 			return ret;

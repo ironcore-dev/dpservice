@@ -199,11 +199,11 @@ static int dp_telemetry_add_htable(struct rte_tel_data *parent,
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = rte_tel_data_add_dict_u64(data, "capacity", htable->capacity);
+	ret = rte_tel_data_add_dict_uint(data, "capacity", htable->capacity);
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = rte_tel_data_add_dict_u64(data, "entries", rte_hash_count(htable->htable));
+	ret = rte_tel_data_add_dict_uint(data, "entries", rte_hash_count(htable->htable));
 	if (DP_FAILED(ret))
 		return ret;
 

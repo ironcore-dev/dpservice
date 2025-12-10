@@ -20,7 +20,7 @@ int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict)
 		if (port->is_pf || !port->allocated)
 			continue;
 
-		ret = rte_tel_data_add_dict_u64(dict, port->iface.id, port->stats.nat_stats.used_port_cnt);
+		ret = rte_tel_data_add_dict_uint(dict, port->iface.id, port->stats.nat_stats.used_port_cnt);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to add interface used nat port telemetry data", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return ret;
@@ -39,7 +39,7 @@ int dp_fwall_get_rule_count_telemetry(struct rte_tel_data *dict)
 		if (port->is_pf || !port->allocated)
 			continue;
 
-		ret = rte_tel_data_add_dict_u64(dict, port->iface.id, port->iface.fwall_rule_count);
+		ret = rte_tel_data_add_dict_uint(dict, port->iface.id, port->iface.fwall_rule_count);
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Failed to add interface firewall rule count telemetry data", DP_LOG_PORT(port), DP_LOG_RET(ret));
 			return ret;
