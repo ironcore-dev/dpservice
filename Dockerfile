@@ -2,7 +2,7 @@
 FROM --platform=${TARGETPLATFORM} debian:13-slim AS builder
 
 ARG TARGETARCH
-ARG DPDK_VER=25.07
+ARG DPDK_VER=25.11
 ARG DPDK_BUILDTYPE=release
 ARG DPSERVICE_BUILDTYPE=debug
 ARG DPSERVICE_FEATURES=""
@@ -58,12 +58,12 @@ ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 COPY hack/*.patch hack/
 
 RUN cd $DPDK_DIR \
-&& patch -p1 < ../hack/dpdk_25_07_fdb_def_rule.patch \
-&& patch -p1 < ../hack/dpdk_25_07_log.patch \
-&& patch -p1 < ../hack/dpdk_25_07_telemetry_key.patch \
-&& patch -p1 < ../hack/dpdk_25_07_no_pattern_template_validation.patch \
-&& patch -p1 < ../hack/dpdk_25_07_ethdev_conversion.patch \
-&& patch -p1 < ../hack/dpdk_25_07_allow_outer_inner_ipip.patch
+&& patch -p1 < ../hack/dpdk_25_11_fdb_def_rule.patch \
+&& patch -p1 < ../hack/dpdk_25_11_log.patch \
+&& patch -p1 < ../hack/dpdk_25_11_telemetry_key.patch \
+&& patch -p1 < ../hack/dpdk_25_11_no_pattern_template_validation.patch \
+&& patch -p1 < ../hack/dpdk_25_11_ethdev_conversion.patch \
+&& patch -p1 < ../hack/dpdk_25_11_allow_outer_inner_ipip.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson setup -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\
