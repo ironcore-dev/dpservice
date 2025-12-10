@@ -58,6 +58,7 @@ ENV DPDK_DIR=/workspace/dpdk-${DPDK_VER}
 COPY hack/*.patch hack/
 
 RUN cd $DPDK_DIR \
+&& patch -p1 -R < ../hack/dpdk_25_11_mtu.patch \
 && patch -p1 < ../hack/dpdk_25_11_fdb_def_rule.patch \
 && patch -p1 < ../hack/dpdk_25_11_log.patch \
 && patch -p1 < ../hack/dpdk_25_11_telemetry_key.patch \
