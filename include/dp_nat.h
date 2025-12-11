@@ -23,10 +23,10 @@ extern "C" {
 
 #define DP_NETWORK_NAT_ALL_VNI		0
 
-struct nat_key {
+struct __rte_packed_begin nat_key {
 	uint32_t	ip;
 	uint32_t	vni;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct nat_entry {
 	uint32_t		nat_ip;
@@ -50,11 +50,11 @@ struct dnat_data {
 	uint32_t	dnat_ip;
 };
 
-struct netnat_portmap_key {
+struct __rte_packed_begin netnat_portmap_key {
 	uint32_t				vni;
 	struct dp_ip_address	src_ip;
 	uint16_t				iface_src_port;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct netnat_portmap_data {
 	uint32_t	nat_ip;
@@ -62,13 +62,13 @@ struct netnat_portmap_data {
 	uint16_t	flow_cnt;
 };
 
-struct netnat_portoverload_tbl_key {
+struct __rte_packed_begin netnat_portoverload_tbl_key {
 	uint32_t nat_ip;
 	uint16_t nat_port;
 	uint32_t dst_ip;
 	uint16_t dst_port;
 	uint8_t	l4_type;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct netnat_portoverload_sync_metadata {
 	struct netnat_portmap_key portmap_key;

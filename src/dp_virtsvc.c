@@ -31,11 +31,11 @@
 	DP_LOG_PROTO((SERVICE)->proto)
 
 // packed, because hashing would include padding otherwise
-struct dp_virtsvc_conn_key {
+struct __rte_packed_begin dp_virtsvc_conn_key {
 	uint16_t vf_port_id;
 	rte_be16_t vf_l4_port;
 	rte_be32_t vf_ip;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 static struct dp_virtsvc *dp_virtservices;
 static struct dp_virtsvc *dp_virtservices_end;

@@ -12,28 +12,28 @@
 // NOTE: there will be no endianness protection; both ends should be running on the same machine
 
 // no versioning, if really needed, just create another message type
-struct __attribute__((__packed__)) dp_sync_hdr {
+struct __rte_packed_begin dp_sync_hdr {
 	uint8_t msg_type;
-};
+} __rte_packed_end;
 
 // active -> backup: incremental change to NAT tables
 #define DP_SYNC_MSG_NAT_CREATE		1
-struct __attribute__((__packed__)) dp_sync_msg_nat_create {
+struct __rte_packed_begin dp_sync_msg_nat_create {
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portoverload_tbl_key portoverload_key;
 	uint16_t created_port_id;
 	uint16_t icmp_type_src;
 	rte_be16_t icmp_err_ip_cksum;
-};
+} __rte_packed_end;
 
 #define DP_SYNC_MSG_NAT_DELETE		2
-struct __attribute__((__packed__)) dp_sync_msg_nat_delete {
+struct __rte_packed_begin dp_sync_msg_nat_delete {
 	struct netnat_portmap_key portmap_key;
 	struct netnat_portoverload_tbl_key portoverload_key;
-};
+} __rte_packed_end;
 
 #define DP_SYNC_MSG_VIRTSVC_CONN	3
-struct __attribute__((__packed__)) dp_sync_msg_virtsvc_conn {
+struct __rte_packed_begin dp_sync_msg_virtsvc_conn {
 	rte_be32_t virtual_addr;
 	rte_be16_t virtual_port;
 	uint16_t conn_port;
@@ -41,7 +41,7 @@ struct __attribute__((__packed__)) dp_sync_msg_virtsvc_conn {
 	rte_be16_t vf_l4_port;
 	uint16_t vf_port_id;
 	uint8_t proto;
-};
+} __rte_packed_end;
 
 #define DP_SYNC_MSG_PORT_MAC		4
 struct dp_sync_msg_port_mac {

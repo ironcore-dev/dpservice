@@ -63,77 +63,77 @@
 #define DHCPV6_OPT_BOOT_FILE	59
 
 // General definitions as per RFC
-struct dhcpv6_packet {
+struct __rte_packed_begin dhcpv6_packet {
 	uint8_t msg_type;
 	uint8_t transaction_id[3];
 	uint8_t options[];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_option {
+struct __rte_packed_begin dhcpv6_option {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	uint8_t data[];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_dns_servers {
+struct __rte_packed_begin dhcpv6_opt_dns_servers {
 	uint16_t opt_code;
 	uint16_t opt_len;
 	struct in6_addr dns_server_addrs[]; // Array of IPv6 addresses
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 // client id can be of any type, this is the maximum size allowed
-struct dhcpv6_opt_client_id {
+struct __rte_packed_begin dhcpv6_opt_client_id {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	uint8_t id[128];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_ia_na {
+struct __rte_packed_begin dhcpv6_ia_na {
 	rte_be32_t iaid;
 	rte_be32_t t1;
 	rte_be32_t t2;
 	struct dhcpv6_option options[];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct dhcpv6_opt_ia_na {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_na ia_na;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_vnd_cls {
+struct __rte_packed_begin dhcpv6_opt_vnd_cls {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	rte_be32_t entp_id;
 	rte_be16_t opq_data_len;
 	uint8_t opq_data[];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_usr_cls {
+struct __rte_packed_begin dhcpv6_opt_usr_cls {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	rte_be16_t sub_opt_len;
 	uint8_t sub_opt_data[];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_ia_addr {
+struct __rte_packed_begin dhcpv6_ia_addr {
 	uint8_t  ipv6[16];
 	rte_be32_t preferred_lifetime;
 	rte_be32_t valid_lifetime;
 	struct dhcpv6_option options[];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_ia_addr {
+struct __rte_packed_begin dhcpv6_opt_ia_addr {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_addr addr;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_status_code {
+struct __rte_packed_begin dhcpv6_opt_status_code {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	rte_be16_t status;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct dhcpv6_duid_ll {
 	rte_be16_t type;
@@ -149,36 +149,36 @@ struct dhcpv6_opt_server_id_ll {
 	struct dhcpv6_duid_ll id;
 };
 
-struct dhcpv6_ia_addr_status {
+struct __rte_packed_begin dhcpv6_ia_addr_status {
 	uint8_t  ipv6[16];
 	rte_be32_t preferred_lifetime;
 	rte_be32_t valid_lifetime;
 	struct dhcpv6_opt_status_code options[1];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_ia_addr_status {
+struct __rte_packed_begin dhcpv6_opt_ia_addr_status {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_addr_status addr;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_ia_na_single_addr_status {
+struct __rte_packed_begin dhcpv6_ia_na_single_addr_status {
 	rte_be32_t iaid;
 	rte_be32_t t1;
 	rte_be32_t t2;
 	struct dhcpv6_opt_ia_addr_status options[1];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_ia_na_single_addr_status {
+struct __rte_packed_begin dhcpv6_opt_ia_na_single_addr_status {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	struct dhcpv6_ia_na_single_addr_status ia_na;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-struct dhcpv6_opt_boot_file_url {
+struct __rte_packed_begin dhcpv6_opt_boot_file_url {
 	rte_be16_t op_code;
 	rte_be16_t op_len;
 	char boot_file_url[DHCPV6_BOOT_FILE_BUF_LEN];
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 #endif

@@ -18,10 +18,10 @@ extern "C" {
 /* Needs to be a prime number at least 2xDP_LB_MAX_IPS_PER_VIP for a uniform distribution */
 #define DP_LB_MAGLEV_LOOKUP_SIZE	503
 
-struct lb_key {
+struct __rte_packed_begin lb_key {
 	uint32_t				vni;
 	struct dp_ip_address	ip;
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct lb_port {
 	uint8_t			protocol;
