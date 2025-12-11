@@ -21,7 +21,7 @@ extern "C" {
 // forward declaration as 'struct dp_grpc_responder' needs some definitions from here
 struct dp_grpc_responder;
 
-enum dp_vnf_type {
+enum __rte_packed_begin dp_vnf_type {
 	DP_VNF_TYPE_UNDEFINED,
 	DP_VNF_TYPE_INTERFACE_IP,
 	DP_VNF_TYPE_VIP,
@@ -29,7 +29,7 @@ enum dp_vnf_type {
 	DP_VNF_TYPE_LB,
 	DP_VNF_TYPE_LB_ALIAS_PFX,
 	DP_VNF_TYPE_ALIAS_PFX,
-} __attribute__((__packed__));  // for 'struct dp_flow' and 'struct flow_key'
+} __rte_packed_end;  // for 'struct dp_flow' and 'struct flow_key'
 
 struct dp_vnf_prefix {
 	struct dp_ip_address	ol;

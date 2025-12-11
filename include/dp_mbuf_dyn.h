@@ -21,24 +21,24 @@
 extern "C" {
 #endif
 
-enum dp_flow_type {
+enum __rte_packed_begin dp_flow_type {
 	DP_FLOW_WEST_EAST,
 	DP_FLOW_SOUTH_NORTH,
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-enum dp_pkt_offload_state {
+enum __rte_packed_begin dp_pkt_offload_state {
 	DP_FLOW_NON_OFFLOAD,
 	DP_FLOW_OFFLOAD_INSTALL,
 	DP_FLOW_OFFLOADED,
-} __attribute__((__packed__));
+} __rte_packed_end;
 
-enum dp_flow_dir {
+enum __rte_packed_begin dp_flow_dir {
 	DP_FLOW_DIR_ORG,
 	DP_FLOW_DIR_REPLY,
-} __attribute__((__packed__));
+} __rte_packed_end;
 #define DP_FLOW_DIR_CAPACITY 2
 
-enum dp_nat_type {
+enum __rte_packed_begin dp_nat_type {
 	DP_NAT_CHG_NONE,
 	DP_NAT_CHG_SRC_IP,
 	DP_NAT_CHG_DST_IP,
@@ -46,7 +46,7 @@ enum dp_nat_type {
 	DP_LB_RECIRC,
 	DP_NAT_64_CHG_SRC_IP,
 	DP_NAT_64_CHG_DST_IP,
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 struct dp_flow {
 	enum dp_flow_type			flow_type : 1;

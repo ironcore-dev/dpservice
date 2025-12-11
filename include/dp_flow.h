@@ -53,7 +53,7 @@ extern "C" {
 
 #define DP_FLOW_HAS_FLAG_NF(flag)		((flag) & DP_FLOW_FLAG_NF)
 
-enum dp_flow_nat_type {
+enum __rte_packed_begin dp_flow_nat_type {
 	DP_FLOW_NAT_TYPE_NONE,
 	DP_FLOW_NAT_TYPE_VIP,
 	DP_FLOW_NAT_TYPE_NETWORK_LOCAL,
@@ -62,7 +62,7 @@ enum dp_flow_nat_type {
 	DP_FLOW_LB_TYPE_LOCAL_NEIGH_TRAFFIC,
 	DP_FLOW_LB_TYPE_RECIRC,
 	DP_FLOW_LB_TYPE_FORWARD,
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 enum dp_flow_tcp_state {
 	DP_FLOW_TCP_STATE_NONE,
@@ -73,7 +73,7 @@ enum dp_flow_tcp_state {
 	DP_FLOW_TCP_STATE_RST_FIN,
 };
 
-struct flow_key {
+struct __rte_packed_begin flow_key {
 	struct dp_ip_address l3_dst;
 	uint8_t  proto;
 	uint16_t port_dst;
@@ -84,7 +84,7 @@ struct flow_key {
 		uint16_t type_src; /* ICMP */
 	} src;
 	uint32_t vni;
-} __attribute__((__packed__));
+} __rte_packed_end;
 static_assert(sizeof(((struct flow_key *)0)->vnf_type) == 1,
 			  "enum dp_vnf_type is unnecessarily big");
 

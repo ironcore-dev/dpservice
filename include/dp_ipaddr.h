@@ -31,18 +31,18 @@ union dp_ipv6 {
 		rte_be64_t	_suffix;
 	};
 	const uint8_t	bytes[DP_IPV6_ADDR_SIZE];
-	struct __attribute__((__packed__)) {
+	struct __rte_packed_begin {
 		uint8_t		prefix[DP_IPV6_ADDR_SIZE - sizeof(rte_be32_t)];
 		rte_be32_t	ipv4;
-	} _nat64;
-	struct __attribute__((__packed__)) {
+	} __rte_packed_end _nat64;
+	struct __rte_packed_begin {
 		rte_be64_t	prefix;
 		uint8_t		type;
 		uint8_t		subtype;
 		uint8_t		flags;
 		uint8_t		random;
 		rte_be32_t	local;
-	} _ul;
+	} __rte_packed_end _ul;
 	const struct rte_ipv6_addr	addr;
 };
 static_assert(sizeof(union dp_ipv6) == DP_IPV6_ADDR_SIZE, "union dp_ipv6 has padding");
@@ -176,7 +176,7 @@ void dp_generate_virtsvc_ul_ipv6(union dp_ipv6 *dest, uint32_t index);
 
 // structure for holding dual IP addresses
 // made read-only without the right macro to prevent uninitialized bytes due to the the use of this structure in hash keys
-struct dp_ip_address {
+struct __rte_packed_begin dp_ip_address {
 	union {
 		union dp_ipv6		_ipv6;
 		uint32_t			_ipv4;
@@ -187,7 +187,7 @@ struct dp_ip_address {
 		bool				_is_v6;
 		const bool			is_v6;
 	};
-} __attribute__((__packed__));
+} __rte_packed_end;
 
 static __rte_always_inline
 int dp_ipv6_from_ipaddr(union dp_ipv6 *ipv6, const struct dp_ip_address *addr)
