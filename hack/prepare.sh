@@ -11,6 +11,7 @@ set -Eeuo pipefail
 
 OPT_MULTIPORT=false
 OPT_SYNC_BRIDGE=false
+OPT_ALLOW_ULA=false
 
 BLUEFIELD_IDENTIFIERS=("MT_0000000543" "MT_0000000541")
 MAX_NUMVFS_POSSIBLE=126
@@ -307,13 +308,17 @@ function get_ipv6() {
 	#   1. Have a "global" scope.
 	#   2. Have a prefix length of 64 or more.
 	#   3. Must be in Globally Unique Address (GUA) range (2 or 3).
+	#      (unless --allow-ula is set, then also fc and fd range is allowed)
+	local addr_regex
+	addr_regex='^(2|3)'
+	[[ "$OPT_ALLOW_ULA" == "true" ]] && addr_regex='^(2|3|f[cd])'
 	local global_address
-	global_address=$(echo "$ip_json" | jq -r '
+	global_address=$(echo "$ip_json" | jq -r --arg addr_re "$addr_regex" '
 		.[0].addr_info[]
 		| select(
 			.scope == "global" and
 			.prefixlen >= 64 and
-			(.local | test("^(2|3)"))
+			(.local | test($addr_re))
 		)
 		| .local' | head -n 1)
 
@@ -402,6 +407,9 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--sync-bridge)
 			OPT_SYNC_BRIDGE=true
+			;;
+		--allow-ula)
+			OPT_ALLOW_ULA=true
 			;;
 		*)
 			err "Invalid argument $1"
