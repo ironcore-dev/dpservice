@@ -27,15 +27,19 @@ Dp-service currently only supports x86 architecture (amd64 instruction set actua
 
 
 ### DPDK
-The dataplane service is built upon the [DPDK library](https://dpdk.org). Currently, the only supported version is 23.11 LTS. Unfortunately, some patching is needed, thus it needs to be built from source. Building from source also has the advantage of easier debugging later.
+The dataplane service is built upon the [DPDK library](https://dpdk.org). Currently, the only supported version is 25.11 LTS. Unfortunately, some patching is needed, thus it needs to be built from source. Building from source also has the advantage of easier debugging later.
 ```bash
 git clone https://github.com/ironcore-dev/dpservice.git
-wget https://fast.dpdk.org/rel/dpdk-23.11.tar.xz
-tar xf dpdk-23.11.tar.xz
-cd dpdk-stable-23.11
-patch -p1 < ../dpservice/hack/dpdk_23_11_log.patch
-patch -p1 < ../dpservice/hack/dpdk_23_11_telemetry_key.patch
-patch -p1 < ../dpservice/hack/dpdk_23_11_ethdev_conversion.patch
+wget https://fast.dpdk.org/rel/dpdk-25.11.tar.xz
+tar xf dpdk-25.11.tar.xz
+cd dpdk-stable-25.11
+patch -p1 < ../dpservice/hack/dpdk_25_11_no_pattern_template_validation.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_allow_outer_inner_ipip.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_fdb_def_rule.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_telemetry_key.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_mtu.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_log.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_ethdev_conversion.patch
 meson setup build
 ninja -C build
 sudo ninja -C build install
