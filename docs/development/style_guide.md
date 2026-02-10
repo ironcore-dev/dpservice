@@ -22,7 +22,7 @@ chmod a+x .git/hooks/pre-push
 
 
 ## Consistency
-There can be multiple acceptable ways to achieve your goal, but be consistent, otherwise it makes the reader question why are thing done differently. Take examples from existing code and commits and be consistent with those, unless refactoring is in order.
+There can be multiple acceptable ways to achieve your goal, but be consistent, otherwise it makes the reader question why things are done differently. Take examples from existing code and commits and be consistent with those, unless refactoring is in order.
 
 
 ## Naming
@@ -48,7 +48,7 @@ Inlines are a preferred way to break long functions up without unnecessary neste
 ## Constants
 If a function requires a true/false argument, unless obvious because of the function name (like `dp_port_set_enabled(port, true)`), prefer using a constant definition, e.g. `dp_port_set_mode(port, ENABLED)`. Using a basic type directly, e.g. `dp_port_set_mode(port, true)` is not obvious.
 
-Enums are preffered over defines as they are visible in a debugger and (more importantly) checked by the compiler when using `switch` statements.
+Enums are preferred over defines as they are visible in a debugger and (more importantly) checked by the compiler when using `switch` statements.
 
 
 ## Return values
@@ -60,7 +60,7 @@ If a function is imperative, e.g. `dp_init()`, then the return value should be z
 
 
 ## Error handling
-Function calls **must** be checked for errors. If a function can return an error, but *that can never happen* (e.g. it only fails when an argument is wrong and we provide a constant literal there), comment such fact. Only then you can skip error checking.
+Function calls **must** be checked for errors. If a function can return an error, but *that can never happen* (e.g. it only fails when an argument is wrong and we provide a constant literal there), comment such a fact. Only then you can skip error checking.
 
 Check the documentation (or even better, the code) of called functions and choose the right handling based on that.
 
@@ -106,7 +106,7 @@ Most of `rte_` calls should use the same convention as [dpservice calls](#datapl
 ```
 
 ### Other calls
-In other cases, use your best judgement, but be defensive. If there is a clear "success value", then check for that instead of cheking for error values for example. If the function returns `0` for success and some undefined value for errors, prefer:
+In other cases, use your best judgement, but be defensive. If there is a clear "success value", then check for that instead of checking for error values for example. If the function returns `0` for success and some undefined value for errors, prefer:
 ```c
   if (func()) {
     DPS_LOG_ERR("Failed to do what func() does");
@@ -119,7 +119,7 @@ This way it does not matter what the actual error value is, the condition will w
 ## Logging
 Logging should be done as early as reasonably possible (which, unless in critical path, means pretty much always). This enables the service to log source code information of the call.
 
-Unless helpful, there is no need to log at all points of the callstack, so checked the called function for logging and if done there, do not log errors in the caller.
+Unless helpful, there is no need to log at all points of the callstack, so check the called function for logging and if done there, do not log errors in the caller.
 
 There are currenlty four log-levels. It is expected, that `ERR` will lead to the function's failure, `WARN` will continue on and logs an abnormal state. `INFO` should cover normal state. `DEBUG` should only be used for debugging and is by default not shown.
 
