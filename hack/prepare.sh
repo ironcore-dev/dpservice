@@ -38,17 +38,30 @@ function get_pfs() {
 }
 
 function detect_card_and_arch_type() {
-	local pf="${devs[0]}"
 	local is_bluefield=false
+	local mlx_pf=""
 	local devlink_info
-	devlink_info=$(devlink -js dev info "pci/$pf")
 
-	for id in "${BLUEFIELD_IDENTIFIERS[@]}"; do
-		if echo "$devlink_info" | jq -e '.. | strings | select(. == "'"$id"'")' > /dev/null; then
-			is_bluefield=true
-			log "Detected BlueField card with identifier $id on pf: $pf"
-			break
+	# Iterate all PFs, only inspect those driven by mlx5_core
+	for pf in "${devs[@]}"; do
+		if [ ! -L "/sys/bus/pci/drivers/mlx5_core/$pf" ]; then
+			continue
 		fi
+
+		# If we haven't found a mlx PF yet, set it to the first one we find.
+		# servers as the indicator if a mellanox card is present on the host.
+		if [[ -z "$mlx_pf" ]]; then
+			mlx_pf="$pf"
+		fi
+
+		devlink_info=$(devlink -js dev info "pci/$pf")
+		for id in "${BLUEFIELD_IDENTIFIERS[@]}"; do
+			if echo "$devlink_info" | jq -e '.. | strings | select(. == "'"$id"'")' > /dev/null; then
+				is_bluefield=true
+				log "Detected BlueField card with identifier $id on pf: $pf"
+				break 2
+			fi
+		done
 	done
 
 	local arch=$(uname -m)
@@ -65,7 +78,11 @@ function detect_card_and_arch_type() {
 	esac
 
 	if ! $is_bluefield; then
-		log "Detected Mellanox card on pf: $pf"
+		if [[ -n "$mlx_pf" ]]; then
+			log "Detected Mellanox card on pf: $mlx_pf"
+		else
+			err "No mlx5 PF found among devlink devices"
+		fi
 	fi
 
 	if [[ "$arch" = "aarch64" ]] && [[ "$is_bluefield" = "true" ]]; then
@@ -293,7 +310,17 @@ function get_pattern() {
 
 function get_ifname() {
 	local port_idx=$1
-	devlink -js port | jq -r --argjson idx "$port_idx" '.port | .[] | select(.flavour=="physical" and .port==$idx) | .netdev'
+	local ifname
+	# Physical ports for mlx5 devices are always under auxiliary/mlx5_core.eth.X
+	# Filter by that prefix to avoid matching non-mlx5 NICs (e.g. Intel)
+	ifname=$(devlink -js port | jq -r --argjson idx "$port_idx" \
+		'.port | to_entries[] | select(.key | startswith("auxiliary/mlx5_core.eth.")) | select(.value.flavour=="physical" and .value.port==$idx) | .value.netdev')
+
+	if [ -z "$ifname" ]; then
+		err "No mlx5 physical port interface found for port index $port_idx"
+	fi
+
+	echo "$ifname"
 }
 
 function get_ipv6() {
