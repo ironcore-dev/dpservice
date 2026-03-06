@@ -77,7 +77,7 @@ jobs:
 
       - name: Build and push
         timeout-minutes: 95
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ env.platforms }}
