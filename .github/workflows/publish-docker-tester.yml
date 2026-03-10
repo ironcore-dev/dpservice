@@ -36,7 +36,7 @@ jobs:
           else
            echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
           fi
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@v6
         id: meta
         with:
           images: |
