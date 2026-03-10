@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors
+# SPDX-License-Identifier: Apache-2.0
 
 import argparse
 import json
@@ -325,8 +327,10 @@ def generate_md(options):
 
 
 def print_license():
+	# REUSE-IgnoreStart
 	print("// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and IronCore contributors")
 	print("// SPDX-License-Identifier: Apache-2.0")
+	# REUSE-IgnoreEnd
 	print("")
 
 def print_warning():
