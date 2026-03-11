@@ -45,7 +45,8 @@ libgrpc++-dev \
 libpcap0.8-dev
 
 # Need at least Golang 1.20 which is not part of Debian-12 stable
-RUN curl -Ls https://golang.org/dl/go1.20.14.linux-${TARGETARCH}.tar.gz | tar xz -C /usr/local/
+# Also, due to recent vulnerabilites, 1.24.13 is installed
+RUN curl -Ls https://golang.org/dl/go1.24.13.linux-${TARGETARCH}.tar.gz | tar xz -C /usr/local/
 ENV PATH="${PATH}:/usr/local/go/bin"
 
 # Download DPDK
