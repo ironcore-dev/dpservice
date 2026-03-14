@@ -1,8 +1,8 @@
 stages:
-  - build_tester
-  - mr_test
-  - build
-  - branch_test
+  - required_test
+  - tested_build
+  - untested_build
+  - optional_test
 
 workflow:
   rules:
@@ -19,7 +19,7 @@ variables:
   TESTER_TAG: "mtr.devops.telekom.de/osc/onmetal/dpservice-tester:$COMMITID"
 
 .defaults_template:
-  image: ${MTR_GITLAB_HOST}/osc/gardener/osc-builder:v4.0.0
+  image: ${MTR_GITLAB_HOST}/osc/gardener/osc-builder:v7.1.0
   tags:
     - docker
     - pes
@@ -37,8 +37,6 @@ variables:
     - docker
     - pes
     - osc
-  needs:
-    - tester-build
   services:
     - docker:dind
   before_script:
@@ -68,11 +66,11 @@ variables:
           docker rmi $IMAGE_ID
       fi
 
-tester-build:
-  stage: build_tester
+tester-build-required:
+  stage: required_test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_MERGE_REQUEST_ID == null
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+/
   image: docker:latest
   tags:
     - docker
@@ -86,15 +84,27 @@ tester-build:
       - dpservice-tester.tar
     expire_in: 1 day
 
-tester-test-mr:
-  extends: .tester-run-tests
-  stage: mr_test
+tester-build-optional:
+  stage: optional_test
+  when: manual
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^(feature|bugfix|release-fix)-.+$/
+  image: docker:latest
+  tags:
+    - docker
+    - pes
+    - osc
+  script:
+    - docker build --build-arg=DPSERVICE_FEATURES="-Denable_virtual_services=true" --target tester -t "$TESTER_TAG" .
+    - docker save "$TESTER_TAG" -o dpservice-tester.tar
+  artifacts:
+    paths:
+      - dpservice-tester.tar
+    expire_in: 1 day
 
 build-dev:
   extends: .defaults_template
-  stage: build
+  stage: untested_build
   script:
     - chmod +x ./hack/build-all.sh ./hack/container-build.sh ./hack/cosign-main.sh
     - ./hack/build-all.sh dev
@@ -103,7 +113,7 @@ build-dev:
 
 build-branches:
   extends: .defaults_template
-  stage: build
+  stage: untested_build
   script:
     - chmod +x ./hack/build-all.sh ./hack/container-build.sh ./hack/cosign-main.sh
     - ./hack/build-all.sh ${CI_COMMIT_REF_NAME}
@@ -116,19 +126,29 @@ build-branches:
 
 build-tag:
   extends: .defaults_template
-  stage: build
+  stage: tested_build
+  needs:
+    - tester-test-required
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+/
   script:
     - chmod +x ./hack/build-all.sh ./hack/container-build.sh ./hack/cosign-main.sh
     - ./hack/build-all.sh ${CI_COMMIT_TAG}
-  only:
-    # must match v0.0
-    - /^v(\d+)\.(\d+).*$/
-  except:
-    - branches
 
-tester-test-branch:
+tester-test-required:
   extends: .tester-run-tests
-  stage: branch_test
-  when: manual
+  stage: required_test
+  needs:
+    - tester-build-required
   rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_MERGE_REQUEST_ID == null
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+/
+
+tester-test-optional:
+  extends: .tester-run-tests
+  stage: optional_test
+  when: manual
+  needs:
+    - tester-build-optional
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^(feature|bugfix|release-fix)-.+$/

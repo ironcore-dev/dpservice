@@ -56,7 +56,7 @@ var _ = BeforeSuite(func() {
 	conn, err := grpc.NewClient(dpserviceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	Expect(err).NotTo(HaveOccurred())
 
-	dpdkProtoClient = dpdkproto.NewDPDKironcoreClient(conn)
+	dpdkProtoClient = dpdkproto.NewDPDKonmetalClient(conn)
 	dpdkClient = NewClient(dpdkProtoClient)
 
 	// running gRPC command before initialization should return error
