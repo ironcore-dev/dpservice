@@ -34,6 +34,10 @@ For more details please refer to documentation folder [docs](/docs)
 We`d love to get a feedback from you.
 Please report bugs, suggestions or post question by opening a [Github issue](https://github.com/ironcore-dev/dpservice/issues)
 
-## License
+## Licensing
 
-[Apache License 2.0](/LICENSE)
+Copyright 2025 SAP SE or an SAP affiliate company and IronCore contributors. Please see our [LICENSE](/LICENSES) for
+copyright and license information. Detailed information including third-party components and their licensing/copyright
+information is available [via the REUSE tool](https://api.reuse.software/info/github.com/ironcore-dev/dpservice).
+
+<p align="center"><img alt="Bundesministerium für Wirtschaft und Energie (BMWE)-EU funding logo" src="https://apeirora.eu/assets/img/BMWK-EU.png" width="400"/></p>
