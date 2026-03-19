@@ -758,9 +758,11 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 
 void dp_l2_addr_set(struct dp_port *port, const struct rte_ether_addr *l2_addr)
 {
-	rte_ether_addr_copy(l2_addr, &port->neigh_mac);
+	if (!rte_is_same_ether_addr(l2_addr, &port->neigh_mac)) {
+		rte_ether_addr_copy(l2_addr, &port->neigh_mac);
+		dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
+	}
 	port->iface.l2_addr_received = true;
-	dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
 }
 
 

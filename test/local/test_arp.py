@@ -44,13 +44,13 @@ def test_l2_addr_once(request, prepare_ifaces, grpc_client):
 	assert pkt[Ether].dst == "12:34:56:78:9a:bc", \
 		"Dpservice not using actual VM MAC"
 
-	# Additional ARP/DHCP/ND should not be able to change MAC again
-	request_ip(VM4)
+	# Additional ARP/DHCP/ND should be able to change MAC again
+	request_ip(VM4, "98:76:54:32:10:ab")
 
 	threading.Thread(target=vm_mac_sender).start()
 	pkt = sniff_packet(VM4.tap, is_udp_pkt)
-	assert pkt[Ether].dst == "12:34:56:78:9a:bc", \
-		"Dpservice changed VM MAC"
+	assert pkt[Ether].dst == "98:76:54:32:10:ab", \
+		"Dpservice did not change VM MAC"
 
 	# Now the VM gets removed and *another one* is put into its place
 	# This can have different MAC address
@@ -60,7 +60,7 @@ def test_l2_addr_once(request, prepare_ifaces, grpc_client):
 	# Without ARP/DHCP/ND dpservice should try the use the old MAC
 	threading.Thread(target=vm_mac_sender).start()
 	pkt = sniff_packet(VM4.tap, is_udp_pkt)
-	assert pkt[Ether].dst == "12:34:56:78:9a:bc", \
+	assert pkt[Ether].dst == "98:76:54:32:10:ab", \
 		"Dpservice reset VM MAC"
 
 	# Additional ARP/DHCP/ND should be able to change MAC

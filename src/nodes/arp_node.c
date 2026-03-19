@@ -42,7 +42,7 @@ static __rte_always_inline bool arp_handled(struct rte_mbuf *m)
 	uint32_t temp_ip;
 
 	// ARP reply from VM
-	if (unlikely(dp_l2_addr_needed(port) && sender_ip == htonl(port->iface.cfg.own_ip))) {
+	if (unlikely(sender_ip == htonl(port->iface.cfg.own_ip))) {
 		dp_l2_addr_set(port, &incoming_eth_hdr->src_addr);
 		return true;
 	}
