@@ -167,7 +167,7 @@ static int dp_port_init_ethdev(struct dp_port *port, struct rte_eth_dev_info *de
 	// guess the inital VM MAC until ARP arrives
 	if (!port->is_pf) {
 		rte_ether_addr_copy(&port->own_mac, &port->neigh_mac);
-		port->iface.l2_addr_received = false;
+		port->iface.arp_done = false;
 	}
 
 	static_assert(sizeof(port->dev_name) == RTE_ETH_NAME_MAX_LEN, "Incompatible port dev_name size");
@@ -758,11 +758,10 @@ int dp_port_meter_config(struct dp_port *port, uint64_t total_flow_rate_cap, uin
 
 void dp_l2_addr_set(struct dp_port *port, const struct rte_ether_addr *l2_addr)
 {
-	if (!rte_is_same_ether_addr(l2_addr, &port->neigh_mac)) {
-		rte_ether_addr_copy(l2_addr, &port->neigh_mac);
-		dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
-	}
-	port->iface.l2_addr_received = true;
+	if (rte_is_same_ether_addr(l2_addr, &port->neigh_mac))
+		return;
+	rte_ether_addr_copy(l2_addr, &port->neigh_mac);
+	dp_sync_send_mac(port->port_id, &port->neigh_mac);  // errors ignored
 }
 
 
@@ -777,9 +776,7 @@ int dp_set_port_sync_neigh_mac(uint16_t port_id, const struct rte_ether_addr *ma
 		return DP_ERROR;
 	}
 
-	if (!port->iface.l2_addr_received)
-		rte_ether_addr_copy(mac, &port->neigh_mac);
-
+	rte_ether_addr_copy(mac, &port->neigh_mac);
 	return DP_OK;
 }
 
