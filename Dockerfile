@@ -6,6 +6,7 @@ ARG DPDK_VER=25.11
 ARG DPDK_BUILDTYPE=release
 ARG DPSERVICE_BUILDTYPE=debug
 ARG DPSERVICE_FEATURES=""
+ARG DPSERVICE_VERSION=""
 
 WORKDIR /workspace
 
@@ -99,7 +100,7 @@ COPY include/ include/
 COPY .git/ .git/
 
 # Compile dpservice itself
-RUN meson setup build -Dbuild_dpservice_cli=true -Dbuildtype=$DPSERVICE_BUILDTYPE $DPSERVICE_FEATURES && ninja -C build
+RUN DPSERVICE_VERSION="${DPSERVICE_VERSION}" meson setup build -Dbuild_dpservice_cli=true -Dbuildtype=$DPSERVICE_BUILDTYPE $DPSERVICE_FEATURES && ninja -C build
 
 
 # Extended build image for test-image
