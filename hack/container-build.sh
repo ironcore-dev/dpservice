@@ -38,7 +38,7 @@ $CONTAINER_CLI build \
   --build-arg DPDK_BUILDTYPE="debugoptimized" \
   --build-arg DPSERVICE_BUILDTYPE="debugoptimized" \
   --build-arg DPSERVICE_FEATURES="-Denable_virtual_services=true -Denable_underlay_type=true" \
-  --build-arg OSC_BUILD_VERSION="$commit" \
+  --build-arg DPSERVICE_VERSION="$commit" \
   --build-arg OSC_BUILD_COMMIT_SHA="${CI_COMMIT_SHA}" \
   $LABEL \
   --build-arg CI_SERVER_HOST="${CI_SERVER_HOST}" \
