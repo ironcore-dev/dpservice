@@ -14,7 +14,7 @@ fi
 #  key: image repository path (used for tagging in the registry)
 #  value: Docker build target (must match a stage in your Dockerfile)
 declare -A images=(
-  ["osc/onmetal/dp-service"]="production"
+  ["osc/iaas/dp-service"]="production"
 )
 
 for img_path in "${!images[@]}"; do

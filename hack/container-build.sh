@@ -7,28 +7,35 @@ function timing() {
 }
 trap timing EXIT
 
+# Enable BuildKit for cache mount support in Dockerfile
+export DOCKER_BUILDKIT=1
+
 # Allow switching between docker and podman (default is docker)
 CONTAINER_CLI=${CONTAINER_CLI:-docker}
 
 cd "$GOPATH" || exit
 
-img_mtr_path=$1    # e.g. "osc/onmetal/volumepoollet"
+img_mtr_path=$1    # e.g. "osc/iaas/dp-service"
 commit=$2          # "dev", branch name, or version tag
-docker_target=$3   # e.g. "volumepoollet", "volumebroker", etc.
+docker_target=$3   # e.g. "production"
+
+# Normalize branch names: replace slashes with dashes (e.g. feature/foo -> feature-foo)
+# Docker tags do not allow slashes.
+commit=${commit//\//-}
 
 cd "${GOPATH}/src/${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
 
 LABEL=""
 # If commit equals "dev", replace it with dynamic tag
 if [ "$commit" == "dev" ]; then
-  LABEL='--label quay.expires-after=14d'
+  LABEL='--label quay.expires-after=30d'
   commit=$(date +%d%m%Y)-$(git rev-parse --short HEAD)
 else
   commit=${commit}-$(git rev-parse --short HEAD)
 fi
 
-if [[ "$commit" =~ ^(feature-.*|bugfix-.*|v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.ci-.*) ]]; then
-    LABEL='--label quay.expires-after=14d'
+if [[ "$commit" =~ ^(feature-.*|feat-.*|bugfix-.*|fix-.*|v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.ci-.*) ]]; then
+    LABEL='--label quay.expires-after=30d'
 fi
 
 echo "Using label: $LABEL"
