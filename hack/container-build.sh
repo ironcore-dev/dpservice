@@ -15,7 +15,7 @@ CONTAINER_CLI=${CONTAINER_CLI:-docker}
 
 cd "$GOPATH" || exit
 
-img_mtr_path=$1    # e.g. "osc/iaas/dp-service"
+img_mtr_path=$1    # e.g. "osc/iaas/dpservice"
 commit=$2          # "dev", branch name, or version tag
 docker_target=$3   # e.g. "production"
 
