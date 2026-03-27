@@ -41,6 +41,9 @@ fi
 echo "Using label: $LABEL"
 
 $CONTAINER_CLI build \
+  --platform linux/amd64 \
+  --provenance=false \
+  --sbom=false \
   --build-arg CI_JOB_TOKEN="${CI_JOB_TOKEN}" \
   --build-arg DPDK_BUILDTYPE="debugoptimized" \
   --build-arg DPSERVICE_BUILDTYPE="debugoptimized" \
