@@ -19,7 +19,7 @@ variables:
   TESTER_TAG: "mtr.devops.telekom.de/osc/onmetal/dpservice-tester:$COMMITID"
 
 .defaults_template:
-  image: mtr.devops.telekom.de/osc/gardener/osc-builder:v7.1.1
+  image: mtr.devops.telekom.de/osc/common/osc-builder:v7.1.3
   tags:
     - docker
     - pes
