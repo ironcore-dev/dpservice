@@ -1,0 +1,25 @@
+components:
+- name: gitlab.devops.telekom.de/osc/iaas/net-dpservice
+  version: ${VERSION}
+  provider:
+    name: OSC
+  labels:
+  - name: osc.t-systems.com/git-repo
+    value: https://gitlab.devops.telekom.de/cas-devs/osc/upstream/onmetal/net-dpservice
+  - name: osc.t-systems.com/git-sha
+    value: ${GIT_SHA}
+  - name: gardener.cloud/cve-categorisation
+    value:
+      network_exposure: protected
+      authentication_enforced: false
+      user_interaction: gardener-operator
+      confidentiality_requirement: low
+      integrity_requirement: high
+      availability_requirement: high
+  resources:
+  - name: production
+    type: ociImage
+    version: ${VERSION}
+    access:
+      type: ociArtifact
+      imageReference: mtr.devops.telekom.de/osc/iaas/dpservice:${IMAGE_TAG}
