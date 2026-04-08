@@ -36,7 +36,7 @@ jobs:
           else
            echo "DOCKER_IMAGE_SHA=${{ github.sha }}" >> $GITHUB_ENV
           fi
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@v6
         id: meta
         with:
           images: |
@@ -66,7 +66,7 @@ jobs:
           echo "CONTEXT_NAME=$CONTEXT_NAME" >> $GITHUB_ENV
       - name: Set up Docker Buildx
         timeout-minutes: 5
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           version: latest
           endpoint: ${{ env.CONTEXT_NAME }} # self-hosted
@@ -78,7 +78,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push tester
         timeout-minutes: 60
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{env.platforms}}
