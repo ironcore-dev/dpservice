@@ -324,6 +324,22 @@ function get_ifname() {
 	echo "$ifname"
 }
 
+function validate_node_ip() {
+	local ip_json
+	ip_json=$(ip -js -6 addr show lo)
+
+	if [ -z "$ip_json" ]; then
+		err "Could not retrieve address information for interface 'lo'."
+	fi
+
+	local lo_addrs
+	lo_addrs=$(echo "$ip_json" | jq -r '.[0].addr_info[] | .local')
+
+	if ! grep -qx "$OPT_NODE_IP" <<< "$lo_addrs"; then
+		err "Node IP '$OPT_NODE_IP' is not assigned to interface 'lo'."
+	fi
+}
+
 function get_ipv6() {
 	local ip_json
 	ip_json=$(ip -js -6 addr show lo)
@@ -442,6 +458,7 @@ while [[ $# -gt 0 ]]; do
 		--node-ip)
 			shift
 			OPT_NODE_IP="$1"
+			validate_node_ip
 			;;
 		*)
 			err "Invalid argument $1"
