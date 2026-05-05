@@ -5,7 +5,6 @@
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
-#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_flow.h"
 #include "dp_log.h"
@@ -51,9 +50,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		if (df->l4_type == IPPROTO_UDP && df->l4_info.trans_port.dst_port == htons(DHCPV6_SERVER_PORT))
 			return CONNTRACK_NEXT_DHCPV6;
 	}
-
-	if (!dp_conf_is_conntrack_enabled())
-		return CONNTRACK_NEXT_DNAT;
 
 	if (df->l4_type == IPPROTO_TCP
 		|| df->l4_type == IPPROTO_UDP

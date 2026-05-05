@@ -31,9 +31,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dnat_data *dnat_data;
 	union dp_ipv6 nat_ipv6;
 
-	if (!cntrack)
-		goto out;
-
 	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags)
 		&& df->flow_dir == DP_FLOW_DIR_ORG
 		&& df->l3_type == RTE_ETHER_TYPE_IPV4
@@ -160,7 +157,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		return DNAT_NEXT_IPV6_LOOKUP;
 	}
 
-out:
 	if (df->l3_type == RTE_ETHER_TYPE_IPV4)
 		return DNAT_NEXT_IPV4_LOOKUP;
 	else if (df->l3_type == RTE_ETHER_TYPE_IPV6)
