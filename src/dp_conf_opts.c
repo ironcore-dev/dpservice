@@ -34,7 +34,6 @@ _OPT_SHOPT_MAX = 255,
 	OPT_WCMP,
 	OPT_NIC_TYPE,
 	OPT_NO_STATS,
-	OPT_NO_CONNTRACK,
 	OPT_ENABLE_IPV6_OVERLAY,
 	OPT_NO_OFFLOAD,
 #ifdef ENABLE_PYTEST
@@ -72,7 +71,6 @@ static const struct option dp_conf_longopts[] = {
 	{ "wcmp", 1, 0, OPT_WCMP },
 	{ "nic-type", 1, 0, OPT_NIC_TYPE },
 	{ "no-stats", 0, 0, OPT_NO_STATS },
-	{ "no-conntrack", 0, 0, OPT_NO_CONNTRACK },
 	{ "enable-ipv6-overlay", 0, 0, OPT_ENABLE_IPV6_OVERLAY },
 	{ "no-offload", 0, 0, OPT_NO_OFFLOAD },
 #ifdef ENABLE_PYTEST
@@ -114,7 +112,6 @@ static int dhcp_mtu = 1500;
 static int wcmp_perc = 100;
 static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_MELLANOX;
 static bool stats_enabled = true;
-static bool conntrack_enabled = true;
 static bool ipv6_overlay_enabled = false;
 static bool offload_enabled = true;
 #ifdef ENABLE_PYTEST
@@ -163,11 +160,6 @@ enum dp_conf_nic_type dp_conf_get_nic_type(void)
 bool dp_conf_is_stats_enabled(void)
 {
 	return stats_enabled;
-}
-
-bool dp_conf_is_conntrack_enabled(void)
-{
-	return conntrack_enabled;
 }
 
 bool dp_conf_is_ipv6_overlay_enabled(void)
@@ -260,7 +252,6 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --wcmp=PERCENTAGE                  weighted-cost-multipath percentage for pf0 (0 - 100)\n"
 		"     --nic-type=NICTYPE                 NIC type to use: 'mellanox' (default), 'tap' or 'bluefield2'\n"
 		"     --no-stats                         do not print periodic statistics to stdout\n"
-		"     --no-conntrack                     disable connection tracking\n"
 		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
 		"     --no-offload                       disable traffic offloading\n"
 #ifdef ENABLE_PYTEST
@@ -310,8 +301,6 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_enum(arg, (int *)&nic_type, nic_type_choices, ARRAY_SIZE(nic_type_choices));
 	case OPT_NO_STATS:
 		return dp_argparse_store_false(&stats_enabled);
-	case OPT_NO_CONNTRACK:
-		return dp_argparse_store_false(&conntrack_enabled);
 	case OPT_ENABLE_IPV6_OVERLAY:
 		return dp_argparse_store_true(&ipv6_overlay_enabled);
 	case OPT_NO_OFFLOAD:
