@@ -456,7 +456,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	dp_copy_ipv6(&port->iface.ul_ipv6, &request->ul_addr6);
 	port->iface.cfg.own_ip = request->ip4_addr;
 	port->iface.cfg.ip_depth = DP_LPM_DHCP_IP_DEPTH;
-	dp_copy_ipv6(&port->iface.cfg.dhcp_ipv6, &request->ip6_addr);
+	dp_copy_ipv6(&port->iface.cfg.own_ipv6, &request->ip6_addr);
 	port->iface.cfg.ip6_depth = DP_LPM_DHCP_IP6_DEPTH;
 	static_assert(sizeof(request->pxe_str) == sizeof(port->iface.cfg.pxe_str), "Incompatible interface PXE size");
 	rte_memcpy(port->iface.cfg.pxe_str, request->pxe_str, sizeof(port->iface.cfg.pxe_str));
@@ -553,7 +553,7 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 		return DP_GRPC_ERR_NOT_FOUND;
 
 	reply->ip4_addr = port->iface.cfg.own_ip;
-	dp_copy_ipv6(&reply->ip6_addr, &port->iface.cfg.dhcp_ipv6);
+	dp_copy_ipv6(&reply->ip6_addr, &port->iface.cfg.own_ipv6);
 	reply->vni = port->iface.vni;
 	static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
 	rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
@@ -752,7 +752,7 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 			return DP_GRPC_ERR_OUT_OF_MEMORY;
 
 		reply->ip4_addr = port->iface.cfg.own_ip;
-		dp_copy_ipv6(&reply->ip6_addr, &port->iface.cfg.dhcp_ipv6);
+		dp_copy_ipv6(&reply->ip6_addr, &port->iface.cfg.own_ipv6);
 		reply->vni = port->iface.vni;
 		static_assert(sizeof(reply->iface_id) == sizeof(port->iface.id), "Incompatible VM ID size");
 		rte_memcpy(reply->iface_id, port->iface.id, sizeof(reply->iface_id));
