@@ -160,9 +160,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			return SNAT_NEXT_DROP;
 	}
 
-	if (!cntrack)
-		return SNAT_NEXT_FIREWALL;
-
 	port = dp_get_in_port(m);
 	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 

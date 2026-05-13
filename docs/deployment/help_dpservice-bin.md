@@ -16,7 +16,6 @@
 | --wcmp | PERCENTAGE | weighted-cost-multipath percentage for pf0 (0 - 100) |  |
 | --nic-type | NICTYPE | NIC type to use | 'mellanox' (default), 'tap' or 'bluefield2' |
 | --no-stats | None | do not print periodic statistics to stdout |  |
-| --no-conntrack | None | disable connection tracking |  |
 | --enable-ipv6-overlay | None | enable IPv6 overlay addresses |  |
 | --no-offload | None | disable traffic offloading |  |
 | --graphtrace-loglevel | LEVEL | verbosity level of packet traversing the graph framework |  |

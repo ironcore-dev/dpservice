@@ -230,11 +230,6 @@ static int run_service(void)
 	srand((unsigned int)rte_rdtsc());
 
 	// pre-init sanity checks
-	if (!dp_conf_is_conntrack_enabled() && dp_conf_is_offload_enabled()) {
-		DP_EARLY_ERR("Disabled conntrack requires disabled offloading");
-		return DP_ERROR;
-	}
-
 	if (dp_conf_is_multiport_eswitch()) {
 		if (dp_conf_is_offload_enabled()) {
 			DP_EARLY_ERR("HW offloading is currently not supported for multi-port eswitch mode");

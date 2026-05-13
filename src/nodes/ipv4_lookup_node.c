@@ -15,11 +15,9 @@
 #include "dp_port.h"
 #include "dp_vnf.h"
 #include "nodes/common_node.h"
-#include "nodes/dhcp_node.h"
 #include "rte_flow/dp_rte_flow.h"
 
 #define NEXT_NODES(NEXT) \
-	NEXT(IPV4_LOOKUP_NEXT_DHCP, "dhcp") \
 	NEXT(IPV4_LOOKUP_NEXT_NAT, "snat")
 DP_NODE_REGISTER_NOINIT(IPV4_LOOKUP, ipv4_lookup, NEXT_NODES);
 
@@ -30,10 +28,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	bool is_default_route;
 	const struct dp_port *in_port = dp_get_in_port(m);
 	const struct dp_port *out_port;
-
-	// TODO: add broadcast routes when machine is added
-	if (df->l4_type == IPPROTO_UDP && df->l4_info.trans_port.dst_port == htons(DP_BOOTP_SRV_PORT))
-		return IPV4_LOOKUP_NEXT_DHCP;
 
 	out_port = dp_get_ip4_out_port(in_port, df->tun_info.dst_vni, df, &route, &is_default_route);
 	if (!out_port)
