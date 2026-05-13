@@ -148,10 +148,10 @@ static __rte_always_inline int parse_options(struct rte_mbuf *m,
 			reply_options->opt_iana = opt_iana_template;
 			reply_options->opt_iana.ia_na.iaid = ((const struct dhcpv6_ia_na *)&opt->data)->iaid;
 			// cannot use optimized function here due to the destination being packed (can cause alignment problems)
-			static_assert(sizeof(reply_options->opt_iana.ia_na.options[0].addr.ipv6) == sizeof(dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes),
+			static_assert(sizeof(reply_options->opt_iana.ia_na.options[0].addr.ipv6) == sizeof(dp_get_in_port(m)->iface.cfg.own_ipv6.bytes),
 						  "Incompatible IPv6 array for IA_NA options");
 			rte_memcpy(reply_options->opt_iana.ia_na.options[0].addr.ipv6,
-					   dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes, sizeof(dp_get_in_port(m)->iface.cfg.dhcp_ipv6.bytes));
+					   dp_get_in_port(m)->iface.cfg.own_ipv6.bytes, sizeof(dp_get_in_port(m)->iface.cfg.own_ipv6.bytes));
 			reply_options->opt_iana_len = sizeof(opt_iana_template);
 			break;
 		case DHCPV6_OPT_RAPID_COMMIT:
@@ -279,7 +279,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	int reply_options_len;
 	size_t payload_len;
 
-	if (dp_is_ipv6_zero(&dp_get_in_port(m)->iface.cfg.dhcp_ipv6))
+	if (dp_is_ipv6_zero(&dp_get_in_port(m)->iface.cfg.own_ipv6))
 		return DHCPV6_NEXT_DROP;
 
 	// packet length is uint16_t, negative value means it's less than the required length

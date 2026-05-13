@@ -18,7 +18,7 @@ static const struct rte_ether_addr dp_mc_mac = {
 
 static __rte_always_inline bool dp_is_ip_set(struct dp_port *port, uint16_t eth_type)
 {
-	return (eth_type == RTE_ETHER_TYPE_IPV6 && !dp_is_ipv6_zero(&port->iface.cfg.dhcp_ipv6)) ||
+	return (eth_type == RTE_ETHER_TYPE_IPV6 && !dp_is_ipv6_zero(&port->iface.cfg.own_ipv6)) ||
 		   (eth_type == RTE_ETHER_TYPE_ARP && port->iface.cfg.own_ip != 0);
 }
 

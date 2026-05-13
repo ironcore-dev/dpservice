@@ -28,7 +28,6 @@ struct dp_iface_cfg {
 	uint32_t				own_ip;
 	uint32_t				neigh_ip;
 	uint8_t					ip_depth;
-	union dp_ipv6			dhcp_ipv6;
 	union dp_ipv6			own_ipv6;
 	uint8_t					ip6_depth;
 	struct dp_ip_address	pxe_ip;

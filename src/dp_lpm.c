@@ -26,7 +26,7 @@ static __rte_always_inline int dp_lpm_fill_route_tables(const struct dp_port *po
 	if (DP_FAILED(ret))
 		return ret;
 
-	ret = dp_add_route6(port, port->iface.vni, 0, &port->iface.cfg.dhcp_ipv6, &dp_empty_ipv6, 128);
+	ret = dp_add_route6(port, port->iface.vni, 0, &port->iface.cfg.own_ipv6, &dp_empty_ipv6, 128);
 	if (DP_FAILED(ret))
 		return ret;
 
