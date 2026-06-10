@@ -91,13 +91,6 @@
       "default": "true"
     },
     {
-      "lgopt": "no-conntrack",
-      "help": "disable connection tracking",
-      "var": "conntrack_enabled",
-      "type": "bool",
-      "default": "true"
-    },
-    {
       "lgopt": "enable-ipv6-overlay",
       "help": "enable IPv6 overlay addresses",
       "var": "ipv6_overlay_enabled",

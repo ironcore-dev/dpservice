@@ -32,7 +32,6 @@ int dp_conf_get_dhcp_mtu(void);
 int dp_conf_get_wcmp_perc(void);
 enum dp_conf_nic_type dp_conf_get_nic_type(void);
 bool dp_conf_is_stats_enabled(void);
-bool dp_conf_is_conntrack_enabled(void);
 bool dp_conf_is_ipv6_overlay_enabled(void);
 bool dp_conf_is_offload_enabled(void);
 #ifdef ENABLE_PYTEST

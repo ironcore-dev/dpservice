@@ -40,8 +40,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	const union dp_ipv6 *target_ip6;
 	uint32_t vni;
 
-	if (!cntrack)
-		return LB_NEXT_DNAT;
+	assert(cntrack);
 
 	vni = df->tun_info.dst_vni;
 	if (vni == 0)

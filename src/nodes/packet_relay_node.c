@@ -75,8 +75,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct flow_value *cntrack = df->conntrack;
 
-	if (!cntrack)
-		return PACKET_RELAY_NEXT_DROP;
+	assert(cntrack);
 
 	if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_NEIGH) {
 		df->nxt_hop = m->port;

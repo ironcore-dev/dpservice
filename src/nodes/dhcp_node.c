@@ -177,7 +177,7 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	struct dp_dhcp_header *dhcp_hdr;
 	struct dp_port *port = dp_get_in_port(m);
 	int options_len, header_size;
-	uint8_t msg_type;
+	uint8_t msg_type = 0;
 
 	// TODO(gg): Once PXE is tested, possibly remove 'static' if not needed
 	static enum dp_pxe_mode pxe_mode = DP_PXE_MODE_NONE;
