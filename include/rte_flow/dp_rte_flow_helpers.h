@@ -42,12 +42,12 @@ static const struct rte_flow_item_eth dp_flow_item_eth_mask = {
 	.hdr.ether_type = 0xffff,
 };
 static const struct rte_flow_item_eth dp_flow_item_eth_dst_mask = {
-	.hdr.dst_addr.addr_bytes = "\xff\xff\xff\xff\xff\xff",
+	.hdr.dst_addr.addr_bytes = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 	.hdr.ether_type = 0xffff,
 };
 static const struct rte_flow_item_eth dp_flow_item_eth_src_dst_mask = {
-	.hdr.src_addr.addr_bytes = "\xff\xff\xff\xff\xff\xff",
-	.hdr.dst_addr.addr_bytes = "\xff\xff\xff\xff\xff\xff",
+	.hdr.src_addr.addr_bytes = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+	.hdr.dst_addr.addr_bytes = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 	.hdr.ether_type = 0xffff,
 };
 
@@ -55,19 +55,19 @@ static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_mask = {
 	.hdr.proto = 0xff,
 };
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_src_mask = {
-	.hdr.src_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.src_addr.a = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 	.hdr.proto = 0xff,
 };
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_mask = {
-	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.dst_addr.a = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 	.hdr.proto = 0xff,
 };
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_pfx68_mask = {
-	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xf0\x00\x00\x00\x00\x00\x00\x00",
+	.hdr.dst_addr.a = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 };
 #ifdef ENABLE_VIRTSVC
 static const struct rte_flow_item_ipv6 dp_flow_item_ipv6_dst_only_mask = {
-	.hdr.dst_addr.a = "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+	.hdr.dst_addr.a = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 };
 #endif
 
