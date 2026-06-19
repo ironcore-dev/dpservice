@@ -44,12 +44,18 @@ bool dp_is_vni_route_table_available(uint32_t vni, int type)
 
 static __rte_always_inline void dp_free_rib6(struct dp_vni_data *vni_data)
 {
-	rte_rib6_free(vni_data->ipv6[DP_SOCKETID(vni_data->socket_id)]);
+	int socket_id = DP_SOCKETID(vni_data->socket_id);
+
+	rte_rib6_free(vni_data->ipv6[socket_id]);
+	vni_data->ipv6[socket_id] = NULL;
 }
 
 static __rte_always_inline void dp_free_rib(struct dp_vni_data *vni_data)
 {
-	rte_rib_free(vni_data->ipv4[DP_SOCKETID(vni_data->socket_id)]);
+	int socket_id = DP_SOCKETID(vni_data->socket_id);
+
+	rte_rib_free(vni_data->ipv4[socket_id]);
+	vni_data->ipv4[socket_id] = NULL;
 }
 
 static void dp_free_vni_data(struct dp_ref *ref)
@@ -198,13 +204,13 @@ static int dp_reset_vni_data(uint32_t vni, struct dp_vni_data *vni_data)
 	int socket_id = DP_SOCKETID(vni_data->socket_id);
 
 	if (vni_data->ipv4[socket_id]) {
-		rte_rib_free(vni_data->ipv4[socket_id]);
+		dp_free_rib(vni_data);
 		if (DP_FAILED(dp_create_rib(vni, socket_id, vni_data)))
 			return DP_ERROR;
 	}
 
 	if (vni_data->ipv6[socket_id]) {
-		rte_rib6_free(vni_data->ipv6[socket_id]);
+		dp_free_rib6(vni_data);
 		if (DP_FAILED(dp_create_rib6(vni, socket_id, vni_data)))
 			return DP_ERROR;
 	}
