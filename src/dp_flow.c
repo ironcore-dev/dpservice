@@ -212,7 +212,7 @@ void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *in
 	}
 }
 
-void dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val)
+int dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val)
 {
 	int ret;
 
@@ -222,7 +222,7 @@ void dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val)
 			dp_flow_log_key(key, "Attempt to delete a non-existing hash key");
 		else
 			DPS_LOG_ERR("Cannot delete key from flow table", DP_LOG_RET(ret));
-		return;
+		return ret;
 	}
 #ifdef ENABLE_PYTEST
 	dp_flow_log_key(key, "Successfully deleted an existing hash key");
@@ -231,6 +231,7 @@ void dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val)
 	// removed a flow, purge the cache to be safe
 	// (could only remove this key from cache, but that would need matching, which takes time)
 	dp_cntrack_flush_cache();
+	return DP_OK;
 }
 
 int dp_add_flow(const struct flow_key *key, struct flow_value *flow_val)
