@@ -156,7 +156,7 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val) {
 		DPS_LOG_ERR("Failed to allocate new flow value");
-		goto error_alloc;
+		return NULL;
 	}
 
 	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_ORG], key, sizeof(*key));
@@ -184,8 +184,10 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 		flow_val->l4_state.tcp.state = DP_FLOW_TCP_STATE_NONE;
 
 	dp_ref_init(&flow_val->ref_count, dp_free_flow);
-	if (DP_FAILED(dp_add_flow(key, flow_val)))
-		goto error_add;
+	if (DP_FAILED(dp_add_flow(key, flow_val))) {
+		rte_free(flow_val);
+		return NULL;
+	}
 
 	// Only the original flow (outgoing)'s hash value is recorded
 	// Implicit casting from hash_sig_t to uint32_t!
@@ -193,18 +195,15 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 
 	dp_invert_flow_key(key, &inverted_key);
 	rte_memcpy(&flow_val->flow_key[DP_FLOW_DIR_REPLY], &inverted_key, sizeof(inverted_key));
-	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
-		goto error_add_inv;
+	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val))) {
+		// this decreases a ref counter, which already frees when it hits zero
+		if (DP_FAILED(dp_delete_flow(key, flow_val)))
+			rte_free(flow_val);
+		return NULL;
+	}
 	dp_ref_inc(&flow_val->ref_count);
 
 	return flow_val;
-
-error_add_inv:
-	dp_delete_flow(key, flow_val);
-error_add:
-	rte_free(flow_val);
-error_alloc:
-	return NULL;
 }
 
 
@@ -241,7 +240,7 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 	flow_val = rte_zmalloc("flow_val", sizeof(struct flow_value), RTE_CACHE_LINE_SIZE);
 	if (!flow_val) {
 		DPS_LOG_ERR("Failed to allocate new sync flow value");
-		goto error_alloc;
+		return DP_ERROR;
 	}
 
 	// Code based on flow_table_insert_entry() (see above).
@@ -293,22 +292,21 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 		dp_set_ipaddr_nat64(&key.l3_dst, htonl(key.l3_dst.ipv4));
 
 	// Create the original conntrack flow
-	if (DP_FAILED(dp_add_flow(&key, flow_val)))
-		goto error_add;
+	if (DP_FAILED(dp_add_flow(&key, flow_val))) {
+		rte_free(flow_val);
+		return DP_ERROR;
+	}
 
 	// Create the reply flow
-	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val)))
-		goto error_add_inv;
+	if (DP_FAILED(dp_add_flow(&inverted_key, flow_val))) {
+		// this decreases a ref counter, which already frees when it hits zero
+		if (DP_FAILED(dp_delete_flow(&key, flow_val)))
+			rte_free(flow_val);
+		return DP_ERROR;
+	}
 	dp_ref_inc(&flow_val->ref_count);
 
 	return DP_OK;
-
-error_add_inv:
-	dp_delete_flow(&key, flow_val);
-error_add:
-	rte_free(flow_val);
-error_alloc:
-	return DP_ERROR;
 }
 
 
