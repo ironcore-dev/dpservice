@@ -240,11 +240,18 @@ int dp_dpdk_main_loop(void)
 		DPS_LOG_ERR("Cannot launch lcores", DP_LOG_RET(ret));
 		// custom threads are already running, stop them
 		dp_force_quit();
+		// FUTURE - with multiple workers, some may already be running, wait before cleaning up
+		rte_eal_mp_wait_lcore();
 		return ret;
 	}
 
 	/* Launch timer loop on main core */
-	return main_core_loop();
+	ret = main_core_loop();
+
+	// wait for workers to finish, as to not teardown something still used in packet processing
+	rte_eal_mp_wait_lcore();
+
+	return ret;
 }
 
 struct dp_dpdk_layer *get_dpdk_layer(void)
