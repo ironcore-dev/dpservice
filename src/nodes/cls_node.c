@@ -135,15 +135,15 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	l3_type = m->packet_type & RTE_PTYPE_L3_MASK;
 	ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 
+	// connected nodes need dp_flow structure (call cannot fail)
+	df = dp_init_flow_ptr(m);
+
 	if (unlikely(l3_type == 0)) {
 		// Manual test, because Mellanox PMD drivers do not set detailed L2 packet_type in mbuf
 		if (is_arp(ether_hdr))
 			return CLS_NEXT_ARP;
 		return CLS_NEXT_DROP;
 	}
-
-	// L3-aware nodes need dp_flow structure (call cannot fail)
-	df = dp_init_flow_ptr(m);
 
 	// this is validating the port-id for all subsequent uses of dp_get_port(m)
 	port = dp_get_port_by_id(m->port);
