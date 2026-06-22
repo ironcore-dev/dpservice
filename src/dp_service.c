@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -141,6 +142,33 @@ static int setup_sighandlers(void)
 	return DP_OK;
 }
 
+static int setup_coredumps(void)
+{
+	int fd;
+	ssize_t written;
+	const char *proc_path = "/proc/self/coredump_filter";
+
+	if (!dp_conf_is_debug_coredumps())
+		return DP_OK;
+
+	fd = open(proc_path, O_WRONLY | O_CLOEXEC);
+	if (fd < 0) {
+		DPS_LOG_ERR("Cannot open coredump flags file", DP_LOG_PATH(proc_path));
+		return DP_ERROR;
+	}
+
+	written = write(fd, "0x7f\n", 5);
+
+	close(fd);
+
+	if (written < 0 || written != 5) {
+		DPS_LOG_ERR("Failed to write coredump flags", DP_LOG_PATH(proc_path));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
 static int init_interfaces(void)
 {
 	int pf0_socket_id;
@@ -245,6 +273,7 @@ static int run_service(void)
 	// from this point on, only DPS_LOG should be used
 
 	if (DP_FAILED(setup_sighandlers())
+		|| DP_FAILED(setup_coredumps())
 		|| DP_FAILED(dp_dpdk_layer_init()))
 		return DP_ERROR;
 
