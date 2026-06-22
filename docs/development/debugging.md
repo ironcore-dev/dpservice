@@ -34,3 +34,11 @@ As the TUN/TAP driver uses signals, it is recommended to use `handle signal SIG3
 To provide a rudimentary packet analysis while the packet is being processed inside dp-service, there is a command-line tool provided by the repository called `dpservice-dump`. This allows you to see packet data as it travels through the DPDK graph (as opposed to only seeing ingress/egress packets using `tcpdump`).
 
 Be aware that this will produce large amounts of logs, so only use it for debugging and if possible, on a prepared traffic flow.
+
+
+## Debugging with coredumps
+Standard coredumps work nicely when dpservice is compiled with debug flags. But most of its data is hidden in hugepages. To include them in coredumps, flags need to be set in `/proc/<pid>/coredump_filter`. For the values see [man(5) core](https://man7.org/linux/man-pages/man5/core.5.html).
+
+Since this filter needs to be changed for each and every process, dpservice offers an optional argument `--debug-coredumps` which sets this automatically on process startup.
+
+> This can result in very large coredump files as hugepages take up many GiB of space.
