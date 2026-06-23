@@ -76,6 +76,17 @@ def is_ipip_pkt(pkt):
 def is_encaped_icmp_pkt(pkt):
 	return is_ipip_pkt(pkt) and ICMP in pkt
 
+def build_icmp_err_with_ihl(outer_src_ip, outer_dst_ip, inner_ihl, original_pkt):
+	# Craft an ICMP type-3/code-4 error whose embedded IPv4 header has a raw IHL value.
+	# Scapy would sanitize the IHL field normally, so we overwrite byte 0 of the raw
+	# inner IP header directly to inject arbitrary (including invalid) IHL values.
+	inner_ip = original_pkt[IP].copy()
+	raw_inner = raw(inner_ip)
+	raw_inner = bytes([raw_inner[0] & 0xF0 | (inner_ihl & 0x0F)]) + raw_inner[1:]
+	return (IP(dst=outer_dst_ip, src=outer_src_ip) /
+			ICMP(type=3, code=4, unused=1280) /
+			Raw(load=raw_inner))
+
 
 def delayed_sendp(packet, interface):
 	# Just wait a bit for the other thread (sniffer/responder) to start listening

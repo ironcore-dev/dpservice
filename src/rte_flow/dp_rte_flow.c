@@ -27,9 +27,12 @@ void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_
 			err_ip_info->err_ipv4_hdr = (struct rte_ipv4_hdr *)(icmp_hdr+1);
 			if (err_ip_info->err_ipv4_hdr->next_proto_id == IPPROTO_TCP
 				|| err_ip_info->err_ipv4_hdr->next_proto_id == IPPROTO_UDP) {
+				uint8_t ihl = err_ip_info->err_ipv4_hdr->ihl;
 
-				rte_memcpy(&(err_ip_info->l4_src_port), (char *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4, 2);
-				rte_memcpy(&(err_ip_info->l4_dst_port), (char *)err_ip_info->err_ipv4_hdr + err_ip_info->err_ipv4_hdr->ihl * 4 + 2, 2);
+				if (ihl < 5 || ihl > 15)
+					return;
+				rte_memcpy(&(err_ip_info->l4_src_port), (char *)err_ip_info->err_ipv4_hdr + ihl * 4, 2);
+				rte_memcpy(&(err_ip_info->l4_dst_port), (char *)err_ip_info->err_ipv4_hdr + ihl * 4 + 2, 2);
 			}
 		}
 	}

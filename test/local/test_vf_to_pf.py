@@ -251,6 +251,49 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 		request_icmperr(505, PF1.tap, nat_ul_ipv6)
 	grpc_client.delnat(VM1.name)
 
+
+def _send_icmperr_with_ihl(ihl, nat_ul_ipv6):
+	# Establish a TCP flow from VM1 so dpservice has a NAT state entry to reverse-translate
+	tcp_pkt = (Ether(dst=ipv6_multicast_mac, src=VM1.mac) /
+			   IP(dst=public_ip, src=VM1.ip) /
+			   TCP(sport=1256, dport=504))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	# Sniff the outbound (NATted) TCP on PF0 so we know the translated src IP/port
+	out_pkt = sniff_packet(PF0.tap, is_tcp_pkt)
+
+	# Build and send an ICMP error whose embedded IP has the requested IHL
+	err_pkt = build_icmp_err_with_ihl(
+		outer_src_ip=out_pkt[IP].dst,
+		outer_dst_ip=out_pkt[IP].src,
+		inner_ihl=ihl,
+		original_pkt=out_pkt,
+	)
+	full_err_pkt = (Ether(dst=out_pkt[Ether].src, src=out_pkt[Ether].dst) /
+					IPv6(dst=nat_ul_ipv6, src=out_pkt[IPv6].dst) /
+					err_pkt)
+	delayed_sendp(full_err_pkt, PF0.tap)
+
+
+def test_vm_nat_icmperr_invalid_ihl_dropped(prepare_ipv4, grpc_client):
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	for ihl in (0, 15):
+		_send_icmperr_with_ihl(ihl, nat_ul_ipv6)
+		pkt_list = sniff(count=1, iface=VM1.tap, lfilter=is_icmp_pkt, timeout=sniff_short_timeout)
+		assert len(pkt_list) == 0, \
+			f"ICMP error with invalid IHL={ihl} must be dropped, but was forwarded to VM"
+	grpc_client.delnat(VM1.name)
+
+
+def test_vm_nat_icmperr_valid_ihl_forwarded(prepare_ipv4, grpc_client):
+	nat_ul_ipv6 = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	_send_icmperr_with_ihl(5, nat_ul_ipv6)
+	pkt = sniff_packet(VM1.tap, is_icmp_pkt)
+	assert pkt[ICMP].type == 3, \
+		f"Expected ICMP type 3, got {pkt[ICMP].type}"
+	grpc_client.delnat(VM1.name)
+
+
 def test_vf_to_pf_firewall_tcp_block(prepare_ipv4, grpc_client):
 	pytest.skip("Skipping till firewall gets fully enabled")
 	sniff_tcp_data = {}
