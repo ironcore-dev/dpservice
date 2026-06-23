@@ -222,6 +222,11 @@ int dp_delete_flow(const struct flow_key *key, struct flow_value *flow_val)
 			dp_flow_log_key(key, "Attempt to delete a non-existing hash key");
 		else
 			DPS_LOG_ERR("Cannot delete key from flow table", DP_LOG_RET(ret));
+		// return without changing reference counter
+		// decreasing ref counter without deleting would leave invalid refence in the table
+		// safe to act this way:
+		//   ENOENT: entry was not present, so there is no reference in use
+		//   else: according to docs this can only be EINVAL - invalid parameters
 		return ret;
 	}
 #ifdef ENABLE_PYTEST
@@ -421,7 +426,7 @@ void dp_process_aged_flows_non_offload(void)
 		}
 
 		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value))
-			dp_delete_flow(next_key, flow_val);
+			dp_delete_flow(next_key, flow_val);  // ignore errors - see inside
 	}
 }
 
@@ -429,7 +434,7 @@ static __rte_always_inline void dp_remove_flow(struct flow_value *flow_val, cons
 {
 	if (offload_mode_enabled)
 		dp_rte_flow_remove(flow_val);
-	dp_delete_flow(key, flow_val);
+	dp_delete_flow(key, flow_val);  // ignore errors - see inside
 }
 
 void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type)

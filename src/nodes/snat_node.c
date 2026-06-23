@@ -62,6 +62,7 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT;
+	// ignore errors - see inside
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, ntohl(ipv4_hdr->src_addr));
 	if (snat_data->nat_ip != 0)
@@ -118,6 +119,7 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 
 	/* Expect the new destination in this conntrack object */
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT64;
+	// ignore errors - see inside
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 	if (df->l4_type == IPPROTO_ICMP) {
 		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].src.type_src == DP_ICMPV6_ECHO_REQUEST)
