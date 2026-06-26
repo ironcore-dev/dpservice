@@ -3,6 +3,7 @@
 
 from helpers import *
 from scapy.layers.dhcp6 import *
+import pytest
 
 PXE_MODE = 0
 IPXE_MODE = 1
@@ -117,3 +118,44 @@ def test_dhcpv6_vf0(prepare_ifaces):
 
 def test_dhcpv6_vf1(prepare_ifaces):
 	request_ipv6(VM2, IPXE_MODE)
+
+
+def make_dhcpv6_pkt(msg_class, vm, iaid=0xBEEF0001):
+	DUID = DUID_LL(lladdr=vm.mac)
+	return (Ether(dst=ipv6_multicast_mac) / IPv6(dst=gateway_ipv6) / UDP() /
+	        msg_class(trid=random.randint(0, 16777215)) /
+	        DHCP6OptIA_NA(iaid=iaid, T1=0, T2=0) /
+	        DHCP6OptClientId(duid=DUID))
+
+
+@pytest.fixture(scope="function")
+def ipv4only_iface(prepare_ifaces, grpc_client):
+	interface_init(VM4.tap)
+	VM4.ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, "::")
+	yield VM4
+	grpc_client.delinterface(VM4.name)
+
+
+def test_dhcpv6_noaddrsavail_solicit(ipv4only_iface):
+	answer = srp1(make_dhcpv6_pkt(DHCP6_Solicit, VM4),
+	              iface=VM4.tap, type=ETH_P_IPV6, timeout=sniff_timeout)
+	validate_checksums(answer)
+	assert DHCP6_Reply in answer
+	assert DHCP6OptStatusCode in answer
+	assert answer[DHCP6OptStatusCode].statuscode == 2, \
+		f"Expected NOADDRSAVAIL (2), got {answer[DHCP6OptStatusCode].statuscode}"
+
+def test_dhcpv6_noaddrsavail_request(ipv4only_iface):
+	answer = srp1(make_dhcpv6_pkt(DHCP6_Request, VM4, iaid=0xBEEF0002),
+	              iface=VM4.tap, type=ETH_P_IPV6, timeout=sniff_timeout)
+	validate_checksums(answer)
+	assert DHCP6_Reply in answer
+	assert DHCP6OptStatusCode in answer
+	assert answer[DHCP6OptStatusCode].statuscode == 2, \
+		f"Expected NOADDRSAVAIL (2), got {answer[DHCP6OptStatusCode].statuscode}"
+
+def test_dhcpv6_noaddrsavail_confirm_dropped(ipv4only_iface):
+	pkt = (Ether(dst=ipv6_multicast_mac) / IPv6(dst=gateway_ipv6) / UDP() /
+	       DHCP6_Confirm(trid=random.randint(0, 16777215)))
+	answer = srp1(pkt, iface=VM4.tap, type=ETH_P_IPV6, timeout=sniff_timeout)
+	assert answer is None, "Expected no reply for DHCP6_Confirm on IPv4-only interface"

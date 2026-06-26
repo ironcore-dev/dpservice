@@ -269,6 +269,21 @@ static int generate_reply_options(struct rte_mbuf *m, uint8_t *options, int opti
 	return reply_options_len;
 }
 
+static __rte_always_inline int generate_noaddrs_reply(struct rte_mbuf *m, uint8_t *options, int options_len)
+{
+	struct dhcpv6_opt_status_code status_opt = {
+		.op_code = htons(DHCPV6_OPT_STATUS_CODE),
+		.op_len  = htons(sizeof(uint16_t)),
+		.status  = htons(DHCPV6_STATUS_NOADDRSAVAIL),
+	};
+
+	if (DP_FAILED(resize_packet(m, (int)sizeof(status_opt) - options_len)))
+		return DP_ERROR;
+
+	memcpy(options, &status_opt, sizeof(status_opt));
+	return (int)sizeof(status_opt);
+}
+
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
 {
 	struct rte_ether_hdr *req_eth_hdr;
@@ -278,9 +293,6 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	int req_options_len = rte_pktmbuf_data_len(m) - (int)DP_DHCPV6_PKT_FIXED_LEN;
 	int reply_options_len;
 	size_t payload_len;
-
-	if (dp_is_ipv6_zero(&dp_get_in_port(m)->iface.cfg.own_ipv6))
-		return DHCPV6_NEXT_DROP;
 
 	// packet length is uint16_t, negative value means it's less than the required length
 	if (req_options_len < 0) {
@@ -303,22 +315,31 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	req_udp_hdr->dst_port = htons(DHCPV6_CLIENT_PORT);
 
 	// create reply with options
-	switch (dhcp_pkt->msg_type) {
-	case DHCPV6_SOLICIT:
-		dhcp_pkt->msg_type = DHCPV6_ADVERTISE;
-		reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
-		break;
-	case DHCPV6_REQUEST:
-	case DHCPV6_RELEASE:
+	if (dp_is_ipv6_zero(&dp_get_in_port(m)->iface.cfg.own_ipv6)) {
+		// if no IPv6 address assigned to this interface — reject explicitly so the client
+		// stops waiting instead of timing out and blocking networkd-wait-online
+		if (dhcp_pkt->msg_type != DHCPV6_SOLICIT && dhcp_pkt->msg_type != DHCPV6_REQUEST)
+			return DHCPV6_NEXT_DROP;
 		dhcp_pkt->msg_type = DHCPV6_REPLY;
-		reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
-		break;
-	case DHCPV6_CONFIRM:
-		dhcp_pkt->msg_type = DHCPV6_REPLY;
-		reply_options_len = strip_options(m, req_options_len);
-		break;
-	default:
-		return DHCPV6_NEXT_DROP;
+		reply_options_len = generate_noaddrs_reply(m, dhcp_pkt->options, req_options_len);
+	} else {
+		switch (dhcp_pkt->msg_type) {
+		case DHCPV6_SOLICIT:
+			dhcp_pkt->msg_type = DHCPV6_ADVERTISE;
+			reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
+			break;
+		case DHCPV6_REQUEST:
+		case DHCPV6_RELEASE:
+			dhcp_pkt->msg_type = DHCPV6_REPLY;
+			reply_options_len = generate_reply_options(m, dhcp_pkt->options, req_options_len);
+			break;
+		case DHCPV6_CONFIRM:
+			dhcp_pkt->msg_type = DHCPV6_REPLY;
+			reply_options_len = strip_options(m, req_options_len);
+			break;
+		default:
+			return DHCPV6_NEXT_DROP;
+		}
 	}
 	if (DP_FAILED(reply_options_len))
 		return DHCPV6_NEXT_DROP;
