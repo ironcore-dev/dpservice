@@ -1,4 +1,7 @@
 dp_sources = [
+  'grpc_onmetal/dp_async_grpc.cpp',
+  'grpc_onmetal/dp_grpc_conv.cpp',
+  'grpc_onmetal/dp_grpc_service.cpp',
   'grpc/dp_async_grpc.cpp',
   'grpc/dp_grpc_conv.cpp',
   'grpc/dp_grpc_health.cpp',
@@ -78,7 +81,7 @@ if get_option('enable_virtual_services')
 endif
 
 exe = executable('dpservice-bin',
-  sources: [ dp_sources, grpc_generated, grpc_health_generated, version_h ],
+  sources: [ dp_sources, grpc_generated, grpc_generated_onmetal, grpc_health_generated, version_h ],
   include_directories: [ includes ],
   dependencies: [ dpdk_dep, proto_dep, grpc_dep, grpccpp_dep, thread_dep, libuuid_dep, pcap_dep ]
 )

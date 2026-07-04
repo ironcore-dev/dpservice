@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "grpc/dp_grpc_service.hpp"
+#include "grpc_onmetal/dp_grpc_service.hpp"
 #include "grpc/dp_async_grpc.hpp"
 #include "dp_lpm.h"
 #include "dp_port.h"
@@ -22,6 +23,7 @@ GRPCService* GRPCService::GetInstance()
 
 void GRPCService::Cleanup()
 {
+	GRPCServiceOnmetal::Cleanup();
 	if (!instance)
 		return;
 	delete instance;
@@ -46,6 +48,10 @@ bool GRPCService::run(std::string listen_address)
 	ServerBuilder builder;
 	builder.AddListeningPort(listen_address, grpc::InsecureServerCredentials());
 	builder.RegisterService(this);
+
+	GRPCServiceOnmetal* onmetal_service = GRPCServiceOnmetal::GetInstance();
+	onmetal_service->ConnectIroncoreService(this);
+	builder.RegisterService(onmetal_service);
 
 	health_service_.reset(new HealthService);
 	builder.RegisterService(health_service_.get());
@@ -132,6 +138,8 @@ void GRPCService::HandleRpcs()
 	new CaptureStartCall();
 	new CaptureStopCall();
 	new CaptureStatusCall();
+
+	GRPCServiceOnmetal::GetInstance()->InitRpcs();
 
 	while (cq_->Next(&tag, &ok) && ok) {
 		call = static_cast<BaseCall*>(tag);

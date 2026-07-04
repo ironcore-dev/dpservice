@@ -1,0 +1,702 @@
+syntax = "proto3";
+
+package dpdkonmetal.v1;
+option go_package = "./dpdkproto";
+
+//// ENUMS
+enum InterfaceType {
+	VIRTUAL = 0;
+	BAREMETAL = 1;
+}
+
+enum IpVersion {
+	IPV4 = 0;
+	IPV6 = 1;
+}
+
+enum Protocol {
+	UNDEFINED = 0;  // "Undefined" will set up a layer 3 firewall rule and does not filter on layer 4 protocol details.
+	ICMP = 1;
+	TCP = 6;
+	UDP = 17;
+	ICMPV6 = 58;
+	SCTP = 132;
+}
+
+enum TrafficDirection {
+	INGRESS = 0;
+	EGRESS = 1;
+}
+
+enum FirewallAction {
+	DROP = 0;
+	ACCEPT = 1;
+}
+
+enum VniType {
+	VNI_IPV4 = 0;
+	VNI_IPV6 = 1;
+	VNI_BOTH = 2;
+}
+
+enum CaptureInterfaceType {
+	SINGLE_PF = 0;
+	SINGLE_VF = 1;
+}
+
+//// STRUCTURES
+message Empty {
+}
+
+message Status {
+	uint32 code = 1;
+	string message = 2;
+}
+
+message IpAddress {
+	IpVersion ipver = 1;
+	bytes address = 2;    // holds 4 bytes (IpVersion::IPV4) or 16 bytes (IpVersion::IPV6)
+}
+
+message Prefix {
+	IpAddress ip = 1;
+	uint32 length = 2;    // max length is 32 for IPv4 and 128 for IPv6 (based on ip->ipver)
+	bytes underlay_route = 3;
+}
+
+message Interface {
+	bytes id = 1;
+	uint32 vni = 2;
+	bytes primary_ipv4 = 3;
+	bytes primary_ipv6 = 4;
+	bytes underlay_route = 5;
+	string pci_name = 6;
+	MeteringParams meteringParams = 7;
+	string hostname = 8;
+}
+
+message IpConfig {
+	bytes primary_address = 1;
+}
+
+message PxeConfig {
+	string next_server = 1;
+	string boot_filename = 2;
+}
+
+message VirtualFunction {
+	string name = 1;      // Linux VF NIC device name
+	// TODO: Not available anymore, remove in next breaking change
+	uint32 domain = 2;    // PCIe Domain
+	uint32 bus = 3;       // PCIe Bus
+	uint32 slot = 4;      // PCIe Slot
+	uint32 function = 5;  // PCIe Function
+}
+
+message LbPort {
+	uint32 port = 1;
+	Protocol protocol = 2;
+}
+
+message NatEntry {
+	IpAddress nat_ip = 1;        // TODO This is actually the local "natted" IP
+	uint32 min_port = 2;
+	uint32 max_port = 3;
+	bytes underlay_route = 4;
+	uint32 vni = 5;
+	IpAddress actual_nat_ip = 6; // The actual NAT IP
+}
+
+message Route {
+	Prefix prefix = 1;
+	uint32 nexthop_vni = 2;
+	IpAddress nexthop_address = 3;
+	uint32 weight = 4;
+}
+
+message Loadbalancer {
+	bytes id = 1;
+	uint32 vni = 2;
+	IpAddress ip = 3;
+	repeated LbPort ports = 4;
+	bytes underlay_route = 5;
+}
+
+message IcmpFilter {
+	int32 icmp_type = 1; // -1 matches all ICMP Codes
+	int32 icmp_code = 2; // -1 matches all ICMP Types
+}
+
+message TcpFilter {
+	int32 src_port_lower = 1; // -1 matches all source ports
+	int32 src_port_upper = 2;
+	int32 dst_port_lower = 3; // -1 matches all destination ports
+	int32 dst_port_upper = 4;
+}
+
+message UdpFilter {
+	int32 src_port_lower = 1; // -1 matches all source ports
+	int32 src_port_upper = 2;
+	int32 dst_port_lower = 3; // -1 matches all destination ports
+	int32 dst_port_upper = 4;
+}
+
+message ProtocolFilter {
+	oneof filter {
+		IcmpFilter icmp = 1;
+		TcpFilter tcp = 2;
+		UdpFilter udp = 3;
+	}
+}
+
+// only for virtual interfaces
+message MeteringParams {
+	uint64 total_rate = 1;	// in mbps (Mbits/s), regulated rate for all outgoing traffic
+	uint64 public_rate = 2; // in mbps (Mbits/s), regulated rate for outgoing traffic to public networks
+}
+
+// Firewall Rules can be inserted and removed while the interface is running. Linked list is used despite O(n) nature, as the list
+// needs to be traversed only once for each packet. (Stateful Firewall and each pass after that is O(1))
+// Firewall rules have a priority. "0" being the highest and "65536" being the lowest. Default is "1000".
+// Current implementation supports only "allow" rules. The priority doesnt have any influence when we have only "allow" rules.
+// Without any installed rule, egress default is "allow" everything and ingress default is "deny" everything. With first installed
+// egress rule, egress default changes to "deny" everything except the installed rule(s).
+// When a packet matches a firewall rule, the defined action is taken. No further firewall rules will be evaluated thereafter.
+message FirewallRule {
+	bytes id = 1;
+	TrafficDirection direction = 2;
+	FirewallAction action = 3;			// Can be only "accept" at the moment.
+	uint32 priority = 4;				// For future use. No effect at the moment.
+	Prefix source_prefix = 5;			// 0.0.0.0 with prefix length 0 matches all source ips
+	Prefix destination_prefix = 6;		// 0.0.0.0 with prefix length 0 matches all destination ips
+	ProtocolFilter protocol_filter = 7;	// Not defining a protocol filter matches all protocols
+}
+
+
+/// REQUESTS/RESPONSES
+message CheckInitializedRequest {
+}
+
+message CheckInitializedResponse {
+	Status status = 1;
+	string uuid = 2;
+}
+
+message InitializeRequest {
+}
+
+message InitializeResponse {
+	Status status = 1;
+	string uuid = 2;
+}
+
+message GetVersionRequest {
+	string client_protocol = 1;
+	string client_name = 2;
+	string client_version = 3;
+}
+
+message GetVersionResponse {
+	Status status = 1;
+	string service_protocol = 2;
+	string service_version = 3;
+}
+
+message ListInterfacesRequest {
+}
+
+message ListInterfacesResponse {
+	Status status = 1;
+	repeated Interface interfaces = 2;
+}
+
+message GetInterfaceRequest {
+	bytes interface_id = 1;
+}
+
+message GetInterfaceResponse {
+	Status status = 1;
+	Interface interface = 2;
+}
+
+message CreateInterfaceRequest {
+	// Define whether a Bare Metal Interface or a Virtual Interface is created.
+	// Both instance types cannot be mixed during a session.
+	// Maximum number of instantiated bare metal interfaces is 1.
+	// Maximum number of Virtual Interfaces is not defined.
+	InterfaceType interface_type = 1;
+	bytes interface_id = 2;
+	uint32 vni = 3;
+	IpConfig ipv4_config = 4;
+	IpConfig ipv6_config = 5;
+	PxeConfig pxe_config = 6;
+	// Device with this name will be assigned if it exists, otherwise error is returned.
+	string device_name = 7;
+	MeteringParams metering_parameters = 8;
+	bytes preferred_underlay_route = 9;
+	string hostname = 10;
+}
+
+message CreateInterfaceResponse {
+	Status status = 1;
+	bytes underlay_route = 2;
+	VirtualFunction vf = 3; // Holds VF information when a VM has been created.
+}
+
+message DeleteInterfaceRequest {
+	bytes interface_id = 1;
+}
+
+message DeleteInterfaceResponse {
+	Status status = 1;
+}
+
+message ListPrefixesRequest {
+	bytes interface_id = 1;
+}
+
+message ListPrefixesResponse {
+	Status status = 1;
+	repeated Prefix prefixes = 2;
+}
+
+message CreatePrefixRequest {
+	bytes interface_id = 1;
+	Prefix prefix = 2;
+	bytes preferred_underlay_route = 3;
+}
+
+message CreatePrefixResponse {
+	Status status = 1;
+	bytes underlay_route = 2;
+}
+
+message DeletePrefixRequest {
+	bytes interface_id = 1;
+	Prefix prefix = 2;
+}
+
+message DeletePrefixResponse {
+	Status status = 1;
+}
+
+message ListLoadBalancerPrefixesRequest {
+	bytes interface_id = 1;
+}
+
+message ListLoadBalancerPrefixesResponse {
+	Status status = 1;
+	repeated Prefix prefixes = 2;
+}
+
+message CreateLoadBalancerPrefixRequest {
+	bytes interface_id = 1;
+	Prefix prefix = 2;
+	bytes preferred_underlay_route = 3;
+}
+
+message CreateLoadBalancerPrefixResponse {
+	Status status = 1;
+	bytes underlay_route = 2;
+}
+
+message DeleteLoadBalancerPrefixRequest {
+	bytes interface_id = 1;
+	Prefix prefix = 2;
+}
+
+message DeleteLoadBalancerPrefixResponse {
+	Status status = 1;
+}
+
+message CreateVipRequest {
+	bytes interface_id = 1;
+	IpAddress vip_ip = 2;
+	bytes preferred_underlay_route = 3;
+}
+
+message CreateVipResponse {
+	Status status = 1;
+	bytes underlay_route = 2;
+}
+
+message GetVipRequest {
+	bytes interface_id = 1;
+}
+
+message GetVipResponse {
+	Status status = 1;
+	IpAddress vip_ip = 2;
+	bytes underlay_route = 3;
+}
+
+message DeleteVipRequest {
+	bytes interface_id = 1;
+}
+
+message DeleteVipResponse {
+	Status status = 1;
+}
+
+message CreateLoadBalancerRequest {
+	// TODO use Loadbalancer message here in the next breaking change
+	bytes loadbalancer_id = 1;
+	IpAddress loadbalanced_ip = 2;
+	uint32 vni = 3;
+	repeated LbPort loadbalanced_ports = 4;
+	bytes preferred_underlay_route = 5;
+}
+
+message CreateLoadBalancerResponse {
+	Status status = 1;
+	bytes underlay_route = 2;
+}
+
+message GetLoadBalancerRequest {
+	bytes loadbalancer_id = 1;
+}
+
+message GetLoadBalancerResponse {
+	Status status = 1;
+	// TODO use Loadbalancer message here in the next breaking change
+	IpAddress loadbalanced_ip = 2;
+	uint32 vni = 3;
+	repeated LbPort loadbalanced_ports = 4;
+	bytes underlay_route = 5;
+}
+
+message DeleteLoadBalancerRequest {
+	bytes loadbalancer_id = 1;
+}
+
+message DeleteLoadBalancerResponse {
+	Status status = 1;
+}
+
+message ListLoadBalancersRequest {
+}
+
+message ListLoadBalancersResponse {
+	Status status = 1;
+	repeated Loadbalancer loadbalancers = 2;
+}
+
+message CreateLoadBalancerTargetRequest {
+	bytes loadbalancer_id = 1;
+	IpAddress target_ip = 2;
+}
+
+message CreateLoadBalancerTargetResponse {
+	Status status = 1;
+}
+
+message ListLoadBalancerTargetsRequest {
+	bytes loadbalancer_id = 1;
+}
+
+message ListLoadBalancerTargetsResponse {
+	Status status = 1;
+	repeated IpAddress target_ips = 2;
+}
+
+message DeleteLoadBalancerTargetRequest {
+	bytes loadbalancer_id = 1;
+	IpAddress target_ip = 2;
+}
+
+message DeleteLoadBalancerTargetResponse {
+	Status status = 1;
+}
+
+message CreateNatRequest {
+	bytes interface_id =1;
+	IpAddress nat_ip = 2;
+	uint32 min_port = 3; // port should be uint16 (less than 65536)
+	uint32 max_port = 4;
+	bytes preferred_underlay_route = 5;
+}
+
+message CreateNatResponse {
+	Status status = 1;
+	bytes underlay_route = 2;
+}
+
+message GetNatRequest {
+	bytes interface_id = 1;
+}
+
+message GetNatResponse {
+	Status status = 1;
+	IpAddress nat_ip = 2;
+	uint32 min_port = 3; // port should be uint16 (less than 65536)
+	uint32 max_port = 4;
+	bytes underlay_route = 5;
+}
+
+message DeleteNatRequest {
+	bytes interface_id = 1;
+}
+
+message DeleteNatResponse {
+	Status status = 1;
+}
+
+message CreateNeighborNatRequest {
+	IpAddress nat_ip = 1;
+	uint32 vni = 2;
+	uint32 min_port = 3; // port should be uint16 (less than 65536)
+	uint32 max_port = 4;
+	bytes underlay_route = 5;
+}
+
+message CreateNeighborNatResponse {
+	Status status = 1;
+}
+
+message DeleteNeighborNatRequest {
+	IpAddress nat_ip = 1;
+	uint32 vni = 2;
+	uint32 min_port = 3; // port should be uint16 (less than 65536)
+	uint32 max_port = 4;
+}
+
+message DeleteNeighborNatResponse {
+	Status status = 1;
+}
+
+message ListLocalNatsRequest {
+	IpAddress nat_ip = 1;
+}
+
+message ListLocalNatsResponse {
+	Status status = 1;
+	repeated NatEntry nat_entries = 2;
+}
+
+message ListNeighborNatsRequest {
+	IpAddress nat_ip = 1;
+}
+
+message ListNeighborNatsResponse {
+	Status status = 1;
+	repeated NatEntry nat_entries = 2;
+}
+
+message ListRoutesRequest {
+	uint32 vni = 1;
+}
+
+message ListRoutesResponse {
+	Status status = 1;
+	repeated Route routes = 2;
+}
+
+message CreateRouteRequest {
+	uint32 vni = 1;
+	Route route = 2;
+}
+
+message CreateRouteResponse {
+	Status status = 1;
+}
+
+message DeleteRouteRequest {
+	uint32 vni = 1;
+	Route route = 2;
+}
+
+message DeleteRouteResponse {
+	Status status = 1;
+}
+
+message CheckVniInUseRequest {
+	uint32 vni = 1;
+	VniType type = 2;
+}
+
+message CheckVniInUseResponse {
+	Status status = 1;
+	bool in_use = 2;
+}
+
+message ResetVniRequest {
+	uint32 vni = 1;
+	VniType type = 2;
+}
+message ResetVniResponse {
+	Status status = 1;
+}
+
+message ListFirewallRulesRequest {
+	bytes interface_id = 1;
+}
+
+message ListFirewallRulesResponse {
+	Status status = 1;
+	repeated FirewallRule rules = 2;
+}
+
+message CreateFirewallRuleRequest {
+	bytes interface_id = 1;
+	FirewallRule rule = 2;
+}
+
+message CreateFirewallRuleResponse {
+	Status status = 1;
+	bytes rule_id = 2;
+}
+
+message GetFirewallRuleRequest {
+	bytes interface_id = 1;
+	bytes rule_id = 2;
+}
+
+message GetFirewallRuleResponse {
+	Status status = 1;
+	FirewallRule rule = 2;
+}
+
+message DeleteFirewallRuleRequest {
+	bytes interface_id = 1;
+	bytes rule_id = 2;
+}
+
+message DeleteFirewallRuleResponse {
+	Status status = 1;
+}
+
+message CapturedInterface {
+	CaptureInterfaceType interface_type = 1;
+	bytes filter =  2;
+	oneof spec {
+		bytes vf_name = 3;
+		uint32 pf_index = 4;
+	}
+}
+
+message CaptureConfig {
+	IpAddress sink_node_ip = 1;
+	uint32 udp_src_port = 2;
+	uint32 udp_dst_port = 3;
+	repeated CapturedInterface interfaces = 4;
+}
+
+message CaptureStartRequest {
+	CaptureConfig capture_config = 1;
+}
+
+message CaptureStartResponse {
+	Status status = 1;
+}
+
+message CaptureStopRequest {
+}
+
+message CaptureStopResponse {
+	Status status = 1;
+	uint32 stopped_interface_cnt = 2;
+}
+
+message CaptureStatusRequest {
+}
+
+message CaptureStatusResponse {
+	Status status = 1;
+	bool is_active = 2;
+	CaptureConfig capture_config = 3;
+}
+
+service DPDKonmetal {
+	//// INITIALIZATION
+	// initialized indicates if the DPDK app has been initialized already, if so an UUID is returned.
+	// this UUID gets changed in case the dp-service gets restarted.
+	rpc CheckInitialized(CheckInitializedRequest) returns (CheckInitializedResponse) {}
+
+	// init will be called once for initial set up of the DPDK app.
+	// init returns an error if the DPDK app has been initialized already. So check if it got initialized before calling init.
+	rpc Initialize(InitializeRequest) returns (InitializeResponse) {}
+
+	//// VERSIONING
+	// Exchange protocol/app versions to establish communication
+	rpc GetVersion(GetVersionRequest) returns (GetVersionResponse) {}
+
+	//// INTERFACES
+	rpc ListInterfaces(ListInterfacesRequest) returns (ListInterfacesResponse) {}
+	rpc GetInterface(GetInterfaceRequest) returns (GetInterfaceResponse) {}
+
+	// CreateInterface creates and configures a VF (hypervisor case) or PF (bare metal) for the new interface.
+	// If the interface's VNet is not known to the DPDK app yet, the VNet and its routing table will be intialized.
+	// After calling CreateInterface() the Client has to make sure that the routing table of the corresponding VNet is filled (use ListRoutes and AddRoute as required).
+	rpc CreateInterface(CreateInterfaceRequest) returns (CreateInterfaceResponse) {}
+
+	// DeleteInterface removes all networking configuration of a interface from the DPDK app.
+	// The VF will be released and can be reused for other VMs.
+	// If the interface was the last interface of a VNet on this hypervisor, the VNet and its routes will be freed from the DPDK app.
+	rpc DeleteInterface(DeleteInterfaceRequest) returns (DeleteInterfaceResponse) {}
+
+	// ListPrefixes returns a list of prefixes, that will be routed to the interface by the DPDK app.
+	// For example this could be a node's Kubernetes Pod CIDR.
+	rpc ListPrefixes(ListPrefixesRequest) returns (ListPrefixesResponse) {}
+	rpc CreatePrefix(CreatePrefixRequest) returns (CreatePrefixResponse) {}
+	rpc DeletePrefix(DeletePrefixRequest) returns (DeletePrefixResponse) {}
+
+	// LoadBalancerTargetPrefix(es) are similar to Prefixes but used for LoadBalancing purposes
+	rpc ListLoadBalancerPrefixes(ListLoadBalancerPrefixesRequest) returns (ListLoadBalancerPrefixesResponse) {}
+	rpc CreateLoadBalancerPrefix(CreateLoadBalancerPrefixRequest) returns (CreateLoadBalancerPrefixResponse) {}
+	rpc DeleteLoadBalancerPrefix(DeleteLoadBalancerPrefixRequest) returns (DeleteLoadBalancerPrefixResponse) {}
+
+	// Nat related, add/get/del Virtual IP for a given Interface
+	rpc CreateVip(CreateVipRequest) returns (CreateVipResponse) {}
+	rpc GetVip(GetVipRequest) returns (GetVipResponse) {}
+	rpc DeleteVip(DeleteVipRequest) returns (DeleteVipResponse) {}
+
+	// create/list/del Loadbalancer for a given IP to be loadbalanced
+	rpc CreateLoadBalancer(CreateLoadBalancerRequest) returns (CreateLoadBalancerResponse) {}
+	rpc GetLoadBalancer(GetLoadBalancerRequest) returns (GetLoadBalancerResponse) {}
+	rpc DeleteLoadBalancer(DeleteLoadBalancerRequest) returns (DeleteLoadBalancerResponse) {}
+	rpc ListLoadBalancers(ListLoadBalancersRequest) returns (ListLoadBalancersResponse) {}
+
+	// create/list/del Loadbalancer Targets for a given Loadbalancer ID
+	rpc CreateLoadBalancerTarget(CreateLoadBalancerTargetRequest) returns (CreateLoadBalancerTargetResponse) {}
+	rpc ListLoadBalancerTargets(ListLoadBalancerTargetsRequest) returns (ListLoadBalancerTargetsResponse) {}
+	rpc DeleteLoadBalancerTarget(DeleteLoadBalancerTargetRequest) returns (DeleteLoadBalancerTargetResponse) {}
+
+	// Network-Nat related, add/del/get a Nat for an interface
+	rpc CreateNat(CreateNatRequest) returns (CreateNatResponse) {}
+	rpc GetNat(GetNatRequest) returns (GetNatResponse) {}
+	rpc DeleteNat(DeleteNatRequest) returns (DeleteNatResponse) {}
+
+	rpc ListLocalNats(ListLocalNatsRequest) returns (ListLocalNatsResponse) {}
+
+	rpc CreateNeighborNat(CreateNeighborNatRequest) returns (CreateNeighborNatResponse) {}
+	rpc DeleteNeighborNat(DeleteNeighborNatRequest) returns (DeleteNeighborNatResponse) {}
+	rpc ListNeighborNats(ListNeighborNatsRequest) returns (ListNeighborNatsResponse) {}
+
+	//// ROUTES
+	rpc ListRoutes(ListRoutesRequest) returns (ListRoutesResponse) {}
+
+	// CreateRoute adds a new route to a VNet's routing table (identified by VNI).
+	// If the DPDK application does not hold any interface in the specified VNet, an error will be returned.
+	rpc CreateRoute(CreateRouteRequest) returns (CreateRouteResponse) {}
+
+	// DeleteRoute removes a route from a VNet.
+	// If the route does not exist, an error will be returned.
+	rpc DeleteRoute(DeleteRouteRequest) returns (DeleteRouteResponse) {}
+
+	// VNI internal state information
+	// VNI can be in use by interfaces and by loadbalancer. So get information
+	// whether the VNI in question is in use or not.
+	rpc CheckVniInUse(CheckVniInUseRequest) returns (CheckVniInUseResponse) {}
+	rpc ResetVni(ResetVniRequest) returns (ResetVniResponse) {}
+
+	//// FIREWALL
+	rpc ListFirewallRules(ListFirewallRulesRequest) returns (ListFirewallRulesResponse) {}
+	rpc CreateFirewallRule(CreateFirewallRuleRequest) returns (CreateFirewallRuleResponse) {}
+	rpc GetFirewallRule(GetFirewallRuleRequest) returns (GetFirewallRuleResponse) {}
+	rpc DeleteFirewallRule(DeleteFirewallRuleRequest) returns (DeleteFirewallRuleResponse) {}
+
+	//// PACKET CAPTURE
+	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}
+	rpc CaptureStop(CaptureStopRequest) returns (CaptureStopResponse) {}
+	rpc CaptureStatus(CaptureStatusRequest) returns (CaptureStatusResponse) {}
+}
