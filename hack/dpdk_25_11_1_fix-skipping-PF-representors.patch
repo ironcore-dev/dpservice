@@ -1,0 +1,56 @@
+From 5c37026495c2f6cc3cb1f4f8b25c93aa7846c72c Mon Sep 17 00:00:00 2001
+From: Dariusz Sosnowski <dsosnowski@nvidia.com>
+Date: Tue, 7 Apr 2026 12:31:30 +0200
+Subject: [PATCH] net/mlx5: fix skipping PF representors
+
+[ upstream commit 47e696635fa9ffc526c179946698d5cfd15113b7 ]
+
+Offending patch changed logic of matching IB ports to requested
+representors in mlx5 driver.
+Each found IB port was matched against all requested representors.
+Whenever:
+
+- requested representor was VF or SF
+- PF was not ignored
+- IB port was physical port
+- physical port index matched requested PF index
+
+the physical port representor was probed.
+If any of the above is false, mlx5 driver should have continue testing
+other requested PF representors.
+In the offending patch, the representor matching loop was stopped.
+As a result, if mlx5 device with MPESW enabled was probed with the
+following devargs:
+
+	-a 08:00.0,dv_flow_en=2,representor=pf[0-1]vf[0,1]
+
+Only 5 ports were probed (physical port 0 and all VF representors),
+instead of 6 ports (physical port 1 is missing).
+
+This patch fixes that by continuing representor matching loop
+on physical port to PF index mismatch as described above.
+
+Fixes: 2f7cdd821b1b ("net/mlx5: fix probing to allow BlueField Socket Direct")
+
+Signed-off-by: Dariusz Sosnowski <dsosnowski@nvidia.com>
+Acked-by: Bing Zhao <bingz@nvidia.com>
+---
+ drivers/net/mlx5/linux/mlx5_os.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/mlx5/linux/mlx5_os.c b/drivers/net/mlx5/linux/mlx5_os.c
+index 2f1e7b10b9..e11c3321e9 100644
+--- a/drivers/net/mlx5/linux/mlx5_os.c
++++ b/drivers/net/mlx5/linux/mlx5_os.c
+@@ -1171,7 +1171,7 @@ representor_match_port(const struct mlx5_dev_spawn_data *spawn,
+ 
+ 		/* Uplink ports should not be matched against representor_ports. */
+ 		if (spawn->info.name_type == MLX5_PHYS_PORT_NAME_TYPE_UPLINK)
+-			return false;
++			continue;
+ 
+ 		for (uint16_t f = 0; f < eth_da->nb_representor_ports; ++f) {
+ 			uint16_t port_num = eth_da->representor_ports[f];
+-- 
+2.39.5
+
