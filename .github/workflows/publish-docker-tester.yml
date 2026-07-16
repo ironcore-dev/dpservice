@@ -13,6 +13,7 @@ on:
       - 'docs/**'
       - '**/*.md'
   pull_request:
+    types: [labeled, opened, synchronize, reopened]
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -20,6 +21,10 @@ on:
 jobs:
   buildAndPushTester:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test')
     permissions:
       contents: read
       packages: write
