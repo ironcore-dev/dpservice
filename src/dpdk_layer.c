@@ -151,9 +151,12 @@ static int graph_main_loop(__rte_unused void *arg)
 	}
 
 	// In standby mode (no packet processing), gRPC requests still need processing
+	// The walk needs to be the last thing done in this loop, so that sync messages that
+	// arrived during the sleep are still processed in backup mode; leaving them in the
+	// receive queue would get them rejected by the sync node once this dpservice is active
 	while (!force_quit && standing_by) {
-		rte_graph_walk(graph);
 		nanosleep(&standby_sleep, NULL);
+		rte_graph_walk(graph);
 	}
 
 	if (!force_quit) {
