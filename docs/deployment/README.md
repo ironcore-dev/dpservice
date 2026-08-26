@@ -10,6 +10,8 @@ For dpservice to work properly, host IPv6 address needs to set up on `lo` instea
 
 This address must be in the form of a network prefix `/64`, i.e. the last 64 bits of the host address must be zero. This way the 64 bit suffix can be used for containers or VMs running on the host.
 
+Note that the prefix (the first 64 bits) of this address must be fully unique per individual host. There must not be any hosts sharing the same `/64` prefix for this `lo` address.
+
 It is suggested that `<host-prefix>:0000::/65` is used for host itself and `<host-prefix>:8000::/65` is then assigned special role, e.g. `<host-prefix>:f000::/68` for PodIPs, `<host-prefix>:d000::/68` for dpservice, etc.
 
 Dpservice will generate addresses in the range from `<host-prefix>:d000::` to `<host-prefix>:dfff::`.
