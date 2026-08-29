@@ -76,6 +76,9 @@ def is_ipip_pkt(pkt):
 def is_encaped_icmp_pkt(pkt):
 	return is_ipip_pkt(pkt) and ICMP in pkt
 
+def is_encaped_udp_pkt(pkt):
+	return is_ipip_pkt(pkt) and UDP in pkt
+
 
 def delayed_sendp(packet, interface):
 	# Just wait a bit for the other thread (sniffer/responder) to start listening
