@@ -45,6 +45,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--ha", action="store_true", help="Run two dpservice instances"
 	)
+	parser.addoption(
+		"--ipsec", action="store_true", help="Encrypt underlay tunnel traffic using IPsec"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -84,7 +87,8 @@ def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, seconda
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
 						   offloading = request.config.getoption("--offloading"),
-						   graphtrace = request.config.getoption("--graphtrace"))
+						   graphtrace = request.config.getoption("--graphtrace"),
+						   ipsec = request.config.getoption("--ipsec"))
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")

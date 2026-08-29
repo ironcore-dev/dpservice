@@ -7,8 +7,10 @@
 #include <rte_arp.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
+#include "nodes/cls_node.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -32,6 +34,17 @@
 
 DP_NODE_REGISTER(CLS, cls, NEXT_NODES);
 
+static bool ipsec_enabled = false;
+
+// Connected dynamically, so that a dp-service without IPsec has exactly the graph it had
+// before the feature existed - the node does not even become a part of it
+static uint16_t next_ipsec_decap_index;
+
+int cls_node_append_ipsec_decap(void)
+{
+	return dp_node_append_edge(DP_NODE_GET_SELF(cls), &next_ipsec_decap_index, "ipsec_decap");
+}
+
 static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 #ifdef ENABLE_VIRTSVC
@@ -39,6 +52,7 @@ static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unuse
 	virtsvc_ipv4_tree = dp_virtsvc_get_ipv4_tree();
 	virtsvc_ipv6_tree = dp_virtsvc_get_ipv6_tree();
 #endif
+	ipsec_enabled = dp_conf_is_ipsec_enabled();
 	return DP_OK;
 }
 
@@ -181,6 +195,18 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				}
 			}
 #endif
+			// In IPsec mode the tunnel is encrypted, so what it carries cannot be known
+			// until ipsec_decap has decrypted it. Unencrypted tunnel traffic is dropped
+			// rather than accepted, which stands in for the policy database we do not have
+			// yet - see docs/concepts/ipsec.md.
+			if (ipsec_enabled) {
+				if (unlikely(ipv6_hdr->proto != IPPROTO_ESP))
+					return CLS_NEXT_DROP;
+				df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
+				dp_extract_underlay_header(df, ipv6_hdr);
+				return next_ipsec_decap_index;
+			}
+
 			switch (ipv6_hdr->proto) {
 			case IPPROTO_IPIP:
 				df->l3_type = RTE_ETHER_TYPE_IPV4;

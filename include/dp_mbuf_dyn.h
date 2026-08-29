@@ -103,6 +103,7 @@ struct dp_pkt_mark {
 	uint32_t id;
 	struct {
 		bool is_recirc : 1;
+		bool crypto_failed : 1;
 	} flags;
 	// check the init function if adding more,
 	// due to this being small, memset has not been used
@@ -141,6 +142,7 @@ static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
 
 	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
 	mark->flags.is_recirc = false;
+	mark->flags.crypto_failed = false;
 }
 
 

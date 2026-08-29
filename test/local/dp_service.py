@@ -22,7 +22,8 @@ class DpService:
 		return spec.tap_b if self.secondary else spec.tap
 
 	def __init__(self, build_path, port_redundancy, fast_flow_timeout, secondary=False, ha=False,
-				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
+				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False,
+				 ipsec=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
@@ -78,6 +79,8 @@ class DpService:
 					 f' --grpc-port={grpc_port_b if self.secondary else grpc_port}'
 					  ' --no-stats'
 					  ' --color=auto')
+		if ipsec:
+			self.cmd += ' --enable-ipsec'
 		if graphtrace:
 			self.cmd += ' --graphtrace-loglevel=1'
 		if not offloading:

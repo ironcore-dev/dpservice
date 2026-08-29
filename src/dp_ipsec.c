@@ -148,10 +148,10 @@ static int dp_ipsec_create_pools(int socket_id)
 		return DP_ERROR;
 	}
 
-	// The private data holds the nonce, which is why it cannot simply be the operation size
+	// The private data holds the nonce and the authenticated data, see dp_ipsec_prepare_op()
 	dp_ipsec_op_pool = rte_crypto_op_pool_create(DP_IPSEC_OP_POOL_NAME, RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 												 DP_IPSEC_OP_POOL_SIZE, DP_IPSEC_OP_CACHE_SIZE,
-												 DP_IPSEC_SALT_LEN + DP_IPSEC_IV_LEN, socket_id);
+												 DP_IPSEC_OP_PRIV_SIZE, socket_id);
 	if (!dp_ipsec_op_pool) {
 		DPS_LOG_ERR("Cannot create crypto operation pool", DP_LOG_RET(rte_errno));
 		return DP_ERROR;
@@ -205,6 +205,32 @@ void dp_ipsec_free(void)
 		rte_mempool_free(dp_ipsec_op_pool);
 	if (dp_ipsec_session_pool)
 		rte_mempool_free(dp_ipsec_session_pool);
+}
+
+void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m,
+						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len, bool encrypt)
+{
+	uint8_t *nonce = rte_crypto_op_ctod_offset(op, uint8_t *, DP_IPSEC_IV_OFFSET);
+	uint8_t *aad = rte_crypto_op_ctod_offset(op, uint8_t *, DP_IPSEC_AAD_OFFSET);
+
+	// GCM's nonce is the secret salt followed by the explicit part carried in the packet
+	rte_memcpy(nonce, dp_ipsec_salt, DP_IPSEC_SALT_LEN);
+	rte_memcpy(nonce + DP_IPSEC_SALT_LEN, esp_hdr + 1, DP_IPSEC_IV_LEN);
+
+	// only the ESP header is authenticated, everything in front of it is not
+	rte_memcpy(aad, esp_hdr, DP_IPSEC_AAD_LEN);
+
+	op->sym->m_src = m;
+	op->sym->aead.data.offset = DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN;
+	op->sym->aead.data.length = crypt_len;
+	op->sym->aead.aad.data = aad;
+	op->sym->aead.aad.phys_addr = rte_crypto_op_ctophys_offset(op, DP_IPSEC_AAD_OFFSET);
+	op->sym->aead.digest.data = rte_pktmbuf_mtod_offset(m, uint8_t *,
+													   DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + crypt_len);
+	op->sym->aead.digest.phys_addr = rte_pktmbuf_iova_offset(m,
+															DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + crypt_len);
+
+	rte_crypto_op_attach_sym_session(op, dp_ipsec_get_session(encrypt));
 }
 
 uint16_t dp_ipsec_process_burst(struct rte_crypto_op *ops[], uint16_t count)

@@ -59,6 +59,10 @@ def testDpService(build_path, print_header):
 	if not args.hw:
 		suites.append(TestSuite("ha", "High-avaliability tests",
 			test_args + ['--ha'], ['xtratest_ha.py']))
+		# Every other test plays the underlay fabric in cleartext, which a strict encrypting
+		# instance drops, so only the round-trip test can run in this mode
+		suites.append(TestSuite("ipsec", "Encapsulation round-trip with IPsec enabled",
+			test_args + ['--ipsec'], ['test_vf_to_vf_encap.py']))
 	if '--flow-timeout' in dpservice_help:
 		suites.append(TestSuite("flow", "Flow timeout tests with extremely fast flow timeout",
 			test_args + ['--fast-flow-timeout'], ['xtratest_flow_timeout.py']))

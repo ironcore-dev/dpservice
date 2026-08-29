@@ -8,6 +8,9 @@
 #include <stdbool.h>
 #include <rte_byteorder.h>
 #include <rte_crypto.h>
+#include <rte_ether.h>
+#include <rte_ip6.h>
+#include <rte_mbuf.h>
 #include <rte_mempool.h>
 
 #ifdef __cplusplus
@@ -26,8 +29,16 @@ extern "C" {
 #define DP_IPSEC_AAD_LEN	8	// the ESP header, i.e. SPI and sequence number
 #define DP_IPSEC_BLOCK_SIZE	4	// ESP requires the ciphertext to be 4-byte aligned
 
-// Where the nonce lives inside an allocated crypto operation
+// The nonce and a copy of the additional authenticated data are kept in the private area of
+// an allocated crypto operation. The data is copied rather than pointed at inside the packet,
+// because a PMD is allowed to write into the buffer it is given.
+#define DP_IPSEC_NONCE_LEN	(DP_IPSEC_SALT_LEN + DP_IPSEC_IV_LEN)
 #define DP_IPSEC_IV_OFFSET	(sizeof(struct rte_crypto_op) + sizeof(struct rte_crypto_sym_op))
+#define DP_IPSEC_AAD_OFFSET	(DP_IPSEC_IV_OFFSET + DP_IPSEC_NONCE_LEN)
+#define DP_IPSEC_OP_PRIV_SIZE	(DP_IPSEC_NONCE_LEN + DP_IPSEC_AAD_LEN)
+
+// What ipip_encap has already put in front of the tunneled packet
+#define DP_IPSEC_OUTER_LEN	((uint32_t)(sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)))
 
 struct dp_esp_hdr {
 	rte_be32_t spi;
@@ -41,9 +52,9 @@ struct dp_esp_tail {
 };
 
 // Bytes added in front of the tunneled packet (in-between the outer IPv6 header and it)
-#define DP_IPSEC_HDR_LEN	(sizeof(struct dp_esp_hdr) + DP_IPSEC_IV_LEN)
+#define DP_IPSEC_HDR_LEN	((uint32_t)(sizeof(struct dp_esp_hdr) + DP_IPSEC_IV_LEN))
 // Bytes added after the tunneled packet, excluding padding
-#define DP_IPSEC_TAIL_LEN	(sizeof(struct dp_esp_tail) + DP_IPSEC_ICV_LEN)
+#define DP_IPSEC_TAIL_LEN	((uint32_t)(sizeof(struct dp_esp_tail) + DP_IPSEC_ICV_LEN))
 
 int dp_ipsec_init(int socket_id);
 void dp_ipsec_free(void);
@@ -65,6 +76,11 @@ uint64_t dp_ipsec_next_seq(void);
 // the order they were submitted in, so the caller has to find its packet via op->sym->m_src
 // rather than by position.
 uint16_t dp_ipsec_process_burst(struct rte_crypto_op *ops[], uint16_t count);
+
+// Fill in everything a symmetric AEAD operation needs to encrypt or decrypt the part of the
+// packet that follows the ESP header, whose nonce this also picks up.
+void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m,
+						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len, bool encrypt);
 
 #ifdef __cplusplus
 }

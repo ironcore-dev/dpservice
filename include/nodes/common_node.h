@@ -95,6 +95,9 @@ void dp_forward_graph_packets(struct rte_graph *graph,
 //
 // Functions for creating dynamic graph edges based on connectet PF/VF ports
 //
+int dp_node_append_edge(struct rte_node_register *node,
+						uint16_t *next_index,
+						const char *next_node_name);
 int dp_node_append_tx(struct rte_node_register *node,
 					  uint16_t next_tx_indices[DP_MAX_PORTS],
 					  uint16_t port_id,

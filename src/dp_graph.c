@@ -13,6 +13,8 @@
 #include "nodes/dhcp_node.h"
 #include "nodes/dhcpv6_node.h"
 #include "nodes/ipip_encap_node.h"
+#include "nodes/cls_node.h"
+#include "nodes/ipsec_encap_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "nodes/firewall_node.h"
 #include "nodes/rx_node.h"
@@ -128,6 +130,12 @@ static int dp_graph_init_nodes(void)
 	const struct dp_ports *ports = dp_get_ports();
 	uint16_t port_id;
 
+	// the decapsulating side is not per-port, but it is connected dynamically for the same
+	// reason the encapsulating one is: so that the graph reflects the mode in use
+	if (dp_conf_is_ipsec_enabled())
+		if (DP_FAILED(cls_node_append_ipsec_decap()))
+			return DP_ERROR;
+
 	DP_FOREACH_PORT(ports, port) {
 		port_id = port->port_id;
 
@@ -139,8 +147,18 @@ static int dp_graph_init_nodes(void)
 		// some nodes need a direct Tx connection to all PF/VF ports, add them dynamically
 		snprintf(name, sizeof(name), "tx-%u", port_id);
 		if (port->is_pf) {
-			if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, name)))
-				return DP_ERROR;
+			// In IPsec mode the encapsulated packet still has to be encrypted, so
+			// ipip_encap hands it to ipsec_encap and that node owns the Tx edges. Wiring
+			// the mode into the graph rather than branching per packet keeps ipip_encap
+			// untouched and makes the exported graph show the pipeline actually in use.
+			if (dp_conf_is_ipsec_enabled()) {
+				if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, "ipsec_encap"))
+					|| DP_FAILED(ipsec_encap_node_append_pf_tx(port_id, name)))
+					return DP_ERROR;
+			} else {
+				if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, name)))
+					return DP_ERROR;
+			}
 		} else {
 			if (DP_FAILED(arp_node_append_vf_tx(port_id, name))
 				|| DP_FAILED(dhcp_node_append_vf_tx(port_id, name))
