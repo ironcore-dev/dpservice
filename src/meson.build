@@ -51,6 +51,7 @@ dp_sources = [
   'dp_iface.c',
   'dp_internal_stats.c',
   'dp_ipaddr.c',
+  'dp_ipsec.c',
   'dp_lb.c',
   'dp_log.c',
   'dp_lpm.c',

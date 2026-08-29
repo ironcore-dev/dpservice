@@ -21,6 +21,7 @@
 #include "dp_port.h"
 #include "dp_telemetry.h"
 #include "dp_internal_stats.h"
+#include "dp_ipsec.h"
 #include "dp_version.h"
 #include "dp_vnf.h"
 #include "dp_vni.h"
@@ -185,6 +186,10 @@ static int init_interfaces(void)
 	if (DP_FAILED(dp_virtsvc_init(pf0_socket_id)))
 		return DP_ERROR;
 #endif
+	// the graph nodes use the crypto device, so it needs to exist before the graph does
+	if (DP_FAILED(dp_ipsec_init(pf0_socket_id)))
+		return DP_ERROR;
+
 	if (DP_FAILED(dp_graph_init())
 		|| DP_FAILED(dp_telemetry_init()))
 		return DP_ERROR;
@@ -223,6 +228,7 @@ static void free_interfaces(void)
 	dp_ports_stop();
 	dp_telemetry_free();
 	dp_graph_free();
+	dp_ipsec_free();
 #ifdef ENABLE_VIRTSVC
 	dp_virtsvc_free();
 #endif
