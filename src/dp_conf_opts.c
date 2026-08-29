@@ -36,6 +36,7 @@ _OPT_SHOPT_MAX = 255,
 	OPT_NO_STATS,
 	OPT_ENABLE_IPV6_OVERLAY,
 	OPT_NO_OFFLOAD,
+	OPT_ENABLE_IPSEC,
 #ifdef ENABLE_PYTEST
 	OPT_GRAPHTRACE_LOGLEVEL,
 #endif
@@ -74,6 +75,7 @@ static const struct option dp_conf_longopts[] = {
 	{ "no-stats", 0, 0, OPT_NO_STATS },
 	{ "enable-ipv6-overlay", 0, 0, OPT_ENABLE_IPV6_OVERLAY },
 	{ "no-offload", 0, 0, OPT_NO_OFFLOAD },
+	{ "enable-ipsec", 0, 0, OPT_ENABLE_IPSEC },
 #ifdef ENABLE_PYTEST
 	{ "graphtrace-loglevel", 1, 0, OPT_GRAPHTRACE_LOGLEVEL },
 #endif
@@ -116,6 +118,7 @@ static enum dp_conf_nic_type nic_type = DP_CONF_NIC_TYPE_MELLANOX;
 static bool stats_enabled = true;
 static bool ipv6_overlay_enabled = false;
 static bool offload_enabled = true;
+static bool ipsec_enabled = false;
 #ifdef ENABLE_PYTEST
 static int graphtrace_loglevel = 0;
 #endif
@@ -173,6 +176,11 @@ bool dp_conf_is_ipv6_overlay_enabled(void)
 bool dp_conf_is_offload_enabled(void)
 {
 	return offload_enabled;
+}
+
+bool dp_conf_is_ipsec_enabled(void)
+{
+	return ipsec_enabled;
 }
 
 #ifdef ENABLE_PYTEST
@@ -262,6 +270,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --no-stats                         do not print periodic statistics to stdout\n"
 		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
 		"     --no-offload                       disable traffic offloading\n"
+		"     --enable-ipsec                     encrypt underlay tunnel traffic using IPsec ESP\n"
 #ifdef ENABLE_PYTEST
 		"     --graphtrace-loglevel=LEVEL        verbosity level of packet traversing the graph framework\n"
 #endif
@@ -314,6 +323,8 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 		return dp_argparse_store_true(&ipv6_overlay_enabled);
 	case OPT_NO_OFFLOAD:
 		return dp_argparse_store_false(&offload_enabled);
+	case OPT_ENABLE_IPSEC:
+		return dp_argparse_store_true(&ipsec_enabled);
 #ifdef ENABLE_PYTEST
 	case OPT_GRAPHTRACE_LOGLEVEL:
 		return dp_argparse_int(arg, &graphtrace_loglevel, 0, DP_GRAPHTRACE_LOGLEVEL_MAX);

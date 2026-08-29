@@ -43,7 +43,8 @@ pkg-config \
 protobuf-compiler-grpc \
 libgrpc++1.51 \
 libgrpc++-dev \
-libpcap0.8-dev
+libpcap0.8-dev \
+libssl-dev
 
 # Need at least Golang 1.20 which is not part of Debian-12 stable
 # Also, due to recent vulnerabilites, 1.24.13 is installed
@@ -128,6 +129,7 @@ udev \
 gawk \
 python3-pytest \
 python3-scapy \
+libssl3t64 \
 && apt-get purge g++-12 ipython3 -y \
 && apt-get autoremove -y \
 && apt-get clean -y \

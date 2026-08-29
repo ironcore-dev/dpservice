@@ -265,6 +265,14 @@ static int run_service(void)
 		}
 	}
 
+	// offloaded flows bypass the graph entirely, so they would leave the PF unencrypted
+	if (dp_conf_is_ipsec_enabled()) {
+		if (dp_conf_is_offload_enabled()) {
+			DP_EARLY_ERR("HW offloading is currently not supported in IPsec mode");
+			return DP_ERROR;
+		}
+	}
+
 	if (DP_FAILED(dp_log_init()))
 		return DP_ERROR;
 

@@ -105,6 +105,13 @@
       "default": "true"
     },
     {
+      "lgopt": "enable-ipsec",
+      "help": "encrypt underlay tunnel traffic using IPsec ESP",
+      "var": "ipsec_enabled",
+      "type": "bool",
+      "default": "false"
+    },
+    {
       "lgopt": "graphtrace-loglevel",
       "arg": "LEVEL",
       "help": "verbosity level of packet traversing the graph framework",
