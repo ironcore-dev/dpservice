@@ -654,6 +654,42 @@ type CaptureGetStatusSpec struct {
 	Interfaces      []CaptureInterface `json:"interfaces,omitempty"`
 }
 
+// SecurityAssociation is one direction of an IPsec Security Association for the underlay
+// tunnel. The underlay addresses are matched on their first 64 bits only, so one association
+// covers a peer host rather than each of its individual underlay addresses.
+type SecurityAssociation struct {
+	TypeMeta                `json:",inline"`
+	SecurityAssociationMeta `json:"metadata"`
+	Spec                    SecurityAssociationSpec `json:"spec"`
+	Status                  Status                  `json:"status"`
+}
+
+// SecurityAssociationMeta is what the database is keyed on
+type SecurityAssociationMeta struct {
+	Spi         uint32      `json:"spi"`
+	SrcUnderlay *netip.Addr `json:"src_underlay,omitempty"`
+	DstUnderlay *netip.Addr `json:"dst_underlay,omitempty"`
+}
+
+func (m *SecurityAssociationMeta) GetName() string {
+	return fmt.Sprintf("%d/%v-%v", m.Spi, m.SrcUnderlay, m.DstUnderlay)
+}
+
+func (m *SecurityAssociation) GetStatus() Status {
+	return m.Status
+}
+
+func (m *SecurityAssociation) String() string {
+	return fmt.Sprintf("%s <spi %d, %v -> %v>", m.Spec.Direction, m.Spi, m.SrcUnderlay, m.DstUnderlay)
+}
+
+type SecurityAssociationSpec struct {
+	Direction string `json:"direction"`
+	Algorithm string `json:"algorithm"`
+	Key       string `json:"key,omitempty"`
+	Salt      string `json:"salt,omitempty"`
+}
+
 var (
 	InterfaceKind              = reflect.TypeOf(Interface{}).Name()
 	InterfaceListKind          = reflect.TypeOf(InterfaceList{}).Name()
@@ -678,4 +714,5 @@ var (
 	CaptureStartKind           = reflect.TypeOf(CaptureStart{}).Name()
 	CaptureStopKind            = reflect.TypeOf(CaptureStop{}).Name()
 	CaptureStatusKind          = reflect.TypeOf(CaptureStatus{}).Name()
+	SecurityAssociationKind    = reflect.TypeOf(SecurityAssociation{}).Name()
 )

@@ -28,6 +28,7 @@ class DpService:
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
 		self.secondary = secondary
+		self.ipsec = ipsec
 
 		# HACK lock the lockfile here, so pytest is in control, not the other dpservice
 		if secondary:
@@ -130,6 +131,13 @@ class DpService:
 		grpc_client.addroute(vni2, "0.0.0.0/0", vni2, router_ul_ipv6)
 		grpc_client.addroute(vni1, "::/0", vni1, router_ul_ipv6)
 		grpc_client.addroute(vni2, "::/0", vni2, router_ul_ipv6)
+
+		if self.ipsec:
+			# The two Security Associations describing the peer this instance tunnels to.
+			# They are underlay topology, exactly like the routes above: without them the
+			# encrypting instance has nothing to look up and drops every tunnel packet.
+			grpc_client.addsa(ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6, ipsec_key, ipsec_salt)
+			grpc_client.addsa(ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6, ipsec_key, ipsec_salt)
 
 	def attach(self, grpc_client):
 		VM1.ul_ipv6 = grpc_client.getinterface(VM1.name)['underlay_route']

@@ -46,6 +46,7 @@ func Create(factory DPDKClientFactory) *cobra.Command {
 		CreateNat(factory, rendererOptions),
 		CreateNeighborNat(factory, rendererOptions),
 		CreateFirewallRule(factory, rendererOptions),
+		CreateSecurityAssociation(factory, rendererOptions),
 	}
 
 	cmd.Short = fmt.Sprintf("Creates one of %v", CommandNames(subcommands))

@@ -187,6 +187,10 @@ CREATE_CALLCLASS(ListFirewallRules, MultiReplyCall);
 CREATE_CALLCLASS(CheckVniInUse, SingleReplyCall);
 CREATE_CALLCLASS(ResetVni, SingleReplyCall);
 
+CREATE_CALLCLASS(CreateSecurityAssociation, SingleReplyCall);
+CREATE_CALLCLASS(DeleteSecurityAssociation, SingleReplyCall);
+CREATE_CALLCLASS(GetSecurityAssociation, SingleReplyCall);
+
 CREATE_CALLCLASS(CaptureStart, SingleReplyCall);
 CREATE_CALLCLASS(CaptureStop, SingleReplyCall);
 CREATE_CALLCLASS(CaptureStatus, SingleReplyCall);

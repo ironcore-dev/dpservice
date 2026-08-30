@@ -1150,6 +1150,86 @@ void ResetVniCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 }
 
 
+const char* CreateSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	int key_len;
+	int salt_len;
+
+	DPGRPC_LOG_INFO("Creating Security Association",
+					DP_LOG_SPI(request_.spi()),
+					DP_LOG_SRC_UNDERLAY(request_.src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.dst_underlay().c_str()));
+	request->add_sa.spi = request_.spi();
+	if (!GrpcConv::GrpcToDpIpsecDir(request_.direction(), &request->add_sa.dir))
+		return "Invalid direction";
+	if (!GrpcConv::GrpcToDpIpsecAlgo(request_.algorithm(), &request->add_sa.algo))
+		return "Invalid algorithm";
+	if (!GrpcConv::StrToIpv6(request_.src_underlay(), &request->add_sa.src))
+		return "Invalid src_underlay";
+	if (!GrpcConv::StrToIpv6(request_.dst_underlay(), &request->add_sa.dst))
+		return "Invalid dst_underlay";
+	// how much key material the cipher needs is a property of the cipher
+	key_len = dp_ipsec_get_key_len(request->add_sa.algo);
+	salt_len = dp_ipsec_get_salt_len(request->add_sa.algo);
+	if (DP_FAILED(key_len) || DP_FAILED(salt_len))
+		return "Invalid algorithm";
+	if (!GrpcConv::HexToBytes(request_.key(), request->add_sa.key, (size_t)key_len))
+		return "Invalid key";
+	if (!GrpcConv::HexToBytes(request_.salt(), request->add_sa.salt, (size_t)salt_len))
+		return "Invalid salt";
+	return NULL;
+}
+void CreateSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* DeleteSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing Security Association",
+					DP_LOG_SPI(request_.spi()),
+					DP_LOG_SRC_UNDERLAY(request_.src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.dst_underlay().c_str()));
+	request->del_sa.spi = request_.spi();
+	if (!GrpcConv::StrToIpv6(request_.src_underlay(), &request->del_sa.src))
+		return "Invalid src_underlay";
+	if (!GrpcConv::StrToIpv6(request_.dst_underlay(), &request->del_sa.dst))
+		return "Invalid dst_underlay";
+	return NULL;
+}
+void DeleteSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* GetSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting Security Association",
+					DP_LOG_SPI(request_.spi()),
+					DP_LOG_SRC_UNDERLAY(request_.src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.dst_underlay().c_str()));
+	request->get_sa.spi = request_.spi();
+	if (!GrpcConv::StrToIpv6(request_.src_underlay(), &request->get_sa.src))
+		return "Invalid src_underlay";
+	if (!GrpcConv::StrToIpv6(request_.dst_underlay(), &request->get_sa.dst))
+		return "Invalid dst_underlay";
+	return NULL;
+}
+void GetSecurityAssociationCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_ipsec_sa *sa = &reply->ipsec_sa;
+	char strbuf[INET6_ADDRSTRLEN];
+
+	reply_.set_spi(sa->spi);
+	reply_.set_direction(GrpcConv::IpsecDirToGrpc(sa->dir));
+	reply_.set_algorithm(GrpcConv::IpsecAlgoToGrpc(sa->algo));
+	// what comes back is what is actually matched, i.e. already masked to the supported prefix
+	DP_IPV6_TO_STR(&sa->src, strbuf);
+	reply_.set_src_underlay(strbuf);
+	DP_IPV6_TO_STR(&sa->dst, strbuf);
+	reply_.set_dst_underlay(strbuf);
+	reply_.set_key(GrpcConv::BytesToHex(sa->key, (size_t)dp_ipsec_get_key_len(sa->algo)));
+	reply_.set_salt(GrpcConv::BytesToHex(sa->salt, (size_t)dp_ipsec_get_salt_len(sa->algo)));
+}
+
 const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Starting packet capture",

@@ -44,6 +44,10 @@ enum CaptureInterfaceType {
 	SINGLE_VF = 1;
 }
 
+enum IpsecAlgorithm {
+	AES_128_GCM = 0;
+}
+
 //// STRUCTURES
 message Empty {
 }
@@ -597,6 +601,52 @@ message CaptureStopResponse {
 	uint32 stopped_interface_cnt = 2;
 }
 
+//// IPSEC
+// A Security Association is unidirectional. Underlay addresses are matched on their first
+// 64 bits only, so one association covers a peer host rather than each of its addresses.
+// The spi is expected to be the vni the association serves, as that is what dpservice
+// derives it from when encrypting.
+message CreateSecurityAssociationRequest {
+	uint32 spi = 1;
+	TrafficDirection direction = 2;
+	IpsecAlgorithm algorithm = 3;
+	bytes src_underlay = 4;    // source underlay address, as seen on the wire in this direction
+	bytes dst_underlay = 5;    // destination underlay address, likewise
+	bytes key = 6;             // hex-encoded, length defined by the algorithm
+	bytes salt = 7;            // hex-encoded, length defined by the algorithm
+}
+
+message CreateSecurityAssociationResponse {
+	Status status = 1;
+}
+
+message DeleteSecurityAssociationRequest {
+	uint32 spi = 1;
+	bytes src_underlay = 2;
+	bytes dst_underlay = 3;
+}
+
+message DeleteSecurityAssociationResponse {
+	Status status = 1;
+}
+
+message GetSecurityAssociationRequest {
+	uint32 spi = 1;
+	bytes src_underlay = 2;
+	bytes dst_underlay = 3;
+}
+
+message GetSecurityAssociationResponse {
+	Status status = 1;
+	uint32 spi = 2;
+	TrafficDirection direction = 3;
+	IpsecAlgorithm algorithm = 4;
+	bytes src_underlay = 5;    // as matched, i.e. masked to the supported prefix length
+	bytes dst_underlay = 6;
+	bytes key = 7;
+	bytes salt = 8;
+}
+
 message CaptureStatusRequest {
 }
 
@@ -694,6 +744,13 @@ service DPDKironcore {
 	rpc CreateFirewallRule(CreateFirewallRuleRequest) returns (CreateFirewallRuleResponse) {}
 	rpc GetFirewallRule(GetFirewallRuleRequest) returns (GetFirewallRuleResponse) {}
 	rpc DeleteFirewallRule(DeleteFirewallRuleRequest) returns (DeleteFirewallRuleResponse) {}
+
+	//// IPSEC
+	// Security Associations for the encrypted underlay tunnel, one per direction.
+	// Only available when dpservice was started with --enable-ipsec.
+	rpc CreateSecurityAssociation(CreateSecurityAssociationRequest) returns (CreateSecurityAssociationResponse) {}
+	rpc DeleteSecurityAssociation(DeleteSecurityAssociationRequest) returns (DeleteSecurityAssociationResponse) {}
+	rpc GetSecurityAssociation(GetSecurityAssociationRequest) returns (GetSecurityAssociationResponse) {}
 
 	//// PACKET CAPTURE
 	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}

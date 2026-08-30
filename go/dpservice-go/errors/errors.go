@@ -52,6 +52,12 @@ const (
 	NO_BACKIP       = 421
 	NO_LB           = 422
 	NO_DROP_SUPPORT = 441
+	SA_EXISTS       = 461
+	SA_NOT_FOUND    = 462
+	SA_CREATE       = 463
+	SA_ALGO         = 464
+	SA_BAD_ADDR     = 465
+	SA_DISABLED     = 466
 
 	// os.Exit value
 	CLIENT_ERROR = 1

@@ -21,9 +21,9 @@ dpservice-cli [command] [flags]
 
 * [dpservice-cli capture](dpservice-cli_capture.md)	 - Gets one of [start stop status]
 * [dpservice-cli completion](dpservice-cli_completion.md)	 - Generate completion script
-* [dpservice-cli create](dpservice-cli_create.md)	 - Creates one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule]
-* [dpservice-cli delete](dpservice-cli_delete.md)	 - Deletes one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule]
-* [dpservice-cli get](dpservice-cli_get.md)	 - Gets one of [interface virtualip loadbalancer nat firewallrule vni version init lbprefix lbtarget prefix route]
+* [dpservice-cli create](dpservice-cli_create.md)	 - Creates one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule securityassociation]
+* [dpservice-cli delete](dpservice-cli_delete.md)	 - Deletes one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule securityassociation]
+* [dpservice-cli get](dpservice-cli_get.md)	 - Gets one of [interface virtualip loadbalancer nat firewallrule securityassociation vni version init lbprefix lbtarget prefix route]
 * [dpservice-cli init](dpservice-cli_init.md)	 - Initial set up of the DPDK app
 * [dpservice-cli list](dpservice-cli_list.md)	 - Lists one of [firewallrules interfaces prefixes lbprefixes routes lbtargets nats loadbalancers]
 * [dpservice-cli reset](dpservice-cli_reset.md)	 - Resets one of [vni]

@@ -45,6 +45,9 @@ type Client interface {
 	CreateRoute(ctx context.Context, route *api.Route, ignoredErrors ...[]uint32) (*api.Route, error)
 	DeleteRoute(ctx context.Context, vni uint32, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.Route, error)
 
+	CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	DeleteSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	GetSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
 	GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
 	CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[]uint32) (*api.Nat, error)
 	DeleteNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
@@ -720,6 +723,130 @@ func (c *client) ListRoutes(ctx context.Context, vni uint32, ignoredErrors ...[]
 		Items:         routes,
 		Status:        api.ProtoStatusToStatus(res.Status),
 	}, nil
+}
+
+func protoIpsecDirection(direction string) (dpdkproto.TrafficDirection, error) {
+	switch strings.ToLower(direction) {
+	case "ingress":
+		return dpdkproto.TrafficDirection_INGRESS, nil
+	case "egress":
+		return dpdkproto.TrafficDirection_EGRESS, nil
+	default:
+		return 0, fmt.Errorf("invalid direction %q, expected ingress or egress", direction)
+	}
+}
+
+func protoIpsecAlgorithm(algorithm string) (dpdkproto.IpsecAlgorithm, error) {
+	// only one cipher is supported, dpservice refuses anything else
+	switch strings.ToLower(algorithm) {
+	case "", "aes-128-gcm":
+		return dpdkproto.IpsecAlgorithm_AES_128_GCM, nil
+	default:
+		return 0, fmt.Errorf("invalid algorithm %q, expected aes-128-gcm", algorithm)
+	}
+}
+
+func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	if sa == nil {
+		return &api.SecurityAssociation{}, fmt.Errorf("error: input security association cannot be nil")
+	}
+	direction, err := protoIpsecDirection(sa.Spec.Direction)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	algorithm, err := protoIpsecAlgorithm(sa.Spec.Algorithm)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	res, err := c.DPDKironcoreClient.CreateSecurityAssociation(ctx, &dpdkproto.CreateSecurityAssociationRequest{
+		Spi:         sa.Spi,
+		Direction:   direction,
+		Algorithm:   algorithm,
+		SrcUnderlay: api.NetIPAddrToByteSlice(sa.SrcUnderlay),
+		DstUnderlay: api.NetIPAddrToByteSlice(sa.DstUnderlay),
+		Key:         []byte(sa.Spec.Key),
+		Salt:        []byte(sa.Spec.Salt),
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	retSa := &api.SecurityAssociation{
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: sa.SecurityAssociationMeta,
+		Spec:                    sa.Spec,
+		Status:                  api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retSa, nil
+}
+
+func (c *client) DeleteSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	res, err := c.DPDKironcoreClient.DeleteSecurityAssociation(ctx, &dpdkproto.DeleteSecurityAssociationRequest{
+		Spi:         spi,
+		SrcUnderlay: api.NetIPAddrToByteSlice(srcUnderlay),
+		DstUnderlay: api.NetIPAddrToByteSlice(dstUnderlay),
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	retSa := &api.SecurityAssociation{
+		TypeMeta: api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: api.SecurityAssociationMeta{
+			Spi:         spi,
+			SrcUnderlay: srcUnderlay,
+			DstUnderlay: dstUnderlay,
+		},
+		Status: api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retSa, nil
+}
+
+func (c *client) GetSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	res, err := c.DPDKironcoreClient.GetSecurityAssociation(ctx, &dpdkproto.GetSecurityAssociationRequest{
+		Spi:         spi,
+		SrcUnderlay: api.NetIPAddrToByteSlice(srcUnderlay),
+		DstUnderlay: api.NetIPAddrToByteSlice(dstUnderlay),
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	retSa := &api.SecurityAssociation{
+		TypeMeta: api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: api.SecurityAssociationMeta{
+			Spi:         spi,
+			SrcUnderlay: srcUnderlay,
+			DstUnderlay: dstUnderlay,
+		},
+		Status: api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+
+	// what comes back is what is actually matched, i.e. masked to the supported prefix length
+	src, err := netip.ParseAddr(string(res.GetSrcUnderlay()))
+	if err != nil {
+		return retSa, fmt.Errorf("error parsing src_underlay: %w", err)
+	}
+	dst, err := netip.ParseAddr(string(res.GetDstUnderlay()))
+	if err != nil {
+		return retSa, fmt.Errorf("error parsing dst_underlay: %w", err)
+	}
+	retSa.Spi = res.GetSpi()
+	retSa.SrcUnderlay = &src
+	retSa.DstUnderlay = &dst
+	retSa.Spec = api.SecurityAssociationSpec{
+		Direction: strings.ToLower(res.GetDirection().String()),
+		Algorithm: strings.ToLower(res.GetAlgorithm().String()),
+		Key:       string(res.GetKey()),
+		Salt:      string(res.GetSalt()),
+	}
+	return retSa, nil
 }
 
 func (c *client) GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error) {

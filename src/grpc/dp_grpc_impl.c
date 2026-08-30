@@ -15,6 +15,7 @@
 #	include "dp_virtsvc.h"
 #endif
 #include "dp_iface.h"
+#include "dp_ipsec.h"
 #include "dp_vnf.h"
 #include "dp_vni.h"
 #include "dpdk_layer.h"
@@ -959,6 +960,66 @@ static int dp_process_capture_status(struct dp_grpc_responder *responder)
 }
 
 
+static int dp_process_create_security_association(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_ipsec_sa *request = &responder->request.add_sa;
+	struct dp_ipsec_sa sa = {
+		.spi = request->spi,
+		.algo = request->algo,
+		.dir = request->dir,
+	};
+
+	dp_copy_ipv6(&sa.src, &request->src);
+	dp_copy_ipv6(&sa.dst, &request->dst);
+	rte_memcpy(sa.key, request->key, sizeof(sa.key));
+	rte_memcpy(sa.salt, request->salt, sizeof(sa.salt));
+
+	return dp_ipsec_create_sa(&sa);
+}
+
+static int dp_process_delete_security_association(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_ipsec_sa_id *request = &responder->request.del_sa;
+	struct dp_ipsec_sa_spec spec = {
+		.spi = request->spi,
+	};
+
+	dp_copy_ipv6(&spec.src, &request->src);
+	dp_copy_ipv6(&spec.dst, &request->dst);
+
+	return dp_ipsec_delete_sa(&spec);
+}
+
+static int dp_process_get_security_association(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_ipsec_sa_id *request = &responder->request.get_sa;
+	struct dpgrpc_ipsec_sa *reply = dp_grpc_single_reply(responder);
+	struct dp_ipsec_sa_spec spec = {
+		.spi = request->spi,
+	};
+	struct dp_ipsec_sa sa;
+	int ret;
+
+	dp_copy_ipv6(&spec.src, &request->src);
+	dp_copy_ipv6(&spec.dst, &request->dst);
+
+	ret = dp_ipsec_get_sa(&spec, &sa);
+	if (DP_FAILED(ret))
+		return ret;
+
+	reply->spi = sa.spi;
+	reply->dir = sa.dir;
+	reply->algo = sa.algo;
+	// the stored addresses are the masked ones, i.e. what is actually being matched
+	dp_copy_ipv6(&reply->src, &sa.src);
+	dp_copy_ipv6(&reply->dst, &sa.dst);
+	rte_memcpy(reply->key, sa.key, sizeof(reply->key));
+	rte_memcpy(reply->salt, sa.salt, sizeof(reply->salt));
+
+	return DP_GRPC_OK;
+}
+
+
 void dp_process_request(struct rte_mbuf *m)
 {
 	struct dp_grpc_responder responder;
@@ -1090,6 +1151,15 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_CaptureStatus:
 		ret = dp_process_capture_status(&responder);
+		break;
+	case DP_REQ_TYPE_CreateSecurityAssociation:
+		ret = dp_process_create_security_association(&responder);
+		break;
+	case DP_REQ_TYPE_DeleteSecurityAssociation:
+		ret = dp_process_delete_security_association(&responder);
+		break;
+	case DP_REQ_TYPE_GetSecurityAssociation:
+		ret = dp_process_get_security_association(&responder);
 		break;
 	// DP_REQ_TYPE_CheckInitialized is handled by the gRPC thread
 	default:

@@ -8,6 +8,7 @@
 #include <rte_common.h>
 #include "dp_firewall.h"
 #include "dp_iface.h"
+#include "dp_ipsec.h"
 #include "dp_util.h"
 #include "monitoring/dp_monitoring.h"
 
@@ -62,6 +63,9 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_CaptureStart,
 	DP_REQ_TYPE_CaptureStop,
 	DP_REQ_TYPE_CaptureStatus,
+	DP_REQ_TYPE_CreateSecurityAssociation,
+	DP_REQ_TYPE_DeleteSecurityAssociation,
+	DP_REQ_TYPE_GetSecurityAssociation,
 };
 
 // in sync with dpdk proto!
@@ -190,6 +194,25 @@ struct dpgrpc_capture_stop {
 	uint16_t		port_cnt;
 };
 
+// A Security Association as it crosses the gRPC boundary, without any of the internals
+// dp_ipsec.c attaches to it
+struct dpgrpc_ipsec_sa {
+	uint32_t			spi;
+	enum dp_ipsec_dir	dir;
+	enum dp_ipsec_algo	algo;
+	union dp_ipv6		src;
+	union dp_ipv6		dst;
+	uint8_t				key[DP_IPSEC_MAX_KEY_LEN];
+	uint8_t				salt[DP_IPSEC_MAX_SALT_LEN];
+};
+
+// What the database is keyed on, which is enough to name one association
+struct dpgrpc_ipsec_sa_id {
+	uint32_t		spi;
+	union dp_ipv6	src;
+	union dp_ipv6	dst;
+};
+
 struct dpgrpc_request {
 	enum dpgrpc_request_type	type;
 	union {
@@ -229,6 +252,9 @@ struct dpgrpc_request {
 		struct dpgrpc_vni		vni_reset;
 		struct dpgrpc_versions	get_version;
 		struct dpgrpc_capture	capture_start;
+		struct dpgrpc_ipsec_sa	add_sa;
+		struct dpgrpc_ipsec_sa_id	del_sa;
+		struct dpgrpc_ipsec_sa_id	get_sa;
 	};
 };
 
@@ -268,6 +294,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_versions		versions;
 		struct dpgrpc_capture_stop	capture_stop;
 		struct dpgrpc_capture		capture_get;
+		struct dpgrpc_ipsec_sa		ipsec_sa;
 	};
 };
 

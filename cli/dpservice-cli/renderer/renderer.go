@@ -189,6 +189,8 @@ func (t defaultTableConverter) ConvertToTable(v any) (*TableData, error) {
 		return t.natTable([]api.Nat{*obj})
 	case *api.NeighborNat:
 		return t.neighborNatTable([]api.NeighborNat{*obj})
+	case *api.SecurityAssociation:
+		return t.securityAssociationTable([]api.SecurityAssociation{*obj})
 	case *api.NatList:
 		return t.natTable(obj.Items)
 	case *api.FirewallRule:
@@ -354,6 +356,26 @@ func (t defaultTableConverter) natTable(nats []api.Nat) (*TableData, error) {
 			} else {
 				columns[i] = append(columns[i], "Neighbor")
 			}
+		}
+	}
+
+	return &TableData{
+		Headers: headers,
+		Columns: columns,
+	}, nil
+}
+
+func (t defaultTableConverter) securityAssociationTable(sas []api.SecurityAssociation) (*TableData, error) {
+	headers := []any{"SPI", "Direction", "Algorithm", "SrcUnderlay", "DstUnderlay"}
+	if t.Wide {
+		headers = append(headers, "Key", "Salt")
+	}
+
+	columns := make([][]any, len(sas))
+	for i, sa := range sas {
+		columns[i] = []any{sa.Spi, sa.Spec.Direction, sa.Spec.Algorithm, sa.SrcUnderlay, sa.DstUnderlay}
+		if t.Wide {
+			columns[i] = append(columns[i], sa.Spec.Key, sa.Spec.Salt)
 		}
 	}
 

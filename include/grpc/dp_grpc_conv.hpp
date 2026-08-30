@@ -30,6 +30,16 @@ namespace GrpcConv
 	bool GrpcToDpFwallDirection(const TrafficDirection& grpc_dir, enum dp_fwall_direction *dp_dir);
 	bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port);
 
+	bool GrpcToDpIpsecDir(const TrafficDirection& grpc_dir, enum dp_ipsec_dir *dp_dir);
+	TrafficDirection IpsecDirToGrpc(enum dp_ipsec_dir dp_dir);
+
+	bool GrpcToDpIpsecAlgo(const IpsecAlgorithm& grpc_algo, enum dp_ipsec_algo *dp_algo);
+	IpsecAlgorithm IpsecAlgoToGrpc(enum dp_ipsec_algo dp_algo);
+
+	// Key material crosses the API hex-encoded, like the addresses cross it as strings
+	bool HexToBytes(const std::string& str, uint8_t *dst, size_t len);
+	std::string BytesToHex(const uint8_t *src, size_t len);
+
 	bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType & grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type);
 	CaptureInterfaceType CaptureInterfaceTypeToGrpc(enum dpgrpc_capture_iface_type dp_capture_iface_type);
 

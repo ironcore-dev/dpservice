@@ -1,10 +1,10 @@
 ## dpservice-cli get
 
-Gets one of [interface virtualip loadbalancer nat firewallrule vni version init lbprefix lbtarget prefix route]
+Gets one of [interface virtualip loadbalancer nat firewallrule securityassociation vni version init lbprefix lbtarget prefix route]
 
 ### Synopsis
 
-Gets one of [interface virtualip loadbalancer nat firewallrule vni version init lbprefix lbtarget prefix route]
+Gets one of [interface virtualip loadbalancer nat firewallrule securityassociation vni version init lbprefix lbtarget prefix route]
 
 ```
 dpservice-cli get [command] [flags]
@@ -30,6 +30,7 @@ dpservice-cli get [command] [flags]
 
 * [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli get firewallrule](dpservice-cli_get_firewallrule.md)	 - Get firewall rule
+* [dpservice-cli get securityassociation](dpservice-cli_get_securityassociation.md)	 - Get an IPsec Security Association
 * [dpservice-cli get init](dpservice-cli_get_init.md)	 - Indicates if the DPDK app has been initialized already
 * [dpservice-cli get interface](dpservice-cli_get_interface.md)	 - Get interface
 * [dpservice-cli get lbprefix](dpservice-cli_get_lbprefix.md)	 - List loadbalancer prefixes on interface.
