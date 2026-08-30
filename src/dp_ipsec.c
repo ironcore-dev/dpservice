@@ -23,22 +23,12 @@
 #define DP_IPSEC_QUEUE_PAIR			0
 #define DP_IPSEC_NB_QUEUE_PAIRS		1	// only one graph worker exists
 #define DP_IPSEC_QP_DESCRIPTORS		2048
-// One session per Security Association, plus the two of the hardcoded one
-// TODO(ipsec-v2): drop the two together with the hardcoded Security Association
-#define DP_IPSEC_NB_SESSIONS		(DP_IPSEC_MAX_SA + 2)
+#define DP_IPSEC_NB_SESSIONS		DP_IPSEC_MAX_SA	// one per Security Association
 #define DP_IPSEC_OP_POOL_SIZE		1024
 #define DP_IPSEC_OP_CACHE_SIZE		64
 // The software PMD completes inside the enqueue call, this is only here so that a device
 // that never completes an operation cannot hang the graph worker forever
 #define DP_IPSEC_DEQUEUE_RETRIES	32
-
-// TODO(ipsec-v2): the hardcoded Security Association, replaced by the SAD in a later commit
-static const uint8_t dp_ipsec_key[DP_IPSEC_KEY_LEN] = {
-	0x24, 0x7b, 0x0e, 0xa2, 0x51, 0xc9, 0x3d, 0x6f,
-	0xb8, 0x40, 0x17, 0xe5, 0x9a, 0x2c, 0xd3, 0x86,
-};
-
-static const uint8_t dp_ipsec_salt[DP_IPSEC_SALT_LEN] = { 0x1b, 0xf4, 0x60, 0xa7 };
 
 // Everything that varies between ciphers, so that adding one only means adding a row here
 static const struct dp_ipsec_algo_spec {
@@ -58,9 +48,6 @@ static const struct dp_ipsec_algo_spec {
 static uint8_t dp_ipsec_dev_id;
 static struct rte_mempool *dp_ipsec_session_pool;
 static struct rte_mempool *dp_ipsec_op_pool;
-static void *dp_ipsec_encrypt_session;
-static void *dp_ipsec_decrypt_session;
-static uint64_t dp_ipsec_seq;
 static bool dp_ipsec_active;
 
 // The Security Association Database. Created without RTE_IPSEC_SAD_FLAG_RW_CONCURRENCY on
@@ -79,21 +66,6 @@ static struct dp_ipsec_sa *dp_ipsec_sas[DP_IPSEC_MAX_SA];
 struct rte_mempool *dp_ipsec_get_op_pool(void)
 {
 	return dp_ipsec_op_pool;
-}
-
-void *dp_ipsec_get_session(bool encrypt)
-{
-	return encrypt ? dp_ipsec_encrypt_session : dp_ipsec_decrypt_session;
-}
-
-const uint8_t *dp_ipsec_get_salt(void)
-{
-	return dp_ipsec_salt;
-}
-
-uint64_t dp_ipsec_next_seq(void)
-{
-	return ++dp_ipsec_seq;
 }
 
 int dp_ipsec_get_key_len(enum dp_ipsec_algo algo)
@@ -251,16 +223,6 @@ int dp_ipsec_init(int socket_id)
 		|| DP_FAILED(dp_ipsec_create_sad(socket_id)))
 		return DP_ERROR;
 
-	// TODO(ipsec-v2): goes away once both nodes resolve their Security Association per packet
-	dp_ipsec_encrypt_session = dp_ipsec_create_session(DP_IPSEC_ALGO_AES_128_GCM,
-													   dp_ipsec_key, dp_ipsec_salt,
-													   RTE_CRYPTO_AEAD_OP_ENCRYPT);
-	dp_ipsec_decrypt_session = dp_ipsec_create_session(DP_IPSEC_ALGO_AES_128_GCM,
-													   dp_ipsec_key, dp_ipsec_salt,
-													   RTE_CRYPTO_AEAD_OP_DECRYPT);
-	if (!dp_ipsec_encrypt_session || !dp_ipsec_decrypt_session)
-		return DP_ERROR;
-
 	ret = rte_cryptodev_start(dp_ipsec_dev_id);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot start crypto device", DP_LOG_RET(ret));
@@ -291,11 +253,6 @@ void dp_ipsec_free(void)
 		rte_ipsec_sad_destroy(dp_ipsec_sad);
 		dp_ipsec_sad = NULL;
 	}
-
-	if (dp_ipsec_encrypt_session)
-		rte_cryptodev_sym_session_free(dp_ipsec_dev_id, dp_ipsec_encrypt_session);
-	if (dp_ipsec_decrypt_session)
-		rte_cryptodev_sym_session_free(dp_ipsec_dev_id, dp_ipsec_decrypt_session);
 
 	if (dp_ipsec_op_pool)
 		rte_mempool_free(dp_ipsec_op_pool);
@@ -388,6 +345,7 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 	// union dp_ipv6 has const members, so the struct cannot be assigned as a whole
 	rte_memcpy(sa, request, sizeof(*sa));
 	sa->seq = 0;
+	sa->salt_len = (uint16_t)dp_ipsec_algos[sa->algo].salt_len;
 	sa->session = dp_ipsec_create_session(sa->algo, sa->key, sa->salt,
 										  sa->dir == DP_IPSEC_DIR_EGRESS
 											  ? RTE_CRYPTO_AEAD_OP_ENCRYPT
@@ -463,15 +421,15 @@ int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out
 	return DP_GRPC_OK;
 }
 
-void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m,
-						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len, bool encrypt)
+void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m, const struct dp_ipsec_sa *sa,
+						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len)
 {
 	uint8_t *nonce = rte_crypto_op_ctod_offset(op, uint8_t *, DP_IPSEC_IV_OFFSET);
 	uint8_t *aad = rte_crypto_op_ctod_offset(op, uint8_t *, DP_IPSEC_AAD_OFFSET);
 
 	// GCM's nonce is the secret salt followed by the explicit part carried in the packet
-	rte_memcpy(nonce, dp_ipsec_salt, DP_IPSEC_SALT_LEN);
-	rte_memcpy(nonce + DP_IPSEC_SALT_LEN, esp_hdr + 1, DP_IPSEC_IV_LEN);
+	rte_memcpy(nonce, sa->salt, sa->salt_len);
+	rte_memcpy(nonce + sa->salt_len, esp_hdr + 1, DP_IPSEC_IV_LEN);
 
 	// only the ESP header is authenticated, everything in front of it is not
 	rte_memcpy(aad, esp_hdr, DP_IPSEC_AAD_LEN);
@@ -486,7 +444,7 @@ void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m,
 	op->sym->aead.digest.phys_addr = rte_pktmbuf_iova_offset(m,
 															DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + crypt_len);
 
-	rte_crypto_op_attach_sym_session(op, dp_ipsec_get_session(encrypt));
+	rte_crypto_op_attach_sym_session(op, sa->session);
 }
 
 uint16_t dp_ipsec_process_burst(struct rte_crypto_op *ops[], uint16_t count)

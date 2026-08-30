@@ -19,16 +19,10 @@
 extern "C" {
 #endif
 
-// The proof-of-concept uses a single hardcoded Security Association, shared by both
-// directions. There is no policy database and no key distribution yet, see
-// docs/concepts/ipsec.md for the full list of deliberate limits.
-// TODO(ipsec-v2): removed once both nodes look their SA up in the SAD
-#define DP_IPSEC_SPI		0xdb5ec001
-
+// Security Associations are provisioned over gRPC and looked up per packet, see
+// docs/concepts/ipsec.md for the deliberate limits of this proof-of-concept.
 #define DP_IPSEC_MAX_KEY_LEN	16	// AES-128
 #define DP_IPSEC_MAX_SALT_LEN	4	// implicit part of the GCM nonce, never on the wire
-#define DP_IPSEC_KEY_LEN	DP_IPSEC_MAX_KEY_LEN
-#define DP_IPSEC_SALT_LEN	DP_IPSEC_MAX_SALT_LEN
 #define DP_IPSEC_IV_LEN		8	// explicit part of the GCM nonce, carried in the packet
 #define DP_IPSEC_ICV_LEN	16
 #define DP_IPSEC_AAD_LEN	8	// the ESP header, i.e. SPI and sequence number
@@ -97,6 +91,7 @@ struct dp_ipsec_sa {
 	union dp_ipv6		dst;
 	uint8_t				key[DP_IPSEC_MAX_KEY_LEN];
 	uint8_t				salt[DP_IPSEC_MAX_SALT_LEN];
+	uint16_t			salt_len;	// resolved from the algorithm, so the datapath needs no table
 	void				*session;
 	// Sequence numbers start at 1 (RFC 4303) and double as the explicit nonce, which is what
 	// guarantees a GCM nonce is never reused under this key. Per-SA, as RFC 4303 requires, so
@@ -118,11 +113,6 @@ void dp_ipsec_free(void);
 
 // Only valid after a successful dp_ipsec_init() in IPsec mode
 struct rte_mempool *dp_ipsec_get_op_pool(void);
-
-// TODO(ipsec-v2): both go away once the nodes take their session and salt from the SA
-void *dp_ipsec_get_session(bool encrypt);
-const uint8_t *dp_ipsec_get_salt(void);
-uint64_t dp_ipsec_next_seq(void);
 
 // Key material length is a property of the algorithm, so that a second cipher only has to be
 // added to one table. Returns DP_ERROR for an unknown algorithm.
@@ -158,8 +148,8 @@ uint16_t dp_ipsec_process_burst(struct rte_crypto_op *ops[], uint16_t count);
 
 // Fill in everything a symmetric AEAD operation needs to encrypt or decrypt the part of the
 // packet that follows the ESP header, whose nonce this also picks up.
-void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m,
-						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len, bool encrypt);
+void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m, const struct dp_ipsec_sa *sa,
+						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len);
 
 #ifdef __cplusplus
 }

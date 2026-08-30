@@ -4,8 +4,9 @@ dp-service can encrypt the traffic it sends over the underlay, so that the tunne
 instances is not readable by anyone with access to the fabric in-between. This is enabled by
 starting dp-service with `--enable-ipsec` and is off by default.
 
-This is a **proof of concept**. It proves the dataplane can carry ESP; it is not yet a usable
-IPsec deployment. The limits below are deliberate, not oversights.
+This is a **proof of concept**. It proves the dataplane can carry ESP and that its Security
+Associations can be managed at runtime; it is not yet a usable IPsec deployment. The limits below
+are deliberate, not oversights.
 
 
 ## Wire format
@@ -31,31 +32,78 @@ precisely what `ipip_decap` would otherwise have received. Neither `ipip_encap` 
 is modified by this feature.
 
 
-## Security Association
+## Security Associations
 
-One hardcoded SA, shared by both directions:
+Associations are provisioned over gRPC and looked up per packet; nothing is compiled in.
+Each one is **unidirectional**, as RFC 4301 defines it, and carries AES-128-GCM (RFC 4106)
+key material, so a peer needs one association for each direction.
 
-- AES-128-GCM (RFC 4106), a compiled-in key and salt, and a compiled-in SPI.
-- The sequence number starts at 1 and doubles as the 8-byte explicit nonce. This makes the one
-  thing AES-GCM cannot survive - the same nonce twice under one key - impossible by construction
-  rather than merely unlikely.
-- The salt is never on the wire; both ends must already have it.
+```
+dpservice-cli create securityassociation --spi=100 --direction=egress \
+    --src-underlay=fc00:1:: --dst-underlay=fc00:2:: \
+    --key=<32 hex digits> --salt=<8 hex digits>
+```
 
-Encryption and decryption are separate AEAD transforms, so the single SA is realised as two
-crypto sessions.
+`src` and `dst` are the underlay addresses as they appear on the wire **in that association's
+direction**, so an ingress association for the same peer swaps them. dp-service refuses an
+association whose local side is not its own underlay prefix, since such an association could
+never match a packet.
+
+
+### How an association is found
+
+The database is keyed on `SPI + destination + source`, with the underlay addresses matched on
+their **first 64 bits only**. dp-service derives every underlay address it hands out from the
+configured underlay address's /64, so one association covers a whole peer host rather than each
+of its individual addresses.
+
+On ingress the SPI is read from the packet. On egress there is nothing to read it from - a real
+implementation would consult a security policy database, which does not exist here - so the SPI
+is derived: **it is the VNI**, and the caller is responsible for creating associations whose
+`spi` equals the VNI they serve. This is an egress-side rule only; ingress matches whatever SPI
+arrives against the address pair, and cannot check it, since the VNI is not known until after
+decapsulation.
+
+A packet with no matching association is **dropped**, in both directions, without a log line.
+Before the control plane has provisioned anything that is the expected state, and one line per
+packet would bury the failures that do matter. Egress never falls back to cleartext.
+
+
+### Sequence numbers
+
+Each association owns its sequence number, as RFC 4303 requires. It starts at 1 and doubles as
+the 8-byte explicit nonce, which makes the one thing AES-GCM cannot survive - the same nonce
+twice under one key - impossible by construction rather than merely unlikely. The salt is never
+on the wire; both ends must already have it.
 
 
 ## Deliberate limits
 
-- **No security policy database.** The mode is all-or-nothing for the whole instance. Everything
-  leaving through the tunnel is encrypted, and unencrypted tunnel traffic arriving on a PF is
-  dropped rather than accepted. That strictness is a stand-in for the "no matching inbound policy"
-  a real SPD would provide, and it prevents a receiver that silently accepts a downgrade.
-- **No SA management.** No gRPC surface, no negotiation or distribution, no rekeying, no lifetime
-  limits. Two instances can only talk to each other if they were built from the same source.
-- **No anti-replay window.** With one SA shared by both directions and a peer that echoes our own
-  sequence numbers, a replay check would reject legitimate traffic. It becomes meaningful only
-  once each direction has its own SA.
+- **No security policy database.** What gets protected is not selectable: with the mode on,
+  everything leaving through the tunnel is encrypted, and unencrypted tunnel traffic arriving on
+  a PF is dropped rather than accepted. The association database doubles as outbound policy,
+  keyed on the address pair, and a missing association stands in for the "no matching policy" a
+  real SPD would provide. It also prevents a receiver that silently accepts a downgrade.
+- **No SA negotiation or rekeying.** Associations are created and deleted over gRPC, but keys
+  arrive fully formed: there is no IKE, no distribution, no lifetime or byte counters, and no
+  automatic rotation. Rekeying is delete-then-create by the control plane, and the gap between
+  the two drops traffic rather than sending it in the clear. `ListSecurityAssociations` does not
+  exist yet.
+- **No anti-replay window.** The test topology reflects our own sequence numbers back at us, so a
+  replay check would reject legitimate traffic. It becomes meaningful once the peer is a real
+  second instance with its own association.
+- **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
+  the host it runs on. `GetSecurityAssociation` returns the key and salt.
+- **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are
+  matched, an egress association `(spi, dst=peer, src=local)` and its ingress mirror become the
+  same database key when the peer's underlay prefix is our own. The second create is then refused
+  as a duplicate. Peers are expected to sit in distinct /64s.
+- **The direction is not re-checked on lookup.** Both directions share one database, and an entry
+  is found purely by its key; nothing verifies afterwards that an association handed to the
+  decrypting node is an ingress one. The address layout makes that unreachable, but by arithmetic
+  rather than by construction.
+- **One cipher.** The API carries an `algorithm` field so a second one does not need a breaking
+  change, but AES-128-GCM is the only accepted value.
 - **Reduced MTU.** ESP adds up to 37 bytes, and the mbuf data room leaves no space for that on a
   full-size frame. Tunneled packets above roughly 1480 bytes are dropped with a warning naming
   the node. The advertised DHCP MTU is *not* adjusted automatically.
@@ -71,16 +119,26 @@ crypto sessions.
 
 ## Testing
 
-The pytest suite runs `test_vf_to_vf_encap.py` twice: once normally, and once as the `ipsec` suite
-with the mode enabled. The test body is identical; only what it observes on the PF differs.
+The pytest suite runs `test_vf_to_vf_encap.py` twice: once normally, and once as the `ipsec`
+suite with the mode enabled. The test body is identical; only what it observes on the PF differs.
+The `ipsec` suite also runs `xtratest_ipsec_grpc.py`, which exercises create, get and delete
+without sending a packet, so that an API failure and a dataplane failure are distinguishable.
 
-The harness deliberately does **not** hold the key. It reflects the captured ESP frame back after
-rewriting only the outer Ethernet and IPv6 headers, which works because the ICV does not cover
-them and because `ipip_decap` picks its target port from the outer destination alone. Instead of
-reading the payload on the PF it asserts the payload is *not* readable there, which fails loudly
-if the cipher ever degrades to doing nothing.
+The loopback responder does not decrypt. It reflects the captured ESP frame back after rewriting
+only the outer Ethernet and IPv6 headers, which works because the ICV does not cover them and
+because `ipip_decap` picks its target port from the outer destination alone. It cannot therefore
+pass by reimplementing a bug in the code under test. On the PF it asserts the payload is *not*
+readable, which fails loudly if the cipher ever degrades to doing nothing.
 
-The consequence is that the suite does not independently verify the framing is RFC-correct - a
-self-consistent but non-standard layout would pass, since dp-service is both the encryptor and
-the decryptor. That was checked once by hand with scapy's `SecurityAssociation` during
-development, and should be rechecked by hand if the framing changes.
+Because the suite provisions the associations itself, it does hold the key, and uses it for one
+read-only check: the captured frame is decrypted with scapy's own ESP implementation and compared
+against the packet that was sent. That is a genuinely independent verification of the framing -
+GCM authentication fails unless the additional authenticated data, the nonce construction and the
+trailer all match what a second implementation expects.
+
+**The test topology installs a configuration that would be critically wrong in production.** The
+responder reflects our own ciphertext, so dp-service decrypts what it encrypted, which means both
+associations must carry the same key and the same SPI. Between two real hosts that is a
+catastrophic misuse of AES-GCM: each side would count sequence numbers from 1 independently and
+reuse nonces under one key, losing confidentiality outright. dp-service neither rejects nor warns
+about it. **A real deployment needs a distinct key per direction.**

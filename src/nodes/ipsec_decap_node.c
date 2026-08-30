@@ -19,9 +19,29 @@ DP_NODE_REGISTER_NOINIT(IPSEC_DECAP, ipsec_decap, NEXT_NODES);
 // Everything ESP adds to a packet, for the smallest possible tunneled payload
 #define IPSEC_DECAP_MIN_LEN (DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + DP_IPSEC_TAIL_LEN)
 
+// The inbound Security Association is named by the packet itself: the SPI it carries plus the
+// underlay addresses it arrived with. A packet too short to hold an ESP header gets a zeroed
+// key, which cannot match, because a stored association always carries this instance's own
+// underlay prefix on its local side.
+static __rte_always_inline void ipsec_decap_build_key(union rte_ipsec_sad_key *key, struct rte_mbuf *m)
+{
+	const struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
+	const struct rte_ipv6_hdr *ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
+	const struct dp_esp_hdr *esp_hdr = (const struct dp_esp_hdr *)(ipv6_hdr + 1);
+
+	if (unlikely(rte_pktmbuf_pkt_len(m) < IPSEC_DECAP_MIN_LEN)) {
+		memset(key, 0, sizeof(*key));
+		return;
+	}
+
+	dp_ipsec_build_key(key, ntohl(esp_hdr->spi),
+					   dp_get_src_ipv6(ipv6_hdr), dp_get_dst_ipv6(ipv6_hdr));
+}
+
 static __rte_always_inline int ipsec_decap_prepare(struct rte_node *node,
 												   struct rte_mbuf *m,
-												   struct rte_crypto_op *op)
+												   struct rte_crypto_op *op,
+												   const struct dp_ipsec_sa *sa)
 {
 	const struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
 	const struct rte_ipv6_hdr *ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
@@ -29,24 +49,13 @@ static __rte_always_inline int ipsec_decap_prepare(struct rte_node *node,
 	uint32_t pkt_len = rte_pktmbuf_pkt_len(m);
 	uint32_t crypt_len;
 
-	if (unlikely(pkt_len < IPSEC_DECAP_MIN_LEN)) {
-		DPNODE_LOG_WARNING(node, "ESP packet too short", DP_LOG_VALUE(pkt_len));
-		return DP_ERROR;
-	}
-
-	// there is only one Security Association, anything else cannot be for us
-	if (unlikely(esp_hdr->spi != htonl(DP_IPSEC_SPI))) {
-		DPNODE_LOG_WARNING(node, "Unknown SPI", DP_LOG_VALUE(ntohl(esp_hdr->spi)));
-		return DP_ERROR;
-	}
-
 	crypt_len = pkt_len - DP_IPSEC_OUTER_LEN - DP_IPSEC_HDR_LEN - DP_IPSEC_ICV_LEN;
 	if (unlikely(crypt_len % DP_IPSEC_BLOCK_SIZE)) {
 		DPNODE_LOG_WARNING(node, "ESP payload not block-aligned", DP_LOG_VALUE(crypt_len));
 		return DP_ERROR;
 	}
 
-	dp_ipsec_prepare_op(op, m, esp_hdr, crypt_len, false);
+	dp_ipsec_prepare_op(op, m, sa, esp_hdr, crypt_len);
 	return DP_OK;
 }
 
@@ -114,6 +123,9 @@ static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 										 void **objs,
 										 uint16_t nb_objs)
 {
+	union rte_ipsec_sad_key keys[RTE_GRAPH_BURST_SIZE];
+	const union rte_ipsec_sad_key *keyptrs[RTE_GRAPH_BURST_SIZE];
+	struct dp_ipsec_sa *sas[RTE_GRAPH_BURST_SIZE];
 	struct rte_crypto_op *ops[RTE_GRAPH_BURST_SIZE];
 	struct rte_crypto_op *done[RTE_GRAPH_BURST_SIZE];
 	struct rte_mbuf *m;
@@ -134,7 +146,18 @@ static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 		m = (struct rte_mbuf *)objs[i];
 		// fail closed: only a completed operation clears this again
 		dp_get_pkt_mark(m)->flags.crypto_failed = true;
-		if (DP_FAILED(ipsec_decap_prepare(node, m, ops[nb_ops])))
+		keyptrs[i] = &keys[i];
+		ipsec_decap_build_key(&keys[i], m);
+	}
+
+	dp_ipsec_lookup_sa(keyptrs, sas, nb_objs);
+
+	for (uint16_t i = 0; i < nb_objs; ++i) {
+		// Nothing matched this SPI and address pair, so the packet is not for any association
+		// we hold and is dropped. Silent on purpose, see ipsec_encap_node_process().
+		if (!sas[i])
+			continue;
+		if (DP_FAILED(ipsec_decap_prepare(node, (struct rte_mbuf *)objs[i], ops[nb_ops], sas[i])))
 			continue;
 		++nb_ops;
 	}

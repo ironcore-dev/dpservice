@@ -4,6 +4,7 @@
 import threading
 
 import pytest
+from scapy.layers.ipsec import SecurityAssociation
 from helpers import *
 
 # VM1 and VM2 are both local interfaces in the same VNI, so dpservice switches their
@@ -23,17 +24,29 @@ from helpers import *
 # A burst of packets is used rather than a single one, so that the whole path is exercised
 # with more than one packet in flight at a time.
 #
-# With --ipsec the very same test runs against a dpservice that encrypts the tunnel. Only
-# what is observed on the PF differs: the harness has no key, so instead of reading the
-# payload it asserts that the payload is *not* readable, which fails loudly if the cipher
-# ever stops doing anything.
+# With --ipsec the very same test runs against a dpservice that encrypts the tunnel, using the
+# Security Associations dp_service.py installs over gRPC. Only what is observed on the PF
+# differs. The responder still never decrypts, so it cannot pass by reimplementing a bug in the
+# code under test; what it asserts there is that the payload is *not* readable, which fails
+# loudly if the cipher ever stops doing anything.
+#
+# Because the associations are provisioned by the test suite, the key is legitimately available
+# here, so the frame is additionally decrypted with scapy's own ESP implementation. That is a
+# genuinely independent check on the framing: GCM authentication fails unless the additional
+# authenticated data, the nonce construction and the trailer all match what a second
+# implementation expects.
 
 udp_payloads = [f"hello {i}".encode() for i in range(1, 6)]
 udp_sport = 1234
 udp_dport = 12345
 neigh_ov_ip = f"{neigh_vni1_ov_ip_prefix}.147"
-# Has to match DP_IPSEC_SPI in dp_ipsec.h
-ipsec_spi = 0xdb5ec001
+
+
+def decrypt_esp_pkt(pkt):
+	# scapy's AES-GCM expects the key and the salt concatenated, exactly as RFC 4106 defines
+	sa = SecurityAssociation(ESP, spi=ipsec_spi, crypt_algo="AES-GCM",
+							 crypt_key=bytes.fromhex(ipsec_key) + bytes.fromhex(ipsec_salt))
+	return sa.decrypt(pkt[IPv6])
 
 
 def is_test_udp_pkt(pkt):
@@ -55,6 +68,17 @@ def udp_encap_loopback_responder(pf_tap, ipsec):
 				"Encrypted request carries an unexpected SPI"
 			assert payload not in raw(pkt), \
 				"Payload is readable in the encrypted request"
+			# an independent implementation has to be able to authenticate and read the frame,
+			# otherwise the framing is only self-consistent and not actually RFC-correct
+			# on a copy: scapy's decrypt() rewrites the packet it is given, and the ESP bytes
+			# below have to be reflected exactly as they were captured
+			inner = decrypt_esp_pkt(pkt.copy())
+			assert IP in inner and UDP in inner[IP], \
+				"Decrypted request does not carry the tunneled IPv4 packet"
+			assert inner[IP].src == VM1.ip and inner[IP].dst == neigh_ov_ip, \
+				"Decrypted request carries the wrong inner addresses"
+			assert get_udp_payload(inner[IP]) == payload, \
+				"Decrypted request carries the wrong payload"
 		else:
 			assert get_udp_payload(pkt) == payload, \
 				"Payload damaged by encapsulation"
