@@ -4,6 +4,7 @@
 #include "dp_ipsec.h"
 #include <rte_cryptodev.h>
 #include <rte_dev.h>
+#include <rte_ipsec.h>
 #include <rte_ipsec_sad.h>
 #include <rte_malloc.h>
 #include "dp_conf.h"
@@ -29,6 +30,13 @@
 // The software PMD completes inside the enqueue call, this is only here so that a device
 // that never completes an operation cannot hang the graph worker forever
 #define DP_IPSEC_DEQUEUE_RETRIES	32
+// How far a packet may be reordered on the underlay before it is taken for a replay. Applies to
+// ingress associations only, an outbound one has nothing to check.
+#define DP_IPSEC_REPLAY_WINDOW		64
+
+// librte_ipsec keeps the salt as one opaque word and copies it into every nonce verbatim
+static_assert(sizeof(uint32_t) == DP_IPSEC_MAX_SALT_LEN,
+			  "The IPsec salt has to fit rte_security_ipsec_xform.salt");
 
 // Everything that varies between ciphers, so that adding one only means adding a row here
 static const struct dp_ipsec_algo_spec {
@@ -128,39 +136,101 @@ static int dp_ipsec_create_device(int socket_id)
 	return DP_OK;
 }
 
-// AES-GCM encryption and decryption are separate transforms, so a session belongs to exactly
-// one direction, which is why a Security Association only ever needs one of them
-static void *dp_ipsec_create_session(enum dp_ipsec_algo algo,
-									 const uint8_t *key, const uint8_t *salt,
-									 enum rte_crypto_aead_operation operation)
+// AES-GCM encryption and decryption are separate transforms, so a transform belongs to exactly
+// one direction, which is why a Security Association only ever needs one of them.
+// The very same transform describes the session the PMD executes and the association
+// librte_ipsec builds on top of it, so it is built once and handed to both - librte_ipsec takes
+// the offset it writes the nonce at straight from this transform's iv.offset.
+static void dp_ipsec_fill_xform(struct rte_crypto_sym_xform *xform, const struct dp_ipsec_sa *sa)
 {
-	const struct dp_ipsec_algo_spec *spec = &dp_ipsec_algos[algo];
-	struct rte_crypto_sym_xform xform = {
-		.type = RTE_CRYPTO_SYM_XFORM_AEAD,
-		.aead = {
-			.op = operation,
-			.algo = spec->aead_algo,
-			.key = {
-				.data = key,
-				.length = spec->key_len,
-			},
-			.iv = {
-				.offset = DP_IPSEC_IV_OFFSET,
-				.length = spec->salt_len + DP_IPSEC_IV_LEN,
-			},
-			.digest_length = spec->icv_len,
-			.aad_length = DP_IPSEC_AAD_LEN,
+	const struct dp_ipsec_algo_spec *spec = &dp_ipsec_algos[sa->algo];
+
+	xform->next = NULL;
+	xform->type = RTE_CRYPTO_SYM_XFORM_AEAD;
+	xform->aead.op = sa->dir == DP_IPSEC_DIR_EGRESS ? RTE_CRYPTO_AEAD_OP_ENCRYPT
+													: RTE_CRYPTO_AEAD_OP_DECRYPT;
+	xform->aead.algo = spec->aead_algo;
+	// the salt is not a part of the key, it is prepended to every nonce
+	xform->aead.key.data = sa->key;
+	xform->aead.key.length = spec->key_len;
+	xform->aead.iv.offset = DP_IPSEC_IV_OFFSET;
+	xform->aead.iv.length = spec->salt_len + DP_IPSEC_IV_LEN;
+	xform->aead.digest_length = spec->icv_len;
+	xform->aead.aad_length = DP_IPSEC_AAD_LEN;
+}
+
+// Everything librte_ipsec needs to own the ESP framing for this association: the association
+// itself, and a session tying it to the crypto one the PMD executes.
+static int dp_ipsec_create_ipsec_sa(struct dp_ipsec_sa *sa, struct rte_crypto_sym_xform *xform)
+{
+	struct rte_ipsec_sa_prm prm = {
+		.ipsec_xform = {
+			.spi = sa->spi,
+			.proto = RTE_SECURITY_IPSEC_SA_PROTO_ESP,
+			// The header being protected is the outer one ipip_encap already built, which is
+			// what transport mode means here. Tunnel mode would build that header itself, from
+			// a fixed per-association template that cannot express a per-VF source and a full
+			// 128-bit destination - see docs/adr/.
+			.mode = RTE_SECURITY_IPSEC_SA_MODE_TRANSPORT,
+			.direction = sa->dir == DP_IPSEC_DIR_EGRESS ? RTE_SECURITY_IPSEC_SA_DIR_EGRESS
+														: RTE_SECURITY_IPSEC_SA_DIR_INGRESS,
+			.replay_win_sz = sa->dir == DP_IPSEC_DIR_INGRESS ? DP_IPSEC_REPLAY_WINDOW : 0,
 		},
+		.crypto_xform = xform,
+		// This names the protocol of the header being protected, not of what it carries: it is
+		// what makes librte_ipsec parse the outer header as IPv6. The tunneled protocol is read
+		// from that header on the way out and from the ESP trailer on the way in, so one
+		// association still carries both IPv4 and IPv6 packets.
+		.trs.proto = IPPROTO_IPV6,
 	};
-	void *session;
+	int size;
+	int ret;
 
-	RTE_SET_USED(salt);  // the salt is not a part of the key, it is prepended to every nonce
+	rte_memcpy(&prm.ipsec_xform.salt, sa->salt, sizeof(prm.ipsec_xform.salt));
 
-	session = rte_cryptodev_sym_session_create(dp_ipsec_dev_id, &xform, dp_ipsec_session_pool);
-	if (!session)
-		DPS_LOG_ERR("Cannot create crypto session", DP_LOG_RET(rte_errno));
+	size = rte_ipsec_sa_size(&prm);
+	if (DP_FAILED(size)) {
+		DPS_LOG_ERR("Cannot size the IPsec Security Association", DP_LOG_RET(size));
+		return DP_ERROR;
+	}
 
-	return session;
+	sa->ipsec_sa = rte_zmalloc("rte_ipsec_sa", (size_t)size, RTE_CACHE_LINE_SIZE);
+	if (!sa->ipsec_sa) {
+		DPS_LOG_ERR("Cannot allocate the IPsec Security Association", DP_LOG_VALUE(size));
+		return DP_ERROR;
+	}
+
+	ret = rte_ipsec_sa_init(sa->ipsec_sa, &prm, (uint32_t)size);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot initialize the IPsec Security Association", DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	sa->ipsec_session.sa = sa->ipsec_sa;
+	// The PMD does the crypto and librte_ipsec everything around it. The other action types
+	// hand the whole association to hardware that does not exist under TAP.
+	sa->ipsec_session.type = RTE_SECURITY_ACTION_TYPE_NONE;
+	sa->ipsec_session.crypto.ses = sa->session;
+
+	ret = rte_ipsec_session_prepare(&sa->ipsec_session);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot prepare the IPsec session", DP_LOG_RET(ret));
+		return DP_ERROR;
+	}
+
+	return DP_OK;
+}
+
+// Undo dp_ipsec_create_sa(), whether it got all the way through or not
+static void dp_ipsec_free_sa(struct dp_ipsec_sa *sa)
+{
+	if (sa->ipsec_sa) {
+		rte_ipsec_sa_fini(sa->ipsec_sa);
+		rte_free(sa->ipsec_sa);
+	}
+	if (sa->session)
+		rte_cryptodev_sym_session_free(dp_ipsec_dev_id, sa->session);
+	rte_free(sa);
 }
 
 static int dp_ipsec_create_pools(int socket_id)
@@ -244,8 +314,7 @@ void dp_ipsec_free(void)
 	for (size_t i = 0; i < RTE_DIM(dp_ipsec_sas); ++i) {
 		if (!dp_ipsec_sas[i])
 			continue;
-		rte_cryptodev_sym_session_free(dp_ipsec_dev_id, dp_ipsec_sas[i]->session);
-		rte_free(dp_ipsec_sas[i]);
+		dp_ipsec_free_sa(dp_ipsec_sas[i]);
 		dp_ipsec_sas[i] = NULL;
 	}
 
@@ -311,6 +380,7 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 		.dst = request->dst,
 	};
 	union rte_ipsec_sad_key key;
+	struct rte_crypto_sym_xform xform;
 	struct dp_ipsec_sa *sa;
 	size_t slot;
 	int ret;
@@ -346,12 +416,20 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 	rte_memcpy(sa, request, sizeof(*sa));
 	sa->seq = 0;
 	sa->salt_len = (uint16_t)dp_ipsec_algos[sa->algo].salt_len;
-	sa->session = dp_ipsec_create_session(sa->algo, sa->key, sa->salt,
-										  sa->dir == DP_IPSEC_DIR_EGRESS
-											  ? RTE_CRYPTO_AEAD_OP_ENCRYPT
-											  : RTE_CRYPTO_AEAD_OP_DECRYPT);
+	sa->ipsec_sa = NULL;
+	sa->session = NULL;
+
+	dp_ipsec_fill_xform(&xform, sa);
+
+	sa->session = rte_cryptodev_sym_session_create(dp_ipsec_dev_id, &xform, dp_ipsec_session_pool);
 	if (!sa->session) {
-		rte_free(sa);
+		DPS_LOG_ERR("Cannot create crypto session", DP_LOG_RET(rte_errno));
+		dp_ipsec_free_sa(sa);
+		return DP_GRPC_ERR_SA_CREATE;
+	}
+
+	if (DP_FAILED(dp_ipsec_create_ipsec_sa(sa, &xform))) {
+		dp_ipsec_free_sa(sa);
 		return DP_GRPC_ERR_SA_CREATE;
 	}
 
@@ -363,8 +441,7 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 	ret = rte_ipsec_sad_add(dp_ipsec_sad, &key, RTE_IPSEC_SAD_SPI_DIP_SIP, sa);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot add Security Association to the database", DP_LOG_RET(ret));
-		rte_cryptodev_sym_session_free(dp_ipsec_dev_id, sa->session);
-		rte_free(sa);
+		dp_ipsec_free_sa(sa);
 		return DP_GRPC_ERR_SA_CREATE;
 	}
 
@@ -400,8 +477,7 @@ int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec)
 		dp_ipsec_sas[i] = NULL;
 		break;
 	}
-	rte_cryptodev_sym_session_free(dp_ipsec_dev_id, sa->session);
-	rte_free(sa);
+	dp_ipsec_free_sa(sa);
 
 	return DP_GRPC_OK;
 }

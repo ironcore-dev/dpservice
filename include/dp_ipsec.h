@@ -10,6 +10,7 @@
 #include <rte_crypto.h>
 #include <rte_ether.h>
 #include <rte_ip6.h>
+#include <rte_ipsec.h>
 #include <rte_ipsec_sad.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
@@ -93,6 +94,11 @@ struct dp_ipsec_sa {
 	uint8_t				salt[DP_IPSEC_MAX_SALT_LEN];
 	uint16_t			salt_len;	// resolved from the algorithm, so the datapath needs no table
 	void				*session;
+	// librte_ipsec's view of this very association: it owns the ESP framing, the sequence
+	// number and the anti-replay window, and drives the session above to do the crypto.
+	// Separately allocated because its size depends on the replay window (rte_ipsec_sa_size()).
+	struct rte_ipsec_sa			*ipsec_sa;
+	struct rte_ipsec_session	ipsec_session;
 	// Sequence numbers start at 1 (RFC 4303) and double as the explicit nonce, which is what
 	// guarantees a GCM nonce is never reused under this key. Per-SA, as RFC 4303 requires, so
 	// peers do not share nonce space. Not atomic on purpose: the graph is limited to a single
