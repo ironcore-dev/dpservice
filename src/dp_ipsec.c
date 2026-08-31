@@ -414,7 +414,6 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 
 	// union dp_ipv6 has const members, so the struct cannot be assigned as a whole
 	rte_memcpy(sa, request, sizeof(*sa));
-	sa->seq = 0;
 	sa->salt_len = (uint16_t)dp_ipsec_algos[sa->algo].salt_len;
 	sa->ipsec_sa = NULL;
 	sa->session = NULL;
@@ -495,32 +494,6 @@ int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out
 
 	rte_memcpy(out, sa, sizeof(*out));
 	return DP_GRPC_OK;
-}
-
-void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m, const struct dp_ipsec_sa *sa,
-						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len)
-{
-	uint8_t *nonce = rte_crypto_op_ctod_offset(op, uint8_t *, DP_IPSEC_IV_OFFSET);
-	uint8_t *aad = rte_crypto_op_ctod_offset(op, uint8_t *, DP_IPSEC_AAD_OFFSET);
-
-	// GCM's nonce is the secret salt followed by the explicit part carried in the packet
-	rte_memcpy(nonce, sa->salt, sa->salt_len);
-	rte_memcpy(nonce + sa->salt_len, esp_hdr + 1, DP_IPSEC_IV_LEN);
-
-	// only the ESP header is authenticated, everything in front of it is not
-	rte_memcpy(aad, esp_hdr, DP_IPSEC_AAD_LEN);
-
-	op->sym->m_src = m;
-	op->sym->aead.data.offset = DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN;
-	op->sym->aead.data.length = crypt_len;
-	op->sym->aead.aad.data = aad;
-	op->sym->aead.aad.phys_addr = rte_crypto_op_ctophys_offset(op, DP_IPSEC_AAD_OFFSET);
-	op->sym->aead.digest.data = rte_pktmbuf_mtod_offset(m, uint8_t *,
-													   DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + crypt_len);
-	op->sym->aead.digest.phys_addr = rte_pktmbuf_iova_offset(m,
-															DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + crypt_len);
-
-	rte_crypto_op_attach_sym_session(op, sa->session);
 }
 
 uint16_t dp_ipsec_process_burst(struct rte_crypto_op *ops[], uint16_t count)

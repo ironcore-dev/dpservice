@@ -27,7 +27,6 @@ extern "C" {
 #define DP_IPSEC_IV_LEN		8	// explicit part of the GCM nonce, carried in the packet
 #define DP_IPSEC_ICV_LEN	16
 #define DP_IPSEC_AAD_LEN	8	// the ESP header, i.e. SPI and sequence number
-#define DP_IPSEC_BLOCK_SIZE	4	// ESP requires the ciphertext to be 4-byte aligned
 
 // Security Associations are looked up on the first 64 bits of the underlay addresses only,
 // so that one SA covers a peer host rather than each of its individual underlay addresses
@@ -40,32 +39,14 @@ extern "C" {
 // costs nothing to pre-allocate
 #define DP_IPSEC_MAX_SA		64
 
-// The nonce and a copy of the additional authenticated data are kept in the private area of
-// an allocated crypto operation. The data is copied rather than pointed at inside the packet,
-// because a PMD is allowed to write into the buffer it is given.
-#define DP_IPSEC_NONCE_LEN	(DP_IPSEC_MAX_SALT_LEN + DP_IPSEC_IV_LEN)
+// librte_ipsec writes the whole AES-GCM nonce block - the salt, the explicit part carried in the
+// packet, and the initial counter - into the private area of an allocated crypto operation, at
+// the offset it takes from the transform the session was created with. The additional
+// authenticated data does not live here: librte_ipsec puts it in the mbuf's tailroom, past the
+// ICV, which is why a packet needs that many bytes of tailroom more than it ends up using.
+#define DP_IPSEC_NONCE_BLOCK_LEN	16
 #define DP_IPSEC_IV_OFFSET	(sizeof(struct rte_crypto_op) + sizeof(struct rte_crypto_sym_op))
-#define DP_IPSEC_AAD_OFFSET	(DP_IPSEC_IV_OFFSET + DP_IPSEC_NONCE_LEN)
-#define DP_IPSEC_OP_PRIV_SIZE	(DP_IPSEC_NONCE_LEN + DP_IPSEC_AAD_LEN)
-
-// What ipip_encap has already put in front of the tunneled packet
-#define DP_IPSEC_OUTER_LEN	((uint32_t)(sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr)))
-
-struct dp_esp_hdr {
-	rte_be32_t spi;
-	rte_be32_t seq;
-};
-
-// Trailing bytes of the encrypted part: padding, then this
-struct dp_esp_tail {
-	uint8_t pad_len;
-	uint8_t next_proto;
-};
-
-// Bytes added in front of the tunneled packet (in-between the outer IPv6 header and it)
-#define DP_IPSEC_HDR_LEN	((uint32_t)(sizeof(struct dp_esp_hdr) + DP_IPSEC_IV_LEN))
-// Bytes added after the tunneled packet, excluding padding
-#define DP_IPSEC_TAIL_LEN	((uint32_t)(sizeof(struct dp_esp_tail) + DP_IPSEC_ICV_LEN))
+#define DP_IPSEC_OP_PRIV_SIZE	DP_IPSEC_NONCE_BLOCK_LEN
 
 // A Security Association is unidirectional (RFC 4301), so an entry only ever needs the one
 // transform its direction implies
@@ -97,14 +78,10 @@ struct dp_ipsec_sa {
 	// librte_ipsec's view of this very association: it owns the ESP framing, the sequence
 	// number and the anti-replay window, and drives the session above to do the crypto.
 	// Separately allocated because its size depends on the replay window (rte_ipsec_sa_size()).
+	// The sequence number lives in there and is not atomic, which is fine only because the graph
+	// is limited to a single worker (see dp_graph_init()); revisit if that ever changes.
 	struct rte_ipsec_sa			*ipsec_sa;
 	struct rte_ipsec_session	ipsec_session;
-	// Sequence numbers start at 1 (RFC 4303) and double as the explicit nonce, which is what
-	// guarantees a GCM nonce is never reused under this key. Per-SA, as RFC 4303 requires, so
-	// peers do not share nonce space. Not atomic on purpose: the graph is limited to a single
-	// worker (see dp_graph_init()), and this needs revisiting if that ever changes.
-	uint64_t			seq;
-	// Only meaningful on DP_IPSEC_DIR_EGRESS, left at zero on ingress entries
 };
 
 // Everything needed to identify one SA, i.e. what the SAD is keyed on
@@ -151,11 +128,6 @@ void dp_ipsec_lookup_sa(const union rte_ipsec_sad_key *keys[], struct dp_ipsec_s
 // the order they were submitted in, so the caller has to find its packet via op->sym->m_src
 // rather than by position.
 uint16_t dp_ipsec_process_burst(struct rte_crypto_op *ops[], uint16_t count);
-
-// Fill in everything a symmetric AEAD operation needs to encrypt or decrypt the part of the
-// packet that follows the ESP header, whose nonce this also picks up.
-void dp_ipsec_prepare_op(struct rte_crypto_op *op, struct rte_mbuf *m, const struct dp_ipsec_sa *sa,
-						 const struct dp_esp_hdr *esp_hdr, uint32_t crypt_len);
 
 #ifdef __cplusplus
 }

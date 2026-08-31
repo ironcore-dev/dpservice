@@ -3,8 +3,11 @@
 
 #include <rte_common.h>
 #include <rte_crypto.h>
+#include <rte_esp.h>
 #include <rte_graph.h>
 #include <rte_graph_worker.h>
+#include <rte_ipsec.h>
+#include <rte_ipsec_group.h>
 #include <rte_mbuf.h>
 #include "dp_error.h"
 #include "dp_ipsec.h"
@@ -16,8 +19,9 @@
 	NEXT(IPSEC_DECAP_NEXT_IPIP_DECAP, "ipip_decap")
 DP_NODE_REGISTER_NOINIT(IPSEC_DECAP, ipsec_decap, NEXT_NODES);
 
-// Everything ESP adds to a packet, for the smallest possible tunneled payload
-#define IPSEC_DECAP_MIN_LEN (DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + DP_IPSEC_TAIL_LEN)
+// Enough to hold the outer header and the ESP header the SPI is read out of
+#define IPSEC_DECAP_MIN_LEN ((uint32_t)(sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv6_hdr) \
+									    + sizeof(struct rte_esp_hdr)))
 
 // The inbound Security Association is named by the packet itself: the SPI it carries plus the
 // underlay addresses it arrived with. A packet too short to hold an ESP header gets a zeroed
@@ -27,7 +31,7 @@ static __rte_always_inline void ipsec_decap_build_key(union rte_ipsec_sad_key *k
 {
 	const struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
 	const struct rte_ipv6_hdr *ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
-	const struct dp_esp_hdr *esp_hdr = (const struct dp_esp_hdr *)(ipv6_hdr + 1);
+	const struct rte_esp_hdr *esp_hdr = (const struct rte_esp_hdr *)(ipv6_hdr + 1);
 
 	if (unlikely(rte_pktmbuf_pkt_len(m) < IPSEC_DECAP_MIN_LEN)) {
 		memset(key, 0, sizeof(*key));
@@ -38,52 +42,32 @@ static __rte_always_inline void ipsec_decap_build_key(union rte_ipsec_sad_key *k
 					   dp_get_src_ipv6(ipv6_hdr), dp_get_dst_ipv6(ipv6_hdr));
 }
 
-static __rte_always_inline int ipsec_decap_prepare(struct rte_node *node,
-												   struct rte_mbuf *m,
-												   struct rte_crypto_op *op,
-												   const struct dp_ipsec_sa *sa)
+// Hand the packet to librte_ipsec, which builds the operation that decrypts everything past the
+// ESP header. Transport mode needs to know where the outer header ends, and nothing sets that
+// on a packet received from a PF.
+static __rte_always_inline int ipsec_decap_prepare(struct rte_mbuf *m,
+												   struct rte_crypto_op **op,
+												   struct dp_ipsec_sa *sa)
 {
-	const struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
-	const struct rte_ipv6_hdr *ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
-	const struct dp_esp_hdr *esp_hdr = (const struct dp_esp_hdr *)(ipv6_hdr + 1);
-	uint32_t pkt_len = rte_pktmbuf_pkt_len(m);
-	uint32_t crypt_len;
+	m->l2_len = sizeof(struct rte_ether_hdr);
+	m->l3_len = sizeof(struct rte_ipv6_hdr);
 
-	crypt_len = pkt_len - DP_IPSEC_OUTER_LEN - DP_IPSEC_HDR_LEN - DP_IPSEC_ICV_LEN;
-	if (unlikely(crypt_len % DP_IPSEC_BLOCK_SIZE)) {
-		DPNODE_LOG_WARNING(node, "ESP payload not block-aligned", DP_LOG_VALUE(crypt_len));
+	if (unlikely(rte_ipsec_pkt_crypto_prepare(&sa->ipsec_session, &m, op, 1) != 1))
 		return DP_ERROR;
-	}
 
-	dp_ipsec_prepare_op(op, m, sa, esp_hdr, crypt_len);
 	return DP_OK;
 }
 
-// Strip ESP off a packet that has just been decrypted successfully, leaving exactly what
-// ipip_encap would have produced on the sending side, which is what ipip_decap expects.
-static __rte_always_inline int ipsec_decap_strip(struct rte_node *node, struct rte_mbuf *m)
+// librte_ipsec has already taken ESP back out and restored what the outer header used to carry,
+// leaving exactly what ipip_encap would have produced on the sending side. What it cannot know
+// is dpservice's own view of the packet, which cls could not fill in before it was decrypted.
+static __rte_always_inline int ipsec_decap_restore_flow(struct rte_node *node, struct rte_mbuf *m)
 {
-	struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	struct rte_ipv6_hdr *ipv6_hdr = (struct rte_ipv6_hdr *)(ether_hdr + 1);
+	const struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
+	const struct rte_ipv6_hdr *ipv6_hdr = (const struct rte_ipv6_hdr *)(ether_hdr + 1);
 	struct dp_flow *df = dp_get_flow_ptr(m);
-	const struct dp_esp_tail *esp_tail;
-	uint32_t crypt_len;
-	uint32_t trim_len;
 
-	crypt_len = rte_pktmbuf_pkt_len(m) - DP_IPSEC_OUTER_LEN - DP_IPSEC_HDR_LEN - DP_IPSEC_ICV_LEN;
-	esp_tail = rte_pktmbuf_mtod_offset(m, const struct dp_esp_tail *,
-									   DP_IPSEC_OUTER_LEN + DP_IPSEC_HDR_LEN + crypt_len
-									   - sizeof(struct dp_esp_tail));
-
-	trim_len = esp_tail->pad_len + sizeof(struct dp_esp_tail) + DP_IPSEC_ICV_LEN;
-	if (unlikely(trim_len > crypt_len + DP_IPSEC_ICV_LEN)) {
-		DPNODE_LOG_WARNING(node, "Invalid ESP padding", DP_LOG_VALUE(esp_tail->pad_len));
-		return DP_ERROR;
-	}
-
-	// what ESP was carrying is what the outer header carries again, and cls could not know
-	// this before the packet was decrypted
-	switch (esp_tail->next_proto) {
+	switch (ipv6_hdr->proto) {
 	case IPPROTO_IPIP:
 		df->l3_type = RTE_ETHER_TYPE_IPV4;
 		break;
@@ -91,19 +75,10 @@ static __rte_always_inline int ipsec_decap_strip(struct rte_node *node, struct r
 		df->l3_type = RTE_ETHER_TYPE_IPV6;
 		break;
 	default:
-		DPNODE_LOG_WARNING(node, "Invalid tunnel type in ESP trailer", DP_LOG_VALUE(esp_tail->next_proto));
+		DPNODE_LOG_WARNING(node, "Invalid tunnel type in ESP trailer", DP_LOG_VALUE(ipv6_hdr->proto));
 		return DP_ERROR;
 	}
-	df->tun_info.proto_id = esp_tail->next_proto;
-
-	ipv6_hdr->proto = esp_tail->next_proto;
-	ipv6_hdr->payload_len = htons((uint16_t)(crypt_len - esp_tail->pad_len - sizeof(struct dp_esp_tail)));
-
-	rte_pktmbuf_trim(m, (uint16_t)trim_len);
-
-	// removing the ESP header means pulling the outer header over it
-	memmove(rte_pktmbuf_mtod_offset(m, uint8_t *, DP_IPSEC_HDR_LEN), ether_hdr, DP_IPSEC_OUTER_LEN);
-	rte_pktmbuf_adj(m, DP_IPSEC_HDR_LEN);
+	df->tun_info.proto_id = ipv6_hdr->proto;
 
 	return DP_OK;
 }
@@ -117,7 +92,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 }
 
 // See ipsec_encap_node_process() for why this node does not simply use
-// dp_foreach_graph_packet() for the whole of its work.
+// dp_foreach_graph_packet() for the whole of its work, and for the three places a packet can
+// be lost in.
 static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 										 struct rte_node *node,
 										 void **objs,
@@ -128,9 +104,13 @@ static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 	struct dp_ipsec_sa *sas[RTE_GRAPH_BURST_SIZE];
 	struct rte_crypto_op *ops[RTE_GRAPH_BURST_SIZE];
 	struct rte_crypto_op *done[RTE_GRAPH_BURST_SIZE];
+	const struct rte_crypto_op *readonly[RTE_GRAPH_BURST_SIZE];
+	struct rte_mbuf *grouped[RTE_GRAPH_BURST_SIZE];
+	struct rte_ipsec_group groups[RTE_GRAPH_BURST_SIZE];
 	struct rte_mbuf *m;
 	uint16_t nb_ops = 0;
 	uint16_t nb_done;
+	uint16_t nb_groups;
 
 	// this is all-or-nothing, it does not allocate a smaller amount
 	if (unlikely(rte_crypto_op_bulk_alloc(dp_ipsec_get_op_pool(), RTE_CRYPTO_OP_TYPE_SYMMETRIC,
@@ -157,23 +137,46 @@ static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 		// we hold and is dropped. Silent on purpose, see ipsec_encap_node_process().
 		if (!sas[i])
 			continue;
-		if (DP_FAILED(ipsec_decap_prepare(node, (struct rte_mbuf *)objs[i], ops[nb_ops], sas[i])))
+		if (unlikely(DP_FAILED(ipsec_decap_prepare((struct rte_mbuf *)objs[i], &ops[nb_ops], sas[i])))) {
+			// nothing has been decrypted yet, so this is the anti-replay window rejecting the
+			// sequence number, or a frame too short to be ESP at all
+			DPNODE_LOG_WARNING(node, "Cannot accept packet for decryption", DP_LOG_RET(-rte_errno));
 			continue;
+		}
 		++nb_ops;
 	}
 
 	if (likely(nb_ops > 0)) {
 		rte_memcpy(done, ops, nb_ops * sizeof(*done));
 		nb_done = dp_ipsec_process_burst(done, nb_ops);
+
+		// the grouping below only records *that* an operation failed, so the status is reported
+		// from here, where it is still at hand
 		for (uint16_t i = 0; i < nb_done; ++i) {
-			m = done[i]->sym->m_src;
-			if (unlikely(done[i]->status != RTE_CRYPTO_OP_STATUS_SUCCESS)) {
+			if (unlikely(done[i]->status != RTE_CRYPTO_OP_STATUS_SUCCESS))
 				DPNODE_LOG_WARNING(node, "Cannot decrypt packet", DP_LOG_VALUE(done[i]->status));
-				continue;
-			}
-			if (DP_FAILED(ipsec_decap_strip(node, m)))
-				continue;
-			dp_get_pkt_mark(m)->flags.crypto_failed = false;
+			// the grouping only reads the operations, but takes them as pointers to const,
+			// which C does not convert to on its own
+			readonly[i] = done[i];
+		}
+
+		// Operations come back in completion order, which is not the order they were submitted
+		// in, and librte_ipsec finalizes one association at a time. Both are what this regroups.
+		nb_groups = rte_ipsec_pkt_crypto_group(readonly, grouped, groups, nb_done);
+		for (uint16_t i = 0; i < nb_groups; ++i) {
+			struct rte_ipsec_group *grp = &groups[i];
+			uint16_t nb_ok;
+
+			// failures are moved to the end of the group, so everything before this succeeded
+			nb_ok = rte_ipsec_pkt_process(grp->id.ptr, grp->m, (uint16_t)grp->cnt);
+			for (uint16_t j = 0; j < nb_ok; ++j)
+				if (likely(DP_SUCCESS(ipsec_decap_restore_flow(node, grp->m[j]))))
+					dp_get_pkt_mark(grp->m[j])->flags.crypto_failed = false;
+			for (uint16_t j = nb_ok; j < (uint16_t)grp->cnt; ++j)
+				// authentication failures were reported above, with their status; what is left
+				// is a malformed trailer or a sequence number repeated inside this very burst
+				if (!(grp->m[j]->ol_flags & RTE_MBUF_F_RX_SEC_OFFLOAD_FAILED))
+					DPNODE_LOG_WARNING(node, "Cannot finalize decrypted packet");
 		}
 	}
 

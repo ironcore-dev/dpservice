@@ -25,7 +25,15 @@ moves into the ESP trailer's next-header byte. Everything from the tunneled pack
 the trailer is encrypted; the ICV authenticates the ESP header and the ciphertext, but **not** the
 outer IP header, exactly as RFC 4303 specifies.
 
-The result is standard ESP in tunnel mode, so a capture can be read with ordinary tooling.
+On the wire this is indistinguishable from ESP in tunnel mode, and interoperates with a
+tunnel-mode peer, so a capture can be read with ordinary tooling.
+
+Inside dp-service it is not tunnel mode, though. The framing is done by `librte_ipsec` in
+**transport** mode, applied to the outer header `ipip_encap` has already built; the tunnelling
+comes from `ipip_decap` stripping that header afterwards. Tunnel mode would build the outer header
+itself, from a fixed per-association template, which cannot express a source that varies per VF
+and a full 128-bit destination the peer resolves to a port. See
+[the ADR](../adr/0001-esp-framing-via-librte-ipsec-transport-mode.md).
 
 On the way in, `cls` sends ESP packets to `ipsec_decap`, which decrypts and strips ESP, leaving
 precisely what `ipip_decap` would otherwise have received. Neither `ipip_encap` nor `ipip_decap`
@@ -76,6 +84,10 @@ the 8-byte explicit nonce, which makes the one thing AES-GCM cannot survive - th
 twice under one key - impossible by construction rather than merely unlikely. The salt is never
 on the wire; both ends must already have it.
 
+Ingress associations carry a **64-packet anti-replay window**. A frame whose sequence number has
+already been seen, or which has fallen more than 64 behind, is rejected before it is decrypted.
+Reordering on the underlay is tolerated up to that depth.
+
 
 ## Deliberate limits
 
@@ -89,9 +101,9 @@ on the wire; both ends must already have it.
   automatic rotation. Rekeying is delete-then-create by the control plane, and the gap between
   the two drops traffic rather than sending it in the clear. `ListSecurityAssociations` does not
   exist yet.
-- **No anti-replay window.** A replayed frame is decrypted and delivered like any other. Nothing
-  in the design prevents one - the test peer now counts its own sequence numbers, so a window
-  would no longer reject legitimate traffic - it is simply not implemented yet.
+- **The anti-replay window is not configurable.** It is 64 packets for every ingress association.
+  Exposing it per association would mean per-association allocation sizes, since
+  `rte_ipsec_sa_size()` depends on it.
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
   the host it runs on. `GetSecurityAssociation` returns the key and salt.
 - **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are
@@ -106,7 +118,12 @@ on the wire; both ends must already have it.
   change, but AES-128-GCM is the only accepted value.
 - **Reduced MTU.** ESP adds up to 37 bytes, and the mbuf data room leaves no space for that on a
   full-size frame. Tunneled packets above roughly 1480 bytes are dropped with a warning naming
-  the node. The advertised DHCP MTU is *not* adjusted automatically.
+  the node. The advertised DHCP MTU is *not* adjusted automatically. A further 8 bytes of
+  tailroom are needed but never used: `librte_ipsec` writes the additional authenticated data
+  past the ICV, outside the packet.
+- **Checksums are computed in software.** Asking a NIC to compute an inner checksum cannot work
+  once the packet is encrypted, so `dp_nat.c` takes the software path whenever the mode is on.
+  This is not covered by a test - the suite runs on TAPs, where that path is taken anyway.
 - **Hardware offloading is refused.** dp-service will not start with both `--enable-ipsec` and
   offloading. Offloaded flows bypass the graph entirely, so they would leave the PF in cleartext.
 - **Virtual services stay in cleartext.** `virtsvc` transmits to a PF directly rather than through
@@ -138,7 +155,13 @@ nonce construction and the trailer all match what a second implementation expect
 that the payload is *not* readable on the PF, which fails loudly if the cipher ever degrades to
 doing nothing, and it checks the parts of the framing that a successful decrypt would silently
 accept: that the explicit IV really is the sequence number, and that the padding is minimal and
-4-byte aligned.
+4-byte aligned. Those assertions are what holds the wire format still: they were written against
+the hand-rolled framing this mode started with, and had to keep passing once `librte_ipsec` took
+it over.
+
+`xtratest_ipsec_dataplane.py` covers the failing path, which the round trip cannot: it runs the
+same exchange twice, differing only in which key the peer authenticates its answer with, and
+requires the second one not to arrive.
 
 **Both associations still share one SPI, and that is a property of the test rather than of the
 design.** dp-service derives the egress SPI from the VNI, so the egress association's SPI is
