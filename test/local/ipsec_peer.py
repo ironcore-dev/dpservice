@@ -34,6 +34,9 @@ class IpsecPeer:
 	def __init__(self):
 		self.egress = self._sa(ipsec_key_egress, ipsec_salt_egress)
 		self.ingress = self._sa(ipsec_key_ingress, ipsec_salt_ingress)
+		# Identical to the ingress association in every respect but the key, so that a frame
+		# built with it differs from a good one only in its ICV
+		self.unauthorized = self._sa(ipsec_key_wrong, ipsec_salt_ingress)
 
 	@staticmethod
 	def _sa(key, salt):
@@ -50,6 +53,16 @@ class IpsecPeer:
 	# Build a frame for dp-service to decrypt, out of such an outer IPv6 packet
 	def encrypt(self, pkt):
 		return self.ingress.encrypt(pkt)
+
+	# The same frame, authenticated with key material dp-service was never given.
+	# It has to keep advancing the *ingress* sequence numbers: a second association counting from
+	# 1 of its own would be rejected by the anti-replay window before its ICV was ever looked at,
+	# and a test asserting the frame is dropped would then pass for entirely the wrong reason.
+	def encrypt_with_wrong_key(self, pkt):
+		self.unauthorized.seq_num = self.ingress.seq_num
+		frame = self.unauthorized.encrypt(pkt)
+		self.ingress.seq_num = self.unauthorized.seq_num
+		return frame
 
 
 # Assertions on the framing itself, on top of what decrypting the frame already proves.

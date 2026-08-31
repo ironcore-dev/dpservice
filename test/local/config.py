@@ -57,6 +57,8 @@ ipsec_key_egress = "247b0ea251c93d6fb84017e59a2cd386"
 ipsec_salt_egress = "1bf460a7"
 ipsec_key_ingress = "9c3d0b7e4a1f8256d0e4b39f7c15a862"
 ipsec_salt_ingress = "5d24c9b1"
+# Never given to dpservice, so a frame authenticated with it must fail the ICV check
+ipsec_key_wrong = "ffeeddccbbaa99887766554433221100"
 neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
 neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
