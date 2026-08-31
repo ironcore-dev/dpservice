@@ -967,6 +967,7 @@ static int dp_process_create_security_association(struct dp_grpc_responder *resp
 		.spi = request->spi,
 		.algo = request->algo,
 		.dir = request->dir,
+		.replay_window = request->replay_window,
 	};
 
 	dp_copy_ipv6(&sa.src, &request->src);
@@ -1015,6 +1016,7 @@ static int dp_process_get_security_association(struct dp_grpc_responder *respond
 	dp_copy_ipv6(&reply->dst, &sa.dst);
 	rte_memcpy(reply->key, sa.key, sizeof(reply->key));
 	rte_memcpy(reply->salt, sa.salt, sizeof(reply->salt));
+	reply->replay_window = sa.replay_window;
 
 	return DP_GRPC_OK;
 }

@@ -759,13 +759,14 @@ func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.Security
 		return &api.SecurityAssociation{}, err
 	}
 	res, err := c.DPDKironcoreClient.CreateSecurityAssociation(ctx, &dpdkproto.CreateSecurityAssociationRequest{
-		Spi:         sa.Spi,
-		Direction:   direction,
-		Algorithm:   algorithm,
-		SrcUnderlay: api.NetIPAddrToByteSlice(sa.SrcUnderlay),
-		DstUnderlay: api.NetIPAddrToByteSlice(sa.DstUnderlay),
-		Key:         []byte(sa.Spec.Key),
-		Salt:        []byte(sa.Spec.Salt),
+		Spi:          sa.Spi,
+		Direction:    direction,
+		Algorithm:    algorithm,
+		SrcUnderlay:  api.NetIPAddrToByteSlice(sa.SrcUnderlay),
+		DstUnderlay:  api.NetIPAddrToByteSlice(sa.DstUnderlay),
+		Key:          []byte(sa.Spec.Key),
+		Salt:         []byte(sa.Spec.Salt),
+		ReplayWindow: sa.Spec.ReplayWindow,
 	})
 	if err != nil {
 		return &api.SecurityAssociation{}, err
@@ -841,10 +842,11 @@ func (c *client) GetSecurityAssociation(ctx context.Context, spi uint32, srcUnde
 	retSa.SrcUnderlay = &src
 	retSa.DstUnderlay = &dst
 	retSa.Spec = api.SecurityAssociationSpec{
-		Direction: strings.ToLower(res.GetDirection().String()),
-		Algorithm: strings.ToLower(res.GetAlgorithm().String()),
-		Key:       string(res.GetKey()),
-		Salt:      string(res.GetSalt()),
+		Direction:    strings.ToLower(res.GetDirection().String()),
+		Algorithm:    strings.ToLower(res.GetAlgorithm().String()),
+		Key:          string(res.GetKey()),
+		Salt:         string(res.GetSalt()),
+		ReplayWindow: res.GetReplayWindow(),
 	}
 	return retSa, nil
 }

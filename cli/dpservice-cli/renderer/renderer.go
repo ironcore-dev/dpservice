@@ -366,14 +366,14 @@ func (t defaultTableConverter) natTable(nats []api.Nat) (*TableData, error) {
 }
 
 func (t defaultTableConverter) securityAssociationTable(sas []api.SecurityAssociation) (*TableData, error) {
-	headers := []any{"SPI", "Direction", "Algorithm", "SrcUnderlay", "DstUnderlay"}
+	headers := []any{"SPI", "Direction", "Algorithm", "SrcUnderlay", "DstUnderlay", "ReplayWindow"}
 	if t.Wide {
 		headers = append(headers, "Key", "Salt")
 	}
 
 	columns := make([][]any, len(sas))
 	for i, sa := range sas {
-		columns[i] = []any{sa.Spi, sa.Spec.Direction, sa.Spec.Algorithm, sa.SrcUnderlay, sa.DstUnderlay}
+		columns[i] = []any{sa.Spi, sa.Spec.Direction, sa.Spec.Algorithm, sa.SrcUnderlay, sa.DstUnderlay, sa.Spec.ReplayWindow}
 		if t.Wide {
 			columns[i] = append(columns[i], sa.Spec.Key, sa.Spec.Salt)
 		}

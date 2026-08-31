@@ -138,8 +138,11 @@ class DpService:
 			# encrypting instance has nothing to look up and drops every tunnel packet.
 			grpc_client.addsa(ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
 							  ipsec_key_egress, ipsec_salt_egress)
+			# the ingress association asks for a window explicitly: without it replay checking
+			# would be off, and every test here would run through a path it does not mean to test
 			grpc_client.addsa(ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
-							  ipsec_key_ingress, ipsec_salt_ingress)
+							  ipsec_key_ingress, ipsec_salt_ingress,
+							  replay_window=ipsec_replay_window)
 
 	def attach(self, grpc_client):
 		VM1.ul_ipv6 = grpc_client.getinterface(VM1.name)['underlay_route']

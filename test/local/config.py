@@ -59,6 +59,9 @@ ipsec_key_ingress = "9c3d0b7e4a1f8256d0e4b39f7c15a862"
 ipsec_salt_ingress = "5d24c9b1"
 # Never given to dpservice, so a frame authenticated with it must fail the ICV check
 ipsec_key_wrong = "ffeeddccbbaa99887766554433221100"
+# Asked for explicitly, because dpservice leaves anti-replay off unless an association requests
+# a window. This is what the whole suite's ingress association runs with.
+ipsec_replay_window = 64
 neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
 neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"

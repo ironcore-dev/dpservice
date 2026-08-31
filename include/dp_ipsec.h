@@ -39,6 +39,12 @@ extern "C" {
 // costs nothing to pre-allocate
 #define DP_IPSEC_MAX_SA		64
 
+// Largest anti-replay window a Security Association may ask for, in packets. librte_ipsec only
+// refuses above two million, where one association's bitmap alone costs a quarter of a megabyte,
+// so the bound is drawn here instead: RFC 4303 recommends 64 as a minimum and 1024 for
+// high-speed links, which this is comfortably above.
+#define DP_IPSEC_REPLAY_WINDOW_MAX	4096
+
 // librte_ipsec writes the whole AES-GCM nonce block - the salt, the explicit part carried in the
 // packet, and the initial counter - into the private area of an allocated crypto operation, at
 // the offset it takes from the transform the session was created with. The additional
@@ -74,6 +80,10 @@ struct dp_ipsec_sa {
 	uint8_t				key[DP_IPSEC_MAX_KEY_LEN];
 	uint8_t				salt[DP_IPSEC_MAX_SALT_LEN];
 	uint16_t			salt_len;	// resolved from the algorithm, so the datapath needs no table
+	// How far a packet may be reordered on the underlay before it is taken for a replay, in
+	// packets. Zero disables replay checking altogether, which is what an association created
+	// without the field asks for, and is the only value an egress association may carry.
+	uint32_t			replay_window;
 	void				*session;
 	// librte_ipsec's view of this very association: it owns the ESP framing, the sequence
 	// number and the anti-replay window, and drives the session above to do the crypto.

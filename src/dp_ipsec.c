@@ -30,9 +30,6 @@
 // The software PMD completes inside the enqueue call, this is only here so that a device
 // that never completes an operation cannot hang the graph worker forever
 #define DP_IPSEC_DEQUEUE_RETRIES	32
-// How far a packet may be reordered on the underlay before it is taken for a replay. Applies to
-// ingress associations only, an outbound one has nothing to check.
-#define DP_IPSEC_REPLAY_WINDOW		64
 
 // librte_ipsec keeps the salt as one opaque word and copies it into every nonce verbatim
 static_assert(sizeof(uint32_t) == DP_IPSEC_MAX_SALT_LEN,
@@ -174,7 +171,9 @@ static int dp_ipsec_create_ipsec_sa(struct dp_ipsec_sa *sa, struct rte_crypto_sy
 			.mode = RTE_SECURITY_IPSEC_SA_MODE_TRANSPORT,
 			.direction = sa->dir == DP_IPSEC_DIR_EGRESS ? RTE_SECURITY_IPSEC_SA_DIR_EGRESS
 														: RTE_SECURITY_IPSEC_SA_DIR_INGRESS,
-			.replay_win_sz = sa->dir == DP_IPSEC_DIR_INGRESS ? DP_IPSEC_REPLAY_WINDOW : 0,
+			// No direction test: an egress association is refused at creation unless this
+			// is zero, which is the only value librte_ipsec would have honoured there anyway
+			.replay_win_sz = sa->replay_window,
 		},
 		.crypto_xform = xform,
 		// This names the protocol of the header being protected, not of what it carries: it is
@@ -372,6 +371,19 @@ static bool dp_ipsec_is_local_side_valid(const struct dp_ipsec_sa *request)
 	return local->_prefix == dp_conf_get_underlay_ip()->_prefix;
 }
 
+// An outbound association has no anti-replay window: librte_ipsec only sizes a replay bitmap for
+// the inbound direction and ignores the field entirely otherwise. Refusing a non-zero value there
+// keeps dp_ipsec_get_sa() from reporting a number that protects nothing, the same reason
+// dp_ipsec_is_local_side_valid() refuses a swapped address pair. The upper bound is dpservice's
+// own, see DP_IPSEC_REPLAY_WINDOW_MAX.
+static bool dp_ipsec_is_replay_window_valid(const struct dp_ipsec_sa *request)
+{
+	if (request->dir == DP_IPSEC_DIR_EGRESS)
+		return request->replay_window == 0;
+
+	return request->replay_window <= DP_IPSEC_REPLAY_WINDOW_MAX;
+}
+
 int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 {
 	struct dp_ipsec_sa_spec spec = {
@@ -393,6 +405,9 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 
 	if (!dp_ipsec_is_local_side_valid(request))
 		return DP_GRPC_ERR_SA_BAD_ADDR;
+
+	if (!dp_ipsec_is_replay_window_valid(request))
+		return DP_GRPC_ERR_SA_REPLAY_WINDOW;
 
 	// The SAD would silently overwrite the entry and leak what it used to point at, because
 	// rte_hash_add_key_with_hash_data() updates an existing key and reports success

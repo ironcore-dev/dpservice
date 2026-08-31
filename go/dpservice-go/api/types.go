@@ -688,6 +688,8 @@ type SecurityAssociationSpec struct {
 	Algorithm string `json:"algorithm"`
 	Key       string `json:"key,omitempty"`
 	Salt      string `json:"salt,omitempty"`
+	// Anti-replay window in packets, ingress only. Zero disables replay checking.
+	ReplayWindow uint32 `json:"replay_window"`
 }
 
 var (

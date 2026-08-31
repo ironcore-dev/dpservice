@@ -204,6 +204,7 @@ struct dpgrpc_ipsec_sa {
 	union dp_ipv6		dst;
 	uint8_t				key[DP_IPSEC_MAX_KEY_LEN];
 	uint8_t				salt[DP_IPSEC_MAX_SALT_LEN];
+	uint32_t			replay_window;
 };
 
 // What the database is keyed on, which is enough to name one association

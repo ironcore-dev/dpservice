@@ -47,7 +47,8 @@ Two consequences of the model are worth stating, because both are easy to read b
 - The ESP header, sequence number, explicit IV, padding, trailer and ICV placement all come from
   DPDK. About 150 lines of header surgery across the two graph nodes are gone.
 - An anti-replay window becomes one configuration field (`replay_win_sz`) rather than a sliding
-  bitmap we would have had to write. Ingress associations use 64.
+  bitmap we would have had to write. It is set per association over gRPC; ADR 0002 records why
+  it defaults to off.
 - The wire format does not change. `gen_iv()` is `iv[0] = sqn` and `IPSEC_PAD_AES_GCM` is 4, both
   matching what the hand-rolled code produced, and the test suite's independent scapy
   implementation authenticates the result in both directions.

@@ -614,6 +614,11 @@ message CreateSecurityAssociationRequest {
 	bytes dst_underlay = 5;    // destination underlay address, likewise
 	bytes key = 6;             // hex-encoded, length defined by the algorithm
 	bytes salt = 7;            // hex-encoded, length defined by the algorithm
+	// Anti-replay window, in packets, for an ingress association: how far a frame may be
+	// reordered on the underlay before it is taken for a replay. Zero, which is also what an
+	// omitted field means, disables replay checking entirely. An egress association has
+	// nothing to check, so anything but zero is rejected there.
+	uint32 replay_window = 8;
 }
 
 message CreateSecurityAssociationResponse {
@@ -645,6 +650,7 @@ message GetSecurityAssociationResponse {
 	bytes dst_underlay = 6;
 	bytes key = 7;
 	bytes salt = 8;
+	uint32 replay_window = 9;
 }
 
 message CaptureStatusRequest {

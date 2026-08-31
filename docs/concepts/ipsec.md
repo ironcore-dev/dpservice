@@ -84,9 +84,20 @@ the 8-byte explicit nonce, which makes the one thing AES-GCM cannot survive - th
 twice under one key - impossible by construction rather than merely unlikely. The salt is never
 on the wire; both ends must already have it.
 
-Ingress associations carry a **64-packet anti-replay window**. A frame whose sequence number has
-already been seen, or which has fallen more than 64 behind, is rejected before it is decrypted.
-Reordering on the underlay is tolerated up to that depth.
+Ingress associations may carry an **anti-replay window**, sized per association by the
+`replay_window` field on `CreateSecurityAssociation`. A frame whose sequence number has already
+been seen, or which has fallen further behind than the window is wide, is rejected before it is
+decrypted; reordering on the underlay is tolerated up to that depth. The rejection happens in
+`ipsec_decap` before any crypto runs, so a replayed frame costs nothing to refuse.
+
+**The window is off unless an association asks for one.** `replay_window` defaults to zero, and
+zero disables replay checking altogether rather than narrowing it to a single packet - a
+duplicated frame is decrypted and delivered. This is a deliberate departure from RFC 4303
+section 3.4.3, where anti-replay is the receiver's default; see ADR 0002 for why. An association
+that wants the protection has to say so, and 64 is the value RFC 4303 recommends as a minimum.
+
+An egress association has nothing to check, so any non-zero `replay_window` is refused there
+rather than silently ignored. The upper bound is 4096.
 
 
 ## Deliberate limits
@@ -101,9 +112,9 @@ Reordering on the underlay is tolerated up to that depth.
   automatic rotation. Rekeying is delete-then-create by the control plane, and the gap between
   the two drops traffic rather than sending it in the clear. `ListSecurityAssociations` does not
   exist yet.
-- **The anti-replay window is not configurable.** It is 64 packets for every ingress association.
-  Exposing it per association would mean per-association allocation sizes, since
-  `rte_ipsec_sa_size()` depends on it.
+- **Anti-replay is off by default.** `replay_window` is configurable per association, but an
+  association created without it accepts replayed frames. A control plane that wants the
+  protection must ask for it on every ingress association it creates. See ADR 0002.
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
   the host it runs on. `GetSecurityAssociation` returns the key and salt.
 - **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are

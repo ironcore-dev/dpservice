@@ -46,13 +46,14 @@ func CreateSecurityAssociation(dpdkClientFactory DPDKClientFactory, rendererFact
 }
 
 type CreateSecurityAssociationOptions struct {
-	Spi         uint32
-	Direction   string
-	Algorithm   string
-	SrcUnderlay netip.Addr
-	DstUnderlay netip.Addr
-	Key         string
-	Salt        string
+	Spi          uint32
+	Direction    string
+	Algorithm    string
+	SrcUnderlay  netip.Addr
+	DstUnderlay  netip.Addr
+	Key          string
+	Salt         string
+	ReplayWindow uint32
 }
 
 func (o *CreateSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -63,6 +64,9 @@ func (o *CreateSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
 	flag.AddrVar(fs, &o.DstUnderlay, "dst-underlay", o.DstUnderlay, "Destination underlay address, matched on its first 64 bits.")
 	fs.StringVar(&o.Key, "key", o.Key, "Hex-encoded cipher key.")
 	fs.StringVar(&o.Salt, "salt", o.Salt, "Hex-encoded salt, the implicit part of the nonce.")
+	// Deliberately unvalidated here: which values a direction allows is dpservice's to decide,
+	// and a check in this process would hide that answer behind a client-side failure.
+	fs.Uint32Var(&o.ReplayWindow, "replay-window", o.ReplayWindow, "Anti-replay window in packets, ingress only. Zero, the default, disables replay checking.")
 }
 
 func (o *CreateSecurityAssociationOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -94,10 +98,11 @@ func RunCreateSecurityAssociation(
 			DstUnderlay: &opts.DstUnderlay,
 		},
 		Spec: api.SecurityAssociationSpec{
-			Direction: opts.Direction,
-			Algorithm: opts.Algorithm,
-			Key:       opts.Key,
-			Salt:      opts.Salt,
+			Direction:    opts.Direction,
+			Algorithm:    opts.Algorithm,
+			Key:          opts.Key,
+			Salt:         opts.Salt,
+			ReplayWindow: opts.ReplayWindow,
 		},
 	})
 	if err != nil {
