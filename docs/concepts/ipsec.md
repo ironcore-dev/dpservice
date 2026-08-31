@@ -89,9 +89,9 @@ on the wire; both ends must already have it.
   automatic rotation. Rekeying is delete-then-create by the control plane, and the gap between
   the two drops traffic rather than sending it in the clear. `ListSecurityAssociations` does not
   exist yet.
-- **No anti-replay window.** The test topology reflects our own sequence numbers back at us, so a
-  replay check would reject legitimate traffic. It becomes meaningful once the peer is a real
-  second instance with its own association.
+- **No anti-replay window.** A replayed frame is decrypted and delivered like any other. Nothing
+  in the design prevents one - the test peer now counts its own sequence numbers, so a window
+  would no longer reject legitimate traffic - it is simply not implemented yet.
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
   the host it runs on. `GetSecurityAssociation` returns the key and salt.
 - **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are
@@ -124,21 +124,24 @@ suite with the mode enabled. The test body is identical; only what it observes o
 The `ipsec` suite also runs `xtratest_ipsec_grpc.py`, which exercises create, get and delete
 without sending a packet, so that an API failure and a dataplane failure are distinguishable.
 
-The loopback responder does not decrypt. It reflects the captured ESP frame back after rewriting
-only the outer Ethernet and IPv6 headers, which works because the ICV does not cover them and
-because `ipip_decap` picks its target port from the outer destination alone. It cannot therefore
-pass by reimplementing a bug in the code under test. On the PF it asserts the payload is *not*
-readable, which fails loudly if the cipher ever degrades to doing nothing.
+In IPsec mode the loopback responder plays the peer for real. The two directions carry different
+keys, so it decrypts the captured frame with one association and builds the answer with the
+other, using scapy's own ESP implementation. That matters for what the suite proves: a responder
+that reflects ciphertext only shows dp-service can be *read*, while one that builds the frame
+shows dp-service accepts ESP it did not produce. Both halves of interoperability are covered only
+by the second.
 
-Because the suite provisions the associations itself, it does hold the key, and uses it for one
-read-only check: the captured frame is decrypted with scapy's own ESP implementation and compared
-against the packet that was sent. That is a genuinely independent verification of the framing -
-GCM authentication fails unless the additional authenticated data, the nonce construction and the
-trailer all match what a second implementation expects.
+The harness therefore holds both keys, which the suite is entitled to since it provisions the
+associations itself. It shares no code with dp-service, so it cannot pass by reimplementing a bug
+in the code under test - GCM authentication fails unless the additional authenticated data, the
+nonce construction and the trailer all match what a second implementation expects. It also asserts
+that the payload is *not* readable on the PF, which fails loudly if the cipher ever degrades to
+doing nothing, and it checks the parts of the framing that a successful decrypt would silently
+accept: that the explicit IV really is the sequence number, and that the padding is minimal and
+4-byte aligned.
 
-**The test topology installs a configuration that would be critically wrong in production.** The
-responder reflects our own ciphertext, so dp-service decrypts what it encrypted, which means both
-associations must carry the same key and the same SPI. Between two real hosts that is a
-catastrophic misuse of AES-GCM: each side would count sequence numbers from 1 independently and
-reuse nonces under one key, losing confidentiality outright. dp-service neither rejects nor warns
-about it. **A real deployment needs a distinct key per direction.**
+**Both associations still share one SPI, and that is a property of the test rather than of the
+design.** dp-service derives the egress SPI from the VNI, so the egress association's SPI is
+fixed; the ingress one is free, and is kept equal to it. Between two real hosts each side picks
+its own. Nothing in dp-service depends on them matching - ingress resolves the association from
+the SPI on the wire - but the suite would not notice if something started to.

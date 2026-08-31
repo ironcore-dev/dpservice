@@ -11,6 +11,7 @@ from dp_service import DpService
 from exporter import Exporter
 from grpc_client import GrpcClient
 from helpers import request_ip, wait_for_port, is_port_open, run_command
+from ipsec_peer import IpsecPeer
 
 
 def pytest_addoption(parser):
@@ -74,6 +75,16 @@ def grpc_client(request, build_path):
 @pytest.fixture(scope="package")
 def grpc_client_b(build_path):
 	return GrpcClient(build_path, grpc_port_b)
+
+# The neighbouring instance dpservice tunnels to is played by the harness, so it holds both
+# keys. Package-scoped like the service itself, and deliberately so: the sequence numbers inside
+# it have to keep advancing for as long as dpservice's associations exist. None when the mode is
+# off, which is also what the tests switch on.
+@pytest.fixture(scope="package")
+def ipsec_peer(request):
+	if not request.config.getoption("--ipsec"):
+		return None
+	return IpsecPeer()
 
 
 # All tests require dp_service to be running

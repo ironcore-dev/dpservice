@@ -46,14 +46,17 @@ neigh_ul_ipv6 = "fc00:2::1"
 # Neighboring dp-service instance info (normally provided by metalnet)
 neigh_vni1_ul_ipv6 = "fc00:2::64:0:1"  # Hardcoded VNI, this would need to correspond to the other instance's config
 
-# IPsec (--ipsec suite only). One Security Association per direction, both carrying the same
-# key and SPI because the loopback responder reflects our own ciphertext back at us and
-# dpservice has to decrypt what it encrypted. A real two-host deployment must use a distinct
-# key per direction, see docs/concepts/ipsec.md.
-# The SPI is the VNI, which is what dpservice derives it from when encrypting.
+# IPsec (--ipsec suite only). One Security Association per direction, each with its own key and
+# salt: the harness plays the peer and does the crypto for the other side, so the two directions
+# are as independent here as they would be between two real hosts.
+# The SPI is shared, though, and that part is still a property of the test rather than of the
+# design - dpservice derives the egress SPI from the VNI, and the ingress one is kept equal to it.
+# See docs/concepts/ipsec.md.
 ipsec_spi = vni1
-ipsec_key = "247b0ea251c93d6fb84017e59a2cd386"
-ipsec_salt = "1bf460a7"
+ipsec_key_egress = "247b0ea251c93d6fb84017e59a2cd386"
+ipsec_salt_egress = "1bf460a7"
+ipsec_key_ingress = "9c3d0b7e4a1f8256d0e4b39f7c15a862"
+ipsec_salt_ingress = "5d24c9b1"
 neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
 neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
