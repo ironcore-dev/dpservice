@@ -15,6 +15,7 @@ sa_src = local_ul_ipv6
 sa_dst = "fc00:3::1"
 sa_key = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
 sa_salt = "0a1b2c3d"
+sa_replay_window = 64
 
 # Only the first 64 bits are matched, so this is what dpservice stores and reports back
 sa_src_prefix = "fc00:1::"
@@ -45,12 +46,18 @@ def test_ipsec_sa_lifecycle(prepare_ipv4, grpc_client):
 # association in the other direction
 def test_ipsec_sa_mirrored_directions(prepare_ipv4, grpc_client):
 	grpc_client.addsa(sa_spi, "egress", sa_src, sa_dst, sa_key, sa_salt)
-	grpc_client.addsa(sa_spi, "ingress", sa_dst, sa_src, sa_key, sa_salt)
+	grpc_client.addsa(sa_spi, "ingress", sa_dst, sa_src, sa_key, sa_salt, replay_window=sa_replay_window)
 
 	assert grpc_client.getsa(sa_spi, sa_src, sa_dst)['direction'] == "egress", \
 		"Egress association not found under its own selectors"
 	assert grpc_client.getsa(sa_spi, sa_dst, sa_src)['direction'] == "ingress", \
 		"Ingress association not found under its own selectors"
+	# the window is a property of the one direction that has one, so it is asserted here rather
+	# than in the lifecycle test above, whose association is an egress one
+	assert grpc_client.getsa(sa_spi, sa_dst, sa_src)['replay_window'] == sa_replay_window, \
+		"Ingress association came back with the wrong replay window"
+	assert grpc_client.getsa(sa_spi, sa_src, sa_dst)['replay_window'] == 0, \
+		"Egress association came back carrying a replay window"
 
 	grpc_client.delsa(sa_spi, sa_src, sa_dst)
 	grpc_client.delsa(sa_spi, sa_dst, sa_src)
@@ -68,6 +75,15 @@ def test_ipsec_sa_errors(prepare_ipv4, grpc_client):
 	# never match a packet
 	grpc_client.expect_error(465).addsa(sa_spi, "egress", sa_dst, sa_src, sa_key, sa_salt)
 	grpc_client.expect_error(465).addsa(sa_spi, "ingress", sa_src, sa_dst, sa_key, sa_salt)
+
+	# an outbound association has nothing to replay-check, so a window there would be a number
+	# that protects nothing rather than a harmless one
+	grpc_client.expect_error(467).addsa(sa_spi, "egress", sa_src, sa_dst, sa_key, sa_salt,
+										replay_window=64)
+
+	# and the window dpservice is willing to allocate a bitmap for has an upper bound
+	grpc_client.expect_error(467).addsa(sa_spi, "ingress", sa_dst, sa_src, sa_key, sa_salt,
+										replay_window=8192)
 
 	# key material length is defined by the algorithm
 	grpc_client.expect_failure().addsa(sa_spi, "egress", sa_src, sa_dst, "0011", sa_salt)

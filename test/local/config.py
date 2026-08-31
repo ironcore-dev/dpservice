@@ -62,6 +62,18 @@ ipsec_key_wrong = "ffeeddccbbaa99887766554433221100"
 # Asked for explicitly, because dpservice leaves anti-replay off unless an association requests
 # a window. This is what the whole suite's ingress association runs with.
 ipsec_replay_window = 64
+
+# A second ingress association, created by xtratest_ipsec_dataplane.py to prove what an
+# association without an anti-replay window does. It can only differ from the one above in its
+# SPI - the addresses are pinned by dpservice's local-prefix check on one side and by ipip_decap's
+# port lookup on the other - so the "spi is the vni it serves" convention cannot hold for both,
+# and this one gives it up. Nothing on the ingress path reads the SPI beyond the lookup.
+# It does get its own key and salt: the AES-GCM nonce is salt||sequence_number and the SPI is not
+# part of it, so two associations sharing key and salt while both counted from 1 would repeat a
+# nonce under one key.
+ipsec_spi_unwindowed = vni2
+ipsec_key_unwindowed = "3a7f21c85d0e94b6af12c7e0538b6d94"
+ipsec_salt_unwindowed = "7e3a91d6"
 neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
 neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"

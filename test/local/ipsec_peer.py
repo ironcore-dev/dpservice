@@ -32,16 +32,20 @@ esp_tunneled_protos = (4, 41)
 class IpsecPeer:
 
 	def __init__(self):
-		self.egress = self._sa(ipsec_key_egress, ipsec_salt_egress)
-		self.ingress = self._sa(ipsec_key_ingress, ipsec_salt_ingress)
+		self.egress = self._sa(ipsec_spi, ipsec_key_egress, ipsec_salt_egress)
+		self.ingress = self._sa(ipsec_spi, ipsec_key_ingress, ipsec_salt_ingress)
 		# Identical to the ingress association in every respect but the key, so that a frame
 		# built with it differs from a good one only in its ICV
-		self.unauthorized = self._sa(ipsec_key_wrong, ipsec_salt_ingress)
+		self.unauthorized = self._sa(ipsec_spi, ipsec_key_wrong, ipsec_salt_ingress)
+		# The peer's side of the association a test creates without an anti-replay window. Its own
+		# key and salt, because the SPI is not part of the AES-GCM nonce and this one would
+		# otherwise repeat the ingress association's nonces one for one.
+		self.unwindowed = self._sa(ipsec_spi_unwindowed, ipsec_key_unwindowed, ipsec_salt_unwindowed)
 
 	@staticmethod
-	def _sa(key, salt):
+	def _sa(spi, key, salt):
 		# scapy's AES-GCM expects the key and the salt concatenated, exactly as RFC 4106 defines
-		return SecurityAssociation(ESP, spi=ipsec_spi, crypt_algo="AES-GCM",
+		return SecurityAssociation(ESP, spi=spi, crypt_algo="AES-GCM",
 								   crypt_key=bytes.fromhex(key) + bytes.fromhex(salt))
 
 	# Read a frame dp-service encrypted, returning the outer IPv6 packet with ESP taken back out,
@@ -63,6 +67,29 @@ class IpsecPeer:
 		frame = self.unauthorized.encrypt(pkt)
 		self.ingress.seq_num = self.unauthorized.seq_num
 		return frame
+
+	# Build a frame for the association that was created without an anti-replay window
+	def encrypt_unwindowed(self, pkt):
+		return self.unwindowed.encrypt(pkt)
+
+	# The number the next frame from encrypt() will carry. Reading it is what lets a test place a
+	# frame at a chosen distance from the window's edge without caring how many frames the rest of
+	# the session has already sent.
+	def next_seq(self):
+		return self.ingress.seq_num
+
+	# A frame carrying an explicit sequence number. scapy only advances its own counter for a
+	# number it picked itself, so this leaves the association exactly where it was and the caller
+	# decides where the counter ends up - see advance_seq_to().
+	def encrypt_at_seq(self, pkt, seq):
+		return self.ingress.encrypt(pkt, seq_num=seq)
+
+	# Move the counter past everything encrypt_at_seq() has used. A test that pushed dp-service's
+	# window forward has to do this before it finishes: the next ordinary frame would otherwise
+	# carry a number the window has already moved past, and be dropped as a replay in whichever
+	# test happens to run next.
+	def advance_seq_to(self, seq):
+		self.ingress.seq_num = seq
 
 
 # Assertions on the framing itself, on top of what decrypting the frame already proves.
