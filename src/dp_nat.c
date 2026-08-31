@@ -274,7 +274,11 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 {
 	struct rte_udp_hdr *udp_hdr;
 	struct rte_tcp_hdr *tcp_hdr;
-	bool is_tap = dp_conf_is_tap_mode();
+	// Offloading a checksum only works if the NIC can still see the header it covers. Under
+	// IPsec it cannot: by the time the packet is transmitted, ipsec_encap has encrypted
+	// everything from this header onwards, so the NIC would compute a checksum over ciphertext
+	// at an offset that is no longer where this header sits. It has to be done here or not at all.
+	bool no_offload = dp_conf_is_tap_mode() || dp_conf_is_ipsec_enabled();
 
 	ipv4_hdr->hdr_checksum = 0;
 	m->ol_flags |= RTE_MBUF_F_TX_IPV4;
@@ -288,7 +292,7 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 			tcp_hdr =  (struct rte_tcp_hdr *)(ipv4_hdr + 1);
 			m->l4_len = DP_TCP_HDR_LEN(tcp_hdr);
 			tcp_hdr->cksum = 0;
-			if (unlikely(is_tap))
+			if (unlikely(no_offload))
 				tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
 			else
 				m->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
@@ -297,7 +301,7 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 			udp_hdr =  (struct rte_udp_hdr *)(ipv4_hdr + 1);
 			m->l4_len = sizeof(struct rte_udp_hdr);
 			udp_hdr->dgram_cksum = 0;
-			if (unlikely(is_tap))
+			if (unlikely(no_offload))
 				udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
 			else
 				m->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
@@ -308,7 +312,7 @@ void dp_nat_chg_ip(struct dp_flow *df, struct rte_ipv4_hdr *ipv4_hdr,
 		default:
 		break;
 	}
-	if (unlikely(is_tap))
+	if (unlikely(no_offload))
 		ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
 	else
 		m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM;
