@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 700" width="1350" height="700" role="img">
+	<title>The xfrm peer round trip</title>
+	<desc>Four domains left to right: the pytest process, dpservice's DPDK graph, a scapy relay in the host root namespace, and the peer network namespace. The top lane shows the outbound path from scapy's sendp through cls, ipip_encap and ipsec_encap onto the PF tap dtap0, across the veth pair into the namespace where xfrm decrypts and the echo server answers. The bottom lane shows the return path back through the same interfaces via ipsec_decap and ipip_decap to the VF tap. Middle panels show where the SPI comes from and where each association and policy lookup happens; a lower band lists the interfaces inside the peer namespace.</desc>
+
+	<style>
+		svg {
+			--ground: #eceff0;
+			--surface: #ffffff;
+			--panel: #f5f8f8;
+			--ink: #131b1f;
+			--ink-2: #4d5c62;
+			--ink-3: #71838a;
+			--rule: #c6d2d5;
+			--out: #0f6f8c;
+			--back: #8a5713;
+			--sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			--mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
+		}
+
+		@media (prefers-color-scheme: dark) {
+			svg {
+				--ground: #0c1214;
+				--surface: #151d20;
+				--panel: #111a1c;
+				--ink: #dde7e9;
+				--ink-2: #97aab0;
+				--ink-3: #7b8d93;
+				--rule: #2a393d;
+				--out: #5cc0dd;
+				--back: #e2b262;
+			}
+		}
+
+		.d-dom { font-family: var(--mono); font-size: 10px; letter-spacing: 0.07em; fill: var(--ink-3); }
+		.d-name { font-family: var(--mono); font-size: 10.5px; fill: var(--ink); }
+		.d-desc { font-family: var(--sans); font-size: 9px; fill: var(--ink-3); }
+		.d-wire { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-2); }
+		.d-if { font-family: var(--mono); font-size: 10px; fill: var(--ink); }
+		.d-ifsub { font-family: var(--sans); font-size: 8.5px; fill: var(--ink-3); }
+		.d-foot { font-family: var(--sans); font-size: 9px; fill: var(--ink-3); }
+		.d-legend { font-family: var(--sans); font-size: 10.5px; fill: var(--ink-2); }
+		.d-term { font-family: var(--mono); font-size: 9.5px; fill: var(--ink); }
+		.d-cmd { font-family: var(--mono); font-size: 9.5px; fill: var(--out); }
+		.d-note { font-family: var(--sans); font-size: 9px; fill: var(--ink-2); }
+
+		.panel { fill: var(--panel); stroke: var(--rule); stroke-dasharray: 4 4; }
+		.chip { fill: var(--surface); stroke: var(--rule); }
+		.plate { fill: var(--ground); }
+		.bound { stroke: var(--rule); stroke-dasharray: 3 5; }
+		.box-out { fill: var(--surface); stroke: var(--out); stroke-width: 1.25; }
+		.box-back { fill: var(--surface); stroke: var(--back); stroke-width: 1.25; }
+		.arr-out { stroke: var(--out); stroke-width: 1.5; fill: none; }
+		.arr-back { stroke: var(--back); stroke-width: 1.5; fill: none; }
+		.lookup { fill: var(--surface); stroke: var(--rule); stroke-width: 1.25; }
+		.divider { stroke: var(--rule); }
+	</style>
+
+	<defs>
+		<marker id="ar-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="var(--out)"/>
+		</marker>
+		<marker id="ar-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<path d="M 0 0 L 10 5 L 0 10 z" fill="var(--back)"/>
+		</marker>
+	</defs>
+
+	<rect x="0" y="0" width="1350" height="700" fill="var(--ground)"/>
+
+	<!-- legend -->
+	<rect x="16" y="22" width="20" height="3" fill="var(--out)"/>
+	<text class="d-legend" x="42" y="28">outbound · VM1 → peer</text>
+	<rect x="196" y="22" width="20" height="3" fill="var(--back)"/>
+	<text class="d-legend" x="222" y="28">return · peer → VM1</text>
+
+	<!-- domain panels -->
+	<rect class="panel" x="16" y="46" width="200" height="498" rx="10"/>
+	<rect class="panel" x="286" y="46" width="340" height="498" rx="10"/>
+	<rect class="panel" x="696" y="46" width="200" height="498" rx="10"/>
+	<rect class="panel" x="966" y="46" width="368" height="498" rx="10"/>
+
+	<text class="d-dom" x="30" y="70">PYTEST PROCESS</text>
+	<text class="d-dom" x="300" y="70">DPSERVICE · DPDK GRAPH</text>
+	<text class="d-dom" x="710" y="70">ROOT NETNS · RELAY</text>
+	<text class="d-dom" x="980" y="70">NETNS DP_IPSEC_PEER</text>
+
+	<!-- interface boundaries -->
+	<line class="bound" x1="251" y1="46" x2="251" y2="544"/>
+	<line class="bound" x1="661" y1="46" x2="661" y2="544"/>
+	<line class="bound" x1="931" y1="46" x2="931" y2="544"/>
+
+	<!-- outbound wire-format chips -->
+	<rect class="chip" x="151" y="190" width="200" height="56" rx="5"/>
+	<text class="d-wire" x="161" y="207">Ether 66:…:00 → 22:22:22:22:22:00</text>
+	<text class="d-wire" x="161" y="220">IP 10.100.1.1 → 10.100.3.1</text>
+	<text class="d-wire" x="161" y="233">UDP 1234 → 12345 · “xfrm hello n”</text>
+
+	<rect class="chip" x="561" y="190" width="200" height="56" rx="5"/>
+	<text class="d-wire" x="571" y="207">Ether dst 00:00:00:00:00:00</text>
+	<text class="d-wire" x="571" y="220">IPv6 fc00:1::…(VM1) → fc00:3::64:0:1</text>
+	<text class="d-wire" x="571" y="233">nh=50 · ESP spi 0x64 seq=n · ciphertext</text>
+
+	<rect class="chip" x="831" y="190" width="200" height="56" rx="5"/>
+	<text class="d-wire" x="841" y="207">Ether 02:…:01 → 02:…:02 (rewritten)</text>
+	<text class="d-wire" x="841" y="220">IPv6 + ESP: byte for byte identical</text>
+	<text class="d-wire" x="841" y="233">sendp() on dpsxfrm0</text>
+
+	<!-- return wire-format chips -->
+	<rect class="chip" x="831" y="330" width="200" height="56" rx="5"/>
+	<text class="d-wire" x="841" y="347">Ether 02:…:02 → 02:…:01 (neigh perm)</text>
+	<text class="d-wire" x="841" y="360">IPv6 fc00:3::64:0:1 → fc00:1::…(VM1)</text>
+	<text class="d-wire" x="841" y="373">ESP spi 0x64 · encrypted by the kernel</text>
+
+	<rect class="chip" x="561" y="330" width="200" height="56" rx="5"/>
+	<text class="d-wire" x="571" y="347">Ether src = dst = 22:22:22:22:22:00</text>
+	<text class="d-wire" x="571" y="360">IPv6 + ESP unchanged by the relay</text>
+	<text class="d-wire" x="571" y="373">cls sees nh=50 → ipsec_decap</text>
+
+	<rect class="chip" x="151" y="330" width="200" height="56" rx="5"/>
+	<text class="d-wire" x="161" y="347">IP 10.100.3.1 → 10.100.1.1</text>
+	<text class="d-wire" x="161" y="360">UDP 12345 → 1234 · same payload</text>
+	<text class="d-wire" x="161" y="373">matched by dport == 1234</text>
+
+	<!-- lookup panels -->
+	<rect class="lookup" x="298" y="250" width="316" height="76" rx="5"/>
+	<text class="d-dom" x="308" y="267">SPI &amp; SA LOOKUP · NO SPD EXISTS</text>
+	<text class="d-wire" x="308" y="284">ipsec_encap  spi is derived: it is the VNI, 100</text>
+	<text class="d-wire" x="308" y="296">  key (spi 100, dst/64, src/64) → SAD → SA.spi → ESP</text>
+	<text class="d-wire" x="308" y="309">ipsec_decap  spi is read off the packet</text>
+	<text class="d-wire" x="308" y="321">  key (spi, dst/64, src/64) → SAD → replay window</text>
+
+	<rect class="lookup" x="978" y="250" width="314" height="76" rx="5"/>
+	<text class="d-dom" x="988" y="267">SA &amp; POLICY LOOKUP · KERNEL XFRM</text>
+	<text class="d-wire" x="988" y="284">xfrm in   state by (dst, spi 0x64, esp), then the</text>
+	<text class="d-wire" x="988" y="296">  dir in policy for if_id 0x64 is verified</text>
+	<text class="d-wire" x="988" y="309">xfrm out  policy by (sel 10.100.3.0/24 → 10.100.1.0/24,</text>
+	<text class="d-wire" x="988" y="321">  if_id 0x64) → tmpl reqid 100 → state → spi 0x64</text>
+
+	<!-- interface plates -->
+	<rect class="plate" x="218" y="258" width="66" height="52"/>
+	<text class="d-if" x="251" y="282" text-anchor="middle">dtapvf_0</text>
+	<text class="d-ifsub" x="251" y="296" text-anchor="middle">VF TAP</text>
+
+	<rect class="plate" x="628" y="258" width="66" height="52"/>
+	<text class="d-if" x="661" y="282" text-anchor="middle">dtap0</text>
+	<text class="d-ifsub" x="661" y="296" text-anchor="middle">PF TAP</text>
+
+	<rect class="plate" x="898" y="258" width="66" height="52"/>
+	<text class="d-if" x="931" y="276" text-anchor="middle">dpsxfrm0</text>
+	<text class="d-ifsub" x="931" y="290" text-anchor="middle">veth pair</text>
+	<text class="d-if" x="931" y="304" text-anchor="middle">dpsxfrm1</text>
+
+	<!-- outbound boxes -->
+	<rect class="box-out" x="28" y="100" width="176" height="80" rx="6"/>
+	<text class="d-name" x="116" y="126" text-anchor="middle">delayed_sendp() ×5</text>
+	<text class="d-desc" x="116" y="145" text-anchor="middle">scapy writes plaintext UDP</text>
+	<text class="d-desc" x="116" y="158" text-anchor="middle">onto VM1’s tap, from a thread</text>
+
+	<rect class="box-out" x="298" y="100" width="90" height="80" rx="6"/>
+	<text class="d-name" x="343" y="126" text-anchor="middle">cls</text>
+	<text class="d-desc" x="343" y="145" text-anchor="middle">VF ingress,</text>
+	<text class="d-desc" x="343" y="158" text-anchor="middle">route → peer prefix</text>
+
+	<rect class="box-out" x="411" y="100" width="90" height="80" rx="6"/>
+	<text class="d-name" x="456" y="126" text-anchor="middle">ipip_encap</text>
+	<text class="d-desc" x="456" y="145" text-anchor="middle">writes outer IPv6,</text>
+	<text class="d-desc" x="456" y="158" text-anchor="middle">src = VF underlay</text>
+
+	<rect class="box-out" x="524" y="100" width="90" height="80" rx="6"/>
+	<text class="d-name" x="569" y="126" text-anchor="middle">ipsec_encap</text>
+	<text class="d-desc" x="569" y="145" text-anchor="middle">ESP in transport</text>
+	<text class="d-desc" x="569" y="158" text-anchor="middle">mode, AES-GCM</text>
+
+	<rect class="box-out" x="708" y="100" width="176" height="80" rx="6"/>
+	<text class="d-name" x="796" y="126" text-anchor="middle">AsyncSniffer(dtap0)</text>
+	<text class="d-desc" x="796" y="145" text-anchor="middle">_is_to_peer: ESP with</text>
+	<text class="d-desc" x="796" y="158" text-anchor="middle">IPv6 dst = fc00:3::64:0:1</text>
+
+	<rect class="box-out" x="978" y="100" width="90" height="80" rx="6"/>
+	<text class="d-name" x="1023" y="126" text-anchor="middle">xfrm state</text>
+	<text class="d-desc" x="1023" y="145" text-anchor="middle">verify ICV,</text>
+	<text class="d-desc" x="1023" y="158" text-anchor="middle">decrypt, replay ok</text>
+
+	<rect class="box-out" x="1090" y="100" width="90" height="80" rx="6"/>
+	<text class="d-name" x="1135" y="126" text-anchor="middle">ipsec100</text>
+	<text class="d-desc" x="1135" y="145" text-anchor="middle">xfrm iface, if_id</text>
+	<text class="d-desc" x="1135" y="158" text-anchor="middle">0x64 · 10.100.3.1</text>
+
+	<rect class="box-out" x="1202" y="100" width="90" height="80" rx="6"/>
+	<text class="d-name" x="1247" y="126" text-anchor="middle">recvfrom()</text>
+	<text class="d-desc" x="1247" y="145" text-anchor="middle">xfrm_echo.py,</text>
+	<text class="d-desc" x="1247" y="158" text-anchor="middle">plain UDP socket</text>
+
+	<!-- outbound arrows -->
+	<line class="arr-out" x1="204" y1="140" x2="294" y2="140" marker-end="url(#ar-out)"/>
+	<line class="arr-out" x1="388" y1="140" x2="407" y2="140" marker-end="url(#ar-out)"/>
+	<line class="arr-out" x1="501" y1="140" x2="520" y2="140" marker-end="url(#ar-out)"/>
+	<line class="arr-out" x1="614" y1="140" x2="704" y2="140" marker-end="url(#ar-out)"/>
+	<line class="arr-out" x1="884" y1="140" x2="974" y2="140" marker-end="url(#ar-out)"/>
+	<line class="arr-out" x1="1068" y1="140" x2="1086" y2="140" marker-end="url(#ar-out)"/>
+	<line class="arr-out" x1="1180" y1="140" x2="1198" y2="140" marker-end="url(#ar-out)"/>
+
+	<!-- turn-around at the echo server -->
+	<path class="arr-back" d="M 1292 140 L 1313 140 L 1313 436 L 1296 436" marker-end="url(#ar-back)"/>
+	<text class="d-desc" transform="translate(1326 288) rotate(-90)" text-anchor="middle">echo: sendto(sender)</text>
+
+	<!-- return boxes -->
+	<rect class="box-back" x="1202" y="396" width="90" height="80" rx="6"/>
+	<text class="d-name" x="1247" y="422" text-anchor="middle">sendto()</text>
+	<text class="d-desc" x="1247" y="441" text-anchor="middle">same payload,</text>
+	<text class="d-desc" x="1247" y="454" text-anchor="middle">back to 10.100.1.1</text>
+
+	<rect class="box-back" x="1090" y="396" width="90" height="80" rx="6"/>
+	<text class="d-name" x="1135" y="422" text-anchor="middle">ipsec100</text>
+	<text class="d-desc" x="1135" y="441" text-anchor="middle">route 10.100.1.0/24</text>
+	<text class="d-desc" x="1135" y="454" text-anchor="middle">dev ipsec100</text>
+
+	<rect class="box-back" x="978" y="396" width="90" height="80" rx="6"/>
+	<text class="d-name" x="1023" y="422" text-anchor="middle">policy out</text>
+	<text class="d-desc" x="1023" y="441" text-anchor="middle">encrypt, tunnel</text>
+	<text class="d-desc" x="1023" y="454" text-anchor="middle">mode, reqid 100</text>
+
+	<rect class="box-back" x="708" y="396" width="176" height="80" rx="6"/>
+	<text class="d-name" x="796" y="422" text-anchor="middle">AsyncSniffer(dpsxfrm0)</text>
+	<text class="d-desc" x="796" y="441" text-anchor="middle">_is_to_dpservice: ESP with</text>
+	<text class="d-desc" x="796" y="454" text-anchor="middle">IPv6 src = fc00:3::64:0:1</text>
+
+	<rect class="box-back" x="524" y="396" width="90" height="80" rx="6"/>
+	<text class="d-name" x="569" y="422" text-anchor="middle">cls</text>
+	<text class="d-desc" x="569" y="441" text-anchor="middle">PF ingress,</text>
+	<text class="d-desc" x="569" y="454" text-anchor="middle">nh=50 → decap</text>
+
+	<rect class="box-back" x="411" y="396" width="90" height="80" rx="6"/>
+	<text class="d-name" x="456" y="422" text-anchor="middle">ipsec_decap</text>
+	<text class="d-desc" x="456" y="441" text-anchor="middle">SAD lookup by SPI</text>
+	<text class="d-desc" x="456" y="454" text-anchor="middle">+ addrs, replay win</text>
+
+	<rect class="box-back" x="298" y="396" width="90" height="80" rx="6"/>
+	<text class="d-name" x="343" y="422" text-anchor="middle">ipip_decap</text>
+	<text class="d-desc" x="343" y="441" text-anchor="middle">port picked by ul</text>
+	<text class="d-desc" x="343" y="454" text-anchor="middle">dst → conntrack</text>
+
+	<rect class="box-back" x="28" y="396" width="176" height="80" rx="6"/>
+	<text class="d-name" x="116" y="422" text-anchor="middle">sniff_packets()</text>
+	<text class="d-desc" x="116" y="441" text-anchor="middle">5 packets, then assert</text>
+	<text class="d-desc" x="116" y="454" text-anchor="middle">src, dst and payload</text>
+
+	<!-- return arrows -->
+	<line class="arr-back" x1="1202" y1="436" x2="1184" y2="436" marker-end="url(#ar-back)"/>
+	<line class="arr-back" x1="1090" y1="436" x2="1072" y2="436" marker-end="url(#ar-back)"/>
+	<line class="arr-back" x1="978" y1="436" x2="888" y2="436" marker-end="url(#ar-back)"/>
+	<line class="arr-back" x1="708" y1="436" x2="618" y2="436" marker-end="url(#ar-back)"/>
+	<line class="arr-back" x1="524" y1="436" x2="505" y2="436" marker-end="url(#ar-back)"/>
+	<line class="arr-back" x1="411" y1="436" x2="392" y2="436" marker-end="url(#ar-back)"/>
+	<line class="arr-back" x1="298" y1="436" x2="208" y2="436" marker-end="url(#ar-back)"/>
+
+	<!-- panel footers -->
+	<text class="d-foot" x="30" y="508">VM1 · 10.100.1.1 · vni 100</text>
+	<text class="d-foot" x="30" y="522">underlay fc00:1::… (assigned)</text>
+	<text class="d-foot" x="300" y="508">--ipv6=fc00:1::1 · SPI 100 (= vni1)</text>
+	<text class="d-foot" x="300" y="522">SA keyed on the /64 prefixes</text>
+	<text class="d-foot" x="710" y="508">no addresses, answers nothing</text>
+	<text class="d-foot" x="710" y="522">sniff + sendp, L2 rewrite only</text>
+	<text class="d-foot" x="980" y="508">fc00:3::64:0:1 · if_id 0x64 · ipsec100</text>
+	<text class="d-foot" x="980" y="522">10.100.3.1/32 · echo bound to :12345</text>
+
+	<!-- ================= lower band ================= -->
+	<line class="divider" x1="16" y1="568" x2="1334" y2="568"/>
+
+	<rect class="chip" x="16" y="584" width="1318" height="96" rx="8"/>
+	<text class="d-cmd" x="30" y="606"># ip netns exec dp_ipsec_peer ip -br a</text>
+	<text class="d-term" x="30" y="628">lo                 DOWN</text>
+	<text class="d-term" x="30" y="644">ipsec100@dpsxfrm1  UNKNOWN  10.100.3.1/32  fe80::…/64</text>
+	<text class="d-term" x="30" y="660">dpsxfrm1@if42      UP       fc00:3::64:0:1/64  fe80::ff:fe00:2/64</text>
+	<text class="d-note" x="620" y="606">ipsec100 is a netdev of its own — link/none, NOARP, type xfrm, if_id 0x64 — and not the veth.</text>
+	<text class="d-note" x="620" y="621">Decrypted packets surface on it; ESP is only ever seen on dpsxfrm1, which carries the underlay alone.</text>
+	<text class="d-note" x="620" y="636">The echo server binds 10.100.3.1/32 on ipsec100, and 10.100.1.0/24 routes back out of the same device.</text>
+	<text class="d-note" x="620" y="651">Both fe80:: addresses are kernel-assigned and unused; ipsec100 generates a random one per run.</text>
+</svg>

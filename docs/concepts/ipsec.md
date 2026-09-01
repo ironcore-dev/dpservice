@@ -209,3 +209,13 @@ design.** dp-service derives the egress SPI from the VNI, so the egress associat
 fixed; the ingress one is free, and is kept equal to it. Between two real hosts each side picks
 its own. Nothing in dp-service depends on them matching - ingress resolves the association from
 the SPI on the wire - but the suite would not notice if something started to.
+
+
+### The full path
+
+![The xfrm peer round trip](xfrm_round_trip.svg)
+
+One burst of five packets, out along the top lane and back along the bottom. The three dashed
+boundaries are the interfaces the frames actually cross; the boxed annotations show what is on the
+wire at each crossing. Both dpservice and the kernel advance their own sequence numbers per burst,
+which is why the peer fixture is module-scoped.
