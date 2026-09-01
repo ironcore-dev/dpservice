@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="668" viewBox="0 0 680 668" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" role="img">
+<title>How one packet crosses a VNI pair</title>
+<desc>Node A routes a packet into ipsec-42 which stamps if_id 0x2a; policy matches and the SA encrypts with SPI 42. On node C, nftables PREROUTING sets a mark from the outer source prefix, the SAD lookup uses destination plus SPI plus mark, and the decrypted packet surfaces on ipsec-42.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="680" height="668" fill="#FFFFFF"/>
+<rect x="120" y="56" width="440" height="194" rx="16" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 4"/>
+<text x="144" y="80" font-size="14" font-weight="500" fill="#2C2C2A" dominant-baseline="central">node a — sending</text>
+<rect x="150" y="96" width="380" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="340" y="116" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">route into ipsec-42</text>
+<text x="340" y="134" font-size="12" fill="#534AB7" text-anchor="middle" dominant-baseline="central">if_id 0x2a stamped on the packet</text>
+<line x1="340" y1="154" x2="340" y2="170" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="150" y="172" width="380" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="340" y="192" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">policy matches, sa encrypts</text>
+<text x="340" y="210" font-size="12" fill="#534AB7" text-anchor="middle" dominant-baseline="central">spi 42, aes-gcm, per-sa key</text>
+<line x1="340" y1="250" x2="340" y2="274" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="190" y="276" width="300" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="340" y="296" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">esp on the wire</text>
+<text x="340" y="314" font-size="12" fill="#5F5E5A" text-anchor="middle" dominant-baseline="central">ip6 aa::1 to cc::1, spi 42</text>
+<line x1="340" y1="332" x2="340" y2="356" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="120" y="358" width="440" height="270" rx="16" fill="none" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="4 4"/>
+<text x="144" y="382" font-size="14" font-weight="500" fill="#2C2C2A" dominant-baseline="central">node c — receiving</text>
+<rect x="150" y="398" width="380" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="340" y="418" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">nftables prerouting sets mark</text>
+<text x="340" y="436" font-size="12" fill="#0F6E56" text-anchor="middle" dominant-baseline="central">source aa::/64 becomes mark 0x1</text>
+<line x1="340" y1="456" x2="340" y2="472" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="150" y="474" width="380" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="340" y="494" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">sad lookup selects the sa</text>
+<text x="340" y="512" font-size="12" fill="#0F6E56" text-anchor="middle" dominant-baseline="central">key is dst plus spi plus mark</text>
+<line x1="340" y1="532" x2="340" y2="548" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="150" y="550" width="380" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="340" y="570" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">decrypt, surface on ipsec-42</text>
+<text x="340" y="588" font-size="12" fill="#0F6E56" text-anchor="middle" dominant-baseline="central">if_id on the sa picks the interface</text>
+</svg>

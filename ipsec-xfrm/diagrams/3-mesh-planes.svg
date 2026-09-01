@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="352" viewBox="0 0 680 352" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" role="img">
+<title>The two tenant planes of the VNI mesh</title>
+<desc>VNI 42 forms a full mesh across nodes A, B, C and D with six edges. VNI 77 covers only nodes A, C and D with three edges. Both planes run over the same physical links.</desc>
+<rect width="680" height="352" fill="#FFFFFF"/>
+<text x="185" y="50" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">vni 42 — full mesh, spi 42</text>
+<text x="475" y="50" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">vni 77 — a, c, d only, spi 77</text>
+<line x1="140" y1="100" x2="230" y2="100" stroke="#534AB7" stroke-width="1.5"/>
+<line x1="140" y1="270" x2="230" y2="270" stroke="#534AB7" stroke-width="1.5"/>
+<line x1="95" y1="120" x2="95" y2="250" stroke="#534AB7" stroke-width="1.5"/>
+<line x1="275" y1="120" x2="275" y2="250" stroke="#534AB7" stroke-width="1.5"/>
+<line x1="142" y1="122" x2="228" y2="248" stroke="#534AB7" stroke-width="1.5"/>
+<line x1="228" y1="122" x2="142" y2="248" stroke="#534AB7" stroke-width="1.5"/>
+<rect x="50" y="80" width="90" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="95" y="100" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">node a</text>
+<rect x="230" y="80" width="90" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="275" y="100" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">node b</text>
+<rect x="50" y="250" width="90" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="95" y="270" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">node c</text>
+<rect x="230" y="250" width="90" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="275" y="270" font-size="14" font-weight="500" fill="#3C3489" text-anchor="middle" dominant-baseline="central">node d</text>
+<line x1="420" y1="122" x2="410" y2="248" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="6 4"/>
+<line x1="455" y1="122" x2="535" y2="248" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="6 4"/>
+<line x1="450" y1="270" x2="500" y2="270" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="390" y="80" width="90" height="40" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="435" y="100" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">node a</text>
+<rect x="360" y="250" width="90" height="40" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="405" y="270" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">node c</text>
+<rect x="500" y="250" width="90" height="40" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="545" y="270" font-size="14" font-weight="500" fill="#085041" text-anchor="middle" dominant-baseline="central">node d</text>
+<text x="340" y="326" font-size="12" fill="#5F5E5A" text-anchor="middle" dominant-baseline="central">each line is two unidirectional sas; both planes share the same physical links</text>
+</svg>
