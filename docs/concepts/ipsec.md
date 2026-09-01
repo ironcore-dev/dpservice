@@ -57,6 +57,8 @@ direction**, so an ingress association for the same peer swaps them. dp-service 
 association whose local side is not its own underlay prefix, since such an association could
 never match a packet.
 
+The three RPCs behind this, and what they reject, are in [the gRPC interface](#the-grpc-interface).
+
 
 ### How an association is found
 
@@ -100,7 +102,110 @@ An egress association has nothing to check, so any non-zero `replay_window` is r
 rather than silently ignored. The upper bound is 4096.
 
 
-## Deliberate limits
+## The gRPC interface
+
+Three RPCs were added to the `DPDKironcore` service in `proto/dpdk.proto`, and they exist only
+when dpservice was started with `--enable-ipsec`; without it every one of them fails with
+`SA_DISABLED` rather than being absent from the service.
+
+| RPC | Purpose |
+| --- | --- |
+| `CreateSecurityAssociation` | Install one unidirectional association, with its key material |
+| `GetSecurityAssociation` | Read one back, including its key and salt |
+| `DeleteSecurityAssociation` | Remove one |
+
+There is no `ListSecurityAssociations`. A caller that wants to enumerate what it installed has to
+remember it, which is acceptable only because the control plane is the sole writer.
+
+### The identity of an association
+
+`Get` and `Delete` name an association by the same three fields the database is keyed on, and
+nothing else:
+
+```protobuf
+message GetSecurityAssociationRequest {
+	uint32 spi = 1;
+	bytes src_underlay = 2;
+	bytes dst_underlay = 3;
+}
+```
+
+`DeleteSecurityAssociationRequest` carries exactly those fields too. The addresses are matched on
+their first 64 bits, so an address anywhere inside the peer's `/64` names the same entry as the
+one that created it; `GetSecurityAssociationResponse` returns them masked to that length, which is
+how a caller can see what was actually stored rather than what it happened to send. The direction
+is deliberately not part of the identity - it is a property of the association, not of its name -
+which is why two associations that differ only in direction collide when a peer shares our `/64`.
+
+### Creating one
+
+```protobuf
+message CreateSecurityAssociationRequest {
+	uint32 spi = 1;
+	TrafficDirection direction = 2;    // INGRESS or EGRESS
+	IpsecAlgorithm algorithm = 3;      // AES_128_GCM is the only value
+	bytes src_underlay = 4;            // source underlay address, as seen on the wire in this direction
+	bytes dst_underlay = 5;            // destination underlay address, likewise
+	bytes key = 6;                     // hex-encoded, 32 digits for AES-128-GCM
+	bytes salt = 7;                    // hex-encoded, 8 digits for AES-128-GCM
+	uint32 replay_window = 8;          // ingress only, 0 disables replay checking
+}
+```
+
+`TrafficDirection` and `IpsecAlgorithm` are enums rather than free-form strings, so an unknown
+cipher is a decode-time failure at the caller instead of a runtime one here. `algorithm` exists
+only so that a second cipher does not need a breaking change; `AES_128_GCM` is value 0, which
+makes it what an omitted field means.
+
+Every `bytes` field here carries text, not octets: `src_underlay` and `dst_underlay` are IPv6
+addresses in their printed form, and `key` and `salt` are hex. That follows the convention the
+rest of the API already uses, and it leaves the key material readable in a capture of the
+management channel - which is a statement about how little this interface is trusted, not a
+feature.
+
+`GetSecurityAssociationResponse` mirrors this message field for field, with `status` prepended,
+and it does return the key and the salt.
+
+### What it rejects
+
+Failures arrive on two layers. Anything malformed enough that the request cannot be built - an
+unparseable address, hex that is not the length the cipher needs, an unknown direction - is
+refused at the gRPC layer with `INVALID_ARGUMENT` and a naming message, before the dataplane sees
+it. Everything the dataplane itself rejects arrives as the `Status` embedded in an otherwise
+successful response:
+
+| Code | Name | Raised when |
+| --- | --- | --- |
+| 461 | `SA_EXISTS` | The `spi`+`dst`+`src` key is already in the database |
+| 462 | `SA_NOT_FOUND` | `Get` or `Delete` named an association that is not there |
+| 463 | `SA_CREATE` | The crypto session or the database insert failed |
+| 464 | `SA_ALGO` | `algorithm` is not one dpservice implements |
+| 465 | `SA_BAD_ADDR` | The local side of the association is not our own underlay `/64` |
+| 466 | `SA_DISABLED` | dpservice was not started with `--enable-ipsec` |
+| 467 | `SA_REPLAY_WINDOW` | Non-zero on an egress association, or above 4096 |
+
+`SA_EXISTS` is checked explicitly rather than left to the database, because
+`rte_ipsec_sad_add()` overwrites a duplicate key and reports success, leaking the association it
+used to point at. A create beyond the 64-association limit returns the generic `LIMIT_REACHED`,
+and an allocation failure `OUT_OF_MEMORY`.
+
+### From the CLI
+
+`dpservice-cli` wraps all three, under `securityassociation`:
+
+```bash
+dpservice-cli create securityassociation --spi=100 --direction=egress \
+    --src-underlay=fc00:1:: --dst-underlay=fc00:2:: \
+    --key=<32 hex digits> --salt=<8 hex digits> [--replay-window=64]
+
+dpservice-cli get    securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::
+dpservice-cli delete securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::
+```
+
+`--algorithm` defaults to `aes-128-gcm` and `--replay-window` to zero, so neither has to be given.
+
+
+## Deliberate limits of the PoC
 
 - **No security policy database.** What gets protected is not selectable: with the mode on,
   everything leaving through the tunnel is encrypted, and unencrypted tunnel traffic arriving on
@@ -111,20 +216,16 @@ rather than silently ignored. The upper bound is 4096.
   arrive fully formed: there is no IKE, no distribution, no lifetime or byte counters, and no
   automatic rotation. Rekeying is delete-then-create by the control plane, and the gap between
   the two drops traffic rather than sending it in the clear. `ListSecurityAssociations` does not
-  exist yet.
+  exist yet; see [the gRPC interface](#the-grpc-interface) for what does.
 - **Anti-replay is off by default.** `replay_window` is configurable per association, but an
   association created without it accepts replayed frames. A control plane that wants the
   protection must ask for it on every ingress association it creates. See ADR 0002.
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
-  the host it runs on. `GetSecurityAssociation` returns the key and salt.
+  the host it runs on. [`GetSecurityAssociation`](#the-grpc-interface) returns the key and salt.
 - **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are
   matched, an egress association `(spi, dst=peer, src=local)` and its ingress mirror become the
   same database key when the peer's underlay prefix is our own. The second create is then refused
   as a duplicate. Peers are expected to sit in distinct /64s.
-- **The direction is not re-checked on lookup.** Both directions share one database, and an entry
-  is found purely by its key; nothing verifies afterwards that an association handed to the
-  decrypting node is an ingress one. The address layout makes that unreachable, but by arithmetic
-  rather than by construction.
 - **One cipher.** The API carries an `algorithm` field so a second one does not need a breaking
   change, but AES-128-GCM is the only accepted value.
 - **Reduced MTU.** ESP adds up to 37 bytes, and the mbuf data room leaves no space for that on a
