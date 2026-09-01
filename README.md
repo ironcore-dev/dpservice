@@ -4,6 +4,30 @@
 [![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 
+## New: IPsec for the underlay tunnel (proof of concept)
+
+Underlay tunnel traffic can be encrypted with ESP, enabled at runtime with `--enable-ipsec`.
+See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
+
+- ESP (AES-128-GCM, RFC 4106) over the existing IPv6 tunnel, framed by `librte_ipsec`; two new
+  graph nodes, `ipsec_encap` and `ipsec_decap`. Refused together with hardware offloading.
+- Security Associations are provisioned at runtime over gRPC - `Create`/`Get`/`DeleteSecurityAssociation`,
+  also in `dpservice-cli`. See [the gRPC interface](/docs/concepts/ipsec.md#the-grpc-interface).
+- Per-association **anti-replay window** (`replay_window`, ingress only, max 4096, off by default).
+- **The egress SPI is the VNI** from where the packet is originating. This can be improved and can 
+be looked up from a table filled during GRPC SA creation.
+- Tested dpservice-to-dpservice: a full encrypted round trip against a scapy peer holding a
+  different key per direction, with the SAs installed over gRPC by the test itself.
+- Tested dpservice-to-Linux: `xtratest_ipsec_xfrm.py` runs the same round trip against a kernel
+  XFRM peer in a namespace, and requires every `/proc/net/xfrm_stat` counter to stay zero.
+- The replay window is exercised both ways: a replayed frame is asserted to be dropped against
+  the scapy peer, and the XFRM round trip runs with a window of 64 to prove it interoperates.
+- [`ipsec-xfrm/`](/ipsec-xfrm) - standalone Linux XFRM scripts demonstrating a per-VNI IPsec mesh
+  with **SPI = VNI**, in network namespaces, independent of dpservice.
+- Builds and runs in Docker: `docker build --target tester` gives an image whose `ipsec` suite
+  runs alongside all the others.
+
+
 ## Overview
 
 Dataplane Service in short form dpservice is a L3 virtual router with basic L2 capabilites and with IP in IPv6 tunneling for the uplink traffic. It uses [SRIOV](https://en.wikipedia.org/wiki/Single-root_input/output_virtualization) based Virtual Functions as its virtual ports. A virtual machine or a bare metal machine (In case dpservice running directly on SmartNIC) can be plugged to SRIOV VFs.

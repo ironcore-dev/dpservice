@@ -242,8 +242,8 @@ dpservice-cli delete securityassociation --spi=100 --src-underlay=fc00:1:: --dst
   `ipip_encap`, so its traffic is not covered by this mode.
 - **Software crypto only.** The `crypto_openssl` PMD is created by dp-service itself when the mode
   is enabled; hardware crypto devices are not used. The PMD requires DPDK to have been built with
-  libcrypto available, and the production container image does not yet ship the runtime library,
-  so `--enable-ipsec` there aborts at startup.
+  libcrypto, which is why the builder stage installs `libssl-dev`; the runtime library it then
+  needs is already in the `debian:13-slim` base both container images start from.
 
 
 ## Testing
