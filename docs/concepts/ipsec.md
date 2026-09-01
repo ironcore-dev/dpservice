@@ -174,6 +174,36 @@ it over.
 same exchange twice, differing only in which key the peer authenticates its answer with, and
 requires the second one not to arrive.
 
+
+### The second peer
+
+Everything above happens inside the test process: scapy holds the keys and builds the answers.
+`xtratest_ipsec_xfrm.py` runs the same round trip against the Linux kernel instead. The peer is a
+network namespace holding an XFRM interface, one state and one policy per direction written with
+`iproute2` the way a deployment would write them, and an ordinary UDP echo server that has never
+heard of IPsec. Nothing in the test participates in the crypto: what the echo server receives has
+already been decrypted by the kernel, and what it answers is encrypted on the way out.
+
+That is a different claim from the one scapy supports. scapy is *a* second implementation; the
+kernel is *the* implementation dp-service meets in production, and it refuses what the RFC forbids
+where scapy would shrug. It is also the only place the suite tests the sentence this document
+opens with: dp-service frames ESP in **transport** mode over an outer header `ipip_encap` has
+already written, and the peer at the other end believes it is speaking tunnel mode. That the two
+agree on the wire is what makes the mode interoperable at all, and it is now asserted rather than
+argued.
+
+The peer is a second neighbour, with its own underlay `/64` and its own key material, so nothing
+it does can disturb the associations the scapy peer runs on. Getting the frames to it takes a
+relay: what leaves the PF is addressed to the MAC of a neighbouring router, and on a TAP netlink
+never finds one, so the destination is all zeroes. No bridge can deliver such a frame to a kernel
+stack - it arrives as `PACKET_OTHERHOST` and is dropped before xfrm sees it - so two sniffer
+threads carry the frames across, rewriting the ethernet header and nothing past it.
+
+Because both implementations can drop a packet without saying anything, the test reads the
+namespace's `/proc/net/xfrm_stat` and requires every counter to be zero. That is what turns a
+silent kernel-side drop into `XfrmInStateProtoError` or `XfrmOutNoStates` rather than into five
+packets that never arrived.
+
 **Both associations still share one SPI, and that is a property of the test rather than of the
 design.** dp-service derives the egress SPI from the VNI, so the egress association's SPI is
 fixed; the ingress one is free, and is kept equal to it. Between two real hosts each side picks

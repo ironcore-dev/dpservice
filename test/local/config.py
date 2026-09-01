@@ -79,6 +79,39 @@ neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
 neigh_vni1_ov_ipv6_route = f"{neigh_vni1_ov_ipv6_prefix}::/104"
 
+# The Linux peer (xtratest_ipsec_xfrm.py), which is a second neighbour and shares nothing with
+# the one IpsecPeer plays. Its own underlay /64, because dpservice tells two associations apart
+# by (SPI, source /64, destination /64) and the SPI cannot differ - the egress one is derived
+# from the VNI. Its own key material, because AES-GCM builds its nonce from salt||sequence and
+# two associations counting from 1 under one key would repeat one.
+xfrm_ns = "dp_ipsec_peer"
+xfrm_iface = f"ipsec{vni1}"
+xfrm_if_id = hex(vni1)
+xfrm_peer_ul_ipv6 = "fc00:3::64:0:1"
+# where the peer sends its answers, i.e. local_ul_ipv6's prefix
+xfrm_local_ul_prefix = "fc00:1::/64"
+xfrm_peer_ov_ip = f"{ov_ip_prefix}{vni1}.3.1"
+xfrm_peer_ov_ip_route = f"{ov_ip_prefix}{vni1}.3.0/24"
+# the VMs' own prefix, which is the inner selector of the peer's associations
+xfrm_vm_ov_ip_route = f"{ov_ip_prefix}{vni1}.1.0/24"
+xfrm_key_egress = "0f9c1d7a35b8e264c07fa9d1e5386b40"
+xfrm_salt_egress = "a1c47e39"
+xfrm_key_ingress = "6b2e84f0d915c73a8e40b26fd83a1957"
+xfrm_salt_ingress = "3f8b02da"
+
+# The veth carrying ESP between the host and the namespace. Both MACs are fixed because the
+# relay writes them into every frame it forwards; nothing on the wire depends on their values.
+xfrm_veth_host = "dpsxfrm0"
+xfrm_veth_peer = "dpsxfrm1"
+xfrm_veth_host_mac = "02:00:00:00:00:01"
+xfrm_veth_peer_mac = "02:00:00:00:00:02"
+
+# The echo server the peer answers with. A crashed run leaves it running and holding the
+# namespace open, which is why XfrmPeer kills whatever it finds there before reusing the name.
+xfrm_echo_script = "xfrm_echo.py"
+xfrm_echo_port = 12345
+xfrm_echo_timeout = 5
+
 # DHCP response config
 dhcp_mtu = 1337
 dhcp_dns1 = "8.8.4.4"
