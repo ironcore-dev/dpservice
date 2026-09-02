@@ -690,6 +690,8 @@ type SecurityAssociationSpec struct {
 	Salt      string `json:"salt,omitempty"`
 	// Anti-replay window in packets, ingress only. Zero disables replay checking.
 	ReplayWindow uint32 `json:"replay_window"`
+	// Extended sequence numbers (RFC 4304). Both ends of a tunnel have to agree on this.
+	Esn bool `json:"esn"`
 }
 
 var (

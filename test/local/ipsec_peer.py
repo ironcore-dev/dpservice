@@ -41,12 +41,29 @@ class IpsecPeer:
 		# key and salt, because the SPI is not part of the AES-GCM nonce and this one would
 		# otherwise repeat the ingress association's nonces one for one.
 		self.unwindowed = self._sa(ipsec_spi_unwindowed, ipsec_key_unwindowed, ipsec_salt_unwindowed)
+		# The peer's side of the two associations xtratest_ipsec_dataplane.py creates to cover
+		# extended sequence numbers and the 256-bit cipher. Their own SPIs and their own key
+		# material, for the same two reasons the unwindowed one above has both.
+		self.esn = self._sa(ipsec_spi_esn, ipsec_key_esn, ipsec_salt_esn, esn=True)
+		# The very same association framed *without* extended sequence numbers, which is what makes
+		# a frame that differs from a good one in nothing but the width of its authenticated data
+		self.esn_disabled = self._sa(ipsec_spi_esn, ipsec_key_esn, ipsec_salt_esn)
+		self.aes256 = self._sa(ipsec_spi_aes256, ipsec_key_aes256, ipsec_salt_aes256)
 
+	# The cipher is chosen by the length of the key, exactly as it is on dpservice's side: AES-GCM
+	# is one algorithm whose key can be 128 or 256 bits, and nothing on the wire distinguishes them.
+	#
+	# esn widens the sequence number to 64 bits, of which only the lower half is carried in the
+	# packet. It is not a framing detail that can be left to differ: the upper half is authenticated
+	# along with the rest, so a peer that disagrees fails every ICV rather than merely counting
+	# differently. scapy keeps the upper half in `esn` and never advances it on its own, which is
+	# fine for a test suite that will not send four billion frames.
 	@staticmethod
-	def _sa(spi, key, salt):
+	def _sa(spi, key, salt, esn=False):
 		# scapy's AES-GCM expects the key and the salt concatenated, exactly as RFC 4106 defines
 		return SecurityAssociation(ESP, spi=spi, crypt_algo="AES-GCM",
-								   crypt_key=bytes.fromhex(key) + bytes.fromhex(salt))
+								   crypt_key=bytes.fromhex(key) + bytes.fromhex(salt),
+								   esn_en=esn, esn=0)
 
 	# Read a frame dp-service encrypted, returning the outer IPv6 packet with ESP taken back out,
 	# which is precisely what ipip_encap produced before ipsec_encap ran.
@@ -71,6 +88,24 @@ class IpsecPeer:
 	# Build a frame for the association that was created without an anti-replay window
 	def encrypt_unwindowed(self, pkt):
 		return self.unwindowed.encrypt(pkt)
+
+	# Build a frame for the association using extended sequence numbers
+	def encrypt_esn(self, pkt):
+		return self.esn.encrypt(pkt)
+
+	# The same frame, framed without them. The two counters are kept in step for the reason
+	# encrypt_with_wrong_key() keeps its own in step, and for one more: these two associations
+	# share a key, so letting them count independently would repeat an AES-GCM nonce - the salt
+	# and the sequence number are the whole of it.
+	def encrypt_esn_disabled(self, pkt):
+		self.esn_disabled.seq_num = self.esn.seq_num
+		frame = self.esn_disabled.encrypt(pkt)
+		self.esn.seq_num = self.esn_disabled.seq_num
+		return frame
+
+	# Build a frame for the association using the 256-bit key
+	def encrypt_aes256(self, pkt):
+		return self.aes256.encrypt(pkt)
 
 	# The number the next frame from encrypt() will carry. Reading it is what lets a test place a
 	# frame at a chosen distance from the window's edge without caring how many frames the rest of

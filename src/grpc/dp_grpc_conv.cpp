@@ -350,15 +350,24 @@ bool GrpcToDpIpsecAlgo(const IpsecAlgorithm& grpc_algo, enum dp_ipsec_algo *dp_a
 	case IpsecAlgorithm::AES_128_GCM:
 		*dp_algo = DP_IPSEC_ALGO_AES_128_GCM;
 		return true;
+	case IpsecAlgorithm::AES_256_GCM:
+		*dp_algo = DP_IPSEC_ALGO_AES_256_GCM;
+		return true;
 	default:
 		return false;
 	}
 }
 
-IpsecAlgorithm IpsecAlgoToGrpc(__rte_unused enum dp_ipsec_algo dp_algo)
+IpsecAlgorithm IpsecAlgoToGrpc(enum dp_ipsec_algo dp_algo)
 {
-	// only one algorithm is supported, dp_ipsec_create_sa() refuses anything else
-	return IpsecAlgorithm::AES_128_GCM;
+	switch (dp_algo) {
+	case DP_IPSEC_ALGO_AES_256_GCM:
+		return IpsecAlgorithm::AES_256_GCM;
+	default:
+		// dp_ipsec_create_sa() refuses anything this does not know, so a stored association
+		// can only ever be one of the two
+		return IpsecAlgorithm::AES_128_GCM;
+	}
 }
 
 static int HexDigit(char c)

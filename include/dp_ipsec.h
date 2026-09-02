@@ -22,11 +22,15 @@ extern "C" {
 
 // Security Associations are provisioned over gRPC and looked up per packet, see
 // docs/concepts/ipsec.md for the deliberate limits of this proof-of-concept.
-#define DP_IPSEC_MAX_KEY_LEN	16	// AES-128
+#define DP_IPSEC_MAX_KEY_LEN	32	// AES-256, the longest key any supported algorithm takes
 #define DP_IPSEC_MAX_SALT_LEN	4	// implicit part of the GCM nonce, never on the wire
 #define DP_IPSEC_IV_LEN		8	// explicit part of the GCM nonce, carried in the packet
 #define DP_IPSEC_ICV_LEN	16
 #define DP_IPSEC_AAD_LEN	8	// the ESP header, i.e. SPI and sequence number
+// With extended sequence numbers the upper half of the sequence number is authenticated as well,
+// even though it never appears on the wire (RFC 4304), so the additional authenticated data is
+// four bytes longer. librte_ipsec fills the block itself, this only has to size it.
+#define DP_IPSEC_AAD_LEN_ESN	12
 
 // Security Associations are looked up on the first 64 bits of the underlay addresses only,
 // so that one SA covers a peer host rather than each of its individual underlay addresses
@@ -61,10 +65,12 @@ enum dp_ipsec_dir {
 	DP_IPSEC_DIR_EGRESS,
 };
 
-// Only one algorithm is supported, the enum exists so that a second one has an obvious place
-// to land, in here and in the table in dp_ipsec.c that derives the key lengths from it
+// Everything a cipher implies - the key length above all - is derived from this in the one table
+// in dp_ipsec.c, so a third algorithm means adding a row there and a value here, nothing else.
+// The order is fixed by the wire protocol, see IpsecAlgorithm in dpdk.proto.
 enum dp_ipsec_algo {
 	DP_IPSEC_ALGO_AES_128_GCM,
+	DP_IPSEC_ALGO_AES_256_GCM,
 	DP_IPSEC_ALGO_MAX,
 };
 
@@ -84,6 +90,11 @@ struct dp_ipsec_sa {
 	// packets. Zero disables replay checking altogether, which is what an association created
 	// without the field asks for, and is the only value an egress association may carry.
 	uint32_t			replay_window;
+	// Extended sequence numbers (RFC 4304): the association counts to 2^64 instead of 2^32, with
+	// only the lower half on the wire and the upper half authenticated along with it. Both ends
+	// have to agree, because it changes what the ICV covers - it is not negotiated here, it is
+	// whatever the control plane put in both associations. See docs/adr/0003.
+	bool				esn;
 	void				*session;
 	// librte_ipsec's view of this very association: it owns the ESP framing, the sequence
 	// number and the anti-replay window, and drives the session above to do the crypto.

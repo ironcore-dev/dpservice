@@ -1180,6 +1180,7 @@ const char* CreateSecurityAssociationCall::FillRequest(struct dpgrpc_request* re
 	// the range is dp_ipsec_create_sa()'s to judge, it is the only place that knows which
 	// values a direction allows
 	request->add_sa.replay_window = request_.replay_window();
+	request->add_sa.esn = request_.esn();
 	return NULL;
 }
 void CreateSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
@@ -1232,6 +1233,7 @@ void GetSecurityAssociationCall::ParseReply(struct dpgrpc_reply* reply)
 	reply_.set_key(GrpcConv::BytesToHex(sa->key, (size_t)dp_ipsec_get_key_len(sa->algo)));
 	reply_.set_salt(GrpcConv::BytesToHex(sa->salt, (size_t)dp_ipsec_get_salt_len(sa->algo)));
 	reply_.set_replay_window(sa->replay_window);
+	reply_.set_esn(sa->esn);
 }
 
 const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)

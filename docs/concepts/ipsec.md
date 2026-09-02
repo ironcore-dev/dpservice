@@ -101,6 +101,17 @@ that wants the protection has to say so, and 64 is the value RFC 4303 recommends
 An egress association has nothing to check, so any non-zero `replay_window` is refused there
 rather than silently ignored. The upper bound is 4096.
 
+**Extended sequence numbers** widen that counter from 32 bits to 64, per RFC 4304, and are asked
+for with the `esn` field. Only the lower half travels in the packet; the upper half is
+authenticated along with it and reconstructed by the peer. This matters because a 32-bit counter
+is not a large budget at line rate - an association sending 1.5 Mpps exhausts it in under an
+hour, and it may not wrap, since a repeated sequence number is a repeated nonce.
+
+`esn` is off unless asked for, and unlike the window it is **not** a local decision: it changes
+what the ICV covers, so two ends that disagree fail every frame rather than merely counting
+differently. Both associations of a tunnel have to be created with the same value, and dpservice
+cannot check that - it only ever sees its own end. See ADR 0003.
+
 
 ## The gRPC interface
 
@@ -143,19 +154,22 @@ which is why two associations that differ only in direction collide when a peer 
 message CreateSecurityAssociationRequest {
 	uint32 spi = 1;
 	TrafficDirection direction = 2;    // INGRESS or EGRESS
-	IpsecAlgorithm algorithm = 3;      // AES_128_GCM is the only value
+	IpsecAlgorithm algorithm = 3;      // AES_128_GCM or AES_256_GCM
 	bytes src_underlay = 4;            // source underlay address, as seen on the wire in this direction
 	bytes dst_underlay = 5;            // destination underlay address, likewise
-	bytes key = 6;                     // hex-encoded, 32 digits for AES-128-GCM
-	bytes salt = 7;                    // hex-encoded, 8 digits for AES-128-GCM
+	bytes key = 6;                     // hex-encoded, 32 digits for AES-128-GCM, 64 for AES-256-GCM
+	bytes salt = 7;                    // hex-encoded, 8 digits for both
 	uint32 replay_window = 8;          // ingress only, 0 disables replay checking
+	bool esn = 9;                      // extended (64-bit) sequence numbers, both ends must agree
 }
 ```
 
 `TrafficDirection` and `IpsecAlgorithm` are enums rather than free-form strings, so an unknown
-cipher is a decode-time failure at the caller instead of a runtime one here. `algorithm` exists
-only so that a second cipher does not need a breaking change; `AES_128_GCM` is value 0, which
-makes it what an omitted field means.
+cipher is a decode-time failure at the caller instead of a runtime one here. `AES_128_GCM` is
+value 0, which makes it what an omitted field means.
+
+The key length is a property of the algorithm rather than of the request: a 32-digit key with
+`AES_256_GCM`, or a 64-digit one with `AES_128_GCM`, is refused rather than padded or truncated.
 
 Every `bytes` field here carries text, not octets: `src_underlay` and `dst_underlay` are IPv6
 addresses in their printed form, and `key` and `salt` are hex. That follows the convention the
@@ -202,7 +216,9 @@ dpservice-cli get    securityassociation --spi=100 --src-underlay=fc00:1:: --dst
 dpservice-cli delete securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::
 ```
 
-`--algorithm` defaults to `aes-128-gcm` and `--replay-window` to zero, so neither has to be given.
+`--algorithm` defaults to `aes-128-gcm`, `--replay-window` to zero and `--esn` to off, so none of
+the three has to be given. `--algorithm=aes-256-gcm` takes a 64-digit key; `--esn` has to be
+passed to both ends of a tunnel or neither.
 
 
 ## Deliberate limits of the PoC
@@ -220,14 +236,22 @@ dpservice-cli delete securityassociation --spi=100 --src-underlay=fc00:1:: --dst
 - **Anti-replay is off by default.** `replay_window` is configurable per association, but an
   association created without it accepts replayed frames. A control plane that wants the
   protection must ask for it on every ingress association it creates. See ADR 0002.
+- **Extended sequence numbers are off by default.** `esn` is configurable per association. Without
+  it the association counts in 32 bits, and the sender must be torn down and rebuilt with fresh
+  keys before 2^32 packets - reusing a sequence number reuses the AES-GCM nonce, which forfeits
+  authentication for that key. With it the counter is 64 bits, of which the lower half is sent and
+  the upper half authenticated. Both ends must agree: unlike the replay window this changes what
+  the ICV covers, so a mismatch fails every frame rather than degrading. See ADR 0003.
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
   the host it runs on. [`GetSecurityAssociation`](#the-grpc-interface) returns the key and salt.
 - **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are
   matched, an egress association `(spi, dst=peer, src=local)` and its ingress mirror become the
   same database key when the peer's underlay prefix is our own. The second create is then refused
   as a duplicate. Peers are expected to sit in distinct /64s.
-- **One cipher.** The API carries an `algorithm` field so a second one does not need a breaking
-  change, but AES-128-GCM is the only accepted value.
+- **Two ciphers.** `algorithm` accepts `aes-128-gcm` (the default) and `aes-256-gcm`. They differ
+  only in key length - the nonce construction, the 16-byte ICV and the framing are identical, and
+  nothing on the wire says which one an association uses, so both ends have to be configured
+  alike. Anything else is refused, as is a key whose length does not match the algorithm named.
 - **Reduced MTU.** ESP adds up to 37 bytes, and the mbuf data room leaves no space for that on a
   full-size frame. Tunneled packets above roughly 1480 bytes are dropped with a warning naming
   the node. The advertised DHCP MTU is *not* adjusted automatically. A further 8 bytes of
@@ -252,6 +276,16 @@ The pytest suite runs `test_vf_to_vf_encap.py` twice: once normally, and once as
 suite with the mode enabled. The test body is identical; only what it observes on the PF differs.
 The `ipsec` suite also runs `xtratest_ipsec_grpc.py`, which exercises create, get and delete
 without sending a packet, so that an API failure and a dataplane failure are distinguishable.
+
+`xtratest_ipsec_esn.py` covers the two per-association options that change what the cipher does
+rather than which packets it covers - extended sequence numbers and the 256-bit key - in *both*
+directions, and one test runs them together. It has to get at the encrypting side by deleting the
+session's own pair of associations and creating it again with the parameters under test, because
+the egress SPI is derived from the VNI and there is therefore no way to hold a second outbound
+association for one peer. `xtratest_ipsec_dataplane.py` covers the same two options on the way in,
+where an extra association *can* simply be added, and adds the negative both files rest on: a
+frame framed without extended sequence numbers, on an association that has them, is refused - the
+same key, the same SPI and a sequence number never seen, differing only in what the ICV covers.
 
 In IPsec mode the loopback responder plays the peer for real. The two directions carry different
 keys, so it decrypts the captured frame with one association and builds the answer with the

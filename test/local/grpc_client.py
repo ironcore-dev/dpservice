@@ -227,7 +227,8 @@ class GrpcClient:
 	def delnat(self, vm_name):
 		self._call(f"del nat --interface-id={vm_name}")
 
-	def addsa(self, spi, direction, src_underlay, dst_underlay, key, salt, algorithm=None, replay_window=None):
+	def addsa(self, spi, direction, src_underlay, dst_underlay, key, salt, algorithm=None,
+			  replay_window=None, esn=None):
 		cmd = (f"create securityassociation --spi={spi} --direction={direction}"
 			   f" --src-underlay={src_underlay} --dst-underlay={dst_underlay} --key={key} --salt={salt}")
 		if algorithm:
@@ -235,6 +236,8 @@ class GrpcClient:
 		# omitted on purpose when unset, so that the default dpservice applies is what gets tested
 		if replay_window is not None:
 			cmd += f" --replay-window={replay_window}"
+		if esn is not None:
+			cmd += f" --esn={'true' if esn else 'false'}"
 		self._call(cmd)
 
 	def getsa(self, spi, src_underlay, dst_underlay):

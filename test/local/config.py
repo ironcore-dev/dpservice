@@ -74,6 +74,48 @@ ipsec_replay_window = 64
 ipsec_spi_unwindowed = vni2
 ipsec_key_unwindowed = "3a7f21c85d0e94b6af12c7e0538b6d94"
 ipsec_salt_unwindowed = "7e3a91d6"
+
+# Extended sequence numbers and the second cipher. Every association below gets its own key and
+# salt, for the reason spelled out above: the AES-GCM nonce is salt||sequence_number and the SPI
+# is not a part of it, so two associations sharing key and salt while both counted from 1 would
+# repeat a nonce under one key.
+
+# Ingress-only associations, injected into directly by xtratest_ipsec_dataplane.py. Like
+# ipsec_spi_unwindowed they need an SPI of their own, because the address pair is pinned on both
+# sides and the SPI is the only part of the key left to vary.
+ipsec_spi_esn = vni3
+ipsec_key_esn = "b41d7e0932ca85f61e73d0428b5fa9c7"
+ipsec_salt_esn = "c40e15b8"
+ipsec_spi_aes256 = 400
+ipsec_key_aes256 = "5e91c30d7ab4f826139fe0c47bd25a08e3671fd4029ab85c6e13d7f094a2b5c6"
+ipsec_salt_aes256 = "92b7de41"
+
+# What xtratest_ipsec_esn.py re-creates the session's own pair with, one set per combination it
+# covers. The addresses and the SPI stay exactly what dp_service.py used - it is the same
+# association, created again with different parameters - so only the key material differs.
+ipsec_key_esn_egress = "7c04e9a1b6538df2091ae7c4b83d6510"
+ipsec_salt_esn_egress = "4a0db723"
+ipsec_key_esn_ingress = "e2951b7c40d83a6f1e07c95d284baf31"
+ipsec_salt_esn_ingress = "0c73e5a9"
+ipsec_key_aes256_egress = "1f6b93d0e58c27a4b0d31e6f95c8a274de03b8615fa29c74e0d61b385caf9027"
+ipsec_salt_aes256_egress = "d1e60b47"
+ipsec_key_aes256_ingress = "9a2f75c8e01d436bf82ea59c07d13648b5e092af7c31d0685ea4f92c30b871de"
+ipsec_salt_aes256_ingress = "68af203c"
+
+# Key material is hex handed straight to dpservice, which refuses anything of the wrong length or
+# with a non-hex digit in it - as a "Invalid key" gRPC error several layers away from the typo
+# that caused it. Checking it here names the constant instead.
+for _name, _value in sorted(dict(vars()).items()):
+	if not _name.startswith("ipsec_key_") and not _name.startswith("xfrm_key_"):
+		continue
+	assert len(_value) in (32, 64) and all(c in "0123456789abcdef" for c in _value), \
+		f"{_name} is not a 128-bit or 256-bit key in lower-case hex"
+for _name, _value in sorted(dict(vars()).items()):
+	if not _name.startswith("ipsec_salt_") and not _name.startswith("xfrm_salt_"):
+		continue
+	assert len(_value) == 8 and all(c in "0123456789abcdef" for c in _value), \
+		f"{_name} is not a 32-bit salt in lower-case hex"
+del _name, _value
 neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
 neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
 neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"

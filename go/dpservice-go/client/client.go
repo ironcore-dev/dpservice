@@ -737,12 +737,15 @@ func protoIpsecDirection(direction string) (dpdkproto.TrafficDirection, error) {
 }
 
 func protoIpsecAlgorithm(algorithm string) (dpdkproto.IpsecAlgorithm, error) {
-	// only one cipher is supported, dpservice refuses anything else
+	// Both spellings are accepted so that what GetSecurityAssociation reports, which is the
+	// protobuf enum name lowercased, can be handed straight back to a create.
 	switch strings.ToLower(algorithm) {
-	case "", "aes-128-gcm":
+	case "", "aes-128-gcm", "aes_128_gcm":
 		return dpdkproto.IpsecAlgorithm_AES_128_GCM, nil
+	case "aes-256-gcm", "aes_256_gcm":
+		return dpdkproto.IpsecAlgorithm_AES_256_GCM, nil
 	default:
-		return 0, fmt.Errorf("invalid algorithm %q, expected aes-128-gcm", algorithm)
+		return 0, fmt.Errorf("invalid algorithm %q, expected aes-128-gcm or aes-256-gcm", algorithm)
 	}
 }
 
@@ -767,6 +770,7 @@ func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.Security
 		Key:          []byte(sa.Spec.Key),
 		Salt:         []byte(sa.Spec.Salt),
 		ReplayWindow: sa.Spec.ReplayWindow,
+		Esn:          sa.Spec.Esn,
 	})
 	if err != nil {
 		return &api.SecurityAssociation{}, err
@@ -847,6 +851,7 @@ func (c *client) GetSecurityAssociation(ctx context.Context, spi uint32, srcUnde
 		Key:          string(res.GetKey()),
 		Salt:         string(res.GetSalt()),
 		ReplayWindow: res.GetReplayWindow(),
+		Esn:          res.GetEsn(),
 	}
 	return retSa, nil
 }

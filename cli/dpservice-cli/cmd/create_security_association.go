@@ -54,12 +54,13 @@ type CreateSecurityAssociationOptions struct {
 	Key          string
 	Salt         string
 	ReplayWindow uint32
+	Esn          bool
 }
 
 func (o *CreateSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint32Var(&o.Spi, "spi", o.Spi, "Security Parameter Index, expected to be the VNI this association serves.")
 	fs.StringVar(&o.Direction, "direction", o.Direction, "Direction of the association (ingress or egress).")
-	fs.StringVar(&o.Algorithm, "algorithm", "aes-128-gcm", "Cipher to use.")
+	fs.StringVar(&o.Algorithm, "algorithm", "aes-128-gcm", "Cipher to use (aes-128-gcm or aes-256-gcm).")
 	flag.AddrVar(fs, &o.SrcUnderlay, "src-underlay", o.SrcUnderlay, "Source underlay address, matched on its first 64 bits.")
 	flag.AddrVar(fs, &o.DstUnderlay, "dst-underlay", o.DstUnderlay, "Destination underlay address, matched on its first 64 bits.")
 	fs.StringVar(&o.Key, "key", o.Key, "Hex-encoded cipher key.")
@@ -67,6 +68,9 @@ func (o *CreateSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
 	// Deliberately unvalidated here: which values a direction allows is dpservice's to decide,
 	// and a check in this process would hide that answer behind a client-side failure.
 	fs.Uint32Var(&o.ReplayWindow, "replay-window", o.ReplayWindow, "Anti-replay window in packets, ingress only. Zero, the default, disables replay checking.")
+	// Not validated here either, and for a second reason on top of the one above: the two ends of
+	// a tunnel have to agree on this, and only whoever configures both can know that they do.
+	fs.BoolVar(&o.Esn, "esn", o.Esn, "Use extended (64-bit) sequence numbers. Both ends of the tunnel must be created with the same value.")
 }
 
 func (o *CreateSecurityAssociationOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -103,6 +107,7 @@ func RunCreateSecurityAssociation(
 			Key:          opts.Key,
 			Salt:         opts.Salt,
 			ReplayWindow: opts.ReplayWindow,
+			Esn:          opts.Esn,
 		},
 	})
 	if err != nil {

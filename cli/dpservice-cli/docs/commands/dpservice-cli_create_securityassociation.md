@@ -15,14 +15,16 @@ dpservice-cli create securityassociation --spi=100 --direction=egress --src-unde
 ### Options
 
 ```
-      --algorithm string   Cipher to use. (default "aes-128-gcm")
-      --direction string   Direction of the association (ingress or egress).
-      --dst-underlay ip    Destination underlay address, matched on its first 64 bits. (default invalid IP)
-  -h, --help               help for securityassociation
-      --key string         Hex-encoded cipher key.
-      --salt string        Hex-encoded salt, the implicit part of the nonce.
-      --spi uint32         Security Parameter Index, expected to be the VNI this association serves.
-      --src-underlay ip    Source underlay address, matched on its first 64 bits. (default invalid IP)
+      --algorithm string       Cipher to use (aes-128-gcm or aes-256-gcm). (default "aes-128-gcm")
+      --direction string       Direction of the association (ingress or egress).
+      --dst-underlay ip        Destination underlay address, matched on its first 64 bits. (default invalid IP)
+      --esn                    Use extended (64-bit) sequence numbers. Both ends of the tunnel must be created with the same value.
+  -h, --help                   help for securityassociation
+      --key string             Hex-encoded cipher key.
+      --replay-window uint32   Anti-replay window in packets, ingress only. Zero, the default, disables replay checking.
+      --salt string            Hex-encoded salt, the implicit part of the nonce.
+      --spi uint32             Security Parameter Index, expected to be the VNI this association serves.
+      --src-underlay ip        Source underlay address, matched on its first 64 bits. (default invalid IP)
 ```
 
 ### Options inherited from parent commands

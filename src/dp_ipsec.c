@@ -48,7 +48,20 @@ static const struct dp_ipsec_algo_spec {
 		.salt_len = 4,
 		.icv_len = DP_IPSEC_ICV_LEN,
 	},
+	// Same cipher, same nonce and ICV geometry, twice the key. Nothing on the wire distinguishes
+	// the two beyond the key length both ends were configured with (RFC 4106).
+	[DP_IPSEC_ALGO_AES_256_GCM] = {
+		.aead_algo = RTE_CRYPTO_AEAD_AES_GCM,
+		.key_len = 32,
+		.salt_len = 4,
+		.icv_len = DP_IPSEC_ICV_LEN,
+	},
 };
+
+// The table above is what every key length in this file is read from, so a row that was forgotten
+// has to fail the build rather than hand a zero-length key to the PMD
+static_assert(RTE_DIM(dp_ipsec_algos) == DP_IPSEC_ALGO_MAX,
+			  "Not every dp_ipsec_algo has a row in dp_ipsec_algos");
 
 static uint8_t dp_ipsec_dev_id;
 static struct rte_mempool *dp_ipsec_session_pool;
@@ -153,7 +166,9 @@ static void dp_ipsec_fill_xform(struct rte_crypto_sym_xform *xform, const struct
 	xform->aead.iv.offset = DP_IPSEC_IV_OFFSET;
 	xform->aead.iv.length = spec->salt_len + DP_IPSEC_IV_LEN;
 	xform->aead.digest_length = spec->icv_len;
-	xform->aead.aad_length = DP_IPSEC_AAD_LEN;
+	// what librte_ipsec will put in the block it builds, which is four bytes longer once the
+	// upper half of the sequence number is authenticated too
+	xform->aead.aad_length = sa->esn ? DP_IPSEC_AAD_LEN_ESN : DP_IPSEC_AAD_LEN;
 }
 
 // Everything librte_ipsec needs to own the ESP framing for this association: the association
@@ -174,6 +189,11 @@ static int dp_ipsec_create_ipsec_sa(struct dp_ipsec_sa *sa, struct rte_crypto_sy
 			// No direction test: an egress association is refused at creation unless this
 			// is zero, which is the only value librte_ipsec would have honoured there anyway
 			.replay_win_sz = sa->replay_window,
+			// This widens the sequence number to 64 bits and, with it, what the ICV covers.
+			// librte_ipsec derives the rest on its own: the counter's mask, the value the anti-replay
+			// window starts at, and the additional authenticated data it fills per packet - the only
+			// thing it takes from us is the room for it, in the transform above.
+			.options = { .esn = sa->esn ? 1 : 0 },
 		},
 		.crypto_xform = xform,
 		// This names the protocol of the header being protected, not of what it carries: it is
