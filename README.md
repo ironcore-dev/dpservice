@@ -11,6 +11,8 @@ See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
 
 - ESP (AES-128-GCM, RFC 4106) over the existing IPv6 tunnel, framed by `librte_ipsec`; two new
   graph nodes, `ipsec_encap` and `ipsec_decap`. Refused together with hardware offloading.
+  The crypto is done by DPDK's `crypto_openssl` software PMD, which - unlike the x86-only
+  `ipsec_mb` family - is not architecture-specific, so this runs on arm64 as well as on x86.
 - Security Associations are provisioned at runtime over gRPC - `Create`/`Get`/`DeleteSecurityAssociation`,
   also in `dpservice-cli`. See [the gRPC interface](/docs/concepts/ipsec.md#the-grpc-interface).
 - Per-association **anti-replay window** (`replay_window`, ingress only, max 4096, off by default).
