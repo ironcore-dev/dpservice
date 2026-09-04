@@ -47,7 +47,7 @@ Each one is **unidirectional**, as RFC 4301 defines it, and carries AES-128-GCM 
 key material, so a peer needs one association for each direction.
 
 ```
-dpservice-cli create securityassociation --spi=100 --direction=egress \
+dpservice-cli create securityassociation --vni=100 --spi=43794 --direction=egress \
     --src-underlay=fc00:1:: --dst-underlay=fc00:2:: \
     --key=<32 hex digits> --salt=<8 hex digits>
 ```
@@ -57,26 +57,80 @@ direction**, so an ingress association for the same peer swaps them. dp-service 
 association whose local side is not its own underlay prefix, since such an association could
 never match a packet.
 
+`vni` is the tenant network whose traffic the association protects, and `spi` is what goes in the
+ESP header. The two are independent: an egress association is *found* under its VNI and *writes*
+its SPI, so the number on the wire is whatever the two ends agreed on. See
+[ADR 0004](../adr/0004-the-lookup-spi-is-not-the-wire-spi.md).
+
 The three RPCs behind this, and what they reject, are in [the gRPC interface](#the-grpc-interface).
 
 
 ### How an association is found
 
-The database is keyed on `SPI + destination + source`, with the underlay addresses matched on
-their **first 64 bits only**. dp-service derives every underlay address it hands out from the
-configured underlay address's /64, so one association covers a whole peer host rather than each
-of its individual addresses.
+The database is keyed on a 32-bit value plus the destination and source underlay addresses, with
+the addresses matched on their **first 64 bits only**. dp-service derives every underlay address
+it hands out from the configured underlay address's /64, so one association covers a whole peer
+host rather than each of its individual addresses.
 
-On ingress the SPI is read from the packet. On egress there is nothing to read it from - a real
-implementation would consult a security policy database, which does not exist here - so the SPI
-is derived: **it is the VNI**, and the caller is responsible for creating associations whose
-`spi` equals the VNI they serve. This is an egress-side rule only; ingress matches whatever SPI
-arrives against the address pair, and cannot check it, since the VNI is not known until after
-decapsulation.
+That 32-bit value is the **lookup SPI**, and which field it comes from depends on the direction.
+On ingress it is the SPI the frame carries, because that is all `ipsec_decap` has to go on. On
+egress there is nothing to read it from - the packet is not ESP yet - so it is the **VNI** of the
+interface the packet came in on. An outbound association is therefore named by the tenant whose
+traffic it protects, which leaves the SPI it writes into the ESP header free.
+
+A caller never has to know which of the two it is. `Create`, `Get` and `Delete` all take the same
+five fields, and dp-service resolves the lookup SPI itself and then checks the rest of what it
+was given against what it found; see [the identity of an
+association](#the-identity-of-an-association).
 
 A packet with no matching association is **dropped**, in both directions, without a log line.
 Before the control plane has provisioned anything that is the expected state, and one line per
 packet would bury the failures that do matter. Egress never falls back to cleartext.
+
+
+### The inbound VNI check
+
+Matching only the first 64 bits is deliberate on the peer's side of an association. On the local
+side it would be a hole, because every underlay address dp-service hands out carries this host's
+own prefix in that half: masked, the local side of *every* ingress association on a host is the
+same value.
+
+Left alone, that means a peer holding one valid ingress association can address its ESP at any
+endpoint on this host. The database matches, the ICV verifies - the peer does hold the key - and
+`ipip_decap` then resolves the destination from the outer address the peer chose, delivering the
+traffic into a tenant the association was never provisioned for.
+
+So `ipsec_decap` resolves that endpoint itself, from the outer destination address, and drops any
+frame whose VNI is not the one its association records. The check runs **before** the frame is
+decrypted and logs nothing: reaching it costs no key at all, only a guessed SPI and a spoofed
+source prefix, so anything written there would be forgeable at line rate. This is the one place
+dp-service makes a policy decision on unauthenticated data, and it is safe only because the
+outcome is always a drop - a forged frame cannot cause a legitimate one to be discarded. See
+[ADR 0005](../adr/0005-ingress-associations-are-bound-to-their-vni.md).
+
+
+### Why there is no policy database
+
+A real implementation consults a security policy database per packet, matching traffic selectors -
+addresses, protocol, ports - to decide whether to protect, bypass or discard it, and only then
+looks for an association. dp-service does none of that, and does not need to, because the decision
+is already made by the shape of the graph.
+
+Everything leaving towards a PF has been through `ipip_encap`, which hands it to `ipsec_encap`
+(`dp_graph.c`), so all inter-host overlay traffic is protected; the association is chosen by the
+VNI of the interface it came from; and a VNI with no egress association is **dropped**, not sent
+in the clear. Inbound, `cls` refuses unencrypted tunnel traffic outright rather than accepting it.
+
+In RFC 4301 terms that is a degenerate SPD: a single PROTECT rule covering all inter-host overlay
+traffic, a default of DISCARD, and no BYPASS entry at all. There is nothing to select between, so
+there is nothing to look up - the whole of the per-packet work is finding the association. The
+DISCARD half is what makes the missing database safe rather than merely convenient: there is no
+configuration under which traffic that should have been protected leaves unprotected instead.
+
+What is genuinely missing is the *other* use of an SPD, the inbound policy check of RFC 4301
+section 5.2 - confirming that what a decrypted packet turned out to be is what its association was
+allowed to carry. [The inbound VNI check](#the-inbound-vni-check) is that check narrowed to the
+one selector dp-service has, and nothing inspects the inner packet.
 
 
 ### Sequence numbers
@@ -130,37 +184,43 @@ remember it, which is acceptable only because the control plane is the sole writ
 
 ### The identity of an association
 
-`Get` and `Delete` name an association by the same three fields the database is keyed on, and
-nothing else:
+An association is named by five fields, which travel together as one message:
 
 ```protobuf
-message GetSecurityAssociationRequest {
-	uint32 spi = 1;
-	bytes src_underlay = 2;
-	bytes dst_underlay = 3;
+message SecurityAssociationId {
+	uint32 vni = 1;                    // the VNI whose traffic this association protects
+	uint32 spi = 2;                    // Security Parameter Index, as carried in the ESP header
+	TrafficDirection direction = 3;
+	bytes src_underlay = 4;            // source underlay address, as seen on the wire in this direction
+	bytes dst_underlay = 5;            // destination underlay address, likewise
 }
 ```
 
-`DeleteSecurityAssociationRequest` carries exactly those fields too. The addresses are matched on
-their first 64 bits, so an address anywhere inside the peer's `/64` names the same entry as the
-one that created it; `GetSecurityAssociationResponse` returns them masked to that length, which is
-how a caller can see what was actually stored rather than what it happened to send. The direction
-is deliberately not part of the identity - it is a property of the association, not of its name -
-which is why two associations that differ only in direction collide when a peer shares our `/64`.
+`GetSecurityAssociationRequest` and `DeleteSecurityAssociationRequest` are that message and
+nothing else; `Create` and the `Get` response embed it beside the key material.
+
+Only three of the five are what the database is keyed on - the lookup SPI plus the address pair -
+but all five are matched. dp-service resolves the entry, then compares the fields it did not key
+on against what it was given, and answers `SA_NOT_FOUND` if they differ. The point is that a
+caller working from stale state gets an error instead of silently operating on a different
+association: naming an egress association by a wire SPI it no longer has finds nothing, rather
+than finding the one that replaced it.
+
+The addresses are matched on their first 64 bits, so an address anywhere inside the peer's `/64`
+names the same entry as the one that created it; `GetSecurityAssociationResponse` returns them
+masked to that length, which is how a caller can see what was actually stored rather than what it
+happened to send.
 
 ### Creating one
 
 ```protobuf
 message CreateSecurityAssociationRequest {
-	uint32 spi = 1;
-	TrafficDirection direction = 2;    // INGRESS or EGRESS
-	IpsecAlgorithm algorithm = 3;      // AES_128_GCM or AES_256_GCM
-	bytes src_underlay = 4;            // source underlay address, as seen on the wire in this direction
-	bytes dst_underlay = 5;            // destination underlay address, likewise
-	bytes key = 6;                     // hex-encoded, 32 digits for AES-128-GCM, 64 for AES-256-GCM
-	bytes salt = 7;                    // hex-encoded, 8 digits for both
-	uint32 replay_window = 8;          // ingress only, 0 disables replay checking
-	bool esn = 9;                      // extended (64-bit) sequence numbers, both ends must agree
+	SecurityAssociationId id = 1;
+	IpsecAlgorithm algorithm = 2;      // AES_128_GCM or AES_256_GCM
+	bytes key = 3;                     // hex-encoded, 32 digits for AES-128-GCM, 64 for AES-256-GCM
+	bytes salt = 4;                    // hex-encoded, 8 digits for both
+	uint32 replay_window = 5;          // ingress only, 0 disables replay checking
+	bool esn = 6;                      // extended (64-bit) sequence numbers, both ends must agree
 }
 ```
 
@@ -190,8 +250,8 @@ successful response:
 
 | Code | Name | Raised when |
 | --- | --- | --- |
-| 461 | `SA_EXISTS` | The `spi`+`dst`+`src` key is already in the database |
-| 462 | `SA_NOT_FOUND` | `Get` or `Delete` named an association that is not there |
+| 461 | `SA_EXISTS` | The lookup SPI + `dst` + `src` key is already in the database |
+| 462 | `SA_NOT_FOUND` | `Get` or `Delete` named an association that is not there, or named one by a field that does not match what is |
 | 463 | `SA_CREATE` | The crypto session or the database insert failed |
 | 464 | `SA_ALGO` | `algorithm` is not one dpservice implements |
 | 465 | `SA_BAD_ADDR` | The local side of the association is not our own underlay `/64` |
@@ -200,7 +260,9 @@ successful response:
 
 `SA_EXISTS` is checked explicitly rather than left to the database, because
 `rte_ipsec_sad_add()` overwrites a duplicate key and reports success, leaking the association it
-used to point at. A create beyond the 64-association limit returns the generic `LIMIT_REACHED`,
+used to point at. It is raised on the *lookup* SPI, so a second egress association for a VNI and
+peer collides with the first however different the rest of its identity is - freeing the wire SPI
+does not create a second outbound slot. A create beyond the 64-association limit returns the generic `LIMIT_REACHED`,
 and an allocation failure `OUT_OF_MEMORY`.
 
 ### From the CLI
@@ -208,13 +270,17 @@ and an allocation failure `OUT_OF_MEMORY`.
 `dpservice-cli` wraps all three, under `securityassociation`:
 
 ```bash
-dpservice-cli create securityassociation --spi=100 --direction=egress \
+dpservice-cli create securityassociation --vni=100 --spi=43794 --direction=egress \
     --src-underlay=fc00:1:: --dst-underlay=fc00:2:: \
     --key=<32 hex digits> --salt=<8 hex digits> [--replay-window=64]
 
-dpservice-cli get    securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::
-dpservice-cli delete securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::
+dpservice-cli get    securityassociation --vni=100 --spi=43794 --direction=egress \
+    --src-underlay=fc00:1:: --dst-underlay=fc00:2::
+dpservice-cli delete securityassociation --vni=100 --spi=43794 --direction=egress \
+    --src-underlay=fc00:1:: --dst-underlay=fc00:2::
 ```
+
+All three take the same five flags, because all five name the association.
 
 `--algorithm` defaults to `aes-128-gcm`, `--replay-window` to zero and `--esn` to off, so none of
 the three has to be given. `--algorithm=aes-256-gcm` takes a 64-digit key; `--esn` has to be
@@ -223,15 +289,21 @@ passed to both ends of a tunnel or neither.
 
 ## Deliberate limits of the PoC
 
-- **No security policy database.** What gets protected is not selectable: with the mode on,
-  everything leaving through the tunnel is encrypted, and unencrypted tunnel traffic arriving on
-  a PF is dropped rather than accepted. The association database doubles as outbound policy,
-  keyed on the address pair, and a missing association stands in for the "no matching policy" a
-  real SPD would provide. It also prevents a receiver that silently accepts a downgrade.
-- **No SA negotiation or rekeying.** Associations are created and deleted over gRPC, but keys
-  arrive fully formed: there is no IKE, no distribution, no lifetime or byte counters, and no
-  automatic rotation. Rekeying is delete-then-create by the control plane, and the gap between
-  the two drops traffic rather than sending it in the clear. `ListSecurityAssociations` does not
+- **No security policy database, and none needed.** What gets protected is not selectable: with
+  the mode on, everything leaving through the tunnel is encrypted, and unencrypted tunnel traffic
+  arriving on a PF is dropped rather than accepted. There is nothing for an SPD to select between.
+  See [why there is no policy database](#why-there-is-no-policy-database). What *is* missing is
+  the inbound policy check of RFC 4301 section 5.2 in its full form; the one selector dp-service
+  can check is covered by [the inbound VNI check](#the-inbound-vni-check).
+- **No SA negotiation, and rekeying is not yet gapless.** Associations are created and deleted
+  over gRPC, but keys arrive fully formed: there is no IKE, no distribution, no lifetime or byte
+  counters, and no automatic rotation. The inbound half of a make-before-break rotation works
+  today - ingress associations are found under the SPI their frames carry, so several of them can
+  serve one VNI and peer at once - but the outbound half cannot, because an egress association is
+  found under its VNI and a second one for that VNI and peer is the same entry. Rekeying is
+  therefore still delete-then-create on the sending side, and the gap between the two drops
+  traffic rather than sending it in the clear. Closing it needs a replace path, which does not
+  exist yet. `ListSecurityAssociations` does not
   exist yet; see [the gRPC interface](#the-grpc-interface) for what does.
 - **Anti-replay is off by default.** `replay_window` is configurable per association, but an
   association created without it accepts replayed frames. A control plane that wants the
@@ -244,10 +316,12 @@ passed to both ends of a tunnel or neither.
   the ICV covers, so a mismatch fails every frame rather than degrading. See ADR 0003.
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
   the host it runs on. [`GetSecurityAssociation`](#the-grpc-interface) returns the key and salt.
-- **A peer sharing our /64 cannot have both directions.** Because only the first 64 bits are
-  matched, an egress association `(spi, dst=peer, src=local)` and its ingress mirror become the
-  same database key when the peer's underlay prefix is our own. The second create is then refused
-  as a duplicate. Peers are expected to sit in distinct /64s.
+- **A peer sharing our /64 can collide with itself.** Because only the first 64 bits are matched,
+  an egress association and its ingress mirror see the same address pair when the peer's underlay
+  prefix is our own, and then only the lookup SPI tells them apart - the VNI on one side, the wire
+  SPI on the other. Picking a wire SPI numerically equal to the VNI it serves makes the second
+  create fail as a duplicate. This used to be unavoidable, since the two were required to be equal;
+  now it is merely a number to avoid. Peers are still expected to sit in distinct /64s.
 - **Two ciphers.** `algorithm` accepts `aes-128-gcm` (the default) and `aes-256-gcm`. They differ
   only in key length - the nonce construction, the 16-byte ICV and the framing are identical, and
   nothing on the wire says which one an association uses, so both ends have to be configured
@@ -281,8 +355,8 @@ without sending a packet, so that an API failure and a dataplane failure are dis
 rather than which packets it covers - extended sequence numbers and the 256-bit key - in *both*
 directions, and one test runs them together. It has to get at the encrypting side by deleting the
 session's own pair of associations and creating it again with the parameters under test, because
-the egress SPI is derived from the VNI and there is therefore no way to hold a second outbound
-association for one peer. `xtratest_ipsec_dataplane.py` covers the same two options on the way in,
+an egress association is found under its VNI and there is therefore no way to hold a second
+outbound association for one peer. `xtratest_ipsec_dataplane.py` covers the same two options on the way in,
 where an extra association *can* simply be added, and adds the negative both files rest on: a
 frame framed without extended sequence numbers, on an association that has them, is refused - the
 same key, the same SPI and a sequence number never seen, differing only in what the ICV covers.
@@ -340,10 +414,9 @@ silent kernel-side drop into `XfrmInStateProtoError` or `XfrmOutNoStates` rather
 packets that never arrived.
 
 **Both associations still share one SPI, and that is a property of the test rather than of the
-design.** dp-service derives the egress SPI from the VNI, so the egress association's SPI is
-fixed; the ingress one is free, and is kept equal to it. Between two real hosts each side picks
-its own. Nothing in dp-service depends on them matching - ingress resolves the association from
-the SPI on the wire - but the suite would not notice if something started to.
+design.** Nothing forces it any more: both SPIs are free, and between two real hosts each side
+picks its own. Nothing in dp-service depends on them matching, but the suite would not notice if
+something started to.
 
 
 ### The full path

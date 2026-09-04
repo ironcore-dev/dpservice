@@ -18,8 +18,14 @@ See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
 - Per-association **anti-replay window** (`replay_window`, ingress only, max 4096, off by default).
 - Per-association **extended sequence numbers** (`esn`, RFC 4304, off by default) and a choice of
   **AES-128-GCM or AES-256-GCM** (`algorithm`), both covered in each direction by the test suite.
-- **The egress SPI is the VNI** from where the packet is originating. This can be improved and can 
-be looked up from a table filled during GRPC SA creation.
+- An association is named by its **VNI, SPI, direction and underlay address pair**, and all five
+  are matched. What it is found under depends on the direction - the VNI on egress, since a packet
+  is not ESP yet and has no SPI to read, and the SPI on ingress - so the value in the ESP header
+  is free of the VNI. See [ADR 0004](/docs/adr/0004-the-lookup-spi-is-not-the-wire-spi.md).
+- An **ingress association is bound to its VNI**: `ipsec_decap` resolves the endpoint the frame is
+  addressed at and drops it if that endpoint belongs to another tenant, so one association does not
+  authorise delivery into every interface on the host. See
+  [ADR 0005](/docs/adr/0005-ingress-associations-are-bound-to-their-vni.md).
 - Tested dpservice-to-dpservice: a full encrypted round trip against a scapy peer holding a
   different key per direction, with the SAs installed over gRPC by the test itself.
 - Tested dpservice-to-Linux: `xtratest_ipsec_xfrm.py` runs the same round trip against a kernel

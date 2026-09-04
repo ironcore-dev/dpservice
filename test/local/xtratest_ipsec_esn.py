@@ -12,10 +12,11 @@ from ipsec_peer import IpsecPeer, assert_esp_framing
 # *in*, by injecting frames the harness built. That leaves the encrypting half untested for both:
 # every association dpservice encrypts with in the rest of the suite is a 128-bit one without ESN.
 #
-# It cannot simply be a second egress association, either. dpservice derives the egress SPI from
+# It cannot simply be a second egress association, either. An egress association is found under
 # the VNI a packet came in on, so for one VNI and one peer there is exactly one outbound
 # association and no way to ask for a different one - which is the rekeying limitation named in
-# docs/concepts/ipsec.md.
+# docs/concepts/ipsec.md. Freeing the wire SPI from the VNI did not change that: it lets the SPI
+# on the wire change without moving the entry, it does not create a second entry.
 #
 # So this replaces it. Each test below deletes the pair dp_service.py installed, creates it again
 # with the parameters under test, runs a full round trip through it, and puts the original pair
