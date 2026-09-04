@@ -6,6 +6,8 @@
 #include "dp_error.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
+#include "dp_mbuf_dyn.h"
+#include "dp_port.h"
 #include "grpc/dp_grpc_responder.h"
 
 #define DP_VNF_MAX_TABLE_SIZE 1000
@@ -271,4 +273,29 @@ int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct d
 	}
 
 	return DP_GRPC_OK;
+}
+
+struct dp_port *dp_vnf_resolve_tunnel_dst(struct rte_mbuf *m)
+{
+	struct dp_flow *df = dp_get_flow_ptr(m);
+	const struct dp_vnf *vnf;
+	struct dp_port *dst_port;
+
+	if (df->tun_dst_resolved)
+		return dp_get_port_by_id(df->nxt_hop);  // already validated when it was stored
+
+	vnf = dp_get_vnf(&df->tun_info.ul_dst_addr6);
+	if (!vnf)
+		return NULL;
+
+	dst_port = dp_get_port_by_id(vnf->port_id);
+	if (!dst_port)
+		return NULL;
+
+	df->tun_info.dst_vni = vnf->vni;
+	df->vnf_type = vnf->type;
+	df->nxt_hop = vnf->port_id;
+	df->tun_dst_resolved = true;
+
+	return dst_port;
 }

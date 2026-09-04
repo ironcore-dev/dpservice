@@ -13,6 +13,7 @@
 #include "dp_ipsec.h"
 #include "dp_log.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_vnf.h"
 #include "nodes/common_node.h"
 
 #define NEXT_NODES(NEXT) \
@@ -133,11 +134,21 @@ static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 	dp_ipsec_lookup_sa(keyptrs, sas, nb_objs);
 
 	for (uint16_t i = 0; i < nb_objs; ++i) {
+		m = (struct rte_mbuf *)objs[i];
 		// Nothing matched this SPI and address pair, so the packet is not for any association
 		// we hold and is dropped. Silent on purpose, see ipsec_encap_node_process().
 		if (!sas[i])
 			continue;
-		if (unlikely(DP_FAILED(ipsec_decap_prepare((struct rte_mbuf *)objs[i], &ops[nb_ops], sas[i])))) {
+		// An association protects one VNI's traffic, and every underlay address on this host
+		// masks to the same prefix, so what stops a peer from addressing its frames at another
+		// tenant's endpoint is this comparison and nothing else. Both halves are known before a
+		// single crypto cycle is spent, so it is made here. Silent for the same reason the miss
+		// above is: reaching this point costs no key, only a guessed SPI and a spoofed source
+		// prefix, so anything logged here would be forgeable at line rate. See docs/adr/0005.
+		if (unlikely(!dp_vnf_resolve_tunnel_dst(m)
+					 || dp_get_flow_ptr(m)->tun_info.dst_vni != sas[i]->vni))
+			continue;
+		if (unlikely(DP_FAILED(ipsec_decap_prepare(m, &ops[nb_ops], sas[i])))) {
 			// nothing has been decrypted yet, so this is the anti-replay window rejecting the
 			// sequence number, or a frame too short to be ESP at all
 			DPNODE_LOG_WARNING(node, "Cannot accept packet for decryption", DP_LOG_RET(-rte_errno));

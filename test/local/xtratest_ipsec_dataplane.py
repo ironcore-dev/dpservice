@@ -31,18 +31,19 @@ def is_test_udp_pkt(pkt):
 
 
 # A tunneled packet bound for VM2, framed the way the peer frames the ones it sends back. The
-# outer destination alone picks the target port, ipip_decap never inspects the tunneled packet.
-def build_frame(encrypt):
-	tunneled = (IPv6(src=neigh_vni1_ul_ipv6, dst=VM2.ul_ipv6, nh=ipip_proto) /
+# outer destination alone picks the target port, ipip_decap never inspects the tunneled packet -
+# which is why ul_dst is the only thing test_ipsec_wrong_vni_is_dropped has to change.
+def build_frame(encrypt, ul_dst=None):
+	tunneled = (IPv6(src=neigh_vni1_ul_ipv6, dst=ul_dst or VM2.ul_ipv6, nh=ipip_proto) /
 				IP(dst=neigh_ov_ip, src=VM1.ip) /
 				UDP(sport=udp_sport, dport=udp_dport) /
 				Raw(udp_payload))
 	return Ether(dst=PF0.mac, src=PF0.mac) / encrypt(tunneled)
 
-def inject(frame, timeout):
+def inject(frame, timeout, tap=None):
 	# sending from a thread, so that the sniff below is already listening when the packet lands
 	threading.Thread(target=delayed_sendp, args=(frame, PF0.tap)).start()
-	return sniff(count=1, lfilter=is_test_udp_pkt, iface=VM2.tap, timeout=timeout)
+	return sniff(count=1, lfilter=is_test_udp_pkt, iface=tap or VM2.tap, timeout=timeout)
 
 def assert_delivered(frame, message):
 	assert len(inject(frame, sniff_timeout)) == 1, message
@@ -61,6 +62,25 @@ def test_ipsec_bad_icv_is_dropped(prepare_ipv4, ipsec_peer):
 	# then the very same frame, authenticated with a key dpservice was never given
 	assert len(inject(build_frame(ipsec_peer.encrypt_with_wrong_key), sniff_short_timeout)) == 0, \
 		"Frame with an invalid ICV was decrypted and delivered"
+
+
+# An association protects one VNI's traffic, but the database matches only the first 64 bits of
+# the underlay addresses, and every underlay address dpservice hands out carries the host's own
+# prefix in that half. One valid ingress association therefore matches a frame addressed at any
+# endpoint on this host, whichever tenant it belongs to. What keeps the peer inside the VNI it was
+# given a key for is ipsec_decap holding the endpoint's VNI against the association's, and nothing
+# else - the ICV cannot, because the peer really does hold the key. See docs/adr/0005.
+#
+# VM3 is on vni2; the association this frame is encrypted under is vni1's. Only the outer
+# destination differs between the two injections, so the second one failing to arrive cannot be
+# blamed on how the frame is built.
+def test_ipsec_wrong_vni_is_dropped(prepare_ipv4, ipsec_peer):
+	assert_delivered(build_frame(ipsec_peer.encrypt),
+					 "Frame for an endpoint on the association's own VNI was not delivered")
+
+	assert len(inject(build_frame(ipsec_peer.encrypt, ul_dst=VM3.ul_ipv6),
+					  sniff_short_timeout, tap=VM3.tap)) == 0, \
+		"Frame addressed at an endpoint outside the association's VNI was delivered"
 
 
 # What the anti-replay window is for. dp_service.py creates the session's ingress association with
