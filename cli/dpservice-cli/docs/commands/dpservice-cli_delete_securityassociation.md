@@ -3,22 +3,24 @@
 Delete an IPsec Security Association
 
 ```
-dpservice-cli delete securityassociation <--spi> <--src-underlay> <--dst-underlay> [flags]
+dpservice-cli delete securityassociation <--vni> <--spi> <--direction> <--src-underlay> <--dst-underlay> [flags]
 ```
 
 ### Examples
 
 ```
-dpservice-cli delete securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::
+dpservice-cli delete securityassociation --vni=100 --spi=43794 --direction=egress --src-underlay=fc00:1:: --dst-underlay=fc00:2::
 ```
 
 ### Options
 
 ```
-      --dst-underlay ip   Destination underlay address of the association. (default invalid IP)
-  -h, --help              help for securityassociation
-      --spi uint32        Security Parameter Index of the association.
-      --src-underlay ip   Source underlay address of the association. (default invalid IP)
+      --direction string   Direction of the association (ingress or egress).
+      --dst-underlay ip    Destination underlay address of the association. (default invalid IP)
+  -h, --help               help for securityassociation
+      --spi uint32         Security Parameter Index of the association.
+      --src-underlay ip    Source underlay address of the association. (default invalid IP)
+      --vni uint32         VNI of the association.
 ```
 
 ### Options inherited from parent commands

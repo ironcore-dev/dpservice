@@ -227,9 +227,9 @@ class GrpcClient:
 	def delnat(self, vm_name):
 		self._call(f"del nat --interface-id={vm_name}")
 
-	def addsa(self, spi, direction, src_underlay, dst_underlay, key, salt, algorithm=None,
+	def addsa(self, vni, spi, direction, src_underlay, dst_underlay, key, salt, algorithm=None,
 			  replay_window=None, esn=None):
-		cmd = (f"create securityassociation --spi={spi} --direction={direction}"
+		cmd = (f"create securityassociation --vni={vni} --spi={spi} --direction={direction}"
 			   f" --src-underlay={src_underlay} --dst-underlay={dst_underlay} --key={key} --salt={salt}")
 		if algorithm:
 			cmd += f" --algorithm={algorithm}"
@@ -240,15 +240,17 @@ class GrpcClient:
 			cmd += f" --esn={'true' if esn else 'false'}"
 		self._call(cmd)
 
-	def getsa(self, spi, src_underlay, dst_underlay):
-		# both halves matter here: the selectors live in the metadata, the rest in the spec
-		response = self._call(f"get securityassociation --spi={spi} --src-underlay={src_underlay} --dst-underlay={dst_underlay}")
+	def getsa(self, vni, spi, direction, src_underlay, dst_underlay):
+		# both halves matter here: the identity lives in the metadata, the rest in the spec
+		response = self._call(f"get securityassociation --vni={vni} --spi={spi} --direction={direction}"
+							  f" --src-underlay={src_underlay} --dst-underlay={dst_underlay}")
 		if not response:
 			return None
 		return {**response['metadata'], **response['spec']}
 
-	def delsa(self, spi, src_underlay, dst_underlay):
-		self._call(f"delete securityassociation --spi={spi} --src-underlay={src_underlay} --dst-underlay={dst_underlay}")
+	def delsa(self, vni, spi, direction, src_underlay, dst_underlay):
+		self._call(f"delete securityassociation --vni={vni} --spi={spi} --direction={direction}"
+				   f" --src-underlay={src_underlay} --dst-underlay={dst_underlay}")
 
 	def listlocalnats(self, nat_vip):
 		return self._getSpecList(f"list nats --nat-ip={nat_vip} --nat-type=local")

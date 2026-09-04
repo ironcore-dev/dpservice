@@ -46,8 +46,8 @@ type Client interface {
 	DeleteRoute(ctx context.Context, vni uint32, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.Route, error)
 
 	CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
-	DeleteSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
-	GetSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	DeleteSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	GetSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
 	GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
 	CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[]uint32) (*api.Nat, error)
 	DeleteNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
@@ -749,11 +749,26 @@ func protoIpsecAlgorithm(algorithm string) (dpdkproto.IpsecAlgorithm, error) {
 	}
 }
 
+// The five fields that name an association travel together, on all three calls.
+func protoSecurityAssociationId(id *api.SecurityAssociationMeta) (*dpdkproto.SecurityAssociationId, error) {
+	direction, err := protoIpsecDirection(id.Direction)
+	if err != nil {
+		return nil, err
+	}
+	return &dpdkproto.SecurityAssociationId{
+		Vni:         id.Vni,
+		Spi:         id.Spi,
+		Direction:   direction,
+		SrcUnderlay: api.NetIPAddrToByteSlice(id.SrcUnderlay),
+		DstUnderlay: api.NetIPAddrToByteSlice(id.DstUnderlay),
+	}, nil
+}
+
 func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
 	if sa == nil {
 		return &api.SecurityAssociation{}, fmt.Errorf("error: input security association cannot be nil")
 	}
-	direction, err := protoIpsecDirection(sa.Spec.Direction)
+	id, err := protoSecurityAssociationId(&sa.SecurityAssociationMeta)
 	if err != nil {
 		return &api.SecurityAssociation{}, err
 	}
@@ -762,11 +777,8 @@ func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.Security
 		return &api.SecurityAssociation{}, err
 	}
 	res, err := c.DPDKironcoreClient.CreateSecurityAssociation(ctx, &dpdkproto.CreateSecurityAssociationRequest{
-		Spi:          sa.Spi,
-		Direction:    direction,
+		Id:           id,
 		Algorithm:    algorithm,
-		SrcUnderlay:  api.NetIPAddrToByteSlice(sa.SrcUnderlay),
-		DstUnderlay:  api.NetIPAddrToByteSlice(sa.DstUnderlay),
 		Key:          []byte(sa.Spec.Key),
 		Salt:         []byte(sa.Spec.Salt),
 		ReplayWindow: sa.Spec.ReplayWindow,
@@ -787,23 +799,21 @@ func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.Security
 	return retSa, nil
 }
 
-func (c *client) DeleteSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+func (c *client) DeleteSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	protoId, err := protoSecurityAssociationId(id)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
 	res, err := c.DPDKironcoreClient.DeleteSecurityAssociation(ctx, &dpdkproto.DeleteSecurityAssociationRequest{
-		Spi:         spi,
-		SrcUnderlay: api.NetIPAddrToByteSlice(srcUnderlay),
-		DstUnderlay: api.NetIPAddrToByteSlice(dstUnderlay),
+		Id: protoId,
 	})
 	if err != nil {
 		return &api.SecurityAssociation{}, err
 	}
 	retSa := &api.SecurityAssociation{
-		TypeMeta: api.TypeMeta{Kind: api.SecurityAssociationKind},
-		SecurityAssociationMeta: api.SecurityAssociationMeta{
-			Spi:         spi,
-			SrcUnderlay: srcUnderlay,
-			DstUnderlay: dstUnderlay,
-		},
-		Status: api.ProtoStatusToStatus(res.Status),
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: *id,
+		Status:                  api.ProtoStatusToStatus(res.Status),
 	}
 	if res.GetStatus().GetCode() != 0 {
 		return retSa, errors.GetError(res.Status, ignoredErrors)
@@ -811,42 +821,43 @@ func (c *client) DeleteSecurityAssociation(ctx context.Context, spi uint32, srcU
 	return retSa, nil
 }
 
-func (c *client) GetSecurityAssociation(ctx context.Context, spi uint32, srcUnderlay, dstUnderlay *netip.Addr, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+func (c *client) GetSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	protoId, err := protoSecurityAssociationId(id)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
 	res, err := c.DPDKironcoreClient.GetSecurityAssociation(ctx, &dpdkproto.GetSecurityAssociationRequest{
-		Spi:         spi,
-		SrcUnderlay: api.NetIPAddrToByteSlice(srcUnderlay),
-		DstUnderlay: api.NetIPAddrToByteSlice(dstUnderlay),
+		Id: protoId,
 	})
 	if err != nil {
 		return &api.SecurityAssociation{}, err
 	}
 	retSa := &api.SecurityAssociation{
-		TypeMeta: api.TypeMeta{Kind: api.SecurityAssociationKind},
-		SecurityAssociationMeta: api.SecurityAssociationMeta{
-			Spi:         spi,
-			SrcUnderlay: srcUnderlay,
-			DstUnderlay: dstUnderlay,
-		},
-		Status: api.ProtoStatusToStatus(res.Status),
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: *id,
+		Status:                  api.ProtoStatusToStatus(res.Status),
 	}
 	if res.GetStatus().GetCode() != 0 {
 		return retSa, errors.GetError(res.Status, ignoredErrors)
 	}
 
 	// what comes back is what is actually matched, i.e. masked to the supported prefix length
-	src, err := netip.ParseAddr(string(res.GetSrcUnderlay()))
+	src, err := netip.ParseAddr(string(res.GetId().GetSrcUnderlay()))
 	if err != nil {
 		return retSa, fmt.Errorf("error parsing src_underlay: %w", err)
 	}
-	dst, err := netip.ParseAddr(string(res.GetDstUnderlay()))
+	dst, err := netip.ParseAddr(string(res.GetId().GetDstUnderlay()))
 	if err != nil {
 		return retSa, fmt.Errorf("error parsing dst_underlay: %w", err)
 	}
-	retSa.Spi = res.GetSpi()
-	retSa.SrcUnderlay = &src
-	retSa.DstUnderlay = &dst
+	retSa.SecurityAssociationMeta = api.SecurityAssociationMeta{
+		Vni:         res.GetId().GetVni(),
+		Spi:         res.GetId().GetSpi(),
+		Direction:   strings.ToLower(res.GetId().GetDirection().String()),
+		SrcUnderlay: &src,
+		DstUnderlay: &dst,
+	}
 	retSa.Spec = api.SecurityAssociationSpec{
-		Direction:    strings.ToLower(res.GetDirection().String()),
 		Algorithm:    strings.ToLower(res.GetAlgorithm().String()),
 		Key:          string(res.GetKey()),
 		Salt:         string(res.GetSalt()),

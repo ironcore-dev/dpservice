@@ -49,10 +49,12 @@ neigh_vni1_ul_ipv6 = "fc00:2::64:0:1"  # Hardcoded VNI, this would need to corre
 # IPsec (--ipsec suite only). One Security Association per direction, each with its own key and
 # salt: the harness plays the peer and does the crypto for the other side, so the two directions
 # are as independent here as they would be between two real hosts.
-# The SPI is shared, though, and that part is still a property of the test rather than of the
-# design - dpservice derives the egress SPI from the VNI, and the ingress one is kept equal to it.
-# See docs/concepts/ipsec.md.
-ipsec_spi = vni1
+# The SPI is shared between the two directions, which is a property of the test and nothing else -
+# an association is named by its whole identity, so nothing forces the two to agree.
+# Deliberately not a VNI: an egress association is filed under the VNI it serves and carries this
+# on the wire, and test_vf_to_vf_encap.py reads it out of the ESP header to prove the two are no
+# longer the same number. See docs/concepts/ipsec.md and docs/adr/0004.
+ipsec_spi = 0xab12
 ipsec_key_egress = "247b0ea251c93d6fb84017e59a2cd386"
 ipsec_salt_egress = "1bf460a7"
 ipsec_key_ingress = "9c3d0b7e4a1f8256d0e4b39f7c15a862"
@@ -66,12 +68,12 @@ ipsec_replay_window = 64
 # A second ingress association, created by xtratest_ipsec_dataplane.py to prove what an
 # association without an anti-replay window does. It can only differ from the one above in its
 # SPI - the addresses are pinned by dpservice's local-prefix check on one side and by ipip_decap's
-# port lookup on the other - so the "spi is the vni it serves" convention cannot hold for both,
-# and this one gives it up. Nothing on the ingress path reads the SPI beyond the lookup.
+# port lookup on the other, and both serve vni1 - which is exactly what an ingress association is
+# filed under its SPI for: several of them coexist on one VNI and one peer.
 # It does get its own key and salt: the AES-GCM nonce is salt||sequence_number and the SPI is not
 # part of it, so two associations sharing key and salt while both counted from 1 would repeat a
 # nonce under one key.
-ipsec_spi_unwindowed = vni2
+ipsec_spi_unwindowed = 0xcd34
 ipsec_key_unwindowed = "3a7f21c85d0e94b6af12c7e0538b6d94"
 ipsec_salt_unwindowed = "7e3a91d6"
 
@@ -82,11 +84,11 @@ ipsec_salt_unwindowed = "7e3a91d6"
 
 # Ingress-only associations, injected into directly by xtratest_ipsec_dataplane.py. Like
 # ipsec_spi_unwindowed they need an SPI of their own, because the address pair is pinned on both
-# sides and the SPI is the only part of the key left to vary.
-ipsec_spi_esn = vni3
+# sides and the SPI is what an ingress association is filed under.
+ipsec_spi_esn = 0xef56
 ipsec_key_esn = "b41d7e0932ca85f61e73d0428b5fa9c7"
 ipsec_salt_esn = "c40e15b8"
-ipsec_spi_aes256 = 400
+ipsec_spi_aes256 = 0x1278
 ipsec_key_aes256 = "5e91c30d7ab4f826139fe0c47bd25a08e3671fd4029ab85c6e13d7f094a2b5c6"
 ipsec_salt_aes256 = "92b7de41"
 
@@ -122,10 +124,10 @@ neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
 neigh_vni1_ov_ipv6_route = f"{neigh_vni1_ov_ipv6_prefix}::/104"
 
 # The Linux peer (xtratest_ipsec_xfrm.py), which is a second neighbour and shares nothing with
-# the one IpsecPeer plays. Its own underlay /64, because dpservice tells two associations apart
-# by (SPI, source /64, destination /64) and the SPI cannot differ - the egress one is derived
-# from the VNI. Its own key material, because AES-GCM builds its nonce from salt||sequence and
-# two associations counting from 1 under one key would repeat one.
+# the one IpsecPeer plays. Its own underlay /64, because both of its associations serve vni1 and
+# an egress association is filed under (VNI, source /64, destination /64) - the destination is
+# the only part left to differ. Its own key material, because AES-GCM builds its nonce from
+# salt||sequence and two associations counting from 1 under one key would repeat one.
 xfrm_ns = "dp_ipsec_peer"
 xfrm_iface = f"ipsec{vni1}"
 xfrm_if_id = hex(vni1)

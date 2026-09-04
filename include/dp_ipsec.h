@@ -78,7 +78,12 @@ enum dp_ipsec_algo {
 // kept so that a lookup result can be reported back and its entry removed without rebuilding
 // the key from a packet.
 struct dp_ipsec_sa {
+	// What the ESP header carries. Nothing derives it any more: an egress association is filed
+	// under the VNI below, so its wire SPI is whatever the two ends agreed on.
 	uint32_t			spi;
+	// The VNI whose traffic this association protects. An egress association is filed and found
+	// under it, see dp_ipsec_get_lookup_spi().
+	uint32_t			vni;
 	enum dp_ipsec_algo	algo;
 	enum dp_ipsec_dir	dir;
 	union dp_ipv6		src;  // as seen on the wire in this SA's direction
@@ -105,9 +110,14 @@ struct dp_ipsec_sa {
 	struct rte_ipsec_session	ipsec_session;
 };
 
-// Everything needed to identify one SA, i.e. what the SAD is keyed on
+// Everything needed to name one SA. Only part of it is what the SAD is keyed on -
+// dp_ipsec_get_lookup_spi() decides which - and the rest is verified against whatever that lookup
+// finds, so that naming an association by a stale field yields nothing rather than the entry that
+// happens to share its key.
 struct dp_ipsec_sa_spec {
 	uint32_t			spi;
+	uint32_t			vni;
+	enum dp_ipsec_dir	dir;
 	union dp_ipv6		src;
 	union dp_ipv6		dst;
 };
@@ -131,11 +141,13 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request);
 int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec);
 int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out);
 
-// Build a SAD key from an SPI and the two underlay addresses, masking them to the supported
+// Build a SAD key from a lookup SPI and the two underlay addresses, masking them to the supported
 // prefix length. This is the only place that decides what "the first 64 bits" means, and it is
 // shared by both graph nodes and the gRPC handlers so they cannot drift apart.
+// The lookup SPI is not necessarily the SPI on the wire, see dp_ipsec_get_lookup_spi(); both
+// graph nodes already pass the value their direction is filed under.
 void dp_ipsec_build_key(union rte_ipsec_sad_key *key /* out */,
-						uint32_t spi, const union dp_ipv6 *src, const union dp_ipv6 *dst);
+						uint32_t lookup_spi, const union dp_ipv6 *src, const union dp_ipv6 *dst);
 
 // Look up a whole burst at once. This is what rte_ipsec_sad_lookup() is built for, it
 // prefetches and pipelines across the batch and chunks internally, so any count is fine.

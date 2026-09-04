@@ -11,6 +11,7 @@ import (
 
 	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/flag"
 	"github.com/ironcore-dev/dpservice/cli/dpservice-cli/util"
+	"github.com/ironcore-dev/dpservice/go/dpservice-go/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -21,9 +22,9 @@ func GetSecurityAssociation(dpdkClientFactory DPDKClientFactory, rendererFactory
 	)
 
 	cmd := &cobra.Command{
-		Use:     "securityassociation <--spi> <--src-underlay> <--dst-underlay>",
+		Use:     "securityassociation <--vni> <--spi> <--direction> <--src-underlay> <--dst-underlay>",
 		Short:   "Get an IPsec Security Association",
-		Example: "dpservice-cli get securityassociation --spi=100 --src-underlay=fc00:1:: --dst-underlay=fc00:2::",
+		Example: "dpservice-cli get securityassociation --vni=100 --spi=43794 --direction=egress --src-underlay=fc00:1:: --dst-underlay=fc00:2::",
 		Aliases: SecurityAssociationAliases,
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,19 +46,23 @@ func GetSecurityAssociation(dpdkClientFactory DPDKClientFactory, rendererFactory
 }
 
 type GetSecurityAssociationOptions struct {
+	Vni         uint32
 	Spi         uint32
+	Direction   string
 	SrcUnderlay netip.Addr
 	DstUnderlay netip.Addr
 }
 
 func (o *GetSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.Uint32Var(&o.Vni, "vni", o.Vni, "VNI of the association.")
 	fs.Uint32Var(&o.Spi, "spi", o.Spi, "Security Parameter Index of the association.")
+	fs.StringVar(&o.Direction, "direction", o.Direction, "Direction of the association (ingress or egress).")
 	flag.AddrVar(fs, &o.SrcUnderlay, "src-underlay", o.SrcUnderlay, "Source underlay address of the association.")
 	flag.AddrVar(fs, &o.DstUnderlay, "dst-underlay", o.DstUnderlay, "Destination underlay address of the association.")
 }
 
 func (o *GetSecurityAssociationOptions) MarkRequiredFlags(cmd *cobra.Command) error {
-	for _, name := range []string{"spi", "src-underlay", "dst-underlay"} {
+	for _, name := range []string{"vni", "spi", "direction", "src-underlay", "dst-underlay"} {
 		if err := cmd.MarkFlagRequired(name); err != nil {
 			return err
 		}
@@ -77,7 +82,13 @@ func RunGetSecurityAssociation(
 	}
 	defer DpdkClose(cleanup)
 
-	sa, err := client.GetSecurityAssociation(ctx, opts.Spi, &opts.SrcUnderlay, &opts.DstUnderlay)
+	sa, err := client.GetSecurityAssociation(ctx, &api.SecurityAssociationMeta{
+		Vni:         opts.Vni,
+		Spi:         opts.Spi,
+		Direction:   opts.Direction,
+		SrcUnderlay: &opts.SrcUnderlay,
+		DstUnderlay: &opts.DstUnderlay,
+	})
 	if err != nil {
 		return fmt.Errorf("error getting security association: %w", err)
 	}

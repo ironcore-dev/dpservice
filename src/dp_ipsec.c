@@ -349,7 +349,7 @@ void dp_ipsec_free(void)
 }
 
 void dp_ipsec_build_key(union rte_ipsec_sad_key *key,
-						uint32_t spi, const union dp_ipv6 *src, const union dp_ipv6 *dst)
+						uint32_t lookup_spi, const union dp_ipv6 *src, const union dp_ipv6 *dst)
 {
 	// The SAD matches all sixteen bytes, so the prefix length lives in the keys handed to it
 	union dp_ipv6 masked_src = { ._prefix = src->_prefix, ._suffix = 0 };
@@ -357,7 +357,7 @@ void dp_ipsec_build_key(union rte_ipsec_sad_key *key,
 
 	static_assert(DP_IPSEC_ADDR_PREFIX_LEN == 64, "dp_ipsec_build_key() only masks at 64 bits");
 
-	key->v6.spi = spi;
+	key->v6.spi = lookup_spi;
 	dp_ipv6_to_rte(&masked_dst, &key->v6.dip);
 	dp_ipv6_to_rte(&masked_src, &key->v6.sip);
 }
@@ -368,14 +368,39 @@ void dp_ipsec_lookup_sa(const union rte_ipsec_sad_key *keys[], struct dp_ipsec_s
 	rte_ipsec_sad_lookup(dp_ipsec_sad, keys, (void **)sas, count);
 }
 
+// An inbound association is named by what the packet carries, because that is all ipsec_decap has
+// to go on. An outbound one is named by the VNI whose traffic it protects - ipsec_encap cannot
+// read an SPI off a packet that is not ESP yet - which leaves its wire SPI free to be whatever
+// the two ends agreed on, and free to change without moving the entry. See docs/adr/0004.
+static uint32_t dp_ipsec_get_lookup_spi(const struct dp_ipsec_sa_spec *spec)
+{
+	return spec->dir == DP_IPSEC_DIR_EGRESS ? spec->vni : spec->spi;
+}
+
 static struct dp_ipsec_sa *dp_ipsec_lookup_one(const struct dp_ipsec_sa_spec *spec)
 {
 	union rte_ipsec_sad_key key;
 	const union rte_ipsec_sad_key *keyptr = &key;
 	struct dp_ipsec_sa *sa = NULL;
 
-	dp_ipsec_build_key(&key, spec->spi, &spec->src, &spec->dst);
+	dp_ipsec_build_key(&key, dp_ipsec_get_lookup_spi(spec), &spec->src, &spec->dst);
 	dp_ipsec_lookup_sa(&keyptr, &sa, 1);
+
+	return sa;
+}
+
+// The lookup above only matched what the direction is keyed on, and the addresses only to their
+// prefix. The rest of the identity is checked here so that an association named by a stale field
+// is not found at all, rather than resolving to the entry that happens to share its key.
+static struct dp_ipsec_sa *dp_ipsec_find_sa(const struct dp_ipsec_sa_spec *spec)
+{
+	struct dp_ipsec_sa *sa = dp_ipsec_lookup_one(spec);
+
+	if (!sa)
+		return NULL;
+
+	if (sa->dir != spec->dir || sa->vni != spec->vni || sa->spi != spec->spi)
+		return NULL;
 
 	return sa;
 }
@@ -408,6 +433,8 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 {
 	struct dp_ipsec_sa_spec spec = {
 		.spi = request->spi,
+		.vni = request->vni,
+		.dir = request->dir,
 		.src = request->src,
 		.dst = request->dst,
 	};
@@ -430,7 +457,10 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 		return DP_GRPC_ERR_SA_REPLAY_WINDOW;
 
 	// The SAD would silently overwrite the entry and leak what it used to point at, because
-	// rte_hash_add_key_with_hash_data() updates an existing key and reports success
+	// rte_hash_add_key_with_hash_data() updates an existing key and reports success.
+	// Deliberately dp_ipsec_lookup_one() and not dp_ipsec_find_sa(): what cannot be held twice
+	// is one lookup SPI, so an egress association collides with one already filed under the same
+	// VNI and peer however different the rest of its identity is.
 	if (dp_ipsec_lookup_one(&spec))
 		return DP_GRPC_ERR_SA_EXISTS;
 
@@ -467,7 +497,7 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 		return DP_GRPC_ERR_SA_CREATE;
 	}
 
-	dp_ipsec_build_key(&key, sa->spi, &sa->src, &sa->dst);
+	dp_ipsec_build_key(&key, dp_ipsec_get_lookup_spi(&spec), &sa->src, &sa->dst);
 	// Store what is actually matched, so that a later lookup or delete needs no re-masking
 	dp_ipv6_from_rte(&sa->src, &key.v6.sip);
 	dp_ipv6_from_rte(&sa->dst, &key.v6.dip);
@@ -492,11 +522,11 @@ int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec)
 	if (!dp_ipsec_sad)
 		return DP_GRPC_ERR_SA_DISABLED;
 
-	sa = dp_ipsec_lookup_one(spec);
+	sa = dp_ipsec_find_sa(spec);
 	if (!sa)
 		return DP_GRPC_ERR_SA_NOT_FOUND;
 
-	dp_ipsec_build_key(&key, spec->spi, &spec->src, &spec->dst);
+	dp_ipsec_build_key(&key, dp_ipsec_get_lookup_spi(spec), &spec->src, &spec->dst);
 	ret = rte_ipsec_sad_del(dp_ipsec_sad, &key, RTE_IPSEC_SAD_SPI_DIP_SIP);
 	if (DP_FAILED(ret)) {
 		DPS_LOG_ERR("Cannot remove Security Association from the database", DP_LOG_RET(ret));
@@ -523,7 +553,7 @@ int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out
 	if (!dp_ipsec_sad)
 		return DP_GRPC_ERR_SA_DISABLED;
 
-	sa = dp_ipsec_lookup_one(spec);
+	sa = dp_ipsec_find_sa(spec);
 	if (!sa)
 		return DP_GRPC_ERR_SA_NOT_FOUND;
 

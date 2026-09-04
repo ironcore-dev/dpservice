@@ -3,13 +3,13 @@
 Create an IPsec Security Association
 
 ```
-dpservice-cli create securityassociation <--spi> <--direction> <--src-underlay> <--dst-underlay> <--key> <--salt> [flags]
+dpservice-cli create securityassociation <--vni> <--spi> <--direction> <--src-underlay> <--dst-underlay> <--key> <--salt> [flags]
 ```
 
 ### Examples
 
 ```
-dpservice-cli create securityassociation --spi=100 --direction=egress --src-underlay=fc00:1:: --dst-underlay=fc00:2:: --key=247b0ea251c93d6fb84017e59a2cd386 --salt=1bf460a7
+dpservice-cli create securityassociation --vni=100 --spi=43794 --direction=egress --src-underlay=fc00:1:: --dst-underlay=fc00:2:: --key=247b0ea251c93d6fb84017e59a2cd386 --salt=1bf460a7
 ```
 
 ### Options
@@ -23,8 +23,9 @@ dpservice-cli create securityassociation --spi=100 --direction=egress --src-unde
       --key string             Hex-encoded cipher key.
       --replay-window uint32   Anti-replay window in packets, ingress only. Zero, the default, disables replay checking.
       --salt string            Hex-encoded salt, the implicit part of the nonce.
-      --spi uint32             Security Parameter Index, expected to be the VNI this association serves.
+      --spi uint32             Security Parameter Index, as carried in the ESP header.
       --src-underlay ip        Source underlay address, matched on its first 64 bits. (default invalid IP)
+      --vni uint32             VNI whose traffic this association protects.
 ```
 
 ### Options inherited from parent commands

@@ -605,26 +605,35 @@ message CaptureStopResponse {
 //// IPSEC
 // A Security Association is unidirectional. Underlay addresses are matched on their first
 // 64 bits only, so one association covers a peer host rather than each of its addresses.
-// The spi is expected to be the vni the association serves, as that is what dpservice
-// derives it from when encrypting.
-message CreateSecurityAssociationRequest {
-	uint32 spi = 1;
-	TrafficDirection direction = 2;
-	IpsecAlgorithm algorithm = 3;
+//
+// These five fields name exactly one association. Which of them dpservice files it under
+// depends on the direction - the vni for an egress association, the spi for an ingress one,
+// because ipsec_encap cannot read an SPI off a packet that is not ESP yet - but a caller does
+// not need to know that: every field given here is matched, and an association is only ever
+// found under all five of them.
+message SecurityAssociationId {
+	uint32 vni = 1;            // the VNI whose traffic this association protects
+	uint32 spi = 2;            // Security Parameter Index, as carried in the ESP header
+	TrafficDirection direction = 3;
 	bytes src_underlay = 4;    // source underlay address, as seen on the wire in this direction
 	bytes dst_underlay = 5;    // destination underlay address, likewise
-	bytes key = 6;             // hex-encoded, length defined by the algorithm
-	bytes salt = 7;            // hex-encoded, length defined by the algorithm
+}
+
+message CreateSecurityAssociationRequest {
+	SecurityAssociationId id = 1;
+	IpsecAlgorithm algorithm = 2;
+	bytes key = 3;             // hex-encoded, length defined by the algorithm
+	bytes salt = 4;            // hex-encoded, length defined by the algorithm
 	// Anti-replay window, in packets, for an ingress association: how far a frame may be
 	// reordered on the underlay before it is taken for a replay. Zero, which is also what an
 	// omitted field means, disables replay checking entirely. An egress association has
 	// nothing to check, so anything but zero is rejected there.
-	uint32 replay_window = 8;
+	uint32 replay_window = 5;
 	// Extended sequence numbers (RFC 4304): the association counts to 2^64 rather than 2^32, with
 	// only the lower half carried in the packet and the upper half authenticated along with it.
 	// Both ends have to be created with the same value - it changes what the ICV covers, so a
 	// mismatch fails every frame rather than degrading. Omitted means off, see ADR 0003.
-	bool esn = 9;
+	bool esn = 6;
 }
 
 message CreateSecurityAssociationResponse {
@@ -632,9 +641,7 @@ message CreateSecurityAssociationResponse {
 }
 
 message DeleteSecurityAssociationRequest {
-	uint32 spi = 1;
-	bytes src_underlay = 2;
-	bytes dst_underlay = 3;
+	SecurityAssociationId id = 1;
 }
 
 message DeleteSecurityAssociationResponse {
@@ -642,22 +649,18 @@ message DeleteSecurityAssociationResponse {
 }
 
 message GetSecurityAssociationRequest {
-	uint32 spi = 1;
-	bytes src_underlay = 2;
-	bytes dst_underlay = 3;
+	SecurityAssociationId id = 1;
 }
 
 message GetSecurityAssociationResponse {
 	Status status = 1;
-	uint32 spi = 2;
-	TrafficDirection direction = 3;
-	IpsecAlgorithm algorithm = 4;
-	bytes src_underlay = 5;    // as matched, i.e. masked to the supported prefix length
-	bytes dst_underlay = 6;
-	bytes key = 7;
-	bytes salt = 8;
-	uint32 replay_window = 9;
-	bool esn = 10;
+	// The underlay addresses come back as matched, i.e. masked to the supported prefix length
+	SecurityAssociationId id = 2;
+	IpsecAlgorithm algorithm = 3;
+	bytes key = 4;
+	bytes salt = 5;
+	uint32 replay_window = 6;
+	bool esn = 7;
 }
 
 message CaptureStatusRequest {

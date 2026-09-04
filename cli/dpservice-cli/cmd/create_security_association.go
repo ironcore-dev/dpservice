@@ -22,9 +22,9 @@ func CreateSecurityAssociation(dpdkClientFactory DPDKClientFactory, rendererFact
 	)
 
 	cmd := &cobra.Command{
-		Use:     "securityassociation <--spi> <--direction> <--src-underlay> <--dst-underlay> <--key> <--salt>",
+		Use:     "securityassociation <--vni> <--spi> <--direction> <--src-underlay> <--dst-underlay> <--key> <--salt>",
 		Short:   "Create an IPsec Security Association",
-		Example: "dpservice-cli create securityassociation --spi=100 --direction=egress --src-underlay=fc00:1:: --dst-underlay=fc00:2:: --key=247b0ea251c93d6fb84017e59a2cd386 --salt=1bf460a7",
+		Example: "dpservice-cli create securityassociation --vni=100 --spi=43794 --direction=egress --src-underlay=fc00:1:: --dst-underlay=fc00:2:: --key=247b0ea251c93d6fb84017e59a2cd386 --salt=1bf460a7",
 		Aliases: SecurityAssociationAliases,
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,6 +46,7 @@ func CreateSecurityAssociation(dpdkClientFactory DPDKClientFactory, rendererFact
 }
 
 type CreateSecurityAssociationOptions struct {
+	Vni          uint32
 	Spi          uint32
 	Direction    string
 	Algorithm    string
@@ -58,7 +59,8 @@ type CreateSecurityAssociationOptions struct {
 }
 
 func (o *CreateSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.Uint32Var(&o.Spi, "spi", o.Spi, "Security Parameter Index, expected to be the VNI this association serves.")
+	fs.Uint32Var(&o.Vni, "vni", o.Vni, "VNI whose traffic this association protects.")
+	fs.Uint32Var(&o.Spi, "spi", o.Spi, "Security Parameter Index, as carried in the ESP header.")
 	fs.StringVar(&o.Direction, "direction", o.Direction, "Direction of the association (ingress or egress).")
 	fs.StringVar(&o.Algorithm, "algorithm", "aes-128-gcm", "Cipher to use (aes-128-gcm or aes-256-gcm).")
 	flag.AddrVar(fs, &o.SrcUnderlay, "src-underlay", o.SrcUnderlay, "Source underlay address, matched on its first 64 bits.")
@@ -74,7 +76,7 @@ func (o *CreateSecurityAssociationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *CreateSecurityAssociationOptions) MarkRequiredFlags(cmd *cobra.Command) error {
-	for _, name := range []string{"spi", "direction", "src-underlay", "dst-underlay", "key", "salt"} {
+	for _, name := range []string{"vni", "spi", "direction", "src-underlay", "dst-underlay", "key", "salt"} {
 		if err := cmd.MarkFlagRequired(name); err != nil {
 			return err
 		}
@@ -97,12 +99,13 @@ func RunCreateSecurityAssociation(
 	sa, err := client.CreateSecurityAssociation(ctx, &api.SecurityAssociation{
 		TypeMeta: api.TypeMeta{Kind: api.SecurityAssociationKind},
 		SecurityAssociationMeta: api.SecurityAssociationMeta{
+			Vni:         opts.Vni,
 			Spi:         opts.Spi,
+			Direction:   opts.Direction,
 			SrcUnderlay: &opts.SrcUnderlay,
 			DstUnderlay: &opts.DstUnderlay,
 		},
 		Spec: api.SecurityAssociationSpec{
-			Direction:    opts.Direction,
 			Algorithm:    opts.Algorithm,
 			Key:          opts.Key,
 			Salt:         opts.Salt,
@@ -114,5 +117,5 @@ func RunCreateSecurityAssociation(
 		return fmt.Errorf("error creating security association: %w", err)
 	}
 
-	return rendererFactory.RenderObject(fmt.Sprintf("created, spi: %d", sa.Spi), os.Stdout, sa)
+	return rendererFactory.RenderObject(fmt.Sprintf("created, vni: %d, spi: %d", sa.Vni, sa.Spi), os.Stdout, sa)
 }

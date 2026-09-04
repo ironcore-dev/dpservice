@@ -194,25 +194,25 @@ struct dpgrpc_capture_stop {
 	uint16_t		port_cnt;
 };
 
+// What names one Security Association. Not all of it is what the database is keyed on - which
+// part that is depends on the direction - but all of it is matched, see struct dp_ipsec_sa_spec.
+struct dpgrpc_ipsec_sa_id {
+	uint32_t			spi;
+	uint32_t			vni;
+	enum dp_ipsec_dir	dir;
+	union dp_ipv6		src;
+	union dp_ipv6		dst;
+};
+
 // A Security Association as it crosses the gRPC boundary, without any of the internals
 // dp_ipsec.c attaches to it
 struct dpgrpc_ipsec_sa {
-	uint32_t			spi;
-	enum dp_ipsec_dir	dir;
+	struct dpgrpc_ipsec_sa_id	id;
 	enum dp_ipsec_algo	algo;
-	union dp_ipv6		src;
-	union dp_ipv6		dst;
 	uint8_t				key[DP_IPSEC_MAX_KEY_LEN];
 	uint8_t				salt[DP_IPSEC_MAX_SALT_LEN];
 	uint32_t			replay_window;
 	bool				esn;
-};
-
-// What the database is keyed on, which is enough to name one association
-struct dpgrpc_ipsec_sa_id {
-	uint32_t		spi;
-	union dp_ipv6	src;
-	union dp_ipv6	dst;
 };
 
 struct dpgrpc_request {

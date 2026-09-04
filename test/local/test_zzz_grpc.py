@@ -647,7 +647,7 @@ def test_grpc_external_underlays(prepare_ifaces, grpc_client):
 
 def test_grpc_ipsec_errors(prepare_ipv4, grpc_client):
 	# without --enable-ipsec there is no crypto device and no database to put an association in
-	grpc_client.expect_error(466).addsa(vni1, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
+	grpc_client.expect_error(466).addsa(vni1, 0xab12, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
 										"247b0ea251c93d6fb84017e59a2cd386", "1bf460a7")
-	grpc_client.expect_error(466).getsa(vni1, local_ul_ipv6, neigh_vni1_ul_ipv6)
-	grpc_client.expect_error(466).delsa(vni1, local_ul_ipv6, neigh_vni1_ul_ipv6)
+	grpc_client.expect_error(466).getsa(vni1, 0xab12, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
+	grpc_client.expect_error(466).delsa(vni1, 0xab12, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)

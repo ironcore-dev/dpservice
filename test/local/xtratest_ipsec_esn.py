@@ -65,22 +65,22 @@ class SwappedPeer:
 # key material and would fail its ICV against anything else.
 def swap_associations(grpc_client, key_egress, salt_egress, key_ingress, salt_ingress,
 					  algorithm=None, esn=None):
-	grpc_client.delsa(ipsec_spi, local_ul_ipv6, neigh_vni1_ul_ipv6)
-	grpc_client.delsa(ipsec_spi, neigh_vni1_ul_ipv6, local_ul_ipv6)
+	grpc_client.delsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
+	grpc_client.delsa(vni1, ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6)
 
-	grpc_client.addsa(ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
+	grpc_client.addsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
 					  key_egress, salt_egress, algorithm=algorithm, esn=esn)
-	grpc_client.addsa(ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
+	grpc_client.addsa(vni1, ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
 					  key_ingress, salt_ingress, algorithm=algorithm,
 					  replay_window=ipsec_replay_window, esn=esn)
 
 def restore_associations(grpc_client):
-	grpc_client.delsa(ipsec_spi, local_ul_ipv6, neigh_vni1_ul_ipv6)
-	grpc_client.delsa(ipsec_spi, neigh_vni1_ul_ipv6, local_ul_ipv6)
+	grpc_client.delsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
+	grpc_client.delsa(vni1, ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6)
 
-	grpc_client.addsa(ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
+	grpc_client.addsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
 					  ipsec_key_egress, ipsec_salt_egress)
-	grpc_client.addsa(ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
+	grpc_client.addsa(vni1, ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
 					  ipsec_key_ingress, ipsec_salt_ingress,
 					  replay_window=ipsec_replay_window)
 
@@ -134,7 +134,7 @@ def test_ipsec_esn_both_directions(prepare_ipv4, grpc_client):
 					  ipsec_key_esn_ingress, ipsec_salt_esn_ingress,
 					  esn=True)
 	try:
-		sa = grpc_client.getsa(ipsec_spi, local_ul_ipv6, neigh_vni1_ul_ipv6)
+		sa = grpc_client.getsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
 		assert sa['esn'] is True, \
 			"Egress association was not re-created with extended sequence numbers"
 
@@ -152,7 +152,7 @@ def test_ipsec_aes256_both_directions(prepare_ipv4, grpc_client):
 					  ipsec_key_aes256_ingress, ipsec_salt_aes256_ingress,
 					  algorithm="aes-256-gcm")
 	try:
-		sa = grpc_client.getsa(ipsec_spi, local_ul_ipv6, neigh_vni1_ul_ipv6)
+		sa = grpc_client.getsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
 		assert sa['algorithm'] == "aes_256_gcm", \
 			"Egress association was not re-created with the 256-bit cipher"
 

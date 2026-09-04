@@ -60,6 +60,7 @@ SPDX-License-Identifier = "Apache-2.0"
 [[annotations]]
 path = [
     "docs/**",
+    "CONTEXT.md",
     "**/README.md",
     "**README.md",
     "cli/dpservice-cli/docs/**",

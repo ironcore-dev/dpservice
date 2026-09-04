@@ -964,15 +964,16 @@ static int dp_process_create_security_association(struct dp_grpc_responder *resp
 {
 	struct dpgrpc_ipsec_sa *request = &responder->request.add_sa;
 	struct dp_ipsec_sa sa = {
-		.spi = request->spi,
+		.spi = request->id.spi,
+		.vni = request->id.vni,
 		.algo = request->algo,
-		.dir = request->dir,
+		.dir = request->id.dir,
 		.replay_window = request->replay_window,
 		.esn = request->esn,
 	};
 
-	dp_copy_ipv6(&sa.src, &request->src);
-	dp_copy_ipv6(&sa.dst, &request->dst);
+	dp_copy_ipv6(&sa.src, &request->id.src);
+	dp_copy_ipv6(&sa.dst, &request->id.dst);
 	rte_memcpy(sa.key, request->key, sizeof(sa.key));
 	rte_memcpy(sa.salt, request->salt, sizeof(sa.salt));
 
@@ -984,6 +985,8 @@ static int dp_process_delete_security_association(struct dp_grpc_responder *resp
 	struct dpgrpc_ipsec_sa_id *request = &responder->request.del_sa;
 	struct dp_ipsec_sa_spec spec = {
 		.spi = request->spi,
+		.vni = request->vni,
+		.dir = request->dir,
 	};
 
 	dp_copy_ipv6(&spec.src, &request->src);
@@ -998,6 +1001,8 @@ static int dp_process_get_security_association(struct dp_grpc_responder *respond
 	struct dpgrpc_ipsec_sa *reply = dp_grpc_single_reply(responder);
 	struct dp_ipsec_sa_spec spec = {
 		.spi = request->spi,
+		.vni = request->vni,
+		.dir = request->dir,
 	};
 	struct dp_ipsec_sa sa;
 	int ret;
@@ -1009,12 +1014,13 @@ static int dp_process_get_security_association(struct dp_grpc_responder *respond
 	if (DP_FAILED(ret))
 		return ret;
 
-	reply->spi = sa.spi;
-	reply->dir = sa.dir;
+	reply->id.spi = sa.spi;
+	reply->id.vni = sa.vni;
+	reply->id.dir = sa.dir;
 	reply->algo = sa.algo;
 	// the stored addresses are the masked ones, i.e. what is actually being matched
-	dp_copy_ipv6(&reply->src, &sa.src);
-	dp_copy_ipv6(&reply->dst, &sa.dst);
+	dp_copy_ipv6(&reply->id.src, &sa.src);
+	dp_copy_ipv6(&reply->id.dst, &sa.dst);
 	rte_memcpy(reply->key, sa.key, sizeof(reply->key));
 	rte_memcpy(reply->salt, sa.salt, sizeof(reply->salt));
 	reply->replay_window = sa.replay_window;

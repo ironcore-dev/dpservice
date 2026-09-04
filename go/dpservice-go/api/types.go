@@ -664,15 +664,19 @@ type SecurityAssociation struct {
 	Status                  Status                  `json:"status"`
 }
 
-// SecurityAssociationMeta is what the database is keyed on
+// SecurityAssociationMeta names one association. dpservice matches all of it, and files the
+// association under the vni when it is egress and under the spi when it is ingress - which is
+// not something a caller has to know or provide differently.
 type SecurityAssociationMeta struct {
+	Vni         uint32      `json:"vni"`
 	Spi         uint32      `json:"spi"`
+	Direction   string      `json:"direction"`
 	SrcUnderlay *netip.Addr `json:"src_underlay,omitempty"`
 	DstUnderlay *netip.Addr `json:"dst_underlay,omitempty"`
 }
 
 func (m *SecurityAssociationMeta) GetName() string {
-	return fmt.Sprintf("%d/%v-%v", m.Spi, m.SrcUnderlay, m.DstUnderlay)
+	return fmt.Sprintf("%s/%d/%d/%v-%v", m.Direction, m.Vni, m.Spi, m.SrcUnderlay, m.DstUnderlay)
 }
 
 func (m *SecurityAssociation) GetStatus() Status {
@@ -680,11 +684,10 @@ func (m *SecurityAssociation) GetStatus() Status {
 }
 
 func (m *SecurityAssociation) String() string {
-	return fmt.Sprintf("%s <spi %d, %v -> %v>", m.Spec.Direction, m.Spi, m.SrcUnderlay, m.DstUnderlay)
+	return fmt.Sprintf("%s <vni %d, spi %d, %v -> %v>", m.Direction, m.Vni, m.Spi, m.SrcUnderlay, m.DstUnderlay)
 }
 
 type SecurityAssociationSpec struct {
-	Direction string `json:"direction"`
 	Algorithm string `json:"algorithm"`
 	Key       string `json:"key,omitempty"`
 	Salt      string `json:"salt,omitempty"`
