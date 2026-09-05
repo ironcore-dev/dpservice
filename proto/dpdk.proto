@@ -648,6 +648,36 @@ message DeleteSecurityAssociationResponse {
 	Status status = 1;
 }
 
+// Replace a live egress association with one built to these parameters, without ever leaving the
+// traffic it protects unprotected: dpservice builds the replacement, then swaps it in between two
+// packets. This is what makes rekeying gapless on the sending side; the receiving side needs no
+// replacement, since several ingress associations can serve one VNI and peer at once.
+//
+// Egress only. An ingress association is filed under the SPI its frames carry, so it cannot be
+// renumbered in place, and rotating its key in place would drop the frames still in flight under
+// the old one - add a second ingress association instead and delete the old one once the peer has
+// switched. See ADR 0006.
+message UpdateSecurityAssociationRequest {
+	// The association as it stands now, current wire SPI and all. Naming it by a SPI it no longer
+	// carries replaces nothing, rather than replacing whatever took its place.
+	SecurityAssociationId id = 1;
+	uint32 new_spi = 2;        // what its ESP headers carry from here on
+	// Everything below is what the association becomes, exactly as in a create: nothing is
+	// carried over from the association being replaced, and an omitted field means its default
+	// rather than what was there before.
+	IpsecAlgorithm algorithm = 3;
+	bytes key = 4;             // hex-encoded, length defined by the algorithm
+	bytes salt = 5;            // hex-encoded, length defined by the algorithm
+	uint32 replay_window = 6;  // egress has nothing to check, so anything but zero is rejected
+	bool esn = 7;
+	// NOTE: the replacement starts a sequence number of its own, so it needs key material this
+	// association has not used before - reusing it would repeat an AES-GCM nonce.
+}
+
+message UpdateSecurityAssociationResponse {
+	Status status = 1;
+}
+
 message GetSecurityAssociationRequest {
 	SecurityAssociationId id = 1;
 }
@@ -766,6 +796,7 @@ service DPDKironcore {
 	// Only available when dpservice was started with --enable-ipsec.
 	rpc CreateSecurityAssociation(CreateSecurityAssociationRequest) returns (CreateSecurityAssociationResponse) {}
 	rpc DeleteSecurityAssociation(DeleteSecurityAssociationRequest) returns (DeleteSecurityAssociationResponse) {}
+	rpc UpdateSecurityAssociation(UpdateSecurityAssociationRequest) returns (UpdateSecurityAssociationResponse) {}
 	rpc GetSecurityAssociation(GetSecurityAssociationRequest) returns (GetSecurityAssociationResponse) {}
 
 	//// PACKET CAPTURE

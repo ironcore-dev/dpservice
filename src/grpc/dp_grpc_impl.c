@@ -995,6 +995,35 @@ static int dp_process_delete_security_association(struct dp_grpc_responder *resp
 	return dp_ipsec_delete_sa(&spec);
 }
 
+static int dp_process_update_security_association(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_ipsec_sa_update *request = &responder->request.update_sa;
+	// the association as it stands, which is what it is looked up and verified by
+	struct dp_ipsec_sa_spec spec = {
+		.spi = request->sa.id.spi,
+		.vni = request->sa.id.vni,
+		.dir = request->sa.id.dir,
+	};
+	// and what it becomes: the same name, everything else as asked for
+	struct dp_ipsec_sa sa = {
+		.spi = request->new_spi,
+		.vni = request->sa.id.vni,
+		.algo = request->sa.algo,
+		.dir = request->sa.id.dir,
+		.replay_window = request->sa.replay_window,
+		.esn = request->sa.esn,
+	};
+
+	dp_copy_ipv6(&spec.src, &request->sa.id.src);
+	dp_copy_ipv6(&spec.dst, &request->sa.id.dst);
+	dp_copy_ipv6(&sa.src, &request->sa.id.src);
+	dp_copy_ipv6(&sa.dst, &request->sa.id.dst);
+	rte_memcpy(sa.key, request->sa.key, sizeof(sa.key));
+	rte_memcpy(sa.salt, request->sa.salt, sizeof(sa.salt));
+
+	return dp_ipsec_update_sa(&spec, &sa);
+}
+
 static int dp_process_get_security_association(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_ipsec_sa_id *request = &responder->request.get_sa;
@@ -1167,6 +1196,9 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_DeleteSecurityAssociation:
 		ret = dp_process_delete_security_association(&responder);
+		break;
+	case DP_REQ_TYPE_UpdateSecurityAssociation:
+		ret = dp_process_update_security_association(&responder);
 		break;
 	case DP_REQ_TYPE_GetSecurityAssociation:
 		ret = dp_process_get_security_association(&responder);

@@ -91,6 +91,7 @@ extern "C" {
 #define DP_LOG_IPV6STR(VALUE) _DP_LOG_STR("ipv6", VALUE)
 #define DP_LOG_UNDERLAY(VALUE) _DP_LOG_STR("underlay", VALUE)
 #define DP_LOG_SPI(VALUE) _DP_LOG_UINT("spi", VALUE)
+#define DP_LOG_SPI_NEW(VALUE) _DP_LOG_UINT("new_spi", VALUE)
 #define DP_LOG_SRC_UNDERLAY(VALUE) _DP_LOG_STR("src_underlay", VALUE)
 #define DP_LOG_DST_UNDERLAY(VALUE) _DP_LOG_STR("dst_underlay", VALUE)
 #define DP_LOG_LBID(VALUE) _DP_LOG_STR("lb_id", VALUE)

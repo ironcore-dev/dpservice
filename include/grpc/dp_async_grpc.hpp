@@ -189,6 +189,7 @@ CREATE_CALLCLASS(ResetVni, SingleReplyCall);
 
 CREATE_CALLCLASS(CreateSecurityAssociation, SingleReplyCall);
 CREATE_CALLCLASS(DeleteSecurityAssociation, SingleReplyCall);
+CREATE_CALLCLASS(UpdateSecurityAssociation, SingleReplyCall);
 CREATE_CALLCLASS(GetSecurityAssociation, SingleReplyCall);
 
 CREATE_CALLCLASS(CaptureStart, SingleReplyCall);

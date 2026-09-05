@@ -1166,11 +1166,38 @@ static const char* FillSecurityAssociationId(const SecurityAssociationId& id,
 	return NULL;
 }
 
+// What a create and a replace both carry beyond the id: the cipher, its key material and the two
+// per-association options. A replacement is built from scratch exactly as a new association is,
+// so nothing here is optional in the sense of being carried over from what is being replaced.
+static const char* FillSecurityAssociationParams(const IpsecAlgorithm& algorithm,
+												 const std::string& key, const std::string& salt,
+												 uint32_t replay_window, bool esn,
+												 struct dpgrpc_ipsec_sa* out)
+{
+	int key_len;
+	int salt_len;
+
+	if (!GrpcConv::GrpcToDpIpsecAlgo(algorithm, &out->algo))
+		return "Invalid algorithm";
+	// how much key material the cipher needs is a property of the cipher
+	key_len = dp_ipsec_get_key_len(out->algo);
+	salt_len = dp_ipsec_get_salt_len(out->algo);
+	if (DP_FAILED(key_len) || DP_FAILED(salt_len))
+		return "Invalid algorithm";
+	if (!GrpcConv::HexToBytes(key, out->key, (size_t)key_len))
+		return "Invalid key";
+	if (!GrpcConv::HexToBytes(salt, out->salt, (size_t)salt_len))
+		return "Invalid salt";
+	// the range is dp_ipsec.c's to judge, it is the only place that knows which values a
+	// direction allows
+	out->replay_window = replay_window;
+	out->esn = esn;
+	return NULL;
+}
+
 const char* CreateSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
 {
 	const char* error;
-	int key_len;
-	int salt_len;
 
 	DPGRPC_LOG_INFO("Creating Security Association",
 					DP_LOG_VNI(request_.id().vni()),
@@ -1180,22 +1207,9 @@ const char* CreateSecurityAssociationCall::FillRequest(struct dpgrpc_request* re
 	error = FillSecurityAssociationId(request_.id(), &request->add_sa.id);
 	if (error)
 		return error;
-	if (!GrpcConv::GrpcToDpIpsecAlgo(request_.algorithm(), &request->add_sa.algo))
-		return "Invalid algorithm";
-	// how much key material the cipher needs is a property of the cipher
-	key_len = dp_ipsec_get_key_len(request->add_sa.algo);
-	salt_len = dp_ipsec_get_salt_len(request->add_sa.algo);
-	if (DP_FAILED(key_len) || DP_FAILED(salt_len))
-		return "Invalid algorithm";
-	if (!GrpcConv::HexToBytes(request_.key(), request->add_sa.key, (size_t)key_len))
-		return "Invalid key";
-	if (!GrpcConv::HexToBytes(request_.salt(), request->add_sa.salt, (size_t)salt_len))
-		return "Invalid salt";
-	// the range is dp_ipsec_create_sa()'s to judge, it is the only place that knows which
-	// values a direction allows
-	request->add_sa.replay_window = request_.replay_window();
-	request->add_sa.esn = request_.esn();
-	return NULL;
+	return FillSecurityAssociationParams(request_.algorithm(), request_.key(), request_.salt(),
+										 request_.replay_window(), request_.esn(),
+										 &request->add_sa);
 }
 void CreateSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 {
@@ -1211,6 +1225,28 @@ const char* DeleteSecurityAssociationCall::FillRequest(struct dpgrpc_request* re
 	return FillSecurityAssociationId(request_.id(), &request->del_sa);
 }
 void DeleteSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* UpdateSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	const char* error;
+
+	DPGRPC_LOG_INFO("Replacing Security Association",
+					DP_LOG_VNI(request_.id().vni()),
+					DP_LOG_SPI(request_.id().spi()),
+					DP_LOG_SPI_NEW(request_.new_spi()),
+					DP_LOG_SRC_UNDERLAY(request_.id().src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.id().dst_underlay().c_str()));
+	error = FillSecurityAssociationId(request_.id(), &request->update_sa.sa.id);
+	if (error)
+		return error;
+	request->update_sa.new_spi = request_.new_spi();
+	return FillSecurityAssociationParams(request_.algorithm(), request_.key(), request_.salt(),
+										 request_.replay_window(), request_.esn(),
+										 &request->update_sa.sa);
+}
+void UpdateSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 {
 }
 

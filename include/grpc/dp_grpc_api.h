@@ -65,6 +65,7 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_CaptureStatus,
 	DP_REQ_TYPE_CreateSecurityAssociation,
 	DP_REQ_TYPE_DeleteSecurityAssociation,
+	DP_REQ_TYPE_UpdateSecurityAssociation,
 	DP_REQ_TYPE_GetSecurityAssociation,
 };
 
@@ -215,6 +216,14 @@ struct dpgrpc_ipsec_sa {
 	bool				esn;
 };
 
+// A replacement for a live Security Association: 'sa.id' names the one being replaced, current
+// wire SPI and all, and the rest of 'sa' is what it becomes - with 'new_spi' as the SPI its ESP
+// headers will carry, which is the one field that cannot travel in the id.
+struct dpgrpc_ipsec_sa_update {
+	struct dpgrpc_ipsec_sa	sa;
+	uint32_t				new_spi;
+};
+
 struct dpgrpc_request {
 	enum dpgrpc_request_type	type;
 	union {
@@ -256,6 +265,7 @@ struct dpgrpc_request {
 		struct dpgrpc_capture	capture_start;
 		struct dpgrpc_ipsec_sa	add_sa;
 		struct dpgrpc_ipsec_sa_id	del_sa;
+		struct dpgrpc_ipsec_sa_update	update_sa;
 		struct dpgrpc_ipsec_sa_id	get_sa;
 	};
 };

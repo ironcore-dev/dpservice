@@ -131,6 +131,7 @@ void GRPCService::HandleRpcs()
 	new GetVersionCall();
 	new CreateSecurityAssociationCall();
 	new DeleteSecurityAssociationCall();
+	new UpdateSecurityAssociationCall();
 	new GetSecurityAssociationCall();
 	new CaptureStartCall();
 	new CaptureStopCall();

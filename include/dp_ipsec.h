@@ -133,13 +133,18 @@ struct rte_mempool *dp_ipsec_get_op_pool(void);
 int dp_ipsec_get_key_len(enum dp_ipsec_algo algo);
 int dp_ipsec_get_salt_len(enum dp_ipsec_algo algo);
 
-// Security Association lifecycle. All three run on the worker thread, reached through the
+// Security Association lifecycle. All of these run on the worker thread, reached through the
 // ordinary gRPC request path, and all return DP_GRPC_* codes.
 // The SAD is written and read from that one thread only, which is why it carries no
 // concurrency flags and why dp_ipsec_delete_sa() can free right away, see dp_ipsec.c.
 int dp_ipsec_create_sa(const struct dp_ipsec_sa *request);
 int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec);
 int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out);
+// Replace a live association with one built to new parameters, in place: 'spec' names it as it
+// stands, 'request' is what it becomes. Egress only - an outbound association is the only one
+// found under a name that does not change, see docs/adr/0006. All or nothing: if anything the
+// replacement needs cannot be built, the association that is there keeps serving traffic.
+int dp_ipsec_update_sa(const struct dp_ipsec_sa_spec *spec, const struct dp_ipsec_sa *request);
 
 // Build a SAD key from a lookup SPI and the two underlay addresses, masking them to the supported
 // prefix length. This is the only place that decides what "the first 64 bits" means, and it is

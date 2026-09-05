@@ -429,46 +429,16 @@ static bool dp_ipsec_is_replay_window_valid(const struct dp_ipsec_sa *request)
 	return request->replay_window <= DP_IPSEC_REPLAY_WINDOW_MAX;
 }
 
-int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
+// Everything a request asks for, built into an association that is ready to be filed: its own
+// crypto session and its own librte_ipsec state, with the addresses already masked to what the
+// SAD matches. Nothing here is published anywhere, so a failure leaves the database untouched -
+// which is what lets dp_ipsec_update_sa() build a replacement while the old one keeps encrypting.
+static int dp_ipsec_build_sa(const struct dp_ipsec_sa *request, uint32_t lookup_spi,
+							 struct dp_ipsec_sa **out)
 {
-	struct dp_ipsec_sa_spec spec = {
-		.spi = request->spi,
-		.vni = request->vni,
-		.dir = request->dir,
-		.src = request->src,
-		.dst = request->dst,
-	};
 	union rte_ipsec_sad_key key;
 	struct rte_crypto_sym_xform xform;
 	struct dp_ipsec_sa *sa;
-	size_t slot;
-	int ret;
-
-	if (!dp_ipsec_sad)
-		return DP_GRPC_ERR_SA_DISABLED;
-
-	if (request->algo >= DP_IPSEC_ALGO_MAX)
-		return DP_GRPC_ERR_SA_ALGO;
-
-	if (!dp_ipsec_is_local_side_valid(request))
-		return DP_GRPC_ERR_SA_BAD_ADDR;
-
-	if (!dp_ipsec_is_replay_window_valid(request))
-		return DP_GRPC_ERR_SA_REPLAY_WINDOW;
-
-	// The SAD would silently overwrite the entry and leak what it used to point at, because
-	// rte_hash_add_key_with_hash_data() updates an existing key and reports success.
-	// Deliberately dp_ipsec_lookup_one() and not dp_ipsec_find_sa(): what cannot be held twice
-	// is one lookup SPI, so an egress association collides with one already filed under the same
-	// VNI and peer however different the rest of its identity is.
-	if (dp_ipsec_lookup_one(&spec))
-		return DP_GRPC_ERR_SA_EXISTS;
-
-	for (slot = 0; slot < RTE_DIM(dp_ipsec_sas); ++slot)
-		if (!dp_ipsec_sas[slot])
-			break;
-	if (slot == RTE_DIM(dp_ipsec_sas))
-		return DP_GRPC_ERR_LIMIT_REACHED;
 
 	// rte_ipsec_sad_add() requires the stored pointer to be at least 4-byte aligned
 	sa = rte_zmalloc("ipsec_sa", sizeof(*sa), RTE_CACHE_LINE_SIZE);
@@ -497,10 +467,74 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 		return DP_GRPC_ERR_SA_CREATE;
 	}
 
-	dp_ipsec_build_key(&key, dp_ipsec_get_lookup_spi(&spec), &sa->src, &sa->dst);
+	dp_ipsec_build_key(&key, lookup_spi, &sa->src, &sa->dst);
 	// Store what is actually matched, so that a later lookup or delete needs no re-masking
 	dp_ipv6_from_rte(&sa->src, &key.v6.sip);
 	dp_ipv6_from_rte(&sa->dst, &key.v6.dip);
+
+	*out = sa;
+	return DP_GRPC_OK;
+}
+
+// The slot the association occupies in dp_ipsec_sas[], which is the owning reference the SAD
+// itself does not give back. RTE_DIM(dp_ipsec_sas) if it is not there, which cannot happen.
+static size_t dp_ipsec_get_slot(const struct dp_ipsec_sa *sa)
+{
+	size_t slot;
+
+	for (slot = 0; slot < RTE_DIM(dp_ipsec_sas); ++slot)
+		if (dp_ipsec_sas[slot] == sa)
+			break;
+
+	return slot;
+}
+
+int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
+{
+	struct dp_ipsec_sa_spec spec = {
+		.spi = request->spi,
+		.vni = request->vni,
+		.dir = request->dir,
+		.src = request->src,
+		.dst = request->dst,
+	};
+	union rte_ipsec_sad_key key;
+	struct dp_ipsec_sa *sa;
+	size_t slot;
+	int ret;
+
+	if (!dp_ipsec_sad)
+		return DP_GRPC_ERR_SA_DISABLED;
+
+	if (request->algo >= DP_IPSEC_ALGO_MAX)
+		return DP_GRPC_ERR_SA_ALGO;
+
+	if (!dp_ipsec_is_local_side_valid(request))
+		return DP_GRPC_ERR_SA_BAD_ADDR;
+
+	if (!dp_ipsec_is_replay_window_valid(request))
+		return DP_GRPC_ERR_SA_REPLAY_WINDOW;
+
+	// The SAD would silently overwrite the entry and leak what it used to point at, because
+	// rte_hash_add_key_with_hash_data() updates an existing key and reports success.
+	// Deliberately dp_ipsec_lookup_one() and not dp_ipsec_find_sa(): what cannot be held twice
+	// is one lookup SPI, so an egress association collides with one already filed under the same
+	// VNI and peer however different the rest of its identity is. Replacing that one is what
+	// dp_ipsec_update_sa() is for.
+	if (dp_ipsec_lookup_one(&spec))
+		return DP_GRPC_ERR_SA_EXISTS;
+
+	for (slot = 0; slot < RTE_DIM(dp_ipsec_sas); ++slot)
+		if (!dp_ipsec_sas[slot])
+			break;
+	if (slot == RTE_DIM(dp_ipsec_sas))
+		return DP_GRPC_ERR_LIMIT_REACHED;
+
+	ret = dp_ipsec_build_sa(request, dp_ipsec_get_lookup_spi(&spec), &sa);
+	if (DP_FAILED(ret))
+		return ret;
+
+	dp_ipsec_build_key(&key, dp_ipsec_get_lookup_spi(&spec), &sa->src, &sa->dst);
 
 	ret = rte_ipsec_sad_add(dp_ipsec_sad, &key, RTE_IPSEC_SAD_SPI_DIP_SIP, sa);
 	if (DP_FAILED(ret)) {
@@ -513,10 +547,82 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 	return DP_GRPC_OK;
 }
 
+int dp_ipsec_update_sa(const struct dp_ipsec_sa_spec *spec, const struct dp_ipsec_sa *request)
+{
+	union rte_ipsec_sad_key key;
+	struct dp_ipsec_sa *old_sa;
+	struct dp_ipsec_sa *new_sa;
+	size_t slot;
+	int ret;
+
+	if (!dp_ipsec_sad)
+		return DP_GRPC_ERR_SA_DISABLED;
+
+	// An ingress association is filed under the SPI its frames carry, so replacing one in place
+	// could not change that SPI without moving the entry - and rotating its key in place would be
+	// worse than what the inbound path already offers, which is a second association alongside the
+	// old one for as long as both are needed. See docs/adr/0006.
+	if (spec->dir != DP_IPSEC_DIR_EGRESS)
+		return DP_GRPC_ERR_SA_DIRECTION;
+
+	if (request->algo >= DP_IPSEC_ALGO_MAX)
+		return DP_GRPC_ERR_SA_ALGO;
+
+	if (!dp_ipsec_is_local_side_valid(request))
+		return DP_GRPC_ERR_SA_BAD_ADDR;
+
+	if (!dp_ipsec_is_replay_window_valid(request))
+		return DP_GRPC_ERR_SA_REPLAY_WINDOW;
+
+	// The full identity is matched, exactly as Get and Delete match it, so a caller naming the
+	// association by a wire SPI it no longer carries replaces nothing instead of replacing
+	// whatever took its place.
+	old_sa = dp_ipsec_find_sa(spec);
+	if (!old_sa)
+		return DP_GRPC_ERR_SA_NOT_FOUND;
+
+	slot = dp_ipsec_get_slot(old_sa);
+	if (slot == RTE_DIM(dp_ipsec_sas)) {
+		DPS_LOG_ERR("Security Association is in the database but owned by nothing");
+		return DP_GRPC_ERR_SA_NOT_FOUND;
+	}
+
+	// Built before anything is published, so that a failure here is indistinguishable from a
+	// request that was never sent: the association below is still the one the SAD points at,
+	// still encrypting, with its sequence number untouched.
+	ret = dp_ipsec_build_sa(request, dp_ipsec_get_lookup_spi(spec), &new_sa);
+	if (DP_FAILED(ret))
+		return ret;
+
+	// The lookup SPI of an egress association is its VNI and the addresses are matched on their
+	// prefix, so this is the key the old association is already filed under. rte_ipsec_sad_add()
+	// overwrites an existing key and reports success - the very behaviour dp_ipsec_create_sa()
+	// has to guard against is what a replacement wants, and it is what closes the gap that
+	// deleting first would open. It does not disturb the entry if it fails.
+	dp_ipsec_build_key(&key, dp_ipsec_get_lookup_spi(spec), &new_sa->src, &new_sa->dst);
+
+	ret = rte_ipsec_sad_add(dp_ipsec_sad, &key, RTE_IPSEC_SAD_SPI_DIP_SIP, new_sa);
+	if (DP_FAILED(ret)) {
+		DPS_LOG_ERR("Cannot replace Security Association in the database", DP_LOG_RET(ret));
+		dp_ipsec_free_sa(new_sa);
+		return DP_GRPC_ERR_SA_CREATE;
+	}
+
+	// The replacement takes over the slot rather than asking for one, so a host holding the
+	// maximum number of associations can still rekey every one of them
+	dp_ipsec_sas[slot] = new_sa;
+	// Safe for the reason dp_ipsec_delete_sa() can free right away: the only thread that could
+	// be holding this pointer is the one running here
+	dp_ipsec_free_sa(old_sa);
+
+	return DP_GRPC_OK;
+}
+
 int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec)
 {
 	union rte_ipsec_sad_key key;
 	struct dp_ipsec_sa *sa;
+	size_t slot;
 	int ret;
 
 	if (!dp_ipsec_sad)
@@ -535,12 +641,9 @@ int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec)
 
 	// Freeing right away is safe: the only thread that can be holding this pointer is the one
 	// running here, and no lookup result outlives the node call that obtained it
-	for (size_t i = 0; i < RTE_DIM(dp_ipsec_sas); ++i) {
-		if (dp_ipsec_sas[i] != sa)
-			continue;
-		dp_ipsec_sas[i] = NULL;
-		break;
-	}
+	slot = dp_ipsec_get_slot(sa);
+	if (slot < RTE_DIM(dp_ipsec_sas))
+		dp_ipsec_sas[slot] = NULL;
 	dp_ipsec_free_sa(sa);
 
 	return DP_GRPC_OK;
