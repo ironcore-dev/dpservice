@@ -62,7 +62,7 @@ ESP header. The two are independent: an egress association is *found* under its 
 its SPI, so the number on the wire is whatever the two ends agreed on. See
 [ADR 0004](../adr/0004-the-lookup-spi-is-not-the-wire-spi.md).
 
-The three RPCs behind this, and what they reject, are in [the gRPC interface](#the-grpc-interface).
+The RPCs behind this, and what they reject, are in [the gRPC interface](#the-grpc-interface).
 
 
 ### How an association is found
@@ -79,9 +79,9 @@ interface the packet came in on. An outbound association is therefore named by t
 traffic it protects, which leaves the SPI it writes into the ESP header free.
 
 A caller never has to know which of the two it is. `Create`, `Get` and `Delete` all take the same
-five fields, and dp-service resolves the lookup SPI itself and then checks the rest of what it
-was given against what it found; see [the identity of an
-association](#the-identity-of-an-association).
+five fields - and `Update` names its association by them too - and dp-service resolves the lookup
+SPI itself and then checks the rest of what it was given against what it found; see [the identity
+of an association](#the-identity-of-an-association).
 
 A packet with no matching association is **dropped**, in both directions, without a log line.
 Before the control plane has provisioned anything that is the expected state, and one line per
@@ -137,8 +137,14 @@ one selector dp-service has, and nothing inspects the inner packet.
 
 Each association owns its sequence number, as RFC 4303 requires. It starts at 1 and doubles as
 the 8-byte explicit nonce, which makes the one thing AES-GCM cannot survive - the same nonce
-twice under one key - impossible by construction rather than merely unlikely. The salt is never
+twice under one key - impossible by construction within one association. The salt is never
 on the wire; both ends must already have it.
+
+Across associations it is the control plane's to avoid, and [`Update`](#replacing-one) is where
+that matters: it installs a *new* association under an existing name, so its counter starts over
+from 1. It therefore has to be given key material that association has not used before - the
+nonce is `salt || sequence number`, and reusing both under one key repeats it. This is the same
+obligation a delete followed by a create has always carried, and dpservice checks neither.
 
 Ingress associations may carry an **anti-replay window**, sized per association by the
 `replay_window` field on `CreateSecurityAssociation`. A frame whose sequence number has already
@@ -169,7 +175,7 @@ cannot check that - it only ever sees its own end. See ADR 0003.
 
 ## The gRPC interface
 
-Three RPCs were added to the `DPDKironcore` service in `proto/dpdk.proto`, and they exist only
+Four RPCs were added to the `DPDKironcore` service in `proto/dpdk.proto`, and they exist only
 when dpservice was started with `--enable-ipsec`; without it every one of them fails with
 `SA_DISABLED` rather than being absent from the service.
 
@@ -177,6 +183,7 @@ when dpservice was started with `--enable-ipsec`; without it every one of them f
 | --- | --- |
 | `CreateSecurityAssociation` | Install one unidirectional association, with its key material |
 | `GetSecurityAssociation` | Read one back, including its key and salt |
+| `UpdateSecurityAssociation` | Replace an egress association in place, with no gap in what it protects |
 | `DeleteSecurityAssociation` | Remove one |
 
 There is no `ListSecurityAssociations`. A caller that wants to enumerate what it installed has to
@@ -184,7 +191,9 @@ remember it, which is acceptable only because the control plane is the sole writ
 
 ### The identity of an association
 
-An association is named by five fields, which travel together as one message:
+An association is named by five fields, which travel together as one message. Four of them are
+fixed for its whole life; the wire SPI is not, since [replacing an association](#replacing-one)
+is how it changes:
 
 ```protobuf
 message SecurityAssociationId {
@@ -197,7 +206,8 @@ message SecurityAssociationId {
 ```
 
 `GetSecurityAssociationRequest` and `DeleteSecurityAssociationRequest` are that message and
-nothing else; `Create` and the `Get` response embed it beside the key material.
+nothing else; `Create` and the `Get` response embed it beside the key material, and
+[`Update`](#replacing-one) embeds it as the name of the association it replaces.
 
 Only three of the five are what the database is keyed on - the lookup SPI plus the address pair -
 but all five are matched. dp-service resolves the entry, then compares the fields it did not key
@@ -240,6 +250,48 @@ feature.
 `GetSecurityAssociationResponse` mirrors this message field for field, with `status` prepended,
 and it does return the key and the salt.
 
+### Replacing one
+
+An egress association can be replaced without ever leaving the traffic it protects unprotected:
+
+```protobuf
+message UpdateSecurityAssociationRequest {
+	SecurityAssociationId id = 1;      // the association as it stands now, current wire SPI and all
+	uint32 new_spi = 2;                // what its ESP headers carry from here on
+	IpsecAlgorithm algorithm = 3;
+	bytes key = 4;
+	bytes salt = 5;
+	uint32 replay_window = 6;          // egress, so anything but zero is refused
+	bool esn = 7;
+}
+```
+
+dpservice builds the replacement whole - its own crypto session, its own `librte_ipsec` state -
+while the old association is still encrypting, and only then swaps it in. Requests are processed
+by a source node of the one graph, so no packet is handled in between: packet *N* leaves under the
+old key and packet *N+1* under the new one. Anything that fails leaves the association that is
+there still serving traffic, so a failed `Update` is indistinguishable from one that was never
+sent.
+
+`id` names the association **as it stands**, so it carries the wire SPI the association has now,
+not the one it is about to get; that goes in `new_spi`. Everything after it is what the
+association becomes, with the same defaulting rules as a create - nothing is carried over from
+what is being replaced, so an omitted `algorithm` means AES-128-GCM rather than whatever the old
+association used.
+
+It is **egress only**; an ingress `Update` is refused with `SA_DIRECTION`. An inbound association
+does not need one: it is found under the SPI its frames carry, so a second one is simply added
+beside the live one and the old one deleted once the peer has switched. Rotating an inbound key in
+place would be worse than that, not better, since it would drop whatever is still in flight under
+the old SPI. See [ADR 0006](../adr/0006-egress-associations-are-rekeyed-by-replacement.md).
+
+Rekeying a whole tunnel is therefore three steps, in this order, and the order is the control
+plane's to get right - dpservice cannot see whether the far end is ready:
+
+1. the peer installs its new **ingress** association, alongside the one it already has;
+2. this side **replaces** its egress association, which switches the wire SPI and the key at once;
+3. the peer deletes its old ingress association.
+
 ### What it rejects
 
 Failures arrive on two layers. Anything malformed enough that the request cannot be built - an
@@ -257,6 +309,7 @@ successful response:
 | 465 | `SA_BAD_ADDR` | The local side of the association is not our own underlay `/64` |
 | 466 | `SA_DISABLED` | dpservice was not started with `--enable-ipsec` |
 | 467 | `SA_REPLAY_WINDOW` | Non-zero on an egress association, or above 4096 |
+| 468 | `SA_DIRECTION` | `Update` named an ingress association, which cannot be replaced in place |
 
 `SA_EXISTS` is checked explicitly rather than left to the database, because
 `rte_ipsec_sad_add()` overwrites a duplicate key and reports success, leaking the association it
@@ -267,7 +320,7 @@ and an allocation failure `OUT_OF_MEMORY`.
 
 ### From the CLI
 
-`dpservice-cli` wraps all three, under `securityassociation`:
+`dpservice-cli` wraps all four, under `securityassociation`:
 
 ```bash
 dpservice-cli create securityassociation --vni=100 --spi=43794 --direction=egress \
@@ -278,13 +331,19 @@ dpservice-cli get    securityassociation --vni=100 --spi=43794 --direction=egres
     --src-underlay=fc00:1:: --dst-underlay=fc00:2::
 dpservice-cli delete securityassociation --vni=100 --spi=43794 --direction=egress \
     --src-underlay=fc00:1:: --dst-underlay=fc00:2::
+
+dpservice-cli update securityassociation --vni=100 --spi=43794 --direction=egress \
+    --src-underlay=fc00:1:: --dst-underlay=fc00:2:: \
+    --new-spi=43795 --key=<32 hex digits> --salt=<8 hex digits>
 ```
 
-All three take the same five flags, because all five name the association.
+The same five flags name the association in every one of them. `update` adds `--new-spi` and a
+full set of the create's flags, because it replaces the association rather than editing it.
 
 `--algorithm` defaults to `aes-128-gcm`, `--replay-window` to zero and `--esn` to off, so none of
-the three has to be given. `--algorithm=aes-256-gcm` takes a 64-digit key; `--esn` has to be
-passed to both ends of a tunnel or neither.
+them has to be given - on an `update` too, where an omitted flag means its default rather than
+what the association held a moment ago. `--algorithm=aes-256-gcm` takes a 64-digit key; `--esn`
+has to be passed to both ends of a tunnel or neither.
 
 
 ## Deliberate limits of the PoC
@@ -295,16 +354,15 @@ passed to both ends of a tunnel or neither.
   See [why there is no policy database](#why-there-is-no-policy-database). What *is* missing is
   the inbound policy check of RFC 4301 section 5.2 in its full form; the one selector dp-service
   can check is covered by [the inbound VNI check](#the-inbound-vni-check).
-- **No SA negotiation, and rekeying is not yet gapless.** Associations are created and deleted
-  over gRPC, but keys arrive fully formed: there is no IKE, no distribution, no lifetime or byte
-  counters, and no automatic rotation. The inbound half of a make-before-break rotation works
-  today - ingress associations are found under the SPI their frames carry, so several of them can
-  serve one VNI and peer at once - but the outbound half cannot, because an egress association is
-  found under its VNI and a second one for that VNI and peer is the same entry. Rekeying is
-  therefore still delete-then-create on the sending side, and the gap between the two drops
-  traffic rather than sending it in the clear. Closing it needs a replace path, which does not
-  exist yet. `ListSecurityAssociations` does not
-  exist yet; see [the gRPC interface](#the-grpc-interface) for what does.
+- **No SA negotiation, though rekeying is gapless.** Associations are managed over gRPC, but keys
+  arrive fully formed: there is no IKE, no distribution, no lifetime or byte counters, and no
+  automatic rotation. Rotating them by hand loses nothing - inbound by holding two associations
+  at once, outbound by [replacing one](#replacing-one) - but the *ordering* of those steps is the
+  control plane's obligation, because dpservice cannot see whether the far end is ready and the
+  switch is instantaneous. An `Update` issued before the peer has installed its new ingress
+  association loses exactly as much traffic as the gap it replaces.
+  `ListSecurityAssociations` does not exist; see
+  [the gRPC interface](#the-grpc-interface) for what does.
 - **Anti-replay is off by default.** `replay_window` is configurable per association, but an
   association created without it accepts replayed frames. A control plane that wants the
   protection must ask for it on every ingress association it creates. See ADR 0002.
@@ -348,15 +406,16 @@ passed to both ends of a tunnel or neither.
 
 The pytest suite runs `test_vf_to_vf_encap.py` twice: once normally, and once as the `ipsec`
 suite with the mode enabled. The test body is identical; only what it observes on the PF differs.
-The `ipsec` suite also runs `xtratest_ipsec_grpc.py`, which exercises create, get and delete
-without sending a packet, so that an API failure and a dataplane failure are distinguishable.
+The `ipsec` suite also runs `xtratest_ipsec_grpc.py`, which exercises the four calls without
+sending a packet, so that an API failure and a dataplane failure are distinguishable.
 
 `xtratest_ipsec_esn.py` covers the two per-association options that change what the cipher does
 rather than which packets it covers - extended sequence numbers and the 256-bit key - in *both*
 directions, and one test runs them together. It has to get at the encrypting side by deleting the
 session's own pair of associations and creating it again with the parameters under test, because
 an egress association is found under its VNI and there is therefore no way to hold a second
-outbound association for one peer. `xtratest_ipsec_dataplane.py` covers the same two options on the way in,
+outbound association for one peer - deliberately not through `Update`, so that a regression in
+the replace path cannot report itself as a cipher failure. `xtratest_ipsec_dataplane.py` covers the same two options on the way in,
 where an extra association *can* simply be added, and adds the negative both files rest on: a
 frame framed without extended sequence numbers, on an association that has them, is refused - the
 same key, the same SPI and a sequence number never seen, differing only in what the ICV covers.
@@ -382,6 +441,21 @@ it over.
 `xtratest_ipsec_dataplane.py` covers the failing path, which the round trip cannot: it runs the
 same exchange twice, differing only in which key the peer authenticates its answer with, and
 requires the second one not to arrive.
+
+`xtratest_ipsec_rekey.py` rotates both directions of the session's tunnel, in the order
+[the replace path](#replacing-one) prescribes: the peer registers the new egress key, the egress
+association is replaced, the new ingress association is added beside the live one, and only then
+is the old one deleted. Three bursts of three packets, all nine delivered. The peer holds every
+egress association dpservice might be sending under and picks by the SPI it reads off the frame,
+rather than being told which key to use - a harness that switched keys on cue would pass without
+ever showing that the SPI on the wire changed. The replacement's first frame is required to carry
+sequence 1, which is what a new association starting a counter of its own looks like from
+outside, and why it has to be given key material the old one never used.
+
+Nothing here is concurrent, and nothing needs to be: gRPC requests are handled by a source node
+of the one graph, so no packet is processed while a replacement is swapped in. The bursts either
+side of it show that the transition costs nothing, which is a different claim from winning a race
+and the only one there is to make.
 
 
 ### The second peer

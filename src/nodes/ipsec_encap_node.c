@@ -27,8 +27,9 @@ int ipsec_encap_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
 
 // There is no security policy database, so the outbound Security Association is selected by
 // the underlay addresses ipip_encap has already written plus the VNI this packet belongs to,
-// which is what its SPI is expected to be. The route's target VNI is deliberately not used:
-// it is zero for every route created without one, which would key every association alike.
+// which is what an egress association is filed under (see docs/adr/0004; the SPI it writes into
+// the ESP header is a separate field). The route's target VNI is deliberately not used: it is
+// zero for every route created without one, which would key every association alike.
 static __rte_always_inline void ipsec_encap_build_key(union rte_ipsec_sad_key *key, struct rte_mbuf *m)
 {
 	const struct rte_ether_hdr *ether_hdr = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
