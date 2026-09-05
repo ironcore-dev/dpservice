@@ -31,6 +31,7 @@ func Command() *cobra.Command {
 		Get(dpdkClientOptions),
 		List(dpdkClientOptions),
 		Delete(dpdkClientOptions),
+		Update(dpdkClientOptions),
 		Reset(dpdkClientOptions),
 		Init(dpdkClientOptions, rendererOptions),
 		Capture(dpdkClientOptions),

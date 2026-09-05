@@ -47,6 +47,7 @@ type Client interface {
 
 	CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
 	DeleteSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	UpdateSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, sa *api.SecurityAssociationUpdate, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
 	GetSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
 	GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
 	CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[]uint32) (*api.Nat, error)
@@ -813,6 +814,48 @@ func (c *client) DeleteSecurityAssociation(ctx context.Context, id *api.Security
 	retSa := &api.SecurityAssociation{
 		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
 		SecurityAssociationMeta: *id,
+		Status:                  api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retSa, nil
+}
+
+// Replace a live egress association with one built to the given parameters. 'id' names it as it
+// stands, current wire SPI and all; everything in 'sa' is what it becomes, with nothing carried
+// over from what is being replaced.
+func (c *client) UpdateSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, sa *api.SecurityAssociationUpdate, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	if sa == nil {
+		return &api.SecurityAssociation{}, fmt.Errorf("error: input security association cannot be nil")
+	}
+	protoId, err := protoSecurityAssociationId(id)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	algorithm, err := protoIpsecAlgorithm(sa.Spec.Algorithm)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	res, err := c.DPDKironcoreClient.UpdateSecurityAssociation(ctx, &dpdkproto.UpdateSecurityAssociationRequest{
+		Id:           protoId,
+		NewSpi:       sa.NewSpi,
+		Algorithm:    algorithm,
+		Key:          []byte(sa.Spec.Key),
+		Salt:         []byte(sa.Spec.Salt),
+		ReplayWindow: sa.Spec.ReplayWindow,
+		Esn:          sa.Spec.Esn,
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	// what comes back is the association as it now is, which is the old name with the new SPI
+	newMeta := *id
+	newMeta.Spi = sa.NewSpi
+	retSa := &api.SecurityAssociation{
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: newMeta,
+		Spec:                    sa.Spec,
 		Status:                  api.ProtoStatusToStatus(res.Status),
 	}
 	if res.GetStatus().GetCode() != 0 {

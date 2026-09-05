@@ -697,6 +697,15 @@ type SecurityAssociationSpec struct {
 	Esn bool `json:"esn"`
 }
 
+// SecurityAssociationUpdate is what an association becomes when it is replaced: a new wire SPI
+// and a complete new spec. Nothing is carried over from the association being replaced, and the
+// replacement starts a sequence number of its own - so it needs key material that association
+// has not used before.
+type SecurityAssociationUpdate struct {
+	NewSpi uint32                  `json:"new_spi"`
+	Spec   SecurityAssociationSpec `json:"spec"`
+}
+
 var (
 	InterfaceKind              = reflect.TypeOf(Interface{}).Name()
 	InterfaceListKind          = reflect.TypeOf(InterfaceList{}).Name()

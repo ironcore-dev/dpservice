@@ -99,6 +99,7 @@ type DPDKironcoreClient interface {
 	// Only available when dpservice was started with --enable-ipsec.
 	CreateSecurityAssociation(ctx context.Context, in *CreateSecurityAssociationRequest, opts ...grpc.CallOption) (*CreateSecurityAssociationResponse, error)
 	DeleteSecurityAssociation(ctx context.Context, in *DeleteSecurityAssociationRequest, opts ...grpc.CallOption) (*DeleteSecurityAssociationResponse, error)
+	UpdateSecurityAssociation(ctx context.Context, in *UpdateSecurityAssociationRequest, opts ...grpc.CallOption) (*UpdateSecurityAssociationResponse, error)
 	GetSecurityAssociation(ctx context.Context, in *GetSecurityAssociationRequest, opts ...grpc.CallOption) (*GetSecurityAssociationResponse, error)
 	// // PACKET CAPTURE
 	CaptureStart(ctx context.Context, in *CaptureStartRequest, opts ...grpc.CallOption) (*CaptureStartResponse, error)
@@ -483,6 +484,15 @@ func (c *dPDKironcoreClient) DeleteSecurityAssociation(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *dPDKironcoreClient) UpdateSecurityAssociation(ctx context.Context, in *UpdateSecurityAssociationRequest, opts ...grpc.CallOption) (*UpdateSecurityAssociationResponse, error) {
+	out := new(UpdateSecurityAssociationResponse)
+	err := c.cc.Invoke(ctx, "/dpdkironcore.v1.DPDKironcore/UpdateSecurityAssociation", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *dPDKironcoreClient) GetSecurityAssociation(ctx context.Context, in *GetSecurityAssociationRequest, opts ...grpc.CallOption) (*GetSecurityAssociationResponse, error) {
 	out := new(GetSecurityAssociationResponse)
 	err := c.cc.Invoke(ctx, "/dpdkironcore.v1.DPDKironcore/GetSecurityAssociation", in, out, opts...)
@@ -597,6 +607,7 @@ type DPDKironcoreServer interface {
 	// Only available when dpservice was started with --enable-ipsec.
 	CreateSecurityAssociation(context.Context, *CreateSecurityAssociationRequest) (*CreateSecurityAssociationResponse, error)
 	DeleteSecurityAssociation(context.Context, *DeleteSecurityAssociationRequest) (*DeleteSecurityAssociationResponse, error)
+	UpdateSecurityAssociation(context.Context, *UpdateSecurityAssociationRequest) (*UpdateSecurityAssociationResponse, error)
 	GetSecurityAssociation(context.Context, *GetSecurityAssociationRequest) (*GetSecurityAssociationResponse, error)
 	// // PACKET CAPTURE
 	CaptureStart(context.Context, *CaptureStartRequest) (*CaptureStartResponse, error)
@@ -731,6 +742,9 @@ func (UnimplementedDPDKironcoreServer) CreateSecurityAssociation(context.Context
 }
 func (UnimplementedDPDKironcoreServer) DeleteSecurityAssociation(context.Context, *DeleteSecurityAssociationRequest) (*DeleteSecurityAssociationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSecurityAssociation not implemented")
+}
+func (UnimplementedDPDKironcoreServer) UpdateSecurityAssociation(context.Context, *UpdateSecurityAssociationRequest) (*UpdateSecurityAssociationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSecurityAssociation not implemented")
 }
 func (UnimplementedDPDKironcoreServer) GetSecurityAssociation(context.Context, *GetSecurityAssociationRequest) (*GetSecurityAssociationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSecurityAssociation not implemented")
@@ -1495,6 +1509,24 @@ func _DPDKironcore_DeleteSecurityAssociation_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DPDKironcore_UpdateSecurityAssociation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSecurityAssociationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DPDKironcoreServer).UpdateSecurityAssociation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dpdkironcore.v1.DPDKironcore/UpdateSecurityAssociation",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DPDKironcoreServer).UpdateSecurityAssociation(ctx, req.(*UpdateSecurityAssociationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DPDKironcore_GetSecurityAssociation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetSecurityAssociationRequest)
 	if err := dec(in); err != nil {
@@ -1737,6 +1769,10 @@ var DPDKironcore_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteSecurityAssociation",
 			Handler:    _DPDKironcore_DeleteSecurityAssociation_Handler,
+		},
+		{
+			MethodName: "UpdateSecurityAssociation",
+			Handler:    _DPDKironcore_UpdateSecurityAssociation_Handler,
 		},
 		{
 			MethodName: "GetSecurityAssociation",
