@@ -14,14 +14,16 @@ from ipsec_peer import IpsecPeer, assert_esp_framing
 #
 # It cannot simply be a second egress association, either. An egress association is found under
 # the VNI a packet came in on, so for one VNI and one peer there is exactly one outbound
-# association and no way to ask for a different one - which is the rekeying limitation named in
-# docs/concepts/ipsec.md. Freeing the wire SPI from the VNI did not change that: it lets the SPI
-# on the wire change without moving the entry, it does not create a second entry.
+# association and no way to ask for a different one. Freeing the wire SPI from the VNI did not
+# change that, and neither does the replace path: an association can be replaced, it cannot be
+# duplicated.
 #
 # So this replaces it. Each test below deletes the pair dp_service.py installed, creates it again
 # with the parameters under test, runs a full round trip through it, and puts the original pair
-# back. That the association can be replaced at all is worth having tested on its own: it is the
-# closest thing to a rekey the current design allows.
+# back. Deliberately not through UpdateSecurityAssociation, which could do the egress half in one
+# request: what these tests are about is what the cipher does, and routing their setup through a
+# second feature would let a regression in that feature report itself as an ESN failure.
+# Rekeying itself is xtratest_ipsec_rekey.py's subject.
 #
 # The round trip is the one test_vf_to_vf_encap.py runs, cut down to what is needed here: VM1
 # sends to the neighbouring instance's overlay prefix, the harness catches the encrypted frame on

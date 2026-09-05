@@ -104,6 +104,17 @@ ipsec_salt_aes256_egress = "d1e60b47"
 ipsec_key_aes256_ingress = "9a2f75c8e01d436bf82ea59c07d13648b5e092af7c31d0685ea4f92c30b871de"
 ipsec_salt_aes256_ingress = "68af203c"
 
+# What xtratest_ipsec_rekey.py rotates the session's own pair onto, one set per direction. The
+# egress half arrives by replacement and the ingress half by adding a second association beside
+# the live one, so unlike every other association in this file the ingress SPI has to differ from
+# the one already in place - both are in the database at the same time.
+ipsec_spi_rekeyed = 0x3456
+ipsec_key_rekeyed_egress = "0b57e9c1a3d846f27e05b19c4d3a8e60"
+ipsec_salt_rekeyed_egress = "7f21c0d3"
+ipsec_spi_rekeyed_ingress = 0x789a
+ipsec_key_rekeyed_ingress = "c814a05fd3627eb9401ca8d75f3e26b1"
+ipsec_salt_rekeyed_ingress = "36e0ba9d"
+
 # Key material is hex handed straight to dpservice, which refuses anything of the wrong length or
 # with a non-hex digit in it - as a "Invalid key" gRPC error several layers away from the typo
 # that caused it. Checking it here names the constant instead.

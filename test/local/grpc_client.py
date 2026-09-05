@@ -240,6 +240,21 @@ class GrpcClient:
 			cmd += f" --esn={'true' if esn else 'false'}"
 		self._call(cmd)
 
+	def updatesa(self, vni, spi, direction, src_underlay, dst_underlay, new_spi, key, salt,
+				 algorithm=None, replay_window=None, esn=None):
+		# vni/spi/direction/underlays name the association as it stands, everything after new_spi
+		# is what it becomes - nothing is carried over from what is being replaced
+		cmd = (f"update securityassociation --vni={vni} --spi={spi} --direction={direction}"
+			   f" --src-underlay={src_underlay} --dst-underlay={dst_underlay}"
+			   f" --new-spi={new_spi} --key={key} --salt={salt}")
+		if algorithm:
+			cmd += f" --algorithm={algorithm}"
+		if replay_window is not None:
+			cmd += f" --replay-window={replay_window}"
+		if esn is not None:
+			cmd += f" --esn={'true' if esn else 'false'}"
+		self._call(cmd)
+
 	def getsa(self, vni, spi, direction, src_underlay, dst_underlay):
 		# both halves matter here: the identity lives in the metadata, the rest in the spec
 		response = self._call(f"get securityassociation --vni={vni} --spi={spi} --direction={direction}"

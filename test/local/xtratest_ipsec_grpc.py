@@ -158,6 +158,71 @@ def test_ipsec_sa_errors(prepare_ipv4, grpc_client):
 									   algorithm="chacha20-poly1305")
 
 
+# Replacing an association is a create's worth of parameters applied to a name that already
+# exists, so it rejects everything a create rejects - and two things a create cannot.
+def test_ipsec_sa_update_errors(prepare_ipv4, grpc_client):
+	# there has to be something to replace
+	grpc_client.expect_error(462).updatesa(sa_vni, sa_spi, "egress", sa_src, sa_dst,
+										   sa_spi + 1, sa_key_alt, sa_salt)
+
+	grpc_client.addsa(sa_vni, sa_spi, "egress", sa_src, sa_dst, sa_key, sa_salt)
+	grpc_client.addsa(sa_vni, sa_spi, "ingress", sa_dst, sa_src, sa_key, sa_salt,
+					  replay_window=sa_replay_window)
+
+	# an ingress association is filed under the SPI its frames carry, so it cannot be renumbered
+	# in place - and rotating its key in place would drop what is still in flight under the old
+	# one, which is why the inbound path adds a second association instead
+	grpc_client.expect_error(468).updatesa(sa_vni, sa_spi, "ingress", sa_dst, sa_src,
+										   sa_spi + 1, sa_key_alt, sa_salt)
+	assert grpc_client.getsa(sa_vni, sa_spi, "ingress", sa_dst, sa_src)['key'] == sa_key, 		"A refused replacement disturbed the ingress association"
+
+	# naming the association by a wire SPI it does not carry finds nothing, even though the entry
+	# it would replace is filed under the VNI and is right there
+	grpc_client.expect_error(462).updatesa(sa_vni, sa_spi + 1, "egress", sa_src, sa_dst,
+										   sa_spi + 2, sa_key_alt, sa_salt)
+
+	# the replacement is validated as a fresh association, not as a delta on the old one
+	grpc_client.expect_error(467).updatesa(sa_vni, sa_spi, "egress", sa_src, sa_dst,
+										   sa_spi + 1, sa_key_alt, sa_salt, replay_window=64)
+	grpc_client.expect_error(465).updatesa(sa_vni, sa_spi, "egress", sa_dst, sa_src,
+										   sa_spi + 1, sa_key_alt, sa_salt)
+	grpc_client.expect_failure().updatesa(sa_vni, sa_spi, "egress", sa_src, sa_dst,
+										  sa_spi + 1, sa_key_alt, sa_salt,
+										  algorithm="aes-256-gcm")
+
+	# none of which replaced anything
+	sa = grpc_client.getsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)
+	assert sa['spi'] == sa_spi and sa['key'] == sa_key, 		"A refused replacement left the association changed"
+
+	grpc_client.delsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)
+	grpc_client.delsa(sa_vni, sa_spi, "ingress", sa_dst, sa_src)
+
+
+# What a replacement is: the same name, everything else as asked for. Nothing is carried over from
+# the association being replaced, so an omitted field means its default rather than what was there
+# before - which is why every one of them is asserted here.
+def test_ipsec_sa_update_replaces_everything(prepare_ipv4, grpc_client):
+	grpc_client.addsa(sa_vni, sa_spi, "egress", sa_src, sa_dst, sa_key, sa_salt)
+
+	grpc_client.updatesa(sa_vni, sa_spi, "egress", sa_src, sa_dst,
+						 sa_spi + 1, sa_key_256, sa_salt, algorithm="aes-256-gcm", esn=True)
+
+	sa = grpc_client.getsa(sa_vni, sa_spi + 1, "egress", sa_src, sa_dst)
+	assert sa['spi'] == sa_spi + 1, 		"Replaced association did not take the new wire SPI"
+	assert sa['key'] == sa_key_256 and sa['algorithm'] == "aes_256_gcm", 		"Replaced association did not take the new key material"
+	assert sa['esn'] is True, 		"Replaced association did not take the options it was given"
+	# and it is still one entry, filed where it always was
+	assert sa['vni'] == sa_vni and sa['src_underlay'] == sa_src_prefix and sa['dst_underlay'] == sa_dst_prefix, 		"Replacing an association moved it"
+	grpc_client.expect_error(462).getsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)
+
+	# an omitted option is its default, not what the association held a moment ago
+	grpc_client.updatesa(sa_vni, sa_spi + 1, "egress", sa_src, sa_dst, sa_spi, sa_key, sa_salt)
+	sa = grpc_client.getsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)
+	assert sa['esn'] is False and sa['algorithm'] == "aes_128_gcm", 		"Replacing an association carried over what it was not asked to keep"
+
+	grpc_client.delsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)
+
+
 # The two per-association options that change what the cipher does rather than merely which
 # addresses it covers. Both are reported back, because a control plane that cannot read them back
 # cannot tell an association it configured from one it merely asked for - and for ESN in
