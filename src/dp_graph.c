@@ -147,16 +147,16 @@ static int dp_graph_init_nodes(void)
 		// some nodes need a direct Tx connection to all PF/VF ports, add them dynamically
 		snprintf(name, sizeof(name), "tx-%u", port_id);
 		if (port->is_pf) {
-			// In IPsec mode the encapsulated packet still has to be encrypted, so
-			// ipip_encap hands it to ipsec_encap and that node owns the Tx edges. Wiring
-			// the mode into the graph rather than branching per packet keeps ipip_encap
-			// untouched and makes the exported graph show the pipeline actually in use.
+			// Encryption is per interface, so ipip_encap needs both edges and picks
+			// between them per packet: straight to Tx for a cleartext interface, and to
+			// ipsec_encap - which owns Tx edges of its own - for an encrypting one. The
+			// second edge exists only where the capability does, and no interface can
+			// encrypt without it, so a build without IPsec keeps exactly the graph it had.
+			if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, name)))
+				return DP_ERROR;
 			if (dp_conf_is_ipsec_enabled()) {
-				if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, "ipsec_encap"))
+				if (DP_FAILED(ipip_encap_node_append_pf_ipsec(port_id, "ipsec_encap"))
 					|| DP_FAILED(ipsec_encap_node_append_pf_tx(port_id, name)))
-					return DP_ERROR;
-			} else {
-				if (DP_FAILED(ipip_encap_node_append_pf_tx(port_id, name)))
 					return DP_ERROR;
 			}
 		} else {

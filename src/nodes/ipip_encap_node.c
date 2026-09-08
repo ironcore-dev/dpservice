@@ -17,10 +17,18 @@
 DP_NODE_REGISTER_NOINIT(IPIP_ENCAP, ipip_encap, NEXT_NODES);
 
 static uint16_t next_tx_index[DP_MAX_PORTS];
+// Empty unless dpservice runs with the IPsec capability, and only ever indexed for a packet
+// whose incoming interface encrypts - which cannot be true without that capability.
+static uint16_t next_ipsec_index[DP_MAX_PORTS];
 
 int ipip_encap_node_append_pf_tx(uint16_t port_id, const char *tx_node_name)
 {
 	return dp_node_append_pf_tx(DP_NODE_GET_SELF(ipip_encap), next_tx_index, port_id, tx_node_name);
+}
+
+int ipip_encap_node_append_pf_ipsec(uint16_t port_id, const char *ipsec_node_name)
+{
+	return dp_node_append_pf_tx(DP_NODE_GET_SELF(ipip_encap), next_ipsec_index, port_id, ipsec_node_name);
 }
 
 static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, struct rte_mbuf *m)
@@ -79,6 +87,14 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 		dp_get_pkt_mark(m)->flags.is_recirc = true;
 		return IPIP_ENCAP_NEXT_CLS;
 	}
+
+	// Encryption is a property of the interface this packet came from, so the choice between
+	// leaving in the clear and being handed to ipsec_encap is made here rather than inside
+	// that node. It keeps ipsec_encap single-purpose: everything reaching it must leave
+	// encrypted or not at all, with no cleartext path running through its fail-closed
+	// handling of a missing Security Association. See docs/adr/0007.
+	if (dp_get_in_port(m)->iface.encrypt)
+		return next_ipsec_index[df->nxt_hop];
 
 	return next_tx_index[df->nxt_hop];
 }

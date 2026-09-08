@@ -10,6 +10,7 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_vnf.h"
 #include "nodes/cls_node.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
@@ -139,6 +140,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	uint32_t l3_type;
 	struct dp_flow *df;
 	struct dp_port *port;
+	struct dp_port *dst_port;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
 #endif
@@ -195,16 +197,30 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				}
 			}
 #endif
-			// In IPsec mode the tunnel is encrypted, so what it carries cannot be known
-			// until ipsec_decap has decrypted it. Unencrypted tunnel traffic is dropped
-			// rather than accepted, which stands in for the policy database we do not have
-			// yet - see docs/concepts/ipsec.md.
+			// both paths below need these, and so does the endpoint lookup between them
+			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
+			dp_extract_underlay_header(df, ipv6_hdr);
+
+			// Encryption is a property of the destination interface, and the frame's
+			// protection has to match it: ESP is refused at a cleartext interface, and
+			// cleartext at an encrypting one. That is the whole of the inbound policy,
+			// and this is the only place it can be applied - the endpoint is not known
+			// before it, and after it the distinction is gone, because ipsec_decap
+			// deliberately leaves a decrypted frame looking exactly like one that arrived
+			// in the clear. See docs/adr/0007.
+			//
+			// Like the VNI check in ipsec_decap this decides on unauthenticated data, and
+			// is safe for the same reason: the outcome is always a drop, so a forged frame
+			// cannot cause a legitimate one to be discarded. ipip_decap repeats the lookup
+			// and gets the cached result, exactly as it already does behind ipsec_decap.
 			if (ipsec_enabled) {
-				if (unlikely(ipv6_hdr->proto != IPPROTO_ESP))
+				dst_port = dp_vnf_resolve_tunnel_dst(m);
+				if (unlikely(!dst_port))
 					return CLS_NEXT_DROP;
-				df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
-				dp_extract_underlay_header(df, ipv6_hdr);
-				return next_ipsec_decap_index;
+				if (unlikely(dst_port->iface.encrypt != (ipv6_hdr->proto == IPPROTO_ESP)))
+					return CLS_NEXT_DROP;
+				if (dst_port->iface.encrypt)
+					return next_ipsec_decap_index;
 			}
 
 			switch (ipv6_hdr->proto) {
@@ -217,8 +233,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			default:
 				return CLS_NEXT_DROP;
 			}
-			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
-			dp_extract_underlay_header(df, ipv6_hdr);
 			return CLS_NEXT_IPIP_DECAP;
 		} else {
 			if (is_ipv6_nd(ipv6_hdr))
