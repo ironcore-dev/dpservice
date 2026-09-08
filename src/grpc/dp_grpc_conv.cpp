@@ -221,6 +221,7 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
 	metering_params->set_public_rate(dp_iface->public_flow_rate_cap);
 	grpc_iface->set_allocated_meteringparams(metering_params);
+	grpc_iface->set_encrypt(dp_iface->encrypt);
 }
 
 void DpToGrpcLoadBalancer(const struct dpgrpc_lb *dp_lb, Loadbalancer *grpc_lb)

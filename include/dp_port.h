@@ -40,6 +40,8 @@ struct dp_port_iface {
 	uint32_t				fwall_rule_count;
 	struct dp_iface_cfg		cfg;
 	uint32_t				vni;
+	// read per packet by ipip_encap and cls, so it lives beside the vni they already touch
+	bool					encrypt;
 	char					id[DP_IFACE_ID_MAX_LEN];
 	union dp_ipv6			ul_ipv6;
 	uint32_t				nat_ip;

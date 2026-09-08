@@ -125,6 +125,11 @@ struct dp_ipsec_sa_spec {
 int dp_ipsec_init(int socket_id);
 void dp_ipsec_free(void);
 
+// Whether the crypto subsystem is up, i.e. whether dpservice was started with --enable-ipsec.
+// This is a capability, not a policy: it says associations may be provisioned and interfaces
+// may encrypt, not that any of them does.
+bool dp_ipsec_is_enabled(void);
+
 // Only valid after a successful dp_ipsec_init() in IPsec mode
 struct rte_mempool *dp_ipsec_get_op_pool(void);
 

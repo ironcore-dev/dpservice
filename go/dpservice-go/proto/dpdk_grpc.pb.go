@@ -101,6 +101,11 @@ type DPDKironcoreClient interface {
 	DeleteSecurityAssociation(ctx context.Context, in *DeleteSecurityAssociationRequest, opts ...grpc.CallOption) (*DeleteSecurityAssociationResponse, error)
 	UpdateSecurityAssociation(ctx context.Context, in *UpdateSecurityAssociationRequest, opts ...grpc.CallOption) (*UpdateSecurityAssociationResponse, error)
 	GetSecurityAssociation(ctx context.Context, in *GetSecurityAssociationRequest, opts ...grpc.CallOption) (*GetSecurityAssociationResponse, error)
+	// Per-interface encryption policy. Only available when dpservice was started with
+	// --enable-ipsec; the flag can also be set when the interface is created.
+	EnableInterfaceEncryption(ctx context.Context, in *EnableInterfaceEncryptionRequest, opts ...grpc.CallOption) (*EnableInterfaceEncryptionResponse, error)
+	DisableInterfaceEncryption(ctx context.Context, in *DisableInterfaceEncryptionRequest, opts ...grpc.CallOption) (*DisableInterfaceEncryptionResponse, error)
+	GetInterfaceEncryption(ctx context.Context, in *GetInterfaceEncryptionRequest, opts ...grpc.CallOption) (*GetInterfaceEncryptionResponse, error)
 	// // PACKET CAPTURE
 	CaptureStart(ctx context.Context, in *CaptureStartRequest, opts ...grpc.CallOption) (*CaptureStartResponse, error)
 	CaptureStop(ctx context.Context, in *CaptureStopRequest, opts ...grpc.CallOption) (*CaptureStopResponse, error)
@@ -502,6 +507,33 @@ func (c *dPDKironcoreClient) GetSecurityAssociation(ctx context.Context, in *Get
 	return out, nil
 }
 
+func (c *dPDKironcoreClient) EnableInterfaceEncryption(ctx context.Context, in *EnableInterfaceEncryptionRequest, opts ...grpc.CallOption) (*EnableInterfaceEncryptionResponse, error) {
+	out := new(EnableInterfaceEncryptionResponse)
+	err := c.cc.Invoke(ctx, "/dpdkironcore.v1.DPDKironcore/EnableInterfaceEncryption", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dPDKironcoreClient) DisableInterfaceEncryption(ctx context.Context, in *DisableInterfaceEncryptionRequest, opts ...grpc.CallOption) (*DisableInterfaceEncryptionResponse, error) {
+	out := new(DisableInterfaceEncryptionResponse)
+	err := c.cc.Invoke(ctx, "/dpdkironcore.v1.DPDKironcore/DisableInterfaceEncryption", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dPDKironcoreClient) GetInterfaceEncryption(ctx context.Context, in *GetInterfaceEncryptionRequest, opts ...grpc.CallOption) (*GetInterfaceEncryptionResponse, error) {
+	out := new(GetInterfaceEncryptionResponse)
+	err := c.cc.Invoke(ctx, "/dpdkironcore.v1.DPDKironcore/GetInterfaceEncryption", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *dPDKironcoreClient) CaptureStart(ctx context.Context, in *CaptureStartRequest, opts ...grpc.CallOption) (*CaptureStartResponse, error) {
 	out := new(CaptureStartResponse)
 	err := c.cc.Invoke(ctx, "/dpdkironcore.v1.DPDKironcore/CaptureStart", in, out, opts...)
@@ -609,6 +641,11 @@ type DPDKironcoreServer interface {
 	DeleteSecurityAssociation(context.Context, *DeleteSecurityAssociationRequest) (*DeleteSecurityAssociationResponse, error)
 	UpdateSecurityAssociation(context.Context, *UpdateSecurityAssociationRequest) (*UpdateSecurityAssociationResponse, error)
 	GetSecurityAssociation(context.Context, *GetSecurityAssociationRequest) (*GetSecurityAssociationResponse, error)
+	// Per-interface encryption policy. Only available when dpservice was started with
+	// --enable-ipsec; the flag can also be set when the interface is created.
+	EnableInterfaceEncryption(context.Context, *EnableInterfaceEncryptionRequest) (*EnableInterfaceEncryptionResponse, error)
+	DisableInterfaceEncryption(context.Context, *DisableInterfaceEncryptionRequest) (*DisableInterfaceEncryptionResponse, error)
+	GetInterfaceEncryption(context.Context, *GetInterfaceEncryptionRequest) (*GetInterfaceEncryptionResponse, error)
 	// // PACKET CAPTURE
 	CaptureStart(context.Context, *CaptureStartRequest) (*CaptureStartResponse, error)
 	CaptureStop(context.Context, *CaptureStopRequest) (*CaptureStopResponse, error)
@@ -748,6 +785,15 @@ func (UnimplementedDPDKironcoreServer) UpdateSecurityAssociation(context.Context
 }
 func (UnimplementedDPDKironcoreServer) GetSecurityAssociation(context.Context, *GetSecurityAssociationRequest) (*GetSecurityAssociationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSecurityAssociation not implemented")
+}
+func (UnimplementedDPDKironcoreServer) EnableInterfaceEncryption(context.Context, *EnableInterfaceEncryptionRequest) (*EnableInterfaceEncryptionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EnableInterfaceEncryption not implemented")
+}
+func (UnimplementedDPDKironcoreServer) DisableInterfaceEncryption(context.Context, *DisableInterfaceEncryptionRequest) (*DisableInterfaceEncryptionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DisableInterfaceEncryption not implemented")
+}
+func (UnimplementedDPDKironcoreServer) GetInterfaceEncryption(context.Context, *GetInterfaceEncryptionRequest) (*GetInterfaceEncryptionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInterfaceEncryption not implemented")
 }
 func (UnimplementedDPDKironcoreServer) CaptureStart(context.Context, *CaptureStartRequest) (*CaptureStartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CaptureStart not implemented")
@@ -1545,6 +1591,60 @@ func _DPDKironcore_GetSecurityAssociation_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DPDKironcore_EnableInterfaceEncryption_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnableInterfaceEncryptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DPDKironcoreServer).EnableInterfaceEncryption(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dpdkironcore.v1.DPDKironcore/EnableInterfaceEncryption",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DPDKironcoreServer).EnableInterfaceEncryption(ctx, req.(*EnableInterfaceEncryptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DPDKironcore_DisableInterfaceEncryption_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisableInterfaceEncryptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DPDKironcoreServer).DisableInterfaceEncryption(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dpdkironcore.v1.DPDKironcore/DisableInterfaceEncryption",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DPDKironcoreServer).DisableInterfaceEncryption(ctx, req.(*DisableInterfaceEncryptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DPDKironcore_GetInterfaceEncryption_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInterfaceEncryptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DPDKironcoreServer).GetInterfaceEncryption(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/dpdkironcore.v1.DPDKironcore/GetInterfaceEncryption",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DPDKironcoreServer).GetInterfaceEncryption(ctx, req.(*GetInterfaceEncryptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DPDKironcore_CaptureStart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CaptureStartRequest)
 	if err := dec(in); err != nil {
@@ -1777,6 +1877,18 @@ var DPDKironcore_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSecurityAssociation",
 			Handler:    _DPDKironcore_GetSecurityAssociation_Handler,
+		},
+		{
+			MethodName: "EnableInterfaceEncryption",
+			Handler:    _DPDKironcore_EnableInterfaceEncryption_Handler,
+		},
+		{
+			MethodName: "DisableInterfaceEncryption",
+			Handler:    _DPDKironcore_DisableInterfaceEncryption_Handler,
+		},
+		{
+			MethodName: "GetInterfaceEncryption",
+			Handler:    _DPDKironcore_GetInterfaceEncryption_Handler,
 		},
 		{
 			MethodName: "CaptureStart",

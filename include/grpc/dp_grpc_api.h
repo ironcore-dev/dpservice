@@ -67,6 +67,9 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_DeleteSecurityAssociation,
 	DP_REQ_TYPE_UpdateSecurityAssociation,
 	DP_REQ_TYPE_GetSecurityAssociation,
+	DP_REQ_TYPE_EnableInterfaceEncryption,
+	DP_REQ_TYPE_DisableInterfaceEncryption,
+	DP_REQ_TYPE_GetInterfaceEncryption,
 };
 
 // in sync with dpdk proto!
@@ -93,6 +96,7 @@ struct dpgrpc_iface {
 	union dp_ipv6			ul_addr6;
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
+	bool					encrypt;
 };
 
 struct dpgrpc_iface_id {
@@ -195,6 +199,10 @@ struct dpgrpc_capture_stop {
 	uint16_t		port_cnt;
 };
 
+struct dpgrpc_iface_encryption {
+	bool			encrypt;
+};
+
 // What names one Security Association. Not all of it is what the database is keyed on - which
 // part that is depends on the direction - but all of it is matched, see struct dp_ipsec_sa_spec.
 struct dpgrpc_ipsec_sa_id {
@@ -267,6 +275,9 @@ struct dpgrpc_request {
 		struct dpgrpc_ipsec_sa_id	del_sa;
 		struct dpgrpc_ipsec_sa_update	update_sa;
 		struct dpgrpc_ipsec_sa_id	get_sa;
+		struct dpgrpc_iface_id	enable_encryption;
+		struct dpgrpc_iface_id	disable_encryption;
+		struct dpgrpc_iface_id	get_encryption;
 	};
 };
 
@@ -307,6 +318,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_capture_stop	capture_stop;
 		struct dpgrpc_capture		capture_get;
 		struct dpgrpc_ipsec_sa		ipsec_sa;
+		struct dpgrpc_iface_encryption	iface_encryption;
 	};
 };
 

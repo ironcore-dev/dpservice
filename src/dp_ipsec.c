@@ -323,6 +323,11 @@ int dp_ipsec_init(int socket_id)
 	return DP_OK;
 }
 
+bool dp_ipsec_is_enabled(void)
+{
+	return dp_ipsec_active;
+}
+
 void dp_ipsec_free(void)
 {
 	if (dp_ipsec_active) {

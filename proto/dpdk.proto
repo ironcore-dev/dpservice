@@ -78,6 +78,8 @@ message Interface {
 	string pci_name = 6;
 	MeteringParams meteringParams = 7;
 	string hostname = 8;
+	// Underlay traffic of this interface is carried inside ESP, in both directions.
+	bool encrypt = 9;
 }
 
 message IpConfig {
@@ -240,6 +242,8 @@ message CreateInterfaceRequest {
 	MeteringParams metering_parameters = 8;
 	bytes preferred_underlay_route = 9;
 	string hostname = 10;
+	// Requires dpservice to have been started with --enable-ipsec, otherwise IPSEC_DISABLED.
+	bool encrypt = 11;
 }
 
 message CreateInterfaceResponse {
@@ -693,6 +697,38 @@ message GetSecurityAssociationResponse {
 	bool esn = 7;
 }
 
+// Encryption is a property of an interface, not of the whole instance. It is symmetric: an
+// encrypting interface neither sends nor accepts underlay traffic in the clear, so both ends
+// of a tunnel have to agree or nothing passes between them.
+//
+// There is no single setter taking a bool on purpose. A proto3 scalar has no presence, so an
+// omitted field would be indistinguishable from an explicit request to stop encrypting - and
+// that is the one transition here that turns a protected endpoint into a cleartext one.
+message EnableInterfaceEncryptionRequest {
+	bytes interface_id = 1;
+}
+
+message EnableInterfaceEncryptionResponse {
+	Status status = 1;
+}
+
+message DisableInterfaceEncryptionRequest {
+	bytes interface_id = 1;
+}
+
+message DisableInterfaceEncryptionResponse {
+	Status status = 1;
+}
+
+message GetInterfaceEncryptionRequest {
+	bytes interface_id = 1;
+}
+
+message GetInterfaceEncryptionResponse {
+	Status status = 1;
+	bool encrypt = 2;
+}
+
 message CaptureStatusRequest {
 }
 
@@ -798,6 +834,12 @@ service DPDKironcore {
 	rpc DeleteSecurityAssociation(DeleteSecurityAssociationRequest) returns (DeleteSecurityAssociationResponse) {}
 	rpc UpdateSecurityAssociation(UpdateSecurityAssociationRequest) returns (UpdateSecurityAssociationResponse) {}
 	rpc GetSecurityAssociation(GetSecurityAssociationRequest) returns (GetSecurityAssociationResponse) {}
+
+	// Per-interface encryption policy. Only available when dpservice was started with
+	// --enable-ipsec; the flag can also be set when the interface is created.
+	rpc EnableInterfaceEncryption(EnableInterfaceEncryptionRequest) returns (EnableInterfaceEncryptionResponse) {}
+	rpc DisableInterfaceEncryption(DisableInterfaceEncryptionRequest) returns (DisableInterfaceEncryptionResponse) {}
+	rpc GetInterfaceEncryption(GetInterfaceEncryptionRequest) returns (GetInterfaceEncryptionResponse) {}
 
 	//// PACKET CAPTURE
 	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}

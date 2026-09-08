@@ -133,6 +133,9 @@ void GRPCService::HandleRpcs()
 	new DeleteSecurityAssociationCall();
 	new UpdateSecurityAssociationCall();
 	new GetSecurityAssociationCall();
+	new EnableInterfaceEncryptionCall();
+	new DisableInterfaceEncryptionCall();
+	new GetInterfaceEncryptionCall();
 	new CaptureStartCall();
 	new CaptureStopCall();
 	new CaptureStatusCall();

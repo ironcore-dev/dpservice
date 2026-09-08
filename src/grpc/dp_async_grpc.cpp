@@ -261,6 +261,7 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 
 	request->add_iface.total_flow_rate_cap = request_.metering_parameters().total_rate();
 	request->add_iface.public_flow_rate_cap = request_.metering_parameters().public_rate();
+	request->add_iface.encrypt = request_.encrypt();
 
 	return NULL;
 }
@@ -1382,4 +1383,42 @@ void CaptureStatusCall::ParseReply(struct dpgrpc_reply* reply)
 		}
 		reply_.set_allocated_capture_config(capture_config);
 	}
+}
+
+
+const char* EnableInterfaceEncryptionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Enabling interface encryption",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->enable_encryption.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void EnableInterfaceEncryptionCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* DisableInterfaceEncryptionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Disabling interface encryption",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->disable_encryption.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void DisableInterfaceEncryptionCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* GetInterfaceEncryptionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting interface encryption",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_encryption.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetInterfaceEncryptionCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	reply_.set_encrypt(reply->iface_encryption.encrypt);
 }

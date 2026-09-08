@@ -432,6 +432,13 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	};
 	int ret = DP_GRPC_OK;
 
+	// checked before anything is allocated: an interface that asked to encrypt on an instance
+	// that cannot would be a black hole, not a protected endpoint
+	if (request->encrypt && !dp_ipsec_is_enabled()) {
+		ret = DP_GRPC_ERR_IPSEC_DISABLED;
+		goto err;
+	}
+
 	port = dp_get_port_by_name(request->pci_name);
 	if (!port) {
 		ret = DP_GRPC_ERR_NOT_FOUND;
@@ -464,6 +471,7 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	dp_copy_ipaddr(&port->iface.cfg.pxe_ip, &request->pxe_addr);
 	rte_memcpy(port->iface.cfg.hostname, request->hostname, sizeof(port->iface.cfg.hostname));
 	port->iface.hostname_len = (uint32_t)strnlen(port->iface.cfg.hostname, DP_IFACE_HOSTNAME_MAX_LEN - 1);
+	port->iface.encrypt = request->encrypt;
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {
@@ -565,6 +573,7 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	rte_memcpy(reply->hostname, port->iface.cfg.hostname, sizeof(reply->hostname));
 	reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 	reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
+	reply->encrypt = port->iface.encrypt;
 	return DP_GRPC_OK;
 }
 
@@ -764,6 +773,7 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		rte_memcpy(reply->hostname, port->iface.cfg.hostname, sizeof(reply->hostname));
 		reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 		reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
+		reply->encrypt = port->iface.encrypt;
 	}
 
 	return DP_GRPC_OK;
@@ -1059,6 +1069,60 @@ static int dp_process_get_security_association(struct dp_grpc_responder *respond
 }
 
 
+// Encryption is refused unless the crypto subsystem is up. --enable-ipsec is a capability
+// gate: it says an interface *may* encrypt, never that one does.
+static int dp_process_enable_interface_encryption(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_iface_id *request = &responder->request.enable_encryption;
+	struct dp_port *port;
+
+	if (!dp_ipsec_is_enabled())
+		return DP_GRPC_ERR_IPSEC_DISABLED;
+
+	port = dp_get_port_with_iface_id(request->iface_id);
+	if (!port)
+		return DP_GRPC_ERR_NOT_FOUND;
+
+	if (port->iface.encrypt)
+		return DP_GRPC_ERR_ALREADY_ACTIVE;
+
+	port->iface.encrypt = true;
+	return DP_GRPC_OK;
+}
+
+// Deliberately not gated on the capability: without it no interface can be encrypting, so the
+// answer is DP_GRPC_ERR_NOT_ACTIVE either way, and turning protection off is never refused for
+// want of a subsystem.
+static int dp_process_disable_interface_encryption(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_iface_id *request = &responder->request.disable_encryption;
+	struct dp_port *port;
+
+	port = dp_get_port_with_iface_id(request->iface_id);
+	if (!port)
+		return DP_GRPC_ERR_NOT_FOUND;
+
+	if (!port->iface.encrypt)
+		return DP_GRPC_ERR_NOT_ACTIVE;
+
+	port->iface.encrypt = false;
+	return DP_GRPC_OK;
+}
+
+static int dp_process_get_interface_encryption(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_iface_id *request = &responder->request.get_encryption;
+	struct dpgrpc_iface_encryption *reply = dp_grpc_single_reply(responder);
+	struct dp_port *port;
+
+	port = dp_get_port_with_iface_id(request->iface_id);
+	if (!port)
+		return DP_GRPC_ERR_NOT_FOUND;
+
+	reply->encrypt = port->iface.encrypt;
+	return DP_GRPC_OK;
+}
+
 void dp_process_request(struct rte_mbuf *m)
 {
 	struct dp_grpc_responder responder;
@@ -1202,6 +1266,15 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_GetSecurityAssociation:
 		ret = dp_process_get_security_association(&responder);
+		break;
+	case DP_REQ_TYPE_EnableInterfaceEncryption:
+		ret = dp_process_enable_interface_encryption(&responder);
+		break;
+	case DP_REQ_TYPE_DisableInterfaceEncryption:
+		ret = dp_process_disable_interface_encryption(&responder);
+		break;
+	case DP_REQ_TYPE_GetInterfaceEncryption:
+		ret = dp_process_get_interface_encryption(&responder);
 		break;
 	// DP_REQ_TYPE_CheckInitialized is handled by the gRPC thread
 	default:
