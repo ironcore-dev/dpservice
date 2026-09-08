@@ -335,6 +335,7 @@ type InterfaceSpec struct {
 	VIP             *VirtualIP       `json:"vip,omitempty"`
 	Metering        *MeteringParams  `json:"metering,omitempty"`
 	HostName        string           `json:"hostname,omitempty"`
+	Encrypt         bool             `json:"encrypt"`
 }
 
 type VirtualFunction struct {
@@ -706,8 +707,35 @@ type SecurityAssociationUpdate struct {
 	Spec   SecurityAssociationSpec `json:"spec"`
 }
 
+// InterfaceEncryption is an interface's encryption policy: whether its underlay traffic must be
+// carried inside ESP. It is symmetric - an encrypting interface neither sends nor accepts
+// underlay traffic in the clear - so both ends of a tunnel have to agree or nothing passes.
+type InterfaceEncryption struct {
+	TypeMeta                `json:",inline"`
+	InterfaceEncryptionMeta `json:"metadata"`
+	Spec                    InterfaceEncryptionSpec `json:"spec"`
+	Status                  Status                  `json:"status"`
+}
+
+type InterfaceEncryptionMeta struct {
+	InterfaceID string `json:"interface_id"`
+}
+
+type InterfaceEncryptionSpec struct {
+	Encrypt bool `json:"encrypt"`
+}
+
+func (m *InterfaceEncryptionMeta) GetName() string {
+	return m.InterfaceID
+}
+
+func (m *InterfaceEncryption) GetStatus() Status {
+	return m.Status
+}
+
 var (
 	InterfaceKind              = reflect.TypeOf(Interface{}).Name()
+	InterfaceEncryptionKind    = reflect.TypeOf(InterfaceEncryption{}).Name()
 	InterfaceListKind          = reflect.TypeOf(InterfaceList{}).Name()
 	LoadBalancerKind           = reflect.TypeOf(LoadBalancer{}).Name()
 	LoadBalancerListKind       = reflect.TypeOf(LoadBalancerList{}).Name()

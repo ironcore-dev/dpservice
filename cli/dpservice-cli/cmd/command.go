@@ -35,6 +35,7 @@ func Command() *cobra.Command {
 		Reset(dpdkClientOptions),
 		Init(dpdkClientOptions, rendererOptions),
 		Capture(dpdkClientOptions),
+		Encryption(dpdkClientOptions),
 		completionCmd,
 	)
 

@@ -70,6 +70,10 @@ type Client interface {
 	ResetVni(ctx context.Context, vni uint32, vniType uint8, ignoredErrors ...[]uint32) (*api.Vni, error)
 	GetVersion(ctx context.Context, version *api.Version, ignoredErrors ...[]uint32) (*api.Version, error)
 
+	EnableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error)
+	DisableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error)
+	GetInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error)
+
 	CaptureStart(ctx context.Context, capture *api.CaptureStart, ignoredErrors ...[]uint32) (*api.CaptureStart, error)
 	CaptureStop(ctx context.Context, ignoredErrors ...[]uint32) (*api.CaptureStop, error)
 	CaptureStatus(ctx context.Context, ignoredErrors ...[]uint32) (*api.CaptureStatus, error)
@@ -413,6 +417,7 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 		MeteringParameters:     api.InterfaceMeteringParamsToProtoMeteringParams(iface.Spec.Metering),
 		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(iface.Spec.UnderlayRoute),
 		Hostname:               iface.Spec.HostName,
+		Encrypt:                iface.Spec.Encrypt,
 	}
 	if iface.Spec.PXE != nil {
 		if iface.Spec.PXE.FileName != "" && iface.Spec.PXE.Server != "" {
@@ -1482,4 +1487,57 @@ func (c *client) CaptureStatus(ctx context.Context, ignoredErrors ...[]uint32) (
 	}
 
 	return capture, nil
+}
+
+// encryptionResult names the interface the call was about, so that a failure is reportable
+// without the caller having to remember what it asked for.
+func encryptionResult(interfaceID string, encrypt bool, status *dpdkproto.Status) *api.InterfaceEncryption {
+	return &api.InterfaceEncryption{
+		TypeMeta:                api.TypeMeta{Kind: api.InterfaceEncryptionKind},
+		InterfaceEncryptionMeta: api.InterfaceEncryptionMeta{InterfaceID: interfaceID},
+		Spec:                    api.InterfaceEncryptionSpec{Encrypt: encrypt},
+		Status:                  api.ProtoStatusToStatus(status),
+	}
+}
+
+func (c *client) EnableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error) {
+	res, err := c.DPDKironcoreClient.EnableInterfaceEncryption(ctx, &dpdkproto.EnableInterfaceEncryptionRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.InterfaceEncryption{}, err
+	}
+	retEncryption := encryptionResult(interfaceID, true, res.Status)
+	if res.GetStatus().GetCode() != 0 {
+		return retEncryption, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retEncryption, nil
+}
+
+func (c *client) DisableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error) {
+	res, err := c.DPDKironcoreClient.DisableInterfaceEncryption(ctx, &dpdkproto.DisableInterfaceEncryptionRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.InterfaceEncryption{}, err
+	}
+	retEncryption := encryptionResult(interfaceID, false, res.Status)
+	if res.GetStatus().GetCode() != 0 {
+		return retEncryption, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retEncryption, nil
+}
+
+func (c *client) GetInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error) {
+	res, err := c.DPDKironcoreClient.GetInterfaceEncryption(ctx, &dpdkproto.GetInterfaceEncryptionRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.InterfaceEncryption{}, err
+	}
+	retEncryption := encryptionResult(interfaceID, res.GetEncrypt(), res.Status)
+	if res.GetStatus().GetCode() != 0 {
+		return retEncryption, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retEncryption, nil
 }

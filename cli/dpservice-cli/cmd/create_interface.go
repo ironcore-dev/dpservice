@@ -56,6 +56,7 @@ type CreateInterfaceOptions struct {
 	TotalMeterRate    uint64
 	PublicMeterRate   uint64
 	Hostname          string
+	Encrypt           bool
 }
 
 func (o *CreateInterfaceOptions) AddFlags(fs *pflag.FlagSet) {
@@ -70,6 +71,7 @@ func (o *CreateInterfaceOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Uint64Var(&o.TotalMeterRate, "total-meter-rate", 0, "Total meter rate.")
 	fs.Uint64Var(&o.PublicMeterRate, "public-meter-rate", 0, "Public meter rate.")
 	fs.StringVar(&o.Hostname, "hostname", o.Hostname, "Hostname for the interface.")
+	fs.BoolVar(&o.Encrypt, "encrypt", false, "Carry this interface's underlay traffic inside ESP, in both directions (requires --enable-ipsec).")
 }
 
 func (o *CreateInterfaceOptions) MarkRequiredFlags(cmd *cobra.Command) error {
@@ -101,6 +103,7 @@ func RunCreateInterface(ctx context.Context, dpdkClientFactory DPDKClientFactory
 			PXE:           &api.PXE{Server: opts.PxeServer, FileName: opts.PxeFileName},
 			Metering:      &api.MeteringParams{TotalRate: opts.TotalMeterRate, PublicRate: opts.PublicMeterRate},
 			HostName:      opts.Hostname,
+			Encrypt:       opts.Encrypt,
 		},
 	})
 	if err != nil {
