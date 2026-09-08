@@ -81,7 +81,7 @@ const char *dp_strerror_verbose(int error);
 	ERR(SA_CREATE,							463) \
 	ERR(SA_ALGO,							464) \
 	ERR(SA_BAD_ADDR,						465) \
-	ERR(SA_DISABLED,						466) \
+	ERR(IPSEC_DISABLED,						466) \
 	ERR(SA_REPLAY_WINDOW,					467) \
 	ERR(SA_DIRECTION,						468) \
 

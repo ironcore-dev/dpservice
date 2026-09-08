@@ -504,7 +504,7 @@ int dp_ipsec_create_sa(const struct dp_ipsec_sa *request)
 	int ret;
 
 	if (!dp_ipsec_sad)
-		return DP_GRPC_ERR_SA_DISABLED;
+		return DP_GRPC_ERR_IPSEC_DISABLED;
 
 	if (request->algo >= DP_IPSEC_ALGO_MAX)
 		return DP_GRPC_ERR_SA_ALGO;
@@ -556,7 +556,7 @@ int dp_ipsec_update_sa(const struct dp_ipsec_sa_spec *spec, const struct dp_ipse
 	int ret;
 
 	if (!dp_ipsec_sad)
-		return DP_GRPC_ERR_SA_DISABLED;
+		return DP_GRPC_ERR_IPSEC_DISABLED;
 
 	// An ingress association is filed under the SPI its frames carry, so replacing one in place
 	// could not change that SPI without moving the entry - and rotating its key in place would be
@@ -626,7 +626,7 @@ int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec)
 	int ret;
 
 	if (!dp_ipsec_sad)
-		return DP_GRPC_ERR_SA_DISABLED;
+		return DP_GRPC_ERR_IPSEC_DISABLED;
 
 	sa = dp_ipsec_find_sa(spec);
 	if (!sa)
@@ -654,7 +654,7 @@ int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out
 	struct dp_ipsec_sa *sa;
 
 	if (!dp_ipsec_sad)
-		return DP_GRPC_ERR_SA_DISABLED;
+		return DP_GRPC_ERR_IPSEC_DISABLED;
 
 	sa = dp_ipsec_find_sa(spec);
 	if (!sa)

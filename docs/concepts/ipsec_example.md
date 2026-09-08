@@ -31,7 +31,7 @@ The parts that matter:
 | `--no-pci` + the `--vdev` list | creates the TAP devices instead of binding a NIC |
 | `--nic-type=tap` | tells the service it is not on hardware |
 | `--ipv6=fc00:1::1` | **our own** underlay address; the local side of every association is checked against this `/64`, otherwise `SA_BAD_ADDR` (465) |
-| `--enable-ipsec` | without it every SA call returns `SA_DISABLED` (466) |
+| `--enable-ipsec` | without it every SA call returns `IPSEC_DISABLED` (466) |
 
 It is up once the log says:
 

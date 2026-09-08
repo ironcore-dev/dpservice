@@ -180,7 +180,7 @@ cannot check that - it only ever sees its own end. See ADR 0003.
 
 Four RPCs were added to the `DPDKironcore` service in `proto/dpdk.proto`, and they exist only
 when dpservice was started with `--enable-ipsec`; without it every one of them fails with
-`SA_DISABLED` rather than being absent from the service.
+`IPSEC_DISABLED` rather than being absent from the service.
 
 | RPC | Purpose |
 | --- | --- |
@@ -310,7 +310,7 @@ successful response:
 | 463 | `SA_CREATE` | The crypto session or the database insert failed |
 | 464 | `SA_ALGO` | `algorithm` is not one dpservice implements |
 | 465 | `SA_BAD_ADDR` | The local side of the association is not our own underlay `/64` |
-| 466 | `SA_DISABLED` | dpservice was not started with `--enable-ipsec` |
+| 466 | `IPSEC_DISABLED` | dpservice was not started with `--enable-ipsec` |
 | 467 | `SA_REPLAY_WINDOW` | Non-zero on an egress association, or above 4096 |
 | 468 | `SA_DIRECTION` | `Update` named an ingress association, which cannot be replaced in place |
 

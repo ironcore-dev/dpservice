@@ -57,9 +57,12 @@ const (
 	SA_CREATE        = 463
 	SA_ALGO          = 464
 	SA_BAD_ADDR      = 465
-	SA_DISABLED      = 466
+	IPSEC_DISABLED   = 466
 	SA_REPLAY_WINDOW = 467
 	SA_DIRECTION     = 468
+
+	// Deprecated: renamed to IPSEC_DISABLED, which is what code 466 has always meant.
+	SA_DISABLED = IPSEC_DISABLED
 
 	// os.Exit value
 	CLIENT_ERROR = 1
