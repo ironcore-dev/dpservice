@@ -250,3 +250,45 @@ def test_ipsec_sa_algorithm_and_esn(prepare_ipv4, grpc_client):
 	assert grpc_client.getsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)['esn'] is False, \
 		"Security Association created without --esn came back carrying it"
 	grpc_client.delsa(sa_vni, sa_spi, "egress", sa_src, sa_dst)
+
+
+def test_ipsec_encryption_reported_by_interface(prepare_ipv4, grpc_client):
+	# dp_service.py creates every interface with encryption on in this suite, and both ways of
+	# asking have to agree - the field on the interface and the dedicated call
+	assert grpc_client.getencryption(VM1.name) is True, \
+		"Interface encryption is not reported as enabled"
+	assert grpc_client.getinterface(VM1.name)['encrypt'] is True, \
+		"Interface does not report encryption on its own spec"
+
+	# listinterfaces() reports specs only, the id lives in the metadata it strips
+	assert all(iface['encrypt'] is True for iface in grpc_client.listinterfaces()), \
+		"ListInterfaces does not report encryption"
+
+
+def test_ipsec_encryption_toggle(prepare_ipv4, grpc_client):
+	# VM3 is on vni2 and has no association, so toggling it changes nothing any other test
+	# depends on. It is put back at the end, because the dataplane tests need it encrypting.
+	assert grpc_client.getencryption(VM3.name) is True, \
+		"VM3 did not start out encrypting"
+
+	# enabling what is already enabled is not silently accepted, matching CaptureStart
+	grpc_client.expect_error(210).enableencryption(VM3.name)
+
+	grpc_client.disableencryption(VM3.name)
+	assert grpc_client.getencryption(VM3.name) is False, \
+		"Encryption is still reported as enabled after being disabled"
+	assert grpc_client.getinterface(VM3.name)['encrypt'] is False, \
+		"Interface still reports encryption after it was disabled"
+
+	# and disabling what is already disabled likewise, matching CaptureStop
+	grpc_client.expect_error(211).disableencryption(VM3.name)
+
+	grpc_client.enableencryption(VM3.name)
+	assert grpc_client.getencryption(VM3.name) is True, \
+		"Encryption is not reported as enabled after being re-enabled"
+
+
+def test_ipsec_encryption_unknown_interface(prepare_ipv4, grpc_client):
+	grpc_client.expect_error(201).enableencryption("this-does-not-exist")
+	grpc_client.expect_error(201).disableencryption("this-does-not-exist")
+	grpc_client.expect_error(201).getencryption("this-does-not-exist")

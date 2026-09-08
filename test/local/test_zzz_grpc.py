@@ -76,7 +76,7 @@ def test_grpc_client_service_error(prepare_ifaces, grpc_client):
 
 def test_grpc_interface(prepare_ifaces, grpc_client):
 	vm4_ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
-	vmspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6, "metering": {} }
+	vmspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6, "metering": {}, "encrypt": False }
 	spec = grpc_client.getinterface(VM4.name)
 	assert spec == vmspec, \
 		"Interface not properly added"
@@ -651,3 +651,14 @@ def test_grpc_ipsec_errors(prepare_ipv4, grpc_client):
 										"247b0ea251c93d6fb84017e59a2cd386", "1bf460a7")
 	grpc_client.expect_error(466).getsa(vni1, 0xab12, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
 	grpc_client.expect_error(466).delsa(vni1, 0xab12, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
+
+	# --enable-ipsec is a capability gate: without it an interface cannot be made to encrypt,
+	# neither when it is created nor afterwards
+	grpc_client.expect_error(466).addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6, encrypt=True)
+	grpc_client.expect_error(466).enableencryption(VM1.name)
+
+	# reading is always allowed, and always answers false here
+	assert grpc_client.getencryption(VM1.name) is False, \
+		"Interface reports encryption on an instance started without --enable-ipsec"
+	# so is turning it off, which is a no-op that reports nothing to turn off
+	grpc_client.expect_error(211).disableencryption(VM1.name)

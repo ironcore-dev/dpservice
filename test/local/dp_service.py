@@ -122,9 +122,16 @@ class DpService:
 			interface_init(self._get_tap(PF1), self.port_redundancy)
 		grpc_client.init()
 		dst_ul = 'ul_ipv6_b' if self.secondary else 'ul_ipv6'
-		setattr(VM1, dst_ul, grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name, hostname=VM1.hostname))
-		setattr(VM2, dst_ul, grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name))
-		setattr(VM3, dst_ul, grpc_client.addinterface(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6))
+		# All three encrypt, VM3 included, even though only vni1 gets Security Associations
+		# below. VM3 is the target of the inbound VNI check in xtratest_ipsec_dataplane.py: a
+		# frame encrypted under vni1's association and aimed at it must be refused by that
+		# check. Leaving VM3 unencrypting would make cls refuse the frame earlier, for being
+		# ESP at a cleartext interface, and the test would pass without covering ADR 0005.
+		setattr(VM1, dst_ul, grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name, hostname=VM1.hostname,
+													  encrypt=self.ipsec))
+		setattr(VM2, dst_ul, grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name,
+													  encrypt=self.ipsec))
+		setattr(VM3, dst_ul, grpc_client.addinterface(VM3.name, VM3.pci, VM3.vni, VM3.ip, VM3.ipv6, encrypt=self.ipsec))
 		grpc_client.addroute(vni1, neigh_vni1_ov_ip_route, 0, neigh_vni1_ul_ipv6)
 		grpc_client.addroute(vni1, neigh_vni1_ov_ipv6_route, 0, neigh_vni1_ul_ipv6)
 		grpc_client.addroute(vni1, "0.0.0.0/0", vni1, router_ul_ipv6)

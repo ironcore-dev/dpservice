@@ -125,8 +125,11 @@ class GrpcClient:
 	def getversion(self):
 		return self._getSpec("get version")
 
-	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None, preferred_underlay=None, hostname=None):
+	def addinterface(self, vm_name, pci, vni, ipv4, ipv6, pxe_server=None, ipxe_file=None, preferred_underlay=None, hostname=None,
+					 encrypt=False):
 		cmd = f"add interface --id={vm_name} --device={pci} --vni={vni} --ipv4={ipv4} --ipv6={ipv6}"
+		if encrypt:
+			cmd += " --encrypt"
 		if pxe_server:
 			cmd += f" --pxe-server={pxe_server}"
 		if ipxe_file:
@@ -266,6 +269,16 @@ class GrpcClient:
 	def delsa(self, vni, spi, direction, src_underlay, dst_underlay):
 		self._call(f"delete securityassociation --vni={vni} --spi={spi} --direction={direction}"
 				   f" --src-underlay={src_underlay} --dst-underlay={dst_underlay}")
+
+	def enableencryption(self, vm_name):
+		self._call(f"encryption enable --interface-id={vm_name}")
+
+	def disableencryption(self, vm_name):
+		self._call(f"encryption disable --interface-id={vm_name}")
+
+	def getencryption(self, vm_name):
+		spec = self._getSpec(f"encryption get --interface-id={vm_name}")
+		return spec['encrypt'] if spec else None
 
 	def listlocalnats(self, nat_vip):
 		return self._getSpecList(f"list nats --nat-ip={nat_vip} --nat-type=local")
