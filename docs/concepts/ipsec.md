@@ -8,6 +8,9 @@ This is a **proof of concept**. It proves the dataplane can carry ESP and that i
 Associations can be managed at runtime; it is not yet a usable IPsec deployment. The limits below
 are deliberate, not oversights.
 
+For the commands rather than the concepts, [ipsec_example.md](ipsec_example.md) walks the whole
+API through on TAP devices, from starting the service to rotating both directions of a tunnel.
+
 
 ## Wire format
 
