@@ -13,8 +13,10 @@ See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
   graph nodes, `ipsec_encap` and `ipsec_decap`. Refused together with hardware offloading.
   The crypto is done by DPDK's `crypto_openssl` software PMD, which - unlike the x86-only
   `ipsec_mb` family - is not architecture-specific, so this runs on arm64 as well as on x86.
-- Security Associations are provisioned at runtime over gRPC - `Create`/`Get`/`DeleteSecurityAssociation`,
-  also in `dpservice-cli`. See [the gRPC interface](/docs/concepts/ipsec.md#the-grpc-interface).
+- Security Associations are provisioned at runtime over gRPC -
+  `Create`/`Get`/`Update`/`DeleteSecurityAssociation`, also in `dpservice-cli`. See
+  [the gRPC interface](/docs/concepts/ipsec.md#the-grpc-interface), and
+  [a copy-paste walkthrough](/docs/concepts/ipsec_example.md) of the whole API on TAP devices.
 - Per-association **anti-replay window** (`replay_window`, ingress only, max 4096, off by default).
 - Per-association **extended sequence numbers** (`esn`, RFC 4304, off by default) and a choice of
   **AES-128-GCM or AES-256-GCM** (`algorithm`), both covered in each direction by the test suite.
@@ -26,14 +28,25 @@ See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
   addressed at and drops it if that endpoint belongs to another tenant, so one association does not
   authorise delivery into every interface on the host. See
   [ADR 0005](/docs/adr/0005-ingress-associations-are-bound-to-their-vni.md).
+- **Rekeying is gapless, and the two directions rotate differently.** An egress association is
+  found under its VNI, so it is *replaced* in place - `UpdateSecurityAssociation` switches key and
+  wire SPI together, between two packets. Ingress associations are found under the SPI on the
+  frame, so several coexist: the new one is added beside the live one and the old one deleted once
+  the peer has switched. Ordering the two ends is the control plane's job. See
+  [ADR 0006](/docs/adr/0006-egress-associations-are-rekeyed-by-replacement.md).
 - Tested dpservice-to-dpservice: a full encrypted round trip against a scapy peer holding a
-  different key per direction, with the SAs installed over gRPC by the test itself.
+  different key and SPI per direction, with the SAs installed over gRPC by the test itself.
 - Tested dpservice-to-Linux: `xtratest_ipsec_xfrm.py` runs the same round trip against a kernel
   XFRM peer in a namespace, and requires every `/proc/net/xfrm_stat` counter to stay zero.
 - The replay window is exercised both ways: a replayed frame is asserted to be dropped against
   the scapy peer, and the XFRM round trip runs with a window of 64 to prove it interoperates.
-- [`ipsec-xfrm/`](/ipsec-xfrm) - standalone Linux XFRM scripts demonstrating a per-VNI IPsec mesh
-  with **SPI = VNI**, in network namespaces, independent of dpservice.
+- Tested rekeying: `xtratest_ipsec_rekey.py` rotates both directions of one tunnel in the order
+  above, and requires all nine packets of the three bursts around the switch to arrive.
+- [`ipsec-xfrm/`](/ipsec-xfrm) - standalone Linux XFRM scripts, independent of dpservice, for the
+  case where the receiver cannot choose its own SPIs: a per-VNI mesh in network namespaces with
+  **SPI = VNI**. Linux keys an inbound SA on `(dst, spi, proto, mark)`, so every peer of a node
+  collides there and has to be separated by a packet mark carrying the sender id. dpservice's SAD
+  is keyed on the source `/64` as well, so the same fan-in needs no such trick.
 - Builds and runs in Docker: `docker build --target tester` gives an image whose `ipsec` suite
   runs alongside all the others.
 
