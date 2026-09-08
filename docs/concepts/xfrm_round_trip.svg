@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 700" width="1350" height="700" role="img">
 	<title>The xfrm peer round trip</title>
-	<desc>Four domains left to right: the pytest process, dpservice's DPDK graph, a scapy relay in the host root namespace, and the peer network namespace. The top lane shows the outbound path from scapy's sendp through cls, ipip_encap and ipsec_encap onto the PF tap dtap0, across the veth pair into the namespace where xfrm decrypts and the echo server answers. The bottom lane shows the return path back through the same interfaces via ipsec_decap and ipip_decap to the VF tap. Middle panels show where the SPI comes from and where each association and policy lookup happens; a lower band lists the interfaces inside the peer namespace.</desc>
+	<desc>Four domains left to right: the pytest process, dpservice's DPDK graph, a scapy relay in the host root namespace, and the peer network namespace. The top lane shows the outbound path from scapy's sendp through cls, ipip_encap and ipsec_encap onto the PF tap dtap0, across the veth pair into the namespace where xfrm decrypts and the echo server answers. The bottom lane shows the return path back through the same interfaces via ipsec_decap and ipip_decap to the VF tap. Middle panels show which SPI each direction carries and where each association and policy lookup happens; a lower band lists the interfaces inside the peer namespace.</desc>
 
 	<style>
 		svg {
@@ -90,33 +90,33 @@
 	<line class="bound" x1="931" y1="46" x2="931" y2="544"/>
 
 	<!-- outbound wire-format chips -->
-	<rect class="chip" x="151" y="190" width="200" height="56" rx="5"/>
+	<rect class="chip" x="151" y="190" width="232" height="56" rx="5"/>
 	<text class="d-wire" x="161" y="207">Ether 66:…:00 → 22:22:22:22:22:00</text>
 	<text class="d-wire" x="161" y="220">IP 10.100.1.1 → 10.100.3.1</text>
 	<text class="d-wire" x="161" y="233">UDP 1234 → 12345 · “xfrm hello n”</text>
 
-	<rect class="chip" x="561" y="190" width="200" height="56" rx="5"/>
+	<rect class="chip" x="561" y="190" width="232" height="56" rx="5"/>
 	<text class="d-wire" x="571" y="207">Ether dst 00:00:00:00:00:00</text>
 	<text class="d-wire" x="571" y="220">IPv6 fc00:1::…(VM1) → fc00:3::64:0:1</text>
-	<text class="d-wire" x="571" y="233">nh=50 · ESP spi 0x64 seq=n · ciphertext</text>
+	<text class="d-wire" x="571" y="233">nh=50 · ESP spi 0x9d70 seq=n · ciphertext</text>
 
-	<rect class="chip" x="831" y="190" width="200" height="56" rx="5"/>
+	<rect class="chip" x="831" y="190" width="232" height="56" rx="5"/>
 	<text class="d-wire" x="841" y="207">Ether 02:…:01 → 02:…:02 (rewritten)</text>
 	<text class="d-wire" x="841" y="220">IPv6 + ESP: byte for byte identical</text>
 	<text class="d-wire" x="841" y="233">sendp() on dpsxfrm0</text>
 
 	<!-- return wire-format chips -->
-	<rect class="chip" x="831" y="330" width="200" height="56" rx="5"/>
+	<rect class="chip" x="831" y="330" width="232" height="56" rx="5"/>
 	<text class="d-wire" x="841" y="347">Ether 02:…:02 → 02:…:01 (neigh perm)</text>
 	<text class="d-wire" x="841" y="360">IPv6 fc00:3::64:0:1 → fc00:1::…(VM1)</text>
-	<text class="d-wire" x="841" y="373">ESP spi 0x64 · encrypted by the kernel</text>
+	<text class="d-wire" x="841" y="373">ESP spi 0x21ba · encrypted by the kernel</text>
 
-	<rect class="chip" x="561" y="330" width="200" height="56" rx="5"/>
+	<rect class="chip" x="561" y="330" width="232" height="56" rx="5"/>
 	<text class="d-wire" x="571" y="347">Ether src = dst = 22:22:22:22:22:00</text>
 	<text class="d-wire" x="571" y="360">IPv6 + ESP unchanged by the relay</text>
 	<text class="d-wire" x="571" y="373">cls sees nh=50 → ipsec_decap</text>
 
-	<rect class="chip" x="151" y="330" width="200" height="56" rx="5"/>
+	<rect class="chip" x="151" y="330" width="232" height="56" rx="5"/>
 	<text class="d-wire" x="161" y="347">IP 10.100.3.1 → 10.100.1.1</text>
 	<text class="d-wire" x="161" y="360">UDP 12345 → 1234 · same payload</text>
 	<text class="d-wire" x="161" y="373">matched by dport == 1234</text>
@@ -124,17 +124,17 @@
 	<!-- lookup panels -->
 	<rect class="lookup" x="298" y="250" width="316" height="76" rx="5"/>
 	<text class="d-dom" x="308" y="267">SPI &amp; SA LOOKUP · NO SPD EXISTS</text>
-	<text class="d-wire" x="308" y="284">ipsec_encap  spi is derived: it is the VNI, 100</text>
-	<text class="d-wire" x="308" y="296">  key (spi 100, dst/64, src/64) → SAD → SA.spi → ESP</text>
+	<text class="d-wire" x="308" y="284">ipsec_encap  the lookup spi is the VNI, 100</text>
+	<text class="d-wire" x="308" y="296">  key (100, dst/64, src/64) → SAD → SA.spi 0x9d70 → ESP</text>
 	<text class="d-wire" x="308" y="309">ipsec_decap  spi is read off the packet</text>
-	<text class="d-wire" x="308" y="321">  key (spi, dst/64, src/64) → SAD → replay window</text>
+	<text class="d-wire" x="308" y="321">  key (0x21ba, dst/64, src/64) → SAD → replay window</text>
 
 	<rect class="lookup" x="978" y="250" width="314" height="76" rx="5"/>
 	<text class="d-dom" x="988" y="267">SA &amp; POLICY LOOKUP · KERNEL XFRM</text>
-	<text class="d-wire" x="988" y="284">xfrm in   state by (dst, spi 0x64, esp), then the</text>
+	<text class="d-wire" x="988" y="284">xfrm in   state by (dst, spi 0x9d70, esp), then the</text>
 	<text class="d-wire" x="988" y="296">  dir in policy for if_id 0x64 is verified</text>
 	<text class="d-wire" x="988" y="309">xfrm out  policy by (sel 10.100.3.0/24 → 10.100.1.0/24,</text>
-	<text class="d-wire" x="988" y="321">  if_id 0x64) → tmpl reqid 100 → state → spi 0x64</text>
+	<text class="d-wire" x="988" y="321">  if_id 0x64) → tmpl reqid 100 → state → spi 0x21ba</text>
 
 	<!-- interface plates -->
 	<rect class="plate" x="218" y="258" width="66" height="52"/>
@@ -257,8 +257,8 @@
 	<!-- panel footers -->
 	<text class="d-foot" x="30" y="508">VM1 · 10.100.1.1 · vni 100</text>
 	<text class="d-foot" x="30" y="522">underlay fc00:1::… (assigned)</text>
-	<text class="d-foot" x="300" y="508">--ipv6=fc00:1::1 · SPI 100 (= vni1)</text>
-	<text class="d-foot" x="300" y="522">SA keyed on the /64 prefixes</text>
+	<text class="d-foot" x="300" y="508">--ipv6=fc00:1::1 · egress SA filed under vni 100</text>
+	<text class="d-foot" x="300" y="522">SA keyed on the /64 prefixes · wire spi 0x9d70 out, 0x21ba in</text>
 	<text class="d-foot" x="710" y="508">no addresses, answers nothing</text>
 	<text class="d-foot" x="710" y="522">sniff + sendp, L2 rewrite only</text>
 	<text class="d-foot" x="980" y="508">fc00:3::64:0:1 · if_id 0x64 · ipsec100</text>

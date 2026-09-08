@@ -63,8 +63,8 @@ def xfrm_peer(request, prepare_ipv4, grpc_client):
 	def tear_down():
 		print("------ Xfrm peer cleanup -----")
 		peer.stop()
-		grpc_client.delsa(vni1, ipsec_spi, "ingress", xfrm_peer_ul_ipv6, local_ul_ipv6)
-		grpc_client.delsa(vni1, ipsec_spi, "egress", local_ul_ipv6, xfrm_peer_ul_ipv6)
+		grpc_client.delsa(vni1, xfrm_spi_ingress, "ingress", xfrm_peer_ul_ipv6, local_ul_ipv6)
+		grpc_client.delsa(vni1, xfrm_spi_egress, "egress", local_ul_ipv6, xfrm_peer_ul_ipv6)
 		grpc_client.delroute(vni1, xfrm_peer_ov_ip_route)
 		print("------------------------------")
 	request.addfinalizer(tear_down)
@@ -73,9 +73,11 @@ def xfrm_peer(request, prepare_ipv4, grpc_client):
 	# a neighbour like any other, as far as dpservice is concerned: a route to its overlay
 	# prefix and one association per direction
 	grpc_client.addroute(vni1, xfrm_peer_ov_ip_route, 0, xfrm_peer_ul_ipv6)
-	grpc_client.addsa(vni1, ipsec_spi, "egress", local_ul_ipv6, xfrm_peer_ul_ipv6,
+	grpc_client.addsa(vni1, xfrm_spi_egress, "egress", local_ul_ipv6, xfrm_peer_ul_ipv6,
 					  xfrm_key_egress, xfrm_salt_egress)
-	grpc_client.addsa(vni1, ipsec_spi, "ingress", xfrm_peer_ul_ipv6, local_ul_ipv6,
+	# under the SPI the other peer already sends under, which is the one thing this association
+	# shares with it: two ingress associations, one lookup SPI, told apart by the source /64
+	grpc_client.addsa(vni1, xfrm_spi_ingress, "ingress", xfrm_peer_ul_ipv6, local_ul_ipv6,
 					  xfrm_key_ingress, xfrm_salt_ingress, replay_window=ipsec_replay_window)
 	peer.start()
 	print("------------------------------")

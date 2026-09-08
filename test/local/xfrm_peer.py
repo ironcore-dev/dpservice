@@ -29,8 +29,9 @@ def _run_quiet(cmd):
 # own from a configuration written the way a real deployment writes it.
 #
 # The peer is a second neighbour, entirely separate from the one IpsecPeer plays: its own
-# underlay /64, its own overlay prefix, its own key material. See config.py for why none of
-# that can be shared, and why the SPI has to be.
+# underlay /64, its own overlay prefix, its own key material, and an SPI of its own for what
+# dpservice sends it. What it sends *under* is on purpose the number the scapy peer sends under:
+# see config.py for what each of those choices is worth.
 #
 # Everything it needs lives in one network namespace, which is what makes it cleanable: a run
 # that dies anywhere leaves exactly one named object behind, and deleting it takes the veth,
@@ -155,23 +156,23 @@ class XfrmPeer:
 	# docs/concepts/ipsec.md, tested here rather than asserted.
 	def _create_associations(self):
 		self._ns(f"ip xfrm state add src {self.vm.ul_ipv6} dst {xfrm_peer_ul_ipv6}"
-				 f" proto esp spi {ipsec_spi} reqid {ipsec_spi} mode tunnel if_id {xfrm_if_id}"
+				 f" proto esp spi {xfrm_spi_egress} reqid {xfrm_reqid} mode tunnel if_id {xfrm_if_id}"
 				 f" flag af-unspec replay-window {ipsec_replay_window}"
 				 f" aead 'rfc4106(gcm(aes))' 0x{xfrm_key_egress}{xfrm_salt_egress} 128"
 				 f" sel src {xfrm_vm_ov_ip_route} dst {xfrm_peer_ov_ip_route}")
 		self._ns(f"ip xfrm state add src {xfrm_peer_ul_ipv6} dst {self.vm.ul_ipv6}"
-				 f" proto esp spi {ipsec_spi} reqid {ipsec_spi} mode tunnel if_id {xfrm_if_id}"
+				 f" proto esp spi {xfrm_spi_ingress} reqid {xfrm_reqid} mode tunnel if_id {xfrm_if_id}"
 				 f" flag af-unspec"
 				 f" aead 'rfc4106(gcm(aes))' 0x{xfrm_key_ingress}{xfrm_salt_ingress} 128")
 
 		self._ns(f"ip xfrm policy add dir in if_id {xfrm_if_id}"
 				 f" src {xfrm_vm_ov_ip_route} dst {xfrm_peer_ov_ip_route}"
 				 f" tmpl src {self.vm.ul_ipv6} dst {xfrm_peer_ul_ipv6}"
-				 f" proto esp reqid {ipsec_spi} mode tunnel")
+				 f" proto esp reqid {xfrm_reqid} mode tunnel")
 		self._ns(f"ip xfrm policy add dir out if_id {xfrm_if_id}"
 				 f" src {xfrm_peer_ov_ip_route} dst {xfrm_vm_ov_ip_route}"
 				 f" tmpl src {xfrm_peer_ul_ipv6} dst {self.vm.ul_ipv6}"
-				 f" proto esp reqid {ipsec_spi} mode tunnel")
+				 f" proto esp reqid {xfrm_reqid} mode tunnel")
 
 	def _start_echo_server(self):
 		script = f"{os.path.dirname(os.path.abspath(__file__))}/{xfrm_echo_script}"

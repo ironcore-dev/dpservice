@@ -32,11 +32,11 @@ esp_tunneled_protos = (4, 41)
 class IpsecPeer:
 
 	def __init__(self):
-		self.egress = self._sa(ipsec_spi, ipsec_key_egress, ipsec_salt_egress)
-		self.ingress = self._sa(ipsec_spi, ipsec_key_ingress, ipsec_salt_ingress)
+		self.egress = self._sa(ipsec_spi_egress, ipsec_key_egress, ipsec_salt_egress)
+		self.ingress = self._sa(ipsec_spi_ingress, ipsec_key_ingress, ipsec_salt_ingress)
 		# Identical to the ingress association in every respect but the key, so that a frame
 		# built with it differs from a good one only in its ICV
-		self.unauthorized = self._sa(ipsec_spi, ipsec_key_wrong, ipsec_salt_ingress)
+		self.unauthorized = self._sa(ipsec_spi_ingress, ipsec_key_wrong, ipsec_salt_ingress)
 		# The peer's side of the association a test creates without an anti-replay window. Its own
 		# key and salt, because the SPI is not part of the AES-GCM nonce and this one would
 		# otherwise repeat the ingress association's nonces one for one.

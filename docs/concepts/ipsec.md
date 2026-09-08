@@ -487,10 +487,15 @@ namespace's `/proc/net/xfrm_stat` and requires every counter to be zero. That is
 silent kernel-side drop into `XfrmInStateProtoError` or `XfrmOutNoStates` rather than into five
 packets that never arrived.
 
-**Both associations still share one SPI, and that is a property of the test rather than of the
-design.** Nothing forces it any more: both SPIs are free, and between two real hosts each side
-picks its own. Nothing in dp-service depends on them matching, but the suite would not notice if
-something started to.
+The two directions carry **different SPIs**, here as everywhere else in the suite: each end picks
+the number its peer will send under, and a harness reusing one number for both would keep passing
+if dp-service ever started to derive one direction's SPI from the other's. What the peer sends
+under is, on the other hand, deliberately the very number the scapy peer sends under. Two ingress
+associations then sit in the database under one lookup SPI, told apart by the source `/64` alone,
+which is what the `(SPI, dst, src)` key exists for and what two neighbours picking the same number
+by chance look like. The wire SPI dp-service sends this peer *is* its own, and has to be: the
+kernel finds its inbound state by that number, so an SPI taken from anywhere but the association
+that encrypted the frame surfaces as `XfrmInNoStates` in the counters read above.
 
 
 ### The full path

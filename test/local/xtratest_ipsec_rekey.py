@@ -75,7 +75,7 @@ class RekeyPeer:
 	def decrypt(self, pkt):
 		sa = self.egress_sas.get(pkt[ESP].spi)
 		if sa is None:
-			assert pkt[ESP].spi == ipsec_spi, \
+			assert pkt[ESP].spi == ipsec_spi_egress, \
 				f"Frame carries an SPI no association was provisioned for ({pkt[ESP].spi:#x})"
 			return self.peer.decrypt(pkt)
 		return sa.decrypt(pkt[IPv6].copy())
@@ -146,9 +146,9 @@ def assert_burst(peer, tag):
 # with a sequence number starting over, which is the one thing a deployment must not do - safe
 # here only because the peer is scapy, which has no window to fool and no adversary to fool it.
 def restore_associations(grpc_client):
-	grpc_client.updatesa(vni1, ipsec_spi_rekeyed, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
-						 ipsec_spi, ipsec_key_egress, ipsec_salt_egress)
-	grpc_client.addsa(vni1, ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
+	grpc_client.updatesa(vni1, ipsec_spi_rekeyed_egress, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
+						 ipsec_spi_egress, ipsec_key_egress, ipsec_salt_egress)
+	grpc_client.addsa(vni1, ipsec_spi_ingress, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6,
 					  ipsec_key_ingress, ipsec_salt_ingress, replay_window=ipsec_replay_window)
 	grpc_client.delsa(vni1, ipsec_spi_rekeyed_ingress, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6)
 
@@ -158,26 +158,26 @@ def test_ipsec_rekey_both_directions(prepare_ipv4, grpc_client, ipsec_peer):
 	try:
 		# Everything on the pair the session was set up with
 		seen = assert_burst(peer, "before")
-		assert all(spi == ipsec_spi for spi, _ in seen), \
+		assert all(spi == ipsec_spi_egress for spi, _ in seen), \
 			"Traffic did not start out on the association dp_service.py installed"
 
 		# The receiver goes first, because dpservice cannot tell whether it is ready. Both of its
 		# egress associations are live from here on, and it picks by the SPI on the frame.
-		peer.add_egress(ipsec_spi_rekeyed, ipsec_key_rekeyed_egress, ipsec_salt_rekeyed_egress)
+		peer.add_egress(ipsec_spi_rekeyed_egress, ipsec_key_rekeyed_egress, ipsec_salt_rekeyed_egress)
 
 		# One request, and the outbound association is a different one - no delete, no gap
-		grpc_client.updatesa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
-							 ipsec_spi_rekeyed, ipsec_key_rekeyed_egress, ipsec_salt_rekeyed_egress)
-		sa = grpc_client.getsa(vni1, ipsec_spi_rekeyed, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
+		grpc_client.updatesa(vni1, ipsec_spi_egress, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6,
+							 ipsec_spi_rekeyed_egress, ipsec_key_rekeyed_egress, ipsec_salt_rekeyed_egress)
+		sa = grpc_client.getsa(vni1, ipsec_spi_rekeyed_egress, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
 		assert sa['key'] == ipsec_key_rekeyed_egress and sa['salt'] == ipsec_salt_rekeyed_egress, \
 			"Egress association was not replaced with the key material asked for"
 		# the association is still filed under its VNI, but it is no longer the one that was named
-		grpc_client.expect_error(462).getsa(vni1, ipsec_spi, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
+		grpc_client.expect_error(462).getsa(vni1, ipsec_spi_egress, "egress", local_ul_ipv6, neigh_vni1_ul_ipv6)
 
 		# Outbound on the replacement, inbound untouched: the peer keeps answering under the
 		# association - and the sequence number - it has been using all along
 		seen = assert_burst(peer, "outbound")
-		assert all(spi == ipsec_spi_rekeyed for spi, _ in seen), \
+		assert all(spi == ipsec_spi_rekeyed_egress for spi, _ in seen), \
 			"Traffic did not move onto the association that replaced it"
 		assert seen[0][1] == 1, \
 			"The replacement did not start a sequence number of its own"
@@ -190,12 +190,12 @@ def test_ipsec_rekey_both_directions(prepare_ipv4, grpc_client, ipsec_peer):
 						  ipsec_key_rekeyed_ingress, ipsec_salt_rekeyed_ingress,
 						  replay_window=ipsec_replay_window)
 		peer.switch_ingress(ipsec_spi_rekeyed_ingress, ipsec_key_rekeyed_ingress, ipsec_salt_rekeyed_ingress)
-		grpc_client.delsa(vni1, ipsec_spi, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6)
+		grpc_client.delsa(vni1, ipsec_spi_ingress, "ingress", neigh_vni1_ul_ipv6, local_ul_ipv6)
 
 		# Both directions now on key material the tunnel did not start with, nine packets sent and
 		# nine delivered across the whole rotation
 		seen = assert_burst(peer, "after")
-		assert all(spi == ipsec_spi_rekeyed for spi, _ in seen), \
+		assert all(spi == ipsec_spi_rekeyed_egress for spi, _ in seen), \
 			"Outbound traffic left the association it was rekeyed onto"
 	finally:
 		restore_associations(grpc_client)

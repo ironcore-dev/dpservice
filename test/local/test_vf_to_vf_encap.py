@@ -59,9 +59,10 @@ def udp_encap_loopback_responder(pf_tap, peer):
 		assert pkt[IPv6].dst == neigh_vni1_ul_ipv6, \
 			"Invalid destination in encaped request"
 		if peer:
-			# ipsec_spi is deliberately not a VNI: the association is found under the VNI of the
-			# interface this came from, and what it puts on the wire is free of that. See ADR 4.
-			assert pkt[ESP].spi == ipsec_spi, \
+			# ipsec_spi_egress is deliberately neither a VNI nor the SPI of the association the
+			# answer comes back under: the association is found under the VNI of the interface
+			# this came from, and what it puts on the wire is free of both. See ADR 4.
+			assert pkt[ESP].spi == ipsec_spi_egress, \
 				"Encrypted request carries an unexpected SPI"
 			assert payload not in raw(pkt), \
 				"Payload is readable in the encrypted request"

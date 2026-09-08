@@ -46,15 +46,20 @@ neigh_ul_ipv6 = "fc00:2::1"
 # Neighboring dp-service instance info (normally provided by metalnet)
 neigh_vni1_ul_ipv6 = "fc00:2::64:0:1"  # Hardcoded VNI, this would need to correspond to the other instance's config
 
-# IPsec (--ipsec suite only). One Security Association per direction, each with its own key and
-# salt: the harness plays the peer and does the crypto for the other side, so the two directions
-# are as independent here as they would be between two real hosts.
-# The SPI is shared between the two directions, which is a property of the test and nothing else -
-# an association is named by its whole identity, so nothing forces the two to agree.
-# Deliberately not a VNI: an egress association is filed under the VNI it serves and carries this
-# on the wire, and test_vf_to_vf_encap.py reads it out of the ESP header to prove the two are no
+# IPsec (--ipsec suite only). One Security Association per direction, each with its own SPI, key
+# and salt: the harness plays the peer and does the crypto for the other side, so the two
+# directions are as independent here as they would be between two real hosts.
+#
+# The two SPIs differ because nothing makes them agree. Each end picks the SPI its *peer* will
+# send under - here dpservice writes ipsec_spi_egress into every frame it sends and expects to
+# read ipsec_spi_ingress off every frame it receives - and a harness reusing one number for both
+# would keep passing if dpservice ever started to derive one direction's SPI from the other's.
+#
+# Neither is a VNI: an egress association is filed under the VNI it serves and carries its SPI on
+# the wire, and test_vf_to_vf_encap.py reads that out of the ESP header to prove the two are no
 # longer the same number. See docs/concepts/ipsec.md and docs/adr/0004.
-ipsec_spi = 0xab12
+ipsec_spi_egress = 0xab12
+ipsec_spi_ingress = 0x21ba
 ipsec_key_egress = "247b0ea251c93d6fb84017e59a2cd386"
 ipsec_salt_egress = "1bf460a7"
 ipsec_key_ingress = "9c3d0b7e4a1f8256d0e4b39f7c15a862"
@@ -93,8 +98,8 @@ ipsec_key_aes256 = "5e91c30d7ab4f826139fe0c47bd25a08e3671fd4029ab85c6e13d7f094a2
 ipsec_salt_aes256 = "92b7de41"
 
 # What xtratest_ipsec_esn.py re-creates the session's own pair with, one set per combination it
-# covers. The addresses and the SPI stay exactly what dp_service.py used - it is the same
-# association, created again with different parameters - so only the key material differs.
+# covers. The addresses and both SPIs stay exactly what dp_service.py used - it is the same pair
+# of associations, created again with different parameters - so only the key material differs.
 ipsec_key_esn_egress = "7c04e9a1b6538df2091ae7c4b83d6510"
 ipsec_salt_esn_egress = "4a0db723"
 ipsec_key_esn_ingress = "e2951b7c40d83a6f1e07c95d284baf31"
@@ -104,16 +109,54 @@ ipsec_salt_aes256_egress = "d1e60b47"
 ipsec_key_aes256_ingress = "9a2f75c8e01d436bf82ea59c07d13648b5e092af7c31d0685ea4f92c30b871de"
 ipsec_salt_aes256_ingress = "68af203c"
 
-# What xtratest_ipsec_rekey.py rotates the session's own pair onto, one set per direction. The
-# egress half arrives by replacement and the ingress half by adding a second association beside
-# the live one, so unlike every other association in this file the ingress SPI has to differ from
-# the one already in place - both are in the database at the same time.
-ipsec_spi_rekeyed = 0x3456
+# What xtratest_ipsec_rekey.py rotates the session's own pair onto, one set per direction. Both
+# SPIs change, because a rotation that kept them would be a key change and not a rekey: the peer
+# picks the egress association to decrypt with by the SPI it reads off the frame, and the ingress
+# half is added *beside* the live one, which the SAD only allows because the two are filed under
+# different SPIs - both are in the database at the same time.
+ipsec_spi_rekeyed_egress = 0x3456
 ipsec_key_rekeyed_egress = "0b57e9c1a3d846f27e05b19c4d3a8e60"
 ipsec_salt_rekeyed_egress = "7f21c0d3"
 ipsec_spi_rekeyed_ingress = 0x789a
 ipsec_key_rekeyed_ingress = "c814a05fd3627eb9401ca8d75f3e26b1"
 ipsec_salt_rekeyed_ingress = "36e0ba9d"
+
+neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
+neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
+neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
+neigh_vni1_ov_ipv6_route = f"{neigh_vni1_ov_ipv6_prefix}::/104"
+
+# The Linux peer (xtratest_ipsec_xfrm.py), which is a second neighbour and shares nothing with
+# the one IpsecPeer plays. Its own underlay /64, because both of its associations serve vni1 and
+# an egress association is filed under (VNI, source /64, destination /64) - the destination is
+# the only part left to differ. Its own key material, because AES-GCM builds its nonce from
+# salt||sequence and two associations counting from 1 under one key would repeat one.
+xfrm_ns = "dp_ipsec_peer"
+xfrm_iface = f"ipsec{vni1}"
+xfrm_if_id = hex(vni1)
+xfrm_peer_ul_ipv6 = "fc00:3::64:0:1"
+# An SPI of this peer's own for what dpservice sends it: two egress associations are live at once,
+# one per neighbour, and a wire SPI taken from anywhere but the association that encrypted the
+# frame would leave the peer's kernel without a state to decrypt it under (XfrmInNoStates).
+xfrm_spi_egress = 0x9d70
+# What the peer sends under is, deliberately, the SPI the scapy peer already sends under. Both
+# ingress associations are in the database at the same time, filed under one lookup SPI and told
+# apart only by the source /64 - which is the case the SAD's (SPI, dst, src) key exists for, and
+# is what a real underlay looks like once two neighbours pick the same number by chance.
+xfrm_spi_ingress = ipsec_spi_ingress
+# A local label binding a policy to the state that satisfies it, and nothing to do with the SPI:
+# one value for both directions, the way a single negotiated child SA would have it.
+xfrm_reqid = vni1
+# where the peer sends its answers, i.e. local_ul_ipv6's prefix
+xfrm_local_ul_prefix = "fc00:1::/64"
+xfrm_peer_ov_ip = f"{ov_ip_prefix}{vni1}.3.1"
+xfrm_peer_ov_ip_route = f"{ov_ip_prefix}{vni1}.3.0/24"
+# the VMs' own prefix, which is the inner selector of the peer's associations
+xfrm_vm_ov_ip_route = f"{ov_ip_prefix}{vni1}.1.0/24"
+xfrm_key_egress = "0f9c1d7a35b8e264c07fa9d1e5386b40"
+xfrm_salt_egress = "a1c47e39"
+xfrm_key_ingress = "6b2e84f0d915c73a8e40b26fd83a1957"
+xfrm_salt_ingress = "3f8b02da"
 
 # Key material is hex handed straight to dpservice, which refuses anything of the wrong length or
 # with a non-hex digit in it - as a "Invalid key" gRPC error several layers away from the typo
@@ -129,30 +172,26 @@ for _name, _value in sorted(dict(vars()).items()):
 	assert len(_value) == 8 and all(c in "0123456789abcdef" for c in _value), \
 		f"{_name} is not a 32-bit salt in lower-case hex"
 del _name, _value
-neigh_vni1_ov_ip_prefix = f"{ov_ip_prefix}{vni1}.2"
-neigh_vni1_ov_ip_route = f"{neigh_vni1_ov_ip_prefix}.0/24"
-neigh_vni1_ov_ipv6_prefix = f"{ov_ipv6_prefix}{vni1}:2"
-neigh_vni1_ov_ipv6_route = f"{neigh_vni1_ov_ipv6_prefix}::/104"
 
-# The Linux peer (xtratest_ipsec_xfrm.py), which is a second neighbour and shares nothing with
-# the one IpsecPeer plays. Its own underlay /64, because both of its associations serve vni1 and
-# an egress association is filed under (VNI, source /64, destination /64) - the destination is
-# the only part left to differ. Its own key material, because AES-GCM builds its nonce from
-# salt||sequence and two associations counting from 1 under one key would repeat one.
-xfrm_ns = "dp_ipsec_peer"
-xfrm_iface = f"ipsec{vni1}"
-xfrm_if_id = hex(vni1)
-xfrm_peer_ul_ipv6 = "fc00:3::64:0:1"
-# where the peer sends its answers, i.e. local_ul_ipv6's prefix
-xfrm_local_ul_prefix = "fc00:1::/64"
-xfrm_peer_ov_ip = f"{ov_ip_prefix}{vni1}.3.1"
-xfrm_peer_ov_ip_route = f"{ov_ip_prefix}{vni1}.3.0/24"
-# the VMs' own prefix, which is the inner selector of the peer's associations
-xfrm_vm_ov_ip_route = f"{ov_ip_prefix}{vni1}.1.0/24"
-xfrm_key_egress = "0f9c1d7a35b8e264c07fa9d1e5386b40"
-xfrm_salt_egress = "a1c47e39"
-xfrm_key_ingress = "6b2e84f0d915c73a8e40b26fd83a1957"
-xfrm_salt_ingress = "3f8b02da"
+# Two associations on one address pair are told apart by their SPI alone, so a number used twice
+# would surface as a create failing with SA_EXISTS in whichever test happens to run second.
+_ingress_spis = [ipsec_spi_ingress, ipsec_spi_unwindowed, ipsec_spi_esn, ipsec_spi_aes256,
+				 ipsec_spi_rekeyed_ingress]
+assert len(set(_ingress_spis)) == len(_ingress_spis), \
+	"Two ingress associations on the neighbour's address pair share an SPI"
+del _ingress_spis
+assert ipsec_spi_egress != ipsec_spi_rekeyed_egress, \
+	"The replacement carries the SPI it replaced, so nothing on the wire would show the switch"
+
+# A wire SPI numerically equal to a VNI is legal but collides with the egress association serving
+# that VNI the moment a peer shares our /64 (see docs/concepts/ipsec.md), and reading one out of
+# an ESP header would prove nothing about where it came from.
+for _name, _value in sorted(dict(vars()).items()):
+	if not _name.startswith("ipsec_spi") and not _name.startswith("xfrm_spi"):
+		continue
+	assert 0 < _value < 2**32 and _value not in (vni1, vni2, vni3), \
+		f"{_name} is not a 32-bit SPI distinct from the VNIs"
+del _name, _value
 
 # The veth carrying ESP between the host and the namespace. Both MACs are fixed because the
 # relay writes them into every frame it forwards; nothing on the wire depends on their values.
