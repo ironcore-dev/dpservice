@@ -6,8 +6,9 @@
 
 ## New: IPsec for the underlay tunnel (proof of concept)
 
-Underlay tunnel traffic can be encrypted with ESP, enabled at runtime with `--enable-ipsec`.
-See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
+Underlay tunnel traffic can be encrypted with ESP. `--enable-ipsec` brings up the crypto
+subsystem, and a per-interface `encrypt` flag decides which traffic is protected; both are off by
+default. See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
 
 - ESP (AES-GCM, RFC 4106) over the existing IPv6 tunnel, framed by `librte_ipsec`; two new
   graph nodes, `ipsec_encap` and `ipsec_decap`. Refused together with hardware offloading.
@@ -17,6 +18,10 @@ See [docs/concepts/ipsec.md](/docs/concepts/ipsec.md) for the full concept.
   `Create`/`Get`/`Update`/`DeleteSecurityAssociation`, also in `dpservice-cli`. See
   [the gRPC interface](/docs/concepts/ipsec.md#the-grpc-interface), and
   [a copy-paste walkthrough](/docs/concepts/ipsec_example.md) of the whole API on TAP devices.
+- **Encryption is a property of the interface**, set on `CreateInterface` or toggled at runtime
+  with `Enable`/`Disable`/`GetInterfaceEncryption`. It is symmetric: an encrypting interface
+  neither sends nor accepts underlay traffic in the clear, so both ends of a tunnel must agree.
+  An encrypting interface with no association drops rather than falling back to cleartext.
 - Per-association **anti-replay window** (`replay_window`, ingress only, max 4096, off by default).
 - Per-association **extended sequence numbers** (`esn`, RFC 4304, off by default) and a choice of
   **AES-128-GCM or AES-256-GCM** (`algorithm`), both covered in each direction by the test suite.

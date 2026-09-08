@@ -1,8 +1,13 @@
 # IPsec
 
 dp-service can encrypt the traffic it sends over the underlay, so that the tunnel between two
-instances is not readable by anyone with access to the fabric in-between. This is enabled by
-starting dp-service with `--enable-ipsec` and is off by default.
+instances is not readable by anyone with access to the fabric in-between.
+
+Two things have to be true for a packet to be protected. dp-service has to have been started with
+`--enable-ipsec`, which brings up the crypto subsystem and is off by default; and the interface
+the packet belongs to has to be **encrypting**, which is a per-interface flag that is also off by
+default. The first is a capability - it says an interface *may* encrypt, never that one does -
+and the second is the policy. See [encryption is a property of the interface](#encryption-is-a-property-of-the-interface).
 
 This is a **proof of concept**. It proves the dataplane can carry ESP and that its Security
 Associations can be managed at runtime; it is not yet a usable IPsec deployment. The limits below
@@ -112,28 +117,69 @@ outcome is always a drop - a forged frame cannot cause a legitimate one to be di
 [ADR 0005](../adr/0005-ingress-associations-are-bound-to-their-vni.md).
 
 
-### Why there is no policy database
+### Encryption is a property of the interface
+
+`encrypt` is a flag on an interface, set when it is created or toggled afterwards, and it decides
+one thing in both directions:
+
+> **Cleartext leaves an interface if and only if it is not encrypting, and cleartext is accepted
+> for an interface if and only if it is not encrypting.**
+
+Both halves are enforced, and the second is the one that carries the weight. Refusing ESP at a
+cleartext interface is the lesser half - a peer holding no association is refused by the database
+anyway. Refusing *cleartext* at an encrypting one is what stops an attacker on the fabric from
+injecting into a protected tenant with no key, no ICV and no guessed SPI, using nothing but an
+ordinary IPinIP frame addressed at the endpoint.
+
+There is no fallback. An encrypting interface with no matching egress association **drops**, and
+never sends in the clear instead: an interface is created before its association is provisioned,
+and a fallback would leak during exactly that window, silently. The cost is that such an interface
+is a black hole until its association arrives.
+
+Both ends of a tunnel must agree. Turning the flag on at one endpoint severs it from every peer
+that has not turned it on, in both directions and at once, so encryption is a property of an
+endpoint *pair* and rolling it out is a coordinated change rather than an incremental one.
+
+Nothing checks that a VNI is uniform. Associations are per VNI and interfaces are not, so a VNI
+may hold interfaces of both kinds; that is what makes a permanent exemption possible, and the
+coherence of the result is the control plane's to get right.
+
+### Why the policy database is one selector wide
 
 A real implementation consults a security policy database per packet, matching traffic selectors -
 addresses, protocol, ports - to decide whether to protect, bypass or discard it, and only then
-looks for an association. dp-service does none of that, and does not need to, because the decision
-is already made by the shape of the graph.
+looks for an association. dp-service has exactly one selector: the endpoint.
 
-Everything leaving towards a PF has been through `ipip_encap`, which hands it to `ipsec_encap`
-(`dp_graph.c`), so all inter-host overlay traffic is protected; the association is chosen by the
-VNI of the interface it came from; and a VNI with no egress association is **dropped**, not sent
-in the clear. Inbound, `cls` refuses unencrypted tunnel traffic outright rather than accepting it.
+In RFC 4301 terms that is an SPD with a PROTECT rule for encrypting interfaces, a BYPASS rule for
+the rest, and a default of DISCARD. What makes BYPASS safe here - it is the entry that can leak -
+is that the two rules **partition** the traffic rather than overlapping: a bypassing endpoint
+cannot receive protected traffic and a protecting endpoint cannot receive bypassed traffic, so
+there is no configuration under which traffic that should have been protected is accepted, or
+sent, unprotected instead.
 
-In RFC 4301 terms that is a degenerate SPD: a single PROTECT rule covering all inter-host overlay
-traffic, a default of DISCARD, and no BYPASS entry at all. There is nothing to select between, so
-there is nothing to look up - the whole of the per-packet work is finding the association. The
-DISCARD half is what makes the missing database safe rather than merely convenient: there is no
-configuration under which traffic that should have been protected leaves unprotected instead.
+The whole of it is one comparison in `cls`, made on the port the outer destination address
+resolves to:
 
-What is genuinely missing is the *other* use of an SPD, the inbound policy check of RFC 4301
+```c
+if (unlikely(dst_port->iface.encrypt != (ipv6_hdr->proto == IPPROTO_ESP)))
+    return CLS_NEXT_DROP;
+```
+
+`cls` is the only node that can make it. The endpoint is not resolved before it, and after it the
+distinction is gone: `ipsec_decap` deliberately leaves a decrypted frame indistinguishable from
+one that arrived in the clear, so that `ipip_decap` sees one kind of packet. Egress is the mirror,
+in `ipip_encap`, which holds both edges per PF port and picks between Tx and `ipsec_encap` on the
+flag of the interface the packet came from. `ipsec_encap` therefore only ever receives packets
+that must be encrypted, and keeps its contract unqualified.
+
+Like [the inbound VNI check](#the-inbound-vni-check), the ingress comparison decides on
+unauthenticated data, and is safe for the same reason: its outcome is always a drop, so a forged
+frame cannot cause a legitimate one to be discarded.
+
+What is still genuinely missing is the *other* use of an SPD, the inbound policy check of RFC 4301
 section 5.2 - confirming that what a decrypted packet turned out to be is what its association was
-allowed to carry. [The inbound VNI check](#the-inbound-vni-check) is that check narrowed to the
-one selector dp-service has, and nothing inspects the inner packet.
+allowed to carry. The VNI check is that check narrowed to the one selector dp-service has, and
+nothing inspects the inner packet.
 
 
 ### Sequence numbers
@@ -178,9 +224,9 @@ cannot check that - it only ever sees its own end. See ADR 0003.
 
 ## The gRPC interface
 
-Four RPCs were added to the `DPDKironcore` service in `proto/dpdk.proto`, and they exist only
-when dpservice was started with `--enable-ipsec`; without it every one of them fails with
-`IPSEC_DISABLED` rather than being absent from the service.
+Seven RPCs were added to the `DPDKironcore` service in `proto/dpdk.proto`. Four manage the
+associations, and they exist only when dpservice was started with `--enable-ipsec`; without it
+every one of them fails with `IPSEC_DISABLED` rather than being absent from the service.
 
 | RPC | Purpose |
 | --- | --- |
@@ -191,6 +237,29 @@ when dpservice was started with `--enable-ipsec`; without it every one of them f
 
 There is no `ListSecurityAssociations`. A caller that wants to enumerate what it installed has to
 remember it, which is acceptable only because the control plane is the sole writer.
+
+The other three carry the per-interface policy:
+
+| RPC | Purpose |
+| --- | --- |
+| `EnableInterfaceEncryption` | Start protecting an interface's underlay traffic |
+| `DisableInterfaceEncryption` | Stop protecting it |
+| `GetInterfaceEncryption` | Read the flag back |
+
+All three take nothing but `interface_id`. The same flag can be set when the interface is created
+- `CreateInterfaceRequest.encrypt`, defaulting to false - and is reported by `GetInterface` and
+`ListInterfaces` on `Interface.encrypt`, always, including when it is false.
+
+There is deliberately no single setter taking a `bool`. A proto3 scalar has no presence, so an
+omitted field would be indistinguishable from an explicit request to stop encrypting - which is
+the one transition here that turns a protected endpoint into a cleartext one. The verb goes in
+the method name, where omission cannot forge it.
+
+`Enable` on an interface that is already encrypting is `ALREADY_ACTIVE` (210), and `Disable` on
+one that is not is `NOT_ACTIVE` (211), which is what `CaptureStart` and `CaptureStop` already do.
+A reconciling caller that re-applies desired state should treat both as success. Only `Enable`
+needs the capability; reading is always allowed and answers false, and turning protection off is
+never refused for want of a subsystem.
 
 ### The identity of an association
 
@@ -343,6 +412,18 @@ dpservice-cli update securityassociation --vni=100 --spi=43794 --direction=egres
 The same five flags name the association in every one of them. `update` adds `--new-spi` and a
 full set of the create's flags, because it replaces the association rather than editing it.
 
+The per-interface policy is its own command group, since it is not CRUD:
+
+```bash
+dpservice-cli create interface --id=vm1 --vni=100 --device=... --ipv4=... --ipv6=... --encrypt
+
+dpservice-cli encryption enable  --interface-id=vm1
+dpservice-cli encryption disable --interface-id=vm1
+dpservice-cli encryption get     --interface-id=vm1
+```
+
+`get interface` and `list interfaces` show the flag in an `Encrypt` column.
+
 `--algorithm` defaults to `aes-128-gcm`, `--replay-window` to zero and `--esn` to off, so none of
 them has to be given - on an `update` too, where an omitted flag means its default rather than
 what the association held a moment ago. `--algorithm=aes-256-gcm` takes a 64-digit key; `--esn`
@@ -351,12 +432,12 @@ has to be passed to both ends of a tunnel or neither.
 
 ## Deliberate limits of the PoC
 
-- **No security policy database, and none needed.** What gets protected is not selectable: with
-  the mode on, everything leaving through the tunnel is encrypted, and unencrypted tunnel traffic
-  arriving on a PF is dropped rather than accepted. There is nothing for an SPD to select between.
-  See [why there is no policy database](#why-there-is-no-policy-database). What *is* missing is
-  the inbound policy check of RFC 4301 section 5.2 in its full form; the one selector dp-service
-  can check is covered by [the inbound VNI check](#the-inbound-vni-check).
+- **A security policy database one selector wide.** What gets protected is selectable, but only
+  per interface: there are no traffic selectors on addresses, protocol or ports, and nothing
+  inspects the inner packet. See
+  [why the policy database is one selector wide](#why-the-policy-database-is-one-selector-wide).
+  What *is* missing is the inbound policy check of RFC 4301 section 5.2 in its full form; the one
+  selector dp-service can check is covered by [the inbound VNI check](#the-inbound-vni-check).
 - **No SA negotiation, though rekeying is gapless.** Associations are managed over gRPC, but keys
   arrive fully formed: there is no IKE, no distribution, no lifetime or byte counters, and no
   automatic rotation. Rotating them by hand loses nothing - inbound by holding two associations
@@ -397,8 +478,15 @@ has to be passed to both ends of a tunnel or neither.
   This is not covered by a test - the suite runs on TAPs, where that path is taken anyway.
 - **Hardware offloading is refused.** dp-service will not start with both `--enable-ipsec` and
   offloading. Offloaded flows bypass the graph entirely, so they would leave the PF in cleartext.
-- **Virtual services stay in cleartext.** `virtsvc` transmits to a PF directly rather than through
-  `ipip_encap`, so its traffic is not covered by this mode.
+- **Virtual services stay in cleartext, and are the one exception to the invariant.** `virtsvc`
+  transmits to a PF directly rather than through `ipip_encap`, and inbound it is matched in `cls`
+  before the encryption comparison. So in a build with `enable_virtual_services` an encrypting
+  interface both sends and accepts virtsvc traffic in the clear. The option is off by default.
+- **An upgraded instance stops encrypting.** `encrypt` defaults to false, so an instance that ran
+  with `--enable-ipsec` on an earlier release and had its associations provisioned carries its
+  traffic in the clear after the upgrade, until the control plane sets the flag on each interface.
+  There is no error to say so. This is the cost of defaulting to false and it is not mitigated
+  anywhere in the code.
 - **Software crypto only.** The `crypto_openssl` PMD is created by dp-service itself when the mode
   is enabled; hardware crypto devices are not used. The PMD requires DPDK to have been built with
   libcrypto, which is why the builder stage installs `libssl-dev`; the runtime library it then

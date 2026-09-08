@@ -106,7 +106,7 @@
     },
     {
       "lgopt": "enable-ipsec",
-      "help": "encrypt underlay tunnel traffic using IPsec ESP",
+      "help": "enable IPsec ESP, so interfaces can be created with encryption",
       "var": "ipsec_enabled",
       "type": "bool",
       "default": "false"

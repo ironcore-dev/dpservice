@@ -1,8 +1,9 @@
 # IPsec by hand: an AES-256-GCM walkthrough
 
-A copy-paste run through the Security Association API on a laptop, with no SmartNIC: start
-dpservice on TAP devices, install a tunnel's two associations, read one back, and rotate both
-directions. Every association here uses **AES-256-GCM with extended sequence numbers**.
+A copy-paste run through the IPsec API on a laptop, with no SmartNIC: start dpservice on TAP
+devices, make an interface encrypt, install a tunnel's two associations, read one back, and
+rotate both directions. Every association here uses **AES-256-GCM with extended sequence
+numbers**.
 
 For what the associations *mean* - why they are unidirectional, why an egress one is replaced
 rather than edited - see [ipsec.md](ipsec.md). This file is only the commands.
@@ -31,7 +32,7 @@ The parts that matter:
 | `--no-pci` + the `--vdev` list | creates the TAP devices instead of binding a NIC |
 | `--nic-type=tap` | tells the service it is not on hardware |
 | `--ipv6=fc00:1::1` | **our own** underlay address; the local side of every association is checked against this `/64`, otherwise `SA_BAD_ADDR` (465) |
-| `--enable-ipsec` | without it every SA call returns `IPSEC_DISABLED` (466) |
+| `--enable-ipsec` | brings up the crypto subsystem; without it every SA call, and every attempt to make an interface encrypt, returns `IPSEC_DISABLED` (466) |
 
 It is up once the log says:
 
@@ -53,7 +54,41 @@ cd cli/dpservice-cli && go build -o dpservice-cli .
 Add `--address=localhost:1337` to every call (or export `DP_GRPC_PORT`), and run
 `dpservice-cli init` once before the rest.
 
-## 3. Install the tunnel's two associations
+## 3. Make the interface encrypt
+
+`--enable-ipsec` is only the capability. Nothing is protected until an interface says so, and the
+flag is off by default - either at creation:
+
+```bash
+dpservice-cli create interface --id=vm1 --vni=100 --device=net_tap2 \
+  --ipv4=10.100.1.1 --ipv6=2000:100:1::1 --encrypt
+```
+
+`--device` is the **DPDK device name**, not the TAP interface name. Each `--vdev` above names
+both - `--vdev=net_tap2,iface=dtapvf_0` - and this is the first of the two. Passing `dtapvf_0`
+gets `NOT_FOUND` (201), because `rte_eth_dev_get_port_by_name()` has never heard of it. With two
+PFs taking `net_tap0` and `net_tap1`, the four VFs are `net_tap2` through `net_tap5`.
+
+Encryption can also be turned on afterwards, on an interface that already exists:
+
+```bash
+dpservice-cli encryption enable --interface-id=vm1
+dpservice-cli encryption get    --interface-id=vm1
+```
+
+```
+ InterfaceID  Encrypt
+ vm1          true
+```
+
+`enable` on an interface that already encrypts is `ALREADY_ACTIVE` (210), and `disable` on one
+that does not is `NOT_ACTIVE` (211).
+
+From here on `vm1` neither sends nor accepts underlay traffic in the clear. Until step 4 gives it
+an egress association, that means everything it sends towards the peer is **dropped** rather than
+sent unprotected - which is the intended order, not a race to lose.
+
+## 4. Install the tunnel's two associations
 
 An SA is unidirectional and named by five fields: `vni`, `spi`, `direction`, `src-underlay`,
 `dst-underlay`. The underlays are matched on their first 64 bits only, so `fc00:2::` covers the
@@ -82,7 +117,7 @@ securityassociation/ingress/100/43795/fc00:2::-fc00:1:: created, vni: 100, spi: 
 8 hex digits either way - it is the implicit part of the nonce, not key material. `--esn` and the
 cipher have to match on both ends of the tunnel or every frame fails its ICV.
 
-## 4. Read one back
+## 5. Read one back
 
 The same five flags name it, nothing else:
 
@@ -98,7 +133,7 @@ dpservice-cli get securityassociation --vni=100 --spi=43794 --direction=egress \
 
 `-o yaml` (or `-o json`) gives the full record, key and salt included.
 
-## 5. Rotate the egress association
+## 6. Rotate the egress association
 
 `update` is the gapless replace path, and it is **egress only**. The first five flags name the
 association *as it stands now*; `--new-spi` plus a full set of the create's flags say what it
@@ -121,7 +156,7 @@ key changed together, between two packets, with no second association left behin
 The replacement starts a sequence number of its own, so it needs key material this association has
 never used - reusing it repeats an AES-GCM nonce.
 
-## 6. Rotate the ingress association
+## 7. Rotate the ingress association
 
 An ingress association cannot be updated - it is filed under the SPI its frames carry, and
 renumbering it in place would drop whatever is still in flight. `update` on one is refused with
@@ -144,10 +179,10 @@ Rekeying a whole tunnel is therefore three ordered steps, and the order is the c
 right - dpservice cannot see whether the far end is ready:
 
 1. the peer installs its new **ingress** association, beside the one it has;
-2. this side **replaces** its egress association (step 5);
+2. this side **replaces** its egress association (step 6);
 3. the peer deletes its old ingress association.
 
-## 7. Delete
+## 8. Delete
 
 Same five naming flags:
 
@@ -167,6 +202,10 @@ association holds right now. Two consequences, and only one of them is loud:
   reports `ESN false`, and the tunnel then fails frame by frame against a peer still using ESN.
 
 So repeat `--algorithm=aes-256-gcm --esn` on every rotation.
+
+**A flag on one side is not a tunnel.** Encryption is symmetric, so turning it on at one endpoint
+severs it from every peer that has not turned it on - in both directions, immediately. There is no
+half-migrated state in which the VNI still works. Turn it on at both ends, or at neither.
 
 **Other rejections.** `--replay-window` is ingress-only; anything non-zero on egress is
 `SA_REPLAY_WINDOW` (467), as is a window above 4096. A second egress association for the same VNI

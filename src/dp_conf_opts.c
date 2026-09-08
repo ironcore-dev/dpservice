@@ -270,7 +270,7 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 		"     --no-stats                         do not print periodic statistics to stdout\n"
 		"     --enable-ipv6-overlay              enable IPv6 overlay addresses\n"
 		"     --no-offload                       disable traffic offloading\n"
-		"     --enable-ipsec                     encrypt underlay tunnel traffic using IPsec ESP\n"
+		"     --enable-ipsec                     enable IPsec ESP, so interfaces can be created with encryption\n"
 #ifdef ENABLE_PYTEST
 		"     --graphtrace-loglevel=LEVEL        verbosity level of packet traversing the graph framework\n"
 #endif

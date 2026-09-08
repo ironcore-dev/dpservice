@@ -1,6 +1,6 @@
 # 7. Encryption is a property of the interface
 
-Status: proposed
+Status: accepted
 
 ## Context
 

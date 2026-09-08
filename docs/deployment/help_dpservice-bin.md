@@ -18,7 +18,7 @@
 | --no-stats | None | do not print periodic statistics to stdout |  |
 | --enable-ipv6-overlay | None | enable IPv6 overlay addresses |  |
 | --no-offload | None | disable traffic offloading |  |
-| --enable-ipsec | None | encrypt underlay tunnel traffic using IPsec ESP |  |
+| --enable-ipsec | None | enable IPsec ESP, so interfaces can be created with encryption |  |
 | --graphtrace-loglevel | LEVEL | verbosity level of packet traversing the graph framework |  |
 | --color | MODE | output colorization mode | 'never' (default), 'always' or 'auto' |
 | --log-format | FORMAT | set the format of individual log lines (on standard output) | 'text' (default) or 'json' |
