@@ -126,6 +126,8 @@ void GRPCService::HandleRpcs()
 	new GetFirewallRuleCall();
 	new DeleteFirewallRuleCall();
 	new ListFirewallRulesCall();
+	new GetFirewallParamsCall();
+	new SetFirewallParamsCall();
 	new CheckVniInUseCall();
 	new ResetVniCall();
 	new GetVersionCall();
