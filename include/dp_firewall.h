@@ -26,9 +26,19 @@ enum dp_fwall_action {
 	DP_FWALL_ACCEPT
 };
 
+struct dp_fwall_stats {
+	uint64_t rule_hit;
+};
+
 enum dp_fwall_direction {
 	DP_FWALL_INGRESS,
 	DP_FWALL_EGRESS
+};
+
+/* The firewall is enabled by default, therefore it is the zero value here as well */
+enum dp_fwall_state {
+	DP_FWALL_ENABLED,
+	DP_FWALL_DISABLED
 };
 
 TAILQ_HEAD(dp_fwall_head, dp_fwall_rule);
@@ -69,6 +79,7 @@ struct dp_fwall_rule {
 	} filter;
 	enum dp_fwall_action action;
 	enum dp_fwall_direction dir;
+	struct dp_fwall_stats stats;
 	TAILQ_ENTRY(dp_fwall_rule) next_rule;
 };
 

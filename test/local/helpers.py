@@ -179,6 +179,17 @@ def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
 		sniff_tcp_data["pkt"] = sniff_packet(tap, is_tcp_pkt)
 
 
+def sniff_icmp_fwall_packet(tap, sniff_icmp_data, negated=False):
+	if negated:
+		pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=tap, timeout=sniff_short_timeout)
+		if len(pkt_list) == 0:
+			sniff_icmp_data["pkt"] = None
+		else:
+			sniff_icmp_data["pkt"] = pkt_list[0]
+	else:
+		sniff_icmp_data["pkt"] = sniff_packet(tap, is_icmp_pkt)
+
+
 def age_out_flows():
 	delay = flow_timeout+1  # timers run every 1s, this should always work
 	print(f"Waiting {delay}s for flows to age-out...")

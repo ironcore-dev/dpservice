@@ -3,7 +3,6 @@
 
 import threading
 
-import pytest
 from helpers import *
 
 def vf_to_vf_tcp_responder(vf_tap):
@@ -63,7 +62,6 @@ def test1_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	grpc_client.delfwallrule(VM2.name, "fw1-vm2")
 
 def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
-	pytest.skip("Skipping till firewall gets fully enabled")
 	sniff_tcp_data = {}
 	negated = True
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(VM2.tap, sniff_tcp_data, negated))
@@ -80,6 +78,44 @@ def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	#It should not arrive at the destination VM, as firewall filters it
 	assert sniff_tcp_data["pkt"] == None
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
+
+
+# An ICMP rule must honor its source prefix. The rule below accepts ICMP only
+# from 1.2.3.4/16, which does NOT include VM1, so VM1's ICMP echo must be dropped (a rule
+# exists in this direction, so non-matching traffic is denied).
+def test_vf_to_vf_firewall_icmp_src_prefix(prepare_ipv4, grpc_client):
+	sniff_icmp_data = {}
+	negated = True
+	resp_thread = threading.Thread(target=sniff_icmp_fwall_packet, args=(VM2.tap, sniff_icmp_data, negated))
+	resp_thread.start()
+
+	grpc_client.addfwallrule(VM2.name, "fw-icmp-badsrc", src_prefix="1.2.3.4/16", proto="icmp")
+	icmp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) / IP(dst=VM2.ip, src=VM1.ip) / ICMP(type=8, id=0x0042))
+	delayed_sendp(icmp_pkt, VM1.tap)
+
+	resp_thread.join()
+	#It must not arrive: the rule's source prefix does not match VM1
+	assert sniff_icmp_data["pkt"] == None
+	grpc_client.delfwallrule(VM2.name, "fw-icmp-badsrc")
+
+
+# A wildcard (match-any-protocol) rule must also honor its source prefix for ICMP.
+# The rule below matches any protocol from 1.2.3.4/16 only, which does NOT include VM1, so
+# VM1's ICMP echo must be dropped.
+def test_vf_to_vf_firewall_wildcard_icmp_src_prefix(prepare_ipv4, grpc_client):
+	sniff_icmp_data = {}
+	negated = True
+	resp_thread = threading.Thread(target=sniff_icmp_fwall_packet, args=(VM2.tap, sniff_icmp_data, negated))
+	resp_thread.start()
+
+	grpc_client.addfwallrule(VM2.name, "fw-any-badsrc", src_prefix="1.2.3.4/16")  # no proto => match-any
+	icmp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) / IP(dst=VM2.ip, src=VM1.ip) / ICMP(type=8, id=0x0043))
+	delayed_sendp(icmp_pkt, VM1.tap)
+
+	resp_thread.join()
+	#It must not arrive: the wildcard rule's source prefix does not match VM1
+	assert sniff_icmp_data["pkt"] == None
+	grpc_client.delfwallrule(VM2.name, "fw-any-badsrc")
 
 
 def vf_to_vf_icmp_responder(vf_tap):

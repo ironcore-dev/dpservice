@@ -277,6 +277,22 @@ def test_ha_vm_nat64_icmp(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_cl
 	nat_test_handover(grpc_client, grpc_client_b, dp_service_b, ipv6=True, icmp=True)
 
 
+def test_ha_vm_nat_fwall_src_prefix(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
+	nat_ul = grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+
+	# For a VF->PF flow only the originating VF's egress rules are evaluated
+	grpc_client_b.addfwallrule(VM1.name, "fw-nat-srcpfx", src_prefix=f"{VM1.ip}/32",
+							   proto="udp", direction="egress")
+
+	# Send through the primary, fail over, and sniff the reply on the backup
+	nat_communicate(PF0.tap, VM1.tap, nat_ul_b, dp_service_b, False, False)
+
+	grpc_client_b.delfwallrule(VM1.name, "fw-nat-srcpfx")
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
+
+
 #
 # Virtual Service traffic
 # this also needs synchronization:
