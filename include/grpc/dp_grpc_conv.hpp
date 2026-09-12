@@ -29,6 +29,8 @@ namespace GrpcConv
 	bool GrpcToDpFwallAction(const FirewallAction& grpc_action, enum dp_fwall_action *dp_action);
 	bool GrpcToDpFwallDirection(const TrafficDirection& grpc_dir, enum dp_fwall_direction *dp_dir);
 	bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port);
+	bool GrpcToDpFwallState(const FirewallState& grpc_state, enum dp_fwall_state *dp_state);
+	FirewallState DpToGrpcFwallState(enum dp_fwall_state dp_state);
 
 	bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType & grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type);
 	CaptureInterfaceType CaptureInterfaceTypeToGrpc(enum dpgrpc_capture_iface_type dp_capture_iface_type);
