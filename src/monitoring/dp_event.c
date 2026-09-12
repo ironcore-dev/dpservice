@@ -5,6 +5,7 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_flow.h"
+#include "dp_internal_stats.h"
 #include "dp_log.h"
 #include "dp_port.h"
 #include "monitoring/dp_monitoring.h"
@@ -152,4 +153,21 @@ void dp_process_event_neighmac_msg(struct rte_mbuf *m)
 	struct dp_event_msg *neighmac_msg = rte_pktmbuf_mtod(m, struct dp_event_msg *);
 
 	dp_set_pf_neigh_mac(neighmac_msg->event_entry.neighmac.port_id, &neighmac_msg->event_entry.neighmac.mac);
+}
+
+// Firewall telemetry message - sent by telemetry threads to have the worker refresh the rule hits snapshot
+
+int dp_send_event_firewall_telemetry_msg(void)
+{
+	struct dp_event_msg firewall_telemetry_msg = {
+		.msg_head = {
+			.type = DP_EVENT_TYPE_FIREWALL_TELEMETRY,
+		},
+	};
+	return dp_send_event_msg(&firewall_telemetry_msg);
+}
+
+void dp_process_event_firewall_telemetry_msg(__rte_unused struct rte_mbuf *m)
+{
+	dp_fwall_telemetry_refresh();
 }

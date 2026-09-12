@@ -245,6 +245,16 @@ static int dp_telemetry_handle_firewall_rule_count(const char *cmd,
 	return DP_OK;
 }
 
+static int dp_telemetry_handle_firewall_rule_hits(const char *cmd,
+												  const char *params,
+												  struct rte_tel_data *data)
+{
+	if (DP_FAILED(dp_telemetry_start_dict(data, cmd))
+		|| DP_FAILED(dp_fwall_get_rule_hits_telemetry(params, data)))
+		return DP_ERROR;
+	return DP_OK;
+}
+
 //
 // Entrypoints
 //
@@ -267,6 +277,7 @@ int dp_telemetry_init(void)
 #endif
 		DP_TELEMETRY_REGISTER_COMMAND(table, saturation, "Returns the current and maximal capacity of each hash table."),
 		DP_TELEMETRY_REGISTER_COMMAND(firewall, rule_count, "Returns the number of firewall rules for each VF interface (attached VM)."),
+		DP_TELEMETRY_REGISTER_COMMAND(firewall, rule_hits, "Returns the hit count of each firewall rule of a VF interface (attached VM). Takes the interface id."),
 	};
 
 	if (!rte_graph_has_stats_feature())
@@ -283,6 +294,9 @@ int dp_telemetry_init(void)
 	}
 #endif
 
+	if (DP_FAILED(dp_fwall_telemetry_init()))
+		return DP_ERROR;
+
 	for (size_t i = 0; i < RTE_DIM(commands); ++i) {
 		ret = rte_telemetry_register_cmd(commands[i].command, commands[i].callback, commands[i].description);
 		if (DP_FAILED(ret)) {
@@ -296,6 +310,7 @@ int dp_telemetry_init(void)
 void dp_telemetry_free(void)
 {
 	free(tel_htables);
+	dp_fwall_telemetry_free();
 	if (rte_graph_has_stats_feature())
 		dp_telemetry_graph_stats_destroy();
 }
