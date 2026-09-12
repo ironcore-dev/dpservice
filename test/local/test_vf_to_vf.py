@@ -80,6 +80,30 @@ def test2_vf_to_vf_firewall_tcp(prepare_ipv4, grpc_client):
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
 
 
+# The firewall is enabled by default, an interface with the firewall disabled must not enforce its
+# rules. This is the mirror image of test2_vf_to_vf_firewall_tcp: the very same non-matching ingress
+# rule must not drop anything here.
+def test_vf_to_vf_firewall_disabled(prepare_ipv4, grpc_client):
+	grpc_client.setfwallparams(VM2.name, "DISABLED")
+	#Accept only tcp packets from the source ip 1.2.3.4 / 16 range, which does not cover VM1
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", src_prefix="1.2.3.4/16", proto="tcp")
+
+	sniff_tcp_data = {}
+	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(VM2.tap, sniff_tcp_data))
+	resp_thread.start()
+
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
+			   IP(dst=VM2.ip, src=VM1.ip) /
+			   TCP(sport=1003, dport=1234))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	resp_thread.join()
+	#It should arrive at the destination VM, as the firewall is disabled there
+	assert sniff_tcp_data["pkt"] != None
+	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
+	grpc_client.setfwallparams(VM2.name, "ENABLED")
+
+
 # An ICMP rule must honor its source prefix. The rule below accepts ICMP only
 # from 1.2.3.4/16, which does NOT include VM1, so VM1's ICMP echo must be dropped (a rule
 # exists in this direction, so non-matching traffic is denied).

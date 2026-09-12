@@ -183,6 +183,8 @@ CREATE_CALLCLASS(CreateFirewallRule, SingleReplyCall);
 CREATE_CALLCLASS(DeleteFirewallRule, SingleReplyCall);
 CREATE_CALLCLASS(GetFirewallRule, SingleReplyCall);
 CREATE_CALLCLASS(ListFirewallRules, MultiReplyCall);
+CREATE_CALLCLASS(GetFirewallParams, SingleReplyCall);
+CREATE_CALLCLASS(SetFirewallParams, SingleReplyCall);
 
 CREATE_CALLCLASS(CheckVniInUse, SingleReplyCall);
 CREATE_CALLCLASS(ResetVni, SingleReplyCall);
