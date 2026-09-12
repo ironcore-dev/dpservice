@@ -1121,6 +1121,37 @@ void ListFirewallRulesCall::ParseReply(struct dpgrpc_reply* reply)
 	}
 }
 
+const char* GetFirewallParamsCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting firewall parameters",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_fwparams.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetFirewallParamsCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	FirewallParams *firewall_params = new FirewallParams();
+
+	firewall_params->set_firewall_state(GrpcConv::DpToGrpcFwallState(reply->fwparams.fwall_state));
+	reply_.set_allocated_firewall_params(firewall_params);
+}
+
+const char* SetFirewallParamsCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Setting firewall parameters",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_FWALL_STATE(request_.firewall_params().firewall_state()));
+	if (SNPRINTF_FAILED(request->set_fwparams.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpFwallState(request_.firewall_params().firewall_state(), &request->set_fwparams.fwall_state))
+		return "Invalid firewall_params.firewall_state";
+	return NULL;
+}
+void SetFirewallParamsCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
 
 const char* CheckVniInUseCall::FillRequest(struct dpgrpc_request* request)
 {

@@ -57,6 +57,8 @@ enum dpgrpc_request_type {
 	DP_REQ_TYPE_DeleteFirewallRule,
 	DP_REQ_TYPE_GetFirewallRule,
 	DP_REQ_TYPE_ListFirewallRules,
+	DP_REQ_TYPE_GetFirewallParams,
+	DP_REQ_TYPE_SetFirewallParams,
 	DP_REQ_TYPE_CheckVniInUse,
 	DP_REQ_TYPE_ResetVni,
 	DP_REQ_TYPE_CaptureStart,
@@ -88,6 +90,7 @@ struct dpgrpc_iface {
 	union dp_ipv6			ul_addr6;
 	uint64_t				total_flow_rate_cap;
 	uint64_t				public_flow_rate_cap;
+	enum dp_fwall_state		fwall_state;						// reply (get/list) only
 };
 
 struct dpgrpc_iface_id {
@@ -158,6 +161,11 @@ struct dpgrpc_fwrule_id {
 	char					rule_id[DP_FIREWALL_ID_MAX_LEN];
 };
 
+struct dpgrpc_fwparams {
+	char					iface_id[DP_IFACE_ID_MAX_LEN] __rte_aligned(4);	// request only
+	enum dp_fwall_state		fwall_state;
+};
+
 struct dpgrpc_vni {
 	uint32_t				vni;
 	enum dpgrpc_vni_type	type;
@@ -225,6 +233,8 @@ struct dpgrpc_request {
 		struct dpgrpc_fwrule_id	del_fwrule;
 		struct dpgrpc_fwrule_id	get_fwrule;
 		struct dpgrpc_iface_id	list_fwrule;
+		struct dpgrpc_iface_id	get_fwparams;
+		struct dpgrpc_fwparams	set_fwparams;
 		struct dpgrpc_vni		vni_in_use;
 		struct dpgrpc_vni		vni_reset;
 		struct dpgrpc_versions	get_version;
@@ -264,6 +274,7 @@ struct dpgrpc_reply {
 		struct dpgrpc_nat			nat;
 		struct dpgrpc_lb			lb;
 		struct dpgrpc_fwrule_info	fwrule;
+		struct dpgrpc_fwparams		fwparams;
 		struct dpgrpc_vni_in_use	vni_in_use;
 		struct dpgrpc_versions		versions;
 		struct dpgrpc_capture_stop	capture_stop;

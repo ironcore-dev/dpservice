@@ -74,9 +74,11 @@ def test_grpc_client_service_error(prepare_ifaces, grpc_client):
 # 4. Remove the other one
 #
 
+default_firewall_params = { "firewall_state": "ENABLED" }
+
 def test_grpc_interface(prepare_ifaces, grpc_client):
 	vm4_ul_ipv6 = grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
-	vmspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6, "metering": {} }
+	vmspec = { "vni": VM4.vni, "device": VM4.pci, "primary_ipv4": VM4.ip, "primary_ipv6": VM4.ipv6, "underlay_route": vm4_ul_ipv6, "metering": {}, "firewall_params": default_firewall_params }
 	spec = grpc_client.getinterface(VM4.name)
 	assert spec == vmspec, \
 		"Interface not properly added"
@@ -86,6 +88,35 @@ def test_grpc_interface(prepare_ifaces, grpc_client):
 	grpc_client.expect_error(201).delinterface(VM4.name)
 	grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
 	grpc_client.delinterface(VM4.name)
+
+def check_firewall_params(grpc_client, expected_state):
+	expected = { "firewall_state": expected_state }
+	spec = grpc_client.getinterface(VM4.name)
+	assert spec["firewall_params"] == expected, \
+		f"Firewall params not properly set on interface (expected {expected_state})"
+	vm4_spec = next((s for s in grpc_client.listinterfaces() if s.get("device") == VM4.pci), None)
+	assert vm4_spec is not None, \
+		"Interface not found in list"
+	assert vm4_spec["firewall_params"] == expected, \
+		f"Firewall params not returned correctly in listinterfaces (expected {expected_state})"
+	assert grpc_client.getfwallparams(VM4.name) == expected, \
+		f"Firewall params not returned correctly by getfwallparams (expected {expected_state})"
+
+# Interface creation takes no firewall parameters, every new interface reports the firewall as enabled
+def test_grpc_interface_firewall_params(prepare_ifaces, grpc_client):
+	grpc_client.addinterface(VM4.name, VM4.pci, VM4.vni, VM4.ip, VM4.ipv6)
+	check_firewall_params(grpc_client, "ENABLED")
+
+	grpc_client.setfwallparams(VM4.name, "DISABLED")
+	check_firewall_params(grpc_client, "DISABLED")
+
+	# The state is not write-once, it can be turned back on
+	grpc_client.setfwallparams(VM4.name, "ENABLED")
+	check_firewall_params(grpc_client, "ENABLED")
+
+	grpc_client.delinterface(VM4.name)
+	grpc_client.expect_error(205).getfwallparams(VM4.name)
+	grpc_client.expect_error(205).setfwallparams(VM4.name, "DISABLED")
 
 def test_grpc_interface_list(prepare_ifaces, grpc_client):
 	old_list = grpc_client.listinterfaces()
