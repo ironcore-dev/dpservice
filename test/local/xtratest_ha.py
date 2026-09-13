@@ -216,15 +216,16 @@ def nat_responder(pf_tap, nat_ul, dp_service_b, icmp=False):
 				 payload)
 	delayed_sendp(reply_pkt, PF0.tap_b)
 
-def nat_communicate(pf_tap, vm_tap, nat_ul, dp_service_b, icmp, ipv6):
+# The default sport differs from scapy's default (53), which test_ha_vm_public already used for an untranslated flow
+def nat_communicate(pf_tap, vm_tap, nat_ul, dp_service_b, icmp, ipv6, udp_sport=4000):
 	threading.Thread(target=nat_responder, args=(pf_tap, nat_ul, dp_service_b, icmp)).start()
 
 	if ipv6:
 		l3 = IPv6(dst=public_nat64_ipv6, src=VM1.ipv6)
-		payload = ICMPv6EchoRequest(id=0x0040, seq=123) if icmp else UDP(dport=1234)
+		payload = ICMPv6EchoRequest(id=0x0040, seq=123) if icmp else UDP(sport=udp_sport, dport=1234)
 	else:
 		l3 = IP(dst=public_ip, src=VM1.ip)
-		payload = ICMP(type=8, id=0x0040, seq=123) if icmp else UDP(dport=1234)
+		payload = ICMP(type=8, id=0x0040, seq=123) if icmp else UDP(sport=udp_sport, dport=1234)
 	pkt = Ether(dst=PF0.mac, src=VM1.mac) / l3 / payload
 	delayed_sendp(pkt, vm_tap)
 
@@ -289,6 +290,34 @@ def test_ha_vm_nat_fwall_src_prefix(prepare_ifaces, prepare_ifaces_b, grpc_clien
 	nat_communicate(PF0.tap, VM1.tap, nat_ul_b, dp_service_b, False, False)
 
 	grpc_client_b.delfwallrule(VM1.name, "fw-nat-srcpfx")
+	grpc_client_b.delnat(VM1.name)
+	grpc_client.delnat(VM1.name)
+
+
+# The conntrack flow created on the backup from NAT sync must use the same keys as a locally created one:
+# the reply after failover can only pass through it (any new incoming flow is blocked), and further packets
+# of the VM must hit it instead of creating a new flow. The latter is checked via the firewall rule hits on
+# the backup: the rules are only evaluated while a flow is being created, so a rising hit count means the
+# packets created a new flow instead of using the synced one. The sync itself already evaluates the rules,
+# hence the counts are compared with each other and not against zero.
+def test_ha_vm_nat_fwall_stateful(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
+	grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
+	for client in (grpc_client, grpc_client_b):
+		client.addfwallrule(VM1.name, "ct-org-egress", proto="udp", dst_port_min=1234, dst_port_max=1234, direction="egress")
+		client.addfwallrule(VM1.name, "ct-reply-block", proto="udp", src_prefix="1.2.3.4/16")
+
+	nat_communicate(PF0.tap, VM1.tap, nat_ul_b, dp_service_b, False, False, udp_sport=4321)
+	hits = grpc_client_b.listfwallrulehits(VM1.name)
+	nat_communicate(PF0.tap_b, VM1.tap_b, nat_ul_b, None, False, False, udp_sport=4321)
+
+	new_hits = grpc_client_b.listfwallrulehits(VM1.name)
+	assert new_hits == hits, \
+		f"Synced flow not hit on the backup, conntrack key mismatch (rule hits: {hits} -> {new_hits})"
+
+	for client in (grpc_client_b, grpc_client):
+		client.delfwallrule(VM1.name, "ct-reply-block")
+		client.delfwallrule(VM1.name, "ct-org-egress")
 	grpc_client_b.delnat(VM1.name)
 	grpc_client.delnat(VM1.name)
 
