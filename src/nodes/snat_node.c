@@ -64,8 +64,11 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 	// ignore errors - see inside
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, ntohl(ipv4_hdr->src_addr));
-	if (snat_data->nat_ip != 0)
+	if (snat_data->nat_ip != 0) {
 		cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
+		/* The reply will arrive on the NAT's underlay IP, so it will be classified as such */
+		cntrack->flow_key[DP_FLOW_DIR_REPLY].vnf_type = DP_VNF_TYPE_NAT;
+	}
 
 	if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack))) {
 		if (snat_data->nat_ip != 0)
@@ -132,6 +135,8 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst, snat64_data.nat_ip);
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst = df->nat_port;
 	cntrack->flow_key[DP_FLOW_DIR_REPLY].proto = df->l4_type;
+	/* The reply will arrive on the NAT's underlay IP, so it will be classified as such */
+	cntrack->flow_key[DP_FLOW_DIR_REPLY].vnf_type = DP_VNF_TYPE_NAT;
 
 	if (DP_FAILED(dp_add_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack))) {
 		dp_remove_network_snat_port(cntrack);
