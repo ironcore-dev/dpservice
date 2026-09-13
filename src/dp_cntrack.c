@@ -266,7 +266,8 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 	key.vni = sync_metadata->portmap_key.vni;
 	dp_copy_ipaddr(&key.l3_src, &sync_metadata->portmap_key.src_ip);
 	key.src.port_src = sync_metadata->portmap_key.iface_src_port;
-	key.vnf_type = DP_VNF_TYPE_NAT;
+	// packets from a VF are never marked as NAT, only the reply arriving on the NAT underlay is
+	key.vnf_type = DP_VNF_TYPE_UNDEFINED;
 	// SNAT overwrites src icmp type to work properly, need to restore it here
 	if (key.proto == IPPROTO_ICMP || key.proto == IPPROTO_ICMPV6)
 		key.src.type_src = sync_metadata->icmp_type_src;
@@ -319,6 +320,7 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 	// like above, this is SNAT-specific taken from snat_node.c
 	dp_set_ipaddr4(&inverted_key.l3_dst, portoverload_key->nat_ip);
 	inverted_key.port_dst = portoverload_key->nat_port;
+	inverted_key.vnf_type = DP_VNF_TYPE_NAT;
 	// in NAT64 the reply to ICMPv6 is ICMP (v4)
 	if (key.proto == IPPROTO_ICMPV6) {
 		inverted_key.proto = IPPROTO_ICMP;
