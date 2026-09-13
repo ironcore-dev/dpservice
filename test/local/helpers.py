@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import shlex
+import socket
 import time
 
 from scapy.all import *
@@ -10,6 +12,30 @@ from scapy.layers.inet import Ether, ICMP, TCP
 from scapy.layers.inet6 import IPv6, ICMPv6EchoRequest, ICMPv6EchoReply, _ICMPv6
 
 from config import *
+
+
+TELEMETRY_BUFSIZE = 10240
+
+def get_telemetry(request, param=None, file_prefix="rte"):
+	# dpdk takes everything after the first comma as the parameter and does not strip it, so
+	# neither a filler param nor a trailing newline may be appended - commands that read their
+	# parameter would receive it verbatim. The response is always keyed by the command alone.
+	with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
+		client.connect(f"/var/run/dpdk/{file_prefix}/dpdk_telemetry.v2")
+		client.recv(TELEMETRY_BUFSIZE)
+		client.send(request.encode() if param is None else f"{request},{param}".encode())
+		response = json.loads(client.recv(TELEMETRY_BUFSIZE).decode())[request]
+		client.close()
+	return response
+
+# Rule hits are served from a snapshot the worker refreshes on request (for pytest on every request),
+# so the first query only triggers the refresh and the second one reads its result
+FWALL_SNAPSHOT_DELAY = 0.2
+
+def get_fwall_rule_hits(vm, file_prefix="rte"):
+	get_telemetry("/dp_service/firewall/rule_hits", vm.name, file_prefix)
+	time.sleep(FWALL_SNAPSHOT_DELAY)
+	return get_telemetry("/dp_service/firewall/rule_hits", vm.name, file_prefix)
 
 
 def request_ip(vm, src_mac=None):

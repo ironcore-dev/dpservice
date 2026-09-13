@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
-import json
 import pytest
 import threading
 from urllib.request import urlopen
@@ -9,9 +8,6 @@ from urllib.request import urlopen
 from exporter import Exporter
 from helpers import *
 
-
-BUFSIZE = 10240
-TELEMETRY_SOCKET = "/var/run/dpdk/rte/dpdk_telemetry.v2"
 
 GRAPH_NODES = (
 	'rx-0-0', 'rx-1-0', 'rx-2-0', 'rx-3-0', 'rx-4-0', 'rx-5-0', 'rx_periodic',
@@ -57,27 +53,6 @@ HASH_TABLES = (
 	'loadbalancer_table', 'loadbalancer_id_table',
 	'vni_table', 'vnf_table', 'reverse_vnf_table',
 )
-
-def get_telemetry(request, param=None):
-	# dpdk takes everything after the first comma as the parameter and does not strip it, so
-	# neither a filler param nor a trailing newline may be appended - commands that read their
-	# parameter would receive it verbatim. The response is always keyed by the command alone.
-	with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
-		client.connect(TELEMETRY_SOCKET)
-		client.recv(BUFSIZE)
-		client.send(request.encode() if param is None else f"{request},{param}".encode())
-		response = json.loads(client.recv(BUFSIZE).decode())[request]
-		client.close()
-	return response
-
-# Rule hits are served from a snapshot the worker refreshes on request (for pytest on every request),
-# so the first query only triggers the refresh and the second one reads its result
-FWALL_SNAPSHOT_DELAY = 0.2
-
-def get_fwall_rule_hits(vm):
-	get_telemetry("/dp_service/firewall/rule_hits", vm.name)
-	time.sleep(FWALL_SNAPSHOT_DELAY)
-	return get_telemetry("/dp_service/firewall/rule_hits", vm.name)
 
 def check_tel_graph(key):
 	tel = get_telemetry(f"/dp_service/graph/{key}")
