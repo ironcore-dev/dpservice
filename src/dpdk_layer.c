@@ -25,9 +25,9 @@ static int active_lockfd = -1;
 
 static struct dp_dpdk_layer dp_layer;
 
-static inline int ring_init(const char *name, struct rte_ring **p_ring, uint32_t capacity)
+static inline int ring_init(const char *name, struct rte_ring **p_ring, uint32_t capacity, unsigned int flags)
 {
-	*p_ring = rte_ring_create(name, rte_align32pow2(capacity), rte_socket_id(), RING_F_SC_DEQ | RING_F_SP_ENQ);
+	*p_ring = rte_ring_create(name, rte_align32pow2(capacity), rte_socket_id(), flags);
 	if (!*p_ring) {
 		DPS_LOG_ERR("Error creating ring buffer", DP_LOG_NAME(name), DP_LOG_RET(rte_errno));
 		return DP_ERROR;
@@ -56,11 +56,11 @@ static int dp_dpdk_layer_init_unsafe(void)
 	if (DP_FAILED(dp_layer.num_of_vfs))
 		return DP_ERROR;
 
-	/* TODO monitoring_rx_queue queue needs to be multiproducer, single consumer */
-	if (DP_FAILED(ring_init("grpc_tx_queue", &dp_layer.grpc_tx_queue, DP_GRPC_Q_SIZE))
-		|| DP_FAILED(ring_init("grpc_rx_queue", &dp_layer.grpc_rx_queue, DP_GRPC_Q_SIZE))
-		|| DP_FAILED(ring_init("periodic_msg_queue", &dp_layer.periodic_msg_queue, DP_PERIODIC_Q_SIZE))
-		|| DP_FAILED(ring_init("monitoring_rx_queue", &dp_layer.monitoring_rx_queue, DP_INTERNAL_Q_SIZE)))
+	/* monitoring_rx_queue is fed from several threads (timers, ethdev interrupts, ...), thus multi-producer */
+	if (DP_FAILED(ring_init("grpc_tx_queue", &dp_layer.grpc_tx_queue, DP_GRPC_Q_SIZE, RING_F_SC_DEQ | RING_F_SP_ENQ))
+		|| DP_FAILED(ring_init("grpc_rx_queue", &dp_layer.grpc_rx_queue, DP_GRPC_Q_SIZE, RING_F_SC_DEQ | RING_F_SP_ENQ))
+		|| DP_FAILED(ring_init("periodic_msg_queue", &dp_layer.periodic_msg_queue, DP_PERIODIC_Q_SIZE, RING_F_SC_DEQ | RING_F_SP_ENQ))
+		|| DP_FAILED(ring_init("monitoring_rx_queue", &dp_layer.monitoring_rx_queue, DP_INTERNAL_Q_SIZE, RING_F_SC_DEQ)))
 		return DP_ERROR;
 
 	if (DP_FAILED(dp_timers_init()))
