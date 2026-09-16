@@ -189,7 +189,7 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 def test_vip_nat_loopback(prepare_ipv4, grpc_client):
 	"""VM1 sends TCP to its own VIP (self-hairpin / NAT loopback).
 
-	Correct dpservice behaviour: the hairpin packet delivered back to VM1
+	Correct dpservice behaviour: the NAT loopback packet delivered back to VM1
 	must have src=vip_vip and dst=VM1.ip. The bug delivers src=VM1.ip so
 	the guest kernel would drop it as a self-spoofed frame.
 	"""
@@ -202,7 +202,7 @@ def test_vip_nat_loopback(prepare_ipv4, grpc_client):
 			   TCP(sport=1200, dport=1235))
 
 	# Sniff on VM1.tap: it will see both our injected outbound packet
-	# (dst=vip_vip) and the dpservice-delivered hairpin (dst=VM1.ip).
+	# (dst=vip_vip) and the dpservice-delivered NAT loopback packet (dst=VM1.ip).
 	# Filter by dst==VM1.ip to isolate the delivered one.
 	captured = {}
 
@@ -223,6 +223,8 @@ def test_vip_nat_loopback(prepare_ipv4, grpc_client):
 		f"vip loopback pkt's src not SNATed, got {delivered[0][IP].src}"
 	assert delivered[0][IP].src == vip_vip, \
 		f"expected vip loopback's pkt src {vip_vip}, got {delivered[0][IP].src}"
+	assert delivered[0][IP].dst == VM1.ip, \
+		f"expected vip loopback's pkt dst {VM1.ip}, got {delivered[0][IP].dst}"
 
 	grpc_client.delfwallrule(VM1.name, "fw-loopback")
 	grpc_client.delvip(VM1.name)

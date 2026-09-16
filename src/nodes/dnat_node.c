@@ -10,6 +10,7 @@
 #include "dp_lpm.h"
 #include "dp_mbuf_dyn.h"
 #include "dp_nat.h"
+#include "dp_conf.h"
 #include "nodes/common_node.h"
 #include "protocols/dp_icmpv6.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -80,6 +81,27 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 
 			/* Expect the new source in this conntrack object */
 			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
+
+			/* NAT loopback: sender is a local VF with a VIP. Uses the
+			 * SNAT table keyed on (private_own_ip, vni) — so a packet
+			 * arriving from PF with src=<remote NAT_IP> will miss the
+			 * lookup (NAT_IP is not any local VF's own_ip), and this
+			 * flag only sets when both endpoints live on this host.
+			 * snat_node will finish the SNAT half.
+			 */
+			struct snat_data *sd = dp_get_iface_snat_data(
+				ntohl(df->src.src_addr), vni);
+			if (sd && sd->vip_ip != 0) {
+				cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT_LOOPBACK;
+			/* Offloaded rule actions support only a single src/dst
+			 * rewrite per packet; loopback packets need both.
+			 * Keep such flows in software.
+			 */
+				cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
+				cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
+				df->offload_state = DP_FLOW_NON_OFFLOAD;
+			}
+
 			// ignore errors - see inside
 			dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
 			dp_set_ipaddr4(&cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_src, ntohl(ipv4_hdr->dst_addr));

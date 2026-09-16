@@ -165,15 +165,38 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	assert(cntrack);
 
 	port = dp_get_in_port(m);
-	if (DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
+
+	if ((DP_FLOW_HAS_NO_FLAGS(cntrack->flow_flags)
+		|| (DP_FLOW_HAS_FLAG_DST_NAT_LOOPBACK(cntrack->flow_flags)
+			&& !DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags)))
+		&& df->flow_dir == DP_FLOW_DIR_ORG) {
 
 		if (df->l3_type == RTE_ETHER_TYPE_IPV4) {
 			src_ip = ntohl(df->src.src_addr);
 			snat_data = dp_get_iface_snat_data(src_ip, port->iface.vni);
 		}
 
+		/* dnat_node may have marked this flow as NAT loopback
+		 * (DNAT resolved to a local VIP and the sender is a local VF
+		 * holding a VIP). Such a flow is WEST_EAST, so the SOUTH_NORTH
+		 * condition alone would skip its SNAT; the loopback flag is the
+		 * explicit carve-out for it. Reply direction is handled by the
+		 * existing SRC_NAT+DIR_ORG / DST_NAT+DIR_REPLY branches below.
+		 *
+		 * NOTE: VIP and NAT must NOT coexist on the same VF. dnat_node
+		 * sets the loopback flag only when the sender has vip_ip != 0
+		 * (and under this policy nat_ip == 0), so dp_process_ipv4_snat
+		 * takes its VIP-only branch and does not consume an SNAT port
+		 * for a packet that never leaves the hypervisor.
+		 *
+		 * The !SRC_NAT part of the condition above ensures this one-shot
+		 * initialization runs exactly once per flow: with SRC_NAT set,
+		 * later ORG-direction packets fall into the repeat branch below,
+		 * which re-applies the stored NAT change without re-allocating.
+		 */
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->nat_ip != 0)
-			&& df->flow_type == DP_FLOW_SOUTH_NORTH) {
+			&& (df->flow_type == DP_FLOW_SOUTH_NORTH
+				|| DP_FLOW_HAS_FLAG_DST_NAT_LOOPBACK(cntrack->flow_flags))) {
 			if (DP_FAILED(dp_process_ipv4_snat(m, df, cntrack, port, snat_data)))
 				return SNAT_NEXT_DROP;
 		}
@@ -197,6 +220,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		ipv4_hdr = dp_get_ipv4_hdr(m);
 		ipv4_hdr->src_addr = htonl(cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.ipv4);
 
+		// For VIP loopback packets, nat_type is DP_FLOW_NAT_TYPE_VIP
+		// thus the following block only applies to network-local NAT, not VIP loopback.
 		if (cntrack->nf_info.nat_type == DP_FLOW_NAT_TYPE_NETWORK_LOCAL) {
 			df->nat_port = cntrack->flow_key[DP_FLOW_DIR_REPLY].port_dst;
 			if (df->l4_type == IPPROTO_ICMP)

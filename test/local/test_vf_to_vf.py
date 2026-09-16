@@ -57,7 +57,7 @@ def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
 
 
-def test_vf_to_vf_vip_to_vip_loopback(prepare_ipv4, grpc_client):
+def test_vf_vip_to_vf_vip_loopback(prepare_ipv4, grpc_client):
 	"""VM1 (with VIP) sends TCP to VM2's VIP on the same hypervisor.
 
 	Correct dpservice behaviour: rewrite BOTH src and dst on the forward
