@@ -13,6 +13,18 @@ def vf_to_vf_tcp_responder(vf_tap):
 				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
 	delayed_sendp(reply_pkt, vf_tap)
 
+def vf_to_vf_tcp_responder_capture(vf_tap, captured):
+	"""Sniff one TCP packet on vf_tap, save it into captured['req'],
+	then echo it back with src/dst swapped. Used when the caller wants
+	to inspect the actual packet delivered to the receiving VF (e.g. to
+	assert on SNAT/DNAT rewrites)."""
+	pkt = sniff_packet(vf_tap, is_tcp_pkt)
+	captured['req'] = pkt
+	reply_pkt = (Ether(dst=pkt[Ether].src, src=pkt[Ether].dst) /
+				 IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+				 TCP(sport=pkt[TCP].dport, dport=pkt[TCP].sport))
+	delayed_sendp(reply_pkt, vf_tap)
+
 def test_vf_to_vf_tcp(prepare_ipv4, grpc_client):
 	threading.Thread(target=vf_to_vf_tcp_responder, args=(VM2.tap,)).start()
 
@@ -42,6 +54,52 @@ def test_vf_to_vf_vip_dnat(prepare_ipv4, grpc_client):
 	sniff_packet(VM1.tap, is_tcp_pkt)
 
 	grpc_client.delvip(VM2.name)
+	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
+
+
+def test_vf_to_vf_vip_to_vip_loopback(prepare_ipv4, grpc_client):
+	"""VM1 (with VIP) sends TCP to VM2's VIP on the same hypervisor.
+
+	Correct dpservice behaviour: rewrite BOTH src and dst on the forward
+	direction (SNAT + DNAT), and rewrite BOTH back on the reply. VM2 should
+	see src=vm1_vip, and VM1's returning reply should carry src=vm2_vip.
+
+	"""
+	vm1_vip = vip_vip
+	vm2_vip = vip_vip2
+
+	captured = {}
+	resp_thread = threading.Thread(target=vf_to_vf_tcp_responder_capture,
+								   args=(VM2.tap, captured))
+	resp_thread.start()
+
+	grpc_client.addvip(VM1.name, vm1_vip)
+	grpc_client.addvip(VM2.name, vm2_vip)
+	grpc_client.addfwallrule(VM2.name, "fw0-vm2", proto="tcp", dst_port_min=1235, dst_port_max=1235)
+
+	tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) /
+			   IP(dst=vm2_vip, src=VM1.ip) /
+			   TCP(sport=1200, dport=1235))
+	delayed_sendp(tcp_pkt, VM1.tap)
+
+	reply = sniff_packet(VM1.tap, is_tcp_pkt)
+	resp_thread.join()
+
+	# Forward direction observed at VM2 (the DNAT target).
+	fwd = captured['req']
+	assert fwd[IP].dst == VM2.ip, \
+		f"DNAT dst wrong at VM2: {fwd[IP].dst}"
+	assert fwd[IP].src == vm1_vip, \
+		f"issue #815: forward src should be {vm1_vip} at VM2, got {fwd[IP].src}"
+
+	# Reply direction observed at VM1 (the original sender).
+	assert reply[IP].src == vm2_vip, \
+		f"reply src should be {vm2_vip} at VM1, got {reply[IP].src}"
+	assert reply[IP].dst == VM1.ip, \
+		f"reply dst should be {VM1.ip} at VM1, got {reply[IP].dst}"
+
+	grpc_client.delvip(VM2.name)
+	grpc_client.delvip(VM1.name)
 	grpc_client.delfwallrule(VM2.name, "fw0-vm2")
 
 

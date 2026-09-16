@@ -66,6 +66,7 @@ public_nat64_ipv6 = "64:ff9b::2d56:0606"
 
 # Virtual IP functionality
 vip_vip = "172.20.0.1"
+vip_vip2 = "172.20.0.2"
 
 # NAT functionality
 nat_vip = "172.21.1.1"

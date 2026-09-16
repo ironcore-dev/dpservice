@@ -184,3 +184,45 @@ def test_network_nat_to_vip_on_another_vni(prepare_ipv4, grpc_client, port_redun
 	grpc_client.delvip(VM3.name)
 	grpc_client.delnat(VM1.name)
 	grpc_client.delfwallrule(VM3.name, "fw0-vm3")
+
+
+def test_vip_nat_loopback(prepare_ipv4, grpc_client):
+	"""VM1 sends TCP to its own VIP (self-hairpin / NAT loopback).
+
+	Correct dpservice behaviour: the hairpin packet delivered back to VM1
+	must have src=vip_vip and dst=VM1.ip. The bug delivers src=VM1.ip so
+	the guest kernel would drop it as a self-spoofed frame.
+	"""
+	grpc_client.addvip(VM1.name, vip_vip)
+	grpc_client.addfwallrule(VM1.name, "fw-loopback",
+							 proto="tcp", dst_port_min=1235, dst_port_max=1235)
+
+	tcp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
+			   IP(dst=vip_vip, src=VM1.ip) /
+			   TCP(sport=1200, dport=1235))
+
+	# Sniff on VM1.tap: it will see both our injected outbound packet
+	# (dst=vip_vip) and the dpservice-delivered hairpin (dst=VM1.ip).
+	# Filter by dst==VM1.ip to isolate the delivered one.
+	captured = {}
+
+	def sniff_delivered():
+		pkts = sniff(count=2, iface=VM1.tap, timeout=sniff_timeout,
+					 lfilter=is_tcp_pkt)
+		captured['pkts'] = pkts
+
+	t = threading.Thread(target=sniff_delivered)
+	t.start()
+	delayed_sendp(tcp_pkt, VM1.tap)
+	t.join()
+
+	delivered = [p for p in captured.get('pkts', []) if p[IP].dst == VM1.ip]
+	assert delivered, "no vip loopback packet delivered to VM1.tap"
+
+	assert delivered[0][IP].src != VM1.ip, \
+		f"vip loopback pkt's src not SNATed, got {delivered[0][IP].src}"
+	assert delivered[0][IP].src == vip_vip, \
+		f"expected vip loopback's pkt src {vip_vip}, got {delivered[0][IP].src}"
+
+	grpc_client.delfwallrule(VM1.name, "fw-loopback")
+	grpc_client.delvip(VM1.name)
