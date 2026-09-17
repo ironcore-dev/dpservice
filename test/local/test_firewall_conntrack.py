@@ -17,6 +17,8 @@ from helpers import *
 # (including its VNF type) is exactly the key the reply packet produces when it arrives.
 # The rule hit counters show how often the rules were evaluated: once for the whole exchange, so the second
 # request must also still match the original key.
+# The counters are only up to date when the telemetry refresh interval is disabled (--fast-fwall-telemetry),
+# otherwise only the exchange itself is checked.
 #
 # A "remote" peer is a VM behind another dpservice (non-default route) or the internet (default route),
 # its packets are injected into PF0 as IP-in-IPv6.
@@ -187,7 +189,9 @@ def run_exchange(l4, initiator, responder, sport, dport, vms):
 
 	return request
 
-def assert_evaluated_once(initiator=None, responder=None):
+def assert_evaluated_once(fast_fwall_telemetry, initiator=None, responder=None):
+	if not fast_fwall_telemetry:
+		return
 	if initiator:
 		hits = get_fwall_rule_hits(initiator)
 		assert hits == { "ct-org-egress": 1, "ct-reply-block": 0 }, \
@@ -208,7 +212,7 @@ l4_params = pytest.mark.parametrize("l4,ipv6", [(Tcp, False), (Icmp, False)], id
 	(False, False), (True, False), (False, True), (True, True),
 ], ids=["no_nat", "initiator_nat", "responder_nat", "both_nat"])
 @pytest.mark.parametrize("l4,ipv6", [(Tcp, False), (Icmp, False), (Tcp, True)], ids=["tcp", "icmp", "tcp6"])
-def test_fwall_conntrack_vf_to_vf(prepare_ipv4, fwall_setup, l4, ipv6, initiator_nat, responder_nat):
+def test_fwall_conntrack_vf_to_vf(prepare_ipv4, fwall_setup, fast_fwall_telemetry, l4, ipv6, initiator_nat, responder_nat):
 	sport = 41000 + 10*(2*(l4 is Icmp) + ipv6) + 2*initiator_nat + responder_nat
 	dport = 8100
 	if initiator_nat:
@@ -224,7 +228,7 @@ def test_fwall_conntrack_vf_to_vf(prepare_ipv4, fwall_setup, l4, ipv6, initiator
 	assert get_src_ip(request) == (VM1.ipv6 if ipv6 else VM1.ip) and l4.src_port(request) == sport, \
 		f"West-east traffic must not be translated (src ip: {get_src_ip(request)}, sport: {l4.src_port(request)})"
 
-	assert_evaluated_once(initiator=VM1, responder=VM2)
+	assert_evaluated_once(fast_fwall_telemetry, initiator=VM1, responder=VM2)
 
 
 #
@@ -233,7 +237,7 @@ def test_fwall_conntrack_vf_to_vf(prepare_ipv4, fwall_setup, l4, ipv6, initiator
 @pytest.mark.parametrize("vm_nat", [False, True], ids=["no_nat", "vm_nat"])
 @pytest.mark.parametrize("remote_initiates", [False, True], ids=["vm_initiator", "remote_initiator"])
 @l4_params
-def test_fwall_conntrack_vf_to_remote_vf(prepare_ipv4, fwall_setup, port_redundancy, l4, ipv6, remote_initiates, vm_nat):
+def test_fwall_conntrack_vf_to_remote_vf(prepare_ipv4, fwall_setup, fast_fwall_telemetry, port_redundancy, l4, ipv6, remote_initiates, vm_nat):
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported")
 	vm_port = 42000 + 10*(l4 is Icmp) + 2*remote_initiates + vm_nat
@@ -247,13 +251,13 @@ def test_fwall_conntrack_vf_to_remote_vf(prepare_ipv4, fwall_setup, port_redunda
 	if remote_initiates:
 		fwall_setup.add_responder_rules(VM1, l4, vm_port)
 		run_exchange(l4, remote, vm, remote_port, vm_port, (VM1,))
-		assert_evaluated_once(responder=VM1)
+		assert_evaluated_once(fast_fwall_telemetry, responder=VM1)
 	else:
 		fwall_setup.add_initiator_rules(VM1, l4, remote_port)
 		request = run_exchange(l4, vm, remote, vm_port, remote_port, (VM1,))
 		assert request[IP].src == VM1.ip and l4.src_port(request) == vm_port and request[IPv6].dst == neigh_vni1_ul_ipv6, \
 			f"West-east traffic must not be translated (src ip: {request[IP].src}, sport: {l4.src_port(request)})"
-		assert_evaluated_once(initiator=VM1)
+		assert_evaluated_once(fast_fwall_telemetry, initiator=VM1)
 
 
 #
@@ -261,7 +265,7 @@ def test_fwall_conntrack_vf_to_remote_vf(prepare_ipv4, fwall_setup, port_redunda
 #
 @pytest.mark.parametrize("vm_nat", [False, True], ids=["no_nat", "vm_nat"])
 @l4_params
-def test_fwall_conntrack_vf_to_internet(prepare_ipv4, fwall_setup, port_redundancy, l4, ipv6, vm_nat):
+def test_fwall_conntrack_vf_to_internet(prepare_ipv4, fwall_setup, fast_fwall_telemetry, port_redundancy, l4, ipv6, vm_nat):
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported")
 	vm_port = 43000 + 10*(l4 is Icmp) + vm_nat
@@ -279,7 +283,7 @@ def test_fwall_conntrack_vf_to_internet(prepare_ipv4, fwall_setup, port_redundan
 		assert request[IP].src == VM1.ip and l4.src_port(request) == vm_port, \
 			f"South-north traffic translated without NAT (src ip: {request[IP].src}, sport: {l4.src_port(request)})"
 
-	assert_evaluated_once(initiator=VM1)
+	assert_evaluated_once(fast_fwall_telemetry, initiator=VM1)
 
 # NAT64 translates the packet before the firewall evaluates it, so only the reply direction is guarded here
 def test_fwall_conntrack_vf_to_internet_nat64(prepare_ipv4, fwall_setup, port_redundancy):

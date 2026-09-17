@@ -155,6 +155,17 @@
       "ifdef": "ENABLE_PYTEST"
     },
     {
+      "lgopt": "fwall-tel-interval",
+      "arg": "SECONDS",
+      "help": "minimal interval between firewall rule hits telemetry refreshes",
+      "var": "fwall_telemetry_interval",
+      "type": "int",
+      "min": 0,
+      "max": 15,
+      "default": "DP_FWALL_TELEMETRY_REFRESH_INTERVAL",
+      "ifdef": "ENABLE_PYTEST"
+    },
+    {
       "lgopt": "multiport-eswitch",
       "help": "run on NIC configured in multiport e-switch mode",
       "var": "multiport_eswitch",

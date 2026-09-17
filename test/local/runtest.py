@@ -56,12 +56,17 @@ def testDpService(build_path, print_header):
 		TestSuite("wcmp", "Port-redundancy tests with WCMP enabled",
 			test_args + ['--port-redundancy'], ['test_encap.py', 'test_vf_to_pf.py', 'test_virtsvc.py']),
 	]
+	# firewall rule hits are only up to date if the telemetry refresh interval can be disabled
+	fwall_telemetry_args = ['--fast-fwall-telemetry'] if '--fwall-tel-interval' in dpservice_help else []
 	if not args.hw:
 		suites.append(TestSuite("ha", "High-avaliability tests",
-			test_args + ['--ha'], ['xtratest_ha.py']))
+			test_args + ['--ha'] + fwall_telemetry_args, ['xtratest_ha.py']))
 	if '--flow-timeout' in dpservice_help:
 		suites.append(TestSuite("flow", "Flow timeout tests with extremely fast flow timeout",
 			test_args + ['--fast-flow-timeout'], ['xtratest_flow_timeout.py']))
+	if fwall_telemetry_args:
+		suites.append(TestSuite("firewall", "Firewall tests checking rule hits telemetry refreshed on every request",
+			test_args + fwall_telemetry_args, ['test_firewall_conntrack.py', 'test_telemetry.py::test_telemetry_fwall_rule_hits']))
 
 	# --list-suites prints and terminates
 	if args.list_suites:

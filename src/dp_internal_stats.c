@@ -10,6 +10,7 @@
 #include <rte_stdatomic.h>
 #include <string.h>
 
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_firewall.h"
 #include "dp_log.h"
@@ -41,6 +42,7 @@ struct dp_fwall_telemetry_snapshot {
 static struct dp_fwall_telemetry_snapshot *fwall_snapshot = NULL;
 // only used by the worker
 static uint64_t fwall_snapshot_cycles = 0;
+static uint64_t fwall_refresh_interval_cycles;
 
 int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict)
 {
@@ -191,7 +193,7 @@ void dp_fwall_telemetry_refresh(void)
 	uint64_t handled_requests;
 
 	// requests within the interval are served by the same snapshot
-	if (!fwall_snapshot_cycles || cur_cycles - fwall_snapshot_cycles >= DP_FWALL_TELEMETRY_REFRESH_INTERVAL * rte_get_timer_hz()) {
+	if (!fwall_snapshot_cycles || cur_cycles - fwall_snapshot_cycles >= fwall_refresh_interval_cycles) {
 		fwall_snapshot_cycles = cur_cycles;
 		dp_fwall_telemetry_write_snapshot();
 	}
@@ -209,6 +211,12 @@ int dp_fwall_telemetry_init(void)
 		return DP_ERROR;
 	}
 	rte_seqlock_init(&fwall_snapshot->lock);
+
+#ifdef ENABLE_PYTEST
+	fwall_refresh_interval_cycles = dp_conf_get_fwall_telemetry_interval() * rte_get_timer_hz();
+#else
+	fwall_refresh_interval_cycles = DP_FWALL_TELEMETRY_REFRESH_INTERVAL * rte_get_timer_hz();
+#endif
 	return DP_OK;
 }
 

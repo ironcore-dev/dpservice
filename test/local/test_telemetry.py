@@ -112,7 +112,10 @@ def test_telemetry_fwall(prepare_ifaces, grpc_client):
 # The interface id is a mandatory parameter, the reply maps rule id to hit count. A rule's hit
 # counter is bumped once per matching flow (conntrack caches the decision, so further packets
 # of the same flow do not re-evaluate).
-def test_telemetry_fwall_rule_hits(prepare_ipv4, grpc_client):
+def test_telemetry_fwall_rule_hits(prepare_ipv4, grpc_client, fast_fwall_telemetry):
+	if not fast_fwall_telemetry:
+		pytest.skip("Firewall rule hits are only up to date with fast firewall telemetry")
+
 	# A single ingress rule on VM2 accepting TCP; VM1 has no rules, so only this rule is hit.
 	grpc_client.addfwallrule(VM2.name, "fw-hits-tcp", proto="tcp")
 
@@ -140,13 +143,14 @@ def test_telemetry_fwall_rule_hits(prepare_ipv4, grpc_client):
 	assert get_fwall_rule_hits(VM1) == {}, \
 		"Interface without firewall rules should report no hits"
 
-	# A missing or unknown interface id is an error (null reply)
+	grpc_client.delfwallrule(VM2.name, "fw-hits-tcp")
+
+# A missing or unknown interface id is an error (null reply)
+def test_telemetry_fwall_rule_hits_invalid_iface(prepare_ifaces):
 	assert get_telemetry("/dp_service/firewall/rule_hits") is None, \
 		"Missing interface id should not be accepted"
 	assert get_telemetry("/dp_service/firewall/rule_hits", "invalid_iface") is None, \
 		"Unknown interface id should not be accepted"
-
-	grpc_client.delfwallrule(VM2.name, "fw-hits-tcp")
 
 def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')

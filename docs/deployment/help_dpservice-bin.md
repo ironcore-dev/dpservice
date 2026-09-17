@@ -23,6 +23,7 @@
 | --log-format | FORMAT | set the format of individual log lines (on standard output) | 'text' (default) or 'json' |
 | --grpc-port | PORT | listen for gRPC clients on this port |  |
 | --flow-timeout | SECONDS | inactive flow timeout (except TCP established flows) |  |
+| --fwall-tel-interval | SECONDS | minimal interval between firewall rule hits telemetry refreshes |  |
 | --multiport-eswitch | None | run on NIC configured in multiport e-switch mode |  |
 | --active-lockfile | PATH | file to be locked before starting packet processing |  |
 | --sync-tap | IFNAME | TAP device to use for dpservice-ha synchronization |  |

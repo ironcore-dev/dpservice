@@ -32,11 +32,8 @@ int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict);
 // The telemetry threads cannot walk the firewall rules owned by the worker,
 // instead the worker copies the rule hits into a snapshot on request, at most once per interval (in seconds)
 // and the telemetry thread waits for the worker to handle the request, at most for the timeout
-#ifdef ENABLE_PYTEST
-#	define DP_FWALL_TELEMETRY_REFRESH_INTERVAL 0
-#else
-#	define DP_FWALL_TELEMETRY_REFRESH_INTERVAL 5
-#endif
+// (tests can change the interval via a command-line option)
+#define DP_FWALL_TELEMETRY_REFRESH_INTERVAL 5
 #define DP_FWALL_TELEMETRY_REFRESH_TIMEOUT_MS 2000
 // rules of an interface beyond this limit are not part of the snapshot
 #define DP_FWALL_TELEMETRY_MAX_RULES 64

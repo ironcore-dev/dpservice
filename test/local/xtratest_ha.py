@@ -297,7 +297,7 @@ def test_ha_vm_nat_fwall_src_prefix(prepare_ifaces, prepare_ifaces_b, grpc_clien
 # The conntrack flow created on the backup from NAT sync must use the same keys as a locally created one:
 # the reply after failover can only pass through it (any new incoming flow is blocked), and further packets
 # of the VM must hit it instead of being evaluated as a new flow (the rule is only hit once, by the sync)
-def test_ha_vm_nat_fwall_stateful(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b):
+def test_ha_vm_nat_fwall_stateful(prepare_ifaces, prepare_ifaces_b, grpc_client, grpc_client_b, dp_service_b, fast_fwall_telemetry):
 	grpc_client.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	nat_ul_b = grpc_client_b.addnat(VM1.name, nat_vip, nat_local_min_port, nat_local_max_port)
 	for client in (grpc_client, grpc_client_b):
@@ -307,9 +307,11 @@ def test_ha_vm_nat_fwall_stateful(prepare_ifaces, prepare_ifaces_b, grpc_client,
 	nat_communicate(PF0.tap, VM1.tap, nat_ul_b, dp_service_b, False, False, udp_sport=4321)
 	nat_communicate(PF0.tap_b, VM1.tap_b, nat_ul_b, None, False, False, udp_sport=4321)
 
-	hits = get_fwall_rule_hits(VM1, file_prefix="hatest")
-	assert hits == { "ct-org-egress": 1, "ct-reply-block": 0 }, \
-		f"Synced flow evaluated more than once on the backup, conntrack key mismatch (hits: {hits})"
+	# the rule hits are only up to date with fast firewall telemetry
+	if fast_fwall_telemetry:
+		hits = get_fwall_rule_hits(VM1, file_prefix="hatest")
+		assert hits == { "ct-org-egress": 1, "ct-reply-block": 0 }, \
+			f"Synced flow evaluated more than once on the backup, conntrack key mismatch (hits: {hits})"
 
 	for client in (grpc_client_b, grpc_client):
 		client.delfwallrule(VM1.name, "ct-reply-block")

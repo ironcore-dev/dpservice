@@ -27,7 +27,7 @@ pytest-3 -x -v --build-path=/home/plague/git/dpservice/test/../build --virtsvc /
 ```
 
 ### Pytest
-When running `pytest` directly in the `test/` directory, only a specific set of options for `dpservice-bin` is used. Arguments specifying whether or not port redundancy should be utilized (`--port-redundancy`) or if a shortened flow timeout should be used (`--fast-flow-timeout`) are needed to fully test all code paths. This is done automatically by `runtest.py`.
+When running `pytest` directly in the `test/` directory, only a specific set of options for `dpservice-bin` is used. Arguments specifying whether or not port redundancy should be utilized (`--port-redundancy`) if a shortened flow timeout should be used (`--fast-flow-timeout`) or if firewall rule hits telemetry should be refreshed on every request (`--fast-fwall-telemetry`) are needed to fully test all code paths. This is done automatically by `runtest.py`.
 
 If one should want to instead run your own `dpservice-bin` instance (e.g. for running under a debugger), the `--attach` argument connects to an already running service instead of starting its own (which in turn can be started via a helper `dp_service.py` script). This comes with the caveat of ensuring the right arguments are passed to the service at startup.
 

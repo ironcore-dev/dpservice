@@ -22,7 +22,7 @@ class DpService:
 		return spec.tap_b if self.secondary else spec.tap
 
 	def __init__(self, build_path, port_redundancy, fast_flow_timeout, secondary=False, ha=False,
-				 gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
+				 fast_fwall_telemetry=False, gdb=False, test_virtsvc=False, hardware=False, offloading=False, graphtrace=False):
 		self.build_path = build_path
 		self.port_redundancy = port_redundancy
 		self.hardware = hardware
@@ -87,6 +87,8 @@ class DpService:
 			self.cmd += ' --wcmp=50'
 		if fast_flow_timeout:
 			self.cmd += f' --flow-timeout={flow_timeout}'
+		if fast_fwall_telemetry:
+			self.cmd += ' --fwall-tel-interval=0'
 		if test_virtsvc:
 			self.cmd += (f' --udp-virtsvc="{virtsvc_udp_virtual_ip},{virtsvc_udp_virtual_port},{virtsvc_udp_svc_ipv6},{virtsvc_udp_svc_port}"'
 						 f' --tcp-virtsvc="{virtsvc_tcp_virtual_ip},{virtsvc_tcp_virtual_port},{virtsvc_tcp_svc_ipv6},{virtsvc_tcp_svc_port}"')
@@ -190,6 +192,7 @@ if __name__ == '__main__':
 	parser.add_argument("--build-path", action="store", default=f"{script_path}/../../build", help="Path to the root build directory")
 	parser.add_argument("--port-redundancy", action="store_true", help="Set up two physical ports")
 	parser.add_argument("--fast-flow-timeout", action="store_true", help="Test with fast flow timeout value")
+	parser.add_argument("--fast-fwall-telemetry", action="store_true", help="Refresh firewall rule hits telemetry on every request")
 	parser.add_argument("--virtsvc", action="store_true", help="Enable virtual service tests")
 	parser.add_argument("--no-init", action="store_true", help="Do not set interfaces up automatically")
 	parser.add_argument("--init-only", action="store_true", help="Only init interfaces of a running service")
@@ -200,6 +203,7 @@ if __name__ == '__main__':
 	dp_service = DpService(args.build_path,
 						   args.port_redundancy,
 						   args.fast_flow_timeout,
+						   fast_fwall_telemetry=args.fast_fwall_telemetry,
 						   gdb=args.gdb,
 						   test_virtsvc=args.virtsvc,
 						   hardware=args.hw)
