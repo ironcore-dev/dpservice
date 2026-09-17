@@ -29,12 +29,8 @@ def get_telemetry(request, param=None, file_prefix="rte"):
 	return response
 
 # Rule hits are served from a snapshot the worker refreshes on request (for pytest on every request),
-# so the first query only triggers the refresh and the second one reads its result
-FWALL_SNAPSHOT_DELAY = 0.2
-
+# the query waits for the worker to handle the refresh
 def get_fwall_rule_hits(vm, file_prefix="rte"):
-	get_telemetry("/dp_service/firewall/rule_hits", vm.name, file_prefix)
-	time.sleep(FWALL_SNAPSHOT_DELAY)
 	return get_telemetry("/dp_service/firewall/rule_hits", vm.name, file_prefix)
 
 
