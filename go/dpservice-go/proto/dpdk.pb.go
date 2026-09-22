@@ -1207,13 +1207,21 @@ func (x *Loadbalancer) GetUnderlayRoute() []byte {
 	return nil
 }
 
+// Only the wildcard is accepted for icmp_code, a specific code is rejected.
+// The conntrack key of an ICMP flow holds the ICMP type but no code, and the firewall evaluates its
+// rules only while a flow is being established. A specific code could therefore only ever be applied
+// to the first packet of a flow, every following packet of the same type would inherit that verdict
+// no matter which code it carries. A flow taken over from HA NAT sync cannot reconstruct the code at
+// all. Such a filter is rejected rather than enforced inconsistently.
+// Careful: an unset int32 is 0, and 0 is a valid ICMP code, not the wildcard. A rule that is meant
+// to match any code has to set icmp_code to -1 explicitly.
 type IcmpFilter struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	IcmpType int32 `protobuf:"varint,1,opt,name=icmp_type,json=icmpType,proto3" json:"icmp_type,omitempty"` // -1 matches all ICMP Codes
-	IcmpCode int32 `protobuf:"varint,2,opt,name=icmp_code,json=icmpCode,proto3" json:"icmp_code,omitempty"` // -1 matches all ICMP Types
+	IcmpType int32 `protobuf:"varint,1,opt,name=icmp_type,json=icmpType,proto3" json:"icmp_type,omitempty"` // -1 matches all ICMP types
+	IcmpCode int32 `protobuf:"varint,2,opt,name=icmp_code,json=icmpCode,proto3" json:"icmp_code,omitempty"` // has to be -1, which matches all ICMP codes
 }
 
 func (x *IcmpFilter) Reset() {

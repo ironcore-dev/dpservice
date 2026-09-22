@@ -131,9 +131,17 @@ message Loadbalancer {
 	bytes underlay_route = 5;
 }
 
+// Only the wildcard is accepted for icmp_code, a specific code is rejected.
+// The conntrack key of an ICMP flow holds the ICMP type but no code, and the firewall evaluates its
+// rules only while a flow is being established. A specific code could therefore only ever be applied
+// to the first packet of a flow, every following packet of the same type would inherit that verdict
+// no matter which code it carries. A flow taken over from HA NAT sync cannot reconstruct the code at
+// all. Such a filter is rejected rather than enforced inconsistently.
+// Careful: an unset int32 is 0, and 0 is a valid ICMP code, not the wildcard. A rule that is meant
+// to match any code has to set icmp_code to -1 explicitly.
 message IcmpFilter {
-	int32 icmp_type = 1; // -1 matches all ICMP Codes
-	int32 icmp_code = 2; // -1 matches all ICMP Types
+	int32 icmp_type = 1; // -1 matches all ICMP types
+	int32 icmp_code = 2; // has to be -1, which matches all ICMP codes
 }
 
 message TcpFilter {
