@@ -518,6 +518,14 @@ def test_grpc_fwallrule_errors(prepare_ifaces, grpc_client):
 	grpc_client.expect_error(205).listfwallrules("invalid")
 	# Try to add an unsupported "drop" rule
 	grpc_client.expect_error(441).addfwallrule(VM1.name, "fw0-vm1", src_prefix="1.2.3.4/16", proto="tcp", action="drop")
+	# Try to add a rule filtering on a specific ICMP code, only the wildcard is supported
+	try:
+		grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="icmp", icmp_type=3, icmp_code=3)
+		assert False, \
+			"Firewall rule with a specific ICMP code was accepted"
+	except GrpcError as e:
+		assert str(e) == "gRPC error #3: Invalid icmp.icmp_code, only -1 is supported", \
+			f"Invalid error for a firewall rule with a specific ICMP code: {e}"
 
 
 def test_grpc_vni(prepare_ifaces, grpc_client):

@@ -107,7 +107,7 @@ func (o *CreateFirewallRuleOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.DstPortLower, "dst-port-min", -1, "Destination Ports start (-1 matches all destination ports).")
 	fs.Int32Var(&o.DstPortUpper, "dst-port-max", -1, "Destination Ports end.")
 	fs.Int32Var(&o.IcmpType, "icmp-type", -1, "ICMP type (-1 matches all ICMP Types).")
-	fs.Int32Var(&o.IcmpCode, "icmp-code", -1, "ICMP code (-1 matches all ICMP Codes).")
+	fs.Int32Var(&o.IcmpCode, "icmp-code", -1, "ICMP code, has to be -1 (matches all ICMP codes).")
 
 }
 

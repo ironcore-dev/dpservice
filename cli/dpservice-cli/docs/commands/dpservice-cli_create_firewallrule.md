@@ -21,7 +21,7 @@ dpservice-cli create fwrule --interface-id=vm1 --action=1 --direction=1 --dst=5.
       --dst-port-max int32    Destination Ports end. (default -1)
       --dst-port-min int32    Destination Ports start (-1 matches all destination ports). (default -1)
   -h, --help                  help for firewallrule
-      --icmp-code int32       ICMP code (-1 matches all ICMP Codes). (default -1)
+      --icmp-code int32       ICMP code, has to be -1 (matches all ICMP codes). (default -1)
       --icmp-type int32       ICMP type (-1 matches all ICMP Types). (default -1)
       --interface-id string   InterfaceID of FW Rule.
       --priority uint32       Priority of FW Rule. (For future use. No effect at the moment). (default 1000)

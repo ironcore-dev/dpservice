@@ -45,6 +45,10 @@ TAILQ_HEAD(dp_fwall_head, dp_fwall_rule);
 
 struct dp_icmp_filter {
 	uint32_t icmp_type;
+	/* Always DP_FWALL_MATCH_ANY_ICMP_CODE, the gRPC layer rejects anything else, as the conntrack
+	 * key holds no ICMP code. Matching it is kept, so that only that check has to be relaxed if
+	 * the code ever becomes part of the key.
+	 */
 	uint32_t icmp_code;
 };
 
