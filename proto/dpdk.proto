@@ -200,6 +200,20 @@ message FirewallRule {
 	Prefix source_prefix = 5;			// 0.0.0.0 with prefix length 0 matches all source ips
 	Prefix destination_prefix = 6;		// 0.0.0.0 with prefix length 0 matches all destination ips
 	ProtocolFilter protocol_filter = 7;	// Not defining a protocol filter matches all protocols
+
+	// Hit counter, reported by GetFirewallRule and ListFirewallRules, ignored by CreateFirewallRule.
+	// A "hit" counts one FLOW that the rule matched, never one packet: the firewall evaluates the rule
+	// list only while a flow is being established and the resulting action is then cached for the whole
+	// flow, so a single long-lived connection is one hit and a connection that expires and is
+	// established again is a second one.
+	// A flow is credited to the first rule of its direction that matches it, even when the traffic is
+	// refused for another reason (both directions of a flow are always evaluated) and even when the
+	// firewall of the interface is disabled and the refusal is therefore not enforced. A hit says the
+	// rule matched, it does not say the rule decided.
+	// The counter starts at zero when the rule is created and is only ever incremented; there is no
+	// way to reset it. Deleting and re-creating a rule under the same id therefore restarts it at zero,
+	// so a client tracking differences needs to read a decrease as a restart, not as an error.
+	uint64 flow_hits = 8;
 }
 
 

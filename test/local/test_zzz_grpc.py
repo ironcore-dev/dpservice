@@ -480,7 +480,8 @@ def test_grpc_fwallrule(prepare_ifaces, grpc_client):
 				 "source_prefix": "1.2.3.4/16", "destination_prefix": "0.0.0.0/0",
 				 "protocol_filter": { "Filter": { "Tcp": {
 					 "src_port_lower": -1, "src_port_upper": -1, "dst_port_lower": -1, "dst_port_upper": -1
-				 } } } }
+				 } } },
+				 "flow_hits": 0 }
 	spec = grpc_client.getfwallrule(VM1.name, "fw0-vm1")
 	assert spec == rulespec, \
 		"Firewall rule not added properly"

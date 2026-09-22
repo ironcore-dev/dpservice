@@ -383,7 +383,7 @@ func (t defaultTableConverter) neighborNatTable(nats []api.NeighborNat) (*TableD
 }
 
 func (t defaultTableConverter) fwruleTable(fwrules []api.FirewallRule) (*TableData, error) {
-	headers := []any{"InterfaceID", "RuleID", "Direction", "Src", "Dst", "Action", "Protocol", "Priority"}
+	headers := []any{"InterfaceID", "RuleID", "Direction", "Src", "Dst", "Action", "Protocol", "Priority", "FlowHits"}
 
 	columns := make([][]any, len(fwrules))
 	for i, fwrule := range fwrules {
@@ -396,6 +396,7 @@ func (t defaultTableConverter) fwruleTable(fwrules []api.FirewallRule) (*TableDa
 			fwrule.Spec.FirewallAction,
 			fwrule.Spec.ProtocolFilter.String(),
 			fwrule.Spec.Priority,
+			fwrule.Spec.FlowHits,
 		}
 	}
 

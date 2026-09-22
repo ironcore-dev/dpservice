@@ -308,10 +308,10 @@ def test_ha_vm_nat_fwall_stateful(prepare_ifaces, prepare_ifaces_b, grpc_client,
 		client.addfwallrule(VM1.name, "ct-reply-block", proto="udp", src_prefix="1.2.3.4/16")
 
 	nat_communicate(PF0.tap, VM1.tap, nat_ul_b, dp_service_b, False, False, udp_sport=4321)
-	hits = grpc_client_b.listfwallrulehits(VM1.name)
+	hits = { spec['id']: spec['flow_hits'] for spec in grpc_client_b.listfwallrules(VM1.name) }
 	nat_communicate(PF0.tap_b, VM1.tap_b, nat_ul_b, None, False, False, udp_sport=4321)
 
-	new_hits = grpc_client_b.listfwallrulehits(VM1.name)
+	new_hits = { spec['id']: spec['flow_hits'] for spec in grpc_client_b.listfwallrules(VM1.name) }
 	assert new_hits == hits, \
 		f"Synced flow not hit on the backup, conntrack key mismatch (rule hits: {hits} -> {new_hits})"
 
