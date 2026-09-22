@@ -145,7 +145,7 @@ class FwallSetup:
 	def hits(self):
 		hits = {}
 		for vm in { vm.name: vm for vm, _ in self.rules }.values():
-			for spec in self.grpc_client.listfwallrulehits(vm.name):
+			for spec in self.grpc_client.listfwallrules(vm.name):
 				hits[(vm.name, spec['id'])] = spec['flow_hits']
 		return hits
 

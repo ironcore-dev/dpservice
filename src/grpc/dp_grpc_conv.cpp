@@ -155,6 +155,11 @@ FirewallState DpToGrpcFwallState(enum dp_fwall_state dp_state)
 	return dp_state == DP_FWALL_ENABLED ? FirewallState::ENABLED : FirewallState::DISABLED;
 }
 
+TrafficDirection DpToGrpcFwallDirection(enum dp_fwall_direction dp_dir)
+{
+	return dp_dir == DP_FWALL_INGRESS ? TrafficDirection::INGRESS : TrafficDirection::EGRESS;
+}
+
 bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type)
 {
 	switch (grpc_type) {
@@ -300,10 +305,8 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 
 	grpc_rule->set_id(dp_rule->rule_id);
 	grpc_rule->set_priority(dp_rule->priority);
-	if (dp_rule->dir == DP_FWALL_INGRESS)
-		grpc_rule->set_direction(TrafficDirection::INGRESS);
-	else
-		grpc_rule->set_direction(TrafficDirection::EGRESS);
+	grpc_rule->set_direction(DpToGrpcFwallDirection(dp_rule->dir));
+	grpc_rule->set_flow_hits(dp_rule->stats.rule_hit);
 
 	if (dp_rule->action == DP_FWALL_ACCEPT)
 		grpc_rule->set_action(FirewallAction::ACCEPT);

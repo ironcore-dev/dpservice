@@ -499,6 +499,9 @@ type FirewallRuleSpec struct {
 	SourcePrefix      *netip.Prefix         `json:"source_prefix,omitempty"`
 	DestinationPrefix *netip.Prefix         `json:"destination_prefix,omitempty"`
 	ProtocolFilter    *proto.ProtocolFilter `json:"protocol_filter,omitempty"`
+	// Counts the flows the rule matched, not the packets it let through, see the flow_hits field of
+	// the FirewallRule message in the protobuf definition for what that means. Ignored on creation.
+	FlowHits uint64 `json:"flow_hits"`
 }
 
 type FirewallRuleList struct {
