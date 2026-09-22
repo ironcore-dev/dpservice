@@ -1049,8 +1049,9 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		dp_rule->filter.icmp.icmp_code = (uint32_t)grpc_filter.icmp().icmp_code();
 		if (dp_rule->filter.icmp.icmp_type != DP_FWALL_MATCH_ANY_ICMP_TYPE && dp_rule->filter.icmp.icmp_type > UINT8_MAX)
 			return "Invalid icmp.icmp_type";
-		if (dp_rule->filter.icmp.icmp_code != DP_FWALL_MATCH_ANY_ICMP_CODE && dp_rule->filter.icmp.icmp_code > UINT8_MAX)
-			return "Invalid icmp.icmp_code";
+		// a specific code cannot be enforced beyond the first packet of a flow, see IcmpFilter
+		if (dp_rule->filter.icmp.icmp_code != DP_FWALL_MATCH_ANY_ICMP_CODE)
+			return "Invalid icmp.icmp_code, only -1 is supported";
 		break;
 	case ProtocolFilter::FILTER_NOT_SET:
 	default:

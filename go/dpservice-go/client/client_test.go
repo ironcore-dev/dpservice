@@ -1326,15 +1326,15 @@ var _ = Describe("negative interface related tests", Label("negative"), func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid icmp.icmp_type"))
 
-			By("icmpCode out of range")
+			By("icmpCode other than -1")
 			fwRule.Spec.ProtocolFilter.Filter = &dpdkproto.ProtocolFilter_Icmp{
 				Icmp: &dpdkproto.IcmpFilter{
-					IcmpCode: 400,
+					IcmpCode: 3,
 				},
 			}
 			_, err = dpdkClient.CreateFirewallRule(ctx, &fwRule)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid icmp.icmp_code"))
+			Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = Invalid icmp.icmp_code, only -1 is supported"))
 
 			By("not defining spec")
 			fwRule.Spec = api.FirewallRuleSpec{}
