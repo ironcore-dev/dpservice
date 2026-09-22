@@ -377,6 +377,7 @@ func ProtoFwRuleToFwRule(dpdkFwRule *proto.FirewallRule, interfaceID string) (*F
 			SourcePrefix:      &srcPrefix,
 			DestinationPrefix: &dstPrefix,
 			ProtocolFilter:    dpdkFwRule.ProtocolFilter,
+			FlowHits:          dpdkFwRule.FlowHits,
 		},
 	}, nil
 }
