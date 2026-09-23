@@ -3,13 +3,16 @@
 
 import pytest
 import threading
+import json
+import os
+import subprocess
 
 from helpers import *
 
 #
 # Stateful firewall on top of conntrack
 #
-# Every test runs an exchange (request, reply, second request of the same flow) between a local VM and
+# The test_fwall_conntrack_* tests run an exchange (request, reply, second request of the same flow) between a local VM and
 # a peer, with firewall rules that only allow the original direction and block any new flow in the reverse one:
 #  - a local initiating VM accepts the request in egress and has an ingress rule that matches nothing,
 #  - a local responding VM accepts the request in ingress and has an egress rule that matches nothing.
@@ -115,11 +118,22 @@ class FwallSetup:
 		self.grpc_client = grpc_client
 		self.rules = []
 		self.nats = []
+		self.lbs = []
+		self.neighnats = []
 
 	def add_nat(self, vm, min_port=nat_local_min_port, max_port=nat_local_max_port):
 		nat_ul_ipv6 = self.grpc_client.addnat(vm.name, nat_vip, min_port, max_port)
 		self.nats.append(vm)
 		return nat_ul_ipv6
+
+	def add_lb(self, ip=lb_ip, port=80):
+		lb_ul_ipv6 = self.grpc_client.createlb(lb_name, vni1, ip, f"tcp/{port}")
+		self.lbs.append(lb_name)
+		return lb_ul_ipv6
+
+	def add_neighnat(self, min_port, max_port):
+		self.grpc_client.addneighnat(nat_vip, vni1, min_port, max_port, neigh_vni1_ul_ipv6)
+		self.neighnats.append((min_port, max_port))
 
 	def _add_rule(self, vm, rule_id, l4, ipv6, **kwargs):
 		any_prefix = "::/0" if ipv6 else "0.0.0.0/0"
@@ -152,8 +166,12 @@ class FwallSetup:
 	def cleanup(self):
 		for vm, rule_id in reversed(self.rules):
 			self.grpc_client.delfwallrule(vm.name, rule_id)
+		for min_port, max_port in reversed(self.neighnats):
+			self.grpc_client.delneighnat(nat_vip, vni1, min_port, max_port)
 		for vm in reversed(self.nats):
 			self.grpc_client.delnat(vm.name)
+		for name in reversed(self.lbs):
+			self.grpc_client.dellb(name)
 
 @pytest.fixture
 def fwall_setup(grpc_client):
@@ -288,3 +306,192 @@ def test_fwall_conntrack_vf_to_internet(prepare_ipv4, fwall_setup, port_redundan
 	else:
 		assert request[IP].src == VM1.ip and l4.src_port(request) == vm_port, \
 			f"South-north traffic translated without NAT (src ip: {request[IP].src}, sport: {l4.src_port(request)})"
+
+
+#
+# ICMP errors and the firewall
+#
+# An ICMP destination-unreachable is keyed by the TCP/UDP packet it quotes, so that it finds the flow it
+# reports on. It must not decide an existing flow's firewall action.
+# Errors sent through a service underlay to unrelated VM addresses must not create state.
+# Unmatched errors may create forwarding state only for actual LB/network NAT destinations.
+#
+
+@pytest.fixture(params=["interface", "lb", "nat", "lb-mismatched-quote", "nat-mismatched-quote"])
+def icmp_underlay(request, prepare_ipv4, fwall_setup, port_redundancy):
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported")
+	if request.param == "lb":
+		return fwall_setup.add_lb(), VM1.ip, 1
+	if request.param == "nat":
+		return fwall_setup.add_nat(VM2), VM1.ip, 2
+	if request.param == "lb-mismatched-quote":
+		return fwall_setup.add_lb(), lb_ip, 3
+	if request.param == "nat-mismatched-quote":
+		return fwall_setup.add_nat(VM2), nat_vip, 4
+	return VM1.ul_ipv6, VM1.ip, 0
+
+# Sent by the remote side about a packet VM1:vm_port -> remote:remote_port
+def icmp_error(code, vm_port, remote_port):
+	return ICMP(type=3, code=code) / IPerror(src=VM1.ip, dst=fwall_remote_vm_ip) / TCPerror(sport=vm_port, dport=remote_port)
+
+def is_icmp_error(pkt):
+	return ICMP in pkt and pkt[ICMP].type == 3
+
+def quoted_flow_entries(build_path, vm_port, remote_port):
+	inspector = f"{build_path}/tools/inspect/dpservice-inspect"
+	# Keep the secondary EAL process on one permitted CPU instead of starting per-CPU workers.
+	command = ["taskset", "-c", str(min(os.sched_getaffinity(0))), inspector,
+			   "--file-prefix=rte", "-s", "0", "-t", "conntrack", "--dump", "-o", "json"]
+	entries = json.loads(subprocess.check_output(command))
+	endpoints = {f"{VM1.ip}:{vm_port}", f"{fwall_remote_vm_ip}:{remote_port}"}
+	return [entry for entry in entries if entry["vni"] == vni1 and entry["proto"] == "tcp"
+			and {entry["src"], entry["dst"]} == endpoints]
+
+def test_fwall_icmp_error_cannot_open_tcp(fwall_setup, icmp_underlay):
+	underlay, error_dst, variant = icmp_underlay
+	vm_port = 8400 + variant
+	attack_port = 44000
+	control_port = 44001
+	# VM1 accepts any ICMP but no TCP: with one ingress rule, every other new ingress flow is dropped
+	fwall_setup._add_rule(VM1, "icmp-allow", Icmp, False)
+
+	vm = VfEndpoint(VM1, fwall_remote_vm_ip)
+	remote = PfEndpoint(fwall_remote_vm_ip, VM1.ip, neigh_vni1_ul_ipv6, VM1.ul_ipv6)
+	error_sender = PfEndpoint(fwall_remote_vm_ip, error_dst, neigh_vni1_ul_ipv6, underlay)
+	def syn(sport):
+		return send_and_sniff(remote.packet(Tcp.request(sport, vm_port, 0)), remote.tap, vm.tap,
+							  vm.filter(Tcp.is_request(sport, vm_port)))
+
+	# Different source port than the attack: the control SYN caches a DROP for its own tuple
+	assert syn(control_port) is None, \
+		"TCP SYN passed although VM1 only allows ICMP"
+
+	# "Port unreachable" about a packet VM1 never sent: it belongs to no flow
+	delivered = send_and_sniff(error_sender.packet(icmp_error(3, vm_port, attack_port)), error_sender.tap, vm.tap,
+							   vm.filter(is_icmp_error))
+	assert delivered is None, \
+		"ICMP error without a matching flow was delivered"
+
+	assert syn(attack_port) is None, \
+		"TCP SYN was delivered after an ICMP error quoting its reverse tuple despite the ingress rules"
+
+@pytest.mark.parametrize("with_rules", [False, True], ids=["no-rules", "with-rules"])
+def test_fwall_icmp_error_cannot_block_tcp(fwall_setup, icmp_underlay, build_path, with_rules):
+	underlay, error_dst, variant = icmp_underlay
+	vm_port = 45010 + variant
+	remote_port = 8410
+	vm_port += 10 * with_rules
+	if with_rules:
+		fwall_setup.add_initiator_rules(VM1, Tcp, remote_port)
+		fwall_setup._add_rule(VM1, "icmp-allow", Icmp, False)
+
+	vm = VfEndpoint(VM1, fwall_remote_vm_ip)
+	remote = PfEndpoint(fwall_remote_vm_ip, VM1.ip, neigh_vni1_ul_ipv6, VM1.ul_ipv6)
+	error_sender = PfEndpoint(fwall_remote_vm_ip, error_dst, neigh_vni1_ul_ipv6, underlay)
+	before = fwall_setup.hits()
+	assert not quoted_flow_entries(build_path, vm_port, remote_port), "Test tuple already exists"
+	for _ in range(2):
+		delivered = send_and_sniff(error_sender.packet(icmp_error(3, vm_port, remote_port)),
+								   error_sender.tap, vm.tap, vm.filter(is_icmp_error))
+		assert delivered is None, "Unmatched ICMP error was delivered through a VNF underlay"
+	# Check all VNF namespaces: later VM traffic cannot detect isolated NAT-tagged state.
+	assert not quoted_flow_entries(build_path, vm_port, remote_port), "Unmatched errors created flow state"
+	assert fwall_setup.hits() == before, "An ICMP error evaluated firewall rules"
+
+	run_exchange(fwall_setup, Tcp, vm, remote, vm_port, remote_port)
+	assert len(quoted_flow_entries(build_path, vm_port, remote_port)) == 2, "TCP flow keys are missing"
+
+
+@pytest.mark.parametrize("path", ["lb", "nat", "lb-to-nat"])
+@pytest.mark.parametrize("code", [2, 3, 4], ids=["protocol", "port", "fragmentation"])
+def test_fwall_unmatched_icmp_error_relay(prepare_ipv4, fwall_setup, port_redundancy, path, code):
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported")
+	service_port = 8450 + code
+	remote_port = 45100 + 10 * code + ["lb", "nat", "lb-to-nat"].index(path)
+	if path == "lb":
+		service_ip = lb_ip
+		underlay = fwall_setup.add_lb(port=service_port)
+		fwall_setup.grpc_client.addlbtarget(lb_name, neigh_vni1_ul_ipv6)
+	else:
+		service_ip = nat_vip
+		underlay = fwall_setup.add_nat(VM2)
+		# The current neighbour lookup uses the zero ICMP reserved field as a port.
+		# Quoted-port selection is a separate issue; keep that behaviour out of this test.
+		fwall_setup.add_neighnat(0, 1)
+		if path == "lb-to-nat":
+			underlay = fwall_setup.add_lb()
+
+	remote = PfEndpoint(fwall_remote_vm_ip, service_ip, neigh_ul_ipv6, underlay)
+	error = (ICMP(type=3, code=code) /
+			 IPerror(src=service_ip, dst=fwall_remote_vm_ip) /
+			 TCPerror(sport=service_port, dport=remote_port))
+	for _ in range(2):
+		relayed = send_and_sniff(remote.packet(error), remote.tap, PF0.tap,
+								lambda pkt: is_ipip_pkt(pkt) and pkt[IPv6].dst == neigh_vni1_ul_ipv6
+								and is_icmp_error(pkt))
+		assert relayed is not None, "ICMP error was not relayed to the remote service host"
+		assert relayed[IP].dst == service_ip and relayed[IP].src == fwall_remote_vm_ip
+		assert bytes(relayed[ICMP]) == bytes(error), "Relay changed the ICMP error or its quote"
+
+
+@pytest.mark.parametrize("tcp_allowed", [False, True], ids=["denied", "allowed"])
+def test_fwall_icmp_error_cannot_decide_existing_flow(prepare_ipv4, fwall_setup, port_redundancy, build_path, tcp_allowed):
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported")
+	vm_port = 8420
+	remote_port = 45020 + tcp_allowed
+	fwall_setup._add_rule(VM1, "icmp-allow", Icmp, False)
+	if tcp_allowed:
+		fwall_setup.add_responder_rules(VM1, Tcp, vm_port)
+
+	# Deliberately overlap the LB and VM addresses to create a shared, undecided flow.
+	# This test-only setup exercises the firewall guard, not service-address isolation.
+	# A TCP packet to an LB without backends creates a flow but never reaches the firewall.
+	lb_ul_ipv6 = fwall_setup.add_lb(VM1.ip, vm_port)
+	lb_sender = PfEndpoint(fwall_remote_vm_ip, VM1.ip, neigh_vni1_ul_ipv6, lb_ul_ipv6)
+	vm = VfEndpoint(VM1, fwall_remote_vm_ip)
+	remote = PfEndpoint(fwall_remote_vm_ip, VM1.ip, neigh_vni1_ul_ipv6, VM1.ul_ipv6)
+	delivered = send_and_sniff(lb_sender.packet(Tcp.request(remote_port, vm_port, 0)),
+							   lb_sender.tap, vm.tap, vm.filter(Tcp.is_request(remote_port, vm_port)))
+	assert delivered is None, "TCP packet to an LB without backends was delivered"
+	entries = quoted_flow_entries(build_path, vm_port, remote_port)
+	assert len(entries) == 2 and all(int(entry["flags"], 16) == 0 for entry in entries), \
+		"LB packet did not create the intended undecided flow"
+	before = fwall_setup.hits()
+
+	# This hits that existing undecided flow in ORIGINAL direction, bypassing the miss-only guard.
+	delivered = send_and_sniff(remote.packet(icmp_error(3, vm_port, remote_port)), remote.tap, vm.tap,
+							   vm.filter(is_icmp_error))
+	assert delivered is None, "ICMP error decided an existing flow's firewall action"
+	assert fwall_setup.hits() == before, "An ICMP error evaluated firewall rules"
+
+	delivered = send_and_sniff(remote.packet(Tcp.request(remote_port, vm_port, 0)), remote.tap, vm.tap,
+							   vm.filter(Tcp.is_request(remote_port, vm_port)))
+	assert (delivered is not None) == tcp_allowed, "TCP did not receive its own firewall verdict"
+	after = fwall_setup.hits()
+	assert after[(VM1.name, "icmp-allow")] == before[(VM1.name, "icmp-allow")]
+	if tcp_allowed:
+		assert after[(VM1.name, "ct-org-ingress")] == before[(VM1.name, "ct-org-ingress")] + 1
+
+def test_fwall_icmp_error_of_allowed_flow(prepare_ipv4, fwall_setup, port_redundancy):
+	if port_redundancy:
+		pytest.skip("Port redundancy is not supported")
+	vm_port = 45000
+	remote_port = 8401
+	# VM1 may open TCP flows to remote_port, any new ingress flow is dropped
+	fwall_setup.add_initiator_rules(VM1, Tcp, remote_port)
+
+	vm = VfEndpoint(VM1, fwall_remote_vm_ip)
+	remote = PfEndpoint(fwall_remote_vm_ip, VM1.ip, neigh_vni1_ul_ipv6, VM1.ul_ipv6)
+	request = send_and_sniff(vm.packet(Tcp.request(vm_port, remote_port, 0)), vm.tap, remote.tap,
+							 remote.filter(Tcp.is_request(vm_port, remote_port)))
+	assert request is not None, \
+		"TCP SYN allowed by the egress rule was dropped"
+
+	# "Fragmentation needed" about that SYN belongs to its flow, so it must reach VM1 (path MTU discovery)
+	delivered = send_and_sniff(remote.packet(icmp_error(4, vm_port, remote_port)), remote.tap, vm.tap,
+							   vm.filter(is_icmp_error))
+	assert delivered is not None, \
+		"ICMP error of an accepted flow was dropped"

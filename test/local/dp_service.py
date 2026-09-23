@@ -46,7 +46,8 @@ class DpService:
 			script_path = os.path.dirname(os.path.abspath(__file__))
 			self.cmd = f"gdb -x {script_path}/gdbinit --args "
 
-		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8 --huge-unlink'
+		# Keep this process's hugepage files available for dpservice-inspect secondary attachment.
+		self.cmd += f'{self.build_path}/src/dpservice-bin -l 0,1 --log-level=user*:8 --huge-unlink=existing'
 		if self.secondary:
 			self.cmd += ' --file-prefix=hatest'
 		if not self.hardware:
