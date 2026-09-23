@@ -38,6 +38,11 @@ struct dp_icmp_err_ip_info {
 	rte_be16_t	l4_dst_port;
 };
 
+static __rte_always_inline bool dp_is_icmp_error(const struct dp_flow *df)
+{
+	return df->l4_type == IPPROTO_ICMP && df->l4_info.icmp_field.icmp_type == DP_IP_ICMP_TYPE_ERROR;
+}
+
 // TODO optimize and maybe move
 void dp_get_icmp_err_ip_hdr(struct rte_mbuf *m, struct dp_icmp_err_ip_info *err_ip_info);
 

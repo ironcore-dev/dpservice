@@ -5,7 +5,9 @@
 #include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_firewall.h"
+#include "dp_lb.h"
 #include "dp_log.h"
+#include "dp_nat.h"
 #include "dp_port.h"
 #include "dp_vnf.h"
 #include "monitoring/dp_graphtrace.h"
@@ -388,6 +390,26 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 	}
 }
 
+static __rte_always_inline bool dp_cntrack_can_forward_icmp_error(struct dp_flow *df, const struct flow_key *key)
+{
+	const struct dnat_data *dnat_data;
+
+	// The quoted source must be the address receiving the error, not an unrelated VM's tuple.
+	if (key->l3_dst.ipv4 != ntohl(df->dst.dst_addr))
+		return false;
+
+	if (df->vnf_type == DP_VNF_TYPE_LB && dp_is_ip_lb(df, key->vni))
+		return true;
+
+	// LB traffic not addressed to an LB continues through DNAT, including neighbour NAT relay.
+	if (df->vnf_type == DP_VNF_TYPE_LB || df->vnf_type == DP_VNF_TYPE_NAT) {
+		dnat_data = dp_get_dnat_data(key->l3_dst.ipv4, key->vni);
+		return dnat_data && dnat_data->dnat_ip == 0;
+	}
+
+	return false;
+}
+
 static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flow *df, struct flow_value **p_flow_val)
 {
 	int ret;
@@ -411,6 +433,13 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		if (unlikely(ret != -ENOENT)) {
 			DPS_LOG_WARNING("Flow table key search failed", DP_LOG_RET(ret));
 			return ret;
+		}
+		// Only actual LB/network NAT destinations may create state to forward an unmatched error.
+		// A VNF underlay alone is not enough: LB fall-through to local routing can leave
+		// a blocking reverse flow; NAT-tagged entries would be isolated but still unnecessary.
+		if (unlikely(dp_is_icmp_error(df) && !dp_cntrack_can_forward_icmp_error(df, curr_key))) {
+			DPS_LOG_DEBUG("Dropping an ICMP error without a matching flow");
+			return DP_ERROR;
 		}
 		// create new flow if needed
 		*p_flow_val = flow_table_insert_entry(curr_key, df, dp_get_in_port(m));
