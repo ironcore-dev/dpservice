@@ -31,6 +31,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	struct dp_icmp_err_ip_info icmp_err_ip_info;
 	struct dnat_data *dnat_data;
 	union dp_ipv6 nat_ipv6;
+	struct snat_data *snat_data;
 
 	assert(cntrack);
 
@@ -79,24 +80,18 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			df->dst.dst_addr = ipv4_hdr->dst_addr;
 			dp_nat_chg_ip(df, ipv4_hdr, m);
 
-			/* Expect the new source in this conntrack object */
+			// Expect the new source in this conntrack object
 			cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT;
 
-			/* NAT loopback: sender is a local VF with a VIP. Uses the
-			 * SNAT table keyed on (private_own_ip, vni) — so a packet
-			 * arriving from PF with src=<remote NAT_IP> will miss the
-			 * lookup (NAT_IP is not any local VF's own_ip), and this
-			 * flag only sets when both endpoints live on this host.
-			 * snat_node will finish the SNAT half.
-			 */
-			struct snat_data *sd = dp_get_iface_snat_data(
-				ntohl(df->src.src_addr), vni);
-			if (sd && sd->vip_ip != 0) {
+			// NAT loopback: sender is a local VF with a VIP. Key the sender
+			// identity by the ingress port's VNI. Use in_port's VNI to be
+			// clear that snat data should be fetched via ingress port's VNI.
+			snat_data = dp_get_iface_snat_data(ntohl(df->src.src_addr), dp_get_in_port(m)->iface.vni);
+			if (snat_data && snat_data->vip_ip != 0) {
 				cntrack->flow_flags |= DP_FLOW_FLAG_DST_NAT_LOOPBACK;
-			/* Offloaded rule actions support only a single src/dst
-			 * rewrite per packet; loopback packets need both.
-			 * Keep such flows in software.
-			 */
+				// Offloaded rule actions support only a single src/dst
+				//rewrite per packet; loopback packets need both.
+				// Keep such flows in software.
 				cntrack->offload_state.reply = DP_FLOW_OFFLOADED;
 				cntrack->offload_state.orig = DP_FLOW_OFFLOADED;
 				df->offload_state = DP_FLOW_NON_OFFLOAD;

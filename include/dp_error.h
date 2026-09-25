@@ -60,6 +60,7 @@ const char *dp_strerror_verbose(int error);
 	ERR(SNAT_NO_DATA,						341) \
 	ERR(SNAT_CREATE,						342) \
 	ERR(SNAT_EXISTS,						343) \
+	ERR(NAT_VIP_COEXIST,					344) \
 	ERR(VNI_INIT4,							361) \
 	ERR(VNI_INIT6,							362) \
 	ERR(VNI_FREE4,							363) \
