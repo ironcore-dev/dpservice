@@ -29,12 +29,11 @@ static __rte_always_inline int dp_process_ipv4_snat(struct rte_mbuf *m, struct d
 	uint16_t nat_port;
 	int ret;
 
-	// TODO(tao?): in case of both VIP and NAT set, VIP gets written here and immediately overwritten by NAT
+	// VIP and NAT cannot coexist for one interface (enforced at grpc level)
 	if (snat_data->vip_ip != 0) {
 		ipv4_hdr->src_addr = htonl(snat_data->vip_ip);
 		cntrack->nf_info.nat_type = DP_FLOW_NAT_TYPE_VIP;
-	}
-	if (snat_data->nat_ip != 0) {
+	} else if (snat_data->nat_ip != 0) {
 		ret = dp_allocate_network_snat_port(snat_data, df, port, ipv4_hdr->hdr_checksum);
 		if (DP_FAILED(ret))
 			return DP_ERROR;
@@ -117,7 +116,7 @@ static __rte_always_inline int dp_process_ipv6_nat64(struct rte_mbuf *m, struct 
 	cntrack->nf_info.l4_type = df->l4_type;
 	cntrack->nf_info.icmp_err_ip_cksum = ipv4_hdr->hdr_checksum;
 
-	/* Expect the new destination in this conntrack object */
+	// Expect the new destination in this conntrack object
 	cntrack->flow_flags |= DP_FLOW_FLAG_SRC_NAT64;
 	// ignore errors - see inside
 	dp_delete_flow(&cntrack->flow_key[DP_FLOW_DIR_REPLY], cntrack);
@@ -176,24 +175,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			snat_data = dp_get_iface_snat_data(src_ip, port->iface.vni);
 		}
 
-		/* dnat_node may have marked this flow as NAT loopback
-		 * (DNAT resolved to a local VIP and the sender is a local VF
-		 * holding a VIP). Such a flow is WEST_EAST, so the SOUTH_NORTH
-		 * condition alone would skip its SNAT; the loopback flag is the
-		 * explicit carve-out for it. Reply direction is handled by the
-		 * existing SRC_NAT+DIR_ORG / DST_NAT+DIR_REPLY branches below.
-		 *
-		 * NOTE: VIP and NAT must NOT coexist on the same VF. dnat_node
-		 * sets the loopback flag only when the sender has vip_ip != 0
-		 * (and under this policy nat_ip == 0), so dp_process_ipv4_snat
-		 * takes its VIP-only branch and does not consume an SNAT port
-		 * for a packet that never leaves the hypervisor.
-		 *
-		 * The !SRC_NAT part of the condition above ensures this one-shot
-		 * initialization runs exactly once per flow: with SRC_NAT set,
-		 * later ORG-direction packets fall into the repeat branch below,
-		 * which re-applies the stored NAT change without re-allocating.
-		 */
+		// replace src address in header if this flow is south-north or VIP loopback
 		if (snat_data && (snat_data->vip_ip != 0 || snat_data->nat_ip != 0)
 			&& (df->flow_type == DP_FLOW_SOUTH_NORTH
 				|| DP_FLOW_HAS_FLAG_DST_NAT_LOOPBACK(cntrack->flow_flags))) {
@@ -213,7 +195,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 		}
 	}
 
-	/* We already know what to do */
 	if (DP_FLOW_HAS_FLAG_SRC_NAT(cntrack->flow_flags) && df->flow_dir == DP_FLOW_DIR_ORG) {
 		if (cntrack->flow_key[DP_FLOW_DIR_REPLY].l3_dst.is_v6)
 			return SNAT_NEXT_DROP;

@@ -141,6 +141,8 @@ int dp_set_iface_vip_ip(uint32_t iface_ip, uint32_t vip_ip, uint32_t vni,
 			return DP_GRPC_ERR_SNAT_CREATE;
 	} else if (data->vip_ip != 0)
 		return DP_GRPC_ERR_SNAT_EXISTS;
+	else if (data->nat_ip != 0)
+		return DP_GRPC_ERR_NAT_VIP_COEXIST;
 
 	data->vip_ip = vip_ip;
 	dp_copy_ipv6(&data->ul_vip_ip6, ul_ipv6);
@@ -159,6 +161,8 @@ int dp_set_iface_nat_ip(uint32_t iface_ip, uint32_t nat_ip, uint32_t vni, uint16
 			return DP_GRPC_ERR_SNAT_CREATE;
 	} else if (data->nat_ip != 0)
 		return DP_GRPC_ERR_SNAT_EXISTS;
+	else if (data->vip_ip != 0)
+		return DP_GRPC_ERR_NAT_VIP_COEXIST;
 
 	dp_copy_ipv6(&data->ul_nat_ip6, ul_ipv6);
 	data->nat_ip = nat_ip;
