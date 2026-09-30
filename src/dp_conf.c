@@ -13,6 +13,7 @@
 
 #include "dp_error.h"
 #include "dp_flow.h"
+#include "dp_internal_stats.h"  // firewall telemetry interval default
 #include "dp_log.h"
 #include "dp_version.h"
 #include "nodes/common_node.h"  // graphtrace level limit

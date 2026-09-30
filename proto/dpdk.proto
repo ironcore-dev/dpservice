@@ -33,6 +33,14 @@ enum FirewallAction {
 	ACCEPT = 1;
 }
 
+// The firewall is enabled by default, hence "ENABLED" is the zero (unset) value here.
+// A SetFirewallParams request that carries no state thus enables the firewall, which is
+// the safe direction to fail in.
+enum FirewallState {
+	ENABLED = 0;
+	DISABLED = 1;
+}
+
 enum VniType {
 	VNI_IPV4 = 0;
 	VNI_IPV6 = 1;
@@ -73,6 +81,7 @@ message Interface {
 	string pci_name = 6;
 	MeteringParams meteringParams = 7;
 	string hostname = 8;
+	FirewallParams firewall_params = 9;
 }
 
 message IpConfig {
@@ -155,13 +164,26 @@ message MeteringParams {
 	uint64 public_rate = 2; // in mbps (Mbits/s), regulated rate for outgoing traffic to public networks
 }
 
+// Firewall settings of an interface, they are not part of interface creation. A new interface always
+// starts with the defaults below, SetFirewallParams replaces all of them at once.
+message FirewallParams {
+	FirewallState firewall_state = 1; // Current state of the stateful firewall of this interface
+}
+
 // Firewall Rules can be inserted and removed while the interface is running. Linked list is used despite O(n) nature, as the list
-// needs to be traversed only once for each packet. (Stateful Firewall and each pass after that is O(1))
-// Firewall rules have a priority. "0" being the highest and "65536" being the lowest. Default is "1000".
-// Current implementation supports only "allow" rules. The priority doesnt have any influence when we have only "allow" rules.
-// Without any installed rule, egress default is "allow" everything and ingress default is "deny" everything. With first installed
-// egress rule, egress default changes to "deny" everything except the installed rule(s).
-// When a packet matches a firewall rule, the defined action is taken. No further firewall rules will be evaluated thereafter.
+// needs to be traversed only once per connection. (Stateful Firewall, the conntrack entry caches the resulting action, so every
+// following packet of that flow is O(1))
+// Rules belong to an interface and are evaluated per direction. Traffic between two VF interfaces is checked against the egress
+// rules of the sending one and the ingress rules of the receiving one. A PF holds no rules, so traffic from/to the outside is
+// only checked against the VF's rules of the respective direction.
+// As long as an interface has no rule for a direction, that direction defaults to "allow" everything. With the first installed
+// rule for a direction, its default changes to "deny" everything except the installed rule(s).
+// Within one direction the rules are evaluated in insertion order. When a packet matches a firewall rule, the defined action is
+// taken. No further firewall rules of that direction will be evaluated thereafter.
+// A resulting "deny" is only enforced if the firewall of the interface owning the matched direction is enabled (see
+// FirewallParams), which is the default.
+// Firewall rules have a priority. "0" being the highest and "65535" being the lowest. Default is "1000".
+// Current implementation supports only "allow" rules. The priority doesn't have any influence when we have only "allow" rules.
 message FirewallRule {
 	bytes id = 1;
 	TrafficDirection direction = 2;
@@ -565,6 +587,24 @@ message DeleteFirewallRuleResponse {
 	Status status = 1;
 }
 
+message GetFirewallParamsRequest {
+	bytes interface_id = 1;
+}
+
+message GetFirewallParamsResponse {
+	Status status = 1;
+	FirewallParams firewall_params = 2;
+}
+
+message SetFirewallParamsRequest {
+	bytes interface_id = 1;
+	FirewallParams firewall_params = 2;
+}
+
+message SetFirewallParamsResponse {
+	Status status = 1;
+}
+
 message CapturedInterface {
 	CaptureInterfaceType interface_type = 1;
 	bytes filter =  2;
@@ -694,6 +734,11 @@ service DPDKironcore {
 	rpc CreateFirewallRule(CreateFirewallRuleRequest) returns (CreateFirewallRuleResponse) {}
 	rpc GetFirewallRule(GetFirewallRuleRequest) returns (GetFirewallRuleResponse) {}
 	rpc DeleteFirewallRule(DeleteFirewallRuleRequest) returns (DeleteFirewallRuleResponse) {}
+
+	// Firewall settings of an interface, the rules above are enforced only while it is enabled.
+	// SetFirewallParams replaces all settings at once, it does not patch individual ones.
+	rpc GetFirewallParams(GetFirewallParamsRequest) returns (GetFirewallParamsResponse) {}
+	rpc SetFirewallParams(SetFirewallParamsRequest) returns (SetFirewallParamsResponse) {}
 
 	//// PACKET CAPTURE
 	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}

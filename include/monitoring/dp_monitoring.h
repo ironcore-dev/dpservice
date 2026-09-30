@@ -19,6 +19,7 @@ enum dp_event_type {
 	DP_EVENT_TYPE_LINK_STATUS,
 	DP_EVENT_TYPE_FLOW_AGING,
 	DP_EVENT_TYPE_NEIGHMAC,
+	DP_EVENT_TYPE_FIREWALL_TELEMETRY,
 };
 
 struct dp_event_msg_head {

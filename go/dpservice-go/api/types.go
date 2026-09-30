@@ -315,6 +315,30 @@ type MeteringParams struct {
 	PublicRate uint64 `json:"public_rate,omitempty"`
 }
 
+type FirewallParams struct {
+	TypeMeta           `json:",inline"`
+	FirewallParamsMeta `json:"metadata"`
+	Spec               FirewallParamsSpec `json:"spec"`
+	Status             Status             `json:"status"`
+}
+
+type FirewallParamsMeta struct {
+	InterfaceID string `json:"interface_id"`
+}
+
+func (m *FirewallParamsMeta) GetName() string {
+	return m.InterfaceID
+}
+
+func (m *FirewallParams) GetStatus() Status {
+	return m.Status
+}
+
+// Also embedded in InterfaceSpec, so that get/list interface keep reporting the firewall state
+type FirewallParamsSpec struct {
+	FirewallState string `json:"firewall_state,omitempty"`
+}
+
 func (m *InterfaceMeta) GetName() string {
 	return m.ID
 }
@@ -324,17 +348,18 @@ func (m *Interface) GetStatus() Status {
 }
 
 type InterfaceSpec struct {
-	VNI             uint32           `json:"vni"`
-	Device          string           `json:"device,omitempty"`
-	IPv4            *netip.Addr      `json:"primary_ipv4,omitempty"`
-	IPv6            *netip.Addr      `json:"primary_ipv6,omitempty"`
-	UnderlayRoute   *netip.Addr      `json:"underlay_route,omitempty"`
-	VirtualFunction *VirtualFunction `json:"virtual_function,omitempty"`
-	PXE             *PXE             `json:"pxe,omitempty"`
-	Nat             *Nat             `json:"nat,omitempty"`
-	VIP             *VirtualIP       `json:"vip,omitempty"`
-	Metering        *MeteringParams  `json:"metering,omitempty"`
-	HostName        string           `json:"hostname,omitempty"`
+	VNI             uint32              `json:"vni"`
+	Device          string              `json:"device,omitempty"`
+	IPv4            *netip.Addr         `json:"primary_ipv4,omitempty"`
+	IPv6            *netip.Addr         `json:"primary_ipv6,omitempty"`
+	UnderlayRoute   *netip.Addr         `json:"underlay_route,omitempty"`
+	VirtualFunction *VirtualFunction    `json:"virtual_function,omitempty"`
+	PXE             *PXE                `json:"pxe,omitempty"`
+	Nat             *Nat                `json:"nat,omitempty"`
+	VIP             *VirtualIP          `json:"vip,omitempty"`
+	Metering        *MeteringParams     `json:"metering,omitempty"`
+	FirewallParams  *FirewallParamsSpec `json:"firewall_params,omitempty"`
+	HostName        string              `json:"hostname,omitempty"`
 }
 
 type VirtualFunction struct {
@@ -672,6 +697,7 @@ var (
 	NeighborNatKind            = reflect.TypeOf(NeighborNat{}).Name()
 	FirewallRuleKind           = reflect.TypeOf(FirewallRule{}).Name()
 	FirewallRuleListKind       = reflect.TypeOf(FirewallRuleList{}).Name()
+	FirewallParamsKind         = reflect.TypeOf(FirewallParams{}).Name()
 	InitializedKind            = reflect.TypeOf(Initialized{}).Name()
 	VniKind                    = reflect.TypeOf(Vni{}).Name()
 	VersionKind                = reflect.TypeOf(Version{}).Name()

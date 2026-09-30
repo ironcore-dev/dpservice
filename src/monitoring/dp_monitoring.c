@@ -24,6 +24,9 @@ void dp_process_event_msg(struct rte_mbuf *m)
 	case DP_EVENT_TYPE_NEIGHMAC:
 		dp_process_event_neighmac_msg(m);
 		break;
+	case DP_EVENT_TYPE_FIREWALL_TELEMETRY:
+		dp_process_event_firewall_telemetry_msg(m);
+		break;
 	}
 
 	rte_pktmbuf_free(m);

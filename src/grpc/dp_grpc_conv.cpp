@@ -136,6 +136,25 @@ bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port)
 	return true;
 }
 
+bool GrpcToDpFwallState(const FirewallState& grpc_state, enum dp_fwall_state *dp_state)
+{
+	switch (grpc_state) {
+	case FirewallState::DISABLED:
+		*dp_state = DP_FWALL_DISABLED;
+		return true;
+	case FirewallState::ENABLED:
+		*dp_state = DP_FWALL_ENABLED;
+		return true;
+	default:
+		return false;
+	}
+}
+
+FirewallState DpToGrpcFwallState(enum dp_fwall_state dp_state)
+{
+	return dp_state == DP_FWALL_ENABLED ? FirewallState::ENABLED : FirewallState::DISABLED;
+}
+
 bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type)
 {
 	switch (grpc_type) {
@@ -206,6 +225,7 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 {
 	char strbuf[INET6_ADDRSTRLEN];
 	MeteringParams *metering_params;
+	FirewallParams *firewall_params;
 
 	DP_IPV4_TO_STR(dp_iface->ip4_addr, strbuf);
 	grpc_iface->set_primary_ipv4(strbuf);
@@ -221,6 +241,9 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
 	metering_params->set_public_rate(dp_iface->public_flow_rate_cap);
 	grpc_iface->set_allocated_meteringparams(metering_params);
+	firewall_params = new FirewallParams();
+	firewall_params->set_firewall_state(DpToGrpcFwallState(dp_iface->fwall_state));
+	grpc_iface->set_allocated_firewall_params(firewall_params);
 }
 
 void DpToGrpcLoadBalancer(const struct dpgrpc_lb *dp_lb, Loadbalancer *grpc_lb)

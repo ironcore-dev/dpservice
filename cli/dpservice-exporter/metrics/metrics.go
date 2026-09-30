@@ -140,8 +140,23 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to query firewall rule count: %v", err)
 	}
+	// Rule hits are exported per rule, so the series of deleted rules (and interfaces) need to be dropped
+	DpserviceFwRuleHits.Reset()
 	for ifaceName, fwRuleCount := range dpserviceFirewallRuleCount.Value {
 		DpserviceFwRulesCount.With(prometheus.Labels{"interface_id": ifaceName}).Set(float64(fwRuleCount))
+
+		// Rule hits have to be queried per interface, interfaces without rules have nothing to report
+		if fwRuleCount == 0 {
+			continue
+		}
+		var dpserviceFirewallRuleHits DpServiceFirewallRuleHits
+		err = queryTelemetry(conn, log, fmt.Sprintf("/dp_service/firewall/rule_hits,%s", ifaceName), &dpserviceFirewallRuleHits)
+		if err != nil {
+			return fmt.Errorf("failed to query firewall rule hits: %v", err)
+		}
+		for ruleId, ruleHits := range dpserviceFirewallRuleHits.Value {
+			DpserviceFwRuleHits.With(prometheus.Labels{"interface_id": ifaceName, "rule_id": ruleId}).Set(float64(ruleHits))
+		}
 	}
 
 	var dpserviceCallCount DpServiceGraphCallCount

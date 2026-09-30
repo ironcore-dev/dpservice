@@ -29,7 +29,21 @@ struct dp_port_stats {
 
 int dp_nat_get_used_ports_telemetry(struct rte_tel_data *dict);
 
+// The telemetry threads cannot walk the firewall rules owned by the worker,
+// instead the worker copies the rule hits into a snapshot on request, at most once per interval (in seconds)
+// and the telemetry thread waits for the worker to handle the request, at most for the timeout
+// (tests can change the interval via a command-line option)
+#define DP_FWALL_TELEMETRY_REFRESH_INTERVAL 5
+#define DP_FWALL_TELEMETRY_REFRESH_TIMEOUT_MS 2000
+// rules of an interface beyond this limit are not part of the snapshot
+#define DP_FWALL_TELEMETRY_MAX_RULES 64
+
 int dp_fwall_get_rule_count_telemetry(struct rte_tel_data *dict);
+int dp_fwall_get_rule_hits_telemetry(const char *iface_id, struct rte_tel_data *dict);
+
+int dp_fwall_telemetry_init(void);
+void dp_fwall_telemetry_free(void);
+void dp_fwall_telemetry_refresh(void);
 
 #ifdef __cplusplus
 }

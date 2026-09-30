@@ -43,6 +43,9 @@ int dp_conf_get_grpc_port(void);
 #ifdef ENABLE_PYTEST
 int dp_conf_get_flow_timeout(void);
 #endif
+#ifdef ENABLE_PYTEST
+int dp_conf_get_fwall_telemetry_interval(void);
+#endif
 bool dp_conf_is_multiport_eswitch(void);
 const char *dp_conf_get_active_lockfile(void);
 const char *dp_conf_get_sync_tap(void);

@@ -373,4 +373,5 @@ var (
 	NatAliases                = []string{"nat", "translation"}
 	NeighborNatAliases        = []string{"nnat", "ngbnat", "neighnat"}
 	FirewallRuleAliases       = []string{"firewallrule", "fwrule", "fw-rule", "firewallrules", "fwrules", "fw-rules"}
+	FirewallParamsAliases     = []string{"firewallparams", "fwparams", "fw-params", "firewall-params"}
 )

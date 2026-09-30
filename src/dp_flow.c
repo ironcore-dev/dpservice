@@ -100,30 +100,23 @@ static __rte_always_inline int dp_build_icmp_flow_key(const struct dp_flow *df, 
 	return DP_ERROR;
 }
 
-/* Isolating only VNF NAT conntrack entries at the moment. The others should follow */
+/* Isolating only VNF NAT conntrack entries at the moment. The others should follow.
+ * The NAT type marks packets that really travel on the NAT address. Packets from a PF carry it
+ * in their underlay destination. Packets from a VF cannot be classified here, as whether they get
+ * translated is only decided after routing (south-north only), so snat_node marks the reply key
+ * of a translated flow instead.
+ */
 static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struct dp_port *port, struct flow_key *key)
 {
-	struct snat_data *s_data;
-	union dp_ipv6 dst_ipv6;
-
 	if (port->is_pf) {
 		if (df->vnf_type == DP_VNF_TYPE_NAT || df->vnf_type == DP_VNF_TYPE_LB_ALIAS_PFX)
 			key->vnf_type = df->vnf_type;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
-	} else if (DP_SUCCESS(dp_ipv6_from_ipaddr(&dst_ipv6, &key->l3_dst))) {
-		// assuming key->l3_src is also IPv6 (no IPv4<->IPv6 packets exist)
-		if (dp_is_ipv6_nat64(&dst_ipv6))
-			key->vnf_type = DP_VNF_TYPE_NAT;
+	} else if (!key->l3_src.is_v6 && dp_vnf_lbprefix_exists(port->port_id, key->vni, &key->l3_src, 32)) {
+		key->vnf_type = DP_VNF_TYPE_LB_ALIAS_PFX;
 	} else {
-		// assuming key->l3_src is also IPv4 (no IPv4<->IPv6 packets exist)
-		s_data = dp_get_iface_snat_data(key->l3_src.ipv4, key->vni);
-		if (s_data && s_data->nat_ip != 0)
-			key->vnf_type = DP_VNF_TYPE_NAT;
-		else if (dp_vnf_lbprefix_exists(port->port_id, key->vni, &key->l3_src, 32))
-			key->vnf_type = DP_VNF_TYPE_LB_ALIAS_PFX;
-		else
-			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
+		key->vnf_type = DP_VNF_TYPE_UNDEFINED;
 	}
 }
 

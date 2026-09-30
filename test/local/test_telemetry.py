@@ -1,16 +1,13 @@
 # SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
-import json
 import pytest
+import threading
 from urllib.request import urlopen
 
 from exporter import Exporter
 from helpers import *
 
-
-BUFSIZE = 10240
-TELEMETRY_SOCKET = "/var/run/dpdk/rte/dpdk_telemetry.v2"
 
 GRAPH_NODES = (
 	'rx-0-0', 'rx-1-0', 'rx-2-0', 'rx-3-0', 'rx-4-0', 'rx-5-0', 'rx_periodic',
@@ -56,15 +53,6 @@ HASH_TABLES = (
 	'loadbalancer_table', 'loadbalancer_id_table',
 	'vni_table', 'vnf_table', 'reverse_vnf_table',
 )
-
-def get_telemetry(request):
-	with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
-		client.connect(TELEMETRY_SOCKET)
-		client.recv(BUFSIZE)
-		client.send(f"{request},0\n".encode())
-		response = json.loads(client.recv(BUFSIZE).decode())[request]
-		client.close()
-	return response
 
 def check_tel_graph(key):
 	tel = get_telemetry(f"/dp_service/graph/{key}")
@@ -121,6 +109,49 @@ def test_telemetry_fwall(prepare_ifaces, grpc_client):
 	assert tel == { VM1.name: 0, VM2.name: 0, VM3.name: 0 }, \
 		"Unexpected firewall rule count"
 
+# The interface id is a mandatory parameter, the reply maps rule id to hit count. A rule's hit
+# counter is bumped once per matching flow (conntrack caches the decision, so further packets
+# of the same flow do not re-evaluate).
+def test_telemetry_fwall_rule_hits(prepare_ipv4, grpc_client, fast_fwall_telemetry):
+	if not fast_fwall_telemetry:
+		pytest.skip("Firewall rule hits are only up to date with fast firewall telemetry")
+
+	# A single ingress rule on VM2 accepting TCP; VM1 has no rules, so only this rule is hit.
+	grpc_client.addfwallrule(VM2.name, "fw-hits-tcp", proto="tcp")
+
+	# No matching traffic yet
+	assert get_fwall_rule_hits(VM2) == { "fw-hits-tcp": 0 }, \
+		"Unexpected baseline firewall rule hits"
+
+	# Each distinct TCP flow (unique source port) that matches the rule bumps the counter once.
+	# The sniffer thread must be listening on VM2's tap before delayed_sendp() fires the packet.
+	hits = 3
+	for i in range(hits):
+		sniff_data = {}
+		resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(VM2.tap, sniff_data))
+		resp_thread.start()
+		tcp_pkt = (Ether(dst=VM2.mac, src=VM1.mac) / IP(dst=VM2.ip, src=VM1.ip) / TCP(sport=5000 + i, dport=1234))
+		delayed_sendp(tcp_pkt, VM1.tap)
+		resp_thread.join()
+		assert sniff_data["pkt"] != None, \
+			"TCP packet was not accepted/delivered to VM2"
+
+	assert get_fwall_rule_hits(VM2) == { "fw-hits-tcp": hits }, \
+		"Firewall rule hits not counted"
+
+	# An interface without rules replies with an empty dictionary
+	assert get_fwall_rule_hits(VM1) == {}, \
+		"Interface without firewall rules should report no hits"
+
+	grpc_client.delfwallrule(VM2.name, "fw-hits-tcp")
+
+# A missing or unknown interface id is an error (null reply)
+def test_telemetry_fwall_rule_hits_invalid_iface(prepare_ifaces):
+	assert get_telemetry("/dp_service/firewall/rule_hits") is None, \
+		"Missing interface id should not be accepted"
+	assert get_telemetry("/dp_service/firewall/rule_hits", "invalid_iface") is None, \
+		"Unknown interface id should not be accepted"
+
 def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
 	graph_stats, heap_info, ethdev_stats, htable_saturation = set(), set(), set(), set()
@@ -138,7 +169,8 @@ def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 			assert linkStatus == '0' or linkStatus == '1', \
 				"Link status must be 0 or 1"
 		# these metrics don't have any stat label, only checking if they are not empty
-		elif metric.startswith(('dpdk_ethdev_misc', 'dps_firewall_rules_count', 'dps_virtsvc_used_ports_count', 'dps_nat_used_ports_count')):
+		elif metric.startswith(('dpdk_ethdev_misc', 'dps_firewall_rules_count', 'dps_firewall_rule_hits_total',
+								'dps_virtsvc_used_ports_count', 'dps_nat_used_ports_count')):
 			assert len(metric.split(' ')) > 1, \
 				f"Empty exported metric '{metric.split('{')[0]}' found"
 		else:

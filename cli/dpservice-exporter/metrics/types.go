@@ -70,6 +70,14 @@ var (
 		[]string{"interface_id"},
 	)
 
+	DpserviceFwRuleHits = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dps_firewall_rule_hits_total",
+			Help: "Count of flows matched by a firewall rule on interface",
+		},
+		[]string{"interface_id", "rule_id"},
+	)
+
 	DpserviceVirtsvcUsedPortsCount = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "dps_virtsvc_used_ports_count",
@@ -127,6 +135,11 @@ type DpServiceVirtsvcPortCount struct {
 
 type DpServiceFirewallRuleCount struct {
 	Value map[string]int `json:"/dp_service/firewall/rule_count"`
+}
+
+// Keyed by rule id, this telemetry command needs the interface id as a parameter
+type DpServiceFirewallRuleHits struct {
+	Value map[string]uint64 `json:"/dp_service/firewall/rule_hits"`
 }
 
 type NodeData map[string]float64

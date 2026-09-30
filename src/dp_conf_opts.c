@@ -45,6 +45,9 @@ _OPT_SHOPT_MAX = 255,
 #ifdef ENABLE_PYTEST
 	OPT_FLOW_TIMEOUT,
 #endif
+#ifdef ENABLE_PYTEST
+	OPT_FWALL_TEL_INTERVAL,
+#endif
 	OPT_MULTIPORT_ESWITCH,
 	OPT_ACTIVE_LOCKFILE,
 	OPT_SYNC_TAP,
@@ -82,6 +85,9 @@ static const struct option dp_conf_longopts[] = {
 	{ "grpc-port", 1, 0, OPT_GRPC_PORT },
 #ifdef ENABLE_PYTEST
 	{ "flow-timeout", 1, 0, OPT_FLOW_TIMEOUT },
+#endif
+#ifdef ENABLE_PYTEST
+	{ "fwall-tel-interval", 1, 0, OPT_FWALL_TEL_INTERVAL },
 #endif
 	{ "multiport-eswitch", 0, 0, OPT_MULTIPORT_ESWITCH },
 	{ "active-lockfile", 1, 0, OPT_ACTIVE_LOCKFILE },
@@ -124,6 +130,9 @@ static enum dp_conf_log_format log_format = DP_CONF_LOG_FORMAT_TEXT;
 static int grpc_port = 1337;
 #ifdef ENABLE_PYTEST
 static int flow_timeout = DP_FLOW_DEFAULT_TIMEOUT;
+#endif
+#ifdef ENABLE_PYTEST
+static int fwall_telemetry_interval = DP_FWALL_TELEMETRY_REFRESH_INTERVAL;
 #endif
 static bool multiport_eswitch = false;
 static char active_lockfile[256];
@@ -204,6 +213,13 @@ int dp_conf_get_flow_timeout(void)
 }
 
 #endif
+#ifdef ENABLE_PYTEST
+int dp_conf_get_fwall_telemetry_interval(void)
+{
+	return fwall_telemetry_interval;
+}
+
+#endif
 bool dp_conf_is_multiport_eswitch(void)
 {
 	return multiport_eswitch;
@@ -271,6 +287,9 @@ static inline void dp_argparse_help(const char *progname, FILE *outfile)
 #ifdef ENABLE_PYTEST
 		"     --flow-timeout=SECONDS             inactive flow timeout (except TCP established flows)\n"
 #endif
+#ifdef ENABLE_PYTEST
+		"     --fwall-tel-interval=SECONDS       minimal interval between firewall rule hits telemetry refreshes\n"
+#endif
 		"     --multiport-eswitch                run on NIC configured in multiport e-switch mode\n"
 		"     --active-lockfile=PATH             file to be locked before starting packet processing\n"
 		"     --sync-tap=IFNAME                  TAP device to use for dpservice-ha synchronization\n"
@@ -327,6 +346,10 @@ static int dp_conf_parse_arg(int opt, const char *arg)
 #ifdef ENABLE_PYTEST
 	case OPT_FLOW_TIMEOUT:
 		return dp_argparse_int(arg, &flow_timeout, 1, 300);
+#endif
+#ifdef ENABLE_PYTEST
+	case OPT_FWALL_TEL_INTERVAL:
+		return dp_argparse_int(arg, &fwall_telemetry_interval, 0, 15);
 #endif
 	case OPT_MULTIPORT_ESWITCH:
 		return dp_argparse_store_true(&multiport_eswitch);

@@ -25,6 +25,9 @@ void dp_process_event_flow_aging_msg(struct rte_mbuf *m);
 int dp_send_event_neighmac_msg(uint16_t port_id, struct rte_ether_addr *neighmac);
 void dp_process_event_neighmac_msg(struct rte_mbuf *m);
 
+int dp_send_event_firewall_telemetry_msg(void);
+void dp_process_event_firewall_telemetry_msg(struct rte_mbuf *m);
+
 #ifdef __cplusplus
 }
 #endif

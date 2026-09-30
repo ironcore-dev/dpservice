@@ -264,6 +264,12 @@ class GrpcClient:
 	def listfwallrules(self, vm_name):
 		return self._getSpecList(f"list fwrules --interface-id={vm_name}")
 
+	def getfwallparams(self, vm_name):
+		return self._getSpec(f"get fwparams --interface-id={vm_name}")
+
+	def setfwallparams(self, vm_name, firewall_state):
+		self._call(f"set fwparams --interface-id={vm_name} --firewall-state={firewall_state}")
+
 	def getvni(self, vni):
 		return self._getSpec(f"get vni --vni={vni} --vni-type=0")
 

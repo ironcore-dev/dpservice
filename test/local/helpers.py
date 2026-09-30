@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: SAP SE or an SAP affiliate company and IronCore contributors
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import shlex
+import socket
 import time
 
 from scapy.all import *
@@ -10,6 +12,26 @@ from scapy.layers.inet import Ether, ICMP, TCP
 from scapy.layers.inet6 import IPv6, ICMPv6EchoRequest, ICMPv6EchoReply, _ICMPv6
 
 from config import *
+
+
+TELEMETRY_BUFSIZE = 10240
+
+def get_telemetry(request, param=None, file_prefix="rte"):
+	# dpdk takes everything after the first comma as the parameter and does not strip it, so
+	# neither a filler param nor a trailing newline may be appended - commands that read their
+	# parameter would receive it verbatim. The response is always keyed by the command alone.
+	with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
+		client.connect(f"/var/run/dpdk/{file_prefix}/dpdk_telemetry.v2")
+		client.recv(TELEMETRY_BUFSIZE)
+		client.send(request.encode() if param is None else f"{request},{param}".encode())
+		response = json.loads(client.recv(TELEMETRY_BUFSIZE).decode())[request]
+		client.close()
+	return response
+
+# Rule hits are served from a snapshot the worker refreshes on request (for pytest on every request),
+# the query waits for the worker to handle the refresh
+def get_fwall_rule_hits(vm, file_prefix="rte"):
+	return get_telemetry("/dp_service/firewall/rule_hits", vm.name, file_prefix)
 
 
 def request_ip(vm, src_mac=None):
@@ -177,6 +199,17 @@ def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):
 			sniff_tcp_data["pkt"] = pkt_list[0]
 	else:
 		sniff_tcp_data["pkt"] = sniff_packet(tap, is_tcp_pkt)
+
+
+def sniff_icmp_fwall_packet(tap, sniff_icmp_data, negated=False):
+	if negated:
+		pkt_list = sniff(count=1, lfilter=is_icmp_pkt, iface=tap, timeout=sniff_short_timeout)
+		if len(pkt_list) == 0:
+			sniff_icmp_data["pkt"] = None
+		else:
+			sniff_icmp_data["pkt"] = pkt_list[0]
+	else:
+		sniff_icmp_data["pkt"] = sniff_packet(tap, is_icmp_pkt)
 
 
 def age_out_flows():

@@ -25,6 +25,9 @@ def pytest_addoption(parser):
 		"--fast-flow-timeout", action="store_true", help="Test with fast flow timeout"
 	)
 	parser.addoption(
+		"--fast-fwall-telemetry", action="store_true", help="Test with firewall rule hits telemetry refreshed on every request"
+	)
+	parser.addoption(
 		"--virtsvc", action="store_true", help="Include virtual services tests"
 	)
 	parser.addoption(
@@ -59,6 +62,10 @@ def fast_flow_timeout(request):
 	return request.config.getoption("--fast-flow-timeout")
 
 @pytest.fixture(scope="package")
+def fast_fwall_telemetry(request):
+	return request.config.getoption("--fast-fwall-telemetry")
+
+@pytest.fixture(scope="package")
 def ha_mode(request):
 	return request.config.getoption("--ha")
 
@@ -81,6 +88,7 @@ def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, seconda
 	dp_service = DpService(build_path, port_redundancy, fast_flow_timeout,
 						   secondary = secondary,
 						   ha = ha,
+						   fast_fwall_telemetry = request.config.getoption("--fast-fwall-telemetry"),
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
 						   offloading = request.config.getoption("--offloading"),
