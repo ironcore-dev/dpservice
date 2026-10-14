@@ -147,13 +147,14 @@ func ProtoInterfaceToInterface(dpdkIface *proto.Interface) (*Interface, error) {
 			ID: string(dpdkIface.Id),
 		},
 		Spec: InterfaceSpec{
-			VNI:           dpdkIface.GetVni(),
-			Device:        dpdkIface.GetPciName(),
-			IPv4:          &primaryIpv4,
-			IPv6:          &primaryIpv6,
-			UnderlayRoute: &underlayRoute,
-			Metering:      ProtoMeteringParamsToInterfaceMeteringParams(dpdkIface.GetMeteringParams()),
-			HostName:      dpdkIface.Hostname,
+			VNI:            dpdkIface.GetVni(),
+			Device:         dpdkIface.GetPciName(),
+			IPv4:           &primaryIpv4,
+			IPv6:           &primaryIpv6,
+			UnderlayRoute:  &underlayRoute,
+			Metering:       ProtoMeteringParamsToInterfaceMeteringParams(dpdkIface.GetMeteringParams()),
+			FirewallParams: ProtoFirewallParamsToInterfaceFirewallParams(dpdkIface.GetFirewallParams()),
+			HostName:       dpdkIface.Hostname,
 		},
 	}, nil
 }
@@ -376,6 +377,7 @@ func ProtoFwRuleToFwRule(dpdkFwRule *proto.FirewallRule, interfaceID string) (*F
 			SourcePrefix:      &srcPrefix,
 			DestinationPrefix: &dstPrefix,
 			ProtocolFilter:    dpdkFwRule.ProtocolFilter,
+			FlowHits:          dpdkFwRule.FlowHits,
 		},
 	}, nil
 }
@@ -460,5 +462,11 @@ func ProtoMeteringParamsToInterfaceMeteringParams(meteringParams *proto.Metering
 	return &MeteringParams{
 		TotalRate:  meteringParams.TotalRate,
 		PublicRate: meteringParams.PublicRate,
+	}
+}
+
+func ProtoFirewallParamsToInterfaceFirewallParams(firewallParams *proto.FirewallParams) *FirewallParamsSpec {
+	return &FirewallParamsSpec{
+		FirewallState: firewallParams.GetFirewallState().String(),
 	}
 }

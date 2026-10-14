@@ -55,9 +55,10 @@ def test_vf_to_pf_network_nat_icmp(prepare_ipv4, grpc_client, port_redundancy):
 
 	threading.Thread(target=reply_icmp_pkt_from_vm1, args=(nat_ul_ipv6, pf_tap)).start()
 
+	# The flow key selects the PF under port redundancy, this identifier makes the packet leave through PF1
 	icmp_pkt = (Ether(dst=PF0.mac, src=VM1.mac) /
 			    IP(dst=public_ip3, src=VM1.ip) /
-			    ICMP(type=8, id=0x0050))
+			    ICMP(type=8, id=0x0051))
 	delayed_sendp(icmp_pkt, VM1.tap)
 
 	pkt = sniff_packet(VM1.tap, is_icmp_pkt)
@@ -252,7 +253,6 @@ def test_vm_nat_async_tcp_icmperr(prepare_ipv4, grpc_client, port_redundancy):
 	grpc_client.delnat(VM1.name)
 
 def test_vf_to_pf_firewall_tcp_block(prepare_ipv4, grpc_client):
-	pytest.skip("Skipping till firewall gets fully enabled")
 	sniff_tcp_data = {}
 	negated = True
 	resp_thread = threading.Thread(target=sniff_tcp_fwall_packet, args=(PF0.tap, sniff_tcp_data, negated))

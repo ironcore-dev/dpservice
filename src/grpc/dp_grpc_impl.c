@@ -229,6 +229,35 @@ static int dp_process_delete_fwrule(struct dp_grpc_responder *responder)
 	return DP_GRPC_OK;
 }
 
+static int dp_process_get_fwparams(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_iface_id *request = &responder->request.get_fwparams;
+	struct dpgrpc_fwparams *reply = dp_grpc_single_reply(responder);
+
+	struct dp_port *port;
+
+	port = dp_get_port_with_iface_id(request->iface_id);
+	if (!port)
+		return DP_GRPC_ERR_NO_VM;
+
+	reply->fwall_state = port->iface.fwall_state;
+	return DP_GRPC_OK;
+}
+
+static int dp_process_set_fwparams(struct dp_grpc_responder *responder)
+{
+	struct dpgrpc_fwparams *request = &responder->request.set_fwparams;
+	struct dp_port *port;
+
+	port = dp_get_port_with_iface_id(request->iface_id);
+	if (!port)
+		return DP_GRPC_ERR_NO_VM;
+
+	/* Already established flows keep the action cached in their conntrack entry until they time out */
+	port->iface.fwall_state = request->fwall_state;
+	return DP_GRPC_OK;
+}
+
 static int dp_process_reset_vni(struct dp_grpc_responder *responder)
 {
 	struct dpgrpc_vni *request = &responder->request.vni_reset;
@@ -463,6 +492,8 @@ static int dp_process_create_interface(struct dp_grpc_responder *responder)
 	dp_copy_ipaddr(&port->iface.cfg.pxe_ip, &request->pxe_addr);
 	rte_memcpy(port->iface.cfg.hostname, request->hostname, sizeof(port->iface.cfg.hostname));
 	port->iface.hostname_len = (uint32_t)strnlen(port->iface.cfg.hostname, DP_IFACE_HOSTNAME_MAX_LEN - 1);
+	/* Interface creation carries no firewall parameters, every new interface starts with the firewall enabled */
+	port->iface.fwall_state = DP_FWALL_ENABLED;
 
 	/* Do not install routes for an empty(zero) IP, as zero ip is just a marker for showing the disabled IPv4/IPv6 machinery */
 	if (request->ip4_addr != 0) {
@@ -564,6 +595,7 @@ static int dp_process_get_interface(struct dp_grpc_responder *responder)
 	rte_memcpy(reply->hostname, port->iface.cfg.hostname, sizeof(reply->hostname));
 	reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 	reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
+	reply->fwall_state = port->iface.fwall_state;
 	return DP_GRPC_OK;
 }
 
@@ -763,6 +795,7 @@ static int dp_process_list_interfaces(struct dp_grpc_responder *responder)
 		rte_memcpy(reply->hostname, port->iface.cfg.hostname, sizeof(reply->hostname));
 		reply->total_flow_rate_cap = port->iface.total_flow_rate_cap;
 		reply->public_flow_rate_cap = port->iface.public_flow_rate_cap;
+		reply->fwall_state = port->iface.fwall_state;
 	}
 
 	return DP_GRPC_OK;
@@ -1075,6 +1108,12 @@ void dp_process_request(struct rte_mbuf *m)
 		break;
 	case DP_REQ_TYPE_ListFirewallRules:
 		ret = dp_process_list_fwrules(&responder);
+		break;
+	case DP_REQ_TYPE_GetFirewallParams:
+		ret = dp_process_get_fwparams(&responder);
+		break;
+	case DP_REQ_TYPE_SetFirewallParams:
+		ret = dp_process_set_fwparams(&responder);
 		break;
 	case DP_REQ_TYPE_CheckVniInUse:
 		ret = dp_process_check_vniinuse(&responder);

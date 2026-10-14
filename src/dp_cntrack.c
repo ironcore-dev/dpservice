@@ -4,7 +4,10 @@
 #include "dp_cntrack.h"
 #include "dp_conf.h"
 #include "dp_error.h"
+#include "dp_firewall.h"
+#include "dp_lb.h"
 #include "dp_log.h"
+#include "dp_nat.h"
 #include "dp_port.h"
 #include "dp_vnf.h"
 #include "monitoring/dp_graphtrace.h"
@@ -207,6 +210,49 @@ static __rte_always_inline struct flow_value *flow_table_insert_entry(struct flo
 }
 
 
+// Reverse of dp_build_flow_key(), reconstruct a dp_flow from a flow_key so
+// firewall rule matching functions can be called without a live packet.
+// A flow_key holds IPv4 addresses and ports in host byte order, while a dp_flow holds them
+// as taken from the packet headers, so they need to be converted back here.
+static void dp_cntrack_flow_key_to_df(const struct flow_key *key, struct dp_flow *df)
+{
+	df->l3_type = key->l3_src.is_v6 ? RTE_ETHER_TYPE_IPV6 : RTE_ETHER_TYPE_IPV4;
+	df->l4_type = key->proto;
+	if (key->l3_src.is_v6) {
+		dp_ipv6_from_ipaddr(&df->src.src_addr6, &key->l3_src);
+		dp_ipv6_from_ipaddr(&df->dst.dst_addr6, &key->l3_dst);
+	} else {
+		df->src.src_addr = htonl(key->l3_src.ipv4);
+		df->dst.dst_addr = htonl(key->l3_dst.ipv4);
+	}
+	if (key->proto == IPPROTO_TCP || key->proto == IPPROTO_UDP) {
+		df->l4_info.trans_port.src_port = htons(key->src.port_src);
+		df->l4_info.trans_port.dst_port = htons(key->port_dst);
+	} else if (key->proto == IPPROTO_ICMP || key->proto == IPPROTO_ICMPV6) {
+		df->l4_info.icmp_field.icmp_type = (uint8_t)key->src.type_src;
+	}
+}
+
+static void dp_cntrack_fwall_action_from_sync_nat(const struct flow_key *key,
+												  struct flow_value *flow_val,
+												  uint16_t created_port_id)
+{
+	const struct dp_port *vf_port = dp_get_port_by_id(created_port_id);
+	struct dp_flow df = {0};
+
+	if (!vf_port)
+		return;
+
+	dp_cntrack_flow_key_to_df(key, &df);
+
+	enum dp_fwall_action action = dp_get_firewall_action(&df, vf_port, dp_get_pf0());
+
+	flow_val->fwall_action[DP_FLOW_DIR_ORG]   = action;
+	flow_val->fwall_action[DP_FLOW_DIR_REPLY] = action;
+	flow_val->flow_flags |= DP_FLOW_FLAG_FIREWALL;
+}
+
+
 int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverload_key,
 							 const struct netnat_portoverload_sync_metadata *sync_metadata,
 							 uint64_t timestamp)
@@ -222,7 +268,8 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 	key.vni = sync_metadata->portmap_key.vni;
 	dp_copy_ipaddr(&key.l3_src, &sync_metadata->portmap_key.src_ip);
 	key.src.port_src = sync_metadata->portmap_key.iface_src_port;
-	key.vnf_type = DP_VNF_TYPE_NAT;
+	// packets from a VF are never marked as NAT, only the reply arriving on the NAT underlay is
+	key.vnf_type = DP_VNF_TYPE_UNDEFINED;
 	// SNAT overwrites src icmp type to work properly, need to restore it here
 	if (key.proto == IPPROTO_ICMP || key.proto == IPPROTO_ICMPV6)
 		key.src.type_src = sync_metadata->icmp_type_src;
@@ -275,6 +322,7 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 	// like above, this is SNAT-specific taken from snat_node.c
 	dp_set_ipaddr4(&inverted_key.l3_dst, portoverload_key->nat_ip);
 	inverted_key.port_dst = portoverload_key->nat_port;
+	inverted_key.vnf_type = DP_VNF_TYPE_NAT;
 	// in NAT64 the reply to ICMPv6 is ICMP (v4)
 	if (key.proto == IPPROTO_ICMPV6) {
 		inverted_key.proto = IPPROTO_ICMP;
@@ -290,6 +338,9 @@ int dp_cntrack_from_sync_nat(const struct netnat_portoverload_tbl_key *portoverl
 	// some adjustments are needed for NAT64 (but only for the original direction)
 	if (key.l3_src.is_v6)
 		dp_set_ipaddr_nat64(&key.l3_dst, htonl(key.l3_dst.ipv4));
+
+	// needs the final original key, NAT64 destination included, to match the rules like the VF's packet did
+	dp_cntrack_fwall_action_from_sync_nat(&key, flow_val, sync_metadata->created_port_id);
 
 	// Create the original conntrack flow
 	if (DP_FAILED(dp_add_flow(&key, flow_val))) {
@@ -339,6 +390,26 @@ static __rte_always_inline void dp_set_flow_offload_flag(struct rte_mbuf *m, str
 	}
 }
 
+static __rte_always_inline bool dp_cntrack_can_forward_icmp_error(struct dp_flow *df, const struct flow_key *key)
+{
+	const struct dnat_data *dnat_data;
+
+	// The quoted source must be the address receiving the error, not an unrelated VM's tuple.
+	if (key->l3_dst.ipv4 != ntohl(df->dst.dst_addr))
+		return false;
+
+	if (df->vnf_type == DP_VNF_TYPE_LB && dp_is_ip_lb(df, key->vni))
+		return true;
+
+	// LB traffic not addressed to an LB continues through DNAT, including neighbour NAT relay.
+	if (df->vnf_type == DP_VNF_TYPE_LB || df->vnf_type == DP_VNF_TYPE_NAT) {
+		dnat_data = dp_get_dnat_data(key->l3_dst.ipv4, key->vni);
+		return dnat_data && dnat_data->dnat_ip == 0;
+	}
+
+	return false;
+}
+
 static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flow *df, struct flow_value **p_flow_val)
 {
 	int ret;
@@ -362,6 +433,13 @@ static __rte_always_inline int dp_get_flow_val(struct rte_mbuf *m, struct dp_flo
 		if (unlikely(ret != -ENOENT)) {
 			DPS_LOG_WARNING("Flow table key search failed", DP_LOG_RET(ret));
 			return ret;
+		}
+		// Only actual LB/network NAT destinations may create state to forward an unmatched error.
+		// A VNF underlay alone is not enough: LB fall-through to local routing can leave
+		// a blocking reverse flow; NAT-tagged entries would be isolated but still unnecessary.
+		if (unlikely(dp_is_icmp_error(df) && !dp_cntrack_can_forward_icmp_error(df, curr_key))) {
+			DPS_LOG_DEBUG("Dropping an ICMP error without a matching flow");
+			return DP_ERROR;
 		}
 		// create new flow if needed
 		*p_flow_val = flow_table_insert_entry(curr_key, df, dp_get_in_port(m));

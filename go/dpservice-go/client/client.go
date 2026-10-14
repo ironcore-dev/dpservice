@@ -60,6 +60,9 @@ type Client interface {
 	GetFirewallRule(ctx context.Context, interfaceID string, ruleID string, ignoredErrors ...[]uint32) (*api.FirewallRule, error)
 	DeleteFirewallRule(ctx context.Context, interfaceID string, ruleID string, ignoredErrors ...[]uint32) (*api.FirewallRule, error)
 
+	GetFirewallParams(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.FirewallParams, error)
+	SetFirewallParams(ctx context.Context, fwParams *api.FirewallParams, ignoredErrors ...[]uint32) (*api.FirewallParams, error)
+
 	CheckInitialized(ctx context.Context, ignoredErrors ...[]uint32) (*api.Initialized, error)
 	Initialize(ctx context.Context, ignoredErrors ...[]uint32) (*api.Initialized, error)
 	GetVni(ctx context.Context, vni uint32, vniType uint8, ignoredErrors ...[]uint32) (*api.Vni, error)
@@ -1084,6 +1087,56 @@ func (c *client) DeleteFirewallRule(ctx context.Context, interfaceID string, rul
 		return retFwrule, errors.GetError(res.Status, ignoredErrors)
 	}
 	return retFwrule, nil
+}
+
+func (c *client) GetFirewallParams(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.FirewallParams, error) {
+	res, err := c.DPDKironcoreClient.GetFirewallParams(ctx, &dpdkproto.GetFirewallParamsRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.FirewallParams{}, err
+	}
+	retFwParams := &api.FirewallParams{
+		TypeMeta:           api.TypeMeta{Kind: api.FirewallParamsKind},
+		FirewallParamsMeta: api.FirewallParamsMeta{InterfaceID: interfaceID},
+		Status:             api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retFwParams, errors.GetError(res.Status, ignoredErrors)
+	}
+	retFwParams.Spec = *api.ProtoFirewallParamsToInterfaceFirewallParams(res.GetFirewallParams())
+	return retFwParams, nil
+}
+
+func (c *client) SetFirewallParams(ctx context.Context, fwParams *api.FirewallParams, ignoredErrors ...[]uint32) (*api.FirewallParams, error) {
+	if fwParams == nil {
+		return &api.FirewallParams{}, fmt.Errorf("error: input firewall params cannot be nil")
+	}
+
+	// The proto default is "enabled", so an unknown state must not silently fall back to it
+	fwState, ok := dpdkproto.FirewallState_value[strings.ToUpper(fwParams.Spec.FirewallState)]
+	if !ok {
+		return &api.FirewallParams{}, fmt.Errorf("firewall state can be only: %s|%s",
+			dpdkproto.FirewallState_ENABLED, dpdkproto.FirewallState_DISABLED)
+	}
+
+	res, err := c.DPDKironcoreClient.SetFirewallParams(ctx, &dpdkproto.SetFirewallParamsRequest{
+		InterfaceId:    []byte(fwParams.InterfaceID),
+		FirewallParams: &dpdkproto.FirewallParams{FirewallState: dpdkproto.FirewallState(fwState)},
+	})
+	if err != nil {
+		return &api.FirewallParams{}, err
+	}
+	retFwParams := &api.FirewallParams{
+		TypeMeta:           api.TypeMeta{Kind: api.FirewallParamsKind},
+		FirewallParamsMeta: api.FirewallParamsMeta{InterfaceID: fwParams.InterfaceID},
+		Spec:               api.FirewallParamsSpec{FirewallState: dpdkproto.FirewallState(fwState).String()},
+		Status:             api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retFwParams, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retFwParams, nil
 }
 
 func (c *client) CheckInitialized(ctx context.Context, ignoredErrors ...[]uint32) (*api.Initialized, error) {

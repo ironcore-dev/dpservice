@@ -136,6 +136,30 @@ bool GrpcToDpFwallPort(int32_t grpc_port, uint32_t *dp_port)
 	return true;
 }
 
+bool GrpcToDpFwallState(const FirewallState& grpc_state, enum dp_fwall_state *dp_state)
+{
+	switch (grpc_state) {
+	case FirewallState::DISABLED:
+		*dp_state = DP_FWALL_DISABLED;
+		return true;
+	case FirewallState::ENABLED:
+		*dp_state = DP_FWALL_ENABLED;
+		return true;
+	default:
+		return false;
+	}
+}
+
+FirewallState DpToGrpcFwallState(enum dp_fwall_state dp_state)
+{
+	return dp_state == DP_FWALL_ENABLED ? FirewallState::ENABLED : FirewallState::DISABLED;
+}
+
+TrafficDirection DpToGrpcFwallDirection(enum dp_fwall_direction dp_dir)
+{
+	return dp_dir == DP_FWALL_INGRESS ? TrafficDirection::INGRESS : TrafficDirection::EGRESS;
+}
+
 bool GrpcToDpCaptureInterfaceType(const CaptureInterfaceType& grpc_type, enum dpgrpc_capture_iface_type *dp_capture_iface_type)
 {
 	switch (grpc_type) {
@@ -206,6 +230,7 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 {
 	char strbuf[INET6_ADDRSTRLEN];
 	MeteringParams *metering_params;
+	FirewallParams *firewall_params;
 
 	DP_IPV4_TO_STR(dp_iface->ip4_addr, strbuf);
 	grpc_iface->set_primary_ipv4(strbuf);
@@ -221,6 +246,9 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
 	metering_params->set_public_rate(dp_iface->public_flow_rate_cap);
 	grpc_iface->set_allocated_meteringparams(metering_params);
+	firewall_params = new FirewallParams();
+	firewall_params->set_firewall_state(DpToGrpcFwallState(dp_iface->fwall_state));
+	grpc_iface->set_allocated_firewall_params(firewall_params);
 }
 
 void DpToGrpcLoadBalancer(const struct dpgrpc_lb *dp_lb, Loadbalancer *grpc_lb)
@@ -277,10 +305,8 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 
 	grpc_rule->set_id(dp_rule->rule_id);
 	grpc_rule->set_priority(dp_rule->priority);
-	if (dp_rule->dir == DP_FWALL_INGRESS)
-		grpc_rule->set_direction(TrafficDirection::INGRESS);
-	else
-		grpc_rule->set_direction(TrafficDirection::EGRESS);
+	grpc_rule->set_direction(DpToGrpcFwallDirection(dp_rule->dir));
+	grpc_rule->set_flow_hits(dp_rule->stats.rule_hit);
 
 	if (dp_rule->action == DP_FWALL_ACCEPT)
 		grpc_rule->set_action(FirewallAction::ACCEPT);

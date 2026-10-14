@@ -1049,8 +1049,9 @@ const char* CreateFirewallRuleCall::FillRequest(struct dpgrpc_request* request)
 		dp_rule->filter.icmp.icmp_code = (uint32_t)grpc_filter.icmp().icmp_code();
 		if (dp_rule->filter.icmp.icmp_type != DP_FWALL_MATCH_ANY_ICMP_TYPE && dp_rule->filter.icmp.icmp_type > UINT8_MAX)
 			return "Invalid icmp.icmp_type";
-		if (dp_rule->filter.icmp.icmp_code != DP_FWALL_MATCH_ANY_ICMP_CODE && dp_rule->filter.icmp.icmp_code > UINT8_MAX)
-			return "Invalid icmp.icmp_code";
+		// a specific code cannot be enforced beyond the first packet of a flow, see IcmpFilter
+		if (dp_rule->filter.icmp.icmp_code != DP_FWALL_MATCH_ANY_ICMP_CODE)
+			return "Invalid icmp.icmp_code, only -1 is supported";
 		break;
 	case ProtocolFilter::FILTER_NOT_SET:
 	default:
@@ -1119,6 +1120,37 @@ void ListFirewallRulesCall::ParseReply(struct dpgrpc_reply* reply)
 		rule = reply_.add_rules();
 		GrpcConv::DpToGrpcFwrule(&grpc_rule->rule, rule);
 	}
+}
+
+const char* GetFirewallParamsCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting firewall parameters",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_fwparams.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetFirewallParamsCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	FirewallParams *firewall_params = new FirewallParams();
+
+	firewall_params->set_firewall_state(GrpcConv::DpToGrpcFwallState(reply->fwparams.fwall_state));
+	reply_.set_allocated_firewall_params(firewall_params);
+}
+
+const char* SetFirewallParamsCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Setting firewall parameters",
+					DP_LOG_IFACE(request_.interface_id().c_str()),
+					DP_LOG_FWALL_STATE(request_.firewall_params().firewall_state()));
+	if (SNPRINTF_FAILED(request->set_fwparams.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	if (!GrpcConv::GrpcToDpFwallState(request_.firewall_params().firewall_state(), &request->set_fwparams.fwall_state))
+		return "Invalid firewall_params.firewall_state";
+	return NULL;
+}
+void SetFirewallParamsCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
 }
 
 
