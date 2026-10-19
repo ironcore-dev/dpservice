@@ -21,14 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Labels PRs based on branch, title, files, and body patterns
-      - uses: release-drafter/release-drafter/autolabeler@72967cdc98ddd3160f1fc3dff619de365e137dd0 # v7.9.0
+      - uses: release-drafter/release-drafter/autolabeler@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         if: github.event_name == 'pull_request_target'
         with:
           config-name: release-drafter.yml
           token: ${{ secrets.GITHUB_TOKEN }}
       # Drafts your next Release notes as Pull Requests are merged into "main"
       # or a release branch
-      - uses: release-drafter/release-drafter@72967cdc98ddd3160f1fc3dff619de365e137dd0 # v7.9.0
+      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         with:
           config-name: release-drafter.yml
           token: ${{ secrets.GITHUB_TOKEN }}
