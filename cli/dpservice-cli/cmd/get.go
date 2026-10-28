@@ -26,6 +26,7 @@ func Get(factory DPDKClientFactory) *cobra.Command {
 		GetLoadBalancer(factory, rendererOptions),
 		GetNat(factory, rendererOptions),
 		GetFirewallRule(factory, rendererOptions),
+		GetSecurityAssociation(factory, rendererOptions),
 		GetVni(factory, rendererOptions),
 		GetVersion(factory, rendererOptions),
 		GetInit(factory, rendererOptions),

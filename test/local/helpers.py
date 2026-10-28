@@ -76,6 +76,12 @@ def is_ipip_pkt(pkt):
 def is_encaped_icmp_pkt(pkt):
 	return is_ipip_pkt(pkt) and ICMP in pkt
 
+def is_encaped_udp_pkt(pkt):
+	return is_ipip_pkt(pkt) and UDP in pkt
+
+def is_esp_pkt(pkt):
+	return IPv6 in pkt and pkt[IPv6].nh == 50 and ESP in pkt
+
 
 def delayed_sendp(packet, interface):
 	# Just wait a bit for the other thread (sniffer/responder) to start listening
@@ -149,14 +155,7 @@ def validate_checksums(packet):
 		_validate_checksum(pkt, packet)
 		pkt = pkt.payload
 
-def sniff_packet(iface, lfilter, skip=0):
-	count = skip+1
-	# Need to accept 1337 EtherType which is reflected packet used for --hw tests
-	pkt_list = sniff(count=count, iface=iface, timeout=count*sniff_timeout,
-					 lfilter=lambda pkt: pkt[Ether].type == 0x1337 or lfilter(pkt))
-	assert len(pkt_list) == count, \
-		f"No reply on {iface}"
-	pkt = pkt_list[skip]
+def _validate_sniffed(pkt, lfilter):
 	validate_checksums(pkt)
 	# Reconstruct the original packet for --hw tests
 	# NOTE: only supports underlay/IPv6 traffic
@@ -166,6 +165,25 @@ def sniff_packet(iface, lfilter, skip=0):
 		assert lfilter(pkt), \
 			"Reflected packet not of right type"
 	return pkt
+
+def sniff_packet(iface, lfilter, skip=0):
+	count = skip+1
+	# Need to accept 1337 EtherType which is reflected packet used for --hw tests
+	pkt_list = sniff(count=count, iface=iface, timeout=count*sniff_timeout,
+					 lfilter=lambda pkt: pkt[Ether].type == 0x1337 or lfilter(pkt))
+	assert len(pkt_list) == count, \
+		f"No reply on {iface}"
+	return _validate_sniffed(pkt_list[skip], lfilter)
+
+# Like sniff_packet(), but returns every packet captured instead of just one of them.
+# Needed when a test sends a burst and has to inspect (or reflect) all of it; repeated
+# sniff_packet() calls would lose the packets that arrive between the calls.
+def sniff_packets(iface, lfilter, count):
+	pkt_list = sniff(count=count, iface=iface, timeout=count*sniff_timeout,
+					 lfilter=lambda pkt: pkt[Ether].type == 0x1337 or lfilter(pkt))
+	assert len(pkt_list) == count, \
+		f"Expected {count} packets on {iface}, got {len(pkt_list)}"
+	return [_validate_sniffed(pkt, lfilter) for pkt in pkt_list]
 
 
 def sniff_tcp_fwall_packet(tap, sniff_tcp_data, negated=False):

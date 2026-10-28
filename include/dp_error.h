@@ -76,6 +76,14 @@ const char *dp_strerror_verbose(int error);
 	ERR(BACKIP_ADD,							423) \
 	ERR(BACKIP_DEL,							424) \
 	ERR(NO_DROP_SUPPORT,					441) \
+	ERR(SA_EXISTS,							461) \
+	ERR(SA_NOT_FOUND,						462) \
+	ERR(SA_CREATE,							463) \
+	ERR(SA_ALGO,							464) \
+	ERR(SA_BAD_ADDR,						465) \
+	ERR(IPSEC_DISABLED,						466) \
+	ERR(SA_REPLAY_WINDOW,					467) \
+	ERR(SA_DIRECTION,						468) \
 
 #define _DP_GRPC_ERROR_ENUM(NAME, NUMBER) \
 	DP_GRPC_ERR_##NAME = _DP_GRPC_ERRCODES - NUMBER,

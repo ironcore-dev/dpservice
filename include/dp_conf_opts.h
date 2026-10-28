@@ -34,6 +34,7 @@ enum dp_conf_nic_type dp_conf_get_nic_type(void);
 bool dp_conf_is_stats_enabled(void);
 bool dp_conf_is_ipv6_overlay_enabled(void);
 bool dp_conf_is_offload_enabled(void);
+bool dp_conf_is_ipsec_enabled(void);
 #ifdef ENABLE_PYTEST
 int dp_conf_get_graphtrace_loglevel(void);
 #endif

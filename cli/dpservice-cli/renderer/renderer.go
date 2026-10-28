@@ -189,6 +189,8 @@ func (t defaultTableConverter) ConvertToTable(v any) (*TableData, error) {
 		return t.natTable([]api.Nat{*obj})
 	case *api.NeighborNat:
 		return t.neighborNatTable([]api.NeighborNat{*obj})
+	case *api.SecurityAssociation:
+		return t.securityAssociationTable([]api.SecurityAssociation{*obj})
 	case *api.NatList:
 		return t.natTable(obj.Items)
 	case *api.FirewallRule:
@@ -207,6 +209,8 @@ func (t defaultTableConverter) ConvertToTable(v any) (*TableData, error) {
 		return t.captureStopTable(*obj)
 	case *api.CaptureStatus:
 		return t.captureStatusTable(*obj)
+	case *api.InterfaceEncryption:
+		return t.interfaceEncryptionTable(*obj)
 	default:
 		return nil, fmt.Errorf("unsupported type %T", v)
 	}
@@ -249,7 +253,7 @@ func (t defaultTableConverter) loadBalancerTargetTable(lbtargets []api.LoadBalan
 }
 
 func (t defaultTableConverter) interfaceTable(ifaces []api.Interface) (*TableData, error) {
-	headers := []any{"ID", "VNI", "Device", "IPv4", "IPv6", "UnderlayRoute", "TotalTx", "PublicTx", "Hostname"}
+	headers := []any{"ID", "VNI", "Device", "IPv4", "IPv6", "UnderlayRoute", "TotalTx", "PublicTx", "Hostname", "Encrypt"}
 	vfNeeded := isColumnNeeded(ifaces, "Spec.VirtualFunction")
 	if vfNeeded {
 		headers = append(headers, "VirtualFunction")
@@ -265,7 +269,7 @@ func (t defaultTableConverter) interfaceTable(ifaces []api.Interface) (*TableDat
 
 	columns := make([][]any, len(ifaces))
 	for i, iface := range ifaces {
-		columns[i] = []any{iface.ID, iface.Spec.VNI, iface.Spec.Device, iface.Spec.IPv4, iface.Spec.IPv6, iface.Spec.UnderlayRoute, iface.Spec.Metering.TotalRate, iface.Spec.Metering.PublicRate, iface.Spec.HostName}
+		columns[i] = []any{iface.ID, iface.Spec.VNI, iface.Spec.Device, iface.Spec.IPv4, iface.Spec.IPv6, iface.Spec.UnderlayRoute, iface.Spec.Metering.TotalRate, iface.Spec.Metering.PublicRate, iface.Spec.HostName, iface.Spec.Encrypt}
 		if iface.Spec.VirtualFunction != nil {
 			columns[i] = append(columns[i], iface.Spec.VirtualFunction.Name)
 		} else if vfNeeded {
@@ -282,6 +286,18 @@ func (t defaultTableConverter) interfaceTable(ifaces []api.Interface) (*TableDat
 			columns[i] = append(columns[i], "")
 		}
 	}
+
+	return &TableData{
+		Headers: headers,
+		Columns: columns,
+	}, nil
+}
+
+func (t defaultTableConverter) interfaceEncryptionTable(encryption api.InterfaceEncryption) (*TableData, error) {
+	headers := []any{"InterfaceID", "Encrypt"}
+
+	columns := make([][]any, 1)
+	columns[0] = []any{encryption.InterfaceID, encryption.Spec.Encrypt}
 
 	return &TableData{
 		Headers: headers,
@@ -354,6 +370,26 @@ func (t defaultTableConverter) natTable(nats []api.Nat) (*TableData, error) {
 			} else {
 				columns[i] = append(columns[i], "Neighbor")
 			}
+		}
+	}
+
+	return &TableData{
+		Headers: headers,
+		Columns: columns,
+	}, nil
+}
+
+func (t defaultTableConverter) securityAssociationTable(sas []api.SecurityAssociation) (*TableData, error) {
+	headers := []any{"VNI", "SPI", "Direction", "Algorithm", "SrcUnderlay", "DstUnderlay", "ReplayWindow", "ESN"}
+	if t.Wide {
+		headers = append(headers, "Key", "Salt")
+	}
+
+	columns := make([][]any, len(sas))
+	for i, sa := range sas {
+		columns[i] = []any{sa.Vni, sa.Spi, sa.Direction, sa.Spec.Algorithm, sa.SrcUnderlay, sa.DstUnderlay, sa.Spec.ReplayWindow, sa.Spec.Esn}
+		if t.Wide {
+			columns[i] = append(columns[i], sa.Spec.Key, sa.Spec.Salt)
 		}
 	}
 

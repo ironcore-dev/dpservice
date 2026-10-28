@@ -1,10 +1,10 @@
 ## dpservice-cli delete
 
-Deletes one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule]
+Deletes one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule securityassociation]
 
 ### Synopsis
 
-Deletes one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule]
+Deletes one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule securityassociation]
 
 ```
 dpservice-cli delete [command] [flags]
@@ -31,6 +31,7 @@ dpservice-cli delete [command] [flags]
 
 * [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli delete firewallrule](dpservice-cli_delete_firewallrule.md)	 - Delete firewall rule from interface
+* [dpservice-cli delete securityassociation](dpservice-cli_delete_securityassociation.md)	 - Delete an IPsec Security Association
 * [dpservice-cli delete interface](dpservice-cli_delete_interface.md)	 - Delete interface
 * [dpservice-cli delete lbprefix](dpservice-cli_delete_lbprefix.md)	 - Delete a loadbalancer prefix
 * [dpservice-cli delete lbtarget](dpservice-cli_delete_lbtarget.md)	 - Delete a loadbalancer target

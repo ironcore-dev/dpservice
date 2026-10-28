@@ -19,21 +19,13 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 {
 	struct dp_flow *df = dp_get_flow_ptr(m);
 	struct rte_ether_hdr *ether_hdr;
-	const struct dp_vnf *vnf;
 	struct dp_port *dst_port;
 	uint32_t l3_type;
 
-	vnf = dp_get_vnf(&df->tun_info.ul_dst_addr6);
-	if (!vnf)
-		return IPIP_DECAP_NEXT_DROP;
-
-	dst_port = dp_get_port_by_id(vnf->port_id);
+	// In IPsec mode ipsec_decap has already done this, and everything it filled in is still here
+	dst_port = dp_vnf_resolve_tunnel_dst(m);
 	if (!dst_port)
 		return IPIP_DECAP_NEXT_DROP;
-
-	df->tun_info.dst_vni = vnf->vni;
-	df->vnf_type = vnf->type;
-	df->nxt_hop = vnf->port_id;  // already validated above
 
 	switch (df->tun_info.proto_id) {
 	case IPPROTO_IPIP:

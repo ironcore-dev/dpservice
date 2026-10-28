@@ -7,8 +7,11 @@
 #include <rte_arp.h>
 #include <rte_graph_worker.h>
 #include <rte_mbuf.h>
+#include "dp_conf.h"
 #include "dp_error.h"
 #include "dp_mbuf_dyn.h"
+#include "dp_vnf.h"
+#include "nodes/cls_node.h"
 #include "nodes/common_node.h"
 #include "nodes/ipv6_nd_node.h"
 #include "rte_flow/dp_rte_flow.h"
@@ -32,6 +35,17 @@
 
 DP_NODE_REGISTER(CLS, cls, NEXT_NODES);
 
+static bool ipsec_enabled = false;
+
+// Connected dynamically, so that a dp-service without IPsec has exactly the graph it had
+// before the feature existed - the node does not even become a part of it
+static uint16_t next_ipsec_decap_index;
+
+int cls_node_append_ipsec_decap(void)
+{
+	return dp_node_append_edge(DP_NODE_GET_SELF(cls), &next_ipsec_decap_index, "ipsec_decap");
+}
+
 static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unused struct rte_node *node)
 {
 #ifdef ENABLE_VIRTSVC
@@ -39,6 +53,7 @@ static int cls_node_init(__rte_unused const struct rte_graph *graph, __rte_unuse
 	virtsvc_ipv4_tree = dp_virtsvc_get_ipv4_tree();
 	virtsvc_ipv6_tree = dp_virtsvc_get_ipv6_tree();
 #endif
+	ipsec_enabled = dp_conf_is_ipsec_enabled();
 	return DP_OK;
 }
 
@@ -125,6 +140,7 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 	uint32_t l3_type;
 	struct dp_flow *df;
 	struct dp_port *port;
+	struct dp_port *dst_port;
 #ifdef ENABLE_VIRTSVC
 	struct dp_virtsvc *virtsvc;
 #endif
@@ -181,6 +197,33 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 				}
 			}
 #endif
+			// both paths below need these, and so does the endpoint lookup between them
+			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
+			dp_extract_underlay_header(df, ipv6_hdr);
+
+			// Encryption is a property of the destination interface, and the frame's
+			// protection has to match it: ESP is refused at a cleartext interface, and
+			// cleartext at an encrypting one. That is the whole of the inbound policy,
+			// and this is the only place it can be applied - the endpoint is not known
+			// before it, and after it the distinction is gone, because ipsec_decap
+			// deliberately leaves a decrypted frame looking exactly like one that arrived
+			// in the clear. See "Why encryption is per interface" in
+			// docs/concepts/ipsec.md.
+			//
+			// Like the VNI check in ipsec_decap this decides on unauthenticated data, and
+			// is safe for the same reason: the outcome is always a drop, so a forged frame
+			// cannot cause a legitimate one to be discarded. ipip_decap repeats the lookup
+			// and gets the cached result, exactly as it already does behind ipsec_decap.
+			if (ipsec_enabled) {
+				dst_port = dp_vnf_resolve_tunnel_dst(m);
+				if (unlikely(!dst_port))
+					return CLS_NEXT_DROP;
+				if (unlikely(dst_port->iface.encrypt != (ipv6_hdr->proto == IPPROTO_ESP)))
+					return CLS_NEXT_DROP;
+				if (dst_port->iface.encrypt)
+					return next_ipsec_decap_index;
+			}
+
 			switch (ipv6_hdr->proto) {
 			case IPPROTO_IPIP:
 				df->l3_type = RTE_ETHER_TYPE_IPV4;
@@ -191,8 +234,6 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			default:
 				return CLS_NEXT_DROP;
 			}
-			df->tun_info.l3_type = ntohs(ether_hdr->ether_type);
-			dp_extract_underlay_header(df, ipv6_hdr);
 			return CLS_NEXT_IPIP_DECAP;
 		} else {
 			if (is_ipv6_nd(ipv6_hdr))

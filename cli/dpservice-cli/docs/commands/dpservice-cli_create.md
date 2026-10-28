@@ -1,10 +1,10 @@
 ## dpservice-cli create
 
-Creates one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule]
+Creates one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule securityassociation]
 
 ### Synopsis
 
-Creates one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule]
+Creates one of [interface prefix route virtualip loadbalancer lbprefix lbtarget nat neighbornat firewallrule securityassociation]
 
 ```
 dpservice-cli create [command] [flags]
@@ -31,6 +31,7 @@ dpservice-cli create [command] [flags]
 
 * [dpservice-cli](dpservice-cli.md)	 -
 * [dpservice-cli create firewallrule](dpservice-cli_create_firewallrule.md)	 - Create a FirewallRule on interface
+* [dpservice-cli create securityassociation](dpservice-cli_create_securityassociation.md)	 - Create an IPsec Security Association
 * [dpservice-cli create interface](dpservice-cli_create_interface.md)	 - Create an interface
 * [dpservice-cli create lbprefix](dpservice-cli_create_lbprefix.md)	 - Create a loadbalancer prefix
 * [dpservice-cli create lbtarget](dpservice-cli_create_lbtarget.md)	 - Create a loadbalancer target

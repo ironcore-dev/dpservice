@@ -335,6 +335,7 @@ type InterfaceSpec struct {
 	VIP             *VirtualIP       `json:"vip,omitempty"`
 	Metering        *MeteringParams  `json:"metering,omitempty"`
 	HostName        string           `json:"hostname,omitempty"`
+	Encrypt         bool             `json:"encrypt"`
 }
 
 type VirtualFunction struct {
@@ -654,8 +655,87 @@ type CaptureGetStatusSpec struct {
 	Interfaces      []CaptureInterface `json:"interfaces,omitempty"`
 }
 
+// SecurityAssociation is one direction of an IPsec Security Association for the underlay
+// tunnel. The underlay addresses are matched on their first 64 bits only, so one association
+// covers a peer host rather than each of its individual underlay addresses.
+type SecurityAssociation struct {
+	TypeMeta                `json:",inline"`
+	SecurityAssociationMeta `json:"metadata"`
+	Spec                    SecurityAssociationSpec `json:"spec"`
+	Status                  Status                  `json:"status"`
+}
+
+// SecurityAssociationMeta names one association. dpservice matches all of it, and files the
+// association under the vni when it is egress and under the spi when it is ingress - which is
+// not something a caller has to know or provide differently.
+type SecurityAssociationMeta struct {
+	Vni         uint32      `json:"vni"`
+	Spi         uint32      `json:"spi"`
+	Direction   string      `json:"direction"`
+	SrcUnderlay *netip.Addr `json:"src_underlay,omitempty"`
+	DstUnderlay *netip.Addr `json:"dst_underlay,omitempty"`
+}
+
+func (m *SecurityAssociationMeta) GetName() string {
+	return fmt.Sprintf("%s/%d/%d/%v-%v", m.Direction, m.Vni, m.Spi, m.SrcUnderlay, m.DstUnderlay)
+}
+
+func (m *SecurityAssociation) GetStatus() Status {
+	return m.Status
+}
+
+func (m *SecurityAssociation) String() string {
+	return fmt.Sprintf("%s <vni %d, spi %d, %v -> %v>", m.Direction, m.Vni, m.Spi, m.SrcUnderlay, m.DstUnderlay)
+}
+
+type SecurityAssociationSpec struct {
+	Algorithm string `json:"algorithm"`
+	Key       string `json:"key,omitempty"`
+	Salt      string `json:"salt,omitempty"`
+	// Anti-replay window in packets, ingress only. Zero disables replay checking.
+	ReplayWindow uint32 `json:"replay_window"`
+	// Extended sequence numbers (RFC 4304). Both ends of a tunnel have to agree on this.
+	Esn bool `json:"esn"`
+}
+
+// SecurityAssociationUpdate is what an association becomes when it is replaced: a new wire SPI
+// and a complete new spec. Nothing is carried over from the association being replaced, and the
+// replacement starts a sequence number of its own - so it needs key material that association
+// has not used before.
+type SecurityAssociationUpdate struct {
+	NewSpi uint32                  `json:"new_spi"`
+	Spec   SecurityAssociationSpec `json:"spec"`
+}
+
+// InterfaceEncryption is an interface's encryption policy: whether its underlay traffic must be
+// carried inside ESP. It is symmetric - an encrypting interface neither sends nor accepts
+// underlay traffic in the clear - so both ends of a tunnel have to agree or nothing passes.
+type InterfaceEncryption struct {
+	TypeMeta                `json:",inline"`
+	InterfaceEncryptionMeta `json:"metadata"`
+	Spec                    InterfaceEncryptionSpec `json:"spec"`
+	Status                  Status                  `json:"status"`
+}
+
+type InterfaceEncryptionMeta struct {
+	InterfaceID string `json:"interface_id"`
+}
+
+type InterfaceEncryptionSpec struct {
+	Encrypt bool `json:"encrypt"`
+}
+
+func (m *InterfaceEncryptionMeta) GetName() string {
+	return m.InterfaceID
+}
+
+func (m *InterfaceEncryption) GetStatus() Status {
+	return m.Status
+}
+
 var (
 	InterfaceKind              = reflect.TypeOf(Interface{}).Name()
+	InterfaceEncryptionKind    = reflect.TypeOf(InterfaceEncryption{}).Name()
 	InterfaceListKind          = reflect.TypeOf(InterfaceList{}).Name()
 	LoadBalancerKind           = reflect.TypeOf(LoadBalancer{}).Name()
 	LoadBalancerListKind       = reflect.TypeOf(LoadBalancerList{}).Name()
@@ -678,4 +758,5 @@ var (
 	CaptureStartKind           = reflect.TypeOf(CaptureStart{}).Name()
 	CaptureStopKind            = reflect.TypeOf(CaptureStop{}).Name()
 	CaptureStatusKind          = reflect.TypeOf(CaptureStatus{}).Name()
+	SecurityAssociationKind    = reflect.TypeOf(SecurityAssociation{}).Name()
 )

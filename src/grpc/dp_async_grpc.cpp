@@ -261,6 +261,7 @@ const char* CreateInterfaceCall::FillRequest(struct dpgrpc_request* request)
 
 	request->add_iface.total_flow_rate_cap = request_.metering_parameters().total_rate();
 	request->add_iface.public_flow_rate_cap = request_.metering_parameters().public_rate();
+	request->add_iface.encrypt = request_.encrypt();
 
 	return NULL;
 }
@@ -1150,6 +1151,136 @@ void ResetVniCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
 }
 
 
+// All three Security Association calls are given the same five fields, so they validate them the
+// same way. Which of them the association is filed under is dp_ipsec.c's business, not this one's.
+static const char* FillSecurityAssociationId(const SecurityAssociationId& id,
+											 struct dpgrpc_ipsec_sa_id* out)
+{
+	out->spi = id.spi();
+	out->vni = id.vni();
+	if (!GrpcConv::GrpcToDpIpsecDir(id.direction(), &out->dir))
+		return "Invalid id.direction";
+	if (!GrpcConv::StrToIpv6(id.src_underlay(), &out->src))
+		return "Invalid id.src_underlay";
+	if (!GrpcConv::StrToIpv6(id.dst_underlay(), &out->dst))
+		return "Invalid id.dst_underlay";
+	return NULL;
+}
+
+// What a create and a replace both carry beyond the id: the cipher, its key material and the two
+// per-association options. A replacement is built from scratch exactly as a new association is,
+// so nothing here is optional in the sense of being carried over from what is being replaced.
+static const char* FillSecurityAssociationParams(const IpsecAlgorithm& algorithm,
+												 const std::string& key, const std::string& salt,
+												 uint32_t replay_window, bool esn,
+												 struct dpgrpc_ipsec_sa* out)
+{
+	int key_len;
+	int salt_len;
+
+	if (!GrpcConv::GrpcToDpIpsecAlgo(algorithm, &out->algo))
+		return "Invalid algorithm";
+	// how much key material the cipher needs is a property of the cipher
+	key_len = dp_ipsec_get_key_len(out->algo);
+	salt_len = dp_ipsec_get_salt_len(out->algo);
+	if (DP_FAILED(key_len) || DP_FAILED(salt_len))
+		return "Invalid algorithm";
+	if (!GrpcConv::HexToBytes(key, out->key, (size_t)key_len))
+		return "Invalid key";
+	if (!GrpcConv::HexToBytes(salt, out->salt, (size_t)salt_len))
+		return "Invalid salt";
+	// the range is dp_ipsec.c's to judge, it is the only place that knows which values a
+	// direction allows
+	out->replay_window = replay_window;
+	out->esn = esn;
+	return NULL;
+}
+
+const char* CreateSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	const char* error;
+
+	DPGRPC_LOG_INFO("Creating Security Association",
+					DP_LOG_VNI(request_.id().vni()),
+					DP_LOG_SPI(request_.id().spi()),
+					DP_LOG_SRC_UNDERLAY(request_.id().src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.id().dst_underlay().c_str()));
+	error = FillSecurityAssociationId(request_.id(), &request->add_sa.id);
+	if (error)
+		return error;
+	return FillSecurityAssociationParams(request_.algorithm(), request_.key(), request_.salt(),
+										 request_.replay_window(), request_.esn(),
+										 &request->add_sa);
+}
+void CreateSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* DeleteSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Removing Security Association",
+					DP_LOG_VNI(request_.id().vni()),
+					DP_LOG_SPI(request_.id().spi()),
+					DP_LOG_SRC_UNDERLAY(request_.id().src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.id().dst_underlay().c_str()));
+	return FillSecurityAssociationId(request_.id(), &request->del_sa);
+}
+void DeleteSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* UpdateSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	const char* error;
+
+	DPGRPC_LOG_INFO("Replacing Security Association",
+					DP_LOG_VNI(request_.id().vni()),
+					DP_LOG_SPI(request_.id().spi()),
+					DP_LOG_SPI_NEW(request_.new_spi()),
+					DP_LOG_SRC_UNDERLAY(request_.id().src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.id().dst_underlay().c_str()));
+	error = FillSecurityAssociationId(request_.id(), &request->update_sa.sa.id);
+	if (error)
+		return error;
+	request->update_sa.new_spi = request_.new_spi();
+	return FillSecurityAssociationParams(request_.algorithm(), request_.key(), request_.salt(),
+										 request_.replay_window(), request_.esn(),
+										 &request->update_sa.sa);
+}
+void UpdateSecurityAssociationCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* GetSecurityAssociationCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting Security Association",
+					DP_LOG_VNI(request_.id().vni()),
+					DP_LOG_SPI(request_.id().spi()),
+					DP_LOG_SRC_UNDERLAY(request_.id().src_underlay().c_str()),
+					DP_LOG_DST_UNDERLAY(request_.id().dst_underlay().c_str()));
+	return FillSecurityAssociationId(request_.id(), &request->get_sa);
+}
+void GetSecurityAssociationCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	struct dpgrpc_ipsec_sa *sa = &reply->ipsec_sa;
+	SecurityAssociationId *id = reply_.mutable_id();
+	char strbuf[INET6_ADDRSTRLEN];
+
+	id->set_spi(sa->id.spi);
+	id->set_vni(sa->id.vni);
+	id->set_direction(GrpcConv::IpsecDirToGrpc(sa->id.dir));
+	// what comes back is what is actually matched, i.e. already masked to the supported prefix
+	DP_IPV6_TO_STR(&sa->id.src, strbuf);
+	id->set_src_underlay(strbuf);
+	DP_IPV6_TO_STR(&sa->id.dst, strbuf);
+	id->set_dst_underlay(strbuf);
+	reply_.set_algorithm(GrpcConv::IpsecAlgoToGrpc(sa->algo));
+	reply_.set_key(GrpcConv::BytesToHex(sa->key, (size_t)dp_ipsec_get_key_len(sa->algo)));
+	reply_.set_salt(GrpcConv::BytesToHex(sa->salt, (size_t)dp_ipsec_get_salt_len(sa->algo)));
+	reply_.set_replay_window(sa->replay_window);
+	reply_.set_esn(sa->esn);
+}
+
 const char* CaptureStartCall::FillRequest(struct dpgrpc_request* request)
 {
 	DPGRPC_LOG_INFO("Starting packet capture",
@@ -1252,4 +1383,42 @@ void CaptureStatusCall::ParseReply(struct dpgrpc_reply* reply)
 		}
 		reply_.set_allocated_capture_config(capture_config);
 	}
+}
+
+
+const char* EnableInterfaceEncryptionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Enabling interface encryption",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->enable_encryption.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void EnableInterfaceEncryptionCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* DisableInterfaceEncryptionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Disabling interface encryption",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->disable_encryption.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void DisableInterfaceEncryptionCall::ParseReply(__rte_unused struct dpgrpc_reply* reply)
+{
+}
+
+const char* GetInterfaceEncryptionCall::FillRequest(struct dpgrpc_request* request)
+{
+	DPGRPC_LOG_INFO("Getting interface encryption",
+					DP_LOG_IFACE(request_.interface_id().c_str()));
+	if (SNPRINTF_FAILED(request->get_encryption.iface_id, request_.interface_id()))
+		return "Invalid interface_id";
+	return NULL;
+}
+void GetInterfaceEncryptionCall::ParseReply(struct dpgrpc_reply* reply)
+{
+	reply_.set_encrypt(reply->iface_encryption.encrypt);
 }

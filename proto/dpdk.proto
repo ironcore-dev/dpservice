@@ -44,6 +44,11 @@ enum CaptureInterfaceType {
 	SINGLE_VF = 1;
 }
 
+enum IpsecAlgorithm {
+	AES_128_GCM = 0;
+	AES_256_GCM = 1;
+}
+
 //// STRUCTURES
 message Empty {
 }
@@ -73,6 +78,8 @@ message Interface {
 	string pci_name = 6;
 	MeteringParams meteringParams = 7;
 	string hostname = 8;
+	// Underlay traffic of this interface is carried inside ESP, in both directions.
+	bool encrypt = 9;
 }
 
 message IpConfig {
@@ -235,6 +242,8 @@ message CreateInterfaceRequest {
 	MeteringParams metering_parameters = 8;
 	bytes preferred_underlay_route = 9;
 	string hostname = 10;
+	// Requires dpservice to have been started with --enable-ipsec, otherwise IPSEC_DISABLED.
+	bool encrypt = 11;
 }
 
 message CreateInterfaceResponse {
@@ -597,6 +606,130 @@ message CaptureStopResponse {
 	uint32 stopped_interface_cnt = 2;
 }
 
+//// IPSEC
+// A Security Association is unidirectional. Underlay addresses are matched on their first
+// 64 bits only, so one association covers a peer host rather than each of its addresses.
+//
+// These five fields name exactly one association. Which of them dpservice files it under
+// depends on the direction - the vni for an egress association, the spi for an ingress one,
+// because ipsec_encap cannot read an SPI off a packet that is not ESP yet - but a caller does
+// not need to know that: every field given here is matched, and an association is only ever
+// found under all five of them.
+message SecurityAssociationId {
+	uint32 vni = 1;            // the VNI whose traffic this association protects
+	uint32 spi = 2;            // Security Parameter Index, as carried in the ESP header
+	TrafficDirection direction = 3;
+	bytes src_underlay = 4;    // source underlay address, as seen on the wire in this direction
+	bytes dst_underlay = 5;    // destination underlay address, likewise
+}
+
+message CreateSecurityAssociationRequest {
+	SecurityAssociationId id = 1;
+	IpsecAlgorithm algorithm = 2;
+	bytes key = 3;             // hex-encoded, length defined by the algorithm
+	bytes salt = 4;            // hex-encoded, length defined by the algorithm
+	// Anti-replay window, in packets, for an ingress association: how far a frame may be
+	// reordered on the underlay before it is taken for a replay. Zero, which is also what an
+	// omitted field means, disables replay checking entirely. An egress association has
+	// nothing to check, so anything but zero is rejected there.
+	uint32 replay_window = 5;
+	// Extended sequence numbers (RFC 4304): the association counts to 2^64 rather than 2^32, with
+	// only the lower half carried in the packet and the upper half authenticated along with it.
+	// Both ends have to be created with the same value - it changes what the ICV covers, so a
+	// mismatch fails every frame rather than degrading. Omitted means off, see "Extended sequence
+	// numbers are opt-in" in docs/concepts/ipsec.md.
+	bool esn = 6;
+}
+
+message CreateSecurityAssociationResponse {
+	Status status = 1;
+}
+
+message DeleteSecurityAssociationRequest {
+	SecurityAssociationId id = 1;
+}
+
+message DeleteSecurityAssociationResponse {
+	Status status = 1;
+}
+
+// Replace a live egress association with one built to these parameters, without ever leaving the
+// traffic it protects unprotected: dpservice builds the replacement, then swaps it in between two
+// packets. This is what makes rekeying gapless on the sending side; the receiving side needs no
+// replacement, since several ingress associations can serve one VNI and peer at once.
+//
+// Egress only. An ingress association is filed under the SPI its frames carry, so it cannot be
+// renumbered in place, and rotating its key in place would drop the frames still in flight under
+// the old one - add a second ingress association instead and delete the old one once the peer has
+// switched. See "Egress associations are rekeyed by replacement" in docs/concepts/ipsec.md.
+message UpdateSecurityAssociationRequest {
+	// The association as it stands now, current wire SPI and all. Naming it by a SPI it no longer
+	// carries replaces nothing, rather than replacing whatever took its place.
+	SecurityAssociationId id = 1;
+	uint32 new_spi = 2;        // what its ESP headers carry from here on
+	// Everything below is what the association becomes, exactly as in a create: nothing is
+	// carried over from the association being replaced, and an omitted field means its default
+	// rather than what was there before.
+	IpsecAlgorithm algorithm = 3;
+	bytes key = 4;             // hex-encoded, length defined by the algorithm
+	bytes salt = 5;            // hex-encoded, length defined by the algorithm
+	uint32 replay_window = 6;  // egress has nothing to check, so anything but zero is rejected
+	bool esn = 7;
+	// NOTE: the replacement starts a sequence number of its own, so it needs key material this
+	// association has not used before - reusing it would repeat an AES-GCM nonce.
+}
+
+message UpdateSecurityAssociationResponse {
+	Status status = 1;
+}
+
+message GetSecurityAssociationRequest {
+	SecurityAssociationId id = 1;
+}
+
+message GetSecurityAssociationResponse {
+	Status status = 1;
+	// The underlay addresses come back as matched, i.e. masked to the supported prefix length
+	SecurityAssociationId id = 2;
+	IpsecAlgorithm algorithm = 3;
+	bytes key = 4;
+	bytes salt = 5;
+	uint32 replay_window = 6;
+	bool esn = 7;
+}
+
+// Encryption is a property of an interface, not of the whole instance. It is symmetric: an
+// encrypting interface neither sends nor accepts underlay traffic in the clear, so both ends
+// of a tunnel have to agree or nothing passes between them.
+//
+// There is no single setter taking a bool on purpose. A proto3 scalar has no presence, so an
+// omitted field would be indistinguishable from an explicit request to stop encrypting - and
+// that is the one transition here that turns a protected endpoint into a cleartext one.
+message EnableInterfaceEncryptionRequest {
+	bytes interface_id = 1;
+}
+
+message EnableInterfaceEncryptionResponse {
+	Status status = 1;
+}
+
+message DisableInterfaceEncryptionRequest {
+	bytes interface_id = 1;
+}
+
+message DisableInterfaceEncryptionResponse {
+	Status status = 1;
+}
+
+message GetInterfaceEncryptionRequest {
+	bytes interface_id = 1;
+}
+
+message GetInterfaceEncryptionResponse {
+	Status status = 1;
+	bool encrypt = 2;
+}
+
 message CaptureStatusRequest {
 }
 
@@ -694,6 +827,20 @@ service DPDKironcore {
 	rpc CreateFirewallRule(CreateFirewallRuleRequest) returns (CreateFirewallRuleResponse) {}
 	rpc GetFirewallRule(GetFirewallRuleRequest) returns (GetFirewallRuleResponse) {}
 	rpc DeleteFirewallRule(DeleteFirewallRuleRequest) returns (DeleteFirewallRuleResponse) {}
+
+	//// IPSEC
+	// Security Associations for the encrypted underlay tunnel, one per direction.
+	// Only available when dpservice was started with --enable-ipsec.
+	rpc CreateSecurityAssociation(CreateSecurityAssociationRequest) returns (CreateSecurityAssociationResponse) {}
+	rpc DeleteSecurityAssociation(DeleteSecurityAssociationRequest) returns (DeleteSecurityAssociationResponse) {}
+	rpc UpdateSecurityAssociation(UpdateSecurityAssociationRequest) returns (UpdateSecurityAssociationResponse) {}
+	rpc GetSecurityAssociation(GetSecurityAssociationRequest) returns (GetSecurityAssociationResponse) {}
+
+	// Per-interface encryption policy. Only available when dpservice was started with
+	// --enable-ipsec; the flag can also be set when the interface is created.
+	rpc EnableInterfaceEncryption(EnableInterfaceEncryptionRequest) returns (EnableInterfaceEncryptionResponse) {}
+	rpc DisableInterfaceEncryption(DisableInterfaceEncryptionRequest) returns (DisableInterfaceEncryptionResponse) {}
+	rpc GetInterfaceEncryption(GetInterfaceEncryptionRequest) returns (GetInterfaceEncryptionResponse) {}
 
 	//// PACKET CAPTURE
 	rpc CaptureStart(CaptureStartRequest) returns (CaptureStartResponse) {}

@@ -154,6 +154,7 @@ func ProtoInterfaceToInterface(dpdkIface *proto.Interface) (*Interface, error) {
 			UnderlayRoute: &underlayRoute,
 			Metering:      ProtoMeteringParamsToInterfaceMeteringParams(dpdkIface.GetMeteringParams()),
 			HostName:      dpdkIface.Hostname,
+			Encrypt:       dpdkIface.GetEncrypt(),
 		},
 	}, nil
 }

@@ -54,6 +54,11 @@ struct dp_flow {
 	enum dp_flow_dir			flow_dir : 1;		// store the direction of each packet
 	enum dp_pkt_offload_state	offload_state : 2;	// store the offload status of each packet
 	enum dp_vnf_type			vnf_type : 3;
+	// Whether dp_vnf_resolve_tunnel_dst() has already filled in the three fields below that
+	// describe where this tunnel packet is going: dst_vni, vnf_type and nxt_hop. It lives here
+	// rather than in dp_pkt_mark because it describes this struct, and a recirculated packet
+	// gets a fresh one of these while its packet mark survives.
+	bool						tun_dst_resolved : 1;
 
 	uint16_t	l3_type;  //layer-3 for inner packets. it can be crafted or extracted from raw frames
 	uint32_t	l3_payload_length;  //layer-3 playload length for inner packets.
@@ -103,6 +108,7 @@ struct dp_pkt_mark {
 	uint32_t id;
 	struct {
 		bool is_recirc : 1;
+		bool crypto_failed : 1;
 	} flags;
 	// check the init function if adding more,
 	// due to this being small, memset has not been used
@@ -141,6 +147,7 @@ static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
 
 	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
 	mark->flags.is_recirc = false;
+	mark->flags.crypto_failed = false;
 }
 
 

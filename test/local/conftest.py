@@ -11,6 +11,7 @@ from dp_service import DpService
 from exporter import Exporter
 from grpc_client import GrpcClient
 from helpers import request_ip, wait_for_port, is_port_open, run_command
+from ipsec_peer import IpsecPeer
 
 
 def pytest_addoption(parser):
@@ -45,6 +46,9 @@ def pytest_addoption(parser):
 	parser.addoption(
 		"--ha", action="store_true", help="Run two dpservice instances"
 	)
+	parser.addoption(
+		"--ipsec", action="store_true", help="Encrypt underlay tunnel traffic using IPsec"
+	)
 
 @pytest.fixture(scope="package")
 def build_path(request):
@@ -72,6 +76,16 @@ def grpc_client(request, build_path):
 def grpc_client_b(build_path):
 	return GrpcClient(build_path, grpc_port_b)
 
+# The neighbouring instance dpservice tunnels to is played by the harness, so it holds both
+# keys. Package-scoped like the service itself, and deliberately so: the sequence numbers inside
+# it have to keep advancing for as long as dpservice's associations exist. None when the mode is
+# off, which is also what the tests switch on.
+@pytest.fixture(scope="package")
+def ipsec_peer(request):
+	if not request.config.getoption("--ipsec"):
+		return None
+	return IpsecPeer()
+
 
 # All tests require dp_service to be running
 def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, secondary, ha):
@@ -84,7 +98,8 @@ def _dp_service(request, build_path, port_redundancy, fast_flow_timeout, seconda
 						   test_virtsvc = request.config.getoption("--virtsvc"),
 						   hardware = request.config.getoption("--hw"),
 						   offloading = request.config.getoption("--offloading"),
-						   graphtrace = request.config.getoption("--graphtrace"))
+						   graphtrace = request.config.getoption("--graphtrace"),
+						   ipsec = request.config.getoption("--ipsec"))
 
 	if request.config.getoption("--attach"):
 		print("Attaching to an already running service")

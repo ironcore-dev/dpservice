@@ -46,6 +46,7 @@ func Delete(factory DPDKClientFactory) *cobra.Command {
 		DeleteNat(factory, rendererOptions),
 		DeleteNeighborNat(factory, rendererOptions),
 		DeleteFirewallRule(factory, rendererOptions),
+		DeleteSecurityAssociation(factory, rendererOptions),
 	}
 
 	cmd.Short = fmt.Sprintf("Deletes one of %v", CommandNames(subcommands))

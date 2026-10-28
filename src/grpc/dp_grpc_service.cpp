@@ -129,6 +129,13 @@ void GRPCService::HandleRpcs()
 	new CheckVniInUseCall();
 	new ResetVniCall();
 	new GetVersionCall();
+	new CreateSecurityAssociationCall();
+	new DeleteSecurityAssociationCall();
+	new UpdateSecurityAssociationCall();
+	new GetSecurityAssociationCall();
+	new EnableInterfaceEncryptionCall();
+	new DisableInterfaceEncryptionCall();
+	new GetInterfaceEncryptionCall();
 	new CaptureStartCall();
 	new CaptureStopCall();
 	new CaptureStatusCall();

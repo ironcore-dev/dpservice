@@ -45,6 +45,10 @@ type Client interface {
 	CreateRoute(ctx context.Context, route *api.Route, ignoredErrors ...[]uint32) (*api.Route, error)
 	DeleteRoute(ctx context.Context, vni uint32, prefix *netip.Prefix, ignoredErrors ...[]uint32) (*api.Route, error)
 
+	CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	DeleteSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	UpdateSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, sa *api.SecurityAssociationUpdate, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
+	GetSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error)
 	GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
 	CreateNat(ctx context.Context, nat *api.Nat, ignoredErrors ...[]uint32) (*api.Nat, error)
 	DeleteNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error)
@@ -65,6 +69,10 @@ type Client interface {
 	GetVni(ctx context.Context, vni uint32, vniType uint8, ignoredErrors ...[]uint32) (*api.Vni, error)
 	ResetVni(ctx context.Context, vni uint32, vniType uint8, ignoredErrors ...[]uint32) (*api.Vni, error)
 	GetVersion(ctx context.Context, version *api.Version, ignoredErrors ...[]uint32) (*api.Version, error)
+
+	EnableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error)
+	DisableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error)
+	GetInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error)
 
 	CaptureStart(ctx context.Context, capture *api.CaptureStart, ignoredErrors ...[]uint32) (*api.CaptureStart, error)
 	CaptureStop(ctx context.Context, ignoredErrors ...[]uint32) (*api.CaptureStop, error)
@@ -409,6 +417,7 @@ func (c *client) CreateInterface(ctx context.Context, iface *api.Interface, igno
 		MeteringParameters:     api.InterfaceMeteringParamsToProtoMeteringParams(iface.Spec.Metering),
 		PreferredUnderlayRoute: api.NetIPAddrToByteSlice(iface.Spec.UnderlayRoute),
 		Hostname:               iface.Spec.HostName,
+		Encrypt:                iface.Spec.Encrypt,
 	}
 	if iface.Spec.PXE != nil {
 		if iface.Spec.PXE.FileName != "" && iface.Spec.PXE.Server != "" {
@@ -720,6 +729,190 @@ func (c *client) ListRoutes(ctx context.Context, vni uint32, ignoredErrors ...[]
 		Items:         routes,
 		Status:        api.ProtoStatusToStatus(res.Status),
 	}, nil
+}
+
+func protoIpsecDirection(direction string) (dpdkproto.TrafficDirection, error) {
+	switch strings.ToLower(direction) {
+	case "ingress":
+		return dpdkproto.TrafficDirection_INGRESS, nil
+	case "egress":
+		return dpdkproto.TrafficDirection_EGRESS, nil
+	default:
+		return 0, fmt.Errorf("invalid direction %q, expected ingress or egress", direction)
+	}
+}
+
+func protoIpsecAlgorithm(algorithm string) (dpdkproto.IpsecAlgorithm, error) {
+	// Both spellings are accepted so that what GetSecurityAssociation reports, which is the
+	// protobuf enum name lowercased, can be handed straight back to a create.
+	switch strings.ToLower(algorithm) {
+	case "", "aes-128-gcm", "aes_128_gcm":
+		return dpdkproto.IpsecAlgorithm_AES_128_GCM, nil
+	case "aes-256-gcm", "aes_256_gcm":
+		return dpdkproto.IpsecAlgorithm_AES_256_GCM, nil
+	default:
+		return 0, fmt.Errorf("invalid algorithm %q, expected aes-128-gcm or aes-256-gcm", algorithm)
+	}
+}
+
+// The five fields that name an association travel together, on all three calls.
+func protoSecurityAssociationId(id *api.SecurityAssociationMeta) (*dpdkproto.SecurityAssociationId, error) {
+	direction, err := protoIpsecDirection(id.Direction)
+	if err != nil {
+		return nil, err
+	}
+	return &dpdkproto.SecurityAssociationId{
+		Vni:         id.Vni,
+		Spi:         id.Spi,
+		Direction:   direction,
+		SrcUnderlay: api.NetIPAddrToByteSlice(id.SrcUnderlay),
+		DstUnderlay: api.NetIPAddrToByteSlice(id.DstUnderlay),
+	}, nil
+}
+
+func (c *client) CreateSecurityAssociation(ctx context.Context, sa *api.SecurityAssociation, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	if sa == nil {
+		return &api.SecurityAssociation{}, fmt.Errorf("error: input security association cannot be nil")
+	}
+	id, err := protoSecurityAssociationId(&sa.SecurityAssociationMeta)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	algorithm, err := protoIpsecAlgorithm(sa.Spec.Algorithm)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	res, err := c.DPDKironcoreClient.CreateSecurityAssociation(ctx, &dpdkproto.CreateSecurityAssociationRequest{
+		Id:           id,
+		Algorithm:    algorithm,
+		Key:          []byte(sa.Spec.Key),
+		Salt:         []byte(sa.Spec.Salt),
+		ReplayWindow: sa.Spec.ReplayWindow,
+		Esn:          sa.Spec.Esn,
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	retSa := &api.SecurityAssociation{
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: sa.SecurityAssociationMeta,
+		Spec:                    sa.Spec,
+		Status:                  api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retSa, nil
+}
+
+func (c *client) DeleteSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	protoId, err := protoSecurityAssociationId(id)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	res, err := c.DPDKironcoreClient.DeleteSecurityAssociation(ctx, &dpdkproto.DeleteSecurityAssociationRequest{
+		Id: protoId,
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	retSa := &api.SecurityAssociation{
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: *id,
+		Status:                  api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retSa, nil
+}
+
+// Replace a live egress association with one built to the given parameters. 'id' names it as it
+// stands, current wire SPI and all; everything in 'sa' is what it becomes, with nothing carried
+// over from what is being replaced.
+func (c *client) UpdateSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, sa *api.SecurityAssociationUpdate, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	if sa == nil {
+		return &api.SecurityAssociation{}, fmt.Errorf("error: input security association cannot be nil")
+	}
+	protoId, err := protoSecurityAssociationId(id)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	algorithm, err := protoIpsecAlgorithm(sa.Spec.Algorithm)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	res, err := c.DPDKironcoreClient.UpdateSecurityAssociation(ctx, &dpdkproto.UpdateSecurityAssociationRequest{
+		Id:           protoId,
+		NewSpi:       sa.NewSpi,
+		Algorithm:    algorithm,
+		Key:          []byte(sa.Spec.Key),
+		Salt:         []byte(sa.Spec.Salt),
+		ReplayWindow: sa.Spec.ReplayWindow,
+		Esn:          sa.Spec.Esn,
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	// what comes back is the association as it now is, which is the old name with the new SPI
+	newMeta := *id
+	newMeta.Spi = sa.NewSpi
+	retSa := &api.SecurityAssociation{
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: newMeta,
+		Spec:                    sa.Spec,
+		Status:                  api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retSa, nil
+}
+
+func (c *client) GetSecurityAssociation(ctx context.Context, id *api.SecurityAssociationMeta, ignoredErrors ...[]uint32) (*api.SecurityAssociation, error) {
+	protoId, err := protoSecurityAssociationId(id)
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	res, err := c.DPDKironcoreClient.GetSecurityAssociation(ctx, &dpdkproto.GetSecurityAssociationRequest{
+		Id: protoId,
+	})
+	if err != nil {
+		return &api.SecurityAssociation{}, err
+	}
+	retSa := &api.SecurityAssociation{
+		TypeMeta:                api.TypeMeta{Kind: api.SecurityAssociationKind},
+		SecurityAssociationMeta: *id,
+		Status:                  api.ProtoStatusToStatus(res.Status),
+	}
+	if res.GetStatus().GetCode() != 0 {
+		return retSa, errors.GetError(res.Status, ignoredErrors)
+	}
+
+	// what comes back is what is actually matched, i.e. masked to the supported prefix length
+	src, err := netip.ParseAddr(string(res.GetId().GetSrcUnderlay()))
+	if err != nil {
+		return retSa, fmt.Errorf("error parsing src_underlay: %w", err)
+	}
+	dst, err := netip.ParseAddr(string(res.GetId().GetDstUnderlay()))
+	if err != nil {
+		return retSa, fmt.Errorf("error parsing dst_underlay: %w", err)
+	}
+	retSa.SecurityAssociationMeta = api.SecurityAssociationMeta{
+		Vni:         res.GetId().GetVni(),
+		Spi:         res.GetId().GetSpi(),
+		Direction:   strings.ToLower(res.GetId().GetDirection().String()),
+		SrcUnderlay: &src,
+		DstUnderlay: &dst,
+	}
+	retSa.Spec = api.SecurityAssociationSpec{
+		Algorithm:    strings.ToLower(res.GetAlgorithm().String()),
+		Key:          string(res.GetKey()),
+		Salt:         string(res.GetSalt()),
+		ReplayWindow: res.GetReplayWindow(),
+		Esn:          res.GetEsn(),
+	}
+	return retSa, nil
 }
 
 func (c *client) GetNat(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.Nat, error) {
@@ -1294,4 +1487,57 @@ func (c *client) CaptureStatus(ctx context.Context, ignoredErrors ...[]uint32) (
 	}
 
 	return capture, nil
+}
+
+// encryptionResult names the interface the call was about, so that a failure is reportable
+// without the caller having to remember what it asked for.
+func encryptionResult(interfaceID string, encrypt bool, status *dpdkproto.Status) *api.InterfaceEncryption {
+	return &api.InterfaceEncryption{
+		TypeMeta:                api.TypeMeta{Kind: api.InterfaceEncryptionKind},
+		InterfaceEncryptionMeta: api.InterfaceEncryptionMeta{InterfaceID: interfaceID},
+		Spec:                    api.InterfaceEncryptionSpec{Encrypt: encrypt},
+		Status:                  api.ProtoStatusToStatus(status),
+	}
+}
+
+func (c *client) EnableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error) {
+	res, err := c.DPDKironcoreClient.EnableInterfaceEncryption(ctx, &dpdkproto.EnableInterfaceEncryptionRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.InterfaceEncryption{}, err
+	}
+	retEncryption := encryptionResult(interfaceID, true, res.Status)
+	if res.GetStatus().GetCode() != 0 {
+		return retEncryption, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retEncryption, nil
+}
+
+func (c *client) DisableInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error) {
+	res, err := c.DPDKironcoreClient.DisableInterfaceEncryption(ctx, &dpdkproto.DisableInterfaceEncryptionRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.InterfaceEncryption{}, err
+	}
+	retEncryption := encryptionResult(interfaceID, false, res.Status)
+	if res.GetStatus().GetCode() != 0 {
+		return retEncryption, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retEncryption, nil
+}
+
+func (c *client) GetInterfaceEncryption(ctx context.Context, interfaceID string, ignoredErrors ...[]uint32) (*api.InterfaceEncryption, error) {
+	res, err := c.DPDKironcoreClient.GetInterfaceEncryption(ctx, &dpdkproto.GetInterfaceEncryptionRequest{
+		InterfaceId: []byte(interfaceID),
+	})
+	if err != nil {
+		return &api.InterfaceEncryption{}, err
+	}
+	retEncryption := encryptionResult(interfaceID, res.GetEncrypt(), res.Status)
+	if res.GetStatus().GetCode() != 0 {
+		return retEncryption, errors.GetError(res.Status, ignoredErrors)
+	}
+	return retEncryption, nil
 }

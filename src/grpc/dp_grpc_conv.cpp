@@ -221,6 +221,7 @@ void DpToGrpcInterface(const struct dpgrpc_iface *dp_iface, Interface *grpc_ifac
 	metering_params->set_total_rate(dp_iface->total_flow_rate_cap);
 	metering_params->set_public_rate(dp_iface->public_flow_rate_cap);
 	grpc_iface->set_allocated_meteringparams(metering_params);
+	grpc_iface->set_encrypt(dp_iface->encrypt);
 }
 
 void DpToGrpcLoadBalancer(const struct dpgrpc_lb *dp_lb, Loadbalancer *grpc_lb)
@@ -323,6 +324,90 @@ void DpToGrpcFwrule(const struct dp_fwall_rule *dp_rule, FirewallRule *grpc_rule
 		break;
 	}
 	grpc_rule->set_allocated_protocol_filter(filter);
+}
+
+bool GrpcToDpIpsecDir(const TrafficDirection& grpc_dir, enum dp_ipsec_dir *dp_dir)
+{
+	switch (grpc_dir) {
+	case TrafficDirection::INGRESS:
+		*dp_dir = DP_IPSEC_DIR_INGRESS;
+		return true;
+	case TrafficDirection::EGRESS:
+		*dp_dir = DP_IPSEC_DIR_EGRESS;
+		return true;
+	default:
+		return false;
+	}
+}
+
+TrafficDirection IpsecDirToGrpc(enum dp_ipsec_dir dp_dir)
+{
+	return dp_dir == DP_IPSEC_DIR_EGRESS ? TrafficDirection::EGRESS : TrafficDirection::INGRESS;
+}
+
+bool GrpcToDpIpsecAlgo(const IpsecAlgorithm& grpc_algo, enum dp_ipsec_algo *dp_algo)
+{
+	switch (grpc_algo) {
+	case IpsecAlgorithm::AES_128_GCM:
+		*dp_algo = DP_IPSEC_ALGO_AES_128_GCM;
+		return true;
+	case IpsecAlgorithm::AES_256_GCM:
+		*dp_algo = DP_IPSEC_ALGO_AES_256_GCM;
+		return true;
+	default:
+		return false;
+	}
+}
+
+IpsecAlgorithm IpsecAlgoToGrpc(enum dp_ipsec_algo dp_algo)
+{
+	switch (dp_algo) {
+	case DP_IPSEC_ALGO_AES_256_GCM:
+		return IpsecAlgorithm::AES_256_GCM;
+	default:
+		// dp_ipsec_create_sa() refuses anything this does not know, so a stored association
+		// can only ever be one of the two
+		return IpsecAlgorithm::AES_128_GCM;
+	}
+}
+
+static int HexDigit(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+bool HexToBytes(const std::string& str, uint8_t *dst, size_t len)
+{
+	if (str.length() != len * 2)
+		return false;
+
+	for (size_t i = 0; i < len; ++i) {
+		int hi = HexDigit(str[i * 2]);
+		int lo = HexDigit(str[i * 2 + 1]);
+
+		if (hi < 0 || lo < 0)
+			return false;
+		dst[i] = (uint8_t)((hi << 4) | lo);
+	}
+	return true;
+}
+
+std::string BytesToHex(const uint8_t *src, size_t len)
+{
+	static const char digits[] = "0123456789abcdef";
+	std::string out(len * 2, '\0');
+
+	for (size_t i = 0; i < len; ++i) {
+		out[i * 2] = digits[src[i] >> 4];
+		out[i * 2 + 1] = digits[src[i] & 0x0f];
+	}
+	return out;
 }
 
 }  // namespace GrpcConversion

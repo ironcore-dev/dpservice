@@ -57,6 +57,19 @@ int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, c
 
 int dp_list_vnf_alias_prefixes(uint16_t port_id, enum dp_vnf_type type, struct dp_grpc_responder *responder);
 
+// forward declarations, because 'struct dp_flow' needs the definitions above
+struct rte_mbuf;
+struct dp_port;
+
+// Resolve the endpoint that an incoming tunnel packet's underlay destination stands for, and
+// record it in the packet's flow data. Both decap nodes need this: ipsec_decap resolves it before
+// decrypting, so that it can hold the VNI against the association that matched, and ipip_decap
+// needs the result to hand the packet on. Whichever gets there first pays for the lookup, the
+// other reads what it left behind.
+// Returns the destination port, or NULL when the address stands for no endpoint or its port is
+// gone - which is a drop in either node.
+struct dp_port *dp_vnf_resolve_tunnel_dst(struct rte_mbuf *m);
+
 
 #ifdef __cplusplus
 }
