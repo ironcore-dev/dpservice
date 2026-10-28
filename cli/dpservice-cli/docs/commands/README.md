@@ -90,6 +90,21 @@ get fwrule --rule-id=<string> --interface-id=<string>
 list firewallrules --interface-id=<string> --sort-by=<string>
 ```
 
+## Create/delete/get/update IPsec Security Associations (dpservice started with --enable-ipsec):
+```
+create securityassociation --vni=<uint32> --spi=<uint32> --direction=<string> --src-underlay=<netip.Addr> --dst-underlay=<netip.Addr> --key=<string> --salt=<string> --algorithm=<string> --replay-window=<uint32> --esn
+delete securityassociation --vni=<uint32> --spi=<uint32> --direction=<string> --src-underlay=<netip.Addr> --dst-underlay=<netip.Addr>
+get securityassociation --vni=<uint32> --spi=<uint32> --direction=<string> --src-underlay=<netip.Addr> --dst-underlay=<netip.Addr>
+update securityassociation --vni=<uint32> --spi=<uint32> --direction=<string> --src-underlay=<netip.Addr> --dst-underlay=<netip.Addr> --new-spi=<uint32> --key=<string> --salt=<string> --algorithm=<string> --esn
+```
+
+## Enable/disable/get IPsec encryption of an interface (also settable with create interface --encrypt):
+```
+encryption enable --interface-id=<string>
+encryption disable --interface-id=<string>
+encryption get --interface-id=<string>
+```
+
 ## Get/reset vni:
 ```
 get vni --vni=<uint32> --vni-type=<uint8>
