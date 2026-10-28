@@ -493,8 +493,10 @@ has to be passed to both ends of a tunnel or neither.
   anywhere in the code.
 - **Software crypto only.** The `crypto_openssl` PMD is created by dp-service itself when the mode
   is enabled; hardware crypto devices are not used. The PMD requires DPDK to have been built with
-  libcrypto, which is why the builder stage installs `libssl-dev`; the runtime library it then
-  needs is already in the `debian:13-slim` base both container images start from.
+  libcrypto, which is why the builder stage installs `libssl-dev`. `dpservice-bin` then links
+  `libssl` and `libcrypto` directly, so they are needed at runtime even without `--enable-ipsec`,
+  and both runtime images install `libssl3t64` rather than relying on the base image happening to
+  carry it.
 
 
 ## Design decisions
@@ -655,11 +657,11 @@ would read as a guarantee dpservice is not making.
 ### Why encryption is per interface
 
 [Encryption is a property of the interface](#encryption-is-a-property-of-the-interface) describes
-the invariant. `--enable-ipsec` stays, as a capability gate, rather than being removed: an
-unconditional `dp_ipsec_init()` would make the `crypto_openssl` PMD, and the libcrypto it needs at
-runtime, a requirement of every deployment, and one without it would fail the vdev hotplug and not
-start. The gate also keeps the startup conflict with hardware offloading where it is, instead of
-turning it into a per-`CreateInterface` rejection.
+the invariant. `--enable-ipsec` stays, as a capability gate, rather than being removed. Without
+it dpservice creates no crypto device, no session or operation pools and no Security Association
+Database, so a deployment that does not use IPsec carries none of it. The gate also keeps the
+startup conflict with hardware offloading where it is, instead of turning it into a
+per-`CreateInterface` rejection.
 
 The checks sit where they do for reasons that are easy to undo by accident:
 

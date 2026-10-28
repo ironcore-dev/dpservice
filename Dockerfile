@@ -171,6 +171,7 @@ udev \
 gawk \
 jq \
 bash-completion \
+libssl3t64 \
 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
