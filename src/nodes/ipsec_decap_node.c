@@ -144,7 +144,8 @@ static uint16_t ipsec_decap_node_process(struct rte_graph *graph,
 		// tenant's endpoint is this comparison and nothing else. Both halves are known before a
 		// single crypto cycle is spent, so it is made here. Silent for the same reason the miss
 		// above is: reaching this point costs no key, only a guessed SPI and a spoofed source
-		// prefix, so anything logged here would be forgeable at line rate. See docs/adr/0005.
+		// prefix, so anything logged here would be forgeable at line rate. See "Ingress
+		// associations are bound to their VNI" in docs/concepts/ipsec.md.
 		if (unlikely(!dp_vnf_resolve_tunnel_dst(m)
 					 || dp_get_flow_ptr(m)->tun_info.dst_vni != sas[i]->vni))
 			continue;

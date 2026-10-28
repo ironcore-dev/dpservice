@@ -69,7 +69,8 @@ def test_ipsec_bad_icv_is_dropped(prepare_ipv4, ipsec_peer):
 # prefix in that half. One valid ingress association therefore matches a frame addressed at any
 # endpoint on this host, whichever tenant it belongs to. What keeps the peer inside the VNI it was
 # given a key for is ipsec_decap holding the endpoint's VNI against the association's, and nothing
-# else - the ICV cannot, because the peer really does hold the key. See docs/adr/0005.
+# else - the ICV cannot, because the peer really does hold the key. See "Ingress associations
+# are bound to their VNI" in docs/concepts/ipsec.md.
 #
 # VM3 is on vni2; the association this frame is encrypted under is vni1's. Only the outer
 # destination differs between the two injections, so the second one failing to arrive cannot be
@@ -122,7 +123,7 @@ def test_ipsec_replay_is_dropped(prepare_ipv4, ipsec_peer):
 
 # The mirror image, on an association created without the field at all: dpservice defaults the
 # window to zero and zero means no replay checking whatsoever, so the frame that was dropped above
-# is delivered twice here. See docs/adr/0002-anti-replay-disabled-by-default.md.
+# is delivered twice here. See "Anti-replay is off by default" in docs/concepts/ipsec.md.
 #
 # The association is created here rather than in dp_service.py, which describes underlay topology;
 # an association with anti-replay switched off exists for this test and nothing else.

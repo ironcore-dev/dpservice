@@ -6378,7 +6378,8 @@ type CreateSecurityAssociationRequest struct {
 	// Extended sequence numbers (RFC 4304): the association counts to 2^64 rather than 2^32, with
 	// only the lower half carried in the packet and the upper half authenticated along with it.
 	// Both ends have to be created with the same value - it changes what the ICV covers, so a
-	// mismatch fails every frame rather than degrading. Omitted means off, see ADR 0003.
+	// mismatch fails every frame rather than degrading. Omitted means off, see "Extended sequence
+	// numbers are opt-in" in docs/concepts/ipsec.md.
 	Esn bool `protobuf:"varint,6,opt,name=esn,proto3" json:"esn,omitempty"`
 }
 
@@ -6605,7 +6606,7 @@ func (x *DeleteSecurityAssociationResponse) GetStatus() *Status {
 // Egress only. An ingress association is filed under the SPI its frames carry, so it cannot be
 // renumbered in place, and rotating its key in place would drop the frames still in flight under
 // the old one - add a second ingress association instead and delete the old one once the peer has
-// switched. See ADR 0006.
+// switched. See "Egress associations are rekeyed by replacement" in docs/concepts/ipsec.md.
 type UpdateSecurityAssociationRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

@@ -38,7 +38,7 @@ Inside dp-service it is not tunnel mode, though. The framing is done by `librte_
 comes from `ipip_decap` stripping that header afterwards. Tunnel mode would build the outer header
 itself, from a fixed per-association template, which cannot express a source that varies per VF
 and a full 128-bit destination the peer resolves to a port. See
-[the ADR](../adr/0001-esp-framing-via-librte-ipsec-transport-mode.md).
+[ESP framing uses transport mode](#esp-framing-uses-transport-mode).
 
 On the way in, `cls` sends ESP packets to `ipsec_decap`, which decrypts and strips ESP, leaving
 precisely what `ipip_decap` would otherwise have received. Neither `ipip_encap` nor `ipip_decap`
@@ -65,7 +65,7 @@ never match a packet.
 `vni` is the tenant network whose traffic the association protects, and `spi` is what goes in the
 ESP header. The two are independent: an egress association is *found* under its VNI and *writes*
 its SPI, so the number on the wire is whatever the two ends agreed on. See
-[ADR 0004](../adr/0004-the-lookup-spi-is-not-the-wire-spi.md).
+[the lookup SPI is not the wire SPI](#the-lookup-spi-is-not-the-wire-spi).
 
 The RPCs behind this, and what they reject, are in [the gRPC interface](#the-grpc-interface).
 
@@ -111,7 +111,7 @@ decrypted and logs nothing: reaching it costs no key at all, only a guessed SPI 
 source prefix, so anything written there would be forgeable at line rate. This is the one place
 dp-service makes a policy decision on unauthenticated data, and it is safe only because the
 outcome is always a drop - a forged frame cannot cause a legitimate one to be discarded. See
-[ADR 0005](../adr/0005-ingress-associations-are-bound-to-their-vni.md).
+[ingress associations are bound to their VNI](#ingress-associations-are-bound-to-their-vni).
 
 
 ### Encryption is a property of the interface
@@ -139,7 +139,8 @@ endpoint *pair* and rolling it out is a coordinated change rather than an increm
 
 Nothing checks that a VNI is uniform. Associations are per VNI and interfaces are not, so a VNI
 may hold interfaces of both kinds; that is what makes a permanent exemption possible, and the
-coherence of the result is the control plane's to get right.
+coherence of the result is the control plane's to get right. Why the checks sit where they do is
+in [why encryption is per interface](#why-encryption-is-per-interface).
 
 ### Why the policy database is one selector wide
 
@@ -201,7 +202,8 @@ decrypted; reordering on the underlay is tolerated up to that depth. The rejecti
 **The window is off unless an association asks for one.** `replay_window` defaults to zero, and
 zero disables replay checking altogether rather than narrowing it to a single packet - a
 duplicated frame is decrypted and delivered. This is a deliberate departure from RFC 4303
-section 3.4.3, where anti-replay is the receiver's default; see ADR 0002 for why. An association
+section 3.4.3, where anti-replay is the receiver's default; see
+[anti-replay is off by default](#anti-replay-is-off-by-default) for why. An association
 that wants the protection has to say so, and 64 is the value RFC 4303 recommends as a minimum.
 
 An egress association has nothing to check, so any non-zero `replay_window` is refused there
@@ -216,7 +218,8 @@ hour, and it may not wrap, since a repeated sequence number is a repeated nonce.
 `esn` is off unless asked for, and unlike the window it is **not** a local decision: it changes
 what the ICV covers, so two ends that disagree fail every frame rather than merely counting
 differently. Both associations of a tunnel have to be created with the same value, and dpservice
-cannot check that - it only ever sees its own end. See ADR 0003.
+cannot check that - it only ever sees its own end. See
+[extended sequence numbers are opt-in](#extended-sequence-numbers-are-opt-in).
 
 
 ## The gRPC interface
@@ -352,7 +355,8 @@ It is **egress only**; an ingress `Update` is refused with `SA_DIRECTION`. An in
 does not need one: it is found under the SPI its frames carry, so a second one is simply added
 beside the live one and the old one deleted once the peer has switched. Rotating an inbound key in
 place would be worse than that, not better, since it would drop whatever is still in flight under
-the old SPI. See [ADR 0006](../adr/0006-egress-associations-are-rekeyed-by-replacement.md).
+the old SPI. See
+[egress associations are rekeyed by replacement](#egress-associations-are-rekeyed-by-replacement).
 
 Rekeying a whole tunnel is therefore three steps, in this order, and the order is the control
 plane's to get right - dpservice cannot see whether the far end is ready:
@@ -446,13 +450,15 @@ has to be passed to both ends of a tunnel or neither.
   [the gRPC interface](#the-grpc-interface) for what does.
 - **Anti-replay is off by default.** `replay_window` is configurable per association, but an
   association created without it accepts replayed frames. A control plane that wants the
-  protection must ask for it on every ingress association it creates. See ADR 0002.
+  protection must ask for it on every ingress association it creates. See
+  [anti-replay is off by default](#anti-replay-is-off-by-default).
 - **Extended sequence numbers are off by default.** `esn` is configurable per association. Without
   it the association counts in 32 bits, and the sender must be torn down and rebuilt with fresh
   keys before 2^32 packets - reusing a sequence number reuses the AES-GCM nonce, which forfeits
   authentication for that key. With it the counter is 64 bits, of which the lower half is sent and
   the upper half authenticated. Both ends must agree: unlike the replay window this changes what
-  the ICV covers, so a mismatch fails every frame rather than degrading. See ADR 0003.
+  the ICV covers, so a mismatch fails every frame rather than degrading. See
+  [extended sequence numbers are opt-in](#extended-sequence-numbers-are-opt-in).
 - **The management API is trusted.** It has no TLS and it is assumed to be reachable only from
   the host it runs on. [`GetSecurityAssociation`](#the-grpc-interface) returns the key and salt.
 - **A peer sharing our /64 can collide with itself.** Because only the first 64 bits are matched,
@@ -488,6 +494,186 @@ has to be passed to both ends of a tunnel or neither.
   is enabled; hardware crypto devices are not used. The PMD requires DPDK to have been built with
   libcrypto, which is why the builder stage installs `libssl-dev`; the runtime library it then
   needs is already in the `debian:13-slim` base both container images start from.
+
+
+## Design decisions
+
+Each of the choices below had a plausible alternative. They are recorded with the reason it was
+not taken, so that a later change which looks like a simplification can be checked against them.
+
+### ESP framing uses transport mode
+
+The outer header is not a property of a Security Association. `ipip_encap` builds it per packet:
+its source is the sending VF's own underlay address and its destination the full 128-bit underlay
+address of the target VF, which the receiving instance's VNF lookup resolves to a port.
+`librte_ipsec`'s tunnel-mode outbound copies a fixed per-association outer header template
+(`lib/ipsec/esp_outb.c`), which cannot express that.
+
+Transport mode has no template. `outb_trs_pkt_prepare()` inserts ESP into whatever header the
+packet already carries, moves that header forward, writes the old next-protocol value into the ESP
+trailer and fixes up the length. Composed with `ipip_encap` and `ipip_decap`, transport-mode ESP
+over the tunnel header produces and consumes exactly the wire format tunnel mode would, and the ESP
+header, sequence number, explicit IV, padding, trailer, ICV placement and anti-replay window all
+come from DPDK.
+
+Two consequences are easy to read backwards:
+
+- `prm.trs.proto` names the protocol of the header **being protected**, not of what that header
+  carries. Ours is the outer IPv6 header, so the value is always `IPPROTO_IPV6`. It does not pin
+  the tunneled protocol: that is read from the header on the way out and from the ESP trailer on
+  the way in, so one association carries both IPv4 and IPv6 packets.
+- **Switching `mode` to `RTE_SECURITY_IPSEC_SA_MODE_TUNNEL` would look like a simplification and
+  would silently break the tunnel.** The outer header would come from the per-association
+  template, and the per-VF destination the peer's VNF lookup depends on would be lost.
+
+Both graph nodes set `mb->l2_len` and `mb->l3_len` to the outer header's sizes, which on egress
+overwrites what `ipip_encap` left there for inner checksum offload. That offload is meaningless
+under IPsec anyway - a NIC cannot checksum ciphertext - which is why `dp_nat.c` computes those
+checksums in software when the mode is on.
+
+### Anti-replay is off by default
+
+RFC 4303 section 3.4.3 makes anti-replay the receiver's default, and 64 is the window it
+recommends as a minimum. On the merits 64 would be the right default for `replay_window`; it was
+rejected because of what it costs in the API.
+
+A proto3 scalar has no presence. With a default of 64, `replay_window = 0` would carry two intents
+that arrive at the server identically - "I omitted the field" and "I want replay checking off".
+Separating them would take an `optional uint32` in a protocol file that uses field presence nowhere
+else, a presence flag travelling beside the value through `struct dpgrpc_ipsec_sa` and
+`struct dp_ipsec_sa`, and a CLI deciding presence from `fs.Changed("replay-window")` rather than
+from the value it parsed. With a default of 0, unset and disabled are the same state because they
+mean the same thing, and the field is a plain `uint32` everywhere.
+
+Zero disables the check totally rather than narrowing it to one packet: in `librte_ipsec` both
+`esn_inb_check_sqn()` and `esp_inb_rsn_update()` return early when `win_sz == 0`. The cap of 4096
+exists because the field would otherwise be an unbounded `uint32` reaching an allocator;
+`rte_ipsec_sa_size()` itself only objects above two million, where one association's bitmap costs
+about a quarter of a megabyte.
+
+The cost is that a control plane that wants anti-replay has to ask for it on every ingress
+association, which is why the test suite asks for 64 explicitly in `test/local/dp_service.py`.
+Should the default ever be reconsidered, the work is the `optional uint32` migration above, not a
+one-line change.
+
+### Extended sequence numbers are opt-in
+
+`esn` defaults to off for the same presence reason as the replay window - a proto3 `bool` cannot
+tell `false` from omitted - and for a second, stronger one. Anti-replay is a local decision: a
+receiver that checks and a sender that does not still interoperate. ESN is not. It changes what
+the ICV covers, so two ends that disagree fail *every* frame, with an authentication error that
+names nothing about the cause. Defaulting it on would silently break interoperability with any peer
+configured without it, including a Linux XFRM peer configured without `flag esn`. A field whose
+wrong value produces a total, undiagnosable outage should be one the operator typed.
+
+Nothing else about an association depends on it: the window and the cipher stay independent, which
+`xtratest_ipsec_esn.py` asserts by running one combination of all three.
+
+### The lookup SPI is not the wire SPI
+
+What an association is keyed on and what its ESP header carries are two fields. `ipsec_encap`
+cannot read an SPI off a packet that is not ESP yet, so if one value did both jobs, an egress
+association would have to be created with its SPI equal to its VNI. That costs two things: every
+ESP packet leaving the host would advertise the tenant's VNI in a header field anyone on the
+underlay can read without a key, and the wire SPI could never change without moving the entry, so
+rekeying could only be a delete followed by a create.
+
+So `spi` is the wire SPI, `vni` records the tenant, and the database key - the lookup SPI - is
+derived from the two by `dp_ipsec_get_lookup_spi()`: the VNI for an egress association, the wire
+SPI for an ingress one.
+
+The API hides that rule by naming every association by its full identity, as
+[described above](#the-identity-of-an-association). Two alternatives were rejected. Shaping the
+requests by direction - a wire SPI for ingress, a VNI for egress - is honest, but pushes the
+internal keying rule into the API and makes the caller learn it. Keying on the lookup SPI alone and
+ignoring the other field is simpler still, but then a caller working from a stale wire SPI silently
+deletes the association that is currently in place, which is the one outcome worth spending a
+comparison to prevent.
+
+Egress uniqueness is therefore `(VNI, src, dst)`: decoupling frees the wire SPI to change, it does
+not create a second outbound slot. And because the wire SPI is unconstrained, an ingress and an
+egress association cannot be assumed to share a number; the test suite deliberately gives the two
+directions different ones.
+
+### Ingress associations are bound to their VNI
+
+[The inbound VNI check](#the-inbound-vni-check) describes what is enforced. The endpoint lookup it
+needs is shared: `ipsec_decap` calls `dp_vnf_resolve_tunnel_dst()` on the outer destination `cls`
+has already extracted and marks the packet, so `ipip_decap` does not repeat it, while cleartext
+traffic is resolved in `ipip_decap` as before.
+
+Matching the local underlay address in full, 128 bits rather than 64, was the alternative. It
+closes the same hole more strongly - the database itself refuses the frame, with no field anyone can
+provision wrongly - but it changes what an association is. Cardinality would become one per local
+interface instead of one per VNI, so every interface added to a host would need its own ingress
+association created and deleted alongside it, and the two directions of a tunnel would stop being
+mirror images, since egress stays keyed on the VNI.
+
+Placing the check after the ICV, where RFC 4301 section 5.2 puts the inbound policy check, was
+considered: there only a key holder can reach it, so a mismatch would mean one specific thing - a
+legitimate peer provisioned with the wrong VNI - and would be worth logging. It was not chosen. The
+drop is the point, the check reads nothing the association lookup did not already read
+unauthenticated, and refusing before the crypto is spent is strictly cheaper. The price is a policy
+decision made on unauthenticated data, which deviates from RFC 4301 and has to stay deliberate.
+
+### Egress associations are rekeyed by replacement
+
+[Replacing one](#replacing-one) describes the operation. The alternative was make-before-break on
+egress too: two outbound associations for one VNI and peer, a selector in `ipsec_encap`, and
+something to retire the loser. It solves a problem that does not exist. Make-before-break is for
+the case where the far end might not be ready; here the far end is the receiver, and the receiver
+can already hold both keys. A selector on the sending side would add a second live association, a
+state machine to retire it, and a decision with exactly one right answer.
+
+The replacement is filed under the key the old association already occupies, so
+`rte_ipsec_sad_add()` overwrites the entry - the very behaviour `Create` guards against with
+`SA_EXISTS` is what a replacement wants. It also takes over the old association's slot in
+`dp_ipsec_sas[]` rather than asking for a free one, so a host at the association limit can still
+rekey every one of them; `Update` never fails on capacity. It is not an upsert: naming an
+association that is not there is `SA_NOT_FOUND`.
+
+An ingress `Update` is refused with `SA_DIRECTION`. `SA_NOT_FOUND` would have been cheaper and
+untrue - the association is right there. Changing an ingress SPI would *move* the entry rather than
+replace it, with its own collision case against whatever sits under the new SPI; and an `Update`
+that cannot change the SPI is a key rotation in place, which destroys the old key while frames under
+it are still in flight. Replacement is meaningful exactly where the name is stable.
+
+The request names the association as it stands, current wire SPI and all, with `new_spi` beside the
+rest. Shaping it the other way - `id` being what the association becomes, resolved by VNI alone -
+would make the message identical to `Create`'s, but give up the comparison that stops a caller
+working from stale state. A rekey is precisely when two controllers can disagree about which SPI is
+current, so it is the last place to stop checking.
+
+The replacement counts from 1. `struct rte_ipsec_sa` is opaque in the installed DPDK headers, so
+the old sequence number cannot be read, and shadowing it with a counter of dpservice's own would
+drift the moment a packet failed crypto after being prepared. dpservice could refuse key material
+the old association used, since this is the only rekey where the previous key is still in the
+database when the new one arrives; it does not, because a rule that fires here and nowhere else
+would read as a guarantee dpservice is not making.
+
+### Why encryption is per interface
+
+[Encryption is a property of the interface](#encryption-is-a-property-of-the-interface) describes
+the invariant. `--enable-ipsec` stays, as a capability gate, rather than being removed: an
+unconditional `dp_ipsec_init()` would make the `crypto_openssl` PMD, and the libcrypto it needs at
+runtime, a requirement of every deployment, and one without it would fail the vdev hotplug and not
+start. The gate also keeps the startup conflict with hardware offloading where it is, instead of
+turning it into a per-`CreateInterface` rejection.
+
+The checks sit where they do for reasons that are easy to undo by accident:
+
+- Splitting the ingress comparison across the two decap nodes would mean reintroducing, as a new
+  per-packet mark bit, the ESP-or-cleartext distinction `ipsec_decap_restore_flow()` deliberately
+  erases.
+- Branching on egress inside `ipsec_encap` instead of `ipip_encap` would have kept the graph wiring
+  unchanged, but that node opens by marking every packet `crypto_failed` and dropping on a lookup
+  miss. A pass-through path would make that fail-closed default conditional.
+- Enforcing a uniform flag across a VNI would need a scan per call, would let the first interface
+  in a VNI silently decide policy for every later one, and would forbid the one configuration
+  per-interface granularity is genuinely good for: a permanent exemption for a workload that must
+  stay in the clear.
+- Refusing `--enable-ipsec` in a build with virtual services, as the offload check does, was
+  considered and not taken.
 
 
 ## Testing
@@ -528,7 +714,10 @@ it over.
 
 `xtratest_ipsec_dataplane.py` covers the failing path, which the round trip cannot: it runs the
 same exchange twice, differing only in which key the peer authenticates its answer with, and
-requires the second one not to arrive.
+requires the second one not to arrive. Its test of [the inbound VNI check](#the-inbound-vni-check)
+relies on the fixture making every interface encrypting: a frame encrypted under one VNI's
+association and aimed at a cleartext interface in another would be dropped by the `cls` comparison
+first, and the assertion would still pass without the VNI check being covered.
 
 `xtratest_ipsec_rekey.py` rotates both directions of the session's tunnel, in the order
 [the replace path](#replacing-one) prescribes: the peer registers the new egress key, the egress

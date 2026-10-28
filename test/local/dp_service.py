@@ -126,7 +126,8 @@ class DpService:
 		# below. VM3 is the target of the inbound VNI check in xtratest_ipsec_dataplane.py: a
 		# frame encrypted under vni1's association and aimed at it must be refused by that
 		# check. Leaving VM3 unencrypting would make cls refuse the frame earlier, for being
-		# ESP at a cleartext interface, and the test would pass without covering ADR 0005.
+		# ESP at a cleartext interface, and the test would pass without covering the inbound
+		# VNI check at all.
 		setattr(VM1, dst_ul, grpc_client.addinterface(VM1.name, VM1.pci, VM1.vni, VM1.ip, VM1.ipv6, pxe_server, ipxe_file_name, hostname=VM1.hostname,
 													  encrypt=self.ipsec))
 		setattr(VM2, dst_ul, grpc_client.addinterface(VM2.name, VM2.pci, VM2.vni, VM2.ip, VM2.ipv6, pxe_server, ipxe_file_name,

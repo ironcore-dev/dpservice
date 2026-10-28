@@ -15,7 +15,8 @@ from helpers import *
 # The rest of the suite only ever runs with every interface encrypting, so it covers the left
 # half of both sentences and none of the right. This file covers the right half, and the two
 # refusals that make the left half mean anything: ESP arriving for a cleartext interface, and
-# cleartext arriving for an encrypting one. See docs/adr/0007.
+# cleartext arriving for an encrypting one. See "Encryption is a property of the interface" in
+# docs/concepts/ipsec.md.
 #
 # Every test here puts the interfaces back the way dp_service.py created them, because the
 # fixture is shared with every other file in the suite.

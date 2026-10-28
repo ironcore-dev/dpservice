@@ -207,7 +207,8 @@ static __rte_always_inline rte_edge_t get_next_index(__rte_unused struct rte_nod
 			// and this is the only place it can be applied - the endpoint is not known
 			// before it, and after it the distinction is gone, because ipsec_decap
 			// deliberately leaves a decrypted frame looking exactly like one that arrived
-			// in the clear. See docs/adr/0007.
+			// in the clear. See "Why encryption is per interface" in
+			// docs/concepts/ipsec.md.
 			//
 			// Like the VNI check in ipsec_decap this decides on unauthenticated data, and
 			// is safe for the same reason: the outcome is always a drop, so a forged frame

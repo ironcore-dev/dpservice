@@ -92,7 +92,8 @@ static __rte_always_inline rte_edge_t get_next_index(struct rte_node *node, stru
 	// leaving in the clear and being handed to ipsec_encap is made here rather than inside
 	// that node. It keeps ipsec_encap single-purpose: everything reaching it must leave
 	// encrypted or not at all, with no cleartext path running through its fail-closed
-	// handling of a missing Security Association. See docs/adr/0007.
+	// handling of a missing Security Association. See "Why encryption is per interface" in
+	// docs/concepts/ipsec.md.
 	if (dp_get_in_port(m)->iface.encrypt)
 		return next_ipsec_index[df->nxt_hop];
 

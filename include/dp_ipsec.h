@@ -98,7 +98,8 @@ struct dp_ipsec_sa {
 	// Extended sequence numbers (RFC 4304): the association counts to 2^64 instead of 2^32, with
 	// only the lower half on the wire and the upper half authenticated along with it. Both ends
 	// have to agree, because it changes what the ICV covers - it is not negotiated here, it is
-	// whatever the control plane put in both associations. See docs/adr/0003.
+	// whatever the control plane put in both associations. See "Extended sequence numbers are
+	// opt-in" in docs/concepts/ipsec.md.
 	bool				esn;
 	void				*session;
 	// librte_ipsec's view of this very association: it owns the ESP framing, the sequence
@@ -147,8 +148,9 @@ int dp_ipsec_delete_sa(const struct dp_ipsec_sa_spec *spec);
 int dp_ipsec_get_sa(const struct dp_ipsec_sa_spec *spec, struct dp_ipsec_sa *out);
 // Replace a live association with one built to new parameters, in place: 'spec' names it as it
 // stands, 'request' is what it becomes. Egress only - an outbound association is the only one
-// found under a name that does not change, see docs/adr/0006. All or nothing: if anything the
-// replacement needs cannot be built, the association that is there keeps serving traffic.
+// found under a name that does not change, see "Egress associations are rekeyed by replacement"
+// in docs/concepts/ipsec.md. All or nothing: if anything the replacement needs cannot be built,
+// the association that is there keeps serving traffic.
 int dp_ipsec_update_sa(const struct dp_ipsec_sa_spec *spec, const struct dp_ipsec_sa *request);
 
 // Build a SAD key from a lookup SPI and the two underlay addresses, masking them to the supported

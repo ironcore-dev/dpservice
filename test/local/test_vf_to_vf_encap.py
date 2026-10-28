@@ -61,7 +61,8 @@ def udp_encap_loopback_responder(pf_tap, peer):
 		if peer:
 			# ipsec_spi_egress is deliberately neither a VNI nor the SPI of the association the
 			# answer comes back under: the association is found under the VNI of the interface
-			# this came from, and what it puts on the wire is free of both. See ADR 4.
+			# this came from, and what it puts on the wire is free of both. See "The lookup
+			# SPI is not the wire SPI" in docs/concepts/ipsec.md.
 			assert pkt[ESP].spi == ipsec_spi_egress, \
 				"Encrypted request carries an unexpected SPI"
 			assert payload not in raw(pkt), \

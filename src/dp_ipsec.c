@@ -182,7 +182,8 @@ static int dp_ipsec_create_ipsec_sa(struct dp_ipsec_sa *sa, struct rte_crypto_sy
 			// The header being protected is the outer one ipip_encap already built, which is
 			// what transport mode means here. Tunnel mode would build that header itself, from
 			// a fixed per-association template that cannot express a per-VF source and a full
-			// 128-bit destination - see docs/adr/.
+			// 128-bit destination - see "ESP framing uses transport mode" in
+			// docs/concepts/ipsec.md.
 			.mode = RTE_SECURITY_IPSEC_SA_MODE_TRANSPORT,
 			.direction = sa->dir == DP_IPSEC_DIR_EGRESS ? RTE_SECURITY_IPSEC_SA_DIR_EGRESS
 														: RTE_SECURITY_IPSEC_SA_DIR_INGRESS,
@@ -376,7 +377,8 @@ void dp_ipsec_lookup_sa(const union rte_ipsec_sad_key *keys[], struct dp_ipsec_s
 // An inbound association is named by what the packet carries, because that is all ipsec_decap has
 // to go on. An outbound one is named by the VNI whose traffic it protects - ipsec_encap cannot
 // read an SPI off a packet that is not ESP yet - which leaves its wire SPI free to be whatever
-// the two ends agreed on, and free to change without moving the entry. See docs/adr/0004.
+// the two ends agreed on, and free to change without moving the entry. See "The lookup SPI is
+// not the wire SPI" in docs/concepts/ipsec.md.
 static uint32_t dp_ipsec_get_lookup_spi(const struct dp_ipsec_sa_spec *spec)
 {
 	return spec->dir == DP_IPSEC_DIR_EGRESS ? spec->vni : spec->spi;
@@ -566,7 +568,8 @@ int dp_ipsec_update_sa(const struct dp_ipsec_sa_spec *spec, const struct dp_ipse
 	// An ingress association is filed under the SPI its frames carry, so replacing one in place
 	// could not change that SPI without moving the entry - and rotating its key in place would be
 	// worse than what the inbound path already offers, which is a second association alongside the
-	// old one for as long as both are needed. See docs/adr/0006.
+	// old one for as long as both are needed. See "Egress associations are rekeyed by
+	// replacement" in docs/concepts/ipsec.md.
 	if (spec->dir != DP_IPSEC_DIR_EGRESS)
 		return DP_GRPC_ERR_SA_DIRECTION;
 

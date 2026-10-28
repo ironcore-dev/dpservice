@@ -57,7 +57,7 @@ neigh_vni1_ul_ipv6 = "fc00:2::64:0:1"  # Hardcoded VNI, this would need to corre
 #
 # Neither is a VNI: an egress association is filed under the VNI it serves and carries its SPI on
 # the wire, and test_vf_to_vf_encap.py reads that out of the ESP header to prove the two are no
-# longer the same number. See docs/concepts/ipsec.md and docs/adr/0004.
+# longer the same number. See "The lookup SPI is not the wire SPI" in docs/concepts/ipsec.md.
 ipsec_spi_egress = 0xab12
 ipsec_spi_ingress = 0x21ba
 ipsec_key_egress = "247b0ea251c93d6fb84017e59a2cd386"

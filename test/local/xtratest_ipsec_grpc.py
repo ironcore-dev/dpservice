@@ -71,7 +71,7 @@ def test_ipsec_sa_mirrored_directions(prepare_ipv4, grpc_client):
 # All five fields name the association and all five are matched, even though only some of them
 # are what it is filed under - the VNI for an egress association, the SPI for an ingress one.
 # A caller working from a stale field has to find nothing, rather than the entry that happens to
-# share the part it got right. See docs/adr/0004.
+# share the part it got right. See "The lookup SPI is not the wire SPI" in docs/concepts/ipsec.md.
 def test_ipsec_sa_identity_is_verified(prepare_ipv4, grpc_client):
 	grpc_client.addsa(sa_vni, sa_spi, "egress", sa_src, sa_dst, sa_key, sa_salt)
 	grpc_client.addsa(sa_vni, sa_spi, "ingress", sa_dst, sa_src, sa_key, sa_salt,

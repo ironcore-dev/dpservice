@@ -16,7 +16,8 @@ from ipsec_peer import IpsecPeer, assert_esp_framing
 # entry rather than a second slot: it is *replaced*, in one request, and dpservice swaps the
 # replacement in between two packets. An ingress association is found under the SPI its frames
 # carry, so several of them coexist: it is rotated by adding the new one beside the live one and
-# deleting the old one once the peer has switched. See docs/adr/0006.
+# deleting the old one once the peer has switched. See "Egress associations are rekeyed by
+# replacement" in docs/concepts/ipsec.md.
 #
 # The order matters and is the control plane's to get right, because dpservice cannot see whether
 # the peer is ready: the receiver installs what it needs *before* the sender starts using it. That
