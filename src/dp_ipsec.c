@@ -11,7 +11,7 @@
 #include "dp_error.h"
 #include "dp_log.h"
 
-// Software crypto device driving the proof-of-concept. This is the only usable software
+// Software crypto device driving the initial implementation. This is the only usable software
 // PMD in the supported environments: the ipsec_mb family is x86-only and crypto_null is
 // disabled in the DPDK build this project uses. Hardware devices (crypto_mlx5) will need
 // this to become a configuration option.

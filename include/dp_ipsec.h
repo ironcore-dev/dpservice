@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 // Security Associations are provisioned over gRPC and looked up per packet, see
-// docs/concepts/ipsec.md for the deliberate limits of this proof-of-concept.
+// docs/concepts/ipsec.md for the deliberate limitations of this initial implementation.
 #define DP_IPSEC_MAX_KEY_LEN	32	// AES-256, the longest key any supported algorithm takes
 #define DP_IPSEC_MAX_SALT_LEN	4	// implicit part of the GCM nonce, never on the wire
 #define DP_IPSEC_IV_LEN		8	// explicit part of the GCM nonce, carried in the packet
@@ -39,7 +39,7 @@ extern "C" {
 // on insert and on lookup alike, see dp_ipsec_build_key().
 #define DP_IPSEC_ADDR_PREFIX_LEN	64
 
-// Enough for a proof-of-concept's peers times VNIs, and small enough that the session pool
+// Enough for the initial implementation's peers times VNIs, and small enough that the session pool
 // costs nothing to pre-allocate
 #define DP_IPSEC_MAX_SA		64
 

@@ -9,9 +9,10 @@ the packet belongs to has to be **encrypting**, which is a per-interface flag th
 default. The first is a capability - it says an interface *may* encrypt, never that one does -
 and the second is the policy. See [encryption is a property of the interface](#encryption-is-a-property-of-the-interface).
 
-This is a **proof of concept**. It proves the dataplane can carry ESP and that its Security
-Associations can be managed at runtime; it is not yet a usable IPsec deployment. The limits below
-are deliberate, not oversights.
+This is the **initial implementation**. The dataplane carries ESP and its Security Associations
+are managed at runtime, but it is not yet a complete IPsec deployment. Its
+[limitations](#deliberate-limitations-of-the-initial-implementation) are deliberate, not
+oversights.
 
 
 ## Wire format
@@ -431,7 +432,7 @@ what the association held a moment ago. `--algorithm=aes-256-gcm` takes a 64-dig
 has to be passed to both ends of a tunnel or neither.
 
 
-## Deliberate limits of the PoC
+## Deliberate limitations of the initial implementation
 
 - **A security policy database one selector wide.** What gets protected is selectable, but only
   per interface: there are no traffic selectors on addresses, protocol or ports, and nothing
