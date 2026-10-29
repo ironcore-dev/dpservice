@@ -1,10 +1,10 @@
 ## dpservice-cli get
 
-Gets one of [interface virtualip loadbalancer nat firewallrule vni version init lbprefix lbtarget prefix route]
+Gets one of [interface virtualip loadbalancer nat firewallrule firewallparams vni version init lbprefix lbtarget prefix route]
 
 ### Synopsis
 
-Gets one of [interface virtualip loadbalancer nat firewallrule vni version init lbprefix lbtarget prefix route]
+Gets one of [interface virtualip loadbalancer nat firewallrule firewallparams vni version init lbprefix lbtarget prefix route]
 
 ```
 dpservice-cli get [command] [flags]
@@ -29,6 +29,7 @@ dpservice-cli get [command] [flags]
 ### SEE ALSO
 
 * [dpservice-cli](dpservice-cli.md)	 -
+* [dpservice-cli get firewallparams](dpservice-cli_get_firewallparams.md)	 - Get firewall parameters of an interface
 * [dpservice-cli get firewallrule](dpservice-cli_get_firewallrule.md)	 - Get firewall rule
 * [dpservice-cli get init](dpservice-cli_get_init.md)	 - Indicates if the DPDK app has been initialized already
 * [dpservice-cli get interface](dpservice-cli_get_interface.md)	 - Get interface
