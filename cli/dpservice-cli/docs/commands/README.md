@@ -90,6 +90,12 @@ get fwrule --rule-id=<string> --interface-id=<string>
 list firewallrules --interface-id=<string> --sort-by=<string>
 ```
 
+## Get/set firewall parameters of the interface:
+```
+get fwparams --interface-id=<string>
+set fwparams --interface-id=<string> --firewall-state=<string>
+```
+
 ## Get/reset vni:
 ```
 get vni --vni=<uint32> --vni-type=<uint8>
