@@ -399,7 +399,8 @@ function create_sync_bridge() {
 	for sync_tap in $sync_tap_a $sync_tap_b; do
 		ip link show $sync_tap || ip tuntap add dev $sync_tap mode tap multi_queue
 		# Large queue in case the new dpservice is slow in processing
-		ip link set $sync_tap txqueuelen 100000
+		# due to CVE-2026-98021 Fix, this is limited to S16_MAX
+		ip link set $sync_tap txqueuelen 32767
 		ip link set $sync_tap master $sync_bridge
 	done
 
