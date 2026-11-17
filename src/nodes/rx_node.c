@@ -178,8 +178,10 @@ static uint16_t rx_node_process(struct rte_graph *graph,
 			// if all packets were old, continue flushing
 			if (old == n_pkts)
 				return 0;
-			objs += old;
 			n_pkts -= old;
+			// rte_node_next_stream_move() below can only take packets from the start of the node's buffer
+			// it cannot use any other offset, so unfortunately move is required
+			memmove(objs, objs + old, n_pkts * sizeof(*objs));
 		}
 		ctx->flush_old_packets = false;
 	}
