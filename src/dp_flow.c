@@ -324,7 +324,7 @@ int dp_destroy_rte_flow_agectx(struct flow_age_ctx *agectx)
 	return DP_OK;
 }
 
-void dp_process_aged_flows(uint16_t port_id)
+void dp_process_aged_flows_offloaded(uint16_t port_id)
 {
 	int total, fetched;
 	struct flow_age_ctx *agectx;
@@ -396,18 +396,72 @@ static __rte_always_inline int dp_rte_flow_query_and_remove(struct flow_value *f
 
 }
 
-void dp_process_aged_flows_non_offload(void)
+// A full sweep of a big table would stall the worker for milliseconds, so it is done in steps, one per graph walk
+#ifdef ENABLE_PYTEST
+// tiny steps make the tests run sweeps spanning many graph walks
+#	define DP_FLOW_AGING_STEP_ENTRIES 2
+#else
+#	define DP_FLOW_AGING_STEP_ENTRIES 256
+#endif
+
+bool _dp_flow_aging_in_progress = false;
+static uint32_t aging_iter;
+static uint64_t aging_timestamp;
+
+void dp_flow_aging_start(void)
+{
+	// A sweep still running when the next one is due just continues, restarting it could starve the table's tail
+	if (_dp_flow_aging_in_progress)
+		return;
+	aging_iter = 0;
+	// one timestamp for the whole sweep, so both keys of a flow get the same verdict whatever the visiting order
+	aging_timestamp = rte_rdtsc();
+	_dp_flow_aging_in_progress = true;
+}
+
+// Removes the other key of an expired flow together with this one, so a packet between steps cannot refresh half of it.
+// If the other key cannot be found (its table key can differ from the stored one, e.g. a synced NAT64 flow),
+// the flow is marked so the sweep removes its remaining entry when it gets there, refreshed or not.
+static __rte_always_inline void dp_age_out_flow(const struct flow_key *key, struct flow_value *flow_val)
+{
+	struct flow_value *other_val;
+	bool other_deleted = false;
+
+	for (size_t i = 0; i < RTE_DIM(flow_val->flow_key); ++i) {
+		if (dp_are_flows_identical(&flow_val->flow_key[i], key))
+			continue;
+		// only delete an entry owned by this flow; both entries hold a reference, so flow_val stays valid below
+		if (DP_FAILED(rte_hash_lookup_data(flow_table, &flow_val->flow_key[i], (void **)&other_val))
+			|| other_val != flow_val)
+			continue;
+		if (DP_SUCCESS(dp_delete_flow(&flow_val->flow_key[i], flow_val)))
+			other_deleted = true;
+	}
+	if (!other_deleted)
+		flow_val->aged = true;
+	// this can free flow_val
+	dp_delete_flow(key, flow_val);  // ignore errors - see inside
+}
+
+void dp_flow_aging_step(void)
 {
 	struct flow_value *flow_val = NULL;
 	const struct flow_key *next_key;
-	uint32_t iter = 0;
-	uint64_t current_timestamp = rte_rdtsc();
 	uint64_t timer_hz = rte_get_timer_hz();
 	int	ret;
 
-	while ((ret = rte_hash_iterate(flow_table, (const void **)&next_key, (void **)&flow_val, &iter)) != -ENOENT) {
+	// NOTE: cuckoo moves by inserts between steps can make the sweep miss an entry (aged next sweep) or visit it twice.
+	// rte_hash_iterate() skips empty slots within one call, so in a near-empty table one step can scan most
+	// of the bucket array (never more than the old single full sweep did).
+	for (int i = 0; i < DP_FLOW_AGING_STEP_ENTRIES; ++i) {
+		ret = rte_hash_iterate(flow_table, (const void **)&next_key, (void **)&flow_val, &aging_iter);
+		if (ret == -ENOENT) {
+			_dp_flow_aging_in_progress = false;
+			return;
+		}
 		if (DP_FAILED(ret)) {
 			DPS_LOG_ERR("Iterating flow table failed while aging flows", DP_LOG_RET(ret));
+			_dp_flow_aging_in_progress = false;
 			return;
 		}
 		// NOTE: possible optimization in moving a runtime constant 'timer_hz *' into 'timeout_value' directly
@@ -418,8 +472,11 @@ void dp_process_aged_flows_non_offload(void)
 				DPS_LOG_ERR("Failed to query and remove rte flows", DP_LOG_RET(ret));
 		}
 
-		if (unlikely((current_timestamp - flow_val->timestamp) > timer_hz * flow_val->timeout_value))
-			dp_delete_flow(next_key, flow_val);  // ignore errors - see inside
+		// flows refreshed after the sweep started are newer than its timestamp, they must not wrap around to expired
+		if (unlikely(flow_val->aged
+					 || (flow_val->timestamp < aging_timestamp
+						 && aging_timestamp - flow_val->timestamp > timer_hz * flow_val->timeout_value)))
+			dp_age_out_flow(next_key, flow_val);
 	}
 }
 

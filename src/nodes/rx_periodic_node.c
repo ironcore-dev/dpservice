@@ -73,6 +73,9 @@ static uint16_t rx_periodic_node_process(struct rte_graph *graph,
 	// temporarily into graph_main_loop, later in a separate core?
 	handle_nongraph_queues();
 
+	if (unlikely(dp_flow_aging_in_progress()))
+		dp_flow_aging_step();
+
 	// these packets do not come from a port, instead they enter the graph from a periodic message
 	// which also implies that this will mostly return 0
 	static_assert(RTE_GRAPH_BURST_SIZE < UINT16_MAX, "Graph burst size is too large");

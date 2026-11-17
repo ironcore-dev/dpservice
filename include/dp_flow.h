@@ -106,6 +106,7 @@ struct flow_value {
 	uint32_t		timeout_value; //actual timeout in sec = dp-service timer's resolution * timeout_value
 	uint16_t		created_port_id;
 	uint8_t			flow_flags;
+	bool			aged;  // in the cache line of timestamp and timeout_value, the aging sweep reads all three
 	enum dp_fwall_action	fwall_action[DP_FLOW_DIR_CAPACITY];
 	struct {
 		enum dp_pkt_offload_state orig;
@@ -122,7 +123,6 @@ struct flow_value {
 			enum dp_flow_dir		first_syn_flow_dir;
 		} tcp;
 	} l4_state;
-	bool			aged;
 };
 
 struct flow_age_ctx {
@@ -152,8 +152,9 @@ int dp_build_flow_key(struct flow_key *key /* out */, struct rte_mbuf *m /* in *
 void dp_invert_flow_key(const struct flow_key *key /* in */, struct flow_key *inv_key /* out */);
 int dp_flow_init(int socket_id);
 void dp_flow_free(void);
-void dp_process_aged_flows(uint16_t port_id);
-void dp_process_aged_flows_non_offload(void);
+void dp_process_aged_flows_offloaded(uint16_t port_id);
+void dp_flow_aging_start(void);
+void dp_flow_aging_step(void);
 void dp_free_flow(struct dp_ref *ref);
 void dp_free_network_nat_port(const struct flow_value *cntrack);
 void dp_remove_nat_flows(uint16_t port_id, enum dp_flow_nat_type nat_type);
@@ -166,6 +167,13 @@ hash_sig_t dp_get_conntrack_flow_hash_value(const struct flow_key *key);
 
 int dp_add_rte_age_ctx(struct flow_value *cntrack, struct flow_age_ctx *ctx);
 int dp_del_rte_age_ctx(struct flow_value *cntrack, const struct flow_age_ctx *ctx);
+
+extern bool _dp_flow_aging_in_progress;
+
+static __rte_always_inline bool dp_flow_aging_in_progress(void)
+{
+	return _dp_flow_aging_in_progress;
+}
 
 
 #ifdef __cplusplus
