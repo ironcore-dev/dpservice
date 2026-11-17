@@ -114,6 +114,8 @@ static_assert((1 << (sizeof(((struct dp_flow *)0)->nxt_hop) * 8)) >= DP_MAX_PORT
 			  "struct dp_flow::nxt_hop cannot hold all possible port_ids");
 
 extern rte_atomic32_t dp_pkt_id_counter;
+// from monitoring/dp_graphtrace.h, which cannot be included here (it includes this header)
+extern bool _dp_graphtrace_enabled;
 
 static __rte_always_inline struct dp_flow *dp_get_flow_ptr(struct rte_mbuf *m)
 {
@@ -139,7 +141,13 @@ static __rte_always_inline void dp_init_pkt_mark(struct rte_mbuf *m)
 {
 	struct dp_pkt_mark *mark = dp_get_pkt_mark(m);
 
+#ifdef ENABLE_PYTEST
+	// graphtrace debug logging prints the id even without graphtrace enabled
 	mark->id = rte_atomic32_add_return(&dp_pkt_id_counter, 1);
+#else
+	// only graphtrace uses the id, spare the atomic operation otherwise
+	mark->id = _dp_graphtrace_enabled ? rte_atomic32_add_return(&dp_pkt_id_counter, 1) : 0;
+#endif
 	mark->flags.is_recirc = false;
 }
 
