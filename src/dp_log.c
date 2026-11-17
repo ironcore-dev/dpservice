@@ -7,6 +7,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <rte_cycles.h>
 #include <rte_log.h>
 
 #include "dp_error.h"
@@ -15,6 +16,8 @@
 #define TIMESTAMP_FMT "%Y-%m-%d %H:%M:%S"
 #define TIMESTAMP_NUL "0000-00-00 00:00:00.000"
 #define TIMESTAMP_MAXSIZE sizeof(TIMESTAMP_NUL)
+
+#define RATELIMIT_INTERVAL 5  /* seconds */
 
 // prevent unnecessary `if (log_json)`
 #define FORMAT_HEADER log_formatter[0]
@@ -61,6 +64,7 @@ static bool log_colors = false;
 static bool log_json = false;
 static const char *const *log_formatter = log_formatter_text;
 static const char *const *log_types = log_types_text;
+static uint64_t ratelimit_interval;  // timer cycles, set by dp_log_init()
 
 // more readable thread ids, pthread_self() is not usable
 static uint16_t thread_id_generator = 0;
@@ -116,6 +120,8 @@ int dp_log_init(void)
 		log_colors = color_mode == DP_CONF_COLOR_ALWAYS
 				 || (color_mode == DP_CONF_COLOR_AUTO && isatty(1));
 	}
+
+	ratelimit_interval = RATELIMIT_INTERVAL * rte_get_timer_hz();
 
 	return DP_OK;
 }
@@ -319,4 +325,18 @@ void _dp_log_early(FILE *f, const char *format, ...)
 	fflush(f);
 
 	funlockfile(f);
+}
+
+bool dp_log_ratelimit_pass(struct dp_log_ratelimit *limit, uint32_t *suppressed)
+{
+	uint64_t timestamp = rte_rdtsc();
+
+	if (limit->timestamp && timestamp - limit->timestamp < ratelimit_interval) {
+		limit->suppressed++;
+		return false;
+	}
+	*suppressed = limit->suppressed;
+	limit->suppressed = 0;
+	limit->timestamp = timestamp;
+	return true;
 }

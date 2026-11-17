@@ -140,6 +140,21 @@ extern "C" {
 #define DPNODE_LOG_INFO(NODE, MESSAGE, ...)    DP_STRUCTURED_LOG(INFO,    GRAPH, MESSAGE, DP_LOG_NODE(NODE), ##__VA_ARGS__)
 #define DPNODE_LOG_DEBUG(NODE, MESSAGE, ...)   DP_STRUCTURED_LOG(DEBUG,   GRAPH, MESSAGE, DP_LOG_NODE(NODE), ##__VA_ARGS__)
 
+// Limit of one log or of logs that belong together (a named static, or a field per object, e.g. per port); not thread-safe
+struct dp_log_ratelimit {
+	uint64_t	timestamp;
+	uint32_t	suppressed;
+};
+// Returns true if the log is to be written now, *suppressed then tells how many were skipped since the last one
+bool dp_log_ratelimit_pass(struct dp_log_ratelimit *limit, uint32_t *suppressed);
+#define DP_LOG_SUPPRESSED(VALUE) _DP_LOG_UINT("suppressed", VALUE)
+
+#define DPS_LOG_RATELIMITED(LIMIT, LEVEL, MESSAGE, ...) do { \
+	uint32_t _dp_log_suppressed; \
+	if (dp_log_ratelimit_pass((LIMIT), &_dp_log_suppressed)) \
+		DPS_LOG_##LEVEL(MESSAGE, ##__VA_ARGS__, DP_LOG_SUPPRESSED(_dp_log_suppressed)); \
+} while (0)
+
 void dp_log_set_thread_name(const char *name);
 
 int dp_log_init(void);

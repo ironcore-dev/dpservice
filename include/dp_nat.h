@@ -10,6 +10,7 @@
 #include <rte_mbuf.h>
 #include "dp_flow.h"
 #include "dp_ipaddr.h"
+#include "dp_log.h"
 #include "grpc/dp_grpc_responder.h"
 
 #ifdef __cplusplus
@@ -43,7 +44,7 @@ struct snat_data {
 	uint16_t		nat_port_range[2];
 	union dp_ipv6	ul_vip_ip6;
 	union dp_ipv6	ul_nat_ip6;
-	uint64_t		log_timestamp;
+	struct dp_log_ratelimit	log_ratelimit;
 };
 
 struct dnat_data {
