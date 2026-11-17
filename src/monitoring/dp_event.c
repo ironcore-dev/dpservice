@@ -118,15 +118,16 @@ void dp_process_event_flow_aging_msg(__rte_unused struct rte_mbuf *m)
 
 		DP_FOREACH_PORT(ports, port) {
 			if (port->allocated)
-				dp_process_aged_flows(port->port_id);
+				dp_process_aged_flows_offloaded(port->port_id);
 		}
 	}
 
 	// software aged flow and hardware aged flow are bound to a same cntrack obj via shared refcount
 	// this cntrack obj gets deleted when the last reference is removed
-	// dp_process_aged_flows_non_offload() also takes care of expired tcp hw rte flow rules via the query mechanism,
+	// the software sweep also takes care of expired tcp hw rte flow rules via the query mechanism,
 	// which enables fully control of hw rules' lifecycle from the software path for tcp flows.
-	dp_process_aged_flows_non_offload();
+	// The sweep only starts here, the worker then advances it in steps (see rx_periodic node)
+	dp_flow_aging_start();
 }
 
 // Neighboring router MAC message - sent after acquiring it (sometimes asynchronously from a timer)
