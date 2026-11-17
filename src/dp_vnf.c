@@ -16,6 +16,8 @@
 static struct rte_hash *vnf_handle_tbl = NULL;
 static struct rte_hash *vnf_value_tbl = NULL;
 
+uint16_t _dp_vnf_lbprefix_count[DP_MAX_PORTS][DP_VNF_LBPREFIX_BUCKETS];
+
 int dp_vnf_init(int socket_id)
 {
 	vnf_handle_tbl = dp_create_jhash_table(DP_VNF_MAX_TABLE_SIZE, sizeof(union dp_ipv6),
@@ -63,8 +65,18 @@ void dp_fill_vnf_data(struct dp_vnf *vnf, enum dp_vnf_type type, uint16_t port_i
 	dp_copy_ipaddr(&vnf->alias_pfx.ol, src);
 }
 
+// Only IPv4 /32 LB alias prefixes are counted, the data path looks up no other length and no IPv6
+static __rte_always_inline uint16_t *dp_vnf_lbprefix_counter(const struct dp_vnf *vnf)
+{
+	if (vnf->type != DP_VNF_TYPE_LB_ALIAS_PFX || vnf->alias_pfx.ol.is_v6 || vnf->alias_pfx.length != 32
+		|| vnf->port_id >= RTE_DIM(_dp_vnf_lbprefix_count))
+		return NULL;
+	return &_dp_vnf_lbprefix_count[vnf->port_id][vnf->alias_pfx.ol.ipv4 % DP_VNF_LBPREFIX_BUCKETS];
+}
+
 static int dp_add_vnf_value(const struct dp_vnf *vnf, const union dp_ipv6 *ul_addr6)
 {
+	uint16_t *lbprefix_counter;
 	int ret;
 	union dp_ipv6 *vnf_ul_addr6;
 
@@ -83,12 +95,17 @@ static int dp_add_vnf_value(const struct dp_vnf *vnf, const union dp_ipv6 *ul_ad
 		return DP_ERROR;
 	}
 
+	lbprefix_counter = dp_vnf_lbprefix_counter(vnf);
+	if (lbprefix_counter)
+		(*lbprefix_counter)++;
+
 	return DP_OK;
 }
 
 static int dp_delete_vnf_value(const struct dp_vnf *vnf)
 {
 	hash_sig_t hash = rte_hash_hash(vnf_value_tbl, vnf);
+	uint16_t *lbprefix_counter;
 	union dp_ipv6 *ul_addr6;
 	int ret;
 
@@ -103,6 +120,10 @@ static int dp_delete_vnf_value(const struct dp_vnf *vnf)
 		DPS_LOG_WARNING("Cannot remove VNF for a underlying IPv6 address", DP_LOG_IPV6(*ul_addr6), DP_LOG_RET(ret));
 		return ret;
 	}
+
+	lbprefix_counter = dp_vnf_lbprefix_counter(vnf);
+	if (lbprefix_counter && *lbprefix_counter > 0)
+		(*lbprefix_counter)--;
 
 	rte_free(ul_addr6);
 	return DP_OK;

@@ -79,6 +79,7 @@ nat_neigh_max_port = 520
 lb_name = "my_lb"
 lb_ip = "172.22.2.1"
 lb_pfx = "172.22.2.1/32"
+lb_pfx_extras = ["172.22.2.65/32", "172.22.2.2/32"]  # the same and different low 6 bits as lb_pfx
 lb_ip6 = "2a10:defe:e01f:f4::2"
 lb_ip6_pfx = "2a10:defe:e01f:f4::2/128"
 
