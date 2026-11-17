@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net"
 	"strings"
 
@@ -16,6 +17,12 @@ import (
 
 var SocketPath = "/var/run/dpdk/rte/dpdk_telemetry.v2"
 
+// telemetryMaxResponseLen is DPDK's MAX_OUTPUT_LEN (lib/telemetry/telemetry.c), the largest
+// response the telemetry socket sends. The socket is SOCK_SEQPACKET, so a read into a smaller
+// buffer silently drops the rest of the message and the JSON can no longer be decoded.
+// Replies are bounded by DPDK's max_ethports (~290 graph nodes), so 16 KB has headroom.
+const telemetryMaxResponseLen = 16 * 1024
+
 func queryTelemetry(conn net.Conn, log *logrus.Logger, command string, response interface{}) error {
 	_, err := conn.Write([]byte(command))
 	if err != nil {
@@ -23,7 +30,7 @@ func queryTelemetry(conn net.Conn, log *logrus.Logger, command string, response 
 		return err
 	}
 
-	respBytes := make([]byte, 1024*6)
+	respBytes := make([]byte, telemetryMaxResponseLen)
 	var responseBuffer bytes.Buffer
 	for {
 		n, err := conn.Read(respBytes)
@@ -34,7 +41,7 @@ func queryTelemetry(conn net.Conn, log *logrus.Logger, command string, response 
 		responseBuffer.Write(respBytes[:n])
 		parts := strings.SplitN(command, ",", 2)
 		command = parts[0]
-		if bytes.Contains(respBytes, []byte(command)) {
+		if bytes.Contains(respBytes[:n], []byte(command)) {
 			break
 		}
 	}
@@ -42,6 +49,27 @@ func queryTelemetry(conn net.Conn, log *logrus.Logger, command string, response 
 	err = json.Unmarshal(responseBuffer.Bytes(), response)
 	if err != nil {
 		log.Errorf("Failed to unmarshal JSON response: %v", err)
+	}
+	return nil
+}
+
+// graphNodeStats merges all Node_<first>_to_<last> blocks of a graph telemetry response.
+func graphNodeStats(response GraphStats, command string) NodeData {
+	stats := NodeData{}
+	for _, block := range response[command] {
+		maps.Copy(stats, block)
+	}
+	return stats
+}
+
+func updateGraphMetric(conn net.Conn, log *logrus.Logger, hostname, command string, metric *prometheus.GaugeVec) error {
+	var response GraphStats
+	err := queryTelemetry(conn, log, command, &response)
+	if err != nil {
+		return fmt.Errorf("failed to query %s: %w", command, err)
+	}
+	for graphNodeName, value := range graphNodeStats(response, command) {
+		metric.WithLabelValues(hostname, graphNodeName).Set(value)
 	}
 	return nil
 }
@@ -144,13 +172,14 @@ func Update(conn net.Conn, hostname string, log *logrus.Logger) error {
 		DpserviceFwRulesCount.With(prometheus.Labels{"interface_id": ifaceName}).Set(float64(fwRuleCount))
 	}
 
-	var dpserviceCallCount DpServiceGraphCallCount
-	err = queryTelemetry(conn, log, "/dp_service/graph/call_count", &dpserviceCallCount)
+	err = updateGraphMetric(conn, log, hostname, "/dp_service/graph/call_count", DpserviceCallCount)
 	if err != nil {
-		return fmt.Errorf("failed to query call count: %v", err)
+		return err
 	}
-	for graphNodeName, callCount := range dpserviceCallCount.GraphCallCnt.Node_0_to_255 {
-		DpserviceCallCount.With(prometheus.Labels{"node": hostname, "graph_node": graphNodeName}).Set(callCount)
+
+	err = updateGraphMetric(conn, log, hostname, "/dp_service/graph/obj_count", DpserviceObjCount)
+	if err != nil {
+		return err
 	}
 
 	var dpServiceHashTableSaturation DpServiceHashTableSaturation

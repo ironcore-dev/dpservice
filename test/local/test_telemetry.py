@@ -123,10 +123,12 @@ def test_telemetry_fwall(prepare_ifaces, grpc_client):
 
 def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 	metrics = urlopen(f"http://localhost:{exporter_port}/metrics").read().decode('utf-8')
-	graph_stats, heap_info, ethdev_stats, htable_saturation = set(), set(), set(), set()
+	graph_stats, graph_objs, heap_info, ethdev_stats, htable_saturation = set(), set(), set(), set(), set()
 	for metric in metrics.splitlines():
 		if metric.startswith('dps_graph_call_count'):
 			graph_stats.add(metric.split('"')[1])
+		elif metric.startswith('dps_graph_obj_count'):
+			graph_objs.add(metric.split('"')[1])
 		elif metric.startswith('dpdk_heap_info'):
 			heap_info.add(metric.split('"')[1])
 		elif metric.startswith(('dpdk_ethdev_errors_total', 'dpdk_ethdev_bytes_total', 'dpdk_ethdev_packets_total')):
@@ -155,6 +157,8 @@ def test_telemetry_exporter(request, prepare_ifaces, start_exporter):
 		iface_stats += HW_PF1_IFACE_STATS
 	assert graph_stats == set(graph_nodes), \
 		"Unexpected graph telemetry in exporter output"
+	assert graph_objs == set(graph_nodes), \
+		"Unexpected graph object counts in exporter output"
 	assert heap_info == set(HEAP_INFO), \
 		"Unexpected heap info in exporter output"
 	assert ethdev_stats == set(iface_stats), \
