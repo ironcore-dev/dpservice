@@ -4,7 +4,7 @@ Export Dpservice statistics to Prometheus readable format.
 
 ## About this project
 
-`dpservice-exporter` is responsible for monitoring and exposing `dpservice-bin` statistics from [DPDK telemetry](https://doc.dpdk.org/guides/howto/telemetry.html). When run, `dpservice-exporter` creates a simple web server (on a configurable port), on which statistics can be reached. These statistics are updated in configurable time intervals and can be then visualized in dashboard tools like [Grafana](https://grafana.com/). Currently, it provides a solution to get the number of NAT ports used, the number of Virtual services used and other Interface statistics exported as [Prometheus metrics](https://prometheus.io/docs/instrumenting/exposition_formats/).
+`dpservice-exporter` is responsible for monitoring and exposing `dpservice-bin` statistics from [DPDK telemetry](https://doc.dpdk.org/guides/howto/telemetry.html). When run, `dpservice-exporter` creates a simple web server (on a configurable port), on which statistics can be reached. These statistics are updated in configurable time intervals and can be then visualized in dashboard tools like [Grafana](https://grafana.com/). Currently, it provides a solution to get the number of NAT ports used, the number of Virtual services used, the calls and packets of each graph node (`dps_graph_call_count`, `dps_graph_obj_count`) and other Interface statistics exported as [Prometheus metrics](https://prometheus.io/docs/instrumenting/exposition_formats/).
 
 ## Requirements and Setup
 

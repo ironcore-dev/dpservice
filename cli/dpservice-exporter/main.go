@@ -218,6 +218,7 @@ func registerAllMetrics(r *prometheus.Registry, log *logrus.Logger) {
 		metrics.DpserviceFwRulesCount,
 		metrics.DpserviceVirtsvcUsedPortsCount,
 		metrics.DpserviceCallCount,
+		metrics.DpserviceObjCount,
 		metrics.DpserviceHashTableSaturation,
 	}
 

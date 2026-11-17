@@ -81,7 +81,15 @@ var (
 	DpserviceCallCount = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "dps_graph_call_count",
-			Help: "Dpservice graph statistics",
+			Help: "Total number of calls to the dpservice graph node since dpservice start",
+		},
+		[]string{"node", "graph_node"},
+	)
+
+	DpserviceObjCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "dps_graph_obj_count",
+			Help: "Total number of packets (objects) processed by the dpservice graph node since dpservice start",
 		},
 		[]string{"node", "graph_node"},
 	)
@@ -131,13 +139,9 @@ type DpServiceFirewallRuleCount struct {
 
 type NodeData map[string]float64
 
-type GraphCallCount struct {
-	Node_0_to_255 NodeData `json:"Node_0_to_255"`
-}
-
-type DpServiceGraphCallCount struct {
-	GraphCallCnt GraphCallCount `json:"/dp_service/graph/call_count"`
-}
+// GraphStats is the response to a /dp_service/graph/* command. Under the command name, dpservice
+// splits the graph nodes into blocks of at most 256 entries named Node_<first>_to_<last>.
+type GraphStats map[string]map[string]NodeData
 
 type EalHeapList struct {
 	Value []int `json:"/eal/heap_list"`
