@@ -66,7 +66,8 @@ RUN cd $DPDK_DIR \
 && patch -p1 < ../hack/dpdk_25_11_telemetry_key.patch \
 && patch -p1 < ../hack/dpdk_25_11_no_pattern_template_validation.patch \
 && patch -p1 < ../hack/dpdk_25_11_ethdev_conversion.patch \
-&& patch -p1 < ../hack/dpdk_25_11_allow_outer_inner_ipip.patch
+&& patch -p1 < ../hack/dpdk_25_11_allow_outer_inner_ipip.patch \
+&& patch -p1 < ../hack/dpdk_25_11_graph_source_enable.patch
 
 # Compile DPDK
 RUN cd $DPDK_DIR && meson setup -Dmax_ethports=132 -Dplatform=generic -Ddisable_drivers=common/dpaax,\

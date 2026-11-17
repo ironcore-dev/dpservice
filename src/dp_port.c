@@ -5,6 +5,7 @@
 #include <rte_bus_pci.h>
 #include "dp_conf.h"
 #include "dp_error.h"
+#include "dp_graph.h"
 #include "dp_hairpin.h"
 #include "dp_log.h"
 #include "dp_lpm.h"
@@ -616,6 +617,7 @@ int dp_start_port(struct dp_port *port)
 
 	port->link_status = link.link_status;
 	port->allocated = true;
+	dp_graph_sources_changed();
 	return DP_OK;
 }
 
@@ -665,6 +667,7 @@ int dp_stop_port(struct dp_port *port)
 		return DP_ERROR;
 
 	port->allocated = false;
+	dp_graph_sources_changed();
 	return DP_OK;
 }
 

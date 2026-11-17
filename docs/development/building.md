@@ -40,6 +40,7 @@ patch -p1 < ../dpservice/hack/dpdk_25_11_telemetry_key.patch
 patch -p1 < ../dpservice/hack/dpdk_25_11_mtu.patch
 patch -p1 < ../dpservice/hack/dpdk_25_11_log.patch
 patch -p1 < ../dpservice/hack/dpdk_25_11_ethdev_conversion.patch
+patch -p1 < ../dpservice/hack/dpdk_25_11_graph_source_enable.patch
 meson setup build
 ninja -C build
 sudo ninja -C build install

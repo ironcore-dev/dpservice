@@ -6,12 +6,15 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <rte_graph.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 int rx_node_create(uint16_t port_id, uint16_t queue_id);
+
+rte_node_t rx_node_get_id(uint16_t port_id);
 
 int rx_node_set_enabled(uint16_t port_id, bool enabled);
 
