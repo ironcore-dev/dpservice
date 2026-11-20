@@ -84,7 +84,7 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/dpservice-tester:${{ env.DOCKER_IMAGE_SHA }}
 
   test:
-    runs-on: [ self-hosted, dpdk ]
+    runs-on: [ dpdk ]
     needs: buildAndPushTester
     steps:
       - name: Determine SHA for Docker Image
