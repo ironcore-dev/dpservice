@@ -38,6 +38,9 @@ If a general-purpose value is needed, consider using `DP_LOG_VALUE(<int>)`. For 
 
 For string identifier, consider re-using the appropriate key or adding a new one, if such identifier is global (like loadbalancer id, interface id, etc.). For general cases (like memory allocation tags, debugging, etc.), consider using `DP_LOG_NAME()`.
 
+### Rate-limited logs
+Logs that can repeat for every packet or every sync message use `DPS_LOG_RATELIMITED(<limit>, <LEVEL>, ...)` with an explicit `struct dp_log_ratelimit`: a named static for one log or a group of logs that belong together, or a field per object, e.g. per port. They write at most one line every 5 seconds, and the written line has a `suppressed` field with the number of lines skipped since the previous one. If formatting the arguments is costly (e.g. addresses converted to strings), call `dp_log_ratelimit_pass()` directly, format only when it returns true and add `DP_LOG_SUPPRESSED()` to the log call. The limits are not thread-safe.
+
 
 ## Implementation specifics
 Due to the nature fo structured logging, variable-length argument list is needed. In C, this will always be inherently unsafe. Especially since the calling convention does not follow printf-style API.

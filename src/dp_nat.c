@@ -22,8 +22,6 @@
 #include "rte_flow/dp_rte_flow.h"
 #include "protocols/dp_icmpv6.h"
 
-#define DP_NAT_FULL_LOG_DELAY 5  /* seconds */
-
 // This is based on the fact that neighnats are being put in the table along with local NAT/VIP
 // To prevent it from being too large, this is assuming 2048 ports per NAT range (32 ranges/IP)
 #define DP_NAT_TABLE_MAX (DP_MAX_VF_PORTS * 32)
@@ -37,7 +35,9 @@ static struct rte_hash *ipv4_netnat_portmap_tbl = NULL;
 static struct rte_hash *ipv4_netnat_portoverload_tbl = NULL;
 static struct nat_head neighnat_head;
 
-static uint64_t dp_nat_full_log_delay;
+static struct dp_log_ratelimit portoverload_tbl_full_log_limit;
+static struct dp_log_ratelimit portmap_tbl_full_log_limit;
+static struct dp_log_ratelimit nat64_range_full_log_limit;
 
 int dp_nat_init(int socket_id)
 {
@@ -64,8 +64,6 @@ int dp_nat_init(int socket_id)
 		return DP_ERROR;
 
 	TAILQ_INIT(&neighnat_head);
-
-	dp_nat_full_log_delay = rte_get_timer_hz() * DP_NAT_FULL_LOG_DELAY;
 
 	return DP_OK;
 }
@@ -614,7 +612,6 @@ int dp_find_new_port(struct snat_data *snat_data,
 	uint16_t max_port = snat_data->nat_port_range[1];
 	uint16_t port_range = max_port - min_port;
 	uint16_t tmp_port;
-	uint64_t timestamp;
 	int ret;
 
 	iface_src_info_hash = (uint32_t)rte_hash_hash(ipv4_netnat_portmap_tbl, portmap_key);
@@ -635,16 +632,15 @@ int dp_find_new_port(struct snat_data *snat_data,
 	// No free port found
 	// This is normal once the port range gets saturated, but still helpful in logs.
 	// Therefore the log must be present, just rate-limited (per interface).
-	timestamp = rte_rdtsc();
-	if (timestamp > snat_data->log_timestamp + dp_nat_full_log_delay) {
-		snat_data->log_timestamp = timestamp;
-		if (portmap_key->src_ip.is_v6) {
-			DPS_LOG_WARNING("NAT64 portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
+	// NAT64 gets a temporary snat_data (see snat_node.c), so it is rate-limited for all interfaces together.
+	if (portmap_key->src_ip.is_v6) {
+		DPS_LOG_RATELIMITED(&nat64_range_full_log_limit, WARNING, "NAT64 portmap range is full",
+							DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
 							DP_LOG_SRC_IPV6(portmap_key->src_ip.ipv6), DP_LOG_SRC_PORT(portmap_key->iface_src_port), DP_LOG_VALUE(port_range));
-		} else {
-			DPS_LOG_WARNING("NAT portmap range is full", DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
+	} else {
+		DPS_LOG_RATELIMITED(&snat_data->log_ratelimit, WARNING, "NAT portmap range is full",
+							DP_LOG_IPV4(snat_data->nat_ip), DP_LOG_VNI(portmap_key->vni),
 							DP_LOG_SRC_IPV4(portmap_key->src_ip.ipv4), DP_LOG_SRC_PORT(portmap_key->iface_src_port), DP_LOG_VALUE(port_range));
-		}
 	}
 
 	return -ENOENT;
@@ -659,7 +655,11 @@ static int dp_create_new_portmap_entry(const struct netnat_portmap_key *portmap_
 
 	ret = rte_hash_add_key_data(ipv4_netnat_portoverload_tbl, portoverload_key, portoverload_data);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
+		// a full table fails every further packet of the flow, and in the standby every synced entry
+		if (ret == -ENOSPC)
+			DPS_LOG_RATELIMITED(&portoverload_tbl_full_log_limit, ERR, "NAT port overload table is full");
+		else
+			DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -677,7 +677,10 @@ static int dp_create_new_portmap_entry(const struct netnat_portmap_key *portmap_
 	if (DP_FAILED(ret)) {
 		rte_hash_del_key(ipv4_netnat_portoverload_tbl, portoverload_key);
 		rte_free(portmap_data);
-		DPS_LOG_ERR("Failed to add ipv4 network nat portmap data", DP_LOG_RET(ret));
+		if (ret == -ENOSPC)
+			DPS_LOG_RATELIMITED(&portmap_tbl_full_log_limit, ERR, "NAT portmap table is full");
+		else
+			DPS_LOG_ERR("Failed to add ipv4 network nat portmap data", DP_LOG_RET(ret));
 		return ret;
 	}
 
@@ -713,7 +716,10 @@ static int dp_use_existing_portmap_entry(const struct netnat_portmap_key *portma
 	// ENOENT: nat_port is the same, but the protocol is different -> just create a portoverload entry
 	ret = rte_hash_add_key_data(ipv4_netnat_portoverload_tbl, portoverload_key, portoverload_data);
 	if (DP_FAILED(ret)) {
-		DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
+		if (ret == -ENOSPC)
+			DPS_LOG_RATELIMITED(&portoverload_tbl_full_log_limit, ERR, "NAT port overload table is full");
+		else
+			DPS_LOG_ERR("Failed to add ipv4 network nat port overload key", DP_LOG_RET(ret));
 		return ret;
 	}
 
