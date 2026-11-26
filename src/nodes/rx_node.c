@@ -96,6 +96,11 @@ int rx_node_create(uint16_t port_id, uint16_t queue_id)
 	return DP_OK;
 }
 
+rte_node_t rx_node_get_id(uint16_t port_id)
+{
+	return port_id < RTE_DIM(rx_node_ids) ? rx_node_ids[port_id] : RTE_NODE_ID_INVALID;
+}
+
 static int rx_node_init(const struct rte_graph *graph, struct rte_node *node)
 {
 	struct rx_node_ctx *ctx = (struct rx_node_ctx *)node->ctx;

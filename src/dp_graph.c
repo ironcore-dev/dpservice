@@ -27,6 +27,8 @@ static struct rte_graph *dp_graph;
 static rte_graph_t dp_graph_id = RTE_GRAPH_ID_INVALID;
 static struct rte_graph_cluster_stats *dp_graph_stats;
 
+bool _dp_graph_sources_dirty = true;
+
 struct rte_graph *dp_graph_get(void)
 {
 	return dp_graph;
@@ -120,6 +122,22 @@ static rte_graph_t dp_graph_create(unsigned int lcore_id)
 	}
 
 	return graph_id;
+}
+
+// Rx nodes of VFs are only polled while their port is allocated; PFs, rx_periodic and sync always run
+void dp_graph_rebuild_sources(void)
+{
+	int ret;
+
+	_dp_graph_sources_dirty = false;
+
+	DP_FOREACH_PORT(dp_get_ports(), port) {
+		if (port->is_pf)
+			continue;
+		ret = rte_graph_source_node_enable(dp_graph_id, rx_node_get_id(port->port_id), port->allocated);
+		if (DP_FAILED(ret))
+			DPS_LOG_ERR("Cannot change Rx node polling", DP_LOG_PORT(port), DP_LOG_RET(ret));
+	}
 }
 
 static int dp_graph_init_nodes(void)

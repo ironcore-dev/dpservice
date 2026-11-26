@@ -156,6 +156,7 @@ static int graph_main_loop(__rte_unused void *arg)
 	// receive queue would get them rejected by the sync node once this dpservice is active
 	while (!force_quit && standing_by) {
 		nanosleep(&standby_sleep, NULL);
+		dp_graph_update_sources();
 		rte_graph_walk(graph);
 	}
 
@@ -170,8 +171,10 @@ static int graph_main_loop(__rte_unused void *arg)
 		rx_node_start_processing();
 	}
 
-	while (!force_quit)
+	while (!force_quit) {
+		dp_graph_update_sources();
 		rte_graph_walk(graph);
+	}
 
 	return 0;
 }
