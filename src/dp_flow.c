@@ -113,7 +113,9 @@ static __rte_always_inline void dp_mark_vnf_type(struct dp_flow *df, const struc
 			key->vnf_type = df->vnf_type;
 		else
 			key->vnf_type = DP_VNF_TYPE_UNDEFINED;
-	} else if (!key->l3_src.is_v6 && dp_vnf_lbprefix_exists(port->port_id, key->vni, &key->l3_src, 32)) {
+	} else if (!key->l3_src.is_v6
+			   && dp_vnf_lbprefix_can_exist(port->port_id, key->l3_src.ipv4)
+			   && dp_vnf_lbprefix_exists(port->port_id, key->vni, &key->l3_src, 32)) {
 		key->vnf_type = DP_VNF_TYPE_LB_ALIAS_PFX;
 	} else {
 		key->vnf_type = DP_VNF_TYPE_UNDEFINED;

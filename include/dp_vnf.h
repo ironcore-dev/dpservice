@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <rte_common.h>
 #include "dp_ipaddr.h"
+#include "dpdk_layer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +53,18 @@ const struct dp_vnf *dp_get_vnf(const union dp_ipv6 *ul_addr6);
 int dp_del_vnf(const union dp_ipv6 *ul_addr6);
 
 bool dp_vnf_lbprefix_exists(uint16_t port_id, uint32_t vni, const struct dp_ip_address *prefix_ip, uint8_t prefix_len);
+
+#define DP_VNF_LBPREFIX_BUCKETS 64
+
+// Number of IPv4 /32 LB alias prefixes per port and per low bits of the address (host byte order, as in the table key)
+extern uint16_t _dp_vnf_lbprefix_count[DP_MAX_PORTS][DP_VNF_LBPREFIX_BUCKETS];
+
+// An IPv4 /32 LB alias prefix can only exist if it has been counted for this port and the low bits of its address
+static __rte_always_inline bool dp_vnf_lbprefix_can_exist(uint16_t port_id, uint32_t ipv4)
+{
+	return port_id >= RTE_DIM(_dp_vnf_lbprefix_count)
+		|| _dp_vnf_lbprefix_count[port_id][ipv4 % DP_VNF_LBPREFIX_BUCKETS] > 0;
+}
 
 int dp_del_vnf_by_value(enum dp_vnf_type type, uint16_t port_id, uint32_t vni, const struct dp_ip_address *prefix_ip, uint8_t prefix_len);
 

@@ -53,7 +53,8 @@ def communicate_vip_lb(vm, lb_ipv6, src_ipv6, src_ipv4, vf_tap, sport):
 		f"Invalid server reply port {vm_reply[TCP].sport}"
 
 
-def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
+@pytest.mark.parametrize("extra_lbpfx", [False, True], ids=["one_lbpfx", "extra_lbpfx_deleted"])
+def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy, extra_lbpfx):
 
 	if port_redundancy:
 		pytest.skip("Port redundancy is not supported for NAT <-> LB+NAT test")
@@ -61,6 +62,12 @@ def test_nat_to_lb_nat(request, prepare_ipv4, grpc_client, port_redundancy):
 	# Create a VM on VNI1 under a loadbalancer and NAT
 	lb_ul_ipv6 = grpc_client.createlb(lb_name, vni1, lb_ip, "tcp/80")
 	lb_vm1_ul_ipv6 = grpc_client.addlbprefix(VM1.name, lb_pfx)
+	if extra_lbpfx:
+		# Deleting other LB prefixes of the VM must keep this one working (VM1's replies would get NATted otherwise)
+		for pfx in lb_pfx_extras:
+			grpc_client.addlbprefix(VM1.name, pfx)
+		for pfx in lb_pfx_extras:
+			grpc_client.dellbprefix(VM1.name, pfx)
 	grpc_client.addlbtarget(lb_name, lb_vm1_ul_ipv6)
 	nat1_ipv6 = grpc_client.addnat(VM1.name, nat_vip, 100, 101)
 	grpc_client.addfwallrule(VM1.name, "fw0-vm1", proto="tcp", dst_port_min=80, dst_port_max=80)
